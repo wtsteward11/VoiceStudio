@@ -1,0 +1,9 @@
+VoiceStudio – State Snapshot (M0 -> M1)
+- Core gRPC: http://127.0.0.1:5071 (HTTP/2 cleartext)
+- Client gRPC calls confirmed (Health OK, TTS OK; Convert/VAD/ASR/VC running)
+- Tools: FFmpeg on PATH; Piper installed with en_US-amy-low voice
+- Workers venv: CPU mode; torch 2.8.0 + torchaudio 2.8.0; whisperx 3.7.2
+- Align: API updated; fallback script present
+- Demo project: C:\VoiceStudio\projects\demo
+
+If this chat resets, hand these prompts to your agents and drop the scripts into your repo.

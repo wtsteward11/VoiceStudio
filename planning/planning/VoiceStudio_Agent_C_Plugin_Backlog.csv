@@ -1,0 +1,8 @@
+ID,Title,Milestone,OwnerRole,EstimateDays,Dependencies,AcceptanceCriteria,CoOwner
+VS-M0-07,"Plugin Host (manifest parse, signature verify, cap registry)",M0 Foundations,BE,2,VS-M0-05,Loads sample plugin; rejects unsigned,false
+VS-M4-02,Staged update + multi-version rollback,M4 Plugin Hardening,BE,2,VS-M0-07,Broken update auto-rolls back,false
+VS-M4-03,Safe Mode (disable 3P plugins at startup),M4 Plugin Hardening,BE,1,VS-M0-07,Toggle from splash works,false
+VS-M4-04,AssemblyLoadContext for UI plugins + hot unload,M4 Plugin Hardening,BE,2,VS-M0-07,Memory drops after unload,false
+VS-M6-01,"Plugin SDK (C#): interfaces, helpers, templates",M6 SDK & Samples,BE,2,VS-M4-02,dotnet new template builds & loads,false
+VS-M6-02,"Plugin SDK (Python): server skeleton, runner, examples",M6 SDK & Samples,ML,2,VS-M4-01,Sample model plugin runs self-test,false
+VS-M6-05,"Dev docs (SDK, manifests, flags, examples)",M6 SDK & Samples,BE,1,VS-M6-01,Versioned docs build,false

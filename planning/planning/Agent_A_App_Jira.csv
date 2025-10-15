@@ -1,0 +1,61 @@
+Summary,Issue Type,Description,Labels,Story Points,Dependencies,External ID
+"VS-M0-01 – Solution skeleton: WinUI 3 (.NET 8), single-project MSIX",Task,"Solution skeleton: WinUI 3 (.NET 8), single-project MSIX
+Milestone: M0 Foundations
+OwnerRole: FE
+Acceptance: App boots to empty shell",M0_Foundations,1,,VS-M0-01
+"VS-M0-02 – Navigation & state host (DI, Settings)",Task,"Navigation & state host (DI, Settings)
+Milestone: M0 Foundations
+OwnerRole: FE
+Acceptance: Frame nav + persisted window state",M0_Foundations,1,VS-M0-01,VS-M0-02
+VS-M0-09 – GPU probe (CUDA/DirectML/CPU) + Hardware banner,Task,"GPU probe (CUDA/DirectML/CPU) + Hardware banner
+Milestone: M0 Foundations
+OwnerRole: ML/FE
+Acceptance: Correct detection on GPU/no-GPU machines",M0_Foundations,1,VS-M0-06,VS-M0-09
+VS-M1-02 – Project audio format presets,Task,"Project audio format presets
+Milestone: M1 Data/Converter
+OwnerRole: FE/BE
+Acceptance: Persisted per-project",M1_Data/Converter,1,VS-M1-01,VS-M1-02
+VS-M1-05 – Dataset Studio waveform viewer,Task,"Dataset Studio waveform viewer
+Milestone: M1 Data/Converter
+OwnerRole: FE
+Acceptance: Smooth zoom/scrub; 60 fps on 10-min audio",M1_Data/Converter,2,VS-M0-02,VS-M1-05
+VS-M2-05 – Transcript editor (text lanes + timing nudge + re-align),Task,"Transcript editor (text lanes + timing nudge + re-align)
+Milestone: M2 Transcripts
+OwnerRole: FE
+Acceptance: Edits persist; phones update",M2_Transcripts,2,VS-M2-04,VS-M2-05
+"VS-M3-04 – Voice Profiles DB/UI (link models, style presets)",Task,"Voice Profiles DB/UI (link models, style presets)
+Milestone: M3 Models
+OwnerRole: FE/BE
+Acceptance: Profile-select drives defaults",M3_Models,2,VS-M3-01,VS-M3-04
+VS-M3-05 – Prosody controls (rate/pitch/energy + style tokens),Task,"Prosody controls (rate/pitch/energy + style tokens)
+Milestone: M3 Models
+OwnerRole: FE/ML
+Acceptance: ±5% measurable change",M3_Models,2,VS-M3-04,VS-M3-05
+"VS-M5-01 – Plugin Gallery (caps badges, compat ranges)",Task,"Plugin Gallery (caps badges, compat ranges)
+Milestone: M5 UX Polish
+OwnerRole: FE
+Acceptance: Install/disable/rollback flows OK",M5_UX_Polish,2,VS-M4-02,VS-M5-01
+VS-M5-02 – Dataset Studio: phoneme lane + diarization view,Task,"Dataset Studio: phoneme lane + diarization view
+Milestone: M5 UX Polish
+OwnerRole: FE/ML
+Acceptance: Phones track scrubbing",M5_UX_Polish,2,VS-M2-04,VS-M5-02
+"VS-M5-03 – Export panel (WAV/FLAC/MP3, loudness, provenance toggle)",Task,"Export panel (WAV/FLAC/MP3, loudness, provenance toggle)
+Milestone: M5 UX Polish
+OwnerRole: FE/BE
+Acceptance: Bit-identical when no processing",M5_UX_Polish,2,VS-M3-01,VS-M5-03
+"VS-M5-04 – Accessibility pass (keyboard, SR labels)",Task,"Accessibility pass (keyboard, SR labels)
+Milestone: M5 UX Polish
+OwnerRole: FE/QA
+Acceptance: Passes Accessibility Insights checks",M5_UX_Polish,1,VS-M5-01,VS-M5-04
+"VS-M5-05 – Performance pass (virtualized lists, async)",Task,"Performance pass (virtualized lists, async)
+Milestone: M5 UX Polish
+OwnerRole: FE
+Acceptance: UI responsive during jobs",M5_UX_Polish,1,VS-M5-01,VS-M5-05
+"VS-M6-04 – Sample plugins: Exporter (C#), Task (Py), UIPanel (C#)",Task,"Sample plugins: Exporter (C#), Task (Py), UIPanel (C#)
+Milestone: M6 SDK & Samples
+OwnerRole: FE/ML
+Acceptance: Appear in Hub; survive restart/update",M6_SDK_&_Samples,3,VS-M6-01,VS-M6-04
+VS-M7-04 – EULA/Consent UX + provenance default ON,Task,"EULA/Consent UX + provenance default ON
+Milestone: M7 Release
+OwnerRole: FE/BE
+Acceptance: User sees policy on first export",M7_Release,1,VS-M5-03,VS-M7-04

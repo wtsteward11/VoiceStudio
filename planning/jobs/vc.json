@@ -1,0 +1,7 @@
+{
+  "Id": "VSJ-VC-001",
+  "Type": "VC.Convert",
+  "InPath":  "C:\\VoiceStudio\\projects\\demo\\processed\\input.wav",
+  "OutPath": "C:\\VoiceStudio\\projects\\demo\\vc\\shifted.wav",
+  "ArgsJson": "{\"semitones\":3}"
+}

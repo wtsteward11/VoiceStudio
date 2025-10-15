@@ -1,0 +1,18 @@
+[tool.black]
+line-length = 120
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+force_single_line = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = [
+  ".git", "__pycache__", ".mypy_cache", ".pytest_cache",
+  "build", "dist", ".venv", "venv", "site-packages"
+]
+
+[tool.ruff.lint]
+extend-ignore = ["E203"]

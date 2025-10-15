@@ -1,0 +1,168 @@
+{
+  "team": "Agent A \u2013 App Shell & UX",
+  "issues": [
+    {
+      "title": "VS-M0-01 \u2013 Solution skeleton: WinUI 3 (.NET 8), single-project MSIX",
+      "description": "Milestone: M0 Foundations\nOwnerRole: FE\nAcceptance: App boots to empty shell",
+      "estimate": 1,
+      "labels": [
+        "M0_Foundations"
+      ],
+      "blocked_by": []
+    },
+    {
+      "title": "VS-M0-02 \u2013 Navigation & state host (DI, Settings)",
+      "description": "Milestone: M0 Foundations\nOwnerRole: FE\nAcceptance: Frame nav + persisted window state",
+      "estimate": 1,
+      "labels": [
+        "M0_Foundations"
+      ],
+      "blocked_by": [
+        "VS-M0-01"
+      ]
+    },
+    {
+      "title": "VS-M0-09 \u2013 GPU probe (CUDA/DirectML/CPU) + Hardware banner",
+      "description": "Milestone: M0 Foundations\nOwnerRole: ML/FE\nAcceptance: Correct detection on GPU/no-GPU machines",
+      "estimate": 1,
+      "labels": [
+        "M0_Foundations"
+      ],
+      "blocked_by": [
+        "VS-M0-06"
+      ]
+    },
+    {
+      "title": "VS-M1-02 \u2013 Project audio format presets",
+      "description": "Milestone: M1 Data/Converter\nOwnerRole: FE/BE\nAcceptance: Persisted per-project",
+      "estimate": 1,
+      "labels": [
+        "M1_Data/Converter"
+      ],
+      "blocked_by": [
+        "VS-M1-01"
+      ]
+    },
+    {
+      "title": "VS-M1-05 \u2013 Dataset Studio waveform viewer",
+      "description": "Milestone: M1 Data/Converter\nOwnerRole: FE\nAcceptance: Smooth zoom/scrub; 60 fps on 10-min audio",
+      "estimate": 2,
+      "labels": [
+        "M1_Data/Converter"
+      ],
+      "blocked_by": [
+        "VS-M0-02"
+      ]
+    },
+    {
+      "title": "VS-M2-05 \u2013 Transcript editor (text lanes + timing nudge + re-align)",
+      "description": "Milestone: M2 Transcripts\nOwnerRole: FE\nAcceptance: Edits persist; phones update",
+      "estimate": 2,
+      "labels": [
+        "M2_Transcripts"
+      ],
+      "blocked_by": [
+        "VS-M2-04"
+      ]
+    },
+    {
+      "title": "VS-M3-04 \u2013 Voice Profiles DB/UI (link models, style presets)",
+      "description": "Milestone: M3 Models\nOwnerRole: FE/BE\nAcceptance: Profile-select drives defaults",
+      "estimate": 2,
+      "labels": [
+        "M3_Models"
+      ],
+      "blocked_by": [
+        "VS-M3-01"
+      ]
+    },
+    {
+      "title": "VS-M3-05 \u2013 Prosody controls (rate/pitch/energy + style tokens)",
+      "description": "Milestone: M3 Models\nOwnerRole: FE/ML\nAcceptance: \u00b15% measurable change",
+      "estimate": 2,
+      "labels": [
+        "M3_Models"
+      ],
+      "blocked_by": [
+        "VS-M3-04"
+      ]
+    },
+    {
+      "title": "VS-M5-01 \u2013 Plugin Gallery (caps badges, compat ranges)",
+      "description": "Milestone: M5 UX Polish\nOwnerRole: FE\nAcceptance: Install/disable/rollback flows OK",
+      "estimate": 2,
+      "labels": [
+        "M5_UX_Polish"
+      ],
+      "blocked_by": [
+        "VS-M4-02"
+      ]
+    },
+    {
+      "title": "VS-M5-02 \u2013 Dataset Studio: phoneme lane + diarization view",
+      "description": "Milestone: M5 UX Polish\nOwnerRole: FE/ML\nAcceptance: Phones track scrubbing",
+      "estimate": 2,
+      "labels": [
+        "M5_UX_Polish"
+      ],
+      "blocked_by": [
+        "VS-M2-04"
+      ]
+    },
+    {
+      "title": "VS-M5-03 \u2013 Export panel (WAV/FLAC/MP3, loudness, provenance toggle)",
+      "description": "Milestone: M5 UX Polish\nOwnerRole: FE/BE\nAcceptance: Bit-identical when no processing",
+      "estimate": 2,
+      "labels": [
+        "M5_UX_Polish"
+      ],
+      "blocked_by": [
+        "VS-M3-01"
+      ]
+    },
+    {
+      "title": "VS-M5-04 \u2013 Accessibility pass (keyboard, SR labels)",
+      "description": "Milestone: M5 UX Polish\nOwnerRole: FE/QA\nAcceptance: Passes Accessibility Insights checks",
+      "estimate": 1,
+      "labels": [
+        "M5_UX_Polish"
+      ],
+      "blocked_by": [
+        "VS-M5-01"
+      ]
+    },
+    {
+      "title": "VS-M5-05 \u2013 Performance pass (virtualized lists, async)",
+      "description": "Milestone: M5 UX Polish\nOwnerRole: FE\nAcceptance: UI responsive during jobs",
+      "estimate": 1,
+      "labels": [
+        "M5_UX_Polish"
+      ],
+      "blocked_by": [
+        "VS-M5-01"
+      ]
+    },
+    {
+      "title": "VS-M6-04 \u2013 Sample plugins: Exporter (C#), Task (Py), UIPanel (C#)",
+      "description": "Milestone: M6 SDK & Samples\nOwnerRole: FE/ML\nAcceptance: Appear in Hub; survive restart/update",
+      "estimate": 3,
+      "labels": [
+        "M6_SDK_&_Samples"
+      ],
+      "blocked_by": [
+        "VS-M6-01"
+      ]
+    },
+    {
+      "title": "VS-M7-04 \u2013 EULA/Consent UX + provenance default ON",
+      "description": "Milestone: M7 Release\nOwnerRole: FE/BE\nAcceptance: User sees policy on first export",
+      "estimate": 1,
+      "labels": [
+        "M7_Release"
+      ],
+      "blocked_by": [
+        "VS-M5-03"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "Type": "Audio.Convert",
+  "InPath":  "C:\\VoiceStudio\\projects\\demo\\raw\\input.mp3",
+  "OutPath": "C:\\VoiceStudio\\projects\\demo\\processed\\input.wav",
+  "ArgsJson": "{\"ar\":48000, \"ac\":1}"
+}

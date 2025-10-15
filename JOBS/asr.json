@@ -1,0 +1,14 @@
+{
+  "job": {
+    "id": "VSJ-LOCAL-ASR",
+    "type": "ASR.Transcribe",
+    "io": {
+      "in": "C:\\\\VoiceStudio\\\\projects\\\\demo\\\\dataset\\\\segments\\\\manifest.json",
+      "out": "C:\\\\VoiceStudio\\\\projects\\\\demo\\\\dataset\\\\segments\\\\asr.json"
+    },
+    "args": {
+      "model": "small",
+      "device": "cpu"
+    }
+  }
+}

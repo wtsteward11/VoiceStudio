@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Protobuf Include="..\IPC\vsd.proto" GrpcServices="Client" ProtoRoot="..\IPC" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.Net.Client" Version="2.62.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.27.4" />
+    <PackageReference Include="Grpc.Tools" Version="2.62.0" PrivateAssets="All" />
+  </ItemGroup>
+</Project>

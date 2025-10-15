@@ -1,0 +1,14 @@
+C:\VoiceStudio\src\PluginHost\bin\Debug\net8.0\VoiceStudio.PluginHost.exe
+C:\VoiceStudio\src\PluginHost\bin\Debug\net8.0\VoiceStudio.PluginHost.deps.json
+C:\VoiceStudio\src\PluginHost\bin\Debug\net8.0\VoiceStudio.PluginHost.runtimeconfig.json
+C:\VoiceStudio\src\PluginHost\bin\Debug\net8.0\VoiceStudio.PluginHost.dll
+C:\VoiceStudio\src\PluginHost\bin\Debug\net8.0\VoiceStudio.PluginHost.pdb
+C:\VoiceStudio\src\PluginHost\obj\Debug\net8.0\VoiceStudio.PluginHost.GeneratedMSBuildEditorConfig.editorconfig
+C:\VoiceStudio\src\PluginHost\obj\Debug\net8.0\VoiceStudio.PluginHost.AssemblyInfoInputs.cache
+C:\VoiceStudio\src\PluginHost\obj\Debug\net8.0\VoiceStudio.PluginHost.AssemblyInfo.cs
+C:\VoiceStudio\src\PluginHost\obj\Debug\net8.0\VoiceStudio.PluginHost.csproj.CoreCompileInputs.cache
+C:\VoiceStudio\src\PluginHost\obj\Debug\net8.0\VoiceStudio.PluginHost.dll
+C:\VoiceStudio\src\PluginHost\obj\Debug\net8.0\refint\VoiceStudio.PluginHost.dll
+C:\VoiceStudio\src\PluginHost\obj\Debug\net8.0\VoiceStudio.PluginHost.pdb
+C:\VoiceStudio\src\PluginHost\obj\Debug\net8.0\VoiceStudio.PluginHost.genruntimeconfig.cache
+C:\VoiceStudio\src\PluginHost\obj\Debug\net8.0\ref\VoiceStudio.PluginHost.dll

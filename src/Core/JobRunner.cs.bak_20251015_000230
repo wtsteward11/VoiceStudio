@@ -1,0 +1,124 @@
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
+using VoiceStudio.IPC;
+
+namespace VoiceStudio.CoreRuntime;
+
+public class JobRunner
+{
+using System.Diagnostics;
+using System.Text;
+
+static (int rc, string stdout, string stderr) RunProcess(string fileName, string arguments, string? workingDir = null)
+{
+    var psi = new ProcessStartInfo
+    {
+        FileName = fileName,
+        Arguments = arguments,
+        WorkingDirectory = workingDir ?? Environment.CurrentDirectory,
+        UseShellExecute = false,
+        RedirectStandardOutput = true,
+        RedirectStandardError   = true,
+        CreateNoWindow = true,
+    };
+
+    var p  = new Process { StartInfo = psi };
+    var so = new StringBuilder();
+    var se = new StringBuilder();
+    p.OutputDataReceived += (_, e) => { if (e.Data != null) so.AppendLine(e.Data); };
+    p.ErrorDataReceived  += (_, e) => { if (e.Data != null) se.AppendLine(e.Data); };
+
+    p.Start();
+    p.BeginOutputReadLine();
+    p.BeginErrorReadLine();
+    p.WaitForExit();
+
+    return (p.ExitCode, so.ToString(), se.ToString());
+}
+
+static string Q(string s) => $"\"{s}\"";
+
+    private static string PyExe  => @"C:\VoiceStudio\workers\python\vsdml\.venv\Scripts\python.exe";
+    private static string PyRoot => @"C:\VoiceStudio\workers\python\vsdml";
+
+    public async Task<(bool ok, string? code, string? message, string[]? outputs)> RunAsync(Job job)
+    {
+        switch (job.Type)
+        {
+            case "Audio.Convert":
+                return await RunCmd($@"ffmpeg -y -hide_banner -loglevel error -i ""{job.InPath}"" -ac 1 -ar 48000 -vn -map_metadata -1 -sample_fmt s16 ""{job.OutPath}""");
+
+            case "Dataset.VAD":
+                return await RunPy("vad.py", $@"--in ""{job.InPath}"" --out ""{job.OutPath}"" --aggr 2 --min 0.6");
+
+            case "ASR.Transcribe":
+                return await RunPy("asr_transcribe.py", $@"--in ""{job.InPath}"" --out ""{job.OutPath}""");
+
+            case "Align.Run":
+                // out_path is aligned.json; pass its folder to the script
+                return await RunPy("align_whisperx.py", $@"--segments ""{System.IO.Path.GetDirectoryName(job.OutPath)}"" --lang en");
+
+            case "TTS.Synthesize":
+                return await RunPy(
+                    "tts_piper.py",
+                    $@"--text {QuoteArg(GetArg(job, "text", "Hello from VoiceStudio"))} --voice ""{GetArg(job, "voice", @"C:\VoiceStudio\tools\piper\voices\en_US-amy-low.onnx")}"" --out ""{job.OutPath}"" --piper ""C:\VoiceStudio\tools\piper\piper.exe"""
+                );
+
+            case "VC.Convert":
+                return await RunPy("vc_pitch.py", $@"--in ""{job.InPath}"" --out ""{job.OutPath}"" --semitones {GetArg(job, "semitones", "3")}");
+
+            default:
+                return (false, "E_NOT_IMPLEMENTED", $"Job type '{job.Type}' not implemented", null);
+        }
+    }
+
+    private static string QuoteArg(string s)
+        => $@"""{s.Replace(@"""", @"\""")}""";
+
+    private static string GetArg(Job job, string key, string def)
+    {
+        if (string.IsNullOrWhiteSpace(job.ArgsJson)) return def;
+        try
+        {
+            var dict = JsonSerializer.Deserialize<Dictionary<string, object?>>(job.ArgsJson);
+            if (dict != null && dict.TryGetValue(key, out var v) && v != null)
+                return v.ToString() ?? def;
+        }
+        catch { }
+        return def;
+    }
+
+    private async Task<(bool, string?, string?, string[]?)> RunPy(string script, string args)
+        => await RunCmd($@"""{PyExe}"" ""{System.IO.Path.Combine(PyRoot, script)}"" {args}");
+
+    private async Task<(bool, string?, string?, string[]?)> RunCmd(string cmd)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = $@"/C {cmd}",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        using var p = Process.Start(psi)!;
+        string stderr = await p.StandardError.ReadToEndAsync();
+        string stdout = await p.StandardOutput.ReadToEndAsync();
+        await p.WaitForExitAsync();
+
+        var outs = new List<string>();
+        foreach (var line in (stdout + "\n" + stderr).Split(Environment.NewLine))
+        {
+            var t = line.Trim();
+            try { if (System.IO.File.Exists(t)) outs.Add(t); } catch { }
+        }
+
+        return p.ExitCode == 0
+            ? (true, null, null, outs.Count > 0 ? outs.ToArray() : null)
+            : (false, "E_JOB_FAIL", $"Exit {p.ExitCode}: {stderr} {stdout}", null);
+    }
+}
+
+

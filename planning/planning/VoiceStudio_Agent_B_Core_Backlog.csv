@@ -1,0 +1,26 @@
+ID,Title,Milestone,OwnerRole,EstimateDays,Dependencies,AcceptanceCriteria,CoOwner
+VS-M0-03,SQLite init + baseline schema (Projects/Assets/Utterances/Models/Checkpoints/Jobs/Logs/Plugins/Consents),M0 Foundations,BE,2,,"Migrations idempotent, WAL on",false
+VS-M0-04,"Structured logging (Serilog JSON, rolling)",M0 Foundations,BE,1,,Per-process logs with correlation IDs,false
+VS-M0-05,gRPC over Named Pipes transport with deadlines/cancel,M0 Foundations,BE,2,VS-M0-03,Echo service passes timeout/cancel tests,false
+VS-M0-07,"Plugin Host (manifest parse, signature verify, cap registry)",M0 Foundations,BE,2,VS-M0-05,Loads sample plugin; rejects unsigned,false
+VS-M0-08,Handshake v1 (version negotiation + warnings),M0 Foundations,BE/ML,1,VS-M0-07,Unknown fields tolerated; flags visible,true
+VS-M1-01,FFmpeg runner (out-of-proc) + error mapping,M1 Data/Converter,BE,1,VS-M0-03,Structured failure codes returned,false
+VS-M1-02,Project audio format presets,M1 Data/Converter,FE/BE,1,VS-M1-01,Persisted per-project,true
+VS-M1-03,Batch converter queue (resume/retry/idempotent by hash),M1 Data/Converter,BE,2,VS-M1-02,Re-run doesn’t duplicate work,false
+VS-M1-06,Cache layout & counters,M1 Data/Converter,BE,1,VS-M0-03,Hit/miss counters visible,false
+VS-M2-01,Transcript importers: .txt/.srt/.vtt,M2 Transcripts,BE,1,VS-M0-03,Cues -> utterances with times,false
+VS-M2-02,Transcript importers: .docx/.pdf/.rtf,M2 Transcripts,BE,2,VS-M2-01,Paragraphs merged; preview shows structure,false
+VS-M2-06,Dataset builder manifests (train/dev/test TSV+JSON),M2 Transcripts,BE,1,VS-M2-05,Validated manifests; counts match UI,false
+VS-M3-04,"Voice Profiles DB/UI (link models, style presets)",M3 Models,FE/BE,2,VS-M3-01,Profile-select drives defaults,true
+VS-M3-06,"Model store mgmt (install/remove, hash verify)",M3 Models,BE,1,VS-M3-01,Corrupt weights quarantined,false
+VS-M4-01,Supervisor & heartbeats; Job Objects limits,M4 Plugin Hardening,BE,2,VS-M0-07,Kill plugin -> restart; resources bounded,false
+VS-M4-02,Staged update + multi-version rollback,M4 Plugin Hardening,BE,2,VS-M0-07,Broken update auto-rolls back,false
+VS-M4-03,Safe Mode (disable 3P plugins at startup),M4 Plugin Hardening,BE,1,VS-M0-07,Toggle from splash works,false
+VS-M4-04,AssemblyLoadContext for UI plugins + hot unload,M4 Plugin Hardening,BE,2,VS-M0-07,Memory drops after unload,false
+VS-M4-05,IPC backpressure & deadlines (ring buffers),M4 Plugin Hardening,BE,2,VS-M0-05,p95 latency stable under 20 synths,false
+VS-M4-06,"Diagnostics bundle (logs, DAG, manifests, env)",M4 Plugin Hardening,BE,1,VS-M0-04,Single ZIP from UI,false
+VS-M5-03,"Export panel (WAV/FLAC/MP3, loudness, provenance toggle)",M5 UX Polish,FE/BE,2,VS-M3-01,Bit-identical when no processing,true
+VS-M6-01,"Plugin SDK (C#): interfaces, helpers, templates",M6 SDK & Samples,BE,2,VS-M4-02,dotnet new template builds & loads,false
+VS-M6-03,"Contract test harness (goldens, perf, memory)",M6 SDK & Samples,QA/BE,2,VS-M6-01,Pass/fail report; CI gate,true
+VS-M6-05,"Dev docs (SDK, manifests, flags, examples)",M6 SDK & Samples,BE,1,VS-M6-01,Versioned docs build,false
+VS-M7-04,EULA/Consent UX + provenance default ON,M7 Release,FE/BE,1,VS-M5-03,User sees policy on first export,true

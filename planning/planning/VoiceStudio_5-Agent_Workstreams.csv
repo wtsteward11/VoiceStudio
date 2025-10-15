@@ -1,0 +1,6 @@
+Agent,Scope,PrimaryDirs,KeyInterfaces,MilestonesOwned
+Agent A – App Shell & UX,"WinUI shell, Dataset Studio, Voice Hub, Export, Settings, accessibility",src/App,Core Services; Plugin Host UI; IPC client stubs,"M0,M1(part UI),M2(Editors),M3(UI),M5, M7(part)"
+Agent B – Core & Job Engine,"Project system, SQLite DAL, DAG, cache, FFmpeg runner, diagnostics bundle",src/Core; src/Cli; db DDL,IPC servers; Plugin Host; App State,"M0,M1,M2(part),M3(part),M4, M5(part), M7(part)"
+Agent C – Plugin Host & SDKs,"Manifest/signature, staging/rollback, supervisor, Job Objects, Safe Mode, SDKs, samples",src/PluginHost; plugins/sdk-*; plugins/samples,Core capability registry; App Plugin Gallery,"M0(part),M4,M5(part),M6"
+Agent D – ML Workers (ASR/Align/TTS/VC),"Python services and pipelines, GPU/DirectML backends, model store",workers/python/vsdml; installers/wheels-cache,IPC proto services; Core job contracts,"M0(worker),M1(VAD),M2(ASR/Align),M3(TTS/VC),M5(part),M7(part)"
+"Agent E – Build, Packaging & QA","MSIX & WinGet, CI workflows, golden-audio tests, chaos/load tests, install matrix",installers/*; .github/workflows; qa harness,All other agents (artifacts & reports),"M0(packaging),M5(QA),M6(harness),M7(release)"

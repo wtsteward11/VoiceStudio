@@ -1,0 +1,14 @@
+{
+  "job": {
+    "id": "VSJ-LOCAL-CONVERT",
+    "type": "Audio.Convert",
+    "io": {
+      "in": "C:\\\\VoiceStudio\\\\projects\\\\demo\\\\raw\\\\input.mp3",
+      "out": "C:\\\\VoiceStudio\\\\projects\\\\demo\\\\processed\\\\input.wav"
+    },
+    "args": {
+      "ar": 48000,
+      "ac": 1
+    }
+  }
+}

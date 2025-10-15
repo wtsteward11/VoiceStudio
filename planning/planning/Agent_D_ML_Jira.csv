@@ -1,0 +1,57 @@
+Summary,Issue Type,Description,Labels,Story Points,Dependencies,External ID
+"VS-M0-06 – Python worker bootstrap (venv, wheels lockfile, run_worker.py)",Task,"Python worker bootstrap (venv, wheels lockfile, run_worker.py)
+Milestone: M0 Foundations
+OwnerRole: ML
+Acceptance: Start/stop from Core; health ping OK",M0_Foundations,2,,VS-M0-06
+VS-M0-08 – Handshake v1 (version negotiation + warnings),Task,"Handshake v1 (version negotiation + warnings)
+Milestone: M0 Foundations
+OwnerRole: BE/ML
+Acceptance: Unknown fields tolerated; flags visible",M0_Foundations,1,VS-M0-07,VS-M0-08
+VS-M0-09 – GPU probe (CUDA/DirectML/CPU) + Hardware banner,Task,"GPU probe (CUDA/DirectML/CPU) + Hardware banner
+Milestone: M0 Foundations
+OwnerRole: ML/FE
+Acceptance: Correct detection on GPU/no-GPU machines",M0_Foundations,1,VS-M0-06,VS-M0-09
+VS-M1-04 – VAD step (WebRTC + Silero selectable),Task,"VAD step (WebRTC + Silero selectable)
+Milestone: M1 Data/Converter
+OwnerRole: ML
+Acceptance: Segments saved; SNR reported",M1_Data/Converter,2,VS-M0-06,VS-M1-04
+VS-M2-03 – ASR: faster-whisper (auto compute type),Task,"ASR: faster-whisper (auto compute type)
+Milestone: M2 Transcripts
+OwnerRole: ML
+Acceptance: 10-min clip transcribed < real-time (GPU)",M2_Transcripts,2,VS-M0-06,VS-M2-03
+"VS-M2-04 – Forced alignment: WhisperX primary, MFA fallback",Task,"Forced alignment: WhisperX primary, MFA fallback
+Milestone: M2 Transcripts
+OwnerRole: ML
+Acceptance: Word/phoneme timings; <2% >80ms error",M2_Transcripts,2,VS-M2-03,VS-M2-04
+VS-M3-01 – Piper TTS inference wrapper,Task,"Piper TTS inference wrapper
+Milestone: M3 Models
+OwnerRole: ML
+Acceptance: Synthesize text -> WAV path",M3_Models,1,VS-M0-06,VS-M3-01
+"VS-M3-02 – Piper fine-tune pipeline (hparams, checkpoints, resume)",Task,"Piper fine-tune pipeline (hparams, checkpoints, resume)
+Milestone: M3 Models
+OwnerRole: ML
+Acceptance: Loss decreases; ckpt in models/piper",M3_Models,2,VS-M3-01,VS-M3-02
+"VS-M3-03 – RVC training + conversion (RMVPE F0, RT/offline)",Task,"RVC training + conversion (RMVPE F0, RT/offline)
+Milestone: M3 Models
+OwnerRole: ML
+Acceptance: <=1.2x RTF on GPU; stable pitch",M3_Models,3,VS-M0-06,VS-M3-03
+VS-M3-05 – Prosody controls (rate/pitch/energy + style tokens),Task,"Prosody controls (rate/pitch/energy + style tokens)
+Milestone: M3 Models
+OwnerRole: FE/ML
+Acceptance: ±5% measurable change",M3_Models,2,VS-M3-04,VS-M3-05
+VS-M5-02 – Dataset Studio: phoneme lane + diarization view,Task,"Dataset Studio: phoneme lane + diarization view
+Milestone: M5 UX Polish
+OwnerRole: FE/ML
+Acceptance: Phones track scrubbing",M5_UX_Polish,2,VS-M2-04,VS-M5-02
+"VS-M6-02 – Plugin SDK (Python): server skeleton, runner, examples",Task,"Plugin SDK (Python): server skeleton, runner, examples
+Milestone: M6 SDK & Samples
+OwnerRole: ML
+Acceptance: Sample model plugin runs self-test",M6_SDK_&_Samples,2,VS-M4-01,VS-M6-02
+"VS-M6-04 – Sample plugins: Exporter (C#), Task (Py), UIPanel (C#)",Task,"Sample plugins: Exporter (C#), Task (Py), UIPanel (C#)
+Milestone: M6 SDK & Samples
+OwnerRole: FE/ML
+Acceptance: Appear in Hub; survive restart/update",M6_SDK_&_Samples,3,VS-M6-01,VS-M6-04
+VS-M7-03 – Offline wheel cache for worker,Task,"Offline wheel cache for worker
+Milestone: M7 Release
+OwnerRole: ML/Build
+Acceptance: First-run offline install works",M7_Release,1,VS-M0-06,VS-M7-03

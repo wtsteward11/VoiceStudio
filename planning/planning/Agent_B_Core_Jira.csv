@@ -1,0 +1,101 @@
+Summary,Issue Type,Description,Labels,Story Points,Dependencies,External ID
+VS-M0-03 – SQLite init + baseline schema (Projects/Assets/Utterances/Models/Checkpoints/Jobs/Logs/Plugins/Consents),Task,"SQLite init + baseline schema (Projects/Assets/Utterances/Models/Checkpoints/Jobs/Logs/Plugins/Consents)
+Milestone: M0 Foundations
+OwnerRole: BE
+Acceptance: Migrations idempotent, WAL on",M0_Foundations,2,,VS-M0-03
+"VS-M0-04 – Structured logging (Serilog JSON, rolling)",Task,"Structured logging (Serilog JSON, rolling)
+Milestone: M0 Foundations
+OwnerRole: BE
+Acceptance: Per-process logs with correlation IDs",M0_Foundations,1,,VS-M0-04
+VS-M0-05 – gRPC over Named Pipes transport with deadlines/cancel,Task,"gRPC over Named Pipes transport with deadlines/cancel
+Milestone: M0 Foundations
+OwnerRole: BE
+Acceptance: Echo service passes timeout/cancel tests",M0_Foundations,2,VS-M0-03,VS-M0-05
+"VS-M0-07 – Plugin Host (manifest parse, signature verify, cap registry)",Task,"Plugin Host (manifest parse, signature verify, cap registry)
+Milestone: M0 Foundations
+OwnerRole: BE
+Acceptance: Loads sample plugin; rejects unsigned",M0_Foundations,2,VS-M0-05,VS-M0-07
+VS-M0-08 – Handshake v1 (version negotiation + warnings),Task,"Handshake v1 (version negotiation + warnings)
+Milestone: M0 Foundations
+OwnerRole: BE/ML
+Acceptance: Unknown fields tolerated; flags visible",M0_Foundations,1,VS-M0-07,VS-M0-08
+VS-M1-01 – FFmpeg runner (out-of-proc) + error mapping,Task,"FFmpeg runner (out-of-proc) + error mapping
+Milestone: M1 Data/Converter
+OwnerRole: BE
+Acceptance: Structured failure codes returned",M1_Data/Converter,1,VS-M0-03,VS-M1-01
+VS-M1-02 – Project audio format presets,Task,"Project audio format presets
+Milestone: M1 Data/Converter
+OwnerRole: FE/BE
+Acceptance: Persisted per-project",M1_Data/Converter,1,VS-M1-01,VS-M1-02
+VS-M1-03 – Batch converter queue (resume/retry/idempotent by hash),Task,"Batch converter queue (resume/retry/idempotent by hash)
+Milestone: M1 Data/Converter
+OwnerRole: BE
+Acceptance: Re-run doesn’t duplicate work",M1_Data/Converter,2,VS-M1-02,VS-M1-03
+VS-M1-06 – Cache layout & counters,Task,"Cache layout & counters
+Milestone: M1 Data/Converter
+OwnerRole: BE
+Acceptance: Hit/miss counters visible",M1_Data/Converter,1,VS-M0-03,VS-M1-06
+VS-M2-01 – Transcript importers: .txt/.srt/.vtt,Task,"Transcript importers: .txt/.srt/.vtt
+Milestone: M2 Transcripts
+OwnerRole: BE
+Acceptance: Cues -> utterances with times",M2_Transcripts,1,VS-M0-03,VS-M2-01
+VS-M2-02 – Transcript importers: .docx/.pdf/.rtf,Task,"Transcript importers: .docx/.pdf/.rtf
+Milestone: M2 Transcripts
+OwnerRole: BE
+Acceptance: Paragraphs merged; preview shows structure",M2_Transcripts,2,VS-M2-01,VS-M2-02
+VS-M2-06 – Dataset builder manifests (train/dev/test TSV+JSON),Task,"Dataset builder manifests (train/dev/test TSV+JSON)
+Milestone: M2 Transcripts
+OwnerRole: BE
+Acceptance: Validated manifests; counts match UI",M2_Transcripts,1,VS-M2-05,VS-M2-06
+"VS-M3-04 – Voice Profiles DB/UI (link models, style presets)",Task,"Voice Profiles DB/UI (link models, style presets)
+Milestone: M3 Models
+OwnerRole: FE/BE
+Acceptance: Profile-select drives defaults",M3_Models,2,VS-M3-01,VS-M3-04
+"VS-M3-06 – Model store mgmt (install/remove, hash verify)",Task,"Model store mgmt (install/remove, hash verify)
+Milestone: M3 Models
+OwnerRole: BE
+Acceptance: Corrupt weights quarantined",M3_Models,1,VS-M3-01,VS-M3-06
+VS-M4-01 – Supervisor & heartbeats; Job Objects limits,Task,"Supervisor & heartbeats; Job Objects limits
+Milestone: M4 Plugin Hardening
+OwnerRole: BE
+Acceptance: Kill plugin -> restart; resources bounded",M4_Plugin_Hardening,2,VS-M0-07,VS-M4-01
+VS-M4-02 – Staged update + multi-version rollback,Task,"Staged update + multi-version rollback
+Milestone: M4 Plugin Hardening
+OwnerRole: BE
+Acceptance: Broken update auto-rolls back",M4_Plugin_Hardening,2,VS-M0-07,VS-M4-02
+VS-M4-03 – Safe Mode (disable 3P plugins at startup),Task,"Safe Mode (disable 3P plugins at startup)
+Milestone: M4 Plugin Hardening
+OwnerRole: BE
+Acceptance: Toggle from splash works",M4_Plugin_Hardening,1,VS-M0-07,VS-M4-03
+VS-M4-04 – AssemblyLoadContext for UI plugins + hot unload,Task,"AssemblyLoadContext for UI plugins + hot unload
+Milestone: M4 Plugin Hardening
+OwnerRole: BE
+Acceptance: Memory drops after unload",M4_Plugin_Hardening,2,VS-M0-07,VS-M4-04
+VS-M4-05 – IPC backpressure & deadlines (ring buffers),Task,"IPC backpressure & deadlines (ring buffers)
+Milestone: M4 Plugin Hardening
+OwnerRole: BE
+Acceptance: p95 latency stable under 20 synths",M4_Plugin_Hardening,2,VS-M0-05,VS-M4-05
+"VS-M4-06 – Diagnostics bundle (logs, DAG, manifests, env)",Task,"Diagnostics bundle (logs, DAG, manifests, env)
+Milestone: M4 Plugin Hardening
+OwnerRole: BE
+Acceptance: Single ZIP from UI",M4_Plugin_Hardening,1,VS-M0-04,VS-M4-06
+"VS-M5-03 – Export panel (WAV/FLAC/MP3, loudness, provenance toggle)",Task,"Export panel (WAV/FLAC/MP3, loudness, provenance toggle)
+Milestone: M5 UX Polish
+OwnerRole: FE/BE
+Acceptance: Bit-identical when no processing",M5_UX_Polish,2,VS-M3-01,VS-M5-03
+"VS-M6-01 – Plugin SDK (C#): interfaces, helpers, templates",Task,"Plugin SDK (C#): interfaces, helpers, templates
+Milestone: M6 SDK & Samples
+OwnerRole: BE
+Acceptance: dotnet new template builds & loads",M6_SDK_&_Samples,2,VS-M4-02,VS-M6-01
+"VS-M6-03 – Contract test harness (goldens, perf, memory)",Task,"Contract test harness (goldens, perf, memory)
+Milestone: M6 SDK & Samples
+OwnerRole: QA/BE
+Acceptance: Pass/fail report; CI gate",M6_SDK_&_Samples,2,VS-M6-01,VS-M6-03
+"VS-M6-05 – Dev docs (SDK, manifests, flags, examples)",Task,"Dev docs (SDK, manifests, flags, examples)
+Milestone: M6 SDK & Samples
+OwnerRole: BE
+Acceptance: Versioned docs build",M6_SDK_&_Samples,1,VS-M6-01,VS-M6-05
+VS-M7-04 – EULA/Consent UX + provenance default ON,Task,"EULA/Consent UX + provenance default ON
+Milestone: M7 Release
+OwnerRole: FE/BE
+Acceptance: User sees policy on first export",M7_Release,1,VS-M5-03,VS-M7-04

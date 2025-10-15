@@ -1,0 +1,32 @@
+syntax = "proto3";
+package voicestudio.v1;
+
+option csharp_namespace = "VoiceStudio.IPC";
+
+message Empty {}
+
+message HealthReply {
+  string status = 1;
+  string version = 2;
+}
+
+message Job {
+  string id = 1;
+  string type = 2;
+  string in_path = 3;
+  string out_path = 4;
+  string args_json = 5;
+}
+
+message RunRequest { Job job = 1; }
+message RunResponse {
+  string status = 1;   // "ok" | "error"
+  string code = 2;     // e.g., "E_TTS_FAIL"
+  string message = 3;
+  repeated string outputs = 4; // file paths
+}
+
+service Core {
+  rpc Health(Empty) returns (HealthReply);
+  rpc Run(RunRequest) returns (RunResponse);
+}

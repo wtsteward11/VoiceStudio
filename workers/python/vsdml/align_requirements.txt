@@ -1,0 +1,7 @@
+# Torch pinned to the version WhisperX accepted above (CPU)
+torch==2.8.0
+torchaudio==2.8.0
+numpy>=2.0.2,<2.1.0
+soundfile==0.12.1
+tqdm==4.66.4
+git+https://github.com/m-bain/whisperx.git

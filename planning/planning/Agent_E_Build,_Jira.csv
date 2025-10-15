@@ -1,0 +1,29 @@
+Summary,Issue Type,Description,Labels,Story Points,Dependencies,External ID
+VS-M0-10 – MSIX packaging (local install),Task,"MSIX packaging (local install)
+Milestone: M0 Foundations
+OwnerRole: Build
+Acceptance: Installs/uninstalls cleanly",M0_Foundations,1,VS-M0-01,VS-M0-10
+"VS-M5-04 – Accessibility pass (keyboard, SR labels)",Task,"Accessibility pass (keyboard, SR labels)
+Milestone: M5 UX Polish
+OwnerRole: FE/QA
+Acceptance: Passes Accessibility Insights checks",M5_UX_Polish,1,VS-M5-01,VS-M5-04
+"VS-M6-03 – Contract test harness (goldens, perf, memory)",Task,"Contract test harness (goldens, perf, memory)
+Milestone: M6 SDK & Samples
+OwnerRole: QA/BE
+Acceptance: Pass/fail report; CI gate",M6_SDK_&_Samples,2,VS-M6-01,VS-M6-03
+VS-M7-01 – MSIX signing & release pipeline,Task,"MSIX signing & release pipeline
+Milestone: M7 Release
+OwnerRole: Build
+Acceptance: Signed MSIX artifact per tag",M7_Release,1,VS-M0-10,VS-M7-01
+VS-M7-02 – WinGet manifests & submit script (optional),Task,"WinGet manifests & submit script (optional)
+Milestone: M7 Release
+OwnerRole: Build
+Acceptance: Dry-run publish OK",M7_Release,1,VS-M7-01,VS-M7-02
+VS-M7-03 – Offline wheel cache for worker,Task,"Offline wheel cache for worker
+Milestone: M7 Release
+OwnerRole: ML/Build
+Acceptance: First-run offline install works",M7_Release,1,VS-M0-06,VS-M7-03
+"VS-M7-05 – Install/upgrade verification matrix (Win10/11, GPU/no GPU)",Task,"Install/upgrade verification matrix (Win10/11, GPU/no GPU)
+Milestone: M7 Release
+OwnerRole: QA
+Acceptance: All end-to-end flows pass",M7_Release,2,VS-M7-01,VS-M7-05

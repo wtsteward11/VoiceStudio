@@ -1,0 +1,50 @@
+ID,Title,Milestone,OwnerRole,EstimateDays,Dependencies,AcceptanceCriteria
+VS-M0-01,"Solution skeleton: WinUI 3 (.NET 8), single-project MSIX",M0 Foundations,FE,1,,App boots to empty shell
+VS-M0-02,"Navigation & state host (DI, Settings)",M0 Foundations,FE,1,VS-M0-01,Frame nav + persisted window state
+VS-M0-03,SQLite init + baseline schema (Projects/Assets/Utterances/Models/Checkpoints/Jobs/Logs/Plugins/Consents),M0 Foundations,BE,2,,"Migrations idempotent, WAL on"
+VS-M0-04,"Structured logging (Serilog JSON, rolling)",M0 Foundations,BE,1,,Per-process logs with correlation IDs
+VS-M0-05,gRPC over Named Pipes transport with deadlines/cancel,M0 Foundations,BE,2,VS-M0-03,Echo service passes timeout/cancel tests
+VS-M0-06,"Python worker bootstrap (venv, wheels lockfile, run_worker.py)",M0 Foundations,ML,2,,Start/stop from Core; health ping OK
+VS-M0-07,"Plugin Host (manifest parse, signature verify, cap registry)",M0 Foundations,BE,2,VS-M0-05,Loads sample plugin; rejects unsigned
+VS-M0-08,Handshake v1 (version negotiation + warnings),M0 Foundations,BE/ML,1,VS-M0-07,Unknown fields tolerated; flags visible
+VS-M0-09,GPU probe (CUDA/DirectML/CPU) + Hardware banner,M0 Foundations,ML/FE,1,VS-M0-06,Correct detection on GPU/no-GPU machines
+VS-M0-10,MSIX packaging (local install),M0 Foundations,Build,1,VS-M0-01,Installs/uninstalls cleanly
+VS-M1-01,FFmpeg runner (out-of-proc) + error mapping,M1 Data/Converter,BE,1,VS-M0-03,Structured failure codes returned
+VS-M1-02,Project audio format presets,M1 Data/Converter,FE/BE,1,VS-M1-01,Persisted per-project
+VS-M1-03,Batch converter queue (resume/retry/idempotent by hash),M1 Data/Converter,BE,2,VS-M1-02,Re-run doesn’t duplicate work
+VS-M1-04,VAD step (WebRTC + Silero selectable),M1 Data/Converter,ML,2,VS-M0-06,Segments saved; SNR reported
+VS-M1-05,Dataset Studio waveform viewer,M1 Data/Converter,FE,2,VS-M0-02,Smooth zoom/scrub; 60 fps on 10-min audio
+VS-M1-06,Cache layout & counters,M1 Data/Converter,BE,1,VS-M0-03,Hit/miss counters visible
+VS-M2-01,Transcript importers: .txt/.srt/.vtt,M2 Transcripts,BE,1,VS-M0-03,Cues -> utterances with times
+VS-M2-02,Transcript importers: .docx/.pdf/.rtf,M2 Transcripts,BE,2,VS-M2-01,Paragraphs merged; preview shows structure
+VS-M2-03,ASR: faster-whisper (auto compute type),M2 Transcripts,ML,2,VS-M0-06,10-min clip transcribed < real-time (GPU)
+VS-M2-04,"Forced alignment: WhisperX primary, MFA fallback",M2 Transcripts,ML,2,VS-M2-03,Word/phoneme timings; <2% >80ms error
+VS-M2-05,Transcript editor (text lanes + timing nudge + re-align),M2 Transcripts,FE,2,VS-M2-04,Edits persist; phones update
+VS-M2-06,Dataset builder manifests (train/dev/test TSV+JSON),M2 Transcripts,BE,1,VS-M2-05,Validated manifests; counts match UI
+VS-M3-01,Piper TTS inference wrapper,M3 Models,ML,1,VS-M0-06,Synthesize text -> WAV path
+VS-M3-02,"Piper fine-tune pipeline (hparams, checkpoints, resume)",M3 Models,ML,2,VS-M3-01,Loss decreases; ckpt in models/piper
+VS-M3-03,"RVC training + conversion (RMVPE F0, RT/offline)",M3 Models,ML,3,VS-M0-06,<=1.2x RTF on GPU; stable pitch
+VS-M3-04,"Voice Profiles DB/UI (link models, style presets)",M3 Models,FE/BE,2,VS-M3-01,Profile-select drives defaults
+VS-M3-05,Prosody controls (rate/pitch/energy + style tokens),M3 Models,FE/ML,2,VS-M3-04,±5% measurable change
+VS-M3-06,"Model store mgmt (install/remove, hash verify)",M3 Models,BE,1,VS-M3-01,Corrupt weights quarantined
+VS-M4-01,Supervisor & heartbeats; Job Objects limits,M4 Plugin Hardening,BE,2,VS-M0-07,Kill plugin -> restart; resources bounded
+VS-M4-02,Staged update + multi-version rollback,M4 Plugin Hardening,BE,2,VS-M0-07,Broken update auto-rolls back
+VS-M4-03,Safe Mode (disable 3P plugins at startup),M4 Plugin Hardening,BE,1,VS-M0-07,Toggle from splash works
+VS-M4-04,AssemblyLoadContext for UI plugins + hot unload,M4 Plugin Hardening,BE,2,VS-M0-07,Memory drops after unload
+VS-M4-05,IPC backpressure & deadlines (ring buffers),M4 Plugin Hardening,BE,2,VS-M0-05,p95 latency stable under 20 synths
+VS-M4-06,"Diagnostics bundle (logs, DAG, manifests, env)",M4 Plugin Hardening,BE,1,VS-M0-04,Single ZIP from UI
+VS-M5-01,"Plugin Gallery (caps badges, compat ranges)",M5 UX Polish,FE,2,VS-M4-02,Install/disable/rollback flows OK
+VS-M5-02,Dataset Studio: phoneme lane + diarization view,M5 UX Polish,FE/ML,2,VS-M2-04,Phones track scrubbing
+VS-M5-03,"Export panel (WAV/FLAC/MP3, loudness, provenance toggle)",M5 UX Polish,FE/BE,2,VS-M3-01,Bit-identical when no processing
+VS-M5-04,"Accessibility pass (keyboard, SR labels)",M5 UX Polish,FE/QA,1,VS-M5-01,Passes Accessibility Insights checks
+VS-M5-05,"Performance pass (virtualized lists, async)",M5 UX Polish,FE,1,VS-M5-01,UI responsive during jobs
+VS-M6-01,"Plugin SDK (C#): interfaces, helpers, templates",M6 SDK & Samples,BE,2,VS-M4-02,dotnet new template builds & loads
+VS-M6-02,"Plugin SDK (Python): server skeleton, runner, examples",M6 SDK & Samples,ML,2,VS-M4-01,Sample model plugin runs self-test
+VS-M6-03,"Contract test harness (goldens, perf, memory)",M6 SDK & Samples,QA/BE,2,VS-M6-01,Pass/fail report; CI gate
+VS-M6-04,"Sample plugins: Exporter (C#), Task (Py), UIPanel (C#)",M6 SDK & Samples,FE/ML,3,VS-M6-01,Appear in Hub; survive restart/update
+VS-M6-05,"Dev docs (SDK, manifests, flags, examples)",M6 SDK & Samples,BE,1,VS-M6-01,Versioned docs build
+VS-M7-01,MSIX signing & release pipeline,M7 Release,Build,1,VS-M0-10,Signed MSIX artifact per tag
+VS-M7-02,WinGet manifests & submit script (optional),M7 Release,Build,1,VS-M7-01,Dry-run publish OK
+VS-M7-03,Offline wheel cache for worker,M7 Release,ML/Build,1,VS-M0-06,First-run offline install works
+VS-M7-04,EULA/Consent UX + provenance default ON,M7 Release,FE/BE,1,VS-M5-03,User sees policy on first export
+VS-M7-05,"Install/upgrade verification matrix (Win10/11, GPU/no GPU)",M7 Release,QA,2,VS-M7-01,All end-to-end flows pass

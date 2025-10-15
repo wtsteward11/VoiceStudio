@@ -1,0 +1,15 @@
+Agent C – PluginHost Safe Mode & Validation
+
+Goal (M1):
+- Add a Safe Mode switch: when ON, third-party plugins are not loaded (only first-party IDs allowed).
+- Strengthen manifest validation (schema + signature). Unknown capabilities cause a clear logged warning and plugin skip.
+
+Scope:
+- Project: /src/PluginHost
+- Add: SafeMode boolean sourced from %LOCALAPPDATA%/VoiceStudio/settings.json
+- Update: manifest parser to validate fields; signature file optional for dev.
+- Provide: unit tests for safe mode, invalid manifest, unknown capability
+
+Acceptance:
+- With SafeMode=true, a third-party plugin folder is ignored with a log line.
+- Invalid manifest doesn’t crash the app; clear message is shown.

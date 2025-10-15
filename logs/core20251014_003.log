@@ -1,0 +1,370 @@
+2025-10-14 07:50:42.623 -05:00 [ERR] Hosting failed to start
+System.IO.IOException: Failed to bind to address http://127.0.0.1:5071: address already in use.
+ ---> Microsoft.AspNetCore.Connections.AddressInUseException: Only one usage of each socket address (protocol/network address/port) is normally permitted.
+ ---> System.Net.Sockets.SocketException (10048): Only one usage of each socket address (protocol/network address/port) is normally permitted.
+   at System.Net.Sockets.Socket.UpdateStatusAfterSocketErrorAndThrowException(SocketError error, Boolean disconnectOnFailure, String callerName)
+   at System.Net.Sockets.Socket.DoBind(EndPoint endPointSnapshot, SocketAddress socketAddress)
+   at System.Net.Sockets.Socket.Bind(EndPoint localEP)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportOptions.CreateDefaultBoundListenSocket(EndPoint endpoint)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   --- End of inner exception stack trace ---
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportFactory.BindAsync(EndPoint endpoint, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure.TransportManager.BindAsync(EndPoint endPoint, ConnectionDelegate connectionDelegate, EndpointConfig endpointConfig, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.<>c__DisplayClass28_0`1.<<StartAsync>g__OnBind|0>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindEndpointAsync(ListenOptions endpoint, AddressBindContext context, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindEndpointAsync(ListenOptions endpoint, AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.ListenOptions.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.EndpointsStrategy.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindAsync(ListenOptions[] listenOptions, AddressBindContext context, Func`2 useHttps, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.BindAsync(CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.StartAsync[TContext](IHttpApplication`1 application, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Hosting.GenericWebHostService.StartAsync(CancellationToken cancellationToken)
+   at Microsoft.Extensions.Hosting.Internal.Host.<StartAsync>b__15_1(IHostedService service, CancellationToken token)
+   at Microsoft.Extensions.Hosting.Internal.Host.ForeachService[T](IEnumerable`1 services, CancellationToken token, Boolean concurrent, Boolean abortOnFirstException, List`1 exceptions, Func`3 operation)
+2025-10-14 07:53:39.237 -05:00 [INF] Now listening on: http://127.0.0.1:5071
+2025-10-14 07:53:39.251 -05:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-10-14 07:53:39.251 -05:00 [INF] Hosting environment: Production
+2025-10-14 07:53:39.251 -05:00 [INF] Content root path: C:\VoiceStudio\src\Core
+2025-10-14 07:53:52.432 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 07:53:52.454 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:53:52.465 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:53:52.466 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 34.7617ms
+2025-10-14 07:53:52.488 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 07:53:52.488 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:53:52.853 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:53:52.853 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 364.911ms
+2025-10-14 07:55:14.009 -05:00 [INF] Now listening on: http://127.0.0.1:5071
+2025-10-14 07:55:14.023 -05:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-10-14 07:55:14.023 -05:00 [INF] Hosting environment: Production
+2025-10-14 07:55:14.023 -05:00 [INF] Content root path: C:\VoiceStudio\src\Core
+2025-10-14 07:55:28.131 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 07:55:28.154 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:55:28.169 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:55:28.170 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 39.6947ms
+2025-10-14 07:55:28.193 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 07:55:28.194 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:55:28.610 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:55:28.611 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 417.435ms
+2025-10-14 07:55:51.300 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 07:55:51.300 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:55:51.301 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:55:51.301 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.4445ms
+2025-10-14 07:55:51.321 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 07:55:51.322 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:55:51.677 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:55:51.677 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 355.9853ms
+2025-10-14 07:56:03.198 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 07:56:03.198 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:56:03.199 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:56:03.199 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2484ms
+2025-10-14 07:56:03.219 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 07:56:03.219 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:56:03.568 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:56:03.568 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 349.1255ms
+2025-10-14 07:56:14.636 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 07:56:14.636 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:56:14.636 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:56:14.636 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.242ms
+2025-10-14 07:56:14.658 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 07:56:14.658 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:56:15.011 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:56:15.011 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 352.8609ms
+2025-10-14 07:57:35.463 -05:00 [INF] Now listening on: http://127.0.0.1:5071
+2025-10-14 07:57:35.478 -05:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-10-14 07:57:35.478 -05:00 [INF] Hosting environment: Production
+2025-10-14 07:57:35.478 -05:00 [INF] Content root path: C:\VoiceStudio\src\Core
+2025-10-14 07:57:45.354 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 07:57:45.376 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:57:45.390 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:57:45.391 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 36.9359ms
+2025-10-14 07:57:45.411 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 07:57:45.411 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:57:45.776 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:57:45.776 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 365.1551ms
+2025-10-14 07:58:01.586 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 07:58:01.586 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:58:01.586 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 07:58:01.586 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.3996ms
+2025-10-14 07:58:01.605 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 07:58:01.605 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:58:01.947 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 07:58:01.947 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 341.8416ms
+2025-10-14 08:01:32.394 -05:00 [INF] Now listening on: http://127.0.0.1:5071
+2025-10-14 08:01:32.408 -05:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-10-14 08:01:32.409 -05:00 [INF] Hosting environment: Production
+2025-10-14 08:01:32.409 -05:00 [INF] Content root path: C:\VoiceStudio\src\Core
+2025-10-14 08:01:59.988 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:02:00.010 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:02:00.023 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:02:00.024 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 36.0275ms
+2025-10-14 08:02:00.042 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:02:00.042 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:02:00.091 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:02:00.092 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 49.6144ms
+2025-10-14 08:02:00.824 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:02:00.824 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:02:00.825 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:02:00.825 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.4295ms
+2025-10-14 08:02:00.842 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:02:00.842 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:02:01.132 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:02:01.132 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 290.4449ms
+2025-10-14 08:02:01.861 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:02:01.861 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:02:01.862 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:02:01.862 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2753ms
+2025-10-14 08:02:01.879 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:02:01.879 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:02:09.763 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:02:09.763 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 7884.1486ms
+2025-10-14 08:02:10.494 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:02:10.494 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:02:10.494 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:02:10.494 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2542ms
+2025-10-14 08:02:10.512 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:02:10.512 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:02:18.496 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:02:18.496 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 7984.415ms
+2025-10-14 08:02:19.227 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:02:19.227 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:02:19.227 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:02:19.227 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.228ms
+2025-10-14 08:02:19.244 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:02:19.244 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:02:19.607 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:02:19.607 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 362.587ms
+2025-10-14 08:02:20.349 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:02:20.349 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:02:20.349 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:02:20.349 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.267ms
+2025-10-14 08:02:20.366 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:02:20.366 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:02:32.833 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:02:32.833 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 12467.3084ms
+2025-10-14 08:07:45.860 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:07:45.860 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:07:45.860 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:07:45.860 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2853ms
+2025-10-14 08:07:45.878 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:07:45.878 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:07:45.917 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:07:45.917 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 38.6796ms
+2025-10-14 08:07:46.019 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:07:46.019 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:07:46.019 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:07:46.019 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2424ms
+2025-10-14 08:07:46.036 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:07:46.036 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:07:46.306 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:07:46.306 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 270.2166ms
+2025-10-14 08:07:46.415 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:07:46.415 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:07:46.415 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:07:46.415 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2113ms
+2025-10-14 08:07:46.432 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:07:46.432 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:07:53.624 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:07:53.624 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 7192.1223ms
+2025-10-14 08:07:53.724 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:07:53.724 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:07:53.725 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:07:53.725 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.1889ms
+2025-10-14 08:07:53.741 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:07:53.741 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:08:01.597 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:08:01.597 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 7856.3369ms
+2025-10-14 08:08:01.704 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:08:01.704 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:08:01.704 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:08:01.704 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2313ms
+2025-10-14 08:08:01.721 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:08:01.721 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:08:02.074 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:08:02.074 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 353.5178ms
+2025-10-14 08:08:02.175 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:08:02.175 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:08:02.175 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:08:02.175 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.1818ms
+2025-10-14 08:08:02.192 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:08:02.192 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:08:04.230 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:08:04.230 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 2037.9195ms
+2025-10-14 08:17:14.836 -05:00 [INF] Now listening on: http://127.0.0.1:5071
+2025-10-14 08:17:14.851 -05:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-10-14 08:17:14.851 -05:00 [INF] Hosting environment: Production
+2025-10-14 08:17:14.851 -05:00 [INF] Content root path: C:\VoiceStudio\src\Core
+2025-10-14 08:22:26.181 -05:00 [INF] Now listening on: http://127.0.0.1:5071
+2025-10-14 08:22:26.195 -05:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-10-14 08:22:26.195 -05:00 [INF] Hosting environment: Production
+2025-10-14 08:22:26.195 -05:00 [INF] Content root path: C:\VoiceStudio\src\Core
+2025-10-14 08:22:58.952 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:22:58.975 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:22:58.986 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:22:58.986 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 34.7861ms
+2025-10-14 08:22:59.004 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:22:59.005 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:22:59.056 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:22:59.057 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 52.1549ms
+2025-10-14 08:22:59.849 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:22:59.849 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:22:59.849 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:22:59.849 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.3454ms
+2025-10-14 08:22:59.866 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:22:59.867 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:00.151 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:00.151 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 284.2105ms
+2025-10-14 08:23:00.895 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:23:00.895 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:00.895 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:00.895 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.259ms
+2025-10-14 08:23:00.912 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:23:00.912 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:08.557 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:08.558 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 7645.6901ms
+2025-10-14 08:23:09.292 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:23:09.293 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:09.293 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:09.293 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2421ms
+2025-10-14 08:23:09.310 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:23:09.310 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:13.309 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:13.309 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 3999.4827ms
+2025-10-14 08:23:14.052 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:23:14.052 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:14.052 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:14.052 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2254ms
+2025-10-14 08:23:14.069 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:23:14.069 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:14.429 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:14.429 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 360.0974ms
+2025-10-14 08:23:15.182 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:23:15.182 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:15.182 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:15.182 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2409ms
+2025-10-14 08:23:15.199 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:23:15.199 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:17.007 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:17.007 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 1807.8115ms
+2025-10-14 08:23:28.488 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:23:28.488 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:28.488 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:28.488 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2472ms
+2025-10-14 08:23:28.505 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:23:28.505 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:28.543 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:28.543 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 37.9718ms
+2025-10-14 08:23:28.650 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:23:28.650 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:28.650 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:28.651 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2178ms
+2025-10-14 08:23:28.668 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:23:28.668 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:28.949 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:28.949 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 281.6014ms
+2025-10-14 08:23:29.052 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:23:29.052 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:29.052 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:29.052 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2867ms
+2025-10-14 08:23:29.069 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:23:29.069 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:36.754 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:36.754 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 7684.9408ms
+2025-10-14 08:23:36.857 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:23:36.857 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:36.857 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:36.857 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.1816ms
+2025-10-14 08:23:36.874 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:23:36.874 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:40.853 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:40.853 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 3979.6937ms
+2025-10-14 08:23:40.963 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:23:40.963 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:40.963 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:40.964 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2009ms
+2025-10-14 08:23:40.982 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:23:40.982 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:41.324 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:41.324 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 342.1289ms
+2025-10-14 08:23:41.438 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:23:41.438 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:41.438 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:23:41.438 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.1941ms
+2025-10-14 08:23:41.457 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:23:41.457 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:43.237 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:23:43.237 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 1780.131ms
+2025-10-14 08:24:58.300 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:24:58.300 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:24:58.300 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:24:58.300 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.1888ms
+2025-10-14 08:24:58.317 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:24:58.317 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:25:02.310 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:25:02.310 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 3993.1463ms
+2025-10-14 08:29:03.958 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:29:03.958 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:29:03.958 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:29:03.958 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2217ms
+2025-10-14 08:29:03.975 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:29:03.975 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:29:15.833 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:29:15.833 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 11858.2418ms
+2025-10-14 08:30:28.754 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 08:30:28.754 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:30:28.754 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 08:30:28.754 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.233ms
+2025-10-14 08:30:28.772 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 08:30:28.772 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:30:34.432 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 08:30:34.432 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 5660.241ms
+2025-10-14 19:06:06.286 -05:00 [INF] Now listening on: http://127.0.0.1:5071
+2025-10-14 19:06:06.302 -05:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-10-14 19:06:06.302 -05:00 [INF] Hosting environment: Production
+2025-10-14 19:06:06.302 -05:00 [INF] Content root path: C:\VoiceStudio\src\Core
+2025-10-14 19:06:41.723 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 19:06:41.760 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 19:06:41.774 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 19:06:41.775 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 52.1623ms
+2025-10-14 19:06:41.797 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 19:06:41.797 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 19:06:42.982 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 19:06:42.983 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 1186.0774ms
+2025-10-14 19:07:35.390 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 19:07:35.390 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 19:07:35.390 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 19:07:35.390 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.4315ms
+2025-10-14 19:07:35.411 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 19:07:35.411 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 19:07:35.750 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 19:07:35.750 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 339.0295ms
+2025-10-14 19:07:37.343 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 19:07:37.343 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 19:07:37.343 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 19:07:37.344 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.3295ms
+2025-10-14 19:07:37.362 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 19:07:37.362 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 19:07:37.700 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 19:07:37.701 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 338.2119ms
+2025-10-14 19:08:12.102 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 19:08:12.102 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 19:08:12.102 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 19:08:12.102 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 0.2857ms
+2025-10-14 19:08:12.121 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 19:08:12.121 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 19:08:12.462 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 19:08:12.462 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 340.7171ms
+2025-10-14 20:05:57.033 -05:00 [INF] Now listening on: http://127.0.0.1:5071
+2025-10-14 20:05:57.047 -05:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-10-14 20:05:57.047 -05:00 [INF] Hosting environment: Production
+2025-10-14 20:05:57.047 -05:00 [INF] Content root path: C:\VoiceStudio\src\Core
+2025-10-14 20:06:30.442 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - application/grpc null
+2025-10-14 20:06:30.463 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 20:06:30.475 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Health'
+2025-10-14 20:06:30.476 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Health - 200 null application/grpc 34.7663ms
+2025-10-14 20:06:30.487 -05:00 [INF] Request starting HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - application/grpc null
+2025-10-14 20:06:30.487 -05:00 [INF] Executing endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 20:06:30.544 -05:00 [INF] Executed endpoint 'gRPC - /voicestudio.v1.Core/Run'
+2025-10-14 20:06:30.544 -05:00 [INF] Request finished HTTP/2 POST http://127.0.0.1:5071/voicestudio.v1.Core/Run - 200 null application/grpc 57.7322ms

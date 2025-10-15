@@ -1,0 +1,7 @@
+{
+  "Id": "VSJ-ALIGN-001",
+  "Type": "Align.Run",
+  "InPath":  "C:\\VoiceStudio\\projects\\demo\\dataset\\segments\\asr.json",
+  "OutPath": "C:\\VoiceStudio\\projects\\demo\\dataset\\segments\\aligned.json",
+  "ArgsJson": "{\"lang\":\"en\",\"device\":\"cpu\",\"model\":\"small\"}"
+}

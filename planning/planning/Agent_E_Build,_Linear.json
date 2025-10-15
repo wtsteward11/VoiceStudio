@@ -1,0 +1,82 @@
+{
+  "team": "Agent E \u2013 Build, Packaging & QA",
+  "issues": [
+    {
+      "title": "VS-M0-10 \u2013 MSIX packaging (local install)",
+      "description": "Milestone: M0 Foundations\nOwnerRole: Build\nAcceptance: Installs/uninstalls cleanly",
+      "estimate": 1,
+      "labels": [
+        "M0_Foundations"
+      ],
+      "blocked_by": [
+        "VS-M0-01"
+      ]
+    },
+    {
+      "title": "VS-M5-04 \u2013 Accessibility pass (keyboard, SR labels)",
+      "description": "Milestone: M5 UX Polish\nOwnerRole: FE/QA\nAcceptance: Passes Accessibility Insights checks",
+      "estimate": 1,
+      "labels": [
+        "M5_UX_Polish"
+      ],
+      "blocked_by": [
+        "VS-M5-01"
+      ]
+    },
+    {
+      "title": "VS-M6-03 \u2013 Contract test harness (goldens, perf, memory)",
+      "description": "Milestone: M6 SDK & Samples\nOwnerRole: QA/BE\nAcceptance: Pass/fail report; CI gate",
+      "estimate": 2,
+      "labels": [
+        "M6_SDK_&_Samples"
+      ],
+      "blocked_by": [
+        "VS-M6-01"
+      ]
+    },
+    {
+      "title": "VS-M7-01 \u2013 MSIX signing & release pipeline",
+      "description": "Milestone: M7 Release\nOwnerRole: Build\nAcceptance: Signed MSIX artifact per tag",
+      "estimate": 1,
+      "labels": [
+        "M7_Release"
+      ],
+      "blocked_by": [
+        "VS-M0-10"
+      ]
+    },
+    {
+      "title": "VS-M7-02 \u2013 WinGet manifests & submit script (optional)",
+      "description": "Milestone: M7 Release\nOwnerRole: Build\nAcceptance: Dry-run publish OK",
+      "estimate": 1,
+      "labels": [
+        "M7_Release"
+      ],
+      "blocked_by": [
+        "VS-M7-01"
+      ]
+    },
+    {
+      "title": "VS-M7-03 \u2013 Offline wheel cache for worker",
+      "description": "Milestone: M7 Release\nOwnerRole: ML/Build\nAcceptance: First-run offline install works",
+      "estimate": 1,
+      "labels": [
+        "M7_Release"
+      ],
+      "blocked_by": [
+        "VS-M0-06"
+      ]
+    },
+    {
+      "title": "VS-M7-05 \u2013 Install/upgrade verification matrix (Win10/11, GPU/no GPU)",
+      "description": "Milestone: M7 Release\nOwnerRole: QA\nAcceptance: All end-to-end flows pass",
+      "estimate": 2,
+      "labels": [
+        "M7_Release"
+      ],
+      "blocked_by": [
+        "VS-M7-01"
+      ]
+    }
+  ]
+}

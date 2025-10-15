@@ -1,0 +1,6 @@
+{
+  "Id": "VSJ-TTS-001",
+  "Type": "TTS.Synthesize",
+  "OutPath": "C:\\VoiceStudio\\projects\\demo\\tts\\hello.wav",
+  "ArgsJson": "{\"text\":\"Hello from VoiceStudio\",\"voice\":\"C:\\\\VoiceStudio\\\\tools\\\\piper\\\\voices\\\\en_US-amy-low.onnx\"}"
+}

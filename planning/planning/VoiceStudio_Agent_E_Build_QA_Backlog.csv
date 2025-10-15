@@ -1,0 +1,8 @@
+ID,Title,Milestone,OwnerRole,EstimateDays,Dependencies,AcceptanceCriteria,CoOwner
+VS-M0-10,MSIX packaging (local install),M0 Foundations,Build,1,VS-M0-01,Installs/uninstalls cleanly,false
+VS-M5-04,"Accessibility pass (keyboard, SR labels)",M5 UX Polish,FE/QA,1,VS-M5-01,Passes Accessibility Insights checks,true
+VS-M6-03,"Contract test harness (goldens, perf, memory)",M6 SDK & Samples,QA/BE,2,VS-M6-01,Pass/fail report; CI gate,true
+VS-M7-01,MSIX signing & release pipeline,M7 Release,Build,1,VS-M0-10,Signed MSIX artifact per tag,false
+VS-M7-02,WinGet manifests & submit script (optional),M7 Release,Build,1,VS-M7-01,Dry-run publish OK,false
+VS-M7-03,Offline wheel cache for worker,M7 Release,ML/Build,1,VS-M0-06,First-run offline install works,true
+VS-M7-05,"Install/upgrade verification matrix (Win10/11, GPU/no GPU)",M7 Release,QA,2,VS-M7-01,All end-to-end flows pass,false

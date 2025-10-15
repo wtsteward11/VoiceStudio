@@ -1,0 +1,82 @@
+{
+  "team": "Agent C \u2013 Plugin Host & SDKs",
+  "issues": [
+    {
+      "title": "VS-M0-07 \u2013 Plugin Host (manifest parse, signature verify, cap registry)",
+      "description": "Milestone: M0 Foundations\nOwnerRole: BE\nAcceptance: Loads sample plugin; rejects unsigned",
+      "estimate": 2,
+      "labels": [
+        "M0_Foundations"
+      ],
+      "blocked_by": [
+        "VS-M0-05"
+      ]
+    },
+    {
+      "title": "VS-M4-02 \u2013 Staged update + multi-version rollback",
+      "description": "Milestone: M4 Plugin Hardening\nOwnerRole: BE\nAcceptance: Broken update auto-rolls back",
+      "estimate": 2,
+      "labels": [
+        "M4_Plugin_Hardening"
+      ],
+      "blocked_by": [
+        "VS-M0-07"
+      ]
+    },
+    {
+      "title": "VS-M4-03 \u2013 Safe Mode (disable 3P plugins at startup)",
+      "description": "Milestone: M4 Plugin Hardening\nOwnerRole: BE\nAcceptance: Toggle from splash works",
+      "estimate": 1,
+      "labels": [
+        "M4_Plugin_Hardening"
+      ],
+      "blocked_by": [
+        "VS-M0-07"
+      ]
+    },
+    {
+      "title": "VS-M4-04 \u2013 AssemblyLoadContext for UI plugins + hot unload",
+      "description": "Milestone: M4 Plugin Hardening\nOwnerRole: BE\nAcceptance: Memory drops after unload",
+      "estimate": 2,
+      "labels": [
+        "M4_Plugin_Hardening"
+      ],
+      "blocked_by": [
+        "VS-M0-07"
+      ]
+    },
+    {
+      "title": "VS-M6-01 \u2013 Plugin SDK (C#): interfaces, helpers, templates",
+      "description": "Milestone: M6 SDK & Samples\nOwnerRole: BE\nAcceptance: dotnet new template builds & loads",
+      "estimate": 2,
+      "labels": [
+        "M6_SDK_&_Samples"
+      ],
+      "blocked_by": [
+        "VS-M4-02"
+      ]
+    },
+    {
+      "title": "VS-M6-02 \u2013 Plugin SDK (Python): server skeleton, runner, examples",
+      "description": "Milestone: M6 SDK & Samples\nOwnerRole: ML\nAcceptance: Sample model plugin runs self-test",
+      "estimate": 2,
+      "labels": [
+        "M6_SDK_&_Samples"
+      ],
+      "blocked_by": [
+        "VS-M4-01"
+      ]
+    },
+    {
+      "title": "VS-M6-05 \u2013 Dev docs (SDK, manifests, flags, examples)",
+      "description": "Milestone: M6 SDK & Samples\nOwnerRole: BE\nAcceptance: Versioned docs build",
+      "estimate": 1,
+      "labels": [
+        "M6_SDK_&_Samples"
+      ],
+      "blocked_by": [
+        "VS-M6-01"
+      ]
+    }
+  ]
+}

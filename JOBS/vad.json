@@ -1,0 +1,14 @@
+{
+  "job": {
+    "id": "VSJ-LOCAL-VAD",
+    "type": "Dataset.VAD",
+    "io": {
+      "in": "C:\\\\VoiceStudio\\\\projects\\\\demo\\\\processed\\\\input.wav",
+      "out": "C:\\\\VoiceStudio\\\\projects\\\\demo\\\\dataset\\\\segments"
+    },
+    "args": {
+      "aggr": 2,
+      "min": 0.6
+    }
+  }
+}

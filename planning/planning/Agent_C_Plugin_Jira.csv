@@ -1,0 +1,29 @@
+Summary,Issue Type,Description,Labels,Story Points,Dependencies,External ID
+"VS-M0-07 – Plugin Host (manifest parse, signature verify, cap registry)",Task,"Plugin Host (manifest parse, signature verify, cap registry)
+Milestone: M0 Foundations
+OwnerRole: BE
+Acceptance: Loads sample plugin; rejects unsigned",M0_Foundations,2,VS-M0-05,VS-M0-07
+VS-M4-02 – Staged update + multi-version rollback,Task,"Staged update + multi-version rollback
+Milestone: M4 Plugin Hardening
+OwnerRole: BE
+Acceptance: Broken update auto-rolls back",M4_Plugin_Hardening,2,VS-M0-07,VS-M4-02
+VS-M4-03 – Safe Mode (disable 3P plugins at startup),Task,"Safe Mode (disable 3P plugins at startup)
+Milestone: M4 Plugin Hardening
+OwnerRole: BE
+Acceptance: Toggle from splash works",M4_Plugin_Hardening,1,VS-M0-07,VS-M4-03
+VS-M4-04 – AssemblyLoadContext for UI plugins + hot unload,Task,"AssemblyLoadContext for UI plugins + hot unload
+Milestone: M4 Plugin Hardening
+OwnerRole: BE
+Acceptance: Memory drops after unload",M4_Plugin_Hardening,2,VS-M0-07,VS-M4-04
+"VS-M6-01 – Plugin SDK (C#): interfaces, helpers, templates",Task,"Plugin SDK (C#): interfaces, helpers, templates
+Milestone: M6 SDK & Samples
+OwnerRole: BE
+Acceptance: dotnet new template builds & loads",M6_SDK_&_Samples,2,VS-M4-02,VS-M6-01
+"VS-M6-02 – Plugin SDK (Python): server skeleton, runner, examples",Task,"Plugin SDK (Python): server skeleton, runner, examples
+Milestone: M6 SDK & Samples
+OwnerRole: ML
+Acceptance: Sample model plugin runs self-test",M6_SDK_&_Samples,2,VS-M4-01,VS-M6-02
+"VS-M6-05 – Dev docs (SDK, manifests, flags, examples)",Task,"Dev docs (SDK, manifests, flags, examples)
+Milestone: M6 SDK & Samples
+OwnerRole: BE
+Acceptance: Versioned docs build",M6_SDK_&_Samples,1,VS-M6-01,VS-M6-05

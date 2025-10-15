@@ -1,0 +1,7 @@
+flake8
+ruff
+black
+isort
+autoflake
+pytest
+pytest-cov

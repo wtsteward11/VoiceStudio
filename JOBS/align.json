@@ -1,0 +1,15 @@
+{
+  "job": {
+    "id": "VSJ-LOCAL-ALIGN",
+    "type": "Align.Run",
+    "io": {
+      "in": "C:\\\\VoiceStudio\\\\projects\\\\demo\\\\dataset\\\\segments\\\\asr.json",
+      "out": "C:\\\\VoiceStudio\\\\projects\\\\demo\\\\dataset\\\\segments\\\\aligned.json"
+    },
+    "args": {
+      "lang": "en",
+      "device": "cpu",
+      "model": "small"
+    }
+  }
+}

@@ -1,0 +1,35 @@
+loading align model...
+Traceback (most recent call last):
+  File "C:\VoiceStudio\workers\python\vsdml\align_whisperx.py", line 47, in main
+    model_a, metadata = whisperx.load_align_model(language=args.lang, device=device, inplace=False)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\VoiceStudio\workers\python\vsdml\.venv\Lib\site-packages\whisperx\__init__.py", line 11, in load_align_model
+    return alignment.load_align_model(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: load_align_model() got an unexpected keyword argument 'language'
+loading align model...
+Traceback (most recent call last):
+  File "C:\VoiceStudio\workers\python\vsdml\align_whisperx.py", line 47, in main
+    model_a, metadata = whisperx.load_align_model(language=args.lang, device=device, inplace=False)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\VoiceStudio\workers\python\vsdml\.venv\Lib\site-packages\whisperx\__init__.py", line 11, in load_align_model
+    return alignment.load_align_model(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: load_align_model() got an unexpected keyword argument 'language'
+loading align model...
+Traceback (most recent call last):
+  File "C:\VoiceStudio\workers\python\vsdml\align_whisperx.py", line 47, in main
+    model_a, metadata = whisperx.load_align_model(language=args.lang, device=device, inplace=False)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\VoiceStudio\workers\python\vsdml\.venv\Lib\site-packages\whisperx\__init__.py", line 11, in load_align_model
+    return alignment.load_align_model(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: load_align_model() got an unexpected keyword argument 'language'
+loading align model (lang=en, device=cpu)...
+align model loaded
+align failed for C:\VoiceStudio\projects\demo\dataset\segments\seg_0000.wav: string indices must be integers, not 'str'
+align failed for C:\VoiceStudio\projects\demo\dataset\segments\seg_0001.wav: string indices must be integers, not 'str'
+loading align model (lang=en, device=cpu)...
+align model loaded
+align failed for C:\VoiceStudio\projects\demo\dataset\segments\seg_0000.wav: string indices must be integers, not 'str'
+align failed for C:\VoiceStudio\projects\demo\dataset\segments\seg_0001.wav: string indices must be integers, not 'str'

@@ -1,0 +1,5 @@
+webrtcvad==2.0.10
+pydub==0.25.1
+numpy==1.26.4
+soundfile==0.12.1
+tqdm==4.66.4

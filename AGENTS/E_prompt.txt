@@ -1,0 +1,17 @@
+Agent E – CI/Build
+
+Goal (M1):
+- Extend .github/workflows/ci.yml to:
+  a) build Core and Client
+  b) set up Python venv for workers
+  c) run smoke-m0.ps1 and then smoke-m1.ps1 (allow skipping align if model unavailable)
+  d) retain artifacts for 7 days
+
+Scope:
+- File: .github/workflows/ci.yml
+- Cache: pip cache by requirements hash
+- Upload: logs, outputs under C:\VoiceStudio\projects\demo
+- Actions may be OFF in GPT; still provide workflow YAML that runs locally or when turned on.
+
+Acceptance:
+- On a repo with this layout, CI passes smoke scripts (or marks align optional) and uploads artifacts.

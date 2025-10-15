@@ -1,0 +1,18 @@
+{
+  "segments": [
+    {
+      "index": 0,
+      "start_ms": 60,
+      "end_ms": 3390,
+      "path": "C:\\VoiceStudio\\projects\\demo\\dataset\\segments\\seg_0000.wav",
+      "text": "This is a quick demo clip for Voice Studio."
+    },
+    {
+      "index": 1,
+      "start_ms": 3690,
+      "end_ms": 5580,
+      "path": "C:\\VoiceStudio\\projects\\demo\\dataset\\segments\\seg_0001.wav",
+      "text": "We are testing the pipeline."
+    }
+  ]
+}

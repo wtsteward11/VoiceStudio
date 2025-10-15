@@ -1,0 +1,125 @@
+**********************
+PowerShell transcript start
+Start time: 20251015071627
+Username: DESKTOP-8TCJTKA\Tyler
+RunAs User: DESKTOP-8TCJTKA\Tyler
+Configuration Name: 
+Machine: DESKTOP-8TCJTKA (Microsoft Windows NT 10.0.26100.0)
+Host Application: C:\Program Files\PowerShell\7\pwsh.dll
+Process ID: 65856
+PSVersion: 7.5.3
+PSEdition: Core
+GitCommitId: 7.5.3
+OS: Microsoft Windows 10.0.26100
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+Requirement already satisfied: pip in c:\users\tyler\appdata\local\programs\python\python311\lib\site-packages (25.2)
+Requirement already satisfied: flake8 in c:\users\tyler\appdata\local\programs\python\python311\lib\site-packages (7.3.0
+)
+Requirement already satisfied: ruff in c:\users\tyler\appdata\local\programs\python\python311\lib\site-packages (0.14.0)
+
+Requirement already satisfied: black in c:\users\tyler\appdata\local\programs\python\python311\lib\site-packages (25.9.0
+)
+Requirement already satisfied: isort in c:\users\tyler\appdata\local\programs\python\python311\lib\site-packages (7.0.0)
+
+Requirement already satisfied: autoflake in c:\users\tyler\appdata\local\programs\python\python311\lib\site-packages (2.
+3.1)
+Requirement already satisfied: mccabe<0.8.0,>=0.7.0 in c:\users\tyler\appdata\local\programs\python\python311\lib\site-p
+ackages (from flake8) (0.7.0)
+Requirement already satisfied: pycodestyle<2.15.0,>=2.14.0 in c:\users\tyler\appdata\local\programs\python\python311\lib
+\site-packages (from flake8) (2.14.0)
+Requirement already satisfied: pyflakes<3.5.0,>=3.4.0 in c:\users\tyler\appdata\local\programs\python\python311\lib\site
+-packages (from flake8) (3.4.0)
+Requirement already satisfied: click>=8.0.0 in c:\users\tyler\appdata\local\programs\python\python311\lib\site-packages
+(from black) (8.3.0)
+Requirement already satisfied: mypy-extensions>=0.4.3 in c:\users\tyler\appdata\local\programs\python\python311\lib\site
+-packages (from black) (1.1.0)
+Requirement already satisfied: packaging>=22.0 in c:\users\tyler\appdata\local\programs\python\python311\lib\site-packag
+es (from black) (25.0)
+Requirement already satisfied: pathspec>=0.9.0 in c:\users\tyler\appdata\local\programs\python\python311\lib\site-packag
+es (from black) (0.12.1)
+Requirement already satisfied: platformdirs>=2 in c:\users\tyler\appdata\local\programs\python\python311\lib\site-packag
+es (from black) (4.5.0)
+Requirement already satisfied: pytokens>=0.1.10 in c:\users\tyler\appdata\local\programs\python\python311\lib\site-packa
+ges (from black) (0.2.0)
+Requirement already satisfied: colorama in c:\users\tyler\appdata\local\programs\python\python311\lib\site-packages (fro
+m click>=8.0.0->black) (0.4.6)
+
+Skipped 3 files
+invalid-syntax: Expected ',', found name
+  --> workers\python\vsdml\align_whisperx.py:11:13
+   |
+ 9 |     import whisperx
+10 | except Exception as e:
+11 |     print(""whisperx import error:"", e, file=sys.stderr)
+   |             ^^^^^^^^
+12 |     sys.exit(1)
+   |
+
+invalid-syntax: Expected ')', found 'import'
+  --> workers\python\vsdml\align_whisperx.py:11:22
+   |
+ 9 |     import whisperx
+10 | except Exception as e:
+11 |     print(""whisperx import error:"", e, file=sys.stderr)
+   |                      ^^^^^^
+12 |     sys.exit(1)
+   |
+
+invalid-syntax: Expected ',', found ':'
+  --> workers\python\vsdml\align_whisperx.py:11:34
+   |
+ 9 |     import whisperx
+10 | except Exception as e:
+11 |     print(""whisperx import error:"", e, file=sys.stderr)
+   |                                  ^
+12 |     sys.exit(1)
+   |
+
+invalid-syntax: Simple statements must be separated by newlines or semicolons
+  --> workers\python\vsdml\align_whisperx.py:11:35
+   |
+ 9 |     import whisperx
+10 | except Exception as e:
+11 |     print(""whisperx import error:"", e, file=sys.stderr)
+   |                                   ^^
+12 |     sys.exit(1)
+   |
+
+invalid-syntax: Expected a statement
+  --> workers\python\vsdml\align_whisperx.py:11:57
+   |
+ 9 |     import whisperx
+10 | except Exception as e:
+11 |     print(""whisperx import error:"", e, file=sys.stderr)
+   |                                                         ^
+12 |     sys.exit(1)
+   |
+
+invalid-syntax: Expected a statement
+  --> workers\python\vsdml\align_whisperx.py:11:58
+   |
+ 9 |     import whisperx
+10 | except Exception as e:
+11 |     print(""whisperx import error:"", e, file=sys.stderr)
+   |                                                          ^
+12 |     sys.exit(1)
+   |
+
+Found 6 errors.
+error: cannot format C:\VoiceStudio\workers\python\vsdml\align_whisperx.py: Cannot parse: 11:12:     print(""whisperx im
+port error:"", e, file=sys.stderr)
+
+Oh no! �� �� ��
+12 files left unchanged, 1 file failed to reformat.
+
+Running flake8...
+.\workers\python\vsdml\align_whisperx.py:11:12: E999 SyntaxError: invalid syntax. Perhaps you forgot a comma?
+**********************
+PowerShell transcript end
+End time: 20251015071630
+**********************

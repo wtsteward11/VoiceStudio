@@ -1,0 +1,23 @@
+Agent D – Workers: Segment Quality (SNR) + flags
+
+Goal (M1):
+- Compute per-segment SNR (simple RMS-based) and store `snr_db` on each segment in manifest.json
+- Add `--snr` flag to vad.py to enable calculation during VAD; or provide standalone snr_report.py operating on segments dir.
+
+Reference SNR (simple):
+snr_db = 20 * log10( (rms(signal)) / (rms(noise_estimate)+1e-9) )
+For a fast heuristic, estimate noise as RMS of lowest 10% frames.
+
+Scope:
+- Files: /workers/python/vsdml/vad.py (optionally) and /workers/python/vsdml/snr_report.py
+- Output: write back manifest.json with new field `snr_db` per segment
+
+Provide:
+- Python code
+- requirements delta if any (uses numpy + soundfile which already exist)
+- run commands
+- sample output
+
+Acceptance:
+- manifest.json shows `snr_db` floats for each segment
+- smoke-m1.ps1 prints average SNR for the dataset

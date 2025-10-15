@@ -1,0 +1,13 @@
+{
+  "job": {
+    "id": "VSJ-LOCAL-VC",
+    "type": "VC.Convert",
+    "io": {
+      "in": "C:\\\\VoiceStudio\\\\projects\\\\demo\\\\processed\\\\input.wav",
+      "out": "C:\\\\VoiceStudio\\\\projects\\\\demo\\\\vc\\\\shifted.wav"
+    },
+    "args": {
+      "semitones": 3
+    }
+  }
+}

@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools","wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vsdml"
+version = "0.0.2"
+description = "VoiceStudio ML worker (stub)"
+requires-python = ">=3.10"
+dependencies = [
+  "grpcio==1.64.0",
+  "grpcio-tools==1.64.0"
+]

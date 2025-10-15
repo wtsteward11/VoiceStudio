@@ -1,0 +1,9 @@
+{
+  "code": "E_JOB_FAIL",
+  "job": "C:\\VoiceStudio\\queue\\in\\m1_step04.job.json",
+  "outputs": null,
+  "message": "Health: OK v0.1.0\r\nRun status: error, code: E_JOB_FAIL",
+  "started": "2025-10-14T22:16:20",
+  "status": "error",
+  "finished": "2025-10-14T22:16:21"
+}

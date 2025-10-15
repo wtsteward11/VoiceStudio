@@ -1,0 +1,2 @@
+obj\Debug\net8.0/Vsd.cs \
+obj\Debug\net8.0/VsdGrpc.cs: ../IPC/vsd.proto

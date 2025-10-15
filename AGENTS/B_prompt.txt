@@ -1,0 +1,29 @@
+Agent B – Core & Job Engine (FFmpeg runner + cache)
+
+Goal (M1):
+1) Implement an FFmpeg runner with friendly error mapping so Convert/VAD/ASR/etc. failures get stable error codes.
+2) Add a content-hash cache: if job io.in (and args) have been seen before AND io.out exists, skip work and return cached outputs.
+
+Scope:
+- Project: /src/Core
+- Add: /src/Core/FfmpegRunner.cs (wraps process start with timeout, captures stderr, maps known errors)
+- Add: /src/Core/JobCache.cs (SQLite or simple JSON db at C:\VoiceStudio\cache\jobcache.db/json)
+- Update: JobRunner.cs to call cache before spawning workers. Cache key = SHA256(type + in + out + args_json + tool versions).
+
+Error mapping examples:
+- “Invalid data found when processing input” -> E_FFMPEG_DECODE
+- “No such file or directory” -> E_NO_INPUT
+- Non-zero exit -> E_TOOL_FAIL with stderr tail
+
+Cache:
+- If hit and out exists, return status=ok immediately. If out missing, treat as miss and recompute.
+
+Provide:
+- New files with code
+- DB schema (if SQLite) or JSON record format
+- Unit test for hash function and mapping
+- Local run commands
+
+Acceptance:
+- Convert job short-circuits on second run (same input), evidenced by logs
+- Bad path returns E_NO_INPUT without crashing

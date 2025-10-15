@@ -1,0 +1,7 @@
+{
+  "Id": "VSJ-ASR-001",
+  "Type": "ASR.Transcribe",
+  "InPath":  "C:\\VoiceStudio\\projects\\demo\\dataset\\segments\\manifest.json",
+  "OutPath": "C:\\VoiceStudio\\projects\\demo\\dataset\\segments\\asr.json",
+  "ArgsJson": "{\"model\":\"small\",\"device\":\"cpu\"}"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "sample.null",
+  "version": "1.0.0",
+  "kinds": ["UIPanel"],
+  "permissions": { "filesystem": [], "network": false }
+}

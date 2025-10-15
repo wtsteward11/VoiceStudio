@@ -1,0 +1,276 @@
+{
+  "team": "Agent B \u2013 Core & Job Engine",
+  "issues": [
+    {
+      "title": "VS-M0-03 \u2013 SQLite init + baseline schema (Projects/Assets/Utterances/Models/Checkpoints/Jobs/Logs/Plugins/Consents)",
+      "description": "Milestone: M0 Foundations\nOwnerRole: BE\nAcceptance: Migrations idempotent, WAL on",
+      "estimate": 2,
+      "labels": [
+        "M0_Foundations"
+      ],
+      "blocked_by": []
+    },
+    {
+      "title": "VS-M0-04 \u2013 Structured logging (Serilog JSON, rolling)",
+      "description": "Milestone: M0 Foundations\nOwnerRole: BE\nAcceptance: Per-process logs with correlation IDs",
+      "estimate": 1,
+      "labels": [
+        "M0_Foundations"
+      ],
+      "blocked_by": []
+    },
+    {
+      "title": "VS-M0-05 \u2013 gRPC over Named Pipes transport with deadlines/cancel",
+      "description": "Milestone: M0 Foundations\nOwnerRole: BE\nAcceptance: Echo service passes timeout/cancel tests",
+      "estimate": 2,
+      "labels": [
+        "M0_Foundations"
+      ],
+      "blocked_by": [
+        "VS-M0-03"
+      ]
+    },
+    {
+      "title": "VS-M0-07 \u2013 Plugin Host (manifest parse, signature verify, cap registry)",
+      "description": "Milestone: M0 Foundations\nOwnerRole: BE\nAcceptance: Loads sample plugin; rejects unsigned",
+      "estimate": 2,
+      "labels": [
+        "M0_Foundations"
+      ],
+      "blocked_by": [
+        "VS-M0-05"
+      ]
+    },
+    {
+      "title": "VS-M0-08 \u2013 Handshake v1 (version negotiation + warnings)",
+      "description": "Milestone: M0 Foundations\nOwnerRole: BE/ML\nAcceptance: Unknown fields tolerated; flags visible",
+      "estimate": 1,
+      "labels": [
+        "M0_Foundations"
+      ],
+      "blocked_by": [
+        "VS-M0-07"
+      ]
+    },
+    {
+      "title": "VS-M1-01 \u2013 FFmpeg runner (out-of-proc) + error mapping",
+      "description": "Milestone: M1 Data/Converter\nOwnerRole: BE\nAcceptance: Structured failure codes returned",
+      "estimate": 1,
+      "labels": [
+        "M1_Data/Converter"
+      ],
+      "blocked_by": [
+        "VS-M0-03"
+      ]
+    },
+    {
+      "title": "VS-M1-02 \u2013 Project audio format presets",
+      "description": "Milestone: M1 Data/Converter\nOwnerRole: FE/BE\nAcceptance: Persisted per-project",
+      "estimate": 1,
+      "labels": [
+        "M1_Data/Converter"
+      ],
+      "blocked_by": [
+        "VS-M1-01"
+      ]
+    },
+    {
+      "title": "VS-M1-03 \u2013 Batch converter queue (resume/retry/idempotent by hash)",
+      "description": "Milestone: M1 Data/Converter\nOwnerRole: BE\nAcceptance: Re-run doesn\u2019t duplicate work",
+      "estimate": 2,
+      "labels": [
+        "M1_Data/Converter"
+      ],
+      "blocked_by": [
+        "VS-M1-02"
+      ]
+    },
+    {
+      "title": "VS-M1-06 \u2013 Cache layout & counters",
+      "description": "Milestone: M1 Data/Converter\nOwnerRole: BE\nAcceptance: Hit/miss counters visible",
+      "estimate": 1,
+      "labels": [
+        "M1_Data/Converter"
+      ],
+      "blocked_by": [
+        "VS-M0-03"
+      ]
+    },
+    {
+      "title": "VS-M2-01 \u2013 Transcript importers: .txt/.srt/.vtt",
+      "description": "Milestone: M2 Transcripts\nOwnerRole: BE\nAcceptance: Cues -> utterances with times",
+      "estimate": 1,
+      "labels": [
+        "M2_Transcripts"
+      ],
+      "blocked_by": [
+        "VS-M0-03"
+      ]
+    },
+    {
+      "title": "VS-M2-02 \u2013 Transcript importers: .docx/.pdf/.rtf",
+      "description": "Milestone: M2 Transcripts\nOwnerRole: BE\nAcceptance: Paragraphs merged; preview shows structure",
+      "estimate": 2,
+      "labels": [
+        "M2_Transcripts"
+      ],
+      "blocked_by": [
+        "VS-M2-01"
+      ]
+    },
+    {
+      "title": "VS-M2-06 \u2013 Dataset builder manifests (train/dev/test TSV+JSON)",
+      "description": "Milestone: M2 Transcripts\nOwnerRole: BE\nAcceptance: Validated manifests; counts match UI",
+      "estimate": 1,
+      "labels": [
+        "M2_Transcripts"
+      ],
+      "blocked_by": [
+        "VS-M2-05"
+      ]
+    },
+    {
+      "title": "VS-M3-04 \u2013 Voice Profiles DB/UI (link models, style presets)",
+      "description": "Milestone: M3 Models\nOwnerRole: FE/BE\nAcceptance: Profile-select drives defaults",
+      "estimate": 2,
+      "labels": [
+        "M3_Models"
+      ],
+      "blocked_by": [
+        "VS-M3-01"
+      ]
+    },
+    {
+      "title": "VS-M3-06 \u2013 Model store mgmt (install/remove, hash verify)",
+      "description": "Milestone: M3 Models\nOwnerRole: BE\nAcceptance: Corrupt weights quarantined",
+      "estimate": 1,
+      "labels": [
+        "M3_Models"
+      ],
+      "blocked_by": [
+        "VS-M3-01"
+      ]
+    },
+    {
+      "title": "VS-M4-01 \u2013 Supervisor & heartbeats; Job Objects limits",
+      "description": "Milestone: M4 Plugin Hardening\nOwnerRole: BE\nAcceptance: Kill plugin -> restart; resources bounded",
+      "estimate": 2,
+      "labels": [
+        "M4_Plugin_Hardening"
+      ],
+      "blocked_by": [
+        "VS-M0-07"
+      ]
+    },
+    {
+      "title": "VS-M4-02 \u2013 Staged update + multi-version rollback",
+      "description": "Milestone: M4 Plugin Hardening\nOwnerRole: BE\nAcceptance: Broken update auto-rolls back",
+      "estimate": 2,
+      "labels": [
+        "M4_Plugin_Hardening"
+      ],
+      "blocked_by": [
+        "VS-M0-07"
+      ]
+    },
+    {
+      "title": "VS-M4-03 \u2013 Safe Mode (disable 3P plugins at startup)",
+      "description": "Milestone: M4 Plugin Hardening\nOwnerRole: BE\nAcceptance: Toggle from splash works",
+      "estimate": 1,
+      "labels": [
+        "M4_Plugin_Hardening"
+      ],
+      "blocked_by": [
+        "VS-M0-07"
+      ]
+    },
+    {
+      "title": "VS-M4-04 \u2013 AssemblyLoadContext for UI plugins + hot unload",
+      "description": "Milestone: M4 Plugin Hardening\nOwnerRole: BE\nAcceptance: Memory drops after unload",
+      "estimate": 2,
+      "labels": [
+        "M4_Plugin_Hardening"
+      ],
+      "blocked_by": [
+        "VS-M0-07"
+      ]
+    },
+    {
+      "title": "VS-M4-05 \u2013 IPC backpressure & deadlines (ring buffers)",
+      "description": "Milestone: M4 Plugin Hardening\nOwnerRole: BE\nAcceptance: p95 latency stable under 20 synths",
+      "estimate": 2,
+      "labels": [
+        "M4_Plugin_Hardening"
+      ],
+      "blocked_by": [
+        "VS-M0-05"
+      ]
+    },
+    {
+      "title": "VS-M4-06 \u2013 Diagnostics bundle (logs, DAG, manifests, env)",
+      "description": "Milestone: M4 Plugin Hardening\nOwnerRole: BE\nAcceptance: Single ZIP from UI",
+      "estimate": 1,
+      "labels": [
+        "M4_Plugin_Hardening"
+      ],
+      "blocked_by": [
+        "VS-M0-04"
+      ]
+    },
+    {
+      "title": "VS-M5-03 \u2013 Export panel (WAV/FLAC/MP3, loudness, provenance toggle)",
+      "description": "Milestone: M5 UX Polish\nOwnerRole: FE/BE\nAcceptance: Bit-identical when no processing",
+      "estimate": 2,
+      "labels": [
+        "M5_UX_Polish"
+      ],
+      "blocked_by": [
+        "VS-M3-01"
+      ]
+    },
+    {
+      "title": "VS-M6-01 \u2013 Plugin SDK (C#): interfaces, helpers, templates",
+      "description": "Milestone: M6 SDK & Samples\nOwnerRole: BE\nAcceptance: dotnet new template builds & loads",
+      "estimate": 2,
+      "labels": [
+        "M6_SDK_&_Samples"
+      ],
+      "blocked_by": [
+        "VS-M4-02"
+      ]
+    },
+    {
+      "title": "VS-M6-03 \u2013 Contract test harness (goldens, perf, memory)",
+      "description": "Milestone: M6 SDK & Samples\nOwnerRole: QA/BE\nAcceptance: Pass/fail report; CI gate",
+      "estimate": 2,
+      "labels": [
+        "M6_SDK_&_Samples"
+      ],
+      "blocked_by": [
+        "VS-M6-01"
+      ]
+    },
+    {
+      "title": "VS-M6-05 \u2013 Dev docs (SDK, manifests, flags, examples)",
+      "description": "Milestone: M6 SDK & Samples\nOwnerRole: BE\nAcceptance: Versioned docs build",
+      "estimate": 1,
+      "labels": [
+        "M6_SDK_&_Samples"
+      ],
+      "blocked_by": [
+        "VS-M6-01"
+      ]
+    },
+    {
+      "title": "VS-M7-04 \u2013 EULA/Consent UX + provenance default ON",
+      "description": "Milestone: M7 Release\nOwnerRole: FE/BE\nAcceptance: User sees policy on first export",
+      "estimate": 1,
+      "labels": [
+        "M7_Release"
+      ],
+      "blocked_by": [
+        "VS-M5-03"
+      ]
+    }
+  ]
+}

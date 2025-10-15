@@ -1,0 +1,16 @@
+# VoiceStudio – STATE (M1)
+- OS: Windows + PowerShell 7.5.x
+- FFmpeg: installed
+- Piper: installed; voices present (en_US-amy-low)
+- Python worker venv: exists; torch 2.8.0+cpu, torchaudio 2.8.0+cpu, faster-whisper 1.2.0; whisperx installed
+- Core (.NET 8): gRPC on http://127.0.0.1:5071 (HTTP/2)
+- Client: can call Core; TTS job returns WAV
+- Pipelines:
+  - Audio.Convert ✅
+  - Dataset.VAD ✅
+  - ASR.Transcribe ✅
+  - Align.Run ❌ (API drift; fixed script included below)
+  - TTS.Synthesize ✅ (Piper)
+  - VC.Convert ✅ (placeholder)
+- Agents A/B/C/D/E: defined; B(Core orchestrator) & D(Worker) **created but not fully wired**
+- Next: finalize Align.Run with whisperx API for CPU, wire job dispatcher (B↔D), add error mapping.

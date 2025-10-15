@@ -1,0 +1,157 @@
+{
+  "team": "Agent D \u2013 ML Workers (ASR/Align/TTS/VC)",
+  "issues": [
+    {
+      "title": "VS-M0-06 \u2013 Python worker bootstrap (venv, wheels lockfile, run_worker.py)",
+      "description": "Milestone: M0 Foundations\nOwnerRole: ML\nAcceptance: Start/stop from Core; health ping OK",
+      "estimate": 2,
+      "labels": [
+        "M0_Foundations"
+      ],
+      "blocked_by": []
+    },
+    {
+      "title": "VS-M0-08 \u2013 Handshake v1 (version negotiation + warnings)",
+      "description": "Milestone: M0 Foundations\nOwnerRole: BE/ML\nAcceptance: Unknown fields tolerated; flags visible",
+      "estimate": 1,
+      "labels": [
+        "M0_Foundations"
+      ],
+      "blocked_by": [
+        "VS-M0-07"
+      ]
+    },
+    {
+      "title": "VS-M0-09 \u2013 GPU probe (CUDA/DirectML/CPU) + Hardware banner",
+      "description": "Milestone: M0 Foundations\nOwnerRole: ML/FE\nAcceptance: Correct detection on GPU/no-GPU machines",
+      "estimate": 1,
+      "labels": [
+        "M0_Foundations"
+      ],
+      "blocked_by": [
+        "VS-M0-06"
+      ]
+    },
+    {
+      "title": "VS-M1-04 \u2013 VAD step (WebRTC + Silero selectable)",
+      "description": "Milestone: M1 Data/Converter\nOwnerRole: ML\nAcceptance: Segments saved; SNR reported",
+      "estimate": 2,
+      "labels": [
+        "M1_Data/Converter"
+      ],
+      "blocked_by": [
+        "VS-M0-06"
+      ]
+    },
+    {
+      "title": "VS-M2-03 \u2013 ASR: faster-whisper (auto compute type)",
+      "description": "Milestone: M2 Transcripts\nOwnerRole: ML\nAcceptance: 10-min clip transcribed < real-time (GPU)",
+      "estimate": 2,
+      "labels": [
+        "M2_Transcripts"
+      ],
+      "blocked_by": [
+        "VS-M0-06"
+      ]
+    },
+    {
+      "title": "VS-M2-04 \u2013 Forced alignment: WhisperX primary, MFA fallback",
+      "description": "Milestone: M2 Transcripts\nOwnerRole: ML\nAcceptance: Word/phoneme timings; <2% >80ms error",
+      "estimate": 2,
+      "labels": [
+        "M2_Transcripts"
+      ],
+      "blocked_by": [
+        "VS-M2-03"
+      ]
+    },
+    {
+      "title": "VS-M3-01 \u2013 Piper TTS inference wrapper",
+      "description": "Milestone: M3 Models\nOwnerRole: ML\nAcceptance: Synthesize text -> WAV path",
+      "estimate": 1,
+      "labels": [
+        "M3_Models"
+      ],
+      "blocked_by": [
+        "VS-M0-06"
+      ]
+    },
+    {
+      "title": "VS-M3-02 \u2013 Piper fine-tune pipeline (hparams, checkpoints, resume)",
+      "description": "Milestone: M3 Models\nOwnerRole: ML\nAcceptance: Loss decreases; ckpt in models/piper",
+      "estimate": 2,
+      "labels": [
+        "M3_Models"
+      ],
+      "blocked_by": [
+        "VS-M3-01"
+      ]
+    },
+    {
+      "title": "VS-M3-03 \u2013 RVC training + conversion (RMVPE F0, RT/offline)",
+      "description": "Milestone: M3 Models\nOwnerRole: ML\nAcceptance: <=1.2x RTF on GPU; stable pitch",
+      "estimate": 3,
+      "labels": [
+        "M3_Models"
+      ],
+      "blocked_by": [
+        "VS-M0-06"
+      ]
+    },
+    {
+      "title": "VS-M3-05 \u2013 Prosody controls (rate/pitch/energy + style tokens)",
+      "description": "Milestone: M3 Models\nOwnerRole: FE/ML\nAcceptance: \u00b15% measurable change",
+      "estimate": 2,
+      "labels": [
+        "M3_Models"
+      ],
+      "blocked_by": [
+        "VS-M3-04"
+      ]
+    },
+    {
+      "title": "VS-M5-02 \u2013 Dataset Studio: phoneme lane + diarization view",
+      "description": "Milestone: M5 UX Polish\nOwnerRole: FE/ML\nAcceptance: Phones track scrubbing",
+      "estimate": 2,
+      "labels": [
+        "M5_UX_Polish"
+      ],
+      "blocked_by": [
+        "VS-M2-04"
+      ]
+    },
+    {
+      "title": "VS-M6-02 \u2013 Plugin SDK (Python): server skeleton, runner, examples",
+      "description": "Milestone: M6 SDK & Samples\nOwnerRole: ML\nAcceptance: Sample model plugin runs self-test",
+      "estimate": 2,
+      "labels": [
+        "M6_SDK_&_Samples"
+      ],
+      "blocked_by": [
+        "VS-M4-01"
+      ]
+    },
+    {
+      "title": "VS-M6-04 \u2013 Sample plugins: Exporter (C#), Task (Py), UIPanel (C#)",
+      "description": "Milestone: M6 SDK & Samples\nOwnerRole: FE/ML\nAcceptance: Appear in Hub; survive restart/update",
+      "estimate": 3,
+      "labels": [
+        "M6_SDK_&_Samples"
+      ],
+      "blocked_by": [
+        "VS-M6-01"
+      ]
+    },
+    {
+      "title": "VS-M7-03 \u2013 Offline wheel cache for worker",
+      "description": "Milestone: M7 Release\nOwnerRole: ML/Build\nAcceptance: First-run offline install works",
+      "estimate": 1,
+      "labels": [
+        "M7_Release"
+      ],
+      "blocked_by": [
+        "VS-M0-06"
+      ]
+    }
+  ]
+}

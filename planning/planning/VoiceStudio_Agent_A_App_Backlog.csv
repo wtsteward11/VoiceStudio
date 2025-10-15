@@ -1,0 +1,16 @@
+ID,Title,Milestone,OwnerRole,EstimateDays,Dependencies,AcceptanceCriteria,CoOwner
+VS-M0-01,"Solution skeleton: WinUI 3 (.NET 8), single-project MSIX",M0 Foundations,FE,1,,App boots to empty shell,false
+VS-M0-02,"Navigation & state host (DI, Settings)",M0 Foundations,FE,1,VS-M0-01,Frame nav + persisted window state,false
+VS-M0-09,GPU probe (CUDA/DirectML/CPU) + Hardware banner,M0 Foundations,ML/FE,1,VS-M0-06,Correct detection on GPU/no-GPU machines,true
+VS-M1-02,Project audio format presets,M1 Data/Converter,FE/BE,1,VS-M1-01,Persisted per-project,true
+VS-M1-05,Dataset Studio waveform viewer,M1 Data/Converter,FE,2,VS-M0-02,Smooth zoom/scrub; 60 fps on 10-min audio,false
+VS-M2-05,Transcript editor (text lanes + timing nudge + re-align),M2 Transcripts,FE,2,VS-M2-04,Edits persist; phones update,false
+VS-M3-04,"Voice Profiles DB/UI (link models, style presets)",M3 Models,FE/BE,2,VS-M3-01,Profile-select drives defaults,true
+VS-M3-05,Prosody controls (rate/pitch/energy + style tokens),M3 Models,FE/ML,2,VS-M3-04,±5% measurable change,true
+VS-M5-01,"Plugin Gallery (caps badges, compat ranges)",M5 UX Polish,FE,2,VS-M4-02,Install/disable/rollback flows OK,false
+VS-M5-02,Dataset Studio: phoneme lane + diarization view,M5 UX Polish,FE/ML,2,VS-M2-04,Phones track scrubbing,true
+VS-M5-03,"Export panel (WAV/FLAC/MP3, loudness, provenance toggle)",M5 UX Polish,FE/BE,2,VS-M3-01,Bit-identical when no processing,true
+VS-M5-04,"Accessibility pass (keyboard, SR labels)",M5 UX Polish,FE/QA,1,VS-M5-01,Passes Accessibility Insights checks,true
+VS-M5-05,"Performance pass (virtualized lists, async)",M5 UX Polish,FE,1,VS-M5-01,UI responsive during jobs,false
+VS-M6-04,"Sample plugins: Exporter (C#), Task (Py), UIPanel (C#)",M6 SDK & Samples,FE/ML,3,VS-M6-01,Appear in Hub; survive restart/update,true
+VS-M7-04,EULA/Consent UX + provenance default ON,M7 Release,FE/BE,1,VS-M5-03,User sees policy on first export,true

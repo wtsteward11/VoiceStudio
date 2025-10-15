@@ -1,0 +1,7 @@
+{
+  "Id": "VSJ-VAD-001",
+  "Type": "Dataset.VAD",
+  "InPath":  "C:\\VoiceStudio\\projects\\demo\\processed\\input.wav",
+  "OutPath": "C:\\VoiceStudio\\projects\\demo\\dataset\\segments",
+  "ArgsJson": "{\"aggr\":2,\"min\":0.6}"
+}

@@ -1,0 +1,33 @@
+Agent A – App UI (WinUI 3, .NET 8)
+
+Goal (M1):
+Create a Dataset Studio page that visualizes:
+- waveform of the selected clip
+- segment overlays from manifest.json
+- hover shows ASR text; if aligned.json exists show per-word timings
+
+Scope:
+- Project: /src/App (WinUI 3 solution already exists from M0; if not, create)
+- New page: /src/App/Pages/DatasetStudioPage.xaml (+ .xaml.cs)
+- Services: IFilePicker, IProjectService (read from %LOCALAPPDATA%/VoiceStudio/settings.json for project root)
+- Data files: 
+  C:\VoiceStudio\projects\demo\dataset\segments\manifest.json
+  C:\VoiceStudio\projects\demo\dataset\segments\asr.json
+  (optional) aligned.json
+
+Requirements:
+- A “Load Project” button that remembers last folder (SettingsService).
+- A file tree (left) for project browsing; when user clicks a segment .wav, render waveform and overlays.
+- Use NAudio to render waveform (precompute peaks) or draw a simple amplitude plot (fast enough for <10 min files).
+- No ML or FFmpeg calls from UI; read-only.
+- Include a minimal MVVM structure, commands, and an error banner area.
+- Provide: file tree, code diffs, build steps, and a short test checklist.
+
+Acceptance:
+- Page compiles and navigates from Home
+- Given demo project, overlays are visible; hovering a segment displays its ASR text
+- If aligned.json exists and contains `words`, draw inner word markers.
+
+Commands:
+- dotnet add package NAudio --version 2.2.1
+- dotnet build / run

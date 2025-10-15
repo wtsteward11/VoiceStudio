@@ -1,0 +1,6 @@
+C:\VoiceStudio\src\Core\obj\Debug\net8.0\VoiceStudio.Core.csproj.AssemblyReference.cache
+C:\VoiceStudio\src\Core\obj\Debug\net8.0\VoiceStudio.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\VoiceStudio\src\Core\obj\Debug\net8.0\VoiceStudio.Core.AssemblyInfoInputs.cache
+C:\VoiceStudio\src\Core\obj\Debug\net8.0\VoiceStudio.Core.AssemblyInfo.cs
+C:\VoiceStudio\src\Core\obj\Debug\net8.0\VoiceStudio.Core.csproj.CoreCompileInputs.cache
+C:\VoiceStudio\src\Core\obj\Debug\net8.0\VoiceStudio.Core.MvcApplicationPartsAssemblyInfo.cache

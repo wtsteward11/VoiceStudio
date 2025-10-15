@@ -1,0 +1,10 @@
+{
+  "input_audio": "data/audio/sample.wav",
+  "output_dir":  "data/out",
+  "xtts_config": "configs/xtts_config.json",
+  "speaker_model": "models/speakers/default_speaker.pth",
+  "align_audio": "data/audio/sample.wav",
+  "align_language": "en",
+  "whisperx_model": "small",
+  "device": "cpu"
+}

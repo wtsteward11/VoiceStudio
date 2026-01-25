@@ -16,7 +16,7 @@ ffmpeg-python>=0.2.0,<1.0.0
 
 # Voice cloning and TTS (optimized versions)
 TTS==0.22.0
-transformers==4.30.0
+transformers==4.53.0
 pyannote.audio==4.0.1
 whisper==20231117
 accelerate>=0.20.0,<1.0.0

@@ -28,7 +28,7 @@ markdown>=3.4.0,<4.0.0
 matplotlib>=3.7.1,<4.0.0
 matplotlib-inline>=0.1.6,<1.0.0
 praat-parselmouth>=0.4.3,<1.0.0
-pillow>=9.1.1,<11.0.0
+pillow>=9.1.1,<13.0.0
 pyworld==0.3.2
 resampy>=0.4.2,<1.0.0
 scikit-learn>=1.2.2,<2.0.0

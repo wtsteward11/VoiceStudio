@@ -32,27 +32,28 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## Current Phase
 
 - **Phase**: Implement (Post Gate D — Gate H)
-- **Master Plan Phase**: 11 - Post-GA Polish and Technical Debt (3 sprints)
+- **Master Plan Phase**: 12 - Strategic Hardening and Ecosystem Integrity
 - **Started**: 2026-02-21
-- **Context**: **PHASE 11 IN PROGRESS.** Sprint 1 blocked (git push 403). Sprint 2 COMPLETE (mypy remediation). Sprint 3 COMPLETE (contributor guide exists, performance baselines updated, closure docs).
+- **Context**: **PHASE 12 COMPLETE.** WS1–WS5 delivered. GA tag checklist ready for Tyler. Git push 403 remains (user action).
 
 ## Active Plan
 
-- **Plan**: Phase 11 Post-GA Polish and Technical Debt
-- **Document**: `c:\Users\Tyler\.cursor\plans\phase_11_grounded_plan_89bc78e5.plan.md`
-- **Sprints**: 3 (Sprint 1 blocked; Sprints 2–3 COMPLETE)
+- **Plan**: Phase 12 Strategic Hardening
+- **Document**: `c:\Users\Tyler\.cursor\plans\phase_12_grounded_plan_f5570232.plan.md`
+- **Workstreams**: WS1–WS5 COMPLETE
 
 ## Active Task
 
-- **ID**: PHASE-11-POST-GA-POLISH
-- **Title**: Phase 11 Post-GA Polish and Technical Debt — COMPLETE (agent-deliverable work)
+- **ID**: PHASE-12-STRATEGIC-HARDENING
+- **Title**: Phase 12 Strategic Hardening and Ecosystem Integrity — COMPLETE
 - **Status**: **COMPLETE** (2026-02-21)
-- **Plan**: `c:\Users\Tyler\.cursor\plans\phase_11_grounded_plan_89bc78e5.plan.md`
 - **Deliverables**:
-  - Sprint 1: BLOCKED — git push 403 (user action required); SPRINT1_GA_BLOCKER.md updated
-  - Sprint 2: model_drift_detector, ab_testing, drift routes type fixes; MYPY_TRIAGE_PLAN updated
-  - Sprint 3: PERFORMANCE_BASELINES inference section; CONTRIBUTING.md exists; CHANGELOG, STATE updated
-- **Verification**: `python scripts/run_verification.py` — 4/5 PASS (completion_guard requires commit)
+  - WS1: CVE remediation (filelock, pillow, python-multipart, keras, transformers); CVE_EXCEPTIONS.md
+  - WS2: Full-app SBOM, requirements hashes, installer provenance, SUPPLY_CHAIN_ATTESTATION.md, ADR-044
+  - WS3: XAML wrapper retry, CleanStaleXamlArtifacts, build-clean.ps1, playbook update
+  - WS4: Mypy incremental fixes (routes, plugins); MYPY_TRIAGE_PLAN, VS-0043 updated
+  - WS5: CHANGELOG, release notes, HANDOVER_CHECKLIST, evidence pack
+- **Next**: v1.0.2 GA tag (resolve git push 403, run verify.ps1, tag, push, release)
 
 ## Previous Active Task
 
@@ -819,9 +820,9 @@ Production Gap Resolution and Architecture Completion. Implemented by Senior Sof
 
 ## Next 3 Steps
 
-1. **v1.0.2 GA:** Run verify.ps1, pip-audit 0 CVEs, then tag v1.0.2 — Release Engineer — HIGH — See `docs/release/HANDOVER_CHECKLIST.md`
-2. **Build recovery:** XAML compiler exit 1 in this env — try Visual Studio or CI; known workaround in docs/build/XAML_COMPILER_PLAYBOOK.md
-3. **CVE remediation:** 25 pip-audit CVEs (basicsr, filelock, keras, pillow, python-multipart, transformers) — upgrade dependencies when compatible
+1. **v1.0.2 GA:** Resolve git push 403; run verify.ps1; tag v1.0.2; push; create GitHub release — Tyler — HIGH — See `docs/release/HANDOVER_CHECKLIST.md`
+2. **Build recovery:** Use `.\scripts\build-clean.ps1` when XAML compiler fails; see docs/build/XAML_COMPILER_PLAYBOOK.md
+3. **v1.1.0 planning:** Phase 12 complete; next phase planning when GA shipped
 
 ✅ **Completed 2026-02-21 (Phase 1 Backend Solidification):**
 - **VS-0045 Root Cause Fixed:** COQUI_TOS_AGREED gate, Whisper download_root, default STT engine, model path unification
@@ -1049,17 +1050,17 @@ _Previous:_
 
 ## Context Acknowledgment
 
-- **Acknowledged At**: 2026-02-21 (Phase 6 Release Polish Complete)
-- **Acknowledged By**: Overseer (Role 0)
+- **Acknowledged At**: 2026-02-21 (Phase 12 Strategic Hardening Complete)
+- **Acknowledged By**: Phase 12 Implementation
 - **Actions Completed**:
-  - Phase 6 WS1: Port mismatch 8001→8000 (16 files)
-  - WS2: Debug.WriteLine Tier 1 → ErrorLogger (16 files, 256 instances)
-  - WS3: test_engine_health_manifests.py (63 manifests, engine_health_report.json)
-  - WS4: STATE.md, Proof Index, release notes updated
-  - WS5: BUILD_BASELINE_2026-02-21.md, VM_TEST_PROCEDURE.md
-- **Notes**: Phase 6 complete. Build 0 errors. empty_catch_check pre-existing (VS-0041).
+  - Phase 12 WS1: CVE remediation (filelock, pillow, python-multipart, keras, transformers); CVE_EXCEPTIONS.md
+  - WS2: Full-app SBOM, generate_requirements_hashes.ps1, generate_installer_provenance.ps1, SUPPLY_CHAIN_ATTESTATION.md, ADR-044
+  - WS3: XAML wrapper retry, CleanStaleXamlArtifacts, build-clean.ps1, XAML_COMPILER_PLAYBOOK.md
+  - WS4: Mypy incremental fixes (routes, plugins); MYPY_TRIAGE_PLAN, VS-0043 updated
+  - WS5: CHANGELOG, RELEASE_NOTES, HANDOVER_CHECKLIST, evidence pack, STATE.md
+- **Notes**: Phase 12 complete. GA tag checklist ready. Git push 403 remains (user action).
 - **Previous**: 2026-02-21 (Phase 6 Release Polish)
-- **Summary**: Phase 6 Release Polish complete. All 5 workstreams delivered.
+- **Summary**: Phase 12 Strategic Hardening complete. All 5 workstreams delivered.
 
 ## SSOT Pointers
 
@@ -1080,6 +1081,7 @@ _Previous:_
 
 | Date | Task | Artifact | Type | Verified |
 | --- | --- | --- | --- | --- |
+| 2026-02-21 | Phase 12 WS1–WS5 | CVE remediation, supply-chain (ADR-044), build-clean.ps1, mypy fixes, CHANGELOG, HANDOVER_CHECKLIST, docs/release/evidence/v1.0.2/ | Phase 12 | Verified |
 | 2026-02-21 | Phase 11 Sprint 2 | model_drift_detector, ab_testing, drift routes type fixes; MYPY_TRIAGE_PLAN updated | Type Safety | Verified |
 | 2026-02-21 | Phase 11 Sprint 3 | PERFORMANCE_BASELINES inference section; CONTRIBUTING.md; CHANGELOG, STATE, CANONICAL_REGISTRY | Documentation | Verified |
 | 2026-02-21 | Phase 11 Sprint 1 | SPRINT1_GA_BLOCKER.md updated (403 persists; SSH fallback noted) | Blocker | Blocked |

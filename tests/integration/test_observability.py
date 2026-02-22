@@ -63,7 +63,9 @@ class TestHealthDashboard(IntegrationTestBase):
         """Test GET /api/health/dashboard returns expected structure."""
         from httpx import ASGITransport, AsyncClient
 
-        from backend.api.main import app
+        from backend.api.main import _register_all_routes, app
+
+        _register_all_routes()
 
         async with AsyncClient(
             transport=ASGITransport(app=app),

@@ -70,8 +70,8 @@ except Exception as e:
     logging.getLogger(__name__).warning("Failed to precreate model directories: %s", e)
 
 import importlib
-import logging
 import importlib as _il
+import logging
 import os
 import time
 from typing import Any, cast
@@ -373,6 +373,25 @@ async def startup_event():
                 logger.info(
                     f"Database ready: {status['applied_count']} migration(s) applied, 0 pending"
                 )
+
+        # Task 2.3: Run infrastructure repository migrations and connect adapter
+        from backend.infrastructure.migrations.initial_schema import (
+            run_migrations as run_infra_migrations,
+        )
+
+        await run_infra_migrations()
+
+        # Connect DatabaseAdapter for repository layer (same path as migrations)
+        try:
+            from backend.infrastructure.adapters.database import (
+                get_database_adapter,
+            )
+
+            db = get_database_adapter(connection_string=config.connection_string)
+            if not db._connected:
+                await db.connect()
+        except Exception as db_err:
+            logger.debug("Repository layer DB connect (optional): %s", db_err)
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}", exc_info=True)
         # Don't fail startup - fall back to in-memory if database unavailable
@@ -755,7 +774,7 @@ def custom_openapi():
     return app.openapi_schema
 
 
-setattr(app, "openapi", custom_openapi)
+app.openapi = custom_openapi
 
 logger = logging.getLogger(__name__)
 

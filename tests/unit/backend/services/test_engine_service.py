@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.services.engine_service import (
+from backend.ml.models.engine_service import (
     EngineService,
     IEngineService,
     get_engine_by_id,
@@ -305,7 +305,7 @@ class TestEngineServiceFactory:
 
     def test_get_engine_service_returns_singleton(self) -> None:
         """get_engine_service returns same instance on repeated calls."""
-        import backend.services.engine_service as engine_module
+        import backend.ml.models.engine_service as engine_module
 
         # Reset singleton for test isolation
         orig = engine_module._engine_service_instance
@@ -320,7 +320,7 @@ class TestEngineServiceFactory:
 
     def test_get_engine_by_id_delegates_to_service(self) -> None:
         """get_engine_by_id delegates to engine service."""
-        with patch("backend.services.engine_service.get_engine_service") as mock_get_service:
+        with patch("backend.ml.models.engine_service.get_engine_service") as mock_get_service:
             mock_svc = MagicMock()
             mock_engine = MagicMock()
             mock_svc.get_engine.return_value = mock_engine

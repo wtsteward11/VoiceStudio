@@ -45,6 +45,7 @@ HAS_LIBROSA = False
 librosa: Any = None
 try:
     import librosa as _librosa_mod
+
     librosa = _librosa_mod
     HAS_LIBROSA = True
 except ImportError:

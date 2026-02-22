@@ -14,14 +14,12 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 
 from ..auth import require_auth_if_enabled
-
-from typing import Any, Callable
 
 try:
     from ..optimization import cache_response

@@ -1,8 +1,11 @@
 import os
 from pathlib import Path
 
-from backend.services.AudioArtifactRegistry import get_audio_registry, reset_audio_registry
-from backend.services.ContentAddressedAudioCache import reset_audio_cache
+from backend.audio.processing.audio_artifact_registry import (
+    get_audio_registry,
+    reset_audio_registry,
+)
+from backend.audio.processing.content_addressed_audio_cache import reset_audio_cache
 
 
 def test_audio_artifact_registry_persists_across_restart(tmp_path: Path, monkeypatch):

@@ -547,9 +547,7 @@ class CertificationEngine:
                 manifest_file = package_path / name
                 if manifest_file.exists():
                     try:
-                        parsed_manifest: dict[str, Any] = json.loads(
-                            manifest_file.read_text()
-                        )
+                        parsed_manifest: dict[str, Any] = json.loads(manifest_file.read_text())
                         return parsed_manifest
                     except json.JSONDecodeError as e:
                         # GAP-PY-001: Invalid JSON in manifest, try next

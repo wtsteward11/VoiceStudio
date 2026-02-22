@@ -53,14 +53,16 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 
+from backend.audio.processing.audio_artifact_registry import get_audio_registry
+from backend.audio.processing.content_addressed_audio_cache import get_audio_cache
+from backend.core.circuit_breaker import (
+    get_engine_breaker,
+)
 from backend.core.security.file_validation import (
     FileCategory,
     FileValidationError,
     validate_audio_file,
     validate_media_for_audio_extraction,
-)
-from backend.core.circuit_breaker import (
-    get_engine_breaker,
 )
 from backend.ml.models.engine_service import IEngineService, get_engine_service
 from backend.ml.models.model_preflight import (
@@ -71,8 +73,6 @@ from backend.ml.models.model_preflight import (
 )
 from backend.platform.config.unified_config import get_config
 
-from ...services.AudioArtifactRegistry import get_audio_registry
-from ...services.ContentAddressedAudioCache import get_audio_cache
 from ..deps import (
     EngineConfigServiceDep,
     EngineServiceDep,
@@ -2815,7 +2815,7 @@ async def post_process_pipeline(
                     import cv2
                     import numpy as np
 
-                    _fourcc_fn: Any = getattr(cv2, "VideoWriter_fourcc")
+                    _fourcc_fn: Any = cv2.VideoWriter_fourcc
                     processed_video_path = video_path
                     stages_applied = []
                     total_quality_improvement = 0.0

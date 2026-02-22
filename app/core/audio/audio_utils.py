@@ -879,7 +879,9 @@ def enhance_voice_quality(
                     # Sequential for 1-2 channels (lower overhead)
                     seq_channels: list[np.ndarray] = []
                     for ch in range(num_channels):
-                        seq_channels.append(np.asarray(nr.reduce_noise(y=enhanced[:, ch], sr=sample_rate)))
+                        seq_channels.append(
+                            np.asarray(nr.reduce_noise(y=enhanced[:, ch], sr=sample_rate))
+                        )
                     enhanced = np.column_stack(seq_channels)
             else:
                 enhanced = nr.reduce_noise(y=enhanced, sr=sample_rate)
@@ -1661,9 +1663,7 @@ def enhance_voice_cloning_quality(
                 if "cloning_voicefixer" not in _lazy_caches:
                     _lazy_caches["cloning_voicefixer"] = VoiceFixer()
 
-                enhanced_44k = _lazy_caches["cloning_voicefixer"].restore(
-                    enhanced_44k, cuda=False
-                )
+                enhanced_44k = _lazy_caches["cloning_voicefixer"].restore(enhanced_44k, cuda=False)
 
                 if sample_rate != 44100:
                     enhanced = resample_audio(enhanced_44k, 44100, sample_rate)

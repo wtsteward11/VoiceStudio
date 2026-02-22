@@ -7,6 +7,7 @@ Provides model fetching, updating, and checksum verification.
 
 from __future__ import annotations
 
+import importlib as _il
 import json
 import logging
 import os
@@ -15,13 +16,11 @@ import sys
 import tempfile
 import zipfile
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-
-import importlib as _il
-from typing import Any
 
 from backend.core.security.file_validation import (
     FileValidationError,
@@ -555,7 +554,7 @@ async def import_model(
                         detail="Invalid model archive: missing model_info.json",
                     )
 
-                with open(metadata_file, "r") as mf:
+                with open(metadata_file) as mf:
                     metadata = json.load(mf)
 
                 # Use provided engine or metadata engine

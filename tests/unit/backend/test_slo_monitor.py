@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
-from backend.services.slo_monitor import (
+from backend.platform.monitoring.slo_monitor import (
     AlertSeverity,
     SLODefinition,
     SLOMonitor,

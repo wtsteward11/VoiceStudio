@@ -375,7 +375,9 @@ class ESpeakNGEngine(EngineProtocol):
                         )
                         return None
                     if calculate_quality:
-                        return np.asarray(cached_result["audio"]), cached_result.get("quality_metrics", {})
+                        return np.asarray(cached_result["audio"]), cached_result.get(
+                            "quality_metrics", {}
+                        )
                     return np.asarray(cached_result["audio"])
                 else:
                     self._cache_stats["misses"] += 1

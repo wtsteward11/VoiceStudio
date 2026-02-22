@@ -90,7 +90,7 @@ class _ProfilesProxy:
         return self._wrap(result)
 
     def __setitem__(self, profile_id: str, profile: object) -> None:
-        data = profile.__dict__ if hasattr(profile, '__dict__') else {}
+        data = profile.__dict__ if hasattr(profile, "__dict__") else {}
         data["id"] = profile_id
         self._store.save(data)
 

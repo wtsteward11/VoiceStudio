@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.services.model_registry import (
+from backend.ml.models.model_registry import (
     EngineModelState,
     ModelArtifact,
     ModelRegistryService,

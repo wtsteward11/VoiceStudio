@@ -733,8 +733,7 @@ class DatabaseQueryOptimizer:
 
                 # Get index info (tbl_name is a value; use parameterized query)
                 cursor.execute(
-                    "SELECT name, sql FROM sqlite_master "
-                    "WHERE type='index' AND tbl_name=?",
+                    "SELECT name, sql FROM sqlite_master " "WHERE type='index' AND tbl_name=?",
                     (table,),
                 )
                 indexes = cursor.fetchall()

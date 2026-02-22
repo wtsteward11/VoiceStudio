@@ -248,6 +248,88 @@ async def health_summary() -> dict[str, Any]:
     return summary
 
 
+@router.get("/dashboard")
+@cache_response(ttl=10)
+async def health_dashboard() -> dict[str, Any]:
+    """
+    Task 3.1: Observability dashboard.
+
+    Returns per-context RED metrics, SLO compliance, engine health,
+    and active alerts.
+    """
+    from datetime import datetime
+
+    dashboard: dict[str, Any] = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "red_metrics": {},
+        "slo_compliance": [],
+        "engines": {},
+        "active_alerts": [],
+        "overall": "healthy",
+    }
+
+    # RED metrics per context
+    try:
+        from backend.platform.monitoring.red_metrics import get_red_metrics
+
+        dashboard["red_metrics"] = get_red_metrics().get_all()
+    except Exception as e:
+        dashboard["red_metrics"] = {"error": str(e)}
+
+    # SLO compliance from config
+    try:
+        import json
+        from pathlib import Path
+
+        # Resolve from project root
+        slos_path = Path(__file__).resolve().parent.parent.parent.parent / "config" / "slos.json"
+        if slos_path.exists():
+            slos_data = json.loads(slos_path.read_text(encoding="utf-8"))
+            for slo in slos_data.get("slos", []):
+                dashboard["slo_compliance"].append(
+                    {
+                        "id": slo.get("id"),
+                        "name": slo.get("name"),
+                        "target": slo.get("target"),
+                        "status": "configured",
+                    }
+                )
+    except Exception as e:
+        dashboard["slo_compliance"] = [{"error": str(e)}]
+
+    # Engine health
+    try:
+        engine_info = _check_engines()
+        dashboard["engines"] = {
+            "status": engine_info.get("status", "unknown"),
+            "available_count": engine_info.get("available_engines", 0),
+            "total_count": engine_info.get("total_engines", 0),
+        }
+    except Exception as e:
+        dashboard["engines"] = {"status": "degraded", "error": str(e)}
+
+    # Active alerts from SLO monitor
+    try:
+        from backend.platform.monitoring.slo_monitor import get_slo_monitor
+
+        monitor = get_slo_monitor()
+        alerts = monitor.get_active_alerts()
+        dashboard["active_alerts"] = [
+            {
+                "slo_id": a.slo_id,
+                "severity": a.severity.value,
+                "message": a.message,
+            }
+            for a in alerts
+        ]
+        if alerts:
+            dashboard["overall"] = "degraded"
+    except Exception as e:
+        dashboard["active_alerts"] = [{"error": str(e)}]
+
+    return dashboard
+
+
 @router.get("/")
 async def health_check() -> dict[str, Any]:
     """
@@ -701,8 +783,8 @@ def preflight_check() -> dict[str, Any]:
     # Resolve core roots
     from backend.audio.processing.audio_artifact_registry import get_audio_registry
     from backend.audio.processing.content_addressed_audio_cache import get_audio_cache
-    from backend.ml.models.engine_config_service import get_engine_config_service
     from backend.infrastructure.adapters.job_state_store import get_job_state_store
+    from backend.ml.models.engine_config_service import get_engine_config_service
     from backend.project.management.project_store_service import get_project_store_service
 
     projects_root = str(get_project_store_service().projects_dir)

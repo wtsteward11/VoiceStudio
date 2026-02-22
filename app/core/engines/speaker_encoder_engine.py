@@ -533,7 +533,9 @@ class SpeakerEncoderEngine(EngineProtocol):
             # Prosodic features (pitch/F0)
             try:
                 f0, voiced_flag, _voiced_probs = librosa.pyin(
-                    audio, fmin=float(librosa.note_to_hz("C2")), fmax=float(librosa.note_to_hz("C7"))
+                    audio,
+                    fmin=float(librosa.note_to_hz("C2")),
+                    fmax=float(librosa.note_to_hz("C7")),
                 )
                 f0_clean = f0[~np.isnan(f0)]
                 if len(f0_clean) > 0:

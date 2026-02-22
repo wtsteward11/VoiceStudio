@@ -569,7 +569,9 @@ class LyrebirdEngine(EngineProtocol):
     # Instead, the engine now prefers using the fallback voice cloning engine (XTTS) for reliable,
     # high-quality synthesis when local model cannot be properly used.
 
-    def _extract_voice_embedding(self, audio: npt.NDArray[Any], sample_rate: int) -> npt.NDArray[Any]:
+    def _extract_voice_embedding(
+        self, audio: npt.NDArray[Any], sample_rate: int
+    ) -> npt.NDArray[Any]:
         """Extract voice embedding from audio."""
         try:
             import librosa
@@ -620,9 +622,7 @@ class LyrebirdEngine(EngineProtocol):
     ) -> str:
         """Clone voice using fallback TTS engine."""
         if output_path is None:
-            _out_dir = os.path.join(
-                os.getenv("TEMP", "C:\\Temp"), "VoiceStudio", "lyrebird_output"
-            )
+            _out_dir = os.path.join(os.getenv("TEMP", "C:\\Temp"), "VoiceStudio", "lyrebird_output")
             os.makedirs(_out_dir, exist_ok=True)
             resolved: Path = Path(os.path.join(_out_dir, "cloned_voice.wav"))
         else:

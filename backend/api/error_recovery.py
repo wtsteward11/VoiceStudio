@@ -40,9 +40,7 @@ class RetryConfig:
     initial_delay: float = 1.0
     max_delay: float = 30.0
     multiplier: float = 2.0
-    retryable_exceptions: list[type[Exception]] = field(
-        default_factory=lambda: [Exception]
-    )
+    retryable_exceptions: list[type[Exception]] = field(default_factory=lambda: [Exception])
 
 
 class ErrorRecoveryManager:
@@ -124,9 +122,7 @@ class ErrorRecoveryManager:
                             loop.close()
                         return fallback_result
                     except Exception as fallback_error:
-                        logger.error(
-                            f"Fallback also failed for {operation_name}: {fallback_error}"
-                        )
+                        logger.error(f"Fallback also failed for {operation_name}: {fallback_error}")
                         raise
                 raise
         else:
@@ -172,9 +168,7 @@ class ErrorRecoveryManager:
                         fallback_result: T = await degradation_handler.execute(dg_func)
                         return fallback_result
                     except Exception as fallback_error:
-                        logger.error(
-                            f"Fallback also failed for {operation_name}: {fallback_error}"
-                        )
+                        logger.error(f"Fallback also failed for {operation_name}: {fallback_error}")
                         raise
                 raise
         else:

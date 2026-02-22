@@ -627,8 +627,6 @@ class SadTalkerEngine(EngineProtocol):
                 if energy > 0.1:
                     # Apply subtle affine transformation for head movement
                     try:
-                        import torch.nn.functional as F
-
                         # Create transformation matrix for subtle rotation/translation
                         angle = energy * 0.01  # Small rotation based on energy
                         tx = energy * 0.001  # Small translation
@@ -894,7 +892,7 @@ class SadTalkerEngine(EngineProtocol):
             raise ValueError("No frames to save")
 
         height, width = frames[0].shape[:2]
-        fourcc_fn = getattr(cv2, "VideoWriter_fourcc")
+        fourcc_fn = cv2.VideoWriter_fourcc
         fourcc = fourcc_fn(*"mp4v")
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 

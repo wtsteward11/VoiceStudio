@@ -543,7 +543,9 @@ class RHVoiceEngine(EngineProtocol):
             resolved_paths = list(output_paths)
 
         # Process in parallel batches for better performance
-        def synthesize_single(args: tuple[str, str | Path | None]) -> np.ndarray | None | tuple[np.ndarray | None, dict[str, Any]]:
+        def synthesize_single(
+            args: tuple[str, str | Path | None],
+        ) -> np.ndarray | None | tuple[np.ndarray | None, dict[str, Any]]:
             text, out_path = args
             try:
                 return self.synthesize(

@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.services.backup_service import (
+from backend.platform.config.backup_service import (
     BackupConfig,
     BackupService,
     BackupStatus,
@@ -52,7 +52,7 @@ class TestBackupService:
 
     def test_import(self) -> None:
         """Test that BackupService can be imported."""
-        from backend.services.backup_service import BackupService
+        from backend.platform.config.backup_service import BackupService
 
         assert BackupService is not None
 

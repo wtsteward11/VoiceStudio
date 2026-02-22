@@ -575,7 +575,9 @@ class EnhancedJobQueue:
                     {
                         "batch_id": batch.batch_id,
                         "status": "completed",
-                        "completed_at": (batch.completed_at.isoformat() if batch.completed_at else None),
+                        "completed_at": (
+                            batch.completed_at.isoformat() if batch.completed_at else None
+                        ),
                         "total_jobs": batch.total_jobs,
                         "completed_jobs": batch.completed_jobs,
                         "failed_jobs": batch.failed_jobs,

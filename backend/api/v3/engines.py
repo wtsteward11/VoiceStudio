@@ -139,7 +139,9 @@ async def list_engines(
                 )
             )
         except Exception as model_err:
-            logger.warning(f"Failed to parse engine info for {eng.get('id', 'unknown')}: {model_err}")
+            logger.warning(
+                f"Failed to parse engine info for {eng.get('id', 'unknown')}: {model_err}"
+            )
             continue
 
     return paginated_response(

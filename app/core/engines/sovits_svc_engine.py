@@ -52,6 +52,7 @@ def _format_template_to_args(template: str, **kwargs: str | int) -> list[str]:
             args.append(str(val) if val is not None else "")
     return args
 
+
 # Try importing PyTorch
 try:
     import torch

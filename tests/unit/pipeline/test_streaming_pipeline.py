@@ -31,7 +31,7 @@ class TestStreamingPipeline:
 
         self.mock_llm.generate_stream = mock_stream
 
-        with patch("backend.services.engine_service.get_engine_service") as mock_service:
+        with patch("backend.ml.models.engine_service.get_engine_service") as mock_service:
             mock_service.return_value.synthesize = AsyncMock(return_value={"audio_data": b"audio"})
 
             chunks = []
@@ -62,7 +62,7 @@ class TestStreamingPipeline:
 
         self.mock_llm.generate_stream = mock_stream
 
-        with patch("backend.services.engine_service.get_engine_service") as mock_service:
+        with patch("backend.ml.models.engine_service.get_engine_service") as mock_service:
             mock_service.return_value.synthesize = AsyncMock(return_value={"audio_data": None})
 
             chunks = []
@@ -102,7 +102,7 @@ class TestStreamingPipeline:
         async def mock_audio_chunks():
             yield b"audio_chunk"
 
-        with patch("backend.services.engine_service.get_engine_service") as mock_service:
+        with patch("backend.ml.models.engine_service.get_engine_service") as mock_service:
             mock_service.return_value.transcribe = AsyncMock(return_value={"text": ""})
 
             chunks = []

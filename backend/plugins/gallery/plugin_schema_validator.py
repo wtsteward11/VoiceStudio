@@ -29,7 +29,10 @@ logger = logging.getLogger(__name__)
 # Path to unified schema (relative to repo root)
 # backend/plugins/gallery/ -> 4 levels up to repo root
 SCHEMA_PATH = (
-    Path(__file__).resolve().parent.parent.parent.parent / "shared" / "schemas" / "plugin-manifest.schema.json"
+    Path(__file__).resolve().parent.parent.parent.parent
+    / "shared"
+    / "schemas"
+    / "plugin-manifest.schema.json"
 )
 
 # Semver regex pattern

@@ -16,8 +16,8 @@ RuntimeEngine: Any = None
 RuntimeEngineManager: Any = None
 
 try:
-    from app.core.runtime.runtime_engine_enhanced import EnhancedRuntimeEngine
     from app.core.runtime.runtime_engine_enhanced import (
+        EnhancedRuntimeEngine,
         EnhancedRuntimeEngineManager,
     )
 
@@ -25,10 +25,8 @@ try:
     RuntimeEngineManager = EnhancedRuntimeEngineManager
 except ImportError:
     try:
-        from app.core.runtime.runtime_engine import (
-            RuntimeEngine as _FallbackRE,
-            RuntimeEngineManager as _FallbackREM,
-        )
+        from app.core.runtime.runtime_engine import RuntimeEngine as _FallbackRE
+        from app.core.runtime.runtime_engine import RuntimeEngineManager as _FallbackREM
 
         RuntimeEngine = _FallbackRE
         RuntimeEngineManager = _FallbackREM

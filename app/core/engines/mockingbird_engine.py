@@ -307,7 +307,11 @@ class MockingBirdEngine(EngineProtocol):
             # Check response cache
             import hashlib
 
-            ref_repr = reference_audio.hex() if isinstance(reference_audio, bytes) else str(reference_audio)
+            ref_repr = (
+                reference_audio.hex()
+                if isinstance(reference_audio, bytes)
+                else str(reference_audio)
+            )
             cache_key = hashlib.md5(f"{text}_{ref_repr}".encode()).hexdigest()
             if cache_key in self._response_cache:
                 logger.debug("Using cached MockingBird synthesis result")

@@ -9,10 +9,10 @@ explicit consent from all parties. All invocations are logged for audit.
 """
 
 from __future__ import annotations
-from typing import Any
 
 import logging
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/face-swap", tags=["face-swap"])
 
 # In-memory storage (replace with database in production)
-_jobs: dict[str, "FaceSwapJob"] = {}
+_jobs: dict[str, FaceSwapJob] = {}
 _job_queue: list[str] = []
 _processing_jobs: set[str] = set()
 _max_concurrent_jobs: int = 2
@@ -79,7 +79,9 @@ class FaceSwapRequest(BaseModel):
     media_type: str
     engine: str = "deepfacelab"
     consent_given: bool = False
-    consent_acknowledged: bool | None = None  # Explicit opt-in; if None, falls back to consent_given
+    consent_acknowledged: bool | None = (
+        None  # Explicit opt-in; if None, falls back to consent_given
+    )
     apply_watermark: bool = True
     quality: str = "high"
     additional_params: dict[str, str] = {}
@@ -180,7 +182,9 @@ async def create_face_swap(
         valid_video_exts = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
 
         if source_ext not in valid_image_exts:
-            raise HTTPException(status_code=400, detail=f"Source must be image ({', '.join(valid_image_exts)})")
+            raise HTTPException(
+                status_code=400, detail=f"Source must be image ({', '.join(valid_image_exts)})"
+            )
         if request.media_type == "image" and target_ext not in valid_image_exts:
             raise HTTPException(status_code=400, detail="Target must be image for image swap")
         if request.media_type == "video" and target_ext not in valid_video_exts:
@@ -355,7 +359,9 @@ async def _process_job(job_id: str):
             source_face_path = Path(job.source_face_file)
             target_media_path = Path(job.target_media_file)
             temp_dir = source_face_path.parent
-            output_path = temp_dir / f"output_{job_id}.{'png' if job.media_type == 'image' else 'mp4'}"
+            output_path = (
+                temp_dir / f"output_{job_id}.{'png' if job.media_type == 'image' else 'mp4'}"
+            )
 
             if job.media_type == "image":
                 engine.swap_face(

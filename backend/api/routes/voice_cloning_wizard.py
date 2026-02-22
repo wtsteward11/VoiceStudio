@@ -13,7 +13,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ...services.JobStateStore import get_job_state_store
+from backend.infrastructure.adapters.job_state_store import get_job_state_store
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +252,9 @@ async def validate_audio(request: AudioValidationRequest):
                 # Check SNR (if available)
                 try:
                     signal_power = float(np.mean(audio_mono**2))
-                    noise_floor = float(np.mean(np.sort(np.abs(audio_mono))[: len(audio_mono) // 10] ** 2))
+                    noise_floor = float(
+                        np.mean(np.sort(np.abs(audio_mono))[: len(audio_mono) // 10] ** 2)
+                    )
                     snr = 10 * np.log10(signal_power / noise_floor) if noise_floor > 0 else 60.0
                     if snr < 20:
                         issues.append(f"Low signal-to-noise ratio ({snr:.1f}dB)")
@@ -301,7 +303,9 @@ async def validate_audio(request: AudioValidationRequest):
                 # SNR scoring (0-0.1 points)
                 try:
                     signal_power = float(np.mean(audio_mono**2))
-                    noise_floor = float(np.mean(np.sort(np.abs(audio_mono))[: len(audio_mono) // 10] ** 2))
+                    noise_floor = float(
+                        np.mean(np.sort(np.abs(audio_mono))[: len(audio_mono) // 10] ** 2)
+                    )
                     snr = 10 * np.log10(signal_power / noise_floor) if noise_floor > 0 else 60.0
                     if snr >= 30:
                         quality_score += 0.1

@@ -293,7 +293,9 @@ class VideoFaceEnhancer:
             # Load cascade if needed
             if self._face_detector is None:
                 cascade_data = getattr(cv2, "data", None)
-                haarcascades_dir: str = getattr(cascade_data, "haarcascades", "") if cascade_data else ""
+                haarcascades_dir: str = (
+                    getattr(cascade_data, "haarcascades", "") if cascade_data else ""
+                )
                 cascade_path = haarcascades_dir + "haarcascade_frontalface_default.xml"
                 self._face_detector = cv2.CascadeClassifier(cascade_path)
 

@@ -17,7 +17,7 @@ from backend.plugins.audit import (
     get_plugin_audit_logger,
     set_plugin_audit_logger,
 )
-from backend.services.audit_logger import AuditAction, AuditSeverity
+from backend.security.audit_logger import AuditAction, AuditSeverity
 
 
 class TestPluginAuditCategory:

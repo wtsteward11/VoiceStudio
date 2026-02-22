@@ -15,7 +15,7 @@ import logging
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from backend.plugins.core.safe_reload import SafePluginReloader

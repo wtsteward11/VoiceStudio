@@ -124,7 +124,10 @@ async def get_analytics_summary(
         try:
             from .projects import _store as _projects_store
 
-            projects = [{"created": p.get("created", end.isoformat())} for p in _projects_store().list_projects()]
+            projects = [
+                {"created": p.get("created", end.isoformat())}
+                for p in _projects_store().list_projects()
+            ]
             projects_in_period = [
                 p
                 for p in projects
@@ -268,7 +271,10 @@ async def get_category_metrics(
                 try:
                     from .projects import _store as _projects_store2
 
-                    all_projects = [{"created": p.get("created", end.isoformat())} for p in _projects_store2().list_projects()]
+                    all_projects = [
+                        {"created": p.get("created", end.isoformat())}
+                        for p in _projects_store2().list_projects()
+                    ]
                     interval_projects = [
                         p
                         for p in all_projects
@@ -553,7 +559,14 @@ async def explain_quality_prediction(audio_id: str, method: str = "shap"):
                                 if isinstance(v, (int, float))
                             ]
                             # Sort by weight descending
-                            explanation_list.sort(key=lambda x: float(x["weight"]) if isinstance(x["weight"], (int, float)) else 0.0, reverse=True)
+                            explanation_list.sort(
+                                key=lambda x: (
+                                    float(x["weight"])
+                                    if isinstance(x["weight"], (int, float))
+                                    else 0.0
+                                ),
+                                reverse=True,
+                            )
                         else:
                             explanation_list = [
                                 {"feature": "mos_score", "weight": 0.3},

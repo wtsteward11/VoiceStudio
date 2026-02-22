@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from backend.services.JobStateStore import get_job_state_store
+from backend.infrastructure.adapters.job_state_store import get_job_state_store
 
 
 def test_job_state_store_persists_per_job(tmp_path: Path, monkeypatch):

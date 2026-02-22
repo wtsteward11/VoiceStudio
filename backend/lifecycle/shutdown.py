@@ -296,12 +296,16 @@ class GracefulShutdownOrchestrator:
 
         for sig in (signal.SIGTERM, signal.SIGINT):
             try:
+
                 def _make_sig_handler(s: signal.Signals = sig) -> None:
                     signal_handler(s)
+
                 loop.add_signal_handler(sig, _make_sig_handler)
             except NotImplementedError:
+
                 def _sig_cb(_s: int, _f: Any, captured_sig: signal.Signals = sig) -> None:
                     signal_handler(captured_sig)
+
                 signal.signal(sig, _sig_cb)
 
     def get_status(self) -> dict:

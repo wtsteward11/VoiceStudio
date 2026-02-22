@@ -2,7 +2,7 @@
 
 import pytest
 
-from backend.services.telemetry import (
+from backend.platform.telemetry.telemetry import (
     SpanStatus,
     get_telemetry_service,
     reset_telemetry_service,

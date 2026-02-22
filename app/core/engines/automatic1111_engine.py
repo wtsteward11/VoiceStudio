@@ -11,7 +11,6 @@ Compatible with:
 - HTTP API for image generation
 """
 
-from typing import Any
 from __future__ import annotations
 
 import base64
@@ -23,6 +22,7 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import requests
 from PIL import Image

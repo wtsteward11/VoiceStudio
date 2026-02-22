@@ -20,11 +20,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from backend.data.repositories.job_repository import (
     JobEntity,
     JobRepository,
-)
-from backend.data.repositories.job_repository import JobStatus as RepoJobStatus
-from backend.data.repositories.job_repository import (
     get_job_repository,
 )
+from backend.data.repositories.job_repository import JobStatus as RepoJobStatus
 from backend.data.repository_base import QueryOptions
 
 from ..middleware.auth_middleware import require_auth_if_enabled

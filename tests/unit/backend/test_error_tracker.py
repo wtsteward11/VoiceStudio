@@ -11,7 +11,7 @@ Tests cover:
 
 import pytest
 
-from backend.services.error_tracker import (
+from backend.platform.monitoring.error_tracker import (
     ErrorCategory,
     ErrorContext,
     ErrorSeverity,

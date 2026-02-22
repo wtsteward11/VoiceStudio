@@ -558,7 +558,13 @@ class MultiSpeakerDubbingService:
         )
         self._projects[project_id] = project
         project.status = "complete"
-        return {"success": True, "project_id": project_id, "segments": [], "speaker_count": 0, "total_duration": 0.0}
+        return {
+            "success": True,
+            "project_id": project_id,
+            "segments": [],
+            "speaker_count": 0,
+            "total_duration": 0.0,
+        }
 
     async def assign_voices(
         self,
@@ -569,7 +575,9 @@ class MultiSpeakerDubbingService:
         project = self._projects.get(project_id)
         if not project:
             return {"success": False, "error": f"Project {project_id} not found"}
-        project.metadata["voice_assignments"] = {a["speaker_id"]: a["target_voice_id"] for a in assignments}
+        project.metadata["voice_assignments"] = {
+            a["speaker_id"]: a["target_voice_id"] for a in assignments
+        }
         return {"success": True, "assignments_applied": len(assignments)}
 
     async def generate(
@@ -584,7 +592,12 @@ class MultiSpeakerDubbingService:
         if not project:
             return {"success": False, "error": f"Project {project_id} not found"}
         project.status = "complete"
-        return {"success": True, "output_audio_id": project_id, "segments_processed": len(project.segments), "speakers_dubbed": len(project.speakers)}
+        return {
+            "success": True,
+            "output_audio_id": project_id,
+            "segments_processed": len(project.segments),
+            "speakers_dubbed": len(project.speakers),
+        }
 
     def get_project_speakers(self, project_id: str) -> list[dict[str, Any]] | None:
         """Get speakers for a project."""

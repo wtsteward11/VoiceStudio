@@ -27,7 +27,7 @@ class TestHalfCascadePipeline:
         """Test process_audio uses S2S provider for input."""
         self.mock_s2s.respond = AsyncMock(return_value=MagicMock(response_text="S2S response"))
 
-        with patch("backend.services.engine_service.get_engine_service") as mock_service:
+        with patch("backend.ml.models.engine_service.get_engine_service") as mock_service:
             mock_service.return_value.synthesize = AsyncMock(return_value={"audio_data": b"audio"})
 
             result = await self.pipeline.process_audio(b"audio_data")
@@ -41,7 +41,7 @@ class TestHalfCascadePipeline:
         self.mock_s2s.respond = AsyncMock(side_effect=Exception("S2S failed"))
         self.mock_llm.generate = AsyncMock(return_value=MagicMock(content="LLM response"))
 
-        with patch("backend.services.engine_service.get_engine_service") as mock_service:
+        with patch("backend.ml.models.engine_service.get_engine_service") as mock_service:
             mock_service.return_value.transcribe = AsyncMock(return_value={"text": "Transcribed"})
             mock_service.return_value.synthesize = AsyncMock(return_value={"audio_data": b"audio"})
 
@@ -65,7 +65,7 @@ class TestHalfCascadePipeline:
         """Test process_audio synthesizes audio output."""
         self.mock_s2s.respond = AsyncMock(return_value=MagicMock(response_text="Test"))
 
-        with patch("backend.services.engine_service.get_engine_service") as mock_service:
+        with patch("backend.ml.models.engine_service.get_engine_service") as mock_service:
             mock_service.return_value.synthesize = AsyncMock(
                 return_value={"audio_data": b"synthesized_audio"}
             )
@@ -80,7 +80,7 @@ class TestHalfCascadePipeline:
         """Test process_audio handles TTS error gracefully."""
         self.mock_s2s.respond = AsyncMock(return_value=MagicMock(response_text="Test"))
 
-        with patch("backend.services.engine_service.get_engine_service") as mock_service:
+        with patch("backend.ml.models.engine_service.get_engine_service") as mock_service:
             mock_service.return_value.synthesize = AsyncMock(side_effect=Exception("TTS failed"))
 
             result = await self.pipeline.process_audio(b"audio_data")
@@ -93,7 +93,7 @@ class TestHalfCascadePipeline:
         """Test process_audio captures timing metrics."""
         self.mock_s2s.respond = AsyncMock(return_value=MagicMock(response_text="Test"))
 
-        with patch("backend.services.engine_service.get_engine_service") as mock_service:
+        with patch("backend.ml.models.engine_service.get_engine_service") as mock_service:
             mock_service.return_value.synthesize = AsyncMock(return_value={"audio_data": b"audio"})
 
             result = await self.pipeline.process_audio(b"audio_data")
@@ -106,7 +106,7 @@ class TestHalfCascadePipeline:
         self.mock_s2s.respond = AsyncMock(side_effect=Exception("S2S failed"))
         self.mock_llm.generate = AsyncMock(side_effect=Exception("LLM failed"))
 
-        with patch("backend.services.engine_service.get_engine_service") as mock_service:
+        with patch("backend.ml.models.engine_service.get_engine_service") as mock_service:
             mock_service.return_value.transcribe = AsyncMock(return_value={"text": "Transcribed"})
 
             result = await self.pipeline.process_audio(b"audio_data")

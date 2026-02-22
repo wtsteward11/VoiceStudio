@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from backend.services.circuit_breaker import (
+from backend.core.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerOpenError,
     CircuitBreakerRegistry,

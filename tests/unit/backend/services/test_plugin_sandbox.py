@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.services.plugin_sandbox import (
+from backend.plugins.sandbox.plugin_sandbox import (
     PermissionViolation,
     PluginSandbox,
     ResourceLimitExceeded,

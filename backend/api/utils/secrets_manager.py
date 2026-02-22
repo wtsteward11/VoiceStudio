@@ -3,11 +3,11 @@ Secrets Manager
 Centralizes secrets management using environment variables and secure storage.
 """
 
-from typing import Any
 from __future__ import annotations
 
 import logging
 import os
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

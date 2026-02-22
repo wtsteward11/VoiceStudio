@@ -447,7 +447,9 @@ class StreamingEngine(EngineProtocol):
                 if self._buffer_pool:
                     self._buffer_pool.pop(0)
 
-    def _apply_overlap_add(self, overlap: npt.NDArray[np.float32], audio: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+    def _apply_overlap_add(
+        self, overlap: npt.NDArray[np.float32], audio: npt.NDArray[np.float32]
+    ) -> npt.NDArray[np.float32]:
         """Apply overlap-add for smooth transitions with optimized buffer management."""
         if len(overlap) == 0 or len(audio) == 0:
             return audio
@@ -459,7 +461,9 @@ class StreamingEngine(EngineProtocol):
 
         # Cache fade windows (avoid recreating)
         if not hasattr(self, "_fade_cache"):
-            self._fade_cache: dict[int, tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]] = {}
+            self._fade_cache: dict[int, tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]] = (
+                {}
+            )
 
         cache_key = overlap_len
         if cache_key not in self._fade_cache:

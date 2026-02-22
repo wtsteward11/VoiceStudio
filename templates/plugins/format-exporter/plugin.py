@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from app.core.plugins_api import Plugin
 from backend.core.audio.conversion import AudioConversionService
 from backend.core.audio.formats import AudioFormat
-from backend.services.export_path_validator import (
+from backend.project.management.export_path_validator import (
     ExportPathRejectedError,
     validate_export_path,
 )

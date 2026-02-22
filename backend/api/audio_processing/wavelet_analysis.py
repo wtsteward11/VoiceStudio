@@ -126,9 +126,7 @@ class WaveletAnalyzer:
                 "energy_details": [float(np.sum(c**2)) for c in coeffs],
                 "total_energy": total_energy,
             }
-            features["energy_ratio"] = (
-                energy_approx / total_energy if total_energy > 0 else 0.0
-            )
+            features["energy_ratio"] = energy_approx / total_energy if total_energy > 0 else 0.0
 
             return features
         except Exception as e:

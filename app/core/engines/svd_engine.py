@@ -11,8 +11,6 @@ Compatible with:
 
 from __future__ import annotations
 
-from typing import Any
-
 import hashlib
 import json
 import logging
@@ -21,6 +19,7 @@ import time
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch

@@ -15,6 +15,7 @@ Features:
 from __future__ import annotations
 
 import hashlib
+import importlib as _il
 import json
 import logging
 import shutil
@@ -39,9 +40,6 @@ from .models import (
     PluginVersion,
     UpdateInfo,
 )
-
-import importlib as _il
-from typing import Any
 
 SIGNER_AVAILABLE = False
 verify_package_auto: Any = None

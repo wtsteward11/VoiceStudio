@@ -347,18 +347,22 @@ class CapabilitySet:
 
 
 STANDARD_CAPABILITY_SETS: dict[str, CapabilitySet] = {
-    "minimal": CapabilitySet.from_tokens([
-        CapabilityToken.LOG_INFO,
-        CapabilityToken.LOG_WARN,
-        CapabilityToken.LOG_ERROR,
-    ]),
-    "audio": CapabilitySet.from_tokens([
-        CapabilityToken.AUDIO_READ,
-        CapabilityToken.AUDIO_WRITE,
-        CapabilityToken.LOG_INFO,
-        CapabilityToken.LOG_WARN,
-        CapabilityToken.LOG_ERROR,
-    ]),
+    "minimal": CapabilitySet.from_tokens(
+        [
+            CapabilityToken.LOG_INFO,
+            CapabilityToken.LOG_WARN,
+            CapabilityToken.LOG_ERROR,
+        ]
+    ),
+    "audio": CapabilitySet.from_tokens(
+        [
+            CapabilityToken.AUDIO_READ,
+            CapabilityToken.AUDIO_WRITE,
+            CapabilityToken.LOG_INFO,
+            CapabilityToken.LOG_WARN,
+            CapabilityToken.LOG_ERROR,
+        ]
+    ),
     "full": CapabilitySet.from_tokens(list(CapabilityToken)),
 }
 

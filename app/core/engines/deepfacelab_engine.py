@@ -484,7 +484,9 @@ class DeepFaceLabEngine(EngineProtocol):
             return face_image, bbox
         return face_image
 
-    def _swap_face_model(self, source_face: npt.NDArray[Any], target_face: npt.NDArray[Any]) -> npt.NDArray[Any]:
+    def _swap_face_model(
+        self, source_face: npt.NDArray[Any], target_face: npt.NDArray[Any]
+    ) -> npt.NDArray[Any]:
         """Perform face swap using model."""
         try:
             # Use model if available
@@ -550,7 +552,9 @@ class DeepFaceLabEngine(EngineProtocol):
             logger.warning(f"Failed to load DeepFaceLab model: {e}")
             return None
 
-    def _swap_with_model(self, source_face: npt.NDArray[Any], target_face: npt.NDArray[Any]) -> npt.NDArray[Any]:
+    def _swap_with_model(
+        self, source_face: npt.NDArray[Any], target_face: npt.NDArray[Any]
+    ) -> npt.NDArray[Any]:
         """Perform face swap using loaded model."""
         if not HAS_TENSORFLOW:
             error_msg = (
@@ -594,7 +598,9 @@ class DeepFaceLabEngine(EngineProtocol):
             logger.warning("Attempting fallback method due to model inference error")
             return self._swap_with_fallback(source_face, target_face)
 
-    def _swap_with_fallback(self, source_face: npt.NDArray[Any], target_face: npt.NDArray[Any]) -> npt.NDArray[Any]:
+    def _swap_with_fallback(
+        self, source_face: npt.NDArray[Any], target_face: npt.NDArray[Any]
+    ) -> npt.NDArray[Any]:
         """Perform face swap using fallback method (alignment and blending)."""
         try:
             # Align faces
@@ -738,7 +744,9 @@ class DeepFaceLabEngine(EngineProtocol):
             logger.warning(f"Face alignment failed: {e}")
             return face
 
-    def _color_correct(self, source_face: npt.NDArray[Any], target_face: npt.NDArray[Any]) -> npt.NDArray[Any]:
+    def _color_correct(
+        self, source_face: npt.NDArray[Any], target_face: npt.NDArray[Any]
+    ) -> npt.NDArray[Any]:
         """Apply color correction to match target face."""
         try:
             # Compute mean and std for both faces
@@ -755,7 +763,9 @@ class DeepFaceLabEngine(EngineProtocol):
         except Exception:
             return source_face
 
-    def _blend_edges(self, swapped_face: npt.NDArray[Any], original_face: npt.NDArray[Any]) -> npt.NDArray[Any]:
+    def _blend_edges(
+        self, swapped_face: npt.NDArray[Any], original_face: npt.NDArray[Any]
+    ) -> npt.NDArray[Any]:
         """Blend edges for seamless integration."""
         try:
             # Create mask for edge blending
@@ -787,10 +797,12 @@ class DeepFaceLabEngine(EngineProtocol):
         self, swapped_face: npt.NDArray[Any], original_face: npt.NDArray[Any], blend_factor: float
     ) -> npt.NDArray[Any]:
         """Blend swapped face with original."""
-        blended = (swapped_face * (1.0 - blend_factor) + original_face * blend_factor)
+        blended = swapped_face * (1.0 - blend_factor) + original_face * blend_factor
         return np.asarray(blended, dtype=np.uint8)
 
-    def _composite_face(self, background: npt.NDArray[Any], face: npt.NDArray[Any], bbox: dict[str, Any]) -> npt.NDArray[Any]:
+    def _composite_face(
+        self, background: npt.NDArray[Any], face: npt.NDArray[Any], bbox: dict[str, Any]
+    ) -> npt.NDArray[Any]:
         """Composite face back onto background."""
         result = background.copy()
 

@@ -900,7 +900,6 @@ class RealtimeVoiceChangerService:
             "setup_url": "https://vb-audio.com/Cable/",
         }
 
-
     def get_preset(self, preset_id: str) -> dict[str, Any] | None:
         """Get an effect preset by ID."""
         effect = self._effects.get(preset_id)
@@ -937,9 +936,7 @@ class RealtimeVoiceChangerService:
             "processing_time_ms": elapsed_ms,
         }
 
-    def set_hotkey(
-        self, hotkey: str, effect_id: str, enabled: bool = True
-    ) -> bool:
+    def set_hotkey(self, hotkey: str, effect_id: str, enabled: bool = True) -> bool:
         """Configure a hotkey for voice switching."""
         if not enabled:
             return self.unregister_hotkey(hotkey)

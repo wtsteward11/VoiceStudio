@@ -22,12 +22,12 @@ HAS_TENSORBOARD = False
 SummaryWriter: Any = None
 try:
     _tb_mod = importlib.import_module("torch.utils.tensorboard")
-    SummaryWriter = getattr(_tb_mod, "SummaryWriter")
+    SummaryWriter = _tb_mod.SummaryWriter
     HAS_TENSORBOARD = True
 except ImportError:
     try:
         _tb_mod = importlib.import_module("tensorboard")
-        SummaryWriter = getattr(_tb_mod, "SummaryWriter")
+        SummaryWriter = _tb_mod.SummaryWriter
         HAS_TENSORBOARD = True
     except (ImportError, AttributeError):
         logger.debug("tensorboard not installed. Training visualization will be limited.")

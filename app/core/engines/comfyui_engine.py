@@ -11,7 +11,6 @@ Compatible with:
 - HTTP API for workflow execution
 """
 
-from typing import Any
 from __future__ import annotations
 
 import hashlib
@@ -23,6 +22,7 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import requests
 from PIL import Image

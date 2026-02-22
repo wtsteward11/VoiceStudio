@@ -249,7 +249,19 @@ INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 
 # Allowed columns for ORDER BY (whitelist to prevent SQL injection)
 _ALLOWED_ORDER_COLUMNS = frozenset(
-    {"event_id", "event_type", "category", "severity", "plugin_id", "plugin_version", "actor", "timestamp", "details", "metadata", "created_at"}
+    {
+        "event_id",
+        "event_type",
+        "category",
+        "severity",
+        "plugin_id",
+        "plugin_version",
+        "actor",
+        "timestamp",
+        "details",
+        "metadata",
+        "created_at",
+    }
 )
 
 # Pre-built full condition strings for IN filters (1-20 items) to avoid string concatenation.
@@ -879,9 +891,7 @@ class AuditLogger:
         """Delete events older than a given timestamp."""
         # Fixed SQL with optional plugin filter via (? IS NULL OR plugin_id = ?) - no string concatenation
         params = (older_than, plugin_id, plugin_id)
-        sql = (
-            "DELETE FROM audit_events WHERE timestamp < ? AND (? IS NULL OR plugin_id = ?)"
-        )
+        sql = "DELETE FROM audit_events WHERE timestamp < ? AND (? IS NULL OR plugin_id = ?)"
 
         with self._get_connection() as conn:
             cursor = conn.execute(sql, params)

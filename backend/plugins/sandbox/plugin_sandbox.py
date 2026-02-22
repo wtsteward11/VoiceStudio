@@ -9,14 +9,14 @@ import sys
 import tempfile
 import threading
 import time
+
+# resource module is Unix-only; provide fallback for Windows
+import types as _types_mod
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set
-
-# resource module is Unix-only; provide fallback for Windows
-import types as _types_mod
 
 _resource_mod: _types_mod.ModuleType | None
 try:

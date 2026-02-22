@@ -5,7 +5,7 @@ Unit tests for ProfileStore (Phase 21.3)
 import shutil
 import tempfile
 
-from backend.services.profile_store import ProfileStore
+from backend.project.management.profile_store import ProfileStore
 
 
 class TestProfileStore:

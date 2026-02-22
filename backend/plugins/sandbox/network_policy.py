@@ -362,7 +362,7 @@ class SocketWrapper:
         if not cls._installed:
             return
 
-        setattr(socket, "socket", cls._original_socket)
+        socket.socket = cls._original_socket
         cls._enforcer = None
         cls._installed = False
 

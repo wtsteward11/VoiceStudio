@@ -43,20 +43,20 @@ except Exception as e:
     logger.warning(f"Quality optimization modules not available: {e}")
 
 try:
-    from app.core.engines.quality_comparison import (
-        QualityComparison as QualityComparison,
-    )
+    from app.core.engines.quality_comparison import QualityComparison as QualityComparison
+    from app.core.engines.quality_optimizer import QualityOptimizer as QualityOptimizer
     from app.core.engines.quality_optimizer import (
-        QualityOptimizer as QualityOptimizer,
         optimize_synthesis_for_quality as optimize_synthesis_for_quality,
     )
+    from app.core.engines.quality_presets import get_preset_description as get_preset_description
     from app.core.engines.quality_presets import (
-        get_preset_description as get_preset_description,
         get_preset_target_metrics as get_preset_target_metrics,
-        get_quality_preset as get_quality_preset,
-        get_synthesis_params_from_preset as get_synthesis_params_from_preset,
-        list_quality_presets as list_quality_presets,
     )
+    from app.core.engines.quality_presets import get_quality_preset as get_quality_preset
+    from app.core.engines.quality_presets import (
+        get_synthesis_params_from_preset as get_synthesis_params_from_preset,
+    )
+    from app.core.engines.quality_presets import list_quality_presets as list_quality_presets
 except ImportError:
     pass
 

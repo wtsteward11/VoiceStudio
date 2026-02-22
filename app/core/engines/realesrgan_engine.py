@@ -356,7 +356,9 @@ class RealESRGANEngine(EngineProtocol):
         # Process in batches for better GPU utilization
         actual_batch_size = min(batch_size, self.batch_size)
 
-        def upscale_single(image: str | Path | Image.Image) -> Image.Image | tuple[Image.Image | None, dict[str, Any]] | None:
+        def upscale_single(
+            image: str | Path | Image.Image,
+        ) -> Image.Image | tuple[Image.Image | None, dict[str, Any]] | None:
             try:
                 return self.upscale(image=image, **kwargs)
             except Exception as e:

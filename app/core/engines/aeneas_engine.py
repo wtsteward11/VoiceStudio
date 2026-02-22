@@ -486,7 +486,9 @@ class AeneasEngine(EngineProtocol):
 
         actual_batch_size = batch_size if batch_size is not None else self.batch_size
 
-        def align_single(args: tuple[str | Path, str, str, str | Path | None, str]) -> dict[str, Any] | None:
+        def align_single(
+            args: tuple[str | Path, str, str, str | Path | None, str],
+        ) -> dict[str, Any] | None:
             audio_path, text, language, output_path, output_format = args
             try:
                 return self.align(

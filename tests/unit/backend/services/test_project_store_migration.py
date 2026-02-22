@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from backend.services.ProjectStoreService import (
+from backend.project.management.project_store_service import (
     CURRENT_PROJECT_SCHEMA_VERSION,
     PROJECT_META_FILENAME,
     ProjectStoreService,

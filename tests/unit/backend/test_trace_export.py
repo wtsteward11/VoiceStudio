@@ -16,13 +16,13 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
-from backend.services.telemetry import (
+from backend.platform.telemetry.telemetry import (
     Span,
     SpanStatus,
     TelemetryService,
     reset_telemetry_service,
 )
-from backend.services.trace_export import (
+from backend.platform.telemetry.trace_export import (
     TraceAnalyzer,
     TraceExport,
     TraceExporter,

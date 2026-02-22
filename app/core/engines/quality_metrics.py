@@ -149,11 +149,9 @@ try:
         calculate_artifact_score_cython,
         calculate_dynamic_range_cython,
         calculate_mos_components_cython,
-    )
-    from .quality_metrics_cython import calculate_snr_cython as calculate_snr_cython_impl
-    from .quality_metrics_cython import (
         calculate_zero_crossing_rate_cython,
     )
+    from .quality_metrics_cython import calculate_snr_cython as calculate_snr_cython_impl
 
     HAS_CYTHON_QUALITY = True
 except ImportError:
@@ -862,7 +860,10 @@ def calculate_spectral_flatness(
 
 
 def calculate_pitch_variance(
-    audio: npt.NDArray[np.float32], sample_rate: int = 22050, fmin: float = 50.0, fmax: float = 400.0
+    audio: npt.NDArray[np.float32],
+    sample_rate: int = 22050,
+    fmin: float = 50.0,
+    fmax: float = 400.0,
 ) -> float | None:
     """
     Calculate pitch variance metric.
@@ -1112,7 +1113,9 @@ def calculate_silence_ratio(
         return 0.0
 
 
-def calculate_clipping_ratio(audio: npt.NDArray[np.float32], clipping_threshold: float = 0.99) -> float | None:
+def calculate_clipping_ratio(
+    audio: npt.NDArray[np.float32], clipping_threshold: float = 0.99
+) -> float | None:
     """
     Calculate clipping ratio metric.
 
@@ -1268,9 +1271,7 @@ def calculate_all_metrics(
                 similarity = metrics.get("similarity") if reference_audio is not None else None
                 artifacts_val = metrics.get("artifacts")
                 artifact_score = (
-                    artifacts_val.get("artifact_score")
-                    if isinstance(artifacts_val, dict)
-                    else None
+                    artifacts_val.get("artifact_score") if isinstance(artifacts_val, dict) else None
                 )
 
                 if None in (mos_score, snr_db, naturalness, artifact_score) or (

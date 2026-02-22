@@ -44,7 +44,7 @@ class TestQualityMetricsDatabase(IntegrationTestBase):
     @pytest.fixture
     def quality_db(self, temp_db_path):
         """Create a QualityMetricsDatabase instance."""
-        from backend.services.quality_metrics_db import QualityMetricsDatabase
+        from backend.ml.models.quality_metrics_db import QualityMetricsDatabase
 
         return QualityMetricsDatabase(db_path=temp_db_path)
 
@@ -209,7 +209,7 @@ class TestQualityMetricsDatabase(IntegrationTestBase):
     @integration
     def test_transaction_isolation(self, temp_db_path):
         """Test that database operations are isolated."""
-        from backend.services.quality_metrics_db import QualityMetricsDatabase
+        from backend.ml.models.quality_metrics_db import QualityMetricsDatabase
 
         # Create two database instances
         db1 = QualityMetricsDatabase(db_path=temp_db_path)
@@ -393,7 +393,7 @@ class TestDatabaseSchemaValidation(IntegrationTestBase):
     @integration
     def test_quality_metrics_schema(self, temp_db_path):
         """Verify quality_history table schema."""
-        from backend.services.quality_metrics_db import QualityMetricsDatabase
+        from backend.ml.models.quality_metrics_db import QualityMetricsDatabase
 
         QualityMetricsDatabase(db_path=temp_db_path)
 
@@ -415,7 +415,7 @@ class TestDatabaseSchemaValidation(IntegrationTestBase):
     @integration
     def test_data_integrity_constraints(self, temp_db_path):
         """Test data integrity constraints."""
-        from backend.services.quality_metrics_db import QualityMetricsDatabase
+        from backend.ml.models.quality_metrics_db import QualityMetricsDatabase
 
         db = QualityMetricsDatabase(db_path=temp_db_path)
 
@@ -467,7 +467,7 @@ class TestDatabaseCleanup(IntegrationTestBase):
     @integration
     def test_per_profile_limit_enforced(self, temp_db_path):
         """Test per-profile entry limit is enforced."""
-        from backend.services.quality_metrics_db import (
+        from backend.ml.models.quality_metrics_db import (
             _MAX_ENTRIES_PER_PROFILE,
             QualityMetricsDatabase,
         )
@@ -517,8 +517,8 @@ class TestDatabaseServiceIntegration(IntegrationTestBase):
     def test_get_quality_metrics_db_singleton(self):
         """Test singleton pattern for quality metrics db."""
         # Reset singleton
-        import backend.services.quality_metrics_db as qm_module
-        from backend.services.quality_metrics_db import get_quality_metrics_db
+        import backend.ml.models.quality_metrics_db as qm_module
+        from backend.ml.models.quality_metrics_db import get_quality_metrics_db
 
         qm_module._quality_db = None
 
@@ -544,7 +544,7 @@ class TestDatabaseServiceIntegration(IntegrationTestBase):
         """Test database handles concurrent access."""
         import threading
 
-        from backend.services.quality_metrics_db import QualityMetricsDatabase
+        from backend.ml.models.quality_metrics_db import QualityMetricsDatabase
 
         db = QualityMetricsDatabase(db_path=temp_db_path)
         errors = []

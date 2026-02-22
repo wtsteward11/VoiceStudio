@@ -36,7 +36,7 @@ try:
     HTTPAdapter = _HTTPAdapter
     Retry = _Retry
     HAS_RETRY = True
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional urllib3 Retry
     pass
 
 import logging

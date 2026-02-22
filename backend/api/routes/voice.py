@@ -38,7 +38,7 @@ try:
     import httpx
 
     HAS_HTTPX = True
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional httpx
     pass
 from fastapi import (
     APIRouter,
@@ -963,7 +963,7 @@ def _extract_quality_metrics(
 @router.post("/synthesize", response_model=VoiceSynthesizeResponse)
 async def synthesize(
     req: VoiceSynthesizeRequest,
-    request: Request | None = None,
+    request: Request,
     config_service: EngineConfigServiceDep | None = None,
 ) -> VoiceSynthesizeResponse:
     """
@@ -977,7 +977,7 @@ async def synthesize(
     _ensure_engine_router()
 
     # Get request ID from middleware
-    request_id = getattr(request.state, "request_id", None) if request else None
+    request_id = getattr(request.state, "request_id", None)
 
     # Select default engine if not specified (XTTS -> Piper -> eSpeak fallback)
     if not req.engine or not req.engine.strip():
@@ -1523,7 +1523,7 @@ async def synthesize(
 @router.post("/synthesize/multipass", response_model=MultiPassSynthesisResponse)
 async def synthesize_multipass(
     req: MultiPassSynthesisRequest,
-    request: Request | None = None,
+    request: Request,
 ) -> MultiPassSynthesisResponse:
     """
     Multi-pass synthesis with quality refinement (IDEA 61).

@@ -59,7 +59,7 @@ try:
     WasmExecutionResult = _WasmExecutionResult
     CapabilitySet = _CapabilitySet
     WASM_RUNNER_AVAILABLE = True
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional wasm runner
     pass
 
 # Phase 5B: Signature verification imports
@@ -77,7 +77,7 @@ try:
     verify_package_auto = _verify_package_auto
     VerificationResult = _VerificationResult
     SIGNING_AVAILABLE = check_signing_available()
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional signing
     pass
 
 # Phase 6 module imports - lazy loaded to avoid circular imports

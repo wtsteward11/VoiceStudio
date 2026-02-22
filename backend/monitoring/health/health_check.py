@@ -17,7 +17,7 @@ from typing import Any
 app_config: Any = None
 try:
     from backend.settings import config as app_config
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional app config
     pass
 
 logger = logging.getLogger(__name__)

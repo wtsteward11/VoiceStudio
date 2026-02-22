@@ -57,7 +57,7 @@ try:
         get_synthesis_params_from_preset as get_synthesis_params_from_preset,
     )
     from app.core.engines.quality_presets import list_quality_presets as list_quality_presets
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional quality presets
     pass
 
 

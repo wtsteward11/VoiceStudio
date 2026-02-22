@@ -34,7 +34,7 @@ try:
 
     _model_cache = get_model_cache(max_models=2, max_memory_mb=2048.0)  # 2GB max
     HAS_MODEL_CACHE = True
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional model cache
     pass
 
 logger = logging.getLogger(__name__)

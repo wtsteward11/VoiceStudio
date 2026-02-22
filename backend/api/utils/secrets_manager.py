@@ -27,7 +27,7 @@ try:
 
     Fernet = _Fernet
     HAS_CRYPTOGRAPHY = True
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional cryptography
     pass
 
 

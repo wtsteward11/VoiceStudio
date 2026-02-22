@@ -25,7 +25,7 @@ try:
 
     _get_metrics_collector = get_metrics_collector
     HAS_METRICS = True
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional metrics
     pass
 
 logger = logging.getLogger(__name__)

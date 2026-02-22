@@ -129,8 +129,7 @@ class TestTelemetryService:
 
         spans = telemetry.get_recent_spans(3)
         assert len(spans) == 3
-        # Most recent spans should be returned
-        assert spans[-1]["name"] == "op_4"
+        assert spans[-1].name == "op_4"
 
     def test_reset(self):
         """Test reset clears all data."""

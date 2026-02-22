@@ -84,12 +84,15 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
           
       - name: Restore dependencies
         run: dotnet restore VoiceStudio.sln -r win-x64 -p:Platform=${{ matrix.platform }}
         
       - name: Build solution (${{ matrix.configuration }})
-        run: dotnet build VoiceStudio.sln -c ${{ matrix.configuration }} -p:Platform=${{ matrix.platform }}
+        run: msbuild VoiceStudio.sln -t:Build -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.platform }} -p:RuntimeIdentifier=win-x64 -restore:false
         
       - name: Run unit tests with coverage (${{ matrix.configuration }})
         run: dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c ${{ matrix.configuration }} -p:Platform=${{ matrix.platform }} --verbosity normal --collect:"XPlat Code Coverage" --filter "TestCategory!=Smoke" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
@@ -205,14 +208,13 @@ jobs:
           
       - name: Check for placeholders
         run: |
-          if [ -f tests/quality/verify_no_placeholders.py ]; then
-            python tests/quality/verify_no_placeholders.py
-          elif [ -f tests/quality/verify_no_placeholders_improved.py ]; then
+          if [ -f tests/quality/verify_no_placeholders_improved.py ]; then
             python tests/quality/verify_no_placeholders_improved.py
+          elif [ -f tests/quality/verify_no_placeholders.py ]; then
+            python tests/quality/verify_no_placeholders.py
           else
             echo "Placeholder verification script not found, skipping..."
           fi
-        # Placeholder check should fail if placeholders found
         
       - name: Verify no TODO/FIXME in code
         run: |

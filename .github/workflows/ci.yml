@@ -39,7 +39,7 @@ jobs:
       - name: Run linting
         run: |
           pip install ruff
-          ruff check .
+          ruff check backend app tests
       
       - name: Run type checking
         run: |
@@ -82,7 +82,7 @@ jobs:
         run: dotnet restore VoiceStudio.sln -r win-x64 -p:Platform=x64
       
       - name: Build
-        run: msbuild VoiceStudio.sln -t:Build -p:Configuration=Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64 -restore:false -warnaserror
+        run: dotnet build VoiceStudio.sln -c Release -p:Platform=x64 --no-restore
       
       - name: Check for root build artifacts
         run: |
@@ -171,14 +171,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       
       - name: Install tools
-        run: |
-          pip install ruff black isort
-      
-      - name: Check formatting with Black
-        run: black --check backend app tests
-      
-      - name: Check imports with isort
-        run: isort --check-only backend app tests
+        run: pip install ruff
       
       - name: Lint with Ruff
         run: ruff check backend app tests

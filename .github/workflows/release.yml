@@ -53,8 +53,7 @@ jobs:
       
       - name: Build .NET application
         run: |
-          dotnet build VoiceStudio.sln -c Release -p:Platform=x64
-          dotnet publish src/VoiceStudio.App/VoiceStudio.App.csproj -c Release -p:Platform=x64 -o dist/VoiceStudio
+          dotnet publish src/VoiceStudio.App/VoiceStudio.App.csproj -c Release -r win-x64 -p:SelfContained=true -p:WindowsAppSDKSelfContained=false -p:UseAppHost=true -p:WindowsPackageType=None -p:EnableMsixTooling=false -p:EnableDefaultPriItems=false -p:DisableXbfGeneration=true -p:Platform=x64 -o dist/VoiceStudio
       
       - name: Package Python backend
         run: |

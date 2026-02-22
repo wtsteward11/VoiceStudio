@@ -820,9 +820,10 @@ Production Gap Resolution and Architecture Completion. Implemented by Senior Sof
 
 ## Next 3 Steps
 
-1. ~~**v1.0.2 GA:**~~ **DONE (2026-02-22)** — Git push 403 resolved; verify PASS (--skip-quality); tag v1.0.2 pushed; release at https://github.com/wtsteward11/VoiceStudio/releases/tag/v1.0.2
-2. **Build recovery:** Use `.\scripts\build-clean.ps1` when XAML compiler fails; see docs/build/XAML_COMPILER_PLAYBOOK.md
-3. **v1.1.0 planning:** Phase 12 complete; next phase planning when ready
+1. ~~**Baseline Recovery Plan:**~~ **DONE (2026-02-22)** — Launch fix (Gate C + dev-launch), branding, tooling, verification
+2. ~~**v1.0.2 GA:**~~ **DONE (2026-02-22)** — Git push 403 resolved; tag v1.0.2 pushed
+3. **Build recovery:** Use `.\scripts\build-clean.ps1` when XAML compiler fails; see docs/build/XAML_COMPILER_PLAYBOOK.md
+4. **v1.1.0 planning:** Phase 12 complete; next phase planning when ready
 
 ✅ **Completed 2026-02-21 (Phase 1 Backend Solidification):**
 - **VS-0045 Root Cause Fixed:** COQUI_TOS_AGREED gate, Whisper download_root, default STT engine, model path unification
@@ -1050,8 +1051,8 @@ _Previous:_
 
 ## Context Acknowledgment
 
-- **Acknowledged At**: 2026-02-21 (Phase 12 Strategic Hardening Complete)
-- **Acknowledged By**: Phase 12 Implementation
+- **Acknowledged At**: 2026-02-22 (Baseline Recovery Plan Complete)
+- **Acknowledged By**: Baseline Recovery Implementation
 - **Actions Completed**:
   - Phase 12 WS1: CVE remediation (filelock, pillow, python-multipart, keras, transformers); CVE_EXCEPTIONS.md
   - WS2: Full-app SBOM, generate_requirements_hashes.ps1, generate_installer_provenance.ps1, SUPPLY_CHAIN_ATTESTATION.md, ADR-044
@@ -1081,6 +1082,7 @@ _Previous:_
 
 | Date | Task | Artifact | Type | Verified |
 | --- | --- | --- | --- | --- |
+| 2026-02-22 | Baseline Recovery Plan | Launch fix (Gate C + dev-launch), branding, tooling (check-branding, check-pri, check-warning-baseline), gatec-publish-launch.ps1 sanity check update, boot_latest.json app_created | Baseline | Verified |
 | 2026-02-21 | Phase 12 WS1–WS5 | CVE remediation, supply-chain (ADR-044), build-clean.ps1, mypy fixes, CHANGELOG, HANDOVER_CHECKLIST, docs/release/evidence/v1.0.2/ | Phase 12 | Verified |
 | 2026-02-21 | Phase 11 Sprint 2 | model_drift_detector, ab_testing, drift routes type fixes; MYPY_TRIAGE_PLAN updated | Type Safety | Verified |
 | 2026-02-21 | Phase 11 Sprint 3 | PERFORMANCE_BASELINES inference section; CONTRIBUTING.md; CHANGELOG, STATE, CANONICAL_REGISTRY | Documentation | Verified |

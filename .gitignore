@@ -121,8 +121,8 @@ installer/Output/
 # Runtime bundle (downloaded/installed at build time)
 installer/runtime/
 
-# External runtime submodules (tracked separately)
-runtime/external/deepfacelab_2025/
+# External runtime tools (local clones, not tracked in this repo)
+runtime/external/
 
 # Installer runtime binaries (local only, too large for git)
 installer/runtime/

@@ -14,98 +14,98 @@
 # ============================================================================
 # Testing Framework (FREE_LIBRARIES_INTEGRATION - Worker 3)
 # ============================================================================
-pytest>=8.0.0
-pytest-cov>=4.1.0
-pytest-asyncio>=0.23.0
-pytest-mock>=3.12.0
-pytest-timeout>=2.2.0
+pytest>=8.0.1
+pytest-cov>=4.1.1
+pytest-asyncio>=0.23.1
+pytest-mock>=3.12.1
+pytest-timeout>=2.2.1
 
 # ============================================================================
 # Code Quality & Linting
 # ============================================================================
-black>=24.0.0
-ruff>=0.1.0
-mypy>=1.7.0
+black>=24.0.1
+ruff>=0.1.1
+mypy>=1.7.1
 
 # ============================================================================
 # Documentation
 # ============================================================================
-sphinx>=7.0.0
-sphinx-rtd-theme>=2.0.0
+sphinx>=7.0.1
+sphinx-rtd-theme>=2.0.1
 
 # ============================================================================
 # FastAPI & Backend Core
 # ============================================================================
-fastapi>=0.109.0
+fastapi>=0.109.1
 uvicorn[standard]>=0.27.0
-python-multipart>=0.0.22  # GHSA-wp53-j4wj-2cfg
-pydantic>=2.5.0
-pydantic-settings>=2.1.0
+python-multipart>=0.0.23  # GHSA-wp53-j4wj-2cfg
+pydantic>=2.5.1
+pydantic-settings>=2.1.1
 
 # ============================================================================
 # HTTP Client & WebSocket
 # ============================================================================
-httpx>=0.26.0
-websockets>=12.0
+httpx>=0.26.1
+websockets>=12.1
 
 # ============================================================================
 # Configuration & Validation (FREE_LIBRARIES_INTEGRATION - Worker 3)
 # ============================================================================
-pyyaml>=6.0.1
-toml>=0.10.2
-cerberus>=1.3.5
-jsonschema>=4.20.0
+pyyaml>=6.0.2
+toml>=0.10.3
+cerberus>=1.3.6
+jsonschema>=4.20.1
 
 # ============================================================================
 # Natural Language Processing (FREE_LIBRARIES_INTEGRATION - Worker 3)
 # ============================================================================
-nltk>=3.8.1
-textblob>=0.17.1
-langdetect>=1.0.9
+nltk>=3.8.2
+textblob>=0.17.2
+langdetect>=1.0.10
 
 # ============================================================================
 # Text-to-Speech Utilities (FREE_LIBRARIES_INTEGRATION - Worker 3)
 # ============================================================================
-gtts>=2.5.0
-pyttsx3>=2.90
+gtts>=2.5.1
+pyttsx3>=2.91
 
 # ============================================================================
 # Plugin Sandbox (Windows resource monitoring - D2)
 # ============================================================================
-psutil>=5.9.0
+psutil>=5.9.1
 
 # ============================================================================
 # Utilities & Helpers (FREE_LIBRARIES_INTEGRATION - Worker 3)
 # ============================================================================
-tqdm>=4.66.0
-cython>=3.0.0
-PyPDF2>=3.0.1  # PDF processing for MCP unlock-pdf integration
+tqdm>=4.66.1
+cython>=3.0.1
+PyPDF2>=3.0.2  # PDF processing for MCP unlock-pdf integration
 
 # ============================================================================
 # Additional Quality Metrics (FREE_LIBRARIES_INTEGRATION - Worker 3)
 # ============================================================================
 # warpq - May require custom installation or build from source
-# nlpaug>=1.1.11
+# nlpaug>=1.1.12
 
 # ============================================================================
 # Security Constraints (TD-003)
 # ============================================================================
 # Constrain protobuf version to address CVE-2024-7254 when installed as transitive dep
-protobuf>=5.28.3
+protobuf>=5.28.4
 
 # ============================================================================
 # Database (Required for production - prevents placeholder mode)
 # ============================================================================
-aiosqlite>=0.19.0
+aiosqlite>=0.19.1
 
 # ============================================================================
 # Note: Engine-specific dependencies are in requirements_engines.txt
 # ============================================================================
 
-eval_type_backport>=0.3.1  # Python 3.10+ type syntax backport for Pydantic
+eval_type_backport>=0.3.2  # Python 3.10+ type syntax backport for Pydantic
 
 # ============================================================================
 # Plugin CLI Dependencies
 # ============================================================================
-click>=8.1.0  # CLI framework for voicestudio-plugin-cli
-cryptography>=42.0.0  # Ed25519 signing for plugin packages (optional)
+click>=8.1.1  # CLI framework for voicestudio-plugin-cli
+cryptography>=42.0.1  # Ed25519 signing for plugin packages (optional)

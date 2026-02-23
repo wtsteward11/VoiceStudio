@@ -22,12 +22,12 @@ protobuf>=5.28.3  # CVE-2024-7254 fix - required for tensorflow/onnx
 # ============================================================================
 # Python 3.11.9 recommended (3.10.15 minimum)
 # PyTorch 2.2.2+cu121 (required for compatibility with other software)
-torch==2.2.2+cu121  # Must install from: --index-url https://download.pytorch.org/whl/cu121
-torchaudio==2.2.2+cu121  # Must match Torch exactly
+torch==2.10.0  # Must install from: --index-url https://download.pytorch.org/whl/cu121
+torchaudio==2.10.0  # Must match Torch exactly
 transformers==4.55.4  # Stable with XTTS v2 and PyTorch 2.2.2
 huggingface_hub==0.36.0  # Matches Transformers 4.55+ API
-tokenizers==0.21.4  # Required by Transformers 4.55 (tokenizers>=0.21,<0.22)
-safetensors==0.6.2  # Fast checkpoint I/O
+tokenizers==0.22.2  # Required by Transformers 4.55 (tokenizers>=0.21,<0.22)
+safetensors==0.7.0  # Fast checkpoint I/O
 hf-xet==1.2.0  # XetHub remote dataset backend (installed by hub)
 fsspec==2025.9.0  # For remote asset loading
 diffusers>=0.21.0
@@ -40,10 +40,10 @@ scipy>=1.9.0
 # ⚠️ DO NOT UPGRADE: numpy > 1.26.4 breaks Librosa 0.11 compatibility
 librosa==0.11.0  # Audio feature extraction for XTTS and QC
 numpy==1.26.4  # Perfect bridge between PyTorch 2.2.2 and Librosa 0.11
-soundfile==0.12.1  # WAV/FLAC I/O
-faster-whisper==1.2.0  # Whisper variant; GPU-ready (compatible with PyTorch 2.2.2)
-pyloudnorm==0.1.1  # LUFS metering
-noisereduce==3.0.2  # NR chain
+soundfile==0.13.1  # WAV/FLAC I/O
+faster-whisper==1.2.1  # Whisper variant; GPU-ready (compatible with PyTorch 2.2.2)
+pyloudnorm==0.2.0  # LUFS metering
+noisereduce==3.0.3  # NR chain
 pydub>=0.25.0
 speechbrain>=0.5.0
 resemblyzer>=0.1.1
@@ -66,8 +66,8 @@ ffmpeg-python==0.2.0  # Audio/video conversion
 # TTS Engines (Worker 1)
 # ============================================================================
 # Coqui TTS (XTTS v2) - PRIMARY ENGINE
-coqui-tts==0.27.2  # Current release w/ XTTS v2 engine
-coqui-tts-trainer==0.3.1  # Finetuning & dataset manager
+coqui-tts==0.27.5  # Current release w/ XTTS v2 engine
+coqui-tts-trainer==0.3.3  # Finetuning & dataset manager
 
 # Tortoise TTS - LEGACY (isolate in separate venv if needed)
 # tortoise-tts>=2.4.0  # Use separate venv - conflicts with Torch 2.9 stack
@@ -96,7 +96,7 @@ paddlespeech>=1.2.0
 # ============================================================================
 # OpenAI Whisper (Python)
 openai-whisper>=20230314
-# faster-whisper==1.2.0  # Upgraded - see Audio Processing section above
+# faster-whisper==1.2.1  # Upgraded - see Audio Processing section above
 
 # whisper.cpp - Requires compiled binary (not Python package)
 # Download from: https://github.com/ggerganov/whisper.cpp/releases
@@ -218,8 +218,8 @@ pystoi>=0.3.3
 # ============================================================================
 # RVC core dependencies
 # fairseq==0.12.2  # Note: Has dependency conflicts with newer pip (omegaconf metadata issues) - needs special handling
-faiss-cpu==1.7.4
-pyworld==0.3.2
+faiss-cpu==1.13.2
+pyworld==0.3.5
 praat-parselmouth>=0.4.3
 
 # RVC Engine - Optional but recommended for full functionality:
@@ -345,7 +345,7 @@ dask>=2025.11.0
 #   pip install --upgrade pip wheel setuptools
 #
 # Step 2: Install PyTorch (CUDA 12.1) - CRITICAL: Must be first
-#   pip install torch==2.2.2+cu121 torchaudio==2.2.2+cu121 --index-url https://download.pytorch.org/whl/cu121
+#   pip install torch==2.10.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu121
 #
 # Step 3: Install this requirements file
 #   pip install -r requirements_engines.txt

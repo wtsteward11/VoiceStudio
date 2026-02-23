@@ -41,8 +41,8 @@ pystoi>=0.3.3
 
 # RVC core dependencies
 fairseq==0.12.2
-faiss-cpu==1.7.4
-pyworld==0.3.2
+faiss-cpu==1.13.2
+pyworld==0.3.5
 praat-parselmouth>=0.4.3
 
 # Note: numba and llvmlite versions should match your Python version

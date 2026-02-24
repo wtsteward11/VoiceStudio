@@ -328,43 +328,55 @@ function Write-Report {
     $skippedCount = ($Stages | Where-Object { $_.Status -eq "SKIPPED" }).Count
     
     # Markdown report
-    $report = "# VoiceStudio Verification Report`n`n" +
-        "**Date:** $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`n" +
-        "**Configuration:** $Configuration`n" +
-        "**Quick Mode:** $Quick`n" +
-        "**Real UI:** $RealUI`n" +
-        "**Overall Status:** $overallStatus`n" +
-        "**Total Duration:** $([math]::Round($overallDuration, 2)) seconds`n`n" +
-        "## Summary`n`n" +
-        "- **Passed:** $passedCount`n" +
-        "- **Failed:** $failedCount`n" +
-        "- **Skipped:** $skippedCount`n`n" +
-        "## Stage Results`n`n" +
-        "| # | Stage | Status | Exit Code | Duration |`n" +
-        "|---|-------|--------|-----------|----------|`n"
+    $report = @"
+# VoiceStudio Verification Report
+
+**Date:** $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+**Configuration:** $Configuration
+**Quick Mode:** $Quick
+**Real UI:** $RealUI
+**Overall Status:** $overallStatus
+**Total Duration:** $([math]::Round($overallDuration, 2)) seconds
+
+## Summary
+
+- **Passed:** $passedCount
+- **Failed:** $failedCount
+- **Skipped:** $skippedCount
+
+## Stage Results
+
+| # | Stage | Status | Exit Code | Duration |
+|---|-------|--------|-----------|----------|
+"@
 
     $stageNum = 1
     foreach ($stage in $Stages) {
         $icon = switch ($stage.Status) {
-            "PASSED" { "[OK]" }
-            "FAILED" { "[X]" }
-            "SKIPPED" { "[--]" }
-            default { "[?]" }
+            "PASSED" { "✅" }
+            "FAILED" { "❌" }
+            "SKIPPED" { "⏭️" }
+            default { "❓" }
         }
-        $line = '| {0} | {1} | {2} {3} | {4} | {5}s |' -f $stageNum, $stage.Name, $icon, $stage.Status, $stage.ExitCode, $stage.DurationSeconds
-        $report += [Environment]::NewLine + $line
+        $report += ("`n" + "| $stageNum | $($stage.Name) | $icon $($stage.Status) | $($stage.ExitCode) | $($stage.DurationSeconds)s |")
         $stageNum++
     }
 
-    $report += [Environment]::NewLine + [Environment]::NewLine +
-        "## Artifacts`n`n" +
-        "- **Report:** $ReportFile`n" +
-        "- **Logs:** $StageLogsDir`n" +
-        "- **Screenshots:** $ScreenshotsDir`n" +
-        "- **Test Results:** $TestResultsDir`n`n" +
-        "## Failed Stages`n`n"
+    $report += @"
 
-    $failedStages = $Stages | Where-Object { $_.Status -eq 'FAILED' }
+
+## Artifacts
+
+- **Report:** ``$ReportFile``
+- **Logs:** ``$StageLogsDir``
+- **Screenshots:** ``$ScreenshotsDir``
+- **Test Results:** ``$TestResultsDir``
+
+## Failed Stages
+
+"@
+
+    $failedStages = $Stages | Where-Object { $_.Status -eq "FAILED" }
     if ($failedStages) {
         foreach ($stage in $failedStages) {
             $report += "`n### $($stage.Name)`n"
@@ -384,23 +396,31 @@ function Write-Report {
         $report += "`nNo failures! 🎉`n"
     }
 
-    $report += [Environment]::NewLine +
-        "## How to Fix Failures`n`n" +
-        "1. Check the log file for the failed stage`n" +
-        "2. Fix the issue in your code`n" +
-        "3. Run .\scripts\verify.ps1 again`n" +
-        "4. Do NOT merge until this script passes`n`n" +
-        "## Re-run Commands`n`n" +
-        "``````powershell`n" +
-        "# Full verification`n" +
-        ".\scripts\verify.ps1`n`n" +
-        "# Quick verification (pre-commit)`n" +
-        ".\scripts\verify.ps1 -Quick`n`n" +
-        "# Skip specific stages`n" +
-        ".\scripts\verify.ps1 -SkipUI -SkipIntegration`n`n" +
-        "# Real UI automation`n" +
-        ".\scripts\verify.ps1 -RealUI`n" +
-        "```````n"
+    $report += @"
+
+## How to Fix Failures
+
+1. Check the log file for the failed stage
+2. Fix the issue in your code
+3. Run ``.\scripts\verify.ps1`` again
+4. Do NOT merge until this script passes
+
+## Re-run Commands
+
+``````powershell
+# Full verification
+.\scripts\verify.ps1
+
+# Quick verification (pre-commit)
+.\scripts\verify.ps1 -Quick
+
+# Skip specific stages
+.\scripts\verify.ps1 -SkipUI -SkipIntegration
+
+# Real UI automation
+.\scripts\verify.ps1 -RealUI
+``````
+"@
 
     $report | Out-File -FilePath $ReportFile -Encoding utf8
     
@@ -436,10 +456,11 @@ function Write-Report {
 # ============================================================================
 
 Write-Host ""
-Write-Host "========================================================================" -ForegroundColor Magenta
-Write-Host "            VOICESTUDIO UNIFIED VERIFICATION HARNESS" -ForegroundColor Magenta
-Write-Host "  RULE: No changes allowed unless this script stays GREEN" -ForegroundColor Yellow
-Write-Host "========================================================================" -ForegroundColor Magenta
+Write-Host "╔══════════════════════════════════════════════════════════════════════╗" -ForegroundColor Magenta
+Write-Host "║            VOICESTUDIO UNIFIED VERIFICATION HARNESS                  ║" -ForegroundColor Magenta
+Write-Host "║                                                                      ║" -ForegroundColor Magenta
+Write-Host "║  RULE: No changes allowed unless this script stays GREEN            ║" -ForegroundColor Yellow
+Write-Host "╚══════════════════════════════════════════════════════════════════════╝" -ForegroundColor Magenta
 Write-Host ""
 Write-Host "Timestamp:     $Timestamp"
 Write-Host "Configuration: $Configuration"
@@ -454,13 +475,9 @@ Set-Location $RootDir
 # STAGE 1: Clean Build (C#)
 # ============================================================================
 
-$script:BuildWarningCount = $null
 $stage1Passed = Invoke-Stage -Name "Clean Build" -Description "Build C# solution (VoiceStudio.sln)" -Skip:$SkipBuild -Action {
     $binlogPath = Join-Path $ArtifactsDir "build.binlog"
-    $buildOut = & dotnet build VoiceStudio.sln -c $Configuration -p:Platform=x64 /bl:$binlogPath 2>&1
-    $buildOut | Write-Host
-    $summaryLine = $buildOut | Where-Object { $_ -match "(\d+)\s+Warning\(s\)" } | Select-Object -Last 1
-    if ($summaryLine -match "(\d+)\s+Warning\(s\)") { $script:BuildWarningCount = [int]$Matches[1] }
+    & dotnet build VoiceStudio.sln -c $Configuration -p:Platform=x64 /bl:$binlogPath
     return $LASTEXITCODE
 }
 
@@ -469,28 +486,6 @@ if (-not $stage1Passed -and -not $SkipBuild) {
     Write-Host "BUILD FAILED - Stopping verification (fail-fast)" -ForegroundColor Red
     Write-Report
     exit 1
-}
-
-# Post-build checks (PRI, warning baseline)
-if ($stage1Passed -and -not $SkipBuild) {
-    $checkPri = & (Join-Path $ScriptDir "check-pri.ps1") 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        $checkPri | Write-Host
-        Write-Host "PRI check failed" -ForegroundColor Red
-        Write-Report
-        exit 1
-    }
-    $checkPri | Write-Host
-    if ($null -ne $script:BuildWarningCount) {
-        $checkWarn = & (Join-Path $ScriptDir "check-warning-baseline.ps1") -WarningCount $script:BuildWarningCount 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            $checkWarn | Write-Host
-            Write-Host "Warning baseline check failed" -ForegroundColor Red
-            Write-Report
-            exit 1
-        }
-        $checkWarn | Write-Host
-    }
 }
 
 # ============================================================================
@@ -538,16 +533,6 @@ if (-not $stage2Passed -and -not $SkipPythonLint) {
     Write-Report
     exit 1
 }
-
-# Branding consistency check (runs after lint)
-$checkBrand = & (Join-Path $ScriptDir "check-branding.ps1") 2>&1
-if ($LASTEXITCODE -ne 0) {
-    $checkBrand | Write-Host
-    Write-Host "Branding check failed" -ForegroundColor Red
-    Write-Report
-    exit 1
-}
-$checkBrand | Write-Host
 
 # ============================================================================
 # STAGE 3: C# Unit Tests

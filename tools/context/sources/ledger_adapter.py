@@ -7,7 +7,7 @@ from tools.context.core.models import AllocationContext, SourceResult
 from tools.context.sources.base import BaseSourceAdapter
 from tools.overseer.ledger_parser import LedgerParser
 
-DEFAULT_LEDGER_PATH = Path("docs/archive/Recovery_Plan/QUALITY_LEDGER.md")
+DEFAULT_LEDGER_PATH = Path("Recovery Plan/QUALITY_LEDGER.md")
 
 
 class LedgerSourceAdapter(BaseSourceAdapter):

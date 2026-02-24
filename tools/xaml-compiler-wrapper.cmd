@@ -59,23 +59,9 @@ if "!XC_EXIT!"=="0" (
 rem VS-0001: false positive exit code 1
 if "!XC_EXIT!"=="1" (
   if exist "!OUTPUT_JSON!" (
-    rem Check for GeneratedCodeFiles (normal codegen) or GeneratedXamlFiles (XBF disabled)
     findstr /c:"GeneratedCodeFiles" "!OUTPUT_JSON!" >nul 2>nul
     if !ERRORLEVEL! EQU 0 (
-      echo [xaml-wrapper] VS-0001: false-positive (GeneratedCodeFiles present^). Returning 0.
-      exit /b 0
-    )
-    findstr /c:"GeneratedXamlFiles" "!OUTPUT_JSON!" >nul 2>nul
-    if !ERRORLEVEL! EQU 0 (
-      echo [xaml-wrapper] VS-0001: false-positive (GeneratedXamlFiles present^). Returning 0.
-      exit /b 0
-    )
-    rem If output.json exists but has neither marker, check if .g.i.cs files were produced
-    rem (XamlCompiler.exe may report success via side-effects rather than output.json content)
-    for %%I in ("!INPUT_JSON!") do set "OBJ_DIR=%%~dpI"
-    dir /s /b "!OBJ_DIR!*.g.i.cs" >nul 2>nul
-    if !ERRORLEVEL! EQU 0 (
-      echo [xaml-wrapper] VS-0001: false-positive (.g.i.cs files exist^). Returning 0.
+      echo [xaml-wrapper] VS-0001: false-positive. Returning 0.
       exit /b 0
     )
   )
@@ -93,11 +79,6 @@ if "!XC_EXIT!"=="1" (
       findstr /c:"GeneratedCodeFiles" "!OUTPUT_JSON!" >nul 2>nul
       if !ERRORLEVEL! EQU 0 (
         echo [xaml-wrapper] VS-0001: false-positive on retry. Returning 0.
-        exit /b 0
-      )
-      findstr /c:"GeneratedXamlFiles" "!OUTPUT_JSON!" >nul 2>nul
-      if !ERRORLEVEL! EQU 0 (
-        echo [xaml-wrapper] VS-0001: false-positive on retry (GeneratedXamlFiles^). Returning 0.
         exit /b 0
       )
     )

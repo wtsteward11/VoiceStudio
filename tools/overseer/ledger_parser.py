@@ -7,7 +7,7 @@ from pathlib import Path
 
 from tools.overseer.models import Category, Gate, LedgerEntry, LedgerState, Severity
 
-LEDGER_DEFAULT_PATH = Path("docs/archive/Recovery_Plan/QUALITY_LEDGER.md")
+LEDGER_DEFAULT_PATH = Path("Recovery Plan/QUALITY_LEDGER.md")
 RESERVED_IDS = {"VS-0025", "VS-0032"}
 
 

@@ -48,13 +48,13 @@ $publishCmd = @(
   "-c", $Configuration,
   "-r", $RuntimeIdentifier,
   "-p:SelfContained=true",
-  "-p:WindowsAppSDKSelfContained=true",
+  "-p:WindowsAppSDKSelfContained=false",
   "-p:UseAppHost=true",
   "-p:WindowsPackageType=None",
   "-p:EnableMsixTooling=false",
   "-p:EnableDefaultPriItems=false",
-  # Use csproj default (DisableXbfGeneration=false). XBF generation is disabled project-wide because
-  # WinUI Pass2 returns false-positive exit code 1, preventing XBF output. Text XAML is equivalent.
+  # Gate C/H ship artifact relies on compiled XAML payload (.xbf). Ensure XBF generation is enabled
+  # so publish output cannot retain stale XBFs when XAML changes.
   "-p:DisableXbfGeneration=false",
   "-p:BaseOutputPath=$baseOutputPath",
   "-p:PublishDir=$publishDir",
@@ -131,13 +131,15 @@ foreach ($priName in $requiredWinUiPri) {
   }
 }
 
-# Required files. With WindowsAppSDKSelfContained=true, WinUI PRI files come from the
-# installed runtime; only VoiceStudio.App.pri is required in the app folder.
+# Required files (unpackaged apps need XAML payload + WinUI PRI indexes)
 $required = @(
   (Join-Path $publishDir "VoiceStudio.App.exe"),
   (Join-Path $publishDir "VoiceStudio.App.dll"),
   (Join-Path $publishDir "VoiceStudio.App.deps.json"),
   (Join-Path $publishDir "VoiceStudio.App.runtimeconfig.json"),
+  (Join-Path $publishDir "Microsoft.UI.pri"),
+  (Join-Path $publishDir "Microsoft.UI.Xaml.Controls.pri"),
+  (Join-Path $publishDir "Microsoft.WindowsAppRuntime.pri"),
   (Join-Path $publishDir "VoiceStudio.App.pri")
 )
 foreach ($p in $required) {
@@ -146,13 +148,14 @@ foreach ($p in $required) {
   }
 }
 
-# XAML payload: With DisableXbfGeneration=false, XAML is in VoiceStudio.App.pri (no loose .xbf/.xaml).
-# WinUI resources come from the installed runtime when WindowsAppSDKSelfContained=true.
-$xbfFiles = @(Get-ChildItem -Path $publishDir -Filter "*.xbf" -Recurse -ErrorAction SilentlyContinue)
-$xamlFiles = @(Get-ChildItem -Path $publishDir -Filter "*.xaml" -Recurse -ErrorAction SilentlyContinue)
-$appPri = Join-Path $publishDir "VoiceStudio.App.pri"
-if ($xbfFiles.Count -eq 0 -and $xamlFiles.Count -eq 0 -and -not (Test-Path $appPri)) {
-  Write-Error "Publish sanity check failed: missing XAML payload (.xbf/.xaml or VoiceStudio.App.pri)"
+# Check for XAML payload (XBF or XAML files).
+# Note: We always include `VoiceStudio.App.pri` in the unpackaged lane to satisfy ms-appx
+# resource resolution, so `.pri` presence is NOT a reliable indicator of packaged vs unpackaged.
+$xbfFiles = Get-ChildItem -Path $publishDir -Filter "*.xbf" -Recurse -ErrorAction SilentlyContinue
+$xamlFiles = Get-ChildItem -Path $publishDir -Filter "*.xaml" -Recurse -ErrorAction SilentlyContinue
+
+if ($xbfFiles.Count -eq 0 -and $xamlFiles.Count -eq 0) {
+  Write-Error "Publish sanity check failed: missing XAML payload (.xbf/.xaml)"
 }
 
 $launchLog = Join-Path $publishDir "gatec-launch.log"
@@ -336,5 +339,3 @@ Write-Host "Launch log: $launchLog"
 ) | Set-Content -Path $latestInfoPath
 
 exit $exitCode
-
-

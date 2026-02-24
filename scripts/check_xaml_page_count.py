@@ -17,9 +17,8 @@ import sys
 from pathlib import Path
 
 # Thresholds per project - adjust as modules grow
-# VoiceStudio.App: 354 pages (migration to modules planned; threshold raised to unblock CI)
 THRESHOLDS = {
-    "VoiceStudio.App": 360,           # Current count; migrate panels to modules per ADR-023
+    "VoiceStudio.App": 25,            # Shell only - most panels migrated to modules
     "VoiceStudio.Module.Voice": 50,   # Voice panels
     "VoiceStudio.Module.Media": 50,   # Media panels
     "VoiceStudio.Module.Analysis": 50, # Analysis panels

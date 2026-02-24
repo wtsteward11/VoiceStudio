@@ -1487,6 +1487,24 @@ def _register_all_routes():
     except Exception as e:
         logger.warning(f"Failed to register plugin_gallery_router: {e}")
 
+    # Register Plugin Health routes (must be before plugins catch-all)
+    try:
+        from .routes.plugin_health import router as plugin_health_router
+
+        app.include_router(plugin_health_router)
+        logger.debug("Registered plugin_health_router")
+    except Exception as e:
+        logger.warning(f"Failed to register plugin_health_router: {e}")
+
+    # Register Plugin routes (catch-all /{plugin_id} — must be AFTER health)
+    try:
+        from .routes.plugins import router as plugins_router
+
+        app.include_router(plugins_router)
+        logger.debug("Registered plugins_router")
+    except Exception as e:
+        logger.warning(f"Failed to register plugins_router: {e}")
+
     # Register Marketplace routes (Phase 7 Sprint 1)
     try:
         from .routes.marketplace import router as marketplace_router

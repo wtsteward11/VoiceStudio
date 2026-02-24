@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import asyncio
 import os
 
 from fastapi import APIRouter, HTTPException
@@ -33,6 +34,7 @@ router = APIRouter(prefix="/api/voice-browser", tags=["voice-browser"])
 
 # Voice catalog with persistence
 _voice_catalog: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 _catalog_file_path: str | None = None
 
 

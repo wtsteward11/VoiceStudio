@@ -46,8 +46,16 @@ namespace VoiceStudio.App
       _startupProfiler.Checkpoint("InitializeComponent");
       WriteDiagMarker("xaml_initialized");
 
-      // Initialize service provider
-      ServiceProvider.Initialize();
+      // Initialize service provider with error recovery
+      try
+      {
+        ServiceProvider.Initialize();
+      }
+      catch (Exception ex)
+      {
+        WriteDiagMarker($"service_provider_failed|{ex.GetType().Name}|{ex.Message}");
+        System.Diagnostics.Debug.WriteLine($"ServiceProvider.Initialize failed: {ex}");
+      }
       _startupProfiler.Checkpoint("ServiceProvider.Initialize");
 
       // Gate C UI smoke relies on capturing binding failures deterministically.

@@ -24,6 +24,7 @@ See also: docs/api/ROUTE_MAPPING.md for complete route documentation.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 
 from fastapi import APIRouter, HTTPException
@@ -37,6 +38,7 @@ router = APIRouter(prefix="/api/waveform", tags=["waveform"])
 
 # In-memory waveform data cache (replace with database in production)
 _waveform_cache: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class WaveformConfig(BaseModel):

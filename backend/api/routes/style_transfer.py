@@ -35,6 +35,7 @@ router = APIRouter(prefix="/api/style-transfer", tags=["style-transfer"])
 
 # In-memory style transfer jobs (replace with database in production)
 _style_transfer_jobs: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class StyleTransferRequest(BaseModel):

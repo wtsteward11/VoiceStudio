@@ -8,6 +8,7 @@ Supports CRUD operations, point editing, and curve interpolation.
 from __future__ import annotations
 
 import logging
+import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/automation", tags=["automation"])
 
 # In-memory automation curves storage (replace with database in production)
 _automation_curves: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class AutomationPoint(BaseModel):

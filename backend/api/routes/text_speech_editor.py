@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import asyncio
 import uuid
 from datetime import datetime
 
@@ -23,6 +24,7 @@ router = APIRouter(prefix="/api/edit", tags=["text-speech-editor"])
 
 # In-memory storage for edit sessions (replace with database in production)
 _edit_sessions: dict[str, EditSession] = {}
+_state_lock = asyncio.Lock()
 
 
 class WordAlignment(BaseModel):

@@ -8,6 +8,7 @@ for voice synthesis) and predicting reward scores.
 from __future__ import annotations
 
 import logging
+import asyncio
 import uuid
 from datetime import datetime
 
@@ -31,6 +32,7 @@ router = APIRouter(prefix="/api/rm", tags=["reward"])
 # In-memory reward model storage (replace with database in production)
 _reward_models: dict[str, dict] = {}
 _reward_training_jobs: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 @router.post("/train", response_model=RmTrainResponse)

@@ -27,6 +27,10 @@ namespace VoiceStudio.App.Services
     private CancellationTokenSource? _receiveCts;
     private Task? _receiveTask;
     private bool _useDirectConnection;
+    private int _reconnectAttempts;
+    private const int MaxReconnectAttempts = 5;
+    private const int BaseReconnectDelayMs = 1000;
+    private volatile bool _intentionalDisconnect;
 
     /// <summary>
     /// Event fired when audio data is received for real-time conversion.
@@ -172,15 +176,68 @@ namespace VoiceStudio.App.Services
           }
         }
       }
-      // ALLOWED: empty catch - OperationCanceledException is expected during shutdown
       catch (OperationCanceledException)
       {
-        // Intentionally empty - cancellation is normal during shutdown
+        // Cancellation is normal during shutdown
+      }
+      catch (WebSocketException ex)
+      {
+        ErrorLogger.LogWarning($"WebSocket connection lost: {ex.Message}", "RealtimeVoiceWebSocketClient.ReceiveLoopAsync");
+        if (!_intentionalDisconnect && !_disposed)
+        {
+          _ = Task.Run(() => AttemptReconnectAsync());
+        }
       }
       catch (Exception ex)
       {
         ErrorLogger.LogWarning($"WebSocket receive error: {ex.Message}", "RealtimeVoiceWebSocketClient.ReceiveLoopAsync");
       }
+    }
+
+    private async Task AttemptReconnectAsync()
+    {
+      for (int attempt = 0; attempt < MaxReconnectAttempts; attempt++)
+      {
+        if (_disposed || _intentionalDisconnect)
+          return;
+
+        _reconnectAttempts = attempt + 1;
+        var delay = BaseReconnectDelayMs * (1 << Math.Min(attempt, 4));
+        ErrorLogger.LogDebug(
+          $"Reconnect attempt {_reconnectAttempts}/{MaxReconnectAttempts} in {delay}ms",
+          "RealtimeVoiceWebSocketClient");
+
+        await Task.Delay(delay);
+
+        if (_disposed || _intentionalDisconnect)
+          return;
+
+        try
+        {
+          await ConnectDirectAsync(CancellationToken.None);
+          _reconnectAttempts = 0;
+          StatusChanged?.Invoke(this, new RealtimeConversionStatus
+          {
+            Status = "converting",
+            Message = "Reconnected",
+            Timestamp = DateTime.UtcNow
+          });
+          return;
+        }
+        catch (Exception ex)
+        {
+          ErrorLogger.LogWarning(
+            $"Reconnect attempt {_reconnectAttempts} failed: {ex.Message}",
+            "RealtimeVoiceWebSocketClient");
+        }
+      }
+
+      StatusChanged?.Invoke(this, new RealtimeConversionStatus
+      {
+        Status = "error",
+        Message = $"Disconnected after {MaxReconnectAttempts} reconnect attempts",
+        Timestamp = DateTime.UtcNow
+      });
     }
 
     private void ProcessDirectMessage(string message)
@@ -264,6 +321,7 @@ namespace VoiceStudio.App.Services
     /// </summary>
     public async Task DisconnectAsync()
     {
+      _intentionalDisconnect = true;
       if (_useDirectConnection)
       {
         try

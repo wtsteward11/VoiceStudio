@@ -7,6 +7,7 @@ Endpoints for SSML (Speech Synthesis Markup Language) editing and processing.
 from __future__ import annotations
 
 import logging
+import asyncio
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -34,6 +35,7 @@ router = APIRouter(prefix="/api/ssml", tags=["ssml"])
 
 # In-memory SSML documents storage (replace with database in production)
 _ssml_documents: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class SSMLDocument(BaseModel):

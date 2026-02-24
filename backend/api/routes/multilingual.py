@@ -7,6 +7,7 @@ Endpoints for managing multi-language voice synthesis and translation.
 from __future__ import annotations
 
 import logging
+import asyncio
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/api/multilingual", tags=["multilingual"])
 
 # In-memory language configurations (replace with database in production)
 _language_configs: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class LanguageConfig(BaseModel):

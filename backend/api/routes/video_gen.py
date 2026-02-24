@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import asyncio
 import os
 import tempfile
 import uuid
@@ -42,6 +43,7 @@ router = APIRouter(prefix="/api/video", tags=["video", "generation"])
 # In-memory storage for generated videos
 # (replace with database/storage in production)
 _video_storage: dict[str, str] = {}  # video_id -> file_path
+_state_lock = asyncio.Lock()
 
 # Engine router for video generation
 ENGINE_AVAILABLE = False

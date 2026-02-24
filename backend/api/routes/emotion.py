@@ -7,6 +7,7 @@ Endpoints for fine-grained emotion control in voice synthesis.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 import uuid
 from datetime import datetime
@@ -40,6 +41,7 @@ router = APIRouter(prefix="/api/emotion", tags=["emotion"])
 
 # In-memory storage for emotion presets (replace with database in production)
 _emotion_presets: dict[str, EmotionPreset] = {}
+_state_lock = asyncio.Lock()
 
 # Available emotions
 AVAILABLE_EMOTIONS = [

@@ -30,6 +30,7 @@ router = APIRouter(prefix="/api/audio-analysis", tags=["audio-analysis"])
 # In-memory analysis results storage (replace with database in production)
 _analysis_results: dict[str, dict] = {}
 _analysis_timestamps: dict[str, float] = {}  # audio_id -> creation_time
+_state_lock = asyncio.Lock()
 _MAX_ANALYSIS_RESULTS = 500  # Maximum number of cached analysis results
 _ANALYSIS_CACHE_TTL = 3600  # Cache TTL in seconds (1 hour)
 

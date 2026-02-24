@@ -7,6 +7,7 @@ Endpoints for sonography (waterfall/3D spectrogram) visualization.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 
 from fastapi import APIRouter, HTTPException
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/api/sonography", tags=["sonography"])
 
 # In-memory sonography data (replace with database in production)
 _sonography_data: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class SonographyConfig(BaseModel):

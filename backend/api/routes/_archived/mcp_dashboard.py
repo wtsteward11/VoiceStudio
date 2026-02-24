@@ -7,6 +7,7 @@ Endpoints for MCP (Model Context Protocol) server dashboard and management.
 from __future__ import annotations
 
 import logging
+import asyncio
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/api/mcp-dashboard", tags=["mcp-dashboard"])
 
 # In-memory storage for MCP servers (replace with database in production)
 _mcp_servers: dict[str, MCPServer] = {}
+_state_lock = asyncio.Lock()
 
 
 class MCPServer(BaseModel):

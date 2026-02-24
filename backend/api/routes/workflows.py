@@ -25,6 +25,7 @@ router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 
 # In-memory storage (ready for database migration)
 _workflows: dict[str, Workflow] = {}
+_state_lock = asyncio.Lock()
 
 
 def _validate_workflow(workflow: Workflow) -> list[str]:

@@ -8,6 +8,7 @@ voice synthesis quality through perceptual testing.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 import uuid
 from datetime import datetime
@@ -49,6 +50,7 @@ router = APIRouter(prefix="/api/eval/abx", tags=["eval", "abx"])
 # In-memory ABX test sessions (replace with database in production)
 _abx_sessions: dict[str, dict] = {}
 _abx_results: dict[str, list[dict]] = {}
+_state_lock = asyncio.Lock()
 
 
 class ABXSession(BaseModel):

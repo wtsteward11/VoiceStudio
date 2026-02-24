@@ -384,6 +384,7 @@ def _coerce_optional_float(value: Any) -> float | None:
 _audio_registry = get_audio_registry()
 _audio_storage: dict[str, str] = _audio_registry.to_dict()  # audio_id -> file_path
 _audio_storage_timestamps: dict[str, float] = {}  # audio_id -> creation_time (best-effort)
+_state_lock = asyncio.Lock()
 
 # Cleanup configuration (mapping only; cached files are content-addressed and not deleted here)
 AUDIO_STORAGE_MAX_AGE_SECONDS = 7 * 24 * 3600  # 7 days
@@ -4315,6 +4316,14 @@ async def synthesize_stream(websocket: WebSocket):
         except Exception as send_err:
             logger.debug(f"Could not send error to WebSocket client: {send_err}")
     finally:
+        if engine_instance is not None:
+            try:
+                if hasattr(engine_instance, "cleanup"):
+                    engine_instance.cleanup()
+                    logger.debug("Streaming engine instance cleaned up")
+            except Exception as cleanup_err:
+                logger.warning(f"Engine cleanup failed after WebSocket disconnect: {cleanup_err}")
+            engine_instance = None
         try:
             await websocket.close()
         except Exception as close_err:

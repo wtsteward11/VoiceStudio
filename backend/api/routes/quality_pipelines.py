@@ -7,6 +7,7 @@ Provides endpoints for engine-specific quality enhancement pipelines.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 import uuid
 from typing import Any
@@ -30,6 +31,7 @@ router = APIRouter(prefix="/api/quality/pipelines", tags=["quality-pipelines"])
 
 # In-memory storage for custom pipelines (replace with database in production)
 _custom_pipelines: dict[str, dict[str, Any]] = {}
+_state_lock = asyncio.Lock()
 
 
 class PipelineConfiguration(BaseModel):

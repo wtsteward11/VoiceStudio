@@ -8,6 +8,7 @@ Supports CRUD operations, tag usage tracking, and categorization.
 from __future__ import annotations
 
 import logging
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/tags", tags=["tags"])
 
 # In-memory tags storage (replace with database in production)
 _tags: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 _MAX_TAGS = 10000  # Maximum number of tags to prevent memory issues
 
 

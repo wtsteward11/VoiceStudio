@@ -7,6 +7,7 @@ Endpoints for voice morphing and blending between multiple voices.
 from __future__ import annotations
 
 import logging
+import asyncio
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/voice-morph", tags=["voice-morph"])
 
 # In-memory morph configurations (replace with database in production)
 _morph_configs: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class VoiceBlend(BaseModel):

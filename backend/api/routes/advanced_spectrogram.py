@@ -8,6 +8,7 @@ and advanced processing options.
 from __future__ import annotations
 
 import logging
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -24,6 +25,7 @@ router = APIRouter(
 
 # In-memory spectrogram data (replace with database in production)
 _spectrogram_data: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class SpectrogramView(BaseModel):

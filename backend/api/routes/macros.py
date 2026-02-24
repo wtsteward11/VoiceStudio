@@ -7,6 +7,7 @@ CRUD operations for macros and automation curves.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 import uuid
 from datetime import datetime, timedelta
@@ -138,6 +139,7 @@ _macros: dict[str, Macro] = {}  # macro_id -> Macro
 _automation_curves: dict[str, AutomationCurve] = {}  # curve_id -> AutomationCurve
 _macro_execution_status: dict[str, MacroExecutionStatus] = {}  # macro_id -> Status
 _macro_schedules: dict[str, dict[str, Any]] = {}  # macro_id -> Schedule info
+_state_lock = asyncio.Lock()
 _MAX_MACROS = 1000
 _MAX_AUTOMATION_CURVES = 2000
 

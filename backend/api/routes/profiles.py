@@ -8,6 +8,7 @@ Uses ProfileStore for persistent, disk-backed storage.
 from __future__ import annotations
 
 import logging
+import asyncio
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -114,6 +115,7 @@ class _ProfilesProxy:
 # Export for backward compatibility
 _profiles = _ProfilesProxy()
 _profile_timestamps: dict[str, float] = {}  # Timestamps not tracked in the new store
+_state_lock = asyncio.Lock()
 
 router = APIRouter(
     prefix="/api/profiles",

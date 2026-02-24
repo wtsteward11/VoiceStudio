@@ -7,6 +7,7 @@ Endpoints for spatial audio positioning and 3D audio effects.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 from typing import Any
 
@@ -23,6 +24,7 @@ router = APIRouter(prefix="/api/spatial-audio", tags=["spatial-audio"])
 
 # In-memory spatial audio configurations (replace with database in production)
 _spatial_configs: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class SpatialPosition(BaseModel):

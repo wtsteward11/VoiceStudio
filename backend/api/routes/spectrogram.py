@@ -25,6 +25,7 @@ See also: docs/api/ROUTE_MAPPING.md for complete route documentation.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 from typing import Any
 
@@ -39,6 +40,7 @@ router = APIRouter(prefix="/api/spectrogram", tags=["spectrogram"])
 
 # In-memory spectrogram settings (replace with database in production)
 _spectrogram_settings: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 _MAX_SPECTROGRAM_SETTINGS = 1000  # Maximum number of settings to keep
 
 

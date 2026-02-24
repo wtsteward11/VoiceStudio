@@ -11,6 +11,7 @@ WebSocket Protocol (GAP-INT-002):
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -36,6 +37,7 @@ router = APIRouter(
 
 # In-memory visualizer sessions (replace with database in production)
 _visualizer_sessions: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class VisualizerConfig(BaseModel):

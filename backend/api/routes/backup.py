@@ -8,6 +8,7 @@ Supports full backups, selective backups, and restore operations.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 import shutil
 import zipfile
@@ -91,6 +92,7 @@ class RestoreRequest(BaseModel):
 
 # In-memory backup metadata (replace with database in production)
 _backups: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 # Backup limits for memory management
 _MAX_BACKUP_SIZE_MB = 5000  # 5GB max backup size

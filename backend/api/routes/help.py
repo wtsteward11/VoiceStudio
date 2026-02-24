@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import asyncio
 import os
 
 from fastapi import APIRouter, HTTPException, Query
@@ -23,6 +24,7 @@ router = APIRouter(prefix="/api/help", tags=["help"])
 # Help content storage with JSON persistence
 _help_topics: dict[str, dict] = {}
 _keyboard_shortcuts: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 _help_data_file: str | None = None
 
 

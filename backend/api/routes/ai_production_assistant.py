@@ -8,6 +8,7 @@ Context-aware chatbot that can answer questions, suggest workflows, and execute 
 from __future__ import annotations
 
 import logging
+import asyncio
 import uuid
 from datetime import datetime
 from typing import Any
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/api/assistant/production", tags=["assistant-producti
 
 # In-memory storage for chat sessions (replace with database in production)
 _chat_sessions: dict[str, ChatSession] = {}
+_state_lock = asyncio.Lock()
 
 
 class ChatMessage(BaseModel):

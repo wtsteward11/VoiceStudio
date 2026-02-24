@@ -8,6 +8,7 @@ transcript editing, and dataset validation.
 from __future__ import annotations
 
 import logging
+import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/api/dataset-editor", tags=["dataset-editor"])
 
 # In-memory dataset details (replace with database in production)
 _dataset_details: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class DatasetAudioFile(BaseModel):

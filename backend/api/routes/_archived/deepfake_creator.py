@@ -27,6 +27,7 @@ router = APIRouter(prefix="/api/deepfake-creator", tags=["deepfake-creator"])
 _deepfake_jobs: dict[str, DeepfakeJob] = {}
 _job_queue: list[str] = []  # Queue of job IDs
 _processing_jobs: set[str] = set()  # Jobs currently being processed
+_state_lock = asyncio.Lock()
 _max_concurrent_jobs: int = 2  # Maximum concurrent deepfake processing jobs
 
 

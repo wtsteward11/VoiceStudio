@@ -7,6 +7,7 @@ Endpoints for text highlighting and synchronization with audio.
 from __future__ import annotations
 
 import logging
+import asyncio
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/api/text-highlighting", tags=["text-highlighting"])
 
 # In-memory highlighting sessions (replace with database in production)
 _highlighting_sessions: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class TextSegment(BaseModel):

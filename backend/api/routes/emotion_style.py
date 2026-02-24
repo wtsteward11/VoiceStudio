@@ -7,6 +7,7 @@ Endpoints for controlling emotion and style in voice synthesis.
 from __future__ import annotations
 
 import logging
+import asyncio
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -22,6 +23,7 @@ _MAX_EMOTION_PRESETS = 200  # Maximum number of emotion presets
 _MAX_STYLE_PRESETS = 200  # Maximum number of style presets
 _emotion_preset_timestamps: dict[str, float] = {}  # preset_id -> creation_time
 _style_preset_timestamps: dict[str, float] = {}  # preset_id -> creation_time
+_state_lock = asyncio.Lock()
 
 
 def _cleanup_old_presets():

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import asyncio
 import os
 
 from fastapi import APIRouter, HTTPException
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/img/sampler", tags=["img", "sampler"])
 
 # In-memory storage for sampled images
 _image_storage: dict[str, str] = {}  # image_id -> file_path
+_state_lock = asyncio.Lock()
 
 # Supported samplers
 SUPPORTED_SAMPLERS = [

@@ -7,6 +7,7 @@ Endpoints for managing scripts and transcripts for voice synthesis.
 from __future__ import annotations
 
 import logging
+import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/api/script-editor", tags=["script-editor"])
 
 # In-memory scripts storage (replace with database in production)
 _scripts: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class ScriptSegment(BaseModel):

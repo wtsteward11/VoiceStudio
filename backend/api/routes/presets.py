@@ -12,6 +12,7 @@ Unified endpoint for managing all types of presets:
 from __future__ import annotations
 
 import logging
+import asyncio
 import uuid
 from datetime import datetime
 from typing import Any
@@ -29,6 +30,7 @@ router = APIRouter(prefix="/api/presets", tags=["presets"])
 _presets: dict[str, dict] = {}
 _MAX_PRESETS = 1000  # Maximum number of presets
 _preset_timestamps: dict[str, float] = {}  # preset_id -> creation_time
+_state_lock = asyncio.Lock()
 
 
 def _cleanup_old_presets():

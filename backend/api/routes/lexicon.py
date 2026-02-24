@@ -7,6 +7,7 @@ Endpoints for managing pronunciation lexicons and custom word pronunciations.
 from __future__ import annotations
 
 import logging
+import asyncio
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -23,6 +24,7 @@ router = APIRouter(prefix="/api/lexicon", tags=["lexicon"])
 # In-memory lexicons (replace with database in production)
 _lexicons: dict[str, dict] = {}
 _lexicon_entries: dict[str, list[dict]] = {}  # lexicon_id -> entries
+_state_lock = asyncio.Lock()
 
 
 class LexiconEntry(BaseModel):

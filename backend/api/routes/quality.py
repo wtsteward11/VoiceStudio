@@ -6,6 +6,7 @@ Quality optimization, presets, and comparison endpoints
 from __future__ import annotations
 
 import logging
+import asyncio
 import tempfile
 import uuid
 from datetime import datetime
@@ -202,6 +203,7 @@ class QualityTrendsResponse(BaseModel):
 
 # In-memory storage for quality history (replace with database in production)
 _quality_history: dict[str, list[QualityHistoryEntry]] = {}  # profile_id -> list of entries
+_state_lock = asyncio.Lock()
 _MAX_HISTORY_ENTRIES_PER_PROFILE = 1000  # Maximum entries per profile
 _MAX_TOTAL_ENTRIES = 10000  # Maximum total entries across all profiles
 

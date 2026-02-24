@@ -7,6 +7,7 @@ Endpoints for managing timeline markers for navigation and organization.
 from __future__ import annotations
 
 import logging
+import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/api/markers", tags=["markers"])
 
 # In-memory markers storage (replace with database in production)
 _markers: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 _MAX_MARKERS = 10000  # Maximum number of markers to keep
 
 

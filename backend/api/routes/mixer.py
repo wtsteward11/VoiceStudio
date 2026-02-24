@@ -36,6 +36,7 @@ router = APIRouter(prefix="/api/mixer", tags=["mixer"])
 # In-memory storage (replace with database in production)
 _mixer_states: dict[str, dict] = {}
 _mixer_presets: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 def _validate_effect_chain_id(effect_chain_id: str | None, project_id: str) -> None:

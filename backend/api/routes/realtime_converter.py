@@ -7,6 +7,7 @@ Endpoints for real-time voice conversion and streaming.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 
 import numpy as np
@@ -28,6 +29,7 @@ router = APIRouter(
 
 # In-memory converter sessions (replace with database in production)
 _converter_sessions: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class ConverterSession(BaseModel):

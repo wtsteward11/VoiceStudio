@@ -28,6 +28,7 @@ router = APIRouter(prefix="/api/upscaling", tags=["upscaling"])
 
 # In-memory storage for upscaling jobs (replace with database in production)
 _upscaling_jobs: dict[str, UpscalingJob] = {}
+_state_lock = asyncio.Lock()
 
 
 class UpscalingJob(BaseModel):

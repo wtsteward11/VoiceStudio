@@ -50,12 +50,13 @@ def run_check(name, command, timeout=30):
     start_time = datetime.now()
 
     try:
+        import shlex
+        cmd_list = shlex.split(command) if isinstance(command, str) else command
         result = subprocess.run(
-            command,
+            cmd_list,
             capture_output=True,
             text=True,
             timeout=timeout,
-            shell=True
         )
 
         duration = (datetime.now() - start_time).total_seconds()

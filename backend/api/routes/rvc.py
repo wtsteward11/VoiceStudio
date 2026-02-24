@@ -391,6 +391,14 @@ async def convert_realtime(websocket: WebSocket):
         except Exception as send_err:
             logger.debug(f"Could not send error to RVC WebSocket client: {send_err}")
     finally:
+        if engine is not None:
+            try:
+                if hasattr(engine, "cleanup"):
+                    engine.cleanup()
+                    logger.debug("RVC engine instance cleaned up")
+            except Exception as cleanup_err:
+                logger.warning(f"RVC engine cleanup failed after WebSocket disconnect: {cleanup_err}")
+            engine = None
         try:
             await websocket.close()
         except Exception as close_err:

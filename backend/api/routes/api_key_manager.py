@@ -9,6 +9,7 @@ Security: All endpoints require authentication when auth is enabled.
 from __future__ import annotations
 
 import logging
+import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/api/api-keys", tags=["api-keys"])
 
 # In-memory cache; persisted to JSON file (Phase 7 Sprint 2)
 _api_keys: dict[str, APIKey] = {}
+_state_lock = asyncio.Lock()
 
 
 def _load_persisted_keys() -> None:

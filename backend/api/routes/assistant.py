@@ -9,6 +9,7 @@ Ollama provider with fallback to cloud providers.
 from __future__ import annotations
 
 import logging
+import asyncio
 import uuid
 from datetime import datetime
 
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 
 # In-memory conversation history (future: persist via JsonFileStore)
 _conversations: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class AssistantMessage(BaseModel):

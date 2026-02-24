@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import asyncio
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -38,6 +39,7 @@ router = APIRouter(
 
 # Active pipeline sessions
 _sessions: dict[str, PipelineSession] = {}
+_state_lock = asyncio.Lock()
 
 
 class PipelineRequest(BaseModel):

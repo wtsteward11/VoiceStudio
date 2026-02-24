@@ -33,6 +33,7 @@ router = APIRouter(prefix="/api/face-swap", tags=["face-swap"])
 _jobs: dict[str, FaceSwapJob] = {}
 _job_queue: list[str] = []
 _processing_jobs: set[str] = set()
+_state_lock = asyncio.Lock()
 _max_concurrent_jobs: int = 2
 
 

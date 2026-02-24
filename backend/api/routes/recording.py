@@ -10,6 +10,7 @@ and writes them to WAV files.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 import threading
 import time
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/api/recording", tags=["recording"])
 
 # In-memory storage for active recordings
 _active_recordings: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 _recording_lock = threading.Lock()
 
 # Try to import sounddevice for device enumeration

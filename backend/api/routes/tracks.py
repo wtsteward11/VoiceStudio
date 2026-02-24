@@ -10,6 +10,7 @@ Supports undo/redo via EditHistory.
 from __future__ import annotations
 
 import logging
+import asyncio
 import uuid
 
 from fastapi import APIRouter, HTTPException
@@ -494,6 +495,7 @@ class UndoRedoResponse(BaseModel):
 from backend.project.versioning.edit_history import EditHistory as _EditHistoryType
 
 _project_histories: dict[str, _EditHistoryType] = {}
+_state_lock = asyncio.Lock()
 
 
 def _get_project_history(project_id: str) -> _EditHistoryType:

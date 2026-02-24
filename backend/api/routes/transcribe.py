@@ -8,6 +8,7 @@ Supports multiple languages, word timestamps, and diarization.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 import uuid
 from datetime import datetime
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/transcribe", tags=["transcribe"])
 
 _transcriptions: dict[str, dict[str, Any]] = {}
+_state_lock = asyncio.Lock()
 
 
 # STT engine via EngineService (ADR-008 compliant)

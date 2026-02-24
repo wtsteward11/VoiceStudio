@@ -7,6 +7,7 @@ Endpoints for formant analysis and formant shifting/editing of audio.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 import tempfile
 import uuid
@@ -23,6 +24,7 @@ router = APIRouter(prefix="/api/formant", tags=["formant"])
 
 # In-memory formant analysis cache (replace with database in production)
 _formant_analyses: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 @router.post("/analyze")

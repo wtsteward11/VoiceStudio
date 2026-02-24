@@ -15,6 +15,7 @@ Aliases provided:
 from __future__ import annotations
 
 import logging
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -209,6 +210,7 @@ class MarkerCreateRequestAlias(BaseModel):
 
 # In-memory marker storage (per project) - can be moved to persistent store later
 _project_markers: dict[str, list[dict]] = {}
+_state_lock = asyncio.Lock()
 
 
 @timeline_alias_router.get("", response_model=TimelineDetailAlias)

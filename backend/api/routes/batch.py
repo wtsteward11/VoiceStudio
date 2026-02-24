@@ -39,6 +39,7 @@ _resource_manager = None
 _batch_jobs: dict[str, dict] = {}
 _job_queue: list[str] = []  # Queue of job IDs
 _processing_jobs: set[str] = set()  # Jobs currently being processed
+_state_lock = asyncio.Lock()
 
 
 def _persist_batch_job(job_id: str, job_data: dict) -> None:

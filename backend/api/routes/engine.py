@@ -7,6 +7,7 @@ Endpoints for engine performance telemetry and monitoring.
 from __future__ import annotations
 
 import logging
+import asyncio
 import time
 
 from backend.ml.models.engine_service import IEngineService, get_engine_service
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/engine", tags=["engine", "telemetry"])
 
 # In-memory telemetry storage (replace with database in production)
 _telemetry_history: dict[str, list] = {}
+_state_lock = asyncio.Lock()
 
 
 @router.get("/telemetry")

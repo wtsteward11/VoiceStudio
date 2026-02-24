@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import asyncio
 import os
 import tempfile
 import uuid
@@ -44,6 +45,7 @@ router = APIRouter(prefix="/api/image", tags=["image", "generation"])
 # In-memory storage for generated images
 # (replace with database/storage in production)
 _image_storage: dict[str, str] = {}  # image_id -> file_path
+_state_lock = asyncio.Lock()
 
 
 def _analyze_image_artifacts(img_array: np.ndarray) -> float:

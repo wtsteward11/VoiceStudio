@@ -56,7 +56,7 @@ router = APIRouter(
     dependencies=[Depends(require_auth_if_enabled)],
 )
 
-# In-memory storage (replace with database in production)
+# In-memory cache backed by database repository
 _training_jobs: dict[str, dict] = {}
 _training_logs: dict[str, list[dict]] = {}
 _training_quality_history: dict[str, list[dict]] = {}  # job_id -> list of quality metrics (IDEA 54)
@@ -64,6 +64,48 @@ _MAX_TRAINING_JOBS = 100  # Maximum number of training jobs
 _MAX_TRAINING_LOGS_PER_JOB = 1000  # Maximum log entries per job
 _MAX_QUALITY_HISTORY_PER_JOB = 1000  # Maximum quality history entries per job
 _training_job_timestamps: dict[str, float] = {}  # job_id -> creation_time
+_state_lock = asyncio.Lock()
+
+_training_repo = None
+
+
+def _get_training_repo():
+    """Lazy-init the database-backed training job repository."""
+    global _training_repo
+    if _training_repo is None:
+        try:
+            from backend.data.repositories.training_repository import TrainingJobRepository
+            _training_repo = TrainingJobRepository()
+            logger.info("Training job repository initialized (database-backed)")
+        except Exception as e:
+            logger.warning(f"Failed to initialize TrainingJobRepository, using in-memory only: {e}")
+    return _training_repo
+
+
+def _persist_training_job(job_id: str, job_data: dict) -> None:
+    """Persist a training job to the database repository."""
+    repo = _get_training_repo()
+    if repo is None:
+        return
+    try:
+        from backend.data.repositories.training_repository import TrainingJobEntity
+        entity = TrainingJobEntity(
+            id=job_id,
+            dataset_id=job_data.get("dataset_id"),
+            engine_id=job_data.get("engine_id"),
+            model_name=job_data.get("model_name", ""),
+            status=job_data.get("status", "pending"),
+            progress=job_data.get("progress", 0.0),
+            current_epoch=job_data.get("current_epoch", 0),
+            total_epochs=job_data.get("total_epochs", 0),
+            metrics=job_data.get("metrics"),
+            hyperparameters=job_data.get("hyperparameters"),
+            error=job_data.get("error"),
+            output_path=job_data.get("output_path"),
+        )
+        repo.save(entity)
+    except Exception as e:
+        logger.debug(f"Failed to persist training job {job_id}: {e}")
 
 
 def _cleanup_old_training_jobs():

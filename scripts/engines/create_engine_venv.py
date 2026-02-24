@@ -214,7 +214,9 @@ def create_venv(family: VenvFamily, force: bool = False) -> bool:
     for cmd in family.post_install:
         logger.info(f"Running post-install: {cmd}")
         try:
-            subprocess.run(cmd, shell=True, check=True, cwd=str(venv_path))
+            import shlex
+            cmd_list = shlex.split(cmd) if isinstance(cmd, str) else cmd
+            subprocess.run(cmd_list, check=True, cwd=str(venv_path))
         except subprocess.CalledProcessError as e:
             logger.warning(f"Post-install command failed: {e}")
 

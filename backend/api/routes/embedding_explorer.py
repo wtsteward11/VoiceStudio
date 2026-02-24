@@ -7,6 +7,7 @@ Endpoints for exploring and visualizing speaker embeddings.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 import uuid
 from datetime import datetime
@@ -55,6 +56,7 @@ router = APIRouter(prefix="/api/embedding-explorer", tags=["embedding-explorer"]
 
 # In-memory embedding data (replace with database in production)
 _embeddings: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class EmbeddingVector(BaseModel):

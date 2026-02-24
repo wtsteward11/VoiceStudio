@@ -7,6 +7,7 @@ Endpoints for applying noise reduction to audio files.
 from __future__ import annotations
 
 import logging
+import asyncio
 import os
 import tempfile
 import uuid
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/api/nr", tags=["nr"])
 
 # In-memory noise print storage (replace with database in production)
 _noise_prints: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 @router.post("/apply")

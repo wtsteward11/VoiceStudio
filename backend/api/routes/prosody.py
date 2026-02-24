@@ -8,6 +8,7 @@ Enhanced with pyrubberband for high-quality pitch/rate modification and Phonemiz
 from __future__ import annotations
 
 import logging
+import asyncio
 import uuid
 
 import numpy as np
@@ -42,6 +43,7 @@ router = APIRouter(prefix="/api/prosody", tags=["prosody"])
 
 # In-memory prosody configurations (replace with database in production)
 _prosody_configs: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class ProsodyConfig(BaseModel):

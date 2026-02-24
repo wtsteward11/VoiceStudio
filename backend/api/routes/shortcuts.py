@@ -8,6 +8,7 @@ Supports CRUD operations and conflict detection.
 from __future__ import annotations
 
 import logging
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/shortcuts", tags=["shortcuts"])
 
 # In-memory shortcuts storage (replace with database in production)
 _shortcuts: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class ShortcutKey(BaseModel):

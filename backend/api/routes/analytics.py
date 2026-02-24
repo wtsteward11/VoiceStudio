@@ -7,6 +7,7 @@ Endpoints for application analytics and usage statistics.
 from __future__ import annotations
 
 import logging
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -63,6 +64,7 @@ router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 # In-memory analytics data (replace with database in production)
 _analytics_data: dict[str, dict] = {}
+_state_lock = asyncio.Lock()
 
 
 class AnalyticsMetric(BaseModel):

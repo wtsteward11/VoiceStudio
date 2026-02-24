@@ -492,6 +492,18 @@ async def startup_event():
 
         startup_time = (time.time() - startup_start) * 1000
         logger.info(f"FastAPI startup completed in {startup_time:.2f}ms")
+
+        try:
+            from .middleware.auth_middleware import AUTH_REQUIRED
+            if AUTH_REQUIRED:
+                logger.info("Authentication: ENABLED (VOICESTUDIO_REQUIRE_AUTH=true)")
+            else:
+                logger.warning(
+                    "Authentication: DISABLED (local desktop mode). "
+                    "Set VOICESTUDIO_REQUIRE_AUTH=true for network deployments."
+                )
+        except ImportError:
+            pass
     except Exception as e:
         logger.error(f"Error during startup: {e}", exc_info=True)
 

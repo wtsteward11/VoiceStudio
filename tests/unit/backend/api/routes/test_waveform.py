@@ -12,7 +12,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-project_root = Path(__file__).parent.parent.parent.parent.parent
+project_root = Path(__file__).parent.parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 # Import the route module
@@ -46,13 +46,19 @@ class TestWaveformRouteImports:
 class TestWaveformConfig:
     """Test waveform configuration endpoints."""
 
+    def setup_method(self):
+        self._saved_cache = dict(waveform._waveform_cache)
+        waveform._waveform_cache.clear()
+
+    def teardown_method(self):
+        waveform._waveform_cache.clear()
+        waveform._waveform_cache.update(self._saved_cache)
+
     def test_get_waveform_config_default(self):
         """Test getting default waveform config."""
         app = FastAPI()
         app.include_router(waveform.router)
         client = TestClient(app)
-
-        waveform._waveform_cache.clear()
 
         response = client.get("/api/waveform/config/test-audio")
         assert response.status_code == 200
@@ -60,7 +66,6 @@ class TestWaveformConfig:
         assert data["audio_id"] == "test-audio"
         assert data["zoom_level"] == 1.0
 
-    @pytest.mark.skip(reason="Cache key format doesn't match endpoint implementation")
     def test_get_waveform_config_cached(self):
         """Test getting cached waveform config."""
         app = FastAPI()

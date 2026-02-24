@@ -12,7 +12,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-project_root = Path(__file__).parent.parent.parent.parent.parent
+project_root = Path(__file__).parent.parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 # Import the route module
@@ -43,17 +43,27 @@ class TestVoiceBrowserRouteImports:
             assert len(routes) > 0, "Router should have routes registered"
 
 
-@pytest.mark.skip(reason="Manipulates module state - needs fixture refactoring")
 class TestVoiceSearchEndpoints:
     """Test voice search endpoints."""
+
+    def setup_method(self):
+        self._saved_catalog = dict(voice_browser._voice_catalog)
+        voice_browser._voice_catalog.clear()
+        self._sync_patch = patch.object(
+            voice_browser, "_sync_catalog_from_profiles", lambda: None
+        )
+        self._sync_patch.start()
+
+    def teardown_method(self):
+        self._sync_patch.stop()
+        voice_browser._voice_catalog.clear()
+        voice_browser._voice_catalog.update(self._saved_catalog)
 
     def test_search_voices_empty(self):
         """Test searching voices when catalog is empty."""
         app = FastAPI()
         app.include_router(voice_browser.router)
         client = TestClient(app)
-
-        voice_browser._voice_catalog.clear()
 
         response = client.get("/api/voice-browser/voices")
         assert response.status_code == 200
@@ -67,8 +77,6 @@ class TestVoiceSearchEndpoints:
         app = FastAPI()
         app.include_router(voice_browser.router)
         client = TestClient(app)
-
-        voice_browser._voice_catalog.clear()
 
         now = datetime.utcnow().isoformat()
         voice_browser._voice_catalog["voice1"] = {
@@ -297,9 +305,21 @@ class TestVoiceSearchEndpoints:
         assert response.status_code == 404
 
 
-@pytest.mark.skip(reason="Test expectations don't match implementation")
 class TestVoiceCatalogEndpoints:
     """Test voice catalog metadata endpoints."""
+
+    def setup_method(self):
+        self._saved_catalog = dict(voice_browser._voice_catalog)
+        voice_browser._voice_catalog.clear()
+        self._sync_patch = patch.object(
+            voice_browser, "_sync_catalog_from_profiles", lambda: None
+        )
+        self._sync_patch.start()
+
+    def teardown_method(self):
+        self._sync_patch.stop()
+        voice_browser._voice_catalog.clear()
+        voice_browser._voice_catalog.update(self._saved_catalog)
 
     def test_get_available_languages_success(self):
         """Test successful languages listing."""

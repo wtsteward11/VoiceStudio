@@ -410,12 +410,12 @@ async def _process_upscaling_job(job_id: str, file: UploadFile, request: Upscali
             engine_service = get_engine_service()
             engine = engine_service.get_realesrgan_engine()
             if not engine:
-                raise Exception("Real-ESRGAN engine not available")
+                raise HTTPException(status_code=503, detail="Real-ESRGAN engine not available")
             # Set scale factor if engine supports it
             if hasattr(engine, "scale"):
                 engine.scale = int(request.scale_factor)
             if not engine.initialize():
-                raise Exception("Real-ESRGAN engine initialization failed")
+                raise HTTPException(status_code=503, detail="Real-ESRGAN engine initialization failed")
 
             job.progress = 50.0
             _upscaling_jobs[job_id] = job
@@ -452,7 +452,7 @@ async def _process_upscaling_job(job_id: str, file: UploadFile, request: Upscali
                     logger.info(f"Upscaling completed: {job_id}, " f"output: {output_file_path}")
                     return
                 else:
-                    raise Exception("Upscaling returned no output")
+                    raise HTTPException(status_code=500, detail="Upscaling returned no output")
             else:
                 # Video upscaling using OpenCV
                 import cv2
@@ -543,7 +543,7 @@ async def _process_upscaling_job(job_id: str, file: UploadFile, request: Upscali
                     logger.error(f"Fallback upscaling failed: {e2}")
                     raise
 
-            raise Exception(f"Upscaling failed: {e!s}")
+            raise HTTPException(status_code=500, detail=f"Upscaling failed: {e!s}")
 
     except Exception as e:
         logger.error(f"Upscaling job {job_id} failed: {e}", exc_info=True)

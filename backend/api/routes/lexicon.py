@@ -648,7 +648,7 @@ async def estimate_phonemes(request: PhonemeEstimateRequest):
                     engine_service = get_engine_service()
                     engine = engine_service.get_whisper_engine()
                     if not engine:
-                        raise Exception("Whisper engine not available")
+                        raise HTTPException(status_code=503, detail="Whisper engine not available")
                     transcription = engine.transcribe(audio_path, language=request.language)
 
                     if transcription and transcription.get("text"):

@@ -521,14 +521,15 @@ async def _process_batch_job(job_id: str):
         # Get engine instance via EngineService (ADR-008 compliant)
         try:
             if not ENGINE_AVAILABLE:
-                raise Exception("EngineService not available. Engines may not be loaded properly.")
+                raise HTTPException(status_code=503, detail="EngineService not available. Engines may not be loaded properly.")
 
             engine_service = get_engine_service()
             engine = engine_service.get_engine(job.engine_id)
             if engine is None:
-                raise Exception(
-                    f"Engine '{job.engine_id}' is not available. "
-                    f"Please check that the engine is installed and configured correctly."
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Engine '{job.engine_id}' is not available. "
+                    f"Please check that the engine is installed and configured correctly.",
                 )
         except AttributeError as e:
             error_msg = (
@@ -819,7 +820,7 @@ async def _process_batch_job(job_id: str):
                 quality_metrics = {}
 
             if audio is None:
-                raise Exception("Engine returned None - synthesis may have failed")
+                raise HTTPException(status_code=500, detail="Engine returned None - synthesis may have failed")
 
             # Calculate quality score from metrics (IDEA 57)
             quality_score = None

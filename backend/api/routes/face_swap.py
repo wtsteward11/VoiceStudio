@@ -354,7 +354,7 @@ async def _process_job(job_id: str):
             engine_service = get_engine_service()
             engine = engine_service.get_deepfacelab_engine()
             if not engine or not engine.is_available():
-                raise Exception("DeepFaceLab engine not available")
+                raise HTTPException(status_code=503, detail="DeepFaceLab engine not available")
 
             source_face_path = Path(job.source_face_file)
             target_media_path = Path(job.target_media_file)

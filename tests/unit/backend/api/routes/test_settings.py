@@ -11,7 +11,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-project_root = Path(__file__).parent.parent.parent.parent.parent
+project_root = Path(__file__).parent.parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 # Import the route module
@@ -211,15 +211,14 @@ class TestSettingsEndpoints:
             assert "engine" in data
             mock_save.assert_called_once()
 
-    @pytest.mark.skip(
-        reason="Mock path doesn't match actual import - load_settings called differently"
-    )
     def test_get_settings_error_handling(self):
         """Test settings retrieval error handling."""
         app = FastAPI()
         app.include_router(settings.router)
         client = TestClient(app)
 
+        settings._settings_cache = None
+        settings._cache_timestamp = 0.0
         with patch("backend.api.routes.settings.load_settings") as mock_load:
             mock_load.side_effect = Exception("File read error")
 

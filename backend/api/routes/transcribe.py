@@ -308,7 +308,7 @@ async def transcribe_audio(
                 logger.info(f"Getting {request.engine} engine via EngineService")
                 stt_engine = engine_service.get_whisper_engine()
                 if not stt_engine:
-                    raise Exception(f"Engine {request.engine} not available")
+                    raise HTTPException(status_code=503, detail=f"Engine {request.engine} not available")
             except Exception as e:
                 logger.error(f"Whisper engine not available: {e}.")
                 raise HTTPException(

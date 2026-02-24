@@ -13,7 +13,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-project_root = Path(__file__).parent.parent.parent.parent.parent
+project_root = Path(__file__).parent.parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 # Import the route module
@@ -44,9 +44,20 @@ class TestLexiconRouteImports:
             assert len(routes) > 0, "Router should have routes registered"
 
 
-@pytest.mark.skip(reason="Manipulates module state - needs fixture refactoring")
 class TestLexiconCRUD:
     """Test lexicon CRUD operations."""
+
+    def setup_method(self):
+        self._saved_lexicons = dict(lexicon._lexicons)
+        self._saved_entries = dict(lexicon._lexicon_entries)
+        lexicon._lexicons.clear()
+        lexicon._lexicon_entries.clear()
+
+    def teardown_method(self):
+        lexicon._lexicons.clear()
+        lexicon._lexicon_entries.clear()
+        lexicon._lexicons.update(self._saved_lexicons)
+        lexicon._lexicon_entries.update(self._saved_entries)
 
     def test_create_lexicon_success(self):
         """Test successful lexicon creation."""

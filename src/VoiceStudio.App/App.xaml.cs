@@ -20,8 +20,23 @@ namespace VoiceStudio.App
     private static bool _bindingFailureLoggingEnabled = false;
     private static string? _bindingFailureLogPath;
 
+    private static void WriteDiagMarker(string stage)
+    {
+      try
+      {
+        var dir = Path.Combine(
+          Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+          "VoiceStudio", "crashes");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "diag_latest.txt"),
+          $"{DateTime.UtcNow:O} | PID={Environment.ProcessId} | {stage}");
+      }
+      catch { /* best effort diagnostic */ }
+    }
+
     public App()
     {
+      WriteDiagMarker("constructor_entered");
       this.UnhandledException += App_UnhandledException;
       _appStartTime = DateTime.UtcNow;
       _startupProfiler = PerformanceProfiler.Start("Application Startup");
@@ -29,6 +44,7 @@ namespace VoiceStudio.App
 
       this.InitializeComponent();
       _startupProfiler.Checkpoint("InitializeComponent");
+      WriteDiagMarker("xaml_initialized");
 
       // Initialize service provider
       ServiceProvider.Initialize();
@@ -48,9 +64,9 @@ namespace VoiceStudio.App
 
     private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
+      WriteDiagMarker($"unhandled_exception|{e.Exception?.GetType().Name}|{e.Exception?.Message}");
       try
       {
-        // Write to deterministic location: %LOCALAPPDATA%\VoiceStudio\crashes\
         var crashDir = System.IO.Path.Combine(
           Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
           "VoiceStudio", "crashes");
@@ -140,6 +156,7 @@ namespace VoiceStudio.App
 
     protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
+      WriteDiagMarker("on_launched");
       _startupProfiler?.Checkpoint("OnLaunched Start");
 
       if (IsSmokeHinted())
@@ -220,6 +237,7 @@ namespace VoiceStudio.App
           }
 
           m_window.Activate();
+          WriteDiagMarker("window_activated");
           _startupProfiler?.Checkpoint("MainWindow Activated");
 
           if (IsSmokeHinted())
@@ -300,6 +318,7 @@ namespace VoiceStudio.App
       }
 
       m_window.Activate();
+      WriteDiagMarker("window_activated");
       _startupProfiler?.Checkpoint("MainWindow Activated");
 
       if (IsSmokeHinted())

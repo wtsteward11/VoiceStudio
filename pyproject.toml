@@ -144,7 +144,7 @@ precision = 2
 show_missing = true
 skip_covered = false
 # Phase 4 target: 95% coverage
-fail_under = 0  # INTEGRATION-PATCH Phase 4: reduced until Phase 6 engine coverage restored (was 95)
+fail_under = 80
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

@@ -19,7 +19,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 # Test the core plugin service
-from backend.plugins.plugin_service import (
+from backend.services.plugin_service import (
     PluginInfo,
     PluginManifest,
     PluginService,
@@ -199,7 +199,7 @@ class TestSignatureVerificationE2E:
 
     def test_signing_module_constants_available(self) -> None:
         """Test that signing availability constant is defined."""
-        from backend.plugins import plugin_service as ps_module
+        from backend.services import plugin_service as ps_module
 
         assert hasattr(ps_module, "SIGNING_AVAILABLE")
 
@@ -229,19 +229,19 @@ class TestPhase6IntegrationE2E:
 
     def test_ai_quality_integration_function_exists(self) -> None:
         """Test get_phase6_ai_quality function for Phase 6.1 integration."""
-        from backend.plugins.plugin_service import get_phase6_ai_quality
+        from backend.services.plugin_service import get_phase6_ai_quality
 
         assert callable(get_phase6_ai_quality)
 
     def test_compliance_integration_function_exists(self) -> None:
         """Test get_phase6_compliance function for Phase 6.3 integration."""
-        from backend.plugins.plugin_service import get_phase6_compliance
+        from backend.services.plugin_service import get_phase6_compliance
 
         assert callable(get_phase6_compliance)
 
     def test_ecosystem_integration_function_exists(self) -> None:
         """Test get_phase6_ecosystem function for Phase 6.5 integration."""
-        from backend.plugins.plugin_service import get_phase6_ecosystem
+        from backend.services.plugin_service import get_phase6_ecosystem
 
         assert callable(get_phase6_ecosystem)
 
@@ -256,7 +256,7 @@ class TestExtensionPointsE2E:
 
     def test_register_extension_function_importable(self) -> None:
         """Test register_extension decorator can be imported."""
-        from backend.plugins.plugin_service import register_extension
+        from backend.services.plugin_service import register_extension
 
         assert callable(register_extension)
 

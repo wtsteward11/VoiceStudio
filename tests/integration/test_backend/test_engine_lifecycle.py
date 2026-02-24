@@ -81,7 +81,7 @@ class TestEngineStartup(EngineLifecycleTestBase):
     @integration
     def test_engine_service_initialization(self):
         """Verify engine service can be initialized."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         service = EngineService()
         assert service is not None
@@ -90,7 +90,7 @@ class TestEngineStartup(EngineLifecycleTestBase):
     @integration
     def test_engine_lazy_loading(self):
         """Verify engines are lazily loaded on first access."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         service = EngineService()
 
@@ -107,7 +107,7 @@ class TestEngineStartup(EngineLifecycleTestBase):
     @integration
     def test_engine_discovery(self, mock_engine_router):
         """Verify engine discovery returns available engines."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         service = EngineService()
         service._engine_router = mock_engine_router
@@ -121,7 +121,7 @@ class TestEngineStartup(EngineLifecycleTestBase):
     @integration
     def test_engine_service_singleton(self):
         """Verify get_engine_service returns singleton."""
-        from backend.ml.models.engine_service import get_engine_service
+        from backend.services.engine_service import get_engine_service
 
         service1 = get_engine_service()
         service2 = get_engine_service()
@@ -131,7 +131,7 @@ class TestEngineStartup(EngineLifecycleTestBase):
     @integration
     def test_engine_startup_with_missing_dependencies(self):
         """Verify graceful handling when engine dependencies are missing."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         with patch.dict("sys.modules", {"app.core.engines.router": None}):
             service = EngineService()
@@ -153,7 +153,7 @@ class TestEngineHealthCheck(EngineLifecycleTestBase):
     @integration
     def test_engine_status_check(self, mock_engine_router):
         """Verify engine status check returns proper format."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         service = EngineService()
         service._engine_router = mock_engine_router
@@ -169,7 +169,7 @@ class TestEngineHealthCheck(EngineLifecycleTestBase):
     @integration
     def test_engine_not_found_status(self, mock_engine_router):
         """Verify proper status for non-existent engine."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         # Clear side_effect and set return_value
         mock_engine_router.get_engine.side_effect = None
@@ -187,7 +187,7 @@ class TestEngineHealthCheck(EngineLifecycleTestBase):
     @integration
     def test_engine_availability_check(self, mock_engine_router):
         """Verify is_engine_available returns correct state."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         service = EngineService()
         service._engine_router = mock_engine_router
@@ -204,7 +204,7 @@ class TestEngineHealthCheck(EngineLifecycleTestBase):
     @integration
     def test_multiple_engine_health_checks(self, mock_engine_router):
         """Verify health checks for multiple engines."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         service = EngineService()
         service._engine_router = mock_engine_router
@@ -220,7 +220,7 @@ class TestEngineHealthCheck(EngineLifecycleTestBase):
     @integration
     def test_engine_health_error_handling(self, mock_engine_router):
         """Verify health check error is properly handled."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         mock_engine_router.get_engine.side_effect = Exception("Connection error")
 
@@ -245,7 +245,7 @@ class TestEngineShutdown(EngineLifecycleTestBase):
     @integration
     def test_engine_router_not_loaded_on_shutdown(self):
         """Verify clean state when engine router not loaded."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         service = EngineService()
 
@@ -262,7 +262,7 @@ class TestEngineShutdown(EngineLifecycleTestBase):
     @integration
     def test_engine_service_reset(self):
         """Verify engine service can be reset for clean state."""
-        from backend.ml.models.engine_service import (
+        from backend.services.engine_service import (
             EngineService,
         )
 
@@ -279,7 +279,7 @@ class TestEngineShutdown(EngineLifecycleTestBase):
     @integration
     def test_graceful_degradation_on_engine_failure(self, mock_engine_router):
         """Verify service continues working when one engine fails."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         def get_engine_with_failure(engine_id):
             if engine_id == "failing_engine":
@@ -310,7 +310,7 @@ class TestEngineOperations(EngineLifecycleTestBase):
     @integration
     def test_synthesize_with_mock_engine(self, mock_engine_router):
         """Verify synthesis operation through service layer."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         mock_engine = self._create_mock_engine("xtts_v2")
         mock_engine.synthesize.return_value = {
@@ -337,7 +337,7 @@ class TestEngineOperations(EngineLifecycleTestBase):
     @integration
     def test_synthesize_engine_not_found(self, mock_engine_router):
         """Verify synthesis returns error for non-existent engine."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         # Clear side_effect and set return_value
         mock_engine_router.get_engine.side_effect = None
@@ -358,7 +358,7 @@ class TestEngineOperations(EngineLifecycleTestBase):
     @integration
     def test_transcribe_with_mock_engine(self, mock_engine_router):
         """Verify transcription operation through service layer."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         mock_engine = self._create_mock_engine("whisper")
         mock_engine.transcribe.return_value = {
@@ -383,7 +383,7 @@ class TestEngineOperations(EngineLifecycleTestBase):
     @integration
     def test_voice_clone_with_mock_engine(self, mock_engine_router):
         """Verify voice cloning operation through service layer."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         mock_engine = self._create_mock_engine("xtts_v2")
         mock_engine.clone_voice.return_value = {
@@ -426,7 +426,7 @@ class TestConcurrentEngineAccess(AsyncIntegrationTestBase):
     @integration
     async def test_concurrent_engine_status_checks(self, mock_engine_router):
         """Verify concurrent status checks don't cause issues."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         mock_engine = MagicMock()
         mock_engine.id = "xtts_v2"
@@ -451,7 +451,7 @@ class TestConcurrentEngineAccess(AsyncIntegrationTestBase):
     @integration
     async def test_concurrent_engine_list(self, mock_engine_router):
         """Verify concurrent engine listing doesn't cause issues."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         service = EngineService()
         service._engine_router = mock_engine_router
@@ -480,7 +480,7 @@ class TestEnginePerformanceMetrics(EngineLifecycleTestBase):
     @integration
     def test_get_engine_performance_metrics_unavailable(self):
         """Verify performance metrics handles unavailable module."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         service = EngineService()
         service._engines_loaded = True
@@ -494,7 +494,7 @@ class TestEnginePerformanceMetrics(EngineLifecycleTestBase):
     @integration
     def test_get_engine_performance_metrics_mock(self, mock_engine_router):
         """Verify performance metrics are collected."""
-        from backend.ml.models.engine_service import EngineService
+        from backend.services.engine_service import EngineService
 
         mock_metrics = MagicMock()
         mock_metrics.get_summary.return_value = {

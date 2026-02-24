@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from backend.platform.monitoring.alerting import AlertingService, get_alerting_service
-from backend.platform.monitoring.metrics_history import get_metrics_history, record_hourly_snapshot
+from backend.services.alerting import AlertingService, get_alerting_service
+from backend.services.metrics_history import get_metrics_history, record_hourly_snapshot
 
 
 class TestAlertingVerification:
@@ -77,7 +77,7 @@ class TestHealthSummary:
 
     def test_circuit_breaker_summary_available(self):
         """Circuit breaker summary is available for health aggregation."""
-        from backend.core.circuit_breaker import get_engine_breaker_summary
+        from backend.services.circuit_breaker import get_engine_breaker_summary
 
         summary = get_engine_breaker_summary()
         assert isinstance(summary, dict)

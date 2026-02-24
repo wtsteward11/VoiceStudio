@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.security.audit_logger import (
+from backend.services.audit_logger import (
     AuditAction,
     AuditConfig,
     AuditEntry,

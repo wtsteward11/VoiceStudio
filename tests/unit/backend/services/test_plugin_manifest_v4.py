@@ -6,7 +6,7 @@ Tests the new distribution, catalog, and trust fields added in Phase 4.
 
 import pytest
 
-from backend.plugins.gallery.plugin_schema_validator import (
+from backend.services.plugin_schema_validator import (
     PluginSchemaValidator,
     validate_plugin_manifest,
 )

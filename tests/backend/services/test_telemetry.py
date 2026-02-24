@@ -2,7 +2,7 @@
 
 import pytest
 
-from backend.platform.telemetry.telemetry import (
+from backend.services.telemetry import (
     SpanStatus,
     get_telemetry_service,
     reset_telemetry_service,
@@ -129,7 +129,8 @@ class TestTelemetryService:
 
         spans = telemetry.get_recent_spans(3)
         assert len(spans) == 3
-        assert spans[-1].name == "op_4"
+        # Most recent spans should be returned
+        assert spans[-1]["name"] == "op_4"
 
     def test_reset(self):
         """Test reset clears all data."""

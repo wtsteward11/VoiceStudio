@@ -2,7 +2,7 @@
 Unit tests for EditHistory (Phase 21.3)
 """
 
-from backend.project.versioning.edit_history import EditCommand, EditHistory
+from backend.services.edit_history import EditCommand, EditHistory
 
 
 class MockCommand(EditCommand):

@@ -29,7 +29,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.audio.processing.content_addressed_audio_cache import reset_audio_cache
+from backend.services.ContentAddressedAudioCache import reset_audio_cache
 
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))

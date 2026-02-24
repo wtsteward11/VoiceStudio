@@ -234,19 +234,19 @@ class TestPluginServiceIntegration:
     """Test plugin service loads and manages plugins."""
 
     def test_plugin_service_imports(self):
-        from backend.plugins.plugin_service import PluginService, PluginState, PluginType
+        from backend.services.plugin_service import PluginService, PluginState, PluginType
 
         assert PluginType.PROCESSOR is not None
         assert PluginState.DISCOVERED is not None
 
     def test_plugin_service_instantiates(self):
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert service is not None
 
     def test_plugin_manifest_from_dict(self):
-        from backend.plugins.plugin_service import PluginManifest, PluginType
+        from backend.services.plugin_service import PluginManifest, PluginType
 
         data = {
             "plugin_id": "test.plugin",
@@ -266,13 +266,13 @@ class TestPluginSandbox:
     """Test sandbox isolation and permission enforcement."""
 
     def test_sandbox_imports(self):
-        from backend.plugins.sandbox.plugin_sandbox import PluginSandbox, SandboxPermissions
+        from backend.services.plugin_sandbox import PluginSandbox, SandboxPermissions
 
         assert PluginSandbox is not None
         assert SandboxPermissions is not None
 
     def test_sandbox_instantiation(self):
-        from backend.plugins.sandbox.plugin_sandbox import (
+        from backend.services.plugin_sandbox import (
             PluginSandbox,
             SandboxPermissions,
             SandboxState,
@@ -284,7 +284,7 @@ class TestPluginSandbox:
         assert sandbox.plugin_id == "test.plugin"
 
     def test_sandbox_temp_workspace_is_isolated(self):
-        from backend.plugins.sandbox.plugin_sandbox import PluginSandbox, SandboxPermissions
+        from backend.services.plugin_sandbox import PluginSandbox, SandboxPermissions
 
         perms = SandboxPermissions(plugin_id="test.isolation")
         sandbox = PluginSandbox(plugin_id="test.isolation", permissions=perms)

@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from backend.plugins.sandbox.plugin_sandbox import (
+from backend.services.plugin_sandbox import (
     PluginSandbox,
     ResourceLimits,
     SandboxPermissions,

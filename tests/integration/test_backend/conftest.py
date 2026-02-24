@@ -118,7 +118,7 @@ def mock_backend_services():
     # Apply patches
     try:
         patches.append(
-            patch("backend.ml.models.engine_service.EngineService", return_value=engine_mock)
+            patch("backend.services.engine_service.EngineService", return_value=engine_mock)
         )
         for p in patches:
             p.start()

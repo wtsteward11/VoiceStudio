@@ -14,7 +14,7 @@ class TestPluginCrashIsolation:
 
     def test_sandbox_runner_isolates_execution(self):
         """PluginSandbox provides execution isolation."""
-        from backend.plugins.sandbox.plugin_sandbox import PluginSandbox, SandboxPermissions
+        from backend.services.plugin_sandbox import PluginSandbox, SandboxPermissions
 
         perms = SandboxPermissions(plugin_id="test.isolation")
         sandbox = PluginSandbox(plugin_id="test.isolation", permissions=perms)
@@ -23,7 +23,7 @@ class TestPluginCrashIsolation:
 
     def test_sandbox_violation_raises_not_system_exit(self):
         """Sandbox violations raise SandboxViolation, not unhandled exceptions."""
-        from backend.plugins.sandbox.plugin_sandbox import (
+        from backend.services.plugin_sandbox import (
             PermissionViolation,
             SandboxViolation,
         )

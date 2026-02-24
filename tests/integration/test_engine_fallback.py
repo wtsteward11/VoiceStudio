@@ -14,7 +14,7 @@ import pytest
 @pytest.fixture
 def engine_service():
     """Create a fresh EngineService instance for testing."""
-    from backend.ml.models.engine_service import EngineService
+    from backend.services.engine_service import EngineService
 
     svc = EngineService()
     return svc

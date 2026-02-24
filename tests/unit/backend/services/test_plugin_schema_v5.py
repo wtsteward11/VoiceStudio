@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.plugins.gallery.plugin_schema_validator import (
+from backend.services.plugin_schema_validator import (
     PluginSchemaValidator,
     validate_plugin_manifest,
 )

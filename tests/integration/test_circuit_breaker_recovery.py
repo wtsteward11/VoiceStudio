@@ -9,7 +9,7 @@ import time
 
 import pytest
 
-from backend.core.circuit_breaker import CircuitBreaker
+from backend.services.circuit_breaker import CircuitBreaker
 
 
 @pytest.fixture

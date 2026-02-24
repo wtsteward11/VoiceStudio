@@ -5,7 +5,7 @@ Unit tests for ArtifactRefCounter (Phase 21.3)
 import shutil
 import tempfile
 
-from backend.infrastructure.adapters.artifact_ref_counter import ArtifactRefCounter
+from backend.services.artifact_ref_counter import ArtifactRefCounter
 
 
 class TestArtifactRefCounter:

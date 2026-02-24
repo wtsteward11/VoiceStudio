@@ -198,7 +198,7 @@ namespace VoiceStudio.App.Tests.Services
             var appName = VersionService.ApplicationName;
 
             // Assert
-            Assert.AreEqual("VoiceStudio", appName);
+            Assert.AreEqual("VoiceStudio Quantum+", appName);
         }
 
         [TestMethod]

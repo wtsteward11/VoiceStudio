@@ -84,12 +84,7 @@ class TestRouteSecurityMatrix:
     def test_critical_protected_routes_classified(self):
         """Critical protected routes are in the matrix."""
         matrix = _load_matrix()
-        critical_protected = [
-            "/api/voice/synthesize",
-            "/api/voice/clone",
-            "/api/profiles",
-            "/api/projects",
-        ]
+        critical_protected = ["/api/voice/synthesize", "/api/voice/clone", "/api/profiles", "/api/projects"]
         for path in critical_protected:
             tier = _get_tier_for_path(path, matrix)
             assert tier == "protected", f"{path} should be protected, got {tier}"
@@ -106,6 +101,4 @@ class TestRouteSecurityMatrix:
 
                 assert rate_limit_middleware is not None
             except ImportError:
-                pytest.fail(
-                    "Rate limiting should be available (rate_limiting or rate_limiting_enhanced)"
-                )
+                pytest.fail("Rate limiting should be available (rate_limiting or rate_limiting_enhanced)")

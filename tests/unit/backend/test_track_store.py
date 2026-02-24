@@ -5,7 +5,7 @@ Unit tests for TrackStore (Phase 21.3)
 import shutil
 import tempfile
 
-from backend.project.tracks.track_store import TrackStore
+from backend.services.track_store import TrackStore
 
 
 class TestTrackStore:

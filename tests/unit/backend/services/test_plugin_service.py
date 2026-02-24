@@ -25,25 +25,25 @@ class TestPluginServiceImports:
 
     def test_import_module(self) -> None:
         """Test basic module import."""
-        from backend.plugins import plugin_service
+        from backend.services import plugin_service
 
         assert plugin_service is not None
 
     def test_import_plugin_type(self) -> None:
         """Test PluginType enum import."""
-        from backend.plugins.plugin_service import PluginType
+        from backend.services.plugin_service import PluginType
 
         assert PluginType is not None
 
     def test_import_plugin_state(self) -> None:
         """Test PluginState enum import."""
-        from backend.plugins.plugin_service import PluginState
+        from backend.services.plugin_service import PluginState
 
         assert PluginState is not None
 
     def test_import_plugin_service_class(self) -> None:
         """Test PluginService class import."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         assert PluginService is not None
 
@@ -58,43 +58,43 @@ class TestPluginType:
 
     def test_engine_type(self) -> None:
         """Test ENGINE plugin type."""
-        from backend.plugins.plugin_service import PluginType
+        from backend.services.plugin_service import PluginType
 
         assert PluginType.ENGINE.value == "engine"
 
     def test_processor_type(self) -> None:
         """Test PROCESSOR plugin type."""
-        from backend.plugins.plugin_service import PluginType
+        from backend.services.plugin_service import PluginType
 
         assert PluginType.PROCESSOR.value == "processor"
 
     def test_exporter_type(self) -> None:
         """Test EXPORTER plugin type."""
-        from backend.plugins.plugin_service import PluginType
+        from backend.services.plugin_service import PluginType
 
         assert PluginType.EXPORTER.value == "exporter"
 
     def test_importer_type(self) -> None:
         """Test IMPORTER plugin type."""
-        from backend.plugins.plugin_service import PluginType
+        from backend.services.plugin_service import PluginType
 
         assert PluginType.IMPORTER.value == "importer"
 
     def test_ui_panel_type(self) -> None:
         """Test UI_PANEL plugin type."""
-        from backend.plugins.plugin_service import PluginType
+        from backend.services.plugin_service import PluginType
 
         assert PluginType.UI_PANEL.value == "ui_panel"
 
     def test_tool_type(self) -> None:
         """Test TOOL plugin type."""
-        from backend.plugins.plugin_service import PluginType
+        from backend.services.plugin_service import PluginType
 
         assert PluginType.TOOL.value == "tool"
 
     def test_all_types_unique(self) -> None:
         """Test that all plugin types have unique values."""
-        from backend.plugins.plugin_service import PluginType
+        from backend.services.plugin_service import PluginType
 
         values = [pt.value for pt in PluginType]
         assert len(values) == len(set(values))
@@ -110,25 +110,25 @@ class TestPluginState:
 
     def test_discovered_state(self) -> None:
         """Test DISCOVERED state."""
-        from backend.plugins.plugin_service import PluginState
+        from backend.services.plugin_service import PluginState
 
         assert PluginState.DISCOVERED.value == "discovered"
 
     def test_loaded_state(self) -> None:
         """Test LOADED state."""
-        from backend.plugins.plugin_service import PluginState
+        from backend.services.plugin_service import PluginState
 
         assert PluginState.LOADED.value == "loaded"
 
     def test_activated_state(self) -> None:
         """Test ACTIVATED state."""
-        from backend.plugins.plugin_service import PluginState
+        from backend.services.plugin_service import PluginState
 
         assert PluginState.ACTIVATED.value == "activated"
 
     def test_deactivated_state(self) -> None:
         """Test DEACTIVATED state."""
-        from backend.plugins.plugin_service import PluginState
+        from backend.services.plugin_service import PluginState
 
         assert PluginState.DEACTIVATED.value == "deactivated"
 
@@ -143,37 +143,37 @@ class TestVersionParsing:
 
     def test_parse_version_simple(self) -> None:
         """Test parsing simple version string."""
-        from backend.plugins.plugin_service import parse_version
+        from backend.services.plugin_service import parse_version
 
         assert parse_version("1.2.3") == (1, 2, 3)
 
     def test_parse_version_with_suffix(self) -> None:
         """Test parsing version with suffix."""
-        from backend.plugins.plugin_service import parse_version
+        from backend.services.plugin_service import parse_version
 
         assert parse_version("1.2.3-beta") == (1, 2, 3)
 
     def test_parse_version_invalid(self) -> None:
         """Test parsing invalid version returns (0, 0, 0)."""
-        from backend.plugins.plugin_service import parse_version
+        from backend.services.plugin_service import parse_version
 
         assert parse_version("invalid") == (0, 0, 0)
 
     def test_is_version_compatible_equal(self) -> None:
         """Test version compatibility when equal."""
-        from backend.plugins.plugin_service import is_version_compatible
+        from backend.services.plugin_service import is_version_compatible
 
         assert is_version_compatible("1.0.0", "1.0.0") is True
 
     def test_is_version_compatible_higher(self) -> None:
         """Test version compatibility when app is higher."""
-        from backend.plugins.plugin_service import is_version_compatible
+        from backend.services.plugin_service import is_version_compatible
 
         assert is_version_compatible("2.0.0", "1.0.0") is True
 
     def test_is_version_compatible_lower(self) -> None:
         """Test version incompatibility when app is lower."""
-        from backend.plugins.plugin_service import is_version_compatible
+        from backend.services.plugin_service import is_version_compatible
 
         assert is_version_compatible("1.0.0", "2.0.0") is False
 
@@ -188,7 +188,7 @@ class TestPluginManifest:
 
     def test_create_manifest(self) -> None:
         """Test creating plugin manifest."""
-        from backend.plugins.plugin_service import PluginManifest, PluginType
+        from backend.services.plugin_service import PluginManifest, PluginType
 
         manifest = PluginManifest(
             plugin_id="test-plugin",
@@ -207,7 +207,7 @@ class TestPluginManifest:
 
     def test_manifest_optional_fields(self) -> None:
         """Test manifest optional fields have defaults."""
-        from backend.plugins.plugin_service import PluginManifest, PluginType
+        from backend.services.plugin_service import PluginManifest, PluginType
 
         manifest = PluginManifest(
             plugin_id="minimal",
@@ -234,7 +234,7 @@ class TestPluginInfo:
 
     def test_create_info(self, tmp_path) -> None:
         """Test creating plugin info."""
-        from backend.plugins.plugin_service import (
+        from backend.services.plugin_service import (
             PluginInfo,
             PluginManifest,
             PluginState,
@@ -272,7 +272,7 @@ class TestPluginServiceInitialization:
 
     def test_singleton_instance(self) -> None:
         """Test PluginService singleton access."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         # PluginService should provide a way to get instance
         service = PluginService()
@@ -280,14 +280,14 @@ class TestPluginServiceInitialization:
 
     def test_service_has_plugins_dict(self) -> None:
         """Test service has plugins dictionary."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "_plugins") or hasattr(service, "plugins")
 
     def test_service_has_plugins_or_settings(self) -> None:
         """Test service has plugins or settings storage."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "_plugins") or hasattr(service, "_settings")
@@ -303,7 +303,7 @@ class TestPluginServiceDiscovery:
 
     def test_discover_plugins_method_exists(self) -> None:
         """Test discover_plugins method exists."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "discover_plugins")
@@ -311,7 +311,7 @@ class TestPluginServiceDiscovery:
 
     def test_get_plugin_method_exists(self) -> None:
         """Test get_plugin method exists."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "get_plugin")
@@ -319,7 +319,7 @@ class TestPluginServiceDiscovery:
 
     def test_list_plugins_method_exists(self) -> None:
         """Test list_plugins method exists."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "list_plugins")
@@ -336,7 +336,7 @@ class TestPluginServiceLifecycle:
 
     def test_load_plugin_method_exists(self) -> None:
         """Test load_plugin method exists."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "load_plugin")
@@ -344,7 +344,7 @@ class TestPluginServiceLifecycle:
 
     def test_unload_plugin_method_exists(self) -> None:
         """Test unload_plugin method exists."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "unload_plugin")
@@ -352,7 +352,7 @@ class TestPluginServiceLifecycle:
 
     def test_activate_plugin_method_exists(self) -> None:
         """Test activate_plugin method exists."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "activate_plugin")
@@ -360,7 +360,7 @@ class TestPluginServiceLifecycle:
 
     def test_deactivate_plugin_method_exists(self) -> None:
         """Test deactivate_plugin method exists."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "deactivate_plugin")
@@ -377,13 +377,13 @@ class TestPluginServiceWasmIntegration:
 
     def test_wasm_runner_availability_flag(self) -> None:
         """Test WASM_RUNNER_AVAILABLE flag exists."""
-        from backend.plugins import plugin_service
+        from backend.services import plugin_service
 
         assert hasattr(plugin_service, "WASM_RUNNER_AVAILABLE")
 
     def test_execute_wasm_plugin_method_exists(self) -> None:
         """Test execute_wasm_plugin method exists."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "execute_wasm_plugin")
@@ -392,7 +392,7 @@ class TestPluginServiceWasmIntegration:
     @pytest.mark.asyncio
     async def test_execute_wasm_plugin_returns_result(self) -> None:
         """Test execute_wasm_plugin returns WasmExecutionResult."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
 
@@ -415,13 +415,13 @@ class TestPluginServiceSignatureIntegration:
 
     def test_signing_available_flag(self) -> None:
         """Test SIGNING_AVAILABLE flag exists."""
-        from backend.plugins import plugin_service
+        from backend.services import plugin_service
 
         assert hasattr(plugin_service, "SIGNING_AVAILABLE")
 
     def test_verify_plugin_signature_method_exists(self) -> None:
         """Test verify_plugin_signature method exists."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "verify_plugin_signature")
@@ -429,7 +429,7 @@ class TestPluginServiceSignatureIntegration:
 
     def test_load_plugin_with_verification_method_exists(self) -> None:
         """Test load_plugin_with_verification method exists."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "load_plugin_with_verification")
@@ -437,7 +437,7 @@ class TestPluginServiceSignatureIntegration:
 
     def test_verify_plugin_signature_returns_result(self) -> None:
         """Test verify_plugin_signature returns verification result."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
 
@@ -458,20 +458,20 @@ class TestPluginServicePhase6Integration:
 
     def test_phase6_ai_quality_integration(self) -> None:
         """Test Phase 6 AI Quality integration exists."""
-        from backend.plugins import plugin_service
+        from backend.services import plugin_service
 
         # Check for Phase 6 lazy-load markers
         assert hasattr(plugin_service, "_phase6_ai_quality") or True
 
     def test_phase6_compliance_integration(self) -> None:
         """Test Phase 6 Compliance integration exists."""
-        from backend.plugins import plugin_service
+        from backend.services import plugin_service
 
         assert hasattr(plugin_service, "_phase6_compliance") or True
 
     def test_phase6_ecosystem_integration(self) -> None:
         """Test Phase 6 Ecosystem integration exists."""
-        from backend.plugins import plugin_service
+        from backend.services import plugin_service
 
         assert hasattr(plugin_service, "_phase6_ecosystem") or True
 
@@ -486,14 +486,14 @@ class TestPluginRegistry:
 
     def test_plugins_dict_exists(self) -> None:
         """Test _plugins dict exists for plugin tracking."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "_plugins")
 
     def test_unregister_plugin_method_exists(self) -> None:
         """Test unregister_plugin method exists."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         # Either public or private method should exist
@@ -515,7 +515,7 @@ class TestPluginBase:
 
     def test_plugin_base_exists(self) -> None:
         """Test PluginBase class exists."""
-        from backend.plugins.plugin_service import PluginBase
+        from backend.services.plugin_service import PluginBase
 
         assert PluginBase is not None
 
@@ -523,19 +523,19 @@ class TestPluginBase:
         """Test PluginBase is abstract."""
         from abc import ABC
 
-        from backend.plugins.plugin_service import PluginBase
+        from backend.services.plugin_service import PluginBase
 
         assert issubclass(PluginBase, ABC)
 
     def test_plugin_base_has_activate(self) -> None:
         """Test PluginBase has activate method."""
-        from backend.plugins.plugin_service import PluginBase
+        from backend.services.plugin_service import PluginBase
 
         assert hasattr(PluginBase, "activate")
 
     def test_plugin_base_has_deactivate(self) -> None:
         """Test PluginBase has deactivate method."""
-        from backend.plugins.plugin_service import PluginBase
+        from backend.services.plugin_service import PluginBase
 
         assert hasattr(PluginBase, "deactivate")
 
@@ -550,14 +550,14 @@ class TestExtensionPoints:
 
     def test_register_extension_function_exists(self) -> None:
         """Test register_extension decorator function exists."""
-        from backend.plugins.plugin_service import register_extension
+        from backend.services.plugin_service import register_extension
 
         # register_extension is a module-level decorator
         assert callable(register_extension)
 
     def test_call_extension_point_method_exists(self) -> None:
         """Test call_extension_point method exists on service."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         assert hasattr(service, "call_extension_point")
@@ -573,7 +573,7 @@ class TestPluginServiceErrorHandling:
 
     def test_get_nonexistent_plugin_returns_none(self) -> None:
         """Test getting non-existent plugin returns None."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
         result = service.get_plugin("absolutely-not-a-real-plugin-id-12345")
@@ -583,7 +583,7 @@ class TestPluginServiceErrorHandling:
     @pytest.mark.asyncio
     async def test_load_invalid_plugin_handles_error(self) -> None:
         """Test loading invalid plugin handles error gracefully."""
-        from backend.plugins.plugin_service import PluginService
+        from backend.services.plugin_service import PluginService
 
         service = PluginService()
 

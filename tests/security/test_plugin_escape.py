@@ -21,7 +21,7 @@ class TestPluginSandboxEscape:
 
     def test_filesystem_escape_blocked(self):
         """Plugin cannot access paths outside allowed workspace."""
-        from backend.plugins.sandbox.plugin_sandbox import (
+        from backend.services.plugin_sandbox import (
             PluginSandbox,
             SandboxPermissions,
         )
@@ -43,7 +43,7 @@ class TestPluginSandboxEscape:
 
     def test_network_permission_default_denied(self):
         """Network access denied by default unless explicitly granted."""
-        from backend.plugins.sandbox.plugin_sandbox import SandboxPermissions
+        from backend.services.plugin_sandbox import SandboxPermissions
 
         perms = SandboxPermissions(plugin_id="test.network")
         assert not perms.can_access_network("example.com", 80)
@@ -51,7 +51,7 @@ class TestPluginSandboxEscape:
 
     def test_process_spawn_requires_sandbox_runner(self):
         """Process execution goes through sandbox runner with limits."""
-        from backend.plugins.sandbox.plugin_sandbox import PluginSandbox, SandboxPermissions
+        from backend.services.plugin_sandbox import PluginSandbox, SandboxPermissions
 
         perms = SandboxPermissions(plugin_id="test.process")
         sandbox = PluginSandbox(plugin_id="test.process", permissions=perms)
@@ -60,7 +60,7 @@ class TestPluginSandboxEscape:
 
     def test_relative_traversal_outside_workspace(self):
         """.. traversal cannot escape workspace."""
-        from backend.plugins.sandbox.plugin_sandbox import SandboxPermissions
+        from backend.services.plugin_sandbox import SandboxPermissions
 
         workspace = Path(tempfile.mkdtemp(prefix="vs_workspace_"))
         perms = SandboxPermissions(

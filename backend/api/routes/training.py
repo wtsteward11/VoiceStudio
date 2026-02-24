@@ -19,7 +19,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from backend.ml.models.engine_service import get_engine_service
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -28,6 +27,7 @@ from backend.core.security.file_validation import (
     FileValidationError,
     validate_archive_file,
 )
+from backend.ml.models.engine_service import get_engine_service
 
 from ..middleware.auth_middleware import require_auth_if_enabled
 from ..ml_optimization import HyperparameterOptimizer
@@ -1358,11 +1358,11 @@ async def export_trained_model(request: ModelExportRequest, http_request: Reques
             raise HTTPException(status_code=500, detail=f"Failed to export model: {e!s}")
 
 
-@router.post("/import", response_model=TrainingStatus)
+@router.post("/import", response_model=None)
 async def import_trained_model(
     file: UploadFile = File(...),
     profile_id: str | None = Query(None),
-    request: Request | None = None,
+    request: Request = None,
 ):
     """Import a trained model from a ZIP package."""
     # Get request ID from middleware (Request is injected by FastAPI)

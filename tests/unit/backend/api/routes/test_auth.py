@@ -81,7 +81,6 @@ class TestAuthRouteHandlers:
         assert callable(auth.revoke_api_key), "revoke_api_key should be callable"
 
 
-@pytest.mark.skip(reason="Async tests require pytest-asyncio fixture - use TestClient instead")
 class TestAuthRouteFunctionality:
     """Test auth route functionality with mocks."""
 
@@ -231,7 +230,6 @@ class TestAuthRouteFunctionality:
         assert result.is_active is True
 
 
-@pytest.mark.skip(reason="Async tests require pytest-asyncio fixture - use TestClient instead")
 class TestAuthRouteErrorHandling:
     """Test auth route error handling."""
 

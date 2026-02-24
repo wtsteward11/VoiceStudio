@@ -307,7 +307,6 @@ class TestCompareAudioAnalysis:
         assert response.status_code == 422  # Validation error
 
 
-@pytest.mark.skip(reason="Depends on non-existent backend.api.routes.audio_processing module")
 class TestGetPitchAnalysis:
     """Test get pitch analysis endpoint."""
 
@@ -330,7 +329,7 @@ class TestGetPitchAnalysis:
                 mock_audio = np.random.randn(samples).astype(np.float32)
                 mock_read.return_value = (mock_audio, sample_rate)
 
-                with patch("backend.api.routes.audio_processing.PitchTracker") as mock_tracker:
+                with patch("backend.api.routes.audio_analysis.PitchTracker") as mock_tracker:
                     mock_instance = mock_tracker.return_value
                     mock_instance.crepe_available = True
                     mock_instance.track_pitch_crepe.return_value = (
@@ -365,7 +364,7 @@ class TestGetPitchAnalysis:
                 mock_audio = np.random.randn(samples).astype(np.float32)
                 mock_read.return_value = (mock_audio, sample_rate)
 
-                with patch("backend.api.routes.audio_processing.PitchTracker") as mock_tracker:
+                with patch("backend.api.routes.audio_analysis.PitchTracker") as mock_tracker:
                     mock_instance = mock_tracker.return_value
                     mock_instance.pyin_available = True
                     mock_instance.track_pitch_pyin.return_value = (
@@ -413,7 +412,7 @@ class TestGetPitchAnalysis:
                 mock_audio = np.random.randn(samples).astype(np.float32)
                 mock_read.return_value = (mock_audio, sample_rate)
 
-                with patch("backend.api.routes.audio_processing.PitchTracker") as mock_tracker:
+                with patch("backend.api.routes.audio_analysis.PitchTracker") as mock_tracker:
                     mock_instance = mock_tracker.return_value
                     mock_instance.crepe_available = False
                     mock_instance.pyin_available = False
@@ -422,7 +421,6 @@ class TestGetPitchAnalysis:
                     assert response.status_code == 400
 
 
-@pytest.mark.skip(reason="Depends on non-existent backend.api.routes.audio_processing module")
 class TestGetAudioMetadata:
     """Test get audio metadata endpoint."""
 
@@ -439,7 +437,7 @@ class TestGetAudioMetadata:
             mock_path.return_value = "/path/to/audio.wav"
 
             with patch(
-                "backend.api.routes.audio_processing." "AudioMetadataExtractor"
+                "backend.api.routes.audio_analysis." "AudioMetadataExtractor"
             ) as mock_extractor:
                 mock_instance = mock_extractor.return_value
                 mock_instance.extract_metadata.return_value = {
@@ -466,7 +464,6 @@ class TestGetAudioMetadata:
             assert response.status_code == 404
 
 
-@pytest.mark.skip(reason="Depends on non-existent backend.api.routes.audio_processing module")
 class TestGetWaveletAnalysis:
     """Test get wavelet analysis endpoint."""
 
@@ -490,7 +487,7 @@ class TestGetWaveletAnalysis:
                 mock_read.return_value = (mock_audio, sample_rate)
 
                 with patch(
-                    "backend.api.routes.audio_processing." "WaveletAnalyzer"
+                    "backend.api.routes.audio_analysis." "WaveletAnalyzer"
                 ) as mock_analyzer:
                     mock_instance = mock_analyzer.return_value
                     mock_instance.get_available_wavelets.return_value = [
@@ -536,7 +533,7 @@ class TestGetWaveletAnalysis:
                     mock_read.return_value = (mock_audio, sample_rate)
 
                     with patch(
-                        "backend.api.routes.audio_processing.WaveletAnalyzer"
+                        "backend.api.routes.audio_analysis.WaveletAnalyzer"
                     ) as mock_analyzer:
                         mock_instance = mock_analyzer.return_value
                         mock_instance.get_available_wavelets.return_value = [

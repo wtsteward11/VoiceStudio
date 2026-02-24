@@ -24,15 +24,24 @@ import pytest
 
 
 def pytest_configure(config):
-    """Ensure project root is in sys.path before collection begins."""
+    """Configure project root path and register custom markers."""
     project_root = str(Path(__file__).parent.parent)
-    # Force insert at position 0 regardless of current state
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
     else:
-        # Move to front if it exists but not at position 0
         sys.path.remove(project_root)
         sys.path.insert(0, project_root)
+
+    config.addinivalue_line(
+        "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
+    )
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
+    config.addinivalue_line("markers", "e2e: marks tests as end-to-end tests")
+    config.addinivalue_line("markers", "gpu: marks tests that require GPU")
+    config.addinivalue_line("markers", "engine: marks tests that require a voice engine")
+    config.addinivalue_line(
+        "markers", "canonical_audio: Tests that use the canonical test audio (Allan Watts)"
+    )
 
 
 # ============================================================================
@@ -270,18 +279,10 @@ def test_env(clean_env):
 # ============================================================================
 
 
-def pytest_configure(config):
-    """Configure pytest markers."""
-    config.addinivalue_line(
-        "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
-    )
-    config.addinivalue_line("markers", "integration: marks tests as integration tests")
-    config.addinivalue_line("markers", "e2e: marks tests as end-to-end tests")
-    config.addinivalue_line("markers", "gpu: marks tests that require GPU")
-    config.addinivalue_line("markers", "engine: marks tests that require a voice engine")
-    config.addinivalue_line(
-        "markers", "canonical_audio: Tests that use the canonical test audio (Allan Watts)"
-    )
+
+# NOTE: pytest_configure is defined at the top of this file (line 26).
+# It handles both sys.path setup AND marker registration in a single function.
+# Previously there were two definitions; the second silently overwrote the first.
 
 
 # ============================================================================

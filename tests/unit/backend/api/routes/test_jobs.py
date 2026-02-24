@@ -43,9 +43,18 @@ class TestJobsRouteImports:
             assert len(routes) > 0, "Router should have routes registered"
 
 
-@pytest.mark.skip(reason="Manipulates module state - needs fixture refactoring")
 class TestJobsEndpoints:
     """Test job management endpoints."""
+
+    def setup_method(self):
+        """Save module state before each test."""
+        self._saved_jobs = dict(getattr(jobs, "_jobs", {}))
+
+    def teardown_method(self):
+        """Restore module state after each test."""
+        if hasattr(jobs, "_jobs"):
+            jobs._jobs.clear()
+            jobs._jobs.update(self._saved_jobs)
 
     def test_get_jobs_empty(self):
         """Test listing jobs when empty."""

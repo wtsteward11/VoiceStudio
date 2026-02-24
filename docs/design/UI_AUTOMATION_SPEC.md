@@ -3,7 +3,7 @@
 > **Version**: 1.0  
 > **Last Updated**: 2026-01-30  
 > **Owner**: Role 3 (UI Engineer)  
-> **Status**: ACTIVE  
+> **Status**: IMPLEMENTED (v1.0.2) -- WinAppDriver integration in `tests/ui/`, CI in `.github/workflows/test.yml`  
 > **Traceability**: [OPTIONAL_TASK_INVENTORY](../governance/OPTIONAL_TASK_INVENTORY.md); Phase 2 Master Plan (Technical Specification & RFCs); [ROLE3_UI_ENGINEER_COMPREHENSIVE_TASKS](../reports/verification/ROLE3_UI_ENGINEER_COMPREHENSIVE_TASKS_2026-01-29.md) §8.2
 
 This document records the **decision and approach for UI automation** (WinAppDriver vs Playwright) for VoiceStudio's native WinUI 3 desktop app, and how it fits into Gate C / regression proof.
@@ -60,11 +60,11 @@ This document records the **decision and approach for UI automation** (WinAppDri
 
 ## 4. Exit Criteria (When Implemented)
 
-- [ ] WinAppDriver setup documented (installation, server start)
-- [ ] UI automation script or test project created
-- [ ] At least one automated test (e.g. nav to Profiles panel, assert panel visible)
-- [ ] Test execution documented (how to run, expected output)
-- [ ] Optional: CI job for WinAppDriver tests
+- [x] WinAppDriver setup documented (installation, server start)
+- [x] UI automation script or test project created
+- [x] At least one automated test (e.g. nav to Profiles panel, assert panel visible)
+- [x] Test execution documented (how to run, expected output)
+- [x] Optional: CI job for WinAppDriver tests
 
 ---
 

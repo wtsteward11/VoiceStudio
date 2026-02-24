@@ -1,6 +1,6 @@
 # Plugin Gallery Specification
 
-**Status**: Future Work - Planning Phase
+**Status**: Implemented (v1.0.2) -- `PluginGalleryView.xaml`, `PluginGalleryViewModel.cs`, `backend/plugins/gallery/`
 **Priority**: Medium
 **Estimated Effort**: High
 **Dependencies**: Engine manifest system, Plugin infrastructure

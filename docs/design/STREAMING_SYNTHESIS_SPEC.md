@@ -1,6 +1,6 @@
 # Streaming Synthesis Specification
 
-**Status**: Future Work - Planning Phase
+**Status**: Implemented (v1.0.2) -- WebSocket endpoint `/api/voice/synthesize/stream`, `StreamingAudioPlayer.cs`, `StreamingPipeline`
 **Priority**: High
 **Estimated Effort**: High
 **Dependencies**: Engine layer, WebSocket infrastructure, Audio pipeline

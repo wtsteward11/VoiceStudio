@@ -10,7 +10,6 @@ import logging
 import os
 from pathlib import Path
 
-from backend.ml.models.engine_service import get_engine_service
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
@@ -19,6 +18,7 @@ from backend.core.security.file_validation import (
     validate_image_file,
     validate_video_file,
 )
+from backend.ml.models.engine_service import get_engine_service
 
 from ..optimization import cache_response
 

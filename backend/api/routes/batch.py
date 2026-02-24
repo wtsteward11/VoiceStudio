@@ -15,11 +15,11 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from backend.ml.models.engine_service import get_engine_service
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from backend.infrastructure.adapters.job_state_store import get_job_state_store
+from backend.ml.models.engine_service import get_engine_service
 
 from ..models import ApiOk
 from ..optimization import cache_response

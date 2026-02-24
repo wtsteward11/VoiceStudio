@@ -48,14 +48,14 @@ $publishCmd = @(
   "-c", $Configuration,
   "-r", $RuntimeIdentifier,
   "-p:SelfContained=true",
-  "-p:WindowsAppSDKSelfContained=false",
+  "-p:WindowsAppSDKSelfContained=true",
   "-p:UseAppHost=true",
   "-p:WindowsPackageType=None",
   "-p:EnableMsixTooling=false",
   "-p:EnableDefaultPriItems=false",
-  # Use csproj default (DisableXbfGeneration=true). XBF generation is disabled project-wide because
+  # Use csproj default (DisableXbfGeneration=false). XBF generation is disabled project-wide because
   # WinUI Pass2 returns false-positive exit code 1, preventing XBF output. Text XAML is equivalent.
-  "-p:DisableXbfGeneration=true",
+  "-p:DisableXbfGeneration=false",
   "-p:BaseOutputPath=$baseOutputPath",
   "-p:PublishDir=$publishDir",
   "/bl:$BinlogPath",
@@ -131,7 +131,7 @@ foreach ($priName in $requiredWinUiPri) {
   }
 }
 
-# Required files. With WindowsAppSDKSelfContained=false, WinUI PRI files come from the
+# Required files. With WindowsAppSDKSelfContained=true, WinUI PRI files come from the
 # installed runtime; only VoiceStudio.App.pri is required in the app folder.
 $required = @(
   (Join-Path $publishDir "VoiceStudio.App.exe"),
@@ -146,8 +146,8 @@ foreach ($p in $required) {
   }
 }
 
-# XAML payload: With DisableXbfGeneration=true, XAML is in VoiceStudio.App.pri (no loose .xbf/.xaml).
-# WinUI resources come from the installed runtime when WindowsAppSDKSelfContained=false.
+# XAML payload: With DisableXbfGeneration=false, XAML is in VoiceStudio.App.pri (no loose .xbf/.xaml).
+# WinUI resources come from the installed runtime when WindowsAppSDKSelfContained=true.
 $xbfFiles = @(Get-ChildItem -Path $publishDir -Filter "*.xbf" -Recurse -ErrorAction SilentlyContinue)
 $xamlFiles = @(Get-ChildItem -Path $publishDir -Filter "*.xaml" -Recurse -ErrorAction SilentlyContinue)
 $appPri = Join-Path $publishDir "VoiceStudio.App.pri"
@@ -336,3 +336,5 @@ Write-Host "Launch log: $launchLog"
 ) | Set-Content -Path $latestInfoPath
 
 exit $exitCode
+
+

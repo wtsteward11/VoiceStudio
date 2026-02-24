@@ -533,7 +533,7 @@ namespace VoiceStudio.App.Views.Panels
           catch (Exception ex)
           {
             // Log error but continue polling
-            System.Diagnostics.ErrorLogger.LogWarning($"Error polling macro status: {ex.Message}", "MacroViewModel");
+            ErrorLogger.LogWarning($"Error polling macro status: {ex.Message}", "MacroViewModel");
           }
 
           // Poll every 200ms

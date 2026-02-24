@@ -271,7 +271,7 @@ namespace VoiceStudio.App.ViewModels
         }
         catch (Exception ex)
         {
-          System.Diagnostics.ErrorLogger.LogWarning($"Error polling jobs: {ex.Message}", "JobProgressViewModel");
+          ErrorLogger.LogWarning($"Error polling jobs: {ex.Message}", "JobProgressViewModel");
           await Task.Delay(5000, cancellationToken); // Wait longer on error
         }
       }

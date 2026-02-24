@@ -126,7 +126,7 @@ public sealed class DelegatingCommand : ICommand
         }
         catch (Exception ex)
         {
-            System.Diagnostics.ErrorLogger.LogWarning($"[DelegatingCommand] CanExecute error for '{CommandId}': {ex.Message}", "DelegatingCommand");
+            ErrorLogger.LogWarning($"[DelegatingCommand] CanExecute error for '{CommandId}': {ex.Message}", "DelegatingCommand");
             return false;
         }
     }
@@ -145,7 +145,7 @@ public sealed class DelegatingCommand : ICommand
 
         if (activeDelegate == null)
         {
-            System.Diagnostics.ErrorLogger.LogDebug($"[DelegatingCommand] Execute called but no delegate for '{CommandId}'", "DelegatingCommand");
+            ErrorLogger.LogDebug($"[DelegatingCommand] Execute called but no delegate for '{CommandId}'", "DelegatingCommand");
             return;
         }
 
@@ -155,7 +155,7 @@ public sealed class DelegatingCommand : ICommand
         }
         catch (Exception ex)
         {
-            System.Diagnostics.ErrorLogger.LogWarning($"[DelegatingCommand] Execute error for '{CommandId}': {ex.Message}", "DelegatingCommand");
+            ErrorLogger.LogWarning($"[DelegatingCommand] Execute error for '{CommandId}': {ex.Message}", "DelegatingCommand");
             throw;
         }
     }

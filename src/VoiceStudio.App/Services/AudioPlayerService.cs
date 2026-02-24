@@ -98,7 +98,7 @@ namespace VoiceStudio.App.Services
                     catch (Exception ex)
                     {
                       // Fall through to normal stop if loop restart fails
-                      System.Diagnostics.ErrorLogger.LogWarning("[AudioPlayer] Loop restart failed: " + ex.Message, "AudioPlayerService");
+                      ErrorLogger.LogWarning("[AudioPlayer] Loop restart failed: " + ex.Message, "AudioPlayerService");
                     }
                   }
 
@@ -182,7 +182,7 @@ namespace VoiceStudio.App.Services
                     catch (Exception ex)
                     {
                       // Fall through to normal stop
-                      System.Diagnostics.ErrorLogger.LogWarning("[AudioPlayer] Loop restart failed: " + ex.Message, "AudioPlayerService");
+                      ErrorLogger.LogWarning("[AudioPlayer] Loop restart failed: " + ex.Message, "AudioPlayerService");
                     }
                   }
 
@@ -391,23 +391,23 @@ namespace VoiceStudio.App.Services
       {
         if (string.IsNullOrEmpty(e.AssetPath))
         {
-          System.Diagnostics.ErrorLogger.LogDebug("[AudioPlayer] PlaybackRequested: No asset path provided", "AudioPlayerService");
+          ErrorLogger.LogDebug("[AudioPlayer] PlaybackRequested: No asset path provided", "AudioPlayerService");
           return;
         }
 
         if (!File.Exists(e.AssetPath))
         {
-          System.Diagnostics.ErrorLogger.LogDebug($"[AudioPlayer] PlaybackRequested: File not found: {e.AssetPath}", "AudioPlayerService");
+          ErrorLogger.LogDebug($"[AudioPlayer] PlaybackRequested: File not found: {e.AssetPath}", "AudioPlayerService");
           return;
         }
 
         // Play the requested audio file
         await PlayFileAsync(e.AssetPath);
-        System.Diagnostics.ErrorLogger.LogDebug($"[AudioPlayer] Playing: {e.AssetName ?? e.AssetPath}", "AudioPlayerService");
+        ErrorLogger.LogDebug($"[AudioPlayer] Playing: {e.AssetName ?? e.AssetPath}", "AudioPlayerService");
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"[AudioPlayer] PlaybackRequested error: {ex.Message}", "AudioPlayerService");
+        ErrorLogger.LogWarning($"[AudioPlayer] PlaybackRequested error: {ex.Message}", "AudioPlayerService");
         ErrorLogger.LogError($"Failed to play audio: {ex.Message}", "AudioPlayerService.OnPlaybackRequested");
       }
     }

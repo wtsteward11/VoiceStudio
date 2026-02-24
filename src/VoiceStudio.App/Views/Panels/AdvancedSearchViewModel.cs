@@ -124,7 +124,7 @@ namespace VoiceStudio.App.Views.Panels
       catch
       {
         // Silently fail - history will be lost but app continues
-        System.Diagnostics.ErrorLogger.LogWarning("Failed to save search history", "AdvancedSearchViewModel");
+        ErrorLogger.LogWarning("Failed to save search history", "AdvancedSearchViewModel");
       }
     }
 
@@ -271,7 +271,7 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         // Log error and show empty results
-        System.Diagnostics.ErrorLogger.LogWarning($"Search failed: {ex.Message}", "AdvancedSearchViewModel");
+        ErrorLogger.LogWarning($"Search failed: {ex.Message}", "AdvancedSearchViewModel");
         SearchResults.Clear();
         ActiveFilters.Clear();
       }
@@ -374,7 +374,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Failed to export results: {ex.Message}", "AdvancedSearchViewModel");
+        ErrorLogger.LogWarning($"Failed to export results: {ex.Message}", "AdvancedSearchViewModel");
       }
     }
 

@@ -273,7 +273,7 @@ namespace VoiceStudio.App.Views.Panels
         }
         
         // Log but don't show error to user since we have fallback
-        System.Diagnostics.ErrorLogger.LogWarning($"Failed to load engines from backend: {ex.Message}", "TranscribeViewModel");
+        ErrorLogger.LogWarning($"Failed to load engines from backend: {ex.Message}", "TranscribeViewModel");
       }
       finally
       {

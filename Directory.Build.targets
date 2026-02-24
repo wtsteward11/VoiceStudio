@@ -5,48 +5,14 @@
     Directory.Build.targets is automatically imported by MSBuild at the end.
   -->
 
-  <!--
-    XAML COMPILER CONFIGURATION
-    
-    CRITICAL: UseXamlCompilerExecutable=true forces the EXTERNAL XamlCompiler.exe process.
-    
-    WHY THIS IS REQUIRED (do not change without understanding these issues):
-    
-    1. In-process Task Loader Issue (net472 Path Hardcoding):
-       The WinAppSDK build task attempts to load XamlCompiler.exe in-process, but the
-       Windows App SDK (as of 1.8) hard-codes paths to net472\XamlCompiler.exe when
-       resolving dependencies. This causes assembly loading failures because the net472
-       SDK path is not in the assembly probing path.
-    
-    2. System.Security.Permissions Failure:
-       When running in-process, the task loader fails to resolve System.Security.Permissions.dll,
-       a .NET Framework 4.7.2 dependency. This failure manifests as:
-       - WMC9999 errors ("Unknown error")
-       - Silent build failures (exit code 1, no output)
-       - Intermittent failures that appear non-deterministic
-    
-    3. Process Isolation Benefits:
-       Running XamlCompiler.exe as a separate process:
-       - Isolates assembly loading to the compiler process
-       - Avoids polluting the MSBuild host with net472 dependencies
-       - Enables our wrapper (tools/xaml-compiler-wrapper.cmd) to intercept and handle
-         false-positive exit code 1 issues (VS-0001)
-    
-    REFERENCES:
-    - GitHub #10027: Can't get error output from XamlCompiler.exe
-      https://github.com/microsoft/microsoft-ui-xaml/issues/10027
-    - GitHub #10947: XamlCompiler.exe exits code 1 for Views subfolders
-      https://github.com/microsoft/microsoft-ui-xaml/issues/10947
-    - Stack Overflow: UseXamlCompilerExecutable=false dependency issue
-      https://stackoverflow.com/questions/76851177/
-    
-    DO NOT SET UseXamlCompilerExecutable=false unless you have explicitly resolved
-    the System.Security.Permissions dependency chain for net472 targets.
-  -->
+  <!-- XAML compilation should run normally (no overrides). -->
+  <!-- Ensure XAML compiler has resolved reference assemblies (dotnet build) -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'VoiceStudio.App'">
+    <!-- CRITICAL: UseXamlCompilerExecutable=true forces EXTERNAL compiler (avoids WMC9999 in-process error)
+         The external compiler goes through our wrapper at tools/xaml-compiler-wrapper.cmd -->
     <UseXamlCompilerExecutable>true</UseXamlCompilerExecutable>
-    <XamlCompilerExePath>$(MSBuildThisFileDirectory)tools\xaml-compiler-wrapper.cmd</XamlCompilerExePath>
     <XAMLFingerprint>false</XAMLFingerprint>
+    <!-- Keep XAML compiler off VC meta + Win32 codegen (stability) -->
     <EnableWin32Codegen>false</EnableWin32Codegen>
     <UseVCMetaManaged>false</UseVCMetaManaged>
     <MarkupCompilePass1DependsOn>ResolveReferences;$(MarkupCompilePass1DependsOn)</MarkupCompilePass1DependsOn>
@@ -75,7 +41,7 @@
   -->
   <Target Name="EnsureXamlInObj"
     BeforeTargets="MarkupCompilePass1;GetCopyToOutputDirectoryItems"
-    Condition="'$(MSBuildProjectName)' == 'VoiceStudio.App' OR '$(MSBuildProjectName)' == 'VoiceStudio.App.Tests'">
+    Condition="'$(MSBuildProjectName)' == 'VoiceStudio.App'">
     <ItemGroup>
       <_XamlSource Include="@(Page)" />
       <_XamlSource Include="@(ApplicationDefinition)" />
@@ -101,7 +67,7 @@
   -->
   <Target Name="EnsureXamlInObjBeforeCopyToOutput"
     BeforeTargets="_CopyOutOfDateSourceItemsToOutputDirectory"
-    Condition="'$(MSBuildProjectName)' == 'VoiceStudio.App' OR '$(MSBuildProjectName)' == 'VoiceStudio.App.Tests'">
+    Condition="'$(MSBuildProjectName)' == 'VoiceStudio.App'">
     <ItemGroup>
       <_XamlSource_CopyOut Include="@(Page)" />
       <_XamlSource_CopyOut Include="@(ApplicationDefinition)" />
@@ -139,161 +105,6 @@
     <Message
       Text="ValidateXamlFilesPresent: XAML files validated successfully"
       Importance="normal" />
-  </Target>
-
-  <!--
-  XAML COMPILER RELIABILITY: Detect Nested Views Subfolders (GitHub #10947)
-
-  PROBLEM: WinUI 3 XamlCompiler.exe can silently fail (exit code 1, no output.json)
-  when XAML files are placed in nested Views subfolders (e.g., Views/UI/ShellView.xaml).
-  
-  This is a known bug reported on Jan 6, 2026:
-  https://github.com/microsoft/microsoft-ui-xaml/issues/10947
-
-  SOLUTION: Detect and warn when XAML files are in nested Views subfolders.
-  VoiceStudio currently uses a flat Views/Panels/ structure which is safe.
-  This target provides early warning if nested folders are introduced.
-
-  Set EnableViewsSubfolderError=false to downgrade to warning (not recommended).
-  -->
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'VoiceStudio.App' OR '$(UseWinUI)' == 'true'">
-    <!-- Default TRUE: fail-fast per ChatGPT/Claude template recommendations -->
-    <EnableViewsSubfolderError Condition="'$(EnableViewsSubfolderError)' == ''">true</EnableViewsSubfolderError>
-  </PropertyGroup>
-
-  <Target Name="DetectNestedViewsXaml"
-    BeforeTargets="MarkupCompilePass1"
-    Condition="'$(MSBuildProjectName)' == 'VoiceStudio.App' OR '$(UseWinUI)' == 'true'">
-    
-    <!-- 
-      Find XAML files in nested Views subfolders.
-      Pattern: Views\subfolder\subfolder\*.xaml (three or more levels deep under project root)
-      Safe patterns: Views\Panels\*.xaml, Views\Shell\*.xaml (two levels is OK)
-      Unsafe pattern: Views\UI\Subdir\*.xaml (three+ levels triggers XamlCompiler bug)
-    -->
-    <ItemGroup>
-      <_AllViewsXaml Include="@(Page)" Condition="$([System.String]::new('%(FullPath)').Contains('\Views\'))" />
-    </ItemGroup>
-    
-    <!-- Check each Views XAML file for nested subfolder pattern -->
-    <PropertyGroup>
-      <_NestedViewsFound>false</_NestedViewsFound>
-    </PropertyGroup>
-    
-    <ItemGroup>
-      <!-- Match pattern: \Views\anything\anything\anything.xaml (3+ path segments after Views) -->
-      <_NestedViewsXaml Include="@(_AllViewsXaml)"
-        Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(FullPath)', '\\Views\\[^\\]+\\[^\\]+\\[^\\]+\.xaml$'))" />
-    </ItemGroup>
-    
-    <PropertyGroup Condition="'@(_NestedViewsXaml)' != ''">
-      <_NestedViewsFound>true</_NestedViewsFound>
-      <_NestedViewsMessage>
-XAML COMPILER ERROR: Nested Views subfolders detected (GitHub #10947).
-
-XamlCompiler.exe will fail silently with exit code 1 and no output.json.
-
-Affected files:
-@(_NestedViewsXaml->'  - %(FullPath)', '%0A')
-
-FIX (choose one):
-  1. Move XAML to Views root: Views/Panels/MyView.xaml (max 2 levels)
-  2. Enable automatic flattener: Add to .csproj:
-     &lt;EnableViewsFlattener&gt;true&lt;/EnableViewsFlattener&gt;
-
-To downgrade this to a warning (NOT RECOMMENDED):
-  &lt;EnableViewsSubfolderError&gt;false&lt;/EnableViewsSubfolderError&gt;
-
-Reference: https://github.com/microsoft/microsoft-ui-xaml/issues/10947
-      </_NestedViewsMessage>
-    </PropertyGroup>
-    
-    <Warning
-      Condition="'$(_NestedViewsFound)' == 'true' AND '$(EnableViewsSubfolderError)' != 'true'"
-      Text="$(_NestedViewsMessage)" />
-    
-    <Error
-      Condition="'$(_NestedViewsFound)' == 'true' AND '$(EnableViewsSubfolderError)' == 'true'"
-      Text="$(_NestedViewsMessage)" />
-    
-    <Message
-      Condition="'$(_NestedViewsFound)' != 'true'"
-      Text="DetectNestedViewsXaml: No deeply nested Views subfolders detected (good)"
-      Importance="normal" />
-  </Target>
-
-  <!--
-    VS-0036: Skip MarkupCompilePass2 for VoiceStudio.App.
-    The WinUI XAML compiler crashes (exit code -1) during pass 2 on this project.
-    Pass 1 (codegen) succeeds and generates all required .g.i.cs files.
-    Pass 2 only generates .xbf binaries (runtime optimization, not functional).
-    This no-op override prevents the crash from blocking the build.
-    To re-enable: remove this target once the upstream XAML compiler crash is resolved.
-  -->
-  <Target Name="MarkupCompilePass2"
-    Condition="'$(MSBuildProjectName)' == 'VoiceStudio.App'">
-    <Message Text="MarkupCompilePass2 SKIPPED (VS-0036: pass 2 crash workaround)" Importance="high" />
-  </Target>
-
-  <!--
-    Remove .xbf items from the copy-to-output list since MarkupCompilePass2 is skipped.
-    Without this, MSBuild tries to copy non-existent .xbf files and fails with MSB3030.
-  -->
-  <Target Name="RemoveXbfFromCopyList"
-    BeforeTargets="_CopyOutOfDateSourceItemsToOutputDirectory;CopyFilesToOutputDirectory"
-    Condition="'$(UseWinUI)' == 'true'">
-    <ItemGroup>
-      <_SourceItemsToCopyToOutputDirectory Remove="@(_SourceItemsToCopyToOutputDirectory)"
-        Condition="'%(Extension)' == '.xbf'" />
-      <Content Remove="@(Content)" Condition="'%(Extension)' == '.xbf'" />
-      <EmbeddedResource Remove="@(EmbeddedResource)" Condition="'%(Extension)' == '.xbf'" />
-    </ItemGroup>
-    <Message Text="RemoveXbfFromCopyList: Removed .xbf items from copy list (VS-0036)" Importance="normal" />
-  </Target>
-
-  <!--
-  OPTIONAL: Views Flattener Target (disabled by default)
-  
-  If you need to maintain a nested folder structure in source but want the XAML compiler
-  to see flattened files, enable this target with EnableViewsFlattener=true.
-  
-  This copies XAML files from nested Views subfolders to obj/FlattenedViews/ and updates
-  the Page item group to reference the flattened copies for compilation.
-  
-  NOTE: This is a workaround. The preferred solution is to maintain a flat structure.
-  -->
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'VoiceStudio.App'">
-    <EnableViewsFlattener Condition="'$(EnableViewsFlattener)' == ''">false</EnableViewsFlattener>
-  </PropertyGroup>
-
-  <Target Name="FlattenViewsBeforeXamlCompile"
-    BeforeTargets="MarkupCompilePass1"
-    Condition="'$(MSBuildProjectName)' == 'VoiceStudio.App' AND '$(EnableViewsFlattener)' == 'true'"
-    DependsOnTargets="DetectNestedViewsXaml">
-    
-    <PropertyGroup>
-      <_FlattenedViewsDir>$(IntermediateOutputPath)FlattenedViews\</_FlattenedViewsDir>
-    </PropertyGroup>
-    
-    <MakeDir Directories="$(MSBuildProjectDirectory)\$(_FlattenedViewsDir)" />
-    
-    <!-- Copy nested Views XAML to flattened directory -->
-    <ItemGroup>
-      <_XamlToFlatten Include="@(_NestedViewsXaml)">
-        <FlattenedPath>$(MSBuildProjectDirectory)\$(_FlattenedViewsDir)%(Filename)%(Extension)</FlattenedPath>
-      </_XamlToFlatten>
-    </ItemGroup>
-    
-    <Copy
-      Condition="'@(_XamlToFlatten)' != ''"
-      SourceFiles="@(_XamlToFlatten)"
-      DestinationFiles="@(_XamlToFlatten->'%(FlattenedPath)')"
-      SkipUnchangedFiles="true" />
-    
-    <Message
-      Condition="'@(_XamlToFlatten)' != ''"
-      Text="FlattenViewsBeforeXamlCompile: Flattened @(_XamlToFlatten->Count()) XAML files to $(_FlattenedViewsDir)"
-      Importance="high" />
   </Target>
 
 </Project>

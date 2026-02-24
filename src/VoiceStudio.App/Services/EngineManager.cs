@@ -62,7 +62,7 @@ namespace VoiceStudio.App.Services
       catch (Exception ex)
       {
         // Log error but allow partial initialization
-        System.Diagnostics.ErrorLogger.LogWarning($"Error initializing EngineManager: {ex.Message}", "EngineManager");
+        ErrorLogger.LogWarning($"Error initializing EngineManager: {ex.Message}", "EngineManager");
         // In a real scenario, we might want to retry or expose the error state
       }
     }

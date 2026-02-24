@@ -26,7 +26,10 @@
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <!-- Use system-installed Windows App SDK runtime (unpackaged app via Bootstrap.Initialize). -->
     <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
-    <SelfContained>true</SelfContained>
+    <!-- SelfContained only for Release to avoid needing runtime packages during development.
+         For production, set RuntimeFrameworkVersion to an available NuGet version if 8.0.24 is unavailable. -->
+    <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
+    <SelfContained Condition="'$(Configuration)' != 'Release'">false</SelfContained>
     <UseAppHost>true</UseAppHost>
     <!-- Don't set RuntimeIdentifier explicitly - let the EnsureRuntimeIdentifierForWin2D target
     handle it -->
@@ -41,13 +44,15 @@
     <!-- Avoid VC/meta-dependent Win32 codegen in XAML compiler -->
     <EnableWin32Codegen>false</EnableWin32Codegen>
     <UseVCMetaManaged>false</UseVCMetaManaged>
-    <!-- Legacy workaround (can be revisited once XAML pipeline is stable) -->
-    <!-- <DisableXbfGeneration>true</DisableXbfGeneration> -->
+    <!-- XBF generation disabled: Pass2 false-positive exit code 1 prevents XBF output,
+         causing MSB3030 copy errors. Text XAML is functionally equivalent at runtime. -->
+    <DisableXbfGeneration>false</DisableXbfGeneration>
     <!-- <EnableUIXamlCompilation>false</EnableUIXamlCompilation> -->
     <!-- VS-0035 fix: Force external XamlCompiler via wrapper to avoid WMC9999 in-process failures. -->
     <UseXamlCompilerExecutable>false</UseXamlCompilerExecutable>
     <CppWinRTFastAbi>false</CppWinRTFastAbi>
-    <BaseOutputPath>$(SolutionDir).buildlogs\</BaseOutputPath>
+    <!-- BaseOutputPath override removed — custom output path broke WinUI runtime resource layout -->
+    <!-- <BaseOutputPath>$(SolutionDir).buildlogs\</BaseOutputPath> -->
     <!-- FIX: Don't use architecture-specific sub-paths that cause double backslash in XAML compiler
     Exec command -->
     <!-- Set a simple flat structure for intermediate output to avoid the escaping issue -->
@@ -62,7 +67,8 @@
     <!-- Unpackaged apphost EXE defaults -->
     <WindowsPackageType>None</WindowsPackageType>
     <EnableMsixTooling>false</EnableMsixTooling>
-    <EnableDefaultPriItems>false</EnableDefaultPriItems>
+    <!-- EnableDefaultPriItems restored to default (true) — disabling it broke PRI generation
+         which caused runtime XamlParseException 0x802B000A on ms-appx:/// resource resolution -->
     <GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
     <AppxPackageDir />
     <AppxBundle>Never</AppxBundle>
@@ -83,8 +89,9 @@
     <WarningLevel>9999</WarningLevel>
   </PropertyGroup>
 
-  <!-- Ensure RuntimeIdentifier is preserved for Win2D before any targets that might clear it -->
-  <Target Name="EnsureRuntimeIdentifierForWin2D" BeforeTargets="ProcessFrameworkReferences;ResolvePackageAssets" Condition="'$(RuntimeIdentifier)' == ''">
+  <!-- Ensure RuntimeIdentifier is preserved for Win2D before any targets that might clear it.
+       Skip for Debug builds to avoid needing runtime packages that may not be on NuGet yet. -->
+  <Target Name="EnsureRuntimeIdentifierForWin2D" BeforeTargets="ProcessFrameworkReferences;ResolvePackageAssets" Condition="'$(RuntimeIdentifier)' == '' And '$(Configuration)' == 'Release'">
     <PropertyGroup>
       <RuntimeIdentifier>win-x64</RuntimeIdentifier>
       <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
@@ -99,6 +106,22 @@
     <Message Text="XAML compilation completed. Check $(XamlErrorLogFile) for errors." Importance="high" Condition="Exists('$(XamlErrorLogFile)')" />
   </Target>
 
+  <!-- Re-embed the generated WinRT activation manifest after build.
+       The SDK's SelfContained.targets generates a merged manifest with 1886+ activatableClass entries
+       but the .NET linker reads ApplicationManifest statically, embedding the simple source manifest.
+       This target re-embeds the generated manifest with all WinRT registrations. -->
+  <Target Name="ReEmbedWinRTManifest" AfterTargets="Build"
+          Condition="'$(WindowsAppSDKSelfContained)' == 'true' And Exists('$(IntermediateOutputPath)Manifests\app.manifest')">
+    <PropertyGroup>
+      <_GeneratedManifest>$(IntermediateOutputPath)Manifests\app.manifest</_GeneratedManifest>
+      <_OutputExe>$(OutDir)$(AssemblyName).exe</_OutputExe>
+    </PropertyGroup>
+    <Exec Command="&quot;$(ManifestTool)&quot; -nologo -manifest &quot;$(_GeneratedManifest)&quot; -outputresource:&quot;$(_OutputExe);#1&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          Condition="Exists('$(_GeneratedManifest)') And Exists('$(_OutputExe)')" />
+    <Message Text="Re-embedded WinRT activation manifest into $(_OutputExe)" Importance="high" />
+  </Target>
+
   <!-- Exclude Windows App Runtime / WinUI native DLLs from publish output (Gate C/H).
        When using WindowsAppSDKSelfContained=false, the unpackaged app relies on
        Bootstrap.Initialize(...) to load these from the installed runtime packages.
@@ -106,18 +129,12 @@
   <!-- Ensure compiled XAML (.xbf) is present in publish output for unpackaged Gate C/H artifacts.
        Without this, ms-appx:///MainWindow.xaml fails in publish output because the build produces
        XBFs under obj (IntermediateOutputPath) but publish doesn't automatically copy them. -->
+  <!-- IncludeXbfInPublishOutput removed — let SDK manage XBF placement in publish output -->
+  <!--
   <Target Name="IncludeXbfInPublishOutput" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">
-    <ItemGroup>
-      <!-- WinUI XamlCompiler generates compiled dictionaries/pages into obj
-      (IntermediateOutputPath). -->
-      <_XbfToPublish Include="$(MSBuildProjectDirectory)\$(IntermediateOutputPath)**\*.xbf" />
-      <_XbfToPublishWithDest Include="@(_XbfToPublish)">
-        <Dest>$(PublishDir)\%(RecursiveDir)%(Filename)%(Extension)</Dest>
-      </_XbfToPublishWithDest>
-    </ItemGroup>
-    <Message Text="IncludeXbfInPublishOutput: Copying @(_XbfToPublishWithDest-&gt;Count()) XBF files from $(TargetDir) -&gt; $(PublishDir)" Importance="high" Condition="'@(_XbfToPublishWithDest)' != ''" />
-    <Copy SourceFiles="@(_XbfToPublishWithDest->'%(FullPath)')" DestinationFiles="@(_XbfToPublishWithDest->'%(Dest)')" SkipUnchangedFiles="true" Condition="'@(_XbfToPublishWithDest)' != ''" />
+    ...
   </Target>
+  -->
 
   <Target Name="ExcludeSystemDllsFromPublish" AfterTargets="Publish" Condition="'$(SelfContained)' == 'true' And '$(WindowsAppSDKSelfContained)' != 'true'">
     <ItemGroup>
@@ -137,6 +154,7 @@
   </Target>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="VoiceStudio.App.Tests" />
     <ProjectReference Include="..\VoiceStudio.Core\VoiceStudio.Core.csproj" />
   </ItemGroup>
 
@@ -201,6 +219,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="Resources\Workspaces\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="..\..\shared\schemas\*.schema.json" Link="shared\schemas\%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -234,5 +258,18 @@
 
   <!-- XAML compilation is enabled (per plan: make XAML compilation succeed normally) -->
   <!-- Directory.Build.targets ensures XAML compiler has resolved reference assemblies -->
-
+  <Target Name="EnsureResourcesPri" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetDir)VoiceStudio.App.pri"
+          DestinationFiles="$(TargetDir)resources.pri"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(TargetDir)VoiceStudio.App.pri')" />
+  </Target>
+    <!-- Stub views compile normally (stubs are minimal but valid XAML) -->
 </Project>
+
+
+
+
+
+
+

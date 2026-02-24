@@ -7,16 +7,29 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Windows.ApplicationModel;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App
 {
   public static class Program
   {
     private const uint WindowsAppSdkMajorMinorVersion = 0x00010008; // Windows App SDK 1.8
+    private const string SingleInstanceMutexName = "VoiceStudio_SingleInstance_Mutex_v1";
+    private static Mutex? _singleInstanceMutex;
 
     [STAThread]
     static void Main(string[] args)
     {
+      // Single-instance enforcement: prevent multiple app instances
+      bool createdNew;
+      _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out createdNew);
+      if (!createdNew)
+      {
+        // Another instance is already running - exit silently
+        // Optionally: could bring existing window to foreground via IPC
+        return;
+      }
+
       var crashDir = GetCrashDir();
       WriteBootMarker(crashDir, "main_entered", args);
       ApplySmokeArgsToEnvironment(args);
@@ -34,6 +47,12 @@ namespace VoiceStudio.App
 
         // Re-throw to ensure process exit code reflects failure.
         throw;
+      }
+      finally
+      {
+        // Release mutex when app exits
+        _singleInstanceMutex?.ReleaseMutex();
+        _singleInstanceMutex?.Dispose();
       }
     }
 
@@ -64,9 +83,9 @@ namespace VoiceStudio.App
           Environment.SetEnvironmentVariable("VOICE_STUDIO_SMOKE_EXIT", "1");
         }
       }
-      catch
+      catch (Exception ex)
       {
-        // Best effort
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "Program.HasFlag");
       }
     }
 
@@ -76,8 +95,6 @@ namespace VoiceStudio.App
 
       try
       {
-        // For unpackaged apps, initialize the Windows App SDK runtime before any WinUI types are activated.
-        // This prevents COM "Class not registered" failures in environments where the runtime isn't loaded yet.
         if (!IsPackaged())
         {
           WriteBootMarker(crashDir, "bootstrap_initialize_begin", args);
@@ -86,7 +103,7 @@ namespace VoiceStudio.App
           WriteBootMarker(crashDir, "bootstrap_initialize_done", args);
         }
 
-        Application.Start((p) =>
+        Application.Start((_) =>
         {
           WriteBootMarker(crashDir, "application_start_callback_entered", args);
           var context = new Microsoft.UI.Dispatching.DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread());
@@ -119,6 +136,12 @@ namespace VoiceStudio.App
       }
     }
 
+    private static bool IsSelfContained()
+    {
+      var exeDir = AppContext.BaseDirectory;
+      return File.Exists(Path.Combine(exeDir, "Microsoft.ui.xaml.dll"));
+    }
+
     private static string GetCrashDir()
     {
       return Path.Combine(
@@ -139,10 +162,10 @@ namespace VoiceStudio.App
             var payload = ex != null ? ex.ToString() : $"Unhandled: {evt.ExceptionObject}";
             WriteTextBestEffort(crashDir, "appdomain_unhandled", payload);
           }
-          catch
-          {
-            // Best effort
-          }
+          catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "Program.RegisterEarlyUnhandledHandlers");
+      }
         };
 
         TaskScheduler.UnobservedTaskException += (sender, evt) =>
@@ -152,15 +175,15 @@ namespace VoiceStudio.App
             WriteTextBestEffort(crashDir, "unobserved_task", evt.Exception.ToString());
             evt.SetObserved();
           }
-          catch
-          {
-            // Best effort
-          }
+          catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "Program.RegisterEarlyUnhandledHandlers");
+      }
         };
       }
-      catch
+      catch (Exception ex)
       {
-        // Best effort
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "Program.RegisterEarlyUnhandledHandlers");
       }
     }
 
@@ -187,9 +210,9 @@ namespace VoiceStudio.App
 
         File.WriteAllText(Path.Combine(crashDir, "boot_latest.json"), json);
       }
-      catch
+      catch (Exception ex)
       {
-        // Best effort; this must never prevent startup.
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "Program.WriteBootMarker");
       }
     }
 
@@ -219,9 +242,9 @@ namespace VoiceStudio.App
           Path.Combine(crashDir, "latest_startup_exception.log"),
           $"See: {logPath}");
       }
-      catch
+      catch (Exception logEx)
       {
-        // Best effort; nothing else to do.
+        ErrorLogger.LogWarning($"Best effort operation failed: {logEx.Message}", "Program.WriteStartupException");
       }
     }
 
@@ -234,9 +257,9 @@ namespace VoiceStudio.App
         var logPath = Path.Combine(crashDir, $"{prefix}_{timestamp}.log");
         File.WriteAllText(logPath, payload);
       }
-      catch
+      catch (Exception ex)
       {
-        // Best effort
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "Program.WriteTextBestEffort");
       }
     }
   }

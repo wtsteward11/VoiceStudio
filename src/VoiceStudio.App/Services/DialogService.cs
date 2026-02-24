@@ -110,7 +110,7 @@ namespace VoiceStudio.App.Services
       catch (System.Runtime.InteropServices.COMException ex) when (ex.HResult == unchecked((int)0x80004005))
       {
         // WinRT FileOpenPicker fails on some systems - use native Win32 dialog as fallback
-        System.Diagnostics.ErrorLogger.LogWarning($"[DialogService] WinRT FileOpenPicker failed (0x80004005), using native fallback", "DialogService");
+        ErrorLogger.LogWarning($"[DialogService] WinRT FileOpenPicker failed (0x80004005), using native fallback", "DialogService");
         var hwnd = WindowNative.GetWindowHandle(_window);
         return await NativeFileDialog.ShowOpenFileDialogAsync(hwnd, title, fileTypes);
       }
@@ -149,7 +149,7 @@ namespace VoiceStudio.App.Services
       catch (System.Runtime.InteropServices.COMException ex) when (ex.HResult == unchecked((int)0x80004005))
       {
         // WinRT FileOpenPicker fails on some systems - use native Win32 dialog as fallback
-        System.Diagnostics.ErrorLogger.LogWarning($"[DialogService] WinRT FileOpenPicker failed (0x80004005), using native fallback", "DialogService");
+        ErrorLogger.LogWarning($"[DialogService] WinRT FileOpenPicker failed (0x80004005), using native fallback", "DialogService");
         var hwnd = WindowNative.GetWindowHandle(_window);
         return await NativeFileDialog.ShowOpenFilesDialogAsync(hwnd, title, fileTypes);
       }

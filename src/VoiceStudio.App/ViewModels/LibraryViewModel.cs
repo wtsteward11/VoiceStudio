@@ -180,7 +180,7 @@ namespace VoiceStudio.App.ViewModels
     private void OnProfileSelected(ProfileSelectedEvent e)
     {
       // When a profile is selected in ProfilesPanel, filter library to show profile-related assets
-      System.Diagnostics.ErrorLogger.LogDebug($"LibraryViewModel: Profile selected - {e.ProfileId} ({e.ProfileName})", "LibraryViewModel");
+      ErrorLogger.LogDebug($"LibraryViewModel: Profile selected - {e.ProfileId} ({e.ProfileName})", "LibraryViewModel");
       // Future enhancement: could filter assets by profile or highlight related items
     }
 
@@ -190,7 +190,7 @@ namespace VoiceStudio.App.ViewModels
     /// </summary>
     private void OnAssetAdded(AssetAddedEvent e)
     {
-      System.Diagnostics.ErrorLogger.LogDebug($"LibraryViewModel: Asset added - {e.AssetId} ({e.AssetType}) from {e.SourcePanelId}", "LibraryViewModel");
+      ErrorLogger.LogDebug($"LibraryViewModel: Asset added - {e.AssetId} ({e.AssetType}) from {e.SourcePanelId}", "LibraryViewModel");
       _ = LoadAssetsAsync(CancellationToken.None);
     }
 
@@ -200,7 +200,7 @@ namespace VoiceStudio.App.ViewModels
     /// </summary>
     private void OnProfileCreatedRefresh(ProfileCreatedEvent e)
     {
-      System.Diagnostics.ErrorLogger.LogDebug($"LibraryViewModel: Profile created - {e.ProfileId} ({e.ProfileName}) from {e.SourcePanelId}", "LibraryViewModel");
+      ErrorLogger.LogDebug($"LibraryViewModel: Profile created - {e.ProfileId} ({e.ProfileName}) from {e.SourcePanelId}", "LibraryViewModel");
       _ = LoadAssetsAsync(CancellationToken.None);
     }
 
@@ -604,7 +604,7 @@ namespace VoiceStudio.App.ViewModels
     {
       if (asset == null) return;
 
-      System.Diagnostics.ErrorLogger.LogDebug($"LibraryViewModel: UseAsCloneReference - {asset.Id} ({asset.Name})", "LibraryViewModel");
+      ErrorLogger.LogDebug($"LibraryViewModel: UseAsCloneReference - {asset.Id} ({asset.Name})", "LibraryViewModel");
 
       // Use workflow coordinator for orchestrated multi-panel workflow
       if (_workflowCoordinator != null)
@@ -652,7 +652,7 @@ namespace VoiceStudio.App.ViewModels
     {
       if (asset == null) return;
 
-      System.Diagnostics.ErrorLogger.LogDebug($"LibraryViewModel: UseSynthesisVoice - {asset.Id} ({asset.Name})", "LibraryViewModel");
+      ErrorLogger.LogDebug($"LibraryViewModel: UseSynthesisVoice - {asset.Id} ({asset.Name})", "LibraryViewModel");
 
       // Use workflow coordinator for orchestrated multi-panel workflow
       if (_workflowCoordinator != null)
@@ -698,7 +698,7 @@ namespace VoiceStudio.App.ViewModels
     {
       if (asset == null) return;
 
-      System.Diagnostics.ErrorLogger.LogDebug($"LibraryViewModel: PlayAsset - {asset.Id} ({asset.Name})", "LibraryViewModel");
+      ErrorLogger.LogDebug($"LibraryViewModel: PlayAsset - {asset.Id} ({asset.Name})", "LibraryViewModel");
 
       // Use workflow coordinator for playback
       if (_workflowCoordinator != null)

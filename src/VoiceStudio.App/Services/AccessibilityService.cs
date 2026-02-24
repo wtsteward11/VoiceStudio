@@ -378,7 +378,7 @@ public class AccessibilityService : IUnifiedAccessibilityService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.ErrorLogger.LogWarning($"[Accessibility] Failed to load settings: {ex.Message}", "AccessibilityService");
+            ErrorLogger.LogWarning($"[Accessibility] Failed to load settings: {ex.Message}", "AccessibilityService");
         }
 
         await Task.CompletedTask;
@@ -401,7 +401,7 @@ public class AccessibilityService : IUnifiedAccessibilityService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.ErrorLogger.LogWarning($"[Accessibility] Failed to save settings: {ex.Message}", "AccessibilityService");
+            ErrorLogger.LogWarning($"[Accessibility] Failed to save settings: {ex.Message}", "AccessibilityService");
         }
 
         await Task.CompletedTask;

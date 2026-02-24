@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Logging;
 using VoiceStudio.Core.Services;
+using System.Diagnostics;
 
 namespace VoiceStudio.App.Services
 {

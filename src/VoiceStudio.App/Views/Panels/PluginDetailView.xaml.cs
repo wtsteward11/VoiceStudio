@@ -123,7 +123,7 @@ namespace VoiceStudio.App.Views.Panels
             }
             catch (Exception ex)
             {
-                System.Diagnostics.ErrorLogger.LogWarning($"[PluginDetail] Failed to load versions: {ex.Message}", "PluginDetailView.xaml");
+                ErrorLogger.LogWarning($"[PluginDetail] Failed to load versions: {ex.Message}", "PluginDetailView.xaml");
             }
         }
 

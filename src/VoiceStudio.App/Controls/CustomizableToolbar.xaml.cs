@@ -178,7 +178,7 @@ namespace VoiceStudio.App.Controls
         {
           var toastService = ServiceProvider.TryGetToastNotificationService();
           toastService?.ShowInfo("Engine", $"Selected: {engineName}");
-          System.Diagnostics.ErrorLogger.LogDebug($"Engine switch requested: {engineName}", "CustomizableToolbar.xaml");
+          ErrorLogger.LogDebug($"Engine switch requested: {engineName}", "CustomizableToolbar.xaml");
         }
       };
 
@@ -328,13 +328,13 @@ namespace VoiceStudio.App.Controls
           toastService?.ShowInfo("Workspace", $"Selected: {GetDisplayNameFromProfileId(workspaceId)}");
         }
 
-        System.Diagnostics.ErrorLogger.LogDebug($"Workspace switch: {workspaceId}", "CustomizableToolbar.xaml");
+        ErrorLogger.LogDebug($"Workspace switch: {workspaceId}", "CustomizableToolbar.xaml");
       }
       catch (Exception ex)
       {
         var toastService = ServiceProvider.TryGetToastNotificationService();
         toastService?.ShowError("Workspace Error", ex.Message);
-        System.Diagnostics.ErrorLogger.LogWarning($"Workspace switch error: {ex}", "CustomizableToolbar.xaml");
+        ErrorLogger.LogWarning($"Workspace switch error: {ex}", "CustomizableToolbar.xaml");
       }
     }
 
@@ -386,7 +386,7 @@ namespace VoiceStudio.App.Controls
       void Log(string msg)
       {
         var line = $"[{DateTime.Now:HH:mm:ss.fff}] {msg}";
-        System.Diagnostics.ErrorLogger.LogDebug(line, "CustomizableToolbar.xaml");
+        ErrorLogger.LogDebug(line, "CustomizableToolbar.xaml");
         // ALLOWED: empty catch - Best effort debug logging, failure is acceptable
         try { System.IO.File.AppendAllText(logPath, line + Environment.NewLine); } catch { }
       }
@@ -409,7 +409,7 @@ namespace VoiceStudio.App.Controls
             Log($"[Toolbar] MainWindowInstance NOT available: {App.MainWindowInstance?.GetType().Name ?? "null"}");
             var toastService = ServiceProvider.TryGetToastNotificationService();
             toastService?.ShowError("Import Error", "MainWindow not available");
-            System.Diagnostics.ErrorLogger.LogWarning($"Import failed: App.MainWindowInstance is {App.MainWindowInstance?.GetType().Name ?? "null"}", "CustomizableToolbar.xaml");
+            ErrorLogger.LogWarning($"Import failed: App.MainWindowInstance is {App.MainWindowInstance?.GetType().Name ?? "null"}", "CustomizableToolbar.xaml");
           }
           return;
         case "loop":
@@ -423,7 +423,7 @@ namespace VoiceStudio.App.Controls
           }
           catch (Exception ex)
           {
-            System.Diagnostics.ErrorLogger.LogWarning($"[Toolbar] Loop toggle failed: {ex.Message}", "CustomizableToolbar.xaml");
+            ErrorLogger.LogWarning($"[Toolbar] Loop toggle failed: {ex.Message}", "CustomizableToolbar.xaml");
           }
           return;
       }

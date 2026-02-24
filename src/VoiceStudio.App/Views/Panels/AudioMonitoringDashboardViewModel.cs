@@ -176,7 +176,7 @@ namespace VoiceStudio.App.Views.Panels
         }
         catch (Exception ex)
         {
-          System.Diagnostics.ErrorLogger.LogWarning($"Error polling meters: {ex.Message}", "AudioMonitoringDashboardViewModel");
+          ErrorLogger.LogWarning($"Error polling meters: {ex.Message}", "AudioMonitoringDashboardViewModel");
           await Task.Delay(1000, cancellationToken);
         }
       }
@@ -273,7 +273,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Error loading meters: {ex.Message}", "AudioMonitoringDashboardViewModel");
+        ErrorLogger.LogWarning($"Error loading meters: {ex.Message}", "AudioMonitoringDashboardViewModel");
       }
     }
 

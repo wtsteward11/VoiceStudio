@@ -870,11 +870,11 @@ namespace VoiceStudio.App.Views.Panels
       {
         await _jobProgressClient.ConnectAsync();
         _isWebSocketConnected = _jobProgressClient.IsConnected;
-        System.Diagnostics.ErrorLogger.LogDebug($"TrainingViewModel: WebSocket connected: {_isWebSocketConnected}", "TrainingViewModel");
+        ErrorLogger.LogDebug($"TrainingViewModel: WebSocket connected: {_isWebSocketConnected}", "TrainingViewModel");
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"TrainingViewModel: WebSocket connection failed: {ex.Message}", "TrainingViewModel");
+        ErrorLogger.LogWarning($"TrainingViewModel: WebSocket connection failed: {ex.Message}", "TrainingViewModel");
         _isWebSocketConnected = false;
       }
     }
@@ -891,7 +891,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"TrainingViewModel: WebSocket disconnect error: {ex.Message}", "TrainingViewModel");
+        ErrorLogger.LogWarning($"TrainingViewModel: WebSocket disconnect error: {ex.Message}", "TrainingViewModel");
       }
     }
 
@@ -958,7 +958,7 @@ namespace VoiceStudio.App.Views.Panels
           {
             var profileName = $"Trained Profile ({job.Engine})";
             _eventAggregator.Publish(new ProfileCreatedEvent(PanelId, job.ProfileId, profileName));
-            System.Diagnostics.ErrorLogger.LogDebug($"[TrainingViewModel] Published ProfileCreatedEvent: {job.ProfileId}", "TrainingViewModel");
+            ErrorLogger.LogDebug($"[TrainingViewModel] Published ProfileCreatedEvent: {job.ProfileId}", "TrainingViewModel");
           }
         }
 
@@ -1096,7 +1096,7 @@ namespace VoiceStudio.App.Views.Panels
         catch (Exception ex)
         {
           // Log but don't show error for polling failures
-          System.Diagnostics.ErrorLogger.LogWarning($"Polling error: {ex.Message}", "TrainingViewModel");
+          ErrorLogger.LogWarning($"Polling error: {ex.Message}", "TrainingViewModel");
         }
 
         await Task.Delay(2000, cancellationToken); // Poll every 2 seconds

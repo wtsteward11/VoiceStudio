@@ -3,6 +3,7 @@
 
 using Microsoft.UI.Xaml;
 
+using VoiceStudio.App.Logging;
 namespace VoiceStudio.App.Core.Commands;
 
 /// <summary>
@@ -142,7 +143,7 @@ public static class CommandBinding
         var registry = Services.AppServices.TryGetCommandRegistry();
         if (registry == null)
         {
-            System.Diagnostics.ErrorLogger.LogDebug($"[CommandBinding] Cannot wire '{commandId}' - registry not available", "CommandBinding");
+            ErrorLogger.LogDebug($"[CommandBinding] Cannot wire '{commandId}' - registry not available", "CommandBinding");
             return;
         }
 
@@ -151,11 +152,11 @@ public static class CommandBinding
         {
             button.Command = command;
             button.CommandParameter = GetCommandParameter(button);
-            System.Diagnostics.ErrorLogger.LogDebug($"[CommandBinding] Wired '{commandId}' to button", "CommandBinding");
+            ErrorLogger.LogDebug($"[CommandBinding] Wired '{commandId}' to button", "CommandBinding");
         }
         else
         {
-            System.Diagnostics.ErrorLogger.LogDebug($"[CommandBinding] Command '{commandId}' not found in registry", "CommandBinding");
+            ErrorLogger.LogDebug($"[CommandBinding] Command '{commandId}' not found in registry", "CommandBinding");
         }
     }
 

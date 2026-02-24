@@ -147,7 +147,7 @@ namespace VoiceStudio.App.Services
         catch (Exception ex)
         {
           // Log shutdown errors but don't throw - allow other modules to shutdown
-          System.Diagnostics.ErrorLogger.LogWarning($"[ModuleLoader] Error during module shutdown '{module.ModuleId}': {ex.Message}", "ModuleLoader");
+          ErrorLogger.LogWarning($"[ModuleLoader] Error during module shutdown '{module.ModuleId}': {ex.Message}", "ModuleLoader");
         }
       }
     }
@@ -228,7 +228,7 @@ namespace VoiceStudio.App.Services
         catch (Exception ex)
         {
           // Log but don't fail - module resources are optional
-          System.Diagnostics.ErrorLogger.LogWarning($"[ModuleLoader] Failed to merge resource dictionary '{uri}': {ex.Message}", "ModuleLoader");
+          ErrorLogger.LogWarning($"[ModuleLoader] Failed to merge resource dictionary '{uri}': {ex.Message}", "ModuleLoader");
         }
       }
 

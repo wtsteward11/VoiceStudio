@@ -408,7 +408,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Auto-optimization failed: {ex.Message}", "EngineParameterTuningViewModel");
+        ErrorLogger.LogWarning($"Auto-optimization failed: {ex.Message}", "EngineParameterTuningViewModel");
       }
     }
 
@@ -449,7 +449,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Failed to apply parameters: {ex.Message}", "EngineParameterTuningViewModel");
+        ErrorLogger.LogWarning($"Failed to apply parameters: {ex.Message}", "EngineParameterTuningViewModel");
       }
     }
   }

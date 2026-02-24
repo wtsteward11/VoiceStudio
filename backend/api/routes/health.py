@@ -12,6 +12,7 @@ import shutil
 from datetime import datetime
 from typing import Any
 
+from backend.ml.models.engine_service import get_engine_service
 from fastapi import APIRouter, HTTPException
 
 from app.core.resilience.health_check import (
@@ -26,7 +27,6 @@ from backend.core.circuit_breaker import (
     get_engine_breaker_summary,
     reset_engine_breaker,
 )
-from backend.ml.models.engine_service import get_engine_service
 from backend.settings import config
 
 from ..optimization import cache_response
@@ -781,10 +781,11 @@ def preflight_check() -> dict[str, Any]:
             return {"ok": False, "path": path, "error": str(e)}
 
     # Resolve core roots
+    from backend.ml.models.engine_config_service import get_engine_config_service
+
     from backend.audio.processing.audio_artifact_registry import get_audio_registry
     from backend.audio.processing.content_addressed_audio_cache import get_audio_cache
     from backend.infrastructure.adapters.job_state_store import get_job_state_store
-    from backend.ml.models.engine_config_service import get_engine_config_service
     from backend.project.management.project_store_service import get_project_store_service
 
     projects_root = str(get_project_store_service().projects_dir)

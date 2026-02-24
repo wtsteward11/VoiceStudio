@@ -12,6 +12,7 @@ import os
 import tempfile
 import uuid
 
+from backend.ml.models.engine_service import get_engine_service
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from backend.core.circuit_breaker import (
@@ -23,7 +24,6 @@ from backend.core.security.file_validation import (
     validate_audio_file,
     validate_video_file,
 )
-from backend.ml.models.engine_service import get_engine_service
 
 from ..models_additional import (
     TemporalAnalysis,

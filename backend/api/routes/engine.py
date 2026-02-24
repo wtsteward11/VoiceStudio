@@ -9,9 +9,8 @@ from __future__ import annotations
 import logging
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-
 from backend.ml.models.engine_service import IEngineService, get_engine_service
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..models_additional import Telemetry
 from ..optimization import cache_response

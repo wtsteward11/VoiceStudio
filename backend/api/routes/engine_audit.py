@@ -11,9 +11,8 @@ Architecture Note:
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
-
 from backend.ml.models.engine_service import IEngineService, get_engine_service
+from fastapi import APIRouter, Depends, HTTPException
 
 logger = logging.getLogger(__name__)
 

@@ -40,6 +40,7 @@ try:
     HAS_HTTPX = True
 except ImportError:  # ALLOWED: bare except - optional httpx
     pass
+from backend.ml.models.engine_service import IEngineService, get_engine_service
 from fastapi import (
     APIRouter,
     Depends,
@@ -64,7 +65,6 @@ from backend.core.security.file_validation import (
     validate_audio_file,
     validate_media_for_audio_extraction,
 )
-from backend.ml.models.engine_service import IEngineService, get_engine_service
 from backend.ml.models.model_preflight import (
     PreflightError,
     ensure_piper,

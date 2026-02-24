@@ -477,8 +477,9 @@ class PipelineOrchestrator:
         # Handle tool calls - send results back to LLM for follow-up
         if response.tool_calls and self._config.enable_function_calling:
             try:
-                from app.core.engines.llm_interface import Message, MessageRole
                 from backend.ml.models.llm_function_calling import get_function_registry
+
+                from app.core.engines.llm_interface import Message, MessageRole
 
                 registry = get_function_registry()
                 tool_results = await registry.process_tool_calls(response.tool_calls)

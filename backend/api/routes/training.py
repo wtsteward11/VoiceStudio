@@ -19,6 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from backend.ml.models.engine_service import get_engine_service
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -27,7 +28,6 @@ from backend.core.security.file_validation import (
     FileValidationError,
     validate_archive_file,
 )
-from backend.ml.models.engine_service import get_engine_service
 
 from ..middleware.auth_middleware import require_auth_if_enabled
 from ..ml_optimization import HyperparameterOptimizer

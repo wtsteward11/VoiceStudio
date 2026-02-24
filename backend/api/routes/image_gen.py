@@ -14,6 +14,7 @@ import uuid
 from io import BytesIO
 
 import numpy as np
+from backend.ml.models.engine_service import get_engine_service
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from PIL import Image
 
@@ -25,7 +26,6 @@ from backend.core.security.file_validation import (
     FileValidationError,
     validate_image_file,
 )
-from backend.ml.models.engine_service import get_engine_service
 
 from ..models_additional import (
     FaceEnhancementRequest,

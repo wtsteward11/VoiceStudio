@@ -11,15 +11,14 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
-
 from backend.ml.models.ab_testing import (
     ABTestingService,
     Experiment,
     ExperimentStatus,
     Variant,
 )
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 

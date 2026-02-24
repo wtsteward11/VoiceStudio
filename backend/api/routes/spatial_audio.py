@@ -10,10 +10,9 @@ import logging
 import os
 from typing import Any
 
+from backend.ml.models.engine_service import get_engine_service
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-
-from backend.ml.models.engine_service import get_engine_service
 
 from ..optimization import cache_response
 

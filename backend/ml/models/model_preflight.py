@@ -24,12 +24,11 @@ and auto-download is disabled or fails.
 
 from __future__ import annotations
 
-from typing import Any
-
 import logging
 import os
 from importlib import metadata
 from pathlib import Path
+from typing import Any
 
 from backend.config.path_config import get_models_path
 
@@ -37,7 +36,8 @@ hf_hub_download: Any = None
 snapshot_download: Any = None
 HAS_HF = False
 try:
-    from huggingface_hub import hf_hub_download as _hf_dl, snapshot_download as _snap_dl
+    from huggingface_hub import hf_hub_download as _hf_dl
+    from huggingface_hub import snapshot_download as _snap_dl
 
     hf_hub_download = _hf_dl
     snapshot_download = _snap_dl

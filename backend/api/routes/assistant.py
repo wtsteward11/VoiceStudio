@@ -185,8 +185,9 @@ async def chat_with_assistant(request: ChatRequest):
         ]
     else:
         try:
-            from app.core.engines.llm_interface import LLMConfig, Message, MessageRole
             from backend.ml.models.llm_function_calling import get_function_registry
+
+            from app.core.engines.llm_interface import LLMConfig, Message, MessageRole
 
             # Build message history
             llm_messages = []

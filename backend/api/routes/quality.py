@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from backend.ml.models.engine_service import get_engine_service
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
@@ -18,7 +19,6 @@ from backend.core.security.file_validation import (
     FileValidationError,
     validate_audio_file,
 )
-from backend.ml.models.engine_service import get_engine_service
 
 from ..optimization import cache_response
 

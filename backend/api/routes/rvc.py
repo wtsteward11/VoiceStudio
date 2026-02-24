@@ -20,6 +20,7 @@ import tempfile
 import uuid
 
 import numpy as np
+from backend.ml.models.engine_service import get_engine_service
 from fastapi import (
     APIRouter,
     Depends,
@@ -37,7 +38,6 @@ from backend.core.circuit_breaker import (
     CircuitBreakerOpenError,
     get_engine_breaker,
 )
-from backend.ml.models.engine_service import get_engine_service
 from backend.ml.models.model_preflight import PreflightError, ensure_sovits
 
 from ..middleware.auth_middleware import require_auth_if_enabled

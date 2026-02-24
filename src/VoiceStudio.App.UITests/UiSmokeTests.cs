@@ -21,18 +21,20 @@ namespace VoiceStudio.App.UITests
 
             var driverUrl = Environment.GetEnvironmentVariable("WINAPPDRIVER_URL") ?? DefaultDriverUrl;
 
-            var options = new AppiumOptions();
-            options.AddAdditionalCapability("app", appPath);
-            options.AddAdditionalCapability("platformName", "Windows");
-            options.AddAdditionalCapability("deviceName", "WindowsPC");
+            var options = new AppiumOptions
+            {
+                App = appPath,
+                PlatformName = "Windows",
+                DeviceName = "WindowsPC"
+            };
 
-            using var session = new WindowsDriver<WindowsElement>(
+            using var session = new WindowsDriver(
                 new Uri(driverUrl),
                 options,
                 TimeSpan.FromSeconds(60));
 
             Assert.IsNotNull(session, "WinAppDriver session should be created");
-            Assert.IsFalse(string.IsNullOrWhiteSpace(session.SessionId), "SessionId should be assigned");
+            Assert.IsNotNull(session.SessionId, "SessionId should be assigned");
 
             var title = session.Title;
             Assert.IsNotNull(title, "Window title should be retrievable");

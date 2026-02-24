@@ -35,7 +35,7 @@ try:
 
     torch = _torch
     HAS_TORCH = True
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional torch
     pass
 
 logger = logging.getLogger(__name__)

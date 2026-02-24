@@ -12,9 +12,9 @@ from __future__ import annotations
 import logging
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from contextlib import contextmanager
 from threading import Lock, RLock
-from collections.abc import Callable
 from typing import Any
 
 _get_metrics_collector: Callable[..., Any] | None = None
@@ -25,7 +25,7 @@ try:
 
     _get_metrics_collector = get_metrics_collector
     HAS_METRICS = True
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional metrics
     pass
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,9 @@ class EnginePerformanceMetrics:
         self._metrics_collector = None
         if HAS_METRICS:
             try:
-                self._metrics_collector = _get_metrics_collector() if _get_metrics_collector is not None else None
+                self._metrics_collector = (
+                    _get_metrics_collector() if _get_metrics_collector is not None else None
+                )
             except Exception as e:
                 logger.warning(f"Failed to get metrics collector: {e}")
 

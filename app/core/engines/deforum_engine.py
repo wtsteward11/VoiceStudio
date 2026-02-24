@@ -704,7 +704,7 @@ class DeforumEngine(EngineProtocol):
             raise ImportError("opencv-python required for video saving")
 
         height, width = frames[0].size[1], frames[0].size[0]
-        fourcc_fn = getattr(cv2, "VideoWriter_fourcc")
+        fourcc_fn = cv2.VideoWriter_fourcc
         fourcc = fourcc_fn(*"mp4v")
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 

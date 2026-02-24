@@ -9,8 +9,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from backend.infrastructure.adapters.base import Adapter

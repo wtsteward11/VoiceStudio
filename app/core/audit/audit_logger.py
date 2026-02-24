@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 class ContextEnricher(Protocol):
     def enrich(self, entry: AuditEntry) -> AuditEntry: ...
 
+
 from .schema import (
     AuditActor,
     AuditEntry,

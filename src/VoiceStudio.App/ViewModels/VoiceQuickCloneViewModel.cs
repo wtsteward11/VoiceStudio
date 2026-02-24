@@ -335,7 +335,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Error loading clone reference: {ex.Message}", "VoiceQuickCloneViewModel");
+        ErrorLogger.LogWarning($"Error loading clone reference: {ex.Message}", "VoiceQuickCloneViewModel");
         ErrorMessage = $"Failed to load audio: {ex.Message}";
       }
     }

@@ -30,7 +30,7 @@ try:
     import yaml as _yaml
 
     yaml = _yaml
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional pyyaml
     pass
 
 logger = logging.getLogger(__name__)

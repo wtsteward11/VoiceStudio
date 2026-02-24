@@ -325,7 +325,9 @@ class AudioBufferManager:
         self._peak_memory_mb = 0.0
         self._pressure_cleanups = 0
 
-    def allocate_buffer(self, size: int, dtype: np.dtype | type = np.float32) -> tuple[int, np.ndarray]:
+    def allocate_buffer(
+        self, size: int, dtype: np.dtype | type = np.float32
+    ) -> tuple[int, np.ndarray]:
         """
         Allocate a new audio buffer.
 

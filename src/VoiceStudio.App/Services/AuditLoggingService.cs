@@ -187,7 +187,7 @@ namespace VoiceStudio.App.Services
             catch (Exception ex)
             {
                 // Git info is optional - log at debug level only
-                System.Diagnostics.ErrorLogger.LogWarning($"[AuditLogging] Git info read failed: {ex.Message}", "AuditLoggingService");
+                ErrorLogger.LogWarning($"[AuditLogging] Git info read failed: {ex.Message}", "AuditLoggingService");
             }
             return string.Empty;
         }

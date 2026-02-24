@@ -49,17 +49,17 @@ try:
     from backend.plugins.wasm.capability_tokens import CapabilitySet as _CapabilitySet
     from backend.plugins.wasm.wasm_runner import (
         WASMTIME_AVAILABLE,
-        WasmExecutionResult as _WasmExecutionResult,
-        WasmPluginConfig as _WasmPluginConfig,
-        WasmRunner as _WasmRunner,
     )
+    from backend.plugins.wasm.wasm_runner import WasmExecutionResult as _WasmExecutionResult
+    from backend.plugins.wasm.wasm_runner import WasmPluginConfig as _WasmPluginConfig
+    from backend.plugins.wasm.wasm_runner import WasmRunner as _WasmRunner
 
     WasmRunner = _WasmRunner
     WasmPluginConfig = _WasmPluginConfig
     WasmExecutionResult = _WasmExecutionResult
     CapabilitySet = _CapabilitySet
     WASM_RUNNER_AVAILABLE = True
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional wasm runner
     pass
 
 # Phase 5B: Signature verification imports
@@ -68,16 +68,16 @@ VerificationResult: type | None = None
 SIGNING_AVAILABLE = False
 
 try:
+    from backend.plugins.supply_chain.signer import VerificationResult as _VerificationResult
     from backend.plugins.supply_chain.signer import (
-        VerificationResult as _VerificationResult,
         check_signing_available,
-        verify_package_auto as _verify_package_auto,
     )
+    from backend.plugins.supply_chain.signer import verify_package_auto as _verify_package_auto
 
     verify_package_auto = _verify_package_auto
     VerificationResult = _VerificationResult
     SIGNING_AVAILABLE = check_signing_available()
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional signing
     pass
 
 # Phase 6 module imports - lazy loaded to avoid circular imports
@@ -1250,14 +1250,12 @@ class PluginService:
                 "execution_time_ms": 0,
             }
 
+        from backend.plugins.wasm.capability_tokens import CapabilitySet as _CapabilitySet
         from backend.plugins.wasm.capability_tokens import (
-            CapabilitySet as _CapabilitySet,
             parse_capabilities_from_manifest,
         )
-        from backend.plugins.wasm.wasm_runner import (
-            WasmPluginConfig as _WasmPluginConfig,
-            WasmRunner as _WasmRunner,
-        )
+        from backend.plugins.wasm.wasm_runner import WasmPluginConfig as _WasmPluginConfig
+        from backend.plugins.wasm.wasm_runner import WasmRunner as _WasmRunner
 
         cap_set = _CapabilitySet.empty()
         if capabilities:
@@ -1277,9 +1275,7 @@ class PluginService:
 
         try:
             runner = _WasmRunner()
-            result = await runner.execute(
-                config, function_name or "_start", {}
-            )
+            result = await runner.execute(config, function_name or "_start", {})
 
             execution_time_ms = (time.perf_counter() - start_time) * 1000
 

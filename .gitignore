@@ -132,3 +132,15 @@ models/
 
 # OpenMemory - IDE/Assistant specific rules
 .cursor/rules/openmemory.mdc
+
+backend/.venv/
+
+# Runtime/tool artifacts (not source)
+.agents/
+.bewaker/
+.voicestudio/
+voicestudio.egg-info/
+tools/chatgpt-localfiles/
+
+# Local database (user data)
+data/voicestudio.db

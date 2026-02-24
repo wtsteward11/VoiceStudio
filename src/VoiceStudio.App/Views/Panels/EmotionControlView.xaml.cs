@@ -181,7 +181,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EmotionControlView.xaml");
+        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EmotionControlView.xaml");
       }
     }
 
@@ -196,7 +196,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EmotionControlView.xaml");
+        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EmotionControlView.xaml");
       }
     }
 

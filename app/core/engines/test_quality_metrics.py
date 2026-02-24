@@ -51,7 +51,6 @@ calculate_all_metrics = quality_metrics.calculate_all_metrics
 load_audio = quality_metrics.load_audio
 
 
-
 def generate_test_audio(
     duration_seconds: float = 1.0, sample_rate: int = 22050, frequency: float = 440.0
 ) -> np.ndarray:

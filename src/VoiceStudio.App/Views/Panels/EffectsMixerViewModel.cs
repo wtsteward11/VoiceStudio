@@ -528,7 +528,7 @@ namespace VoiceStudio.App.Views.Panels
         catch (Exception ex)
         {
           // Log error but continue polling
-          System.Diagnostics.ErrorLogger.LogWarning($"Error polling meters: {ex.Message}", "EffectsMixerViewModel");
+          ErrorLogger.LogWarning($"Error polling meters: {ex.Message}", "EffectsMixerViewModel");
           await Task.Delay(1000, cancellationToken); // Wait longer on error
         }
       }
@@ -610,7 +610,7 @@ namespace VoiceStudio.App.Views.Panels
         // Don't show error message for meter polling failures (too noisy)
         // Only log for debugging
         _logService?.LogError(ex, "LoadMeters");
-        System.Diagnostics.ErrorLogger.LogWarning($"Error loading meters: {ex.Message}", "EffectsMixerViewModel");
+        ErrorLogger.LogWarning($"Error loading meters: {ex.Message}", "EffectsMixerViewModel");
       }
     }
 

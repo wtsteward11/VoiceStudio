@@ -1,6 +1,10 @@
 """
 VoiceStudio API Routes Package
 
+Task 2.4: Context aggregators in routes/contexts/ (voice, audio, project, ml,
+platform, plugins, media) provide APIRouter grouping for OpenAPI tags.
+Routes remain in flat structure; contexts aggregate for documentation.
+
 API Naming Conventions (GAP-INT-003):
 
     1. RESOURCE NAMING

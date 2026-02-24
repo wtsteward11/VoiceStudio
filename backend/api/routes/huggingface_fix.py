@@ -45,7 +45,7 @@ def apply_fix() -> dict[str, Any]:
         import huggingface_hub
 
         if hasattr(huggingface_hub, "constants"):
-            setattr(huggingface_hub.constants, "HF_INFERENCE_API_BASE", HF_INFERENCE_API_BASE)
+            huggingface_hub.constants.HF_INFERENCE_API_BASE = HF_INFERENCE_API_BASE
             hub_patched = True
 
         if hasattr(huggingface_hub, "InferenceClient"):
@@ -55,7 +55,7 @@ def apply_fix() -> dict[str, Any]:
                 kwargs["base_url"] = HF_INFERENCE_API_BASE
                 return original_init(self, *args, **kwargs)
 
-            setattr(huggingface_hub.InferenceClient, "__init__", patched_init)
+            huggingface_hub.InferenceClient.__init__ = patched_init
             hf_client_patched = True
 
     except ImportError as ex:

@@ -218,7 +218,7 @@ namespace VoiceStudio.App.Services
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Failed to process direct message: {ex.Message}", "RealtimeVoiceWebSocketClient");
+        ErrorLogger.LogWarning($"Failed to process direct message: {ex.Message}", "RealtimeVoiceWebSocketClient");
       }
     }
 
@@ -341,7 +341,7 @@ namespace VoiceStudio.App.Services
       catch (Exception ex)
       {
         // Log error but don't throw
-        System.Diagnostics.ErrorLogger.LogWarning($"Failed to process real-time voice message: {ex.Message}", "RealtimeVoiceWebSocketClient");
+        ErrorLogger.LogWarning($"Failed to process real-time voice message: {ex.Message}", "RealtimeVoiceWebSocketClient");
       }
     }
 

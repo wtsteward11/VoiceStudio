@@ -67,7 +67,7 @@ namespace VoiceStudio.App.Controls
             catch (Exception ex)
             {
                 // Log and fall back to default template (still virtualized, just with default cache)
-                System.Diagnostics.ErrorLogger.LogWarning($"[VirtualizedListHelper] Failed to configure ListView ItemsPanel: {ex.Message}", "VirtualizedListHelper");
+                ErrorLogger.LogWarning($"[VirtualizedListHelper] Failed to configure ListView ItemsPanel: {ex.Message}", "VirtualizedListHelper");
             }
 
             // Performance notes for large lists:
@@ -99,7 +99,7 @@ namespace VoiceStudio.App.Controls
             catch (Exception ex)
             {
                 // Log but continue - GridView will use its default ItemsPanel
-                System.Diagnostics.ErrorLogger.LogWarning($"[VirtualizedListHelper] Failed to configure GridView ItemsPanel: {ex.Message}", "VirtualizedListHelper");
+                ErrorLogger.LogWarning($"[VirtualizedListHelper] Failed to configure GridView ItemsPanel: {ex.Message}", "VirtualizedListHelper");
             }
         }
 

@@ -209,7 +209,7 @@ namespace VoiceStudio.App.ViewModels
       {
         // GPU device loading is optional - don't show error if it fails
         // Just leave AvailableGpuDevices empty
-        System.Diagnostics.ErrorLogger.LogWarning($"Failed to load GPU devices: {ex.Message}", "AdvancedSettingsViewModel");
+        ErrorLogger.LogWarning($"Failed to load GPU devices: {ex.Message}", "AdvancedSettingsViewModel");
       }
     }
 

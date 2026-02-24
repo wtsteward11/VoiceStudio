@@ -5,9 +5,9 @@ Endpoints for AI-powered mixing and mastering assistance.
 """
 
 from __future__ import annotations
-from typing import Any
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel

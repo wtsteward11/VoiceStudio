@@ -112,7 +112,9 @@ class ConsoleFormatter(logging.Formatter):
 class LoggerAdapter(logging.LoggerAdapter):
     """Logger adapter with context support."""
 
-    def process(self, msg: str, kwargs: MutableMapping[str, Any]) -> tuple[str, MutableMapping[str, Any]]:
+    def process(
+        self, msg: str, kwargs: MutableMapping[str, Any]
+    ) -> tuple[str, MutableMapping[str, Any]]:
         """Process the message and kwargs."""
         extra = kwargs.get("extra", {})
         extra.update(self.extra)

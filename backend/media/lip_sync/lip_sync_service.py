@@ -550,8 +550,7 @@ class LipSyncService:
     async def get_engine_status(self, engine_id: str | None = None) -> dict[str, Any]:
         """Get status of available lip sync engines."""
         engines_status = {
-            engine.value: available
-            for engine, available in self._engines_available.items()
+            engine.value: available for engine, available in self._engines_available.items()
         }
         if engine_id:
             return {"engine_id": engine_id, "available": engines_status.get(engine_id, False)}

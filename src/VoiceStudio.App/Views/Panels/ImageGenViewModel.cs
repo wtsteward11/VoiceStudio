@@ -457,7 +457,7 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         // Silently fail - use default engines
-        System.Diagnostics.ErrorLogger.LogWarning($"Failed to load engines: {ex.Message}", "ImageGenViewModel");
+        ErrorLogger.LogWarning($"Failed to load engines: {ex.Message}", "ImageGenViewModel");
       }
 
       return Task.CompletedTask;

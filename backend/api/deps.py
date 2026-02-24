@@ -18,7 +18,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends
 
@@ -36,7 +36,7 @@ try:
     from backend.ml.models.engine_config_service import EngineConfigService
 
     _EngineConfigService = EngineConfigService
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional dependency
     pass
 
 EngineConfigServiceDep = Annotated[Any, Depends(get_engine_config_service_dep)]
@@ -55,7 +55,7 @@ try:
     from backend.ml.models.engine_service import IEngineService
 
     _IEngineService = IEngineService
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional dependency
     pass
 
 EngineServiceDep = Annotated[Any, Depends(get_engine_service_dep)]
@@ -76,7 +76,7 @@ try:
     )
 
     _AudioArtifactRegistry = AudioArtifactRegistry
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional dependency
     pass
 
 AudioRegistryDep = Annotated[Any, Depends(get_audio_registry_dep)]
@@ -97,7 +97,7 @@ try:
     )
 
     _ContentAddressedAudioCache = ContentAddressedAudioCache
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional dependency
     pass
 
 AudioCacheDep = Annotated[Any, Depends(get_audio_cache_dep)]
@@ -116,7 +116,7 @@ try:
     from backend.infrastructure.adapters.job_state_store import JobStateStore
 
     _JobStateStore = JobStateStore
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional dependency
     pass
 
 JobStateStoreDep = Annotated[Any, Depends(get_job_state_store_dep)]
@@ -143,7 +143,7 @@ try:
     from backend.project.management.project_store_service import ProjectStoreService
 
     _ProjectStoreService = ProjectStoreService
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional dependency
     pass
 
 ProjectStoreServiceDep = Annotated[Any, Depends(get_project_store_service_dep)]
@@ -162,7 +162,7 @@ try:
     from backend.project.management.profile_store import ProfileStore
 
     _ProfileStore = ProfileStore
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional dependency
     pass
 
 ProfileStoreDep = Annotated[Any, Depends(get_profile_store_dep)]
@@ -181,7 +181,7 @@ try:
     from backend.project.tracks.track_store import TrackStore
 
     _TrackStore = TrackStore
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional dependency
     pass
 
 TrackStoreDep = Annotated[Any, Depends(get_track_store_dep)]
@@ -200,7 +200,7 @@ try:
     from backend.infrastructure.adapters.artifact_ref_counter import ArtifactRefCounter
 
     _ArtifactRefCounter = ArtifactRefCounter
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional dependency
     pass
 
 ArtifactRefCounterDep = Annotated[Any, Depends(get_ref_counter_dep)]
@@ -219,7 +219,7 @@ try:
     from backend.project.versioning.edit_history import EditHistory as _EditHistoryClass
 
     _EditHistory = _EditHistoryClass
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional dependency
     pass
 
 EditHistoryDep = Annotated[Any, Depends(get_edit_history_dep)]
@@ -238,7 +238,7 @@ try:
     from backend.platform.config.unified_config import UnifiedConfigService
 
     _UnifiedConfigService = UnifiedConfigService
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional dependency
     pass
 
 UnifiedConfigDep = Annotated[Any, Depends(get_unified_config_dep)]

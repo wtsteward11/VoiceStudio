@@ -301,6 +301,7 @@ async def get_audio_analysis(
 
                 # Envelope analysis for ADSR
                 from scipy.signal import hilbert
+
                 envelope = np.abs(hilbert(audio_mono))
                 envelope_norm = envelope / np.max(envelope) if np.max(envelope) > 0 else envelope
 

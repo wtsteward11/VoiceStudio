@@ -85,11 +85,9 @@ from .network_policy import (
     NetworkPermissions,
     NetworkPolicyEnforcer,
     SocketWrapper,
-)
-from .network_policy import create_enforcer as create_network_enforcer
-from .network_policy import (
     generate_socket_bootstrap,
 )
+from .network_policy import create_enforcer as create_network_enforcer
 from .network_policy import get_enforcer as get_network_enforcer
 from .network_policy import remove_enforcer as remove_network_enforcer
 from .permissions import (

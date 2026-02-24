@@ -14,11 +14,11 @@ from typing import Any
 
 from app.core.plugins_api import Plugin
 
-# PluginLoader remains in backend.plugins.core until full migration
-from backend.plugins.core.loader import PluginLoader
-
 # Use core PluginMetadata for loader compatibility
 from backend.plugins.core.base import PluginMetadata as CorePluginMetadata
+
+# PluginLoader remains in backend.plugins.core until full migration
+from backend.plugins.core.loader import PluginLoader
 
 # PluginState enum from plugin_service (canonical location)
 from backend.plugins.plugin_service import PluginState
@@ -215,11 +215,7 @@ class PluginRegistry:
         plugins = list(self._plugins.values())
 
         if state:
-            plugins = [
-                p
-                for p in plugins
-                if self._plugin_states.get(p.metadata.plugin_id) == state
-            ]
+            plugins = [p for p in plugins if self._plugin_states.get(p.metadata.plugin_id) == state]
 
         return plugins
 

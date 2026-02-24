@@ -294,7 +294,10 @@ class VoskEngine(EngineProtocol):
         return None
 
     def batch_transcribe(
-        self, audio_files: list[str | Path | npt.NDArray[Any]], word_timestamps: bool = True, **kwargs: Any
+        self,
+        audio_files: list[str | Path | npt.NDArray[Any]],
+        word_timestamps: bool = True,
+        **kwargs: Any,
     ) -> list[dict[str, Any]]:
         """
         Transcribe multiple audio files in batch with optimized processing.

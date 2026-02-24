@@ -640,10 +640,12 @@ class WhisperCPPEngine(EngineProtocol):
                             return {
                                 "text": str(whisper_result.get("text", "")),
                                 "segments": list(whisper_result.get("segments", [])),
-                                "language": str(whisper_result.get(
-                                    "language",
-                                    language or "unknown",
-                                )),
+                                "language": str(
+                                    whisper_result.get(
+                                        "language",
+                                        language or "unknown",
+                                    )
+                                ),
                             }
                 except Exception as e:
                     logger.debug(f"Whisper fallback failed: {e}")

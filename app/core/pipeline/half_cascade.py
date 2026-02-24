@@ -115,7 +115,8 @@ class HalfCascadePipeline:
 
             service = get_engine_service()
             result = service.transcribe(
-                engine_id="whisper", audio_path=str(audio_data),
+                engine_id="whisper",
+                audio_path=str(audio_data),
                 language=self._language,
             )
             return str(result.get("text", ""))
@@ -132,7 +133,8 @@ class HalfCascadePipeline:
 
             service = get_engine_service()
             result = service.synthesize(
-                engine_id=self._tts_engine, text=text,
+                engine_id=self._tts_engine,
+                text=text,
                 language=self._language,
             )
             audio: bytes | None = result.get("audio_data")

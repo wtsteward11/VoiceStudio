@@ -17,8 +17,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from backend.config.path_config import get_path
 from backend.audio.processing.content_addressed_audio_cache import get_audio_cache
+from backend.config.path_config import get_path
 
 logger = logging.getLogger(__name__)
 

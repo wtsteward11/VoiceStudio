@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Any, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 

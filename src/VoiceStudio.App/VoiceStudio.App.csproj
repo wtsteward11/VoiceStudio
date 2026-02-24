@@ -26,10 +26,7 @@
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <!-- Use system-installed Windows App SDK runtime (unpackaged app via Bootstrap.Initialize). -->
     <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
-    <!-- SelfContained only for Release to avoid needing runtime packages during development.
-         For production, set RuntimeFrameworkVersion to an available NuGet version if 8.0.24 is unavailable. -->
-    <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
-    <SelfContained Condition="'$(Configuration)' != 'Release'">false</SelfContained>
+    <SelfContained>true</SelfContained>
     <UseAppHost>true</UseAppHost>
     <!-- Don't set RuntimeIdentifier explicitly - let the EnsureRuntimeIdentifierForWin2D target
     handle it -->
@@ -44,9 +41,8 @@
     <!-- Avoid VC/meta-dependent Win32 codegen in XAML compiler -->
     <EnableWin32Codegen>false</EnableWin32Codegen>
     <UseVCMetaManaged>false</UseVCMetaManaged>
-    <!-- XBF generation disabled: Pass2 false-positive exit code 1 prevents XBF output,
-         causing MSB3030 copy errors. Text XAML is functionally equivalent at runtime. -->
-    <DisableXbfGeneration>true</DisableXbfGeneration>
+    <!-- Legacy workaround (can be revisited once XAML pipeline is stable) -->
+    <!-- <DisableXbfGeneration>true</DisableXbfGeneration> -->
     <!-- <EnableUIXamlCompilation>false</EnableUIXamlCompilation> -->
     <!-- VS-0035 fix: Force external XamlCompiler via wrapper to avoid WMC9999 in-process failures. -->
     <UseXamlCompilerExecutable>false</UseXamlCompilerExecutable>
@@ -87,9 +83,8 @@
     <WarningLevel>9999</WarningLevel>
   </PropertyGroup>
 
-  <!-- Ensure RuntimeIdentifier is preserved for Win2D before any targets that might clear it.
-       Skip for Debug builds to avoid needing runtime packages that may not be on NuGet yet. -->
-  <Target Name="EnsureRuntimeIdentifierForWin2D" BeforeTargets="ProcessFrameworkReferences;ResolvePackageAssets" Condition="'$(RuntimeIdentifier)' == '' And '$(Configuration)' == 'Release'">
+  <!-- Ensure RuntimeIdentifier is preserved for Win2D before any targets that might clear it -->
+  <Target Name="EnsureRuntimeIdentifierForWin2D" BeforeTargets="ProcessFrameworkReferences;ResolvePackageAssets" Condition="'$(RuntimeIdentifier)' == ''">
     <PropertyGroup>
       <RuntimeIdentifier>win-x64</RuntimeIdentifier>
       <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
@@ -142,7 +137,6 @@
   </Target>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="VoiceStudio.App.Tests" />
     <ProjectReference Include="..\VoiceStudio.Core\VoiceStudio.Core.csproj" />
   </ItemGroup>
 
@@ -204,12 +198,6 @@
     <None Include="Assets\**\*.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="Resources\Workspaces\*.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
 
   <ItemGroup>

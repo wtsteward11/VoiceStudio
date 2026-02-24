@@ -20,9 +20,9 @@ Usage:
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from enum import Enum
-from collections.abc import AsyncIterator
 from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
@@ -340,5 +340,3 @@ class ITranslationEngine(Protocol):
     def get_languages(self) -> list[str]:
         """Get supported languages."""
         ...
-
-

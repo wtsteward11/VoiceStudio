@@ -12,20 +12,19 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from backend.data.repositories.transcription_repository import get_transcription_repository
-from backend.security.path_validator import PathValidationError, get_path_validator
 from backend.core.circuit_breaker import get_engine_breaker
+from backend.data.repositories.transcription_repository import get_transcription_repository
 from backend.ml.models.engine_service import get_engine_service
 from backend.ml.models.model_preflight import PreflightError, ensure_whisper_cpp
+from backend.security.path_validator import PathValidationError, get_path_validator
 
 from ..models import ApiOk
 from ..optimization import cache_response
-
-from typing import Any
 
 logger = logging.getLogger(__name__)
 

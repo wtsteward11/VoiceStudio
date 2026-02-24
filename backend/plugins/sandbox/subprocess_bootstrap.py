@@ -292,7 +292,9 @@ class PluginContext:
 
     async def storage_set(self, key: str, value: Any) -> Dict[str, Any]:
         """Set a value in plugin storage."""
-        result: Dict[str, Any] = await self._bridge.call_host("host.storage.set", {"key": key, "value": value})
+        result: Dict[str, Any] = await self._bridge.call_host(
+            "host.storage.set", {"key": key, "value": value}
+        )
         return result
 
     async def settings_get(self, key: str) -> Any:

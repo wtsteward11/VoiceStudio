@@ -6,9 +6,9 @@ Supports CRUD operations and conflict detection.
 """
 
 from __future__ import annotations
-from typing import Any
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -286,7 +286,9 @@ async def update_shortcut(shortcut_id: str, request: ShortcutUpdateRequest):
         )
 
         # Check for conflicts
-        conflict_id = _check_conflict(str(new_key_code) if new_key_code else "", new_modifiers, exclude_id=shortcut_id)
+        conflict_id = _check_conflict(
+            str(new_key_code) if new_key_code else "", new_modifiers, exclude_id=shortcut_id
+        )
         if conflict_id:
             conflict_desc = _shortcuts[conflict_id].get("description", "unknown")
             raise HTTPException(

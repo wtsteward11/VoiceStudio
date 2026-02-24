@@ -96,7 +96,7 @@ namespace VoiceStudio.App.Services
           }
           else
           {
-            System.Diagnostics.ErrorLogger.LogDebug($"[Palette] Panel not found: {e.Value}", "CommandPaletteService");
+            ErrorLogger.LogDebug($"[Palette] Panel not found: {e.Value}", "CommandPaletteService");
           }
           break;
 
@@ -117,7 +117,7 @@ namespace VoiceStudio.App.Services
           break;
 
         default:
-          System.Diagnostics.ErrorLogger.LogDebug($"[Palette] Unknown action: {e.Action}", "CommandPaletteService");
+          ErrorLogger.LogDebug($"[Palette] Unknown action: {e.Action}", "CommandPaletteService");
           break;
       }
     }

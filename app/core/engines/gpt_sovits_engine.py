@@ -320,12 +320,16 @@ class GPTSovitsEngine(EngineProtocol):
             # Check response cache
             import hashlib
 
-            ref_id = reference_audio.hex() if isinstance(reference_audio, bytes) else reference_audio
+            ref_id = (
+                reference_audio.hex() if isinstance(reference_audio, bytes) else reference_audio
+            )
             cache_key = hashlib.md5(f"{text}_{ref_id}_{language}".encode()).hexdigest()
             if cache_key in self._response_cache:
                 logger.debug("Using cached GPT-SoVITS synthesis result")
                 self._response_cache.move_to_end(cache_key)  # LRU update
-                cached: bytes | tuple[bytes | None, dict[str, Any]] | None = self._response_cache[cache_key]
+                cached: bytes | tuple[bytes | None, dict[str, Any]] | None = self._response_cache[
+                    cache_key
+                ]
                 return cached
 
             # Lazy load model if needed
@@ -739,7 +743,11 @@ class GPTSovitsEngine(EngineProtocol):
                 )
 
             # Clean up temporary file
-            if ref_audio is not None and isinstance(ref_audio, np.ndarray) and ref_audio_path is not None:
+            if (
+                ref_audio is not None
+                and isinstance(ref_audio, np.ndarray)
+                and ref_audio_path is not None
+            ):
                 with contextlib.suppress(BaseException):
                     os.remove(ref_audio_path)
 
@@ -790,7 +798,11 @@ class GPTSovitsEngine(EngineProtocol):
                     )
 
                     # Clean up
-                    if ref_audio is not None and isinstance(ref_audio, np.ndarray) and ref_path is not None:
+                    if (
+                        ref_audio is not None
+                        and isinstance(ref_audio, np.ndarray)
+                        and ref_path is not None
+                    ):
                         with contextlib.suppress(BaseException):
                             os.remove(ref_path)
 

@@ -23,7 +23,7 @@ try:
 
     np = numpy
     HAS_NUMPY = True
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional numpy
     pass
 
 try:

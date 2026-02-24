@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.3] - 2026-02-24
+
+### Reintegration Release
+
+Reintegrated 154 commits from v1.0.0-baseline through v1.0.2 using a 7-phase validated process. Every phase verified with build, tests, and app launch before proceeding.
+
+- **Backend**: Circuit breaker, engine adapters, plugin system, 46 API routes, domain model, data layer
+- **Frontend**: 80+ panels, unified command system, design tokens, XAML reliability
+- **Quality**: 1,017 C# tests, 135+ Python unit tests passing, ruff clean
+- **Infrastructure**: Plugin sandbox, CI workflows, verification scripts, architecture docs
+- **Security**: SQL parameterization, shell=True removal, RBAC, session management, encryption
+
+See [docs/integration/delta-audit.md](docs/integration/delta-audit.md) for full reconciliation details.
+
+---
+
 ## [Unreleased]
 
 ### Added

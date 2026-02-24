@@ -15,6 +15,7 @@ import logging
 import os
 import uuid
 from datetime import datetime
+from typing import Callable
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
@@ -25,8 +26,6 @@ from backend.data.repositories.library_repository import (
     get_library_asset_repository,
     get_library_folder_repository,
 )
-
-from typing import Callable
 
 try:
     from ..optimization import cache_response

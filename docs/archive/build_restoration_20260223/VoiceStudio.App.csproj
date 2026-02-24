@@ -1,0 +1,275 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- XAML bypass targets are imported via Directory.Build.targets (after NuGet) -->
+  <!-- Do NOT import here - it must be AFTER NuGet package targets -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <RootNamespace>VoiceStudio.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Nullable>enable</Nullable>
+    <UseWinUI>true</UseWinUI>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <!-- Tell platform compatibility analyzer about minimum supported Windows version -->
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <!-- Suppress platform compatibility warnings - this app is Windows-only (CA1416 is false positive for Windows-only app) -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <!-- Ensure WinRT.Runtime reference assemblies are available to XAML compiler. -->
+    <WindowsSdkPackageVersion>10.0.26100.81</WindowsSdkPackageVersion>
+    <Platform>x64</Platform>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <IsPackable>false</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <!-- Use system-installed Windows App SDK runtime (unpackaged app via Bootstrap.Initialize). -->
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <!-- SelfContained only for Release to avoid needing runtime packages during development.
+         For production, set RuntimeFrameworkVersion to an available NuGet version if 8.0.24 is unavailable. -->
+    <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
+    <SelfContained Condition="'$(Configuration)' != 'Release'">false</SelfContained>
+    <UseAppHost>true</UseAppHost>
+    <!-- Don't set RuntimeIdentifier explicitly - let the EnsureRuntimeIdentifierForWin2D target
+    handle it -->
+    <!-- Setting RuntimeIdentifier causes RID-specific output paths which break the XAML compiler
+    Exec task with double backslashes -->
+    <!-- <RuntimeIdentifier>win-x64</RuntimeIdentifier> -->
+    <!-- <RuntimeIdentifiers>win-x64</RuntimeIdentifiers> -->
+    <!-- Suppress RuntimeIdentifier errors for unsupported RIDs -->
+    <_SuppressWinRTError>true</_SuppressWinRTError>
+    <!-- Allow RID resolution for Win2D, but suppress other RID errors -->
+    <EnableDefaultRuntimeIdentifier>true</EnableDefaultRuntimeIdentifier>
+    <!-- Avoid VC/meta-dependent Win32 codegen in XAML compiler -->
+    <EnableWin32Codegen>false</EnableWin32Codegen>
+    <UseVCMetaManaged>false</UseVCMetaManaged>
+    <!-- XBF generation disabled: Pass2 false-positive exit code 1 prevents XBF output,
+         causing MSB3030 copy errors. Text XAML is functionally equivalent at runtime. -->
+    <DisableXbfGeneration>false</DisableXbfGeneration>
+    <!-- <EnableUIXamlCompilation>false</EnableUIXamlCompilation> -->
+    <!-- VS-0035 fix: Force external XamlCompiler via wrapper to avoid WMC9999 in-process failures. -->
+    <UseXamlCompilerExecutable>false</UseXamlCompilerExecutable>
+    <CppWinRTFastAbi>false</CppWinRTFastAbi>
+    <!-- BaseOutputPath override removed — custom output path broke WinUI runtime resource layout -->
+    <!-- <BaseOutputPath>$(SolutionDir).buildlogs\</BaseOutputPath> -->
+    <!-- FIX: Don't use architecture-specific sub-paths that cause double backslash in XAML compiler
+    Exec command -->
+    <!-- Set a simple flat structure for intermediate output to avoid the escaping issue -->
+    <IntermediateOutputPathHasTrailingSlash>false</IntermediateOutputPathHasTrailingSlash>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+    <Win2DWarnNoPlatform>true</Win2DWarnNoPlatform>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Unpackaged apphost EXE defaults -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <!-- EnableDefaultPriItems restored to default (true) — disabling it broke PRI generation
+         which caused runtime XamlParseException 0x802B000A on ms-appx:/// resource resolution -->
+    <GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
+    <AppxPackageDir />
+    <AppxBundle>Never</AppxBundle>
+    <AppxManifest />
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <WindowsAppSDKRuntimePackageVersion>$(MicrosoftWindowsAppSDKVersion)</WindowsAppSDKRuntimePackageVersion>
+    <WindowsAppSDKRuntimePackageRoot>
+      $(UserProfile)\.nuget\packages\microsoft.windowsappsdk.runtime\$(WindowsAppSDKRuntimePackageVersion)</WindowsAppSDKRuntimePackageRoot>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <WarningLevel>9999</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <WarningLevel>9999</WarningLevel>
+  </PropertyGroup>
+
+  <!-- Ensure RuntimeIdentifier is preserved for Win2D before any targets that might clear it.
+       Skip for Debug builds to avoid needing runtime packages that may not be on NuGet yet. -->
+  <Target Name="EnsureRuntimeIdentifierForWin2D" BeforeTargets="ProcessFrameworkReferences;ResolvePackageAssets" Condition="'$(RuntimeIdentifier)' == '' And '$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+      <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    </PropertyGroup>
+  </Target>
+
+  <!-- Capture XAML compiler errors to file -->
+  <Target Name="CaptureXamlErrors" AfterTargets="MarkupCompilePass1" Condition="'$(BuildingProject)' == 'true'">
+    <PropertyGroup>
+      <XamlErrorLogFile>$(MSBuildProjectDirectory)\..\..\xaml-compiler-errors.txt</XamlErrorLogFile>
+    </PropertyGroup>
+    <Message Text="XAML compilation completed. Check $(XamlErrorLogFile) for errors." Importance="high" Condition="Exists('$(XamlErrorLogFile)')" />
+  </Target>
+
+  <!-- Re-embed the generated WinRT activation manifest after build.
+       The SDK's SelfContained.targets generates a merged manifest with 1886+ activatableClass entries
+       but the .NET linker reads ApplicationManifest statically, embedding the simple source manifest.
+       This target re-embeds the generated manifest with all WinRT registrations. -->
+  <Target Name="ReEmbedWinRTManifest" AfterTargets="Build"
+          Condition="'$(WindowsAppSDKSelfContained)' == 'true' And Exists('$(IntermediateOutputPath)Manifests\app.manifest')">
+    <PropertyGroup>
+      <_GeneratedManifest>$(IntermediateOutputPath)Manifests\app.manifest</_GeneratedManifest>
+      <_OutputExe>$(OutDir)$(AssemblyName).exe</_OutputExe>
+    </PropertyGroup>
+    <Exec Command="&quot;$(ManifestTool)&quot; -nologo -manifest &quot;$(_GeneratedManifest)&quot; -outputresource:&quot;$(_OutputExe);#1&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          Condition="Exists('$(_GeneratedManifest)') And Exists('$(_OutputExe)')" />
+    <Message Text="Re-embedded WinRT activation manifest into $(_OutputExe)" Importance="high" />
+  </Target>
+
+  <!-- Exclude Windows App Runtime / WinUI native DLLs from publish output (Gate C/H).
+       When using WindowsAppSDKSelfContained=false, the unpackaged app relies on
+       Bootstrap.Initialize(...) to load these from the installed runtime packages.
+       Keeping loose copies can cause CoreMessagingXP.dll fail-fast or dependency-resolution issues. -->
+  <!-- Ensure compiled XAML (.xbf) is present in publish output for unpackaged Gate C/H artifacts.
+       Without this, ms-appx:///MainWindow.xaml fails in publish output because the build produces
+       XBFs under obj (IntermediateOutputPath) but publish doesn't automatically copy them. -->
+  <!-- IncludeXbfInPublishOutput removed — let SDK manage XBF placement in publish output -->
+  <!--
+  <Target Name="IncludeXbfInPublishOutput" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">
+    ...
+  </Target>
+  -->
+
+  <Target Name="ExcludeSystemDllsFromPublish" AfterTargets="Publish" Condition="'$(SelfContained)' == 'true' And '$(WindowsAppSDKSelfContained)' != 'true'">
+    <ItemGroup>
+      <SystemDlls Include="$(PublishDir)\CoreMessagingXP.dll" />
+      <SystemDlls Include="$(PublishDir)\dcompi.dll" />
+      <SystemDlls Include="$(PublishDir)\dwmcorei.dll" />
+      <SystemDlls Include="$(PublishDir)\Microsoft.ui.xaml.dll" />
+      <SystemDlls Include="$(PublishDir)\Microsoft.ui.xaml.resources.common.dll" />
+      <SystemDlls Include="$(PublishDir)\Microsoft.ui.xaml.resources.19h1.dll" />
+      <SystemDlls Include="$(PublishDir)\Microsoft.UI.Xaml.Controls.dll" />
+      <SystemDlls Include="$(PublishDir)\Microsoft.UI.Xaml.Internal.dll" />
+      <SystemDlls Include="$(PublishDir)\Microsoft.UI.Xaml.Phone.dll" />
+      <SystemDlls Include="$(PublishDir)\Microsoft.UI.Xaml.winmd" />
+    </ItemGroup>
+    <Delete Files="@(SystemDlls)" Condition="Exists('%(Identity)')" ContinueOnError="true" />
+    <Message Text="Removed Windows App Runtime native DLLs from publish: @(SystemDlls, ', ')" Condition="'@(SystemDlls)' != ''" Importance="high" />
+  </Target>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="VoiceStudio.App.Tests" />
+    <ProjectReference Include="..\VoiceStudio.Core\VoiceStudio.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" Version="8.0.5" />
+    <PackageReference Include="MessagePack" Version="3.1.4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.3.2" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="$(MicrosoftWindowsAppSDKVersion)" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
+    <!-- Required for in-proc XAML compiler task dependency -->
+    <PackageReference Include="System.Security.Permissions" Version="6.0.0" />
+    <PackageReference Include="CommunityToolkit.WinUI.UI.Controls" Version="7.1.2">
+      <PrivateAssets>none</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.1" />
+    <PackageReference Include="Roslynator.Analyzers" Version="4.11.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <!-- Exclude duplicate model files - models should be in VoiceStudio.Core.Models or
+    VoiceStudio.App.Core.Models -->
+    <Compile Remove="Models\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="app.manifest" />
+    <!-- MSIX lane removed: Package.appxmanifest archived under docs/archive/msix/ -->
+  </ItemGroup>
+
+  <!-- Ensure control XAMLs carry Page metadata -->
+  <ItemGroup>
+    <Page Update="Controls\**\*.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+  </ItemGroup>
+
+  <!-- XAML crash isolation switches removed to prevent Visual Studio project system
+  KeyNotFoundException -->
+  <!-- These debug conditionals referenced undefined variables causing project system failures -->
+  <!-- Can be re-added as needed for XAML crash isolation debugging -->
+  <!-- Debug-only XAML compilation targets removed to prevent Visual Studio project system issues -->
+  <!-- These can be re-enabled if needed for XAML debugging -->
+
+  <ItemGroup>
+    <PRIResource Include="Resources\Resources.resw" />
+    <PRIResource Include="Resources\en-US\Resources.resw" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Assets\**\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Resources\Workspaces\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\shared\schemas\*.schema.json" Link="shared\schemas\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\shared\schemas\_registry.json" Link="shared\schemas\_registry.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\shared\contracts\*.schema.json" Link="shared\contracts\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\shared\contracts\error_codes.json" Link="shared\contracts\error_codes.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- De-dupe XAML generated Compile items in design-time builds (LSP/VS) -->
+  <Target Name="DeduplicateCompileItemsDesignTime" AfterTargets="DesignTimeMarkupCompilation;MarkupCompilePass1" Condition="'$(DesignTimeBuild)' == 'true' Or '$(BuildingInsideVisualStudio)' == 'true'">
+    <ItemGroup>
+      <!-- Collect only App.g.i.cs variants (absolute + relative) -->
+      <_AppGi Include="@(Compile)" Condition="$([System.String]::Copy('%(Compile.Identity)').EndsWith('App.g.i.cs'))" />
+      <_AppGi Include="@(Compile)" Condition="$([System.String]::Copy('%(Compile.FullPath)').EndsWith('App.g.i.cs'))" />
+    </ItemGroup>
+    <RemoveDuplicates Inputs="@(_AppGi->'%(FullPath)')">
+      <Output TaskParameter="Filtered" ItemName="_AppGiUnique" />
+    </RemoveDuplicates>
+    <ItemGroup>
+      <!-- Drop all App.g.i.cs entries, then re-add one per full path -->
+      <Compile Remove="@(_AppGi)" />
+      <Compile Include="@(_AppGiUnique)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- XAML compilation is enabled (per plan: make XAML compilation succeed normally) -->
+  <!-- Directory.Build.targets ensures XAML compiler has resolved reference assemblies -->
+  <Target Name="EnsureResourcesPri" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetDir)VoiceStudio.App.pri"
+          DestinationFiles="$(TargetDir)resources.pri"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(TargetDir)VoiceStudio.App.pri')" />
+  </Target>
+    <!-- Stub views compile normally (stubs are minimal but valid XAML) -->
+</Project>
+
+
+
+
+
+
+

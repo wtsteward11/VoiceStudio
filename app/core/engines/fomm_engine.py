@@ -925,7 +925,7 @@ class FOMMEngine(EngineProtocol):
             raise ValueError("No frames to save")
 
         height, width = frames[0].shape[:2]
-        _fourcc_fn = getattr(cv2, "VideoWriter_fourcc")
+        _fourcc_fn = cv2.VideoWriter_fourcc
         fourcc = _fourcc_fn(*"mp4v")
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 

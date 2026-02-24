@@ -132,7 +132,7 @@ public class MultiMonitorManager
         }
         catch (Exception ex)
         {
-            System.Diagnostics.ErrorLogger.LogWarning($"[MultiMonitor] Failed to detect displays: {ex.Message}", "MultiMonitorManager");
+            ErrorLogger.LogWarning($"[MultiMonitor] Failed to detect displays: {ex.Message}", "MultiMonitorManager");
             
             // Add a default display entry
             _displays.Add(new DisplayInfo

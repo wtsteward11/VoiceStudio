@@ -103,7 +103,7 @@ def _ensure_torchaudio_load_fallback() -> None:
                 audio = audio.T
             return torch.from_numpy(audio), sample_rate
 
-    setattr(load_with_fallback, "_voicestudio_fallback", True)
+    load_with_fallback._voicestudio_fallback = True
     torchaudio.load = load_with_fallback
 
 
@@ -1050,7 +1050,9 @@ class XTTSEngine(EngineProtocol):
         if isinstance(speaker_wav, (str, Path)):
             speaker_wav_list = [speaker_wav]
         else:
-            speaker_wav_list = list(speaker_wav) if hasattr(speaker_wav, '__iter__') else [speaker_wav]
+            speaker_wav_list = (
+                list(speaker_wav) if hasattr(speaker_wav, "__iter__") else [speaker_wav]
+            )
 
         # Process in batches for better memory management
         if batch_size > 1 and len(texts) > batch_size:

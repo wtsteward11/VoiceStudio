@@ -310,7 +310,9 @@ async def send_full_sync(websocket: WebSocket, request_id: str | None = None) ->
 
         all_statuses = []
         for plugin_info in plugins:
-            status = _create_plugin_status(plugin_info.manifest.plugin_id, plugin_info.manifest, plugin_service)
+            status = _create_plugin_status(
+                plugin_info.manifest.plugin_id, plugin_info.manifest, plugin_service
+            )
             all_statuses.append(status)
 
         message = create_plugin_sync_message(

@@ -551,17 +551,17 @@ namespace VoiceStudio.App.ViewModels
 
         private void OnInstallStarted(object? sender, CoreModels.PluginInfo e)
         {
-            System.Diagnostics.ErrorLogger.LogDebug($"[PluginGallery] Install started: {e.Name}", "PluginGalleryViewModel");
+            ErrorLogger.LogDebug($"[PluginGallery] Install started: {e.Name}", "PluginGalleryViewModel");
         }
 
         private void OnInstallCompleted(object? sender, CoreModels.PluginInstallResult e)
         {
-            System.Diagnostics.ErrorLogger.LogInfo($"[PluginGallery] Install completed: {e.Success}", "PluginGalleryViewModel");
+            ErrorLogger.LogInfo($"[PluginGallery] Install completed: {e.Success}", "PluginGalleryViewModel");
         }
 
         private void OnCatalogRefreshed(object? sender, EventArgs e)
         {
-            System.Diagnostics.ErrorLogger.LogDebug("[PluginGallery] Catalog refreshed", "PluginGalleryViewModel");
+            ErrorLogger.LogDebug("[PluginGallery] Catalog refreshed", "PluginGalleryViewModel");
         }
 
         #endregion

@@ -18,9 +18,9 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from backend.infrastructure.adapters.job_state_store import get_job_state_store
 from backend.ml.models.engine_service import get_engine_service
 
-from ...services.JobStateStore import get_job_state_store
 from ..models import ApiOk
 from ..optimization import cache_response
 
@@ -1195,7 +1195,9 @@ def _process_batch_job_sync(job_id: str) -> dict[str, Any]:
         return {"job_id": job_id, "status": "failed", "success": False, "error": str(e)}
 
 
-def generate_batch_quality_report(job_data: dict[str, Any], all_jobs: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def generate_batch_quality_report(
+    job_data: dict[str, Any], all_jobs: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     """
     Generate quality report for a batch job.
 
@@ -1225,9 +1227,7 @@ def generate_batch_quality_report(job_data: dict[str, Any], all_jobs: list[dict[
             "score": quality_score,
             "status": quality_status,
             "meets_threshold": (
-                quality_score >= quality_threshold
-                if quality_threshold is not None
-                else None
+                quality_score >= quality_threshold if quality_threshold is not None else None
             ),
         }
 

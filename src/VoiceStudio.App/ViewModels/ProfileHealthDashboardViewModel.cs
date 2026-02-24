@@ -167,7 +167,7 @@ namespace VoiceStudio.App.ViewModels
           catch (Exception ex)
           {
             // Log error but continue with other profiles
-            System.Diagnostics.ErrorLogger.LogWarning($"Error checking health for profile {profile.Id}: {ex.Message}", "ProfileHealthDashboardViewModel");
+            ErrorLogger.LogWarning($"Error checking health for profile {profile.Id}: {ex.Message}", "ProfileHealthDashboardViewModel");
             healthItem.HealthStatus = HealthStatus.Unknown;
           }
 

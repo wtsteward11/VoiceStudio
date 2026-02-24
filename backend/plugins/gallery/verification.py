@@ -900,9 +900,7 @@ class PluginVerificationService:
             audit_db.parent.mkdir(parents=True, exist_ok=True)
             audit_logger = AuditLogger(db_path=audit_db)
 
-            checks_passed = len(
-                [c for c in result.checks if c.status == VerificationStatus.PASSED]
-            )
+            checks_passed = len([c for c in result.checks if c.status == VerificationStatus.PASSED])
             reason = (
                 f"level={result.level.value} passed={checks_passed} "
                 f"failed={len(result.failed_checks)} warnings={len(result.warnings)}"

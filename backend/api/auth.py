@@ -396,7 +396,9 @@ class JWTManager:
     def verify_token(self, token: str) -> dict[str, Any] | None:
         """Verify and decode a JWT token."""
         try:
-            payload: dict[str, Any] = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            payload: dict[str, Any] = jwt.decode(
+                token, self.secret_key, algorithms=[self.algorithm]
+            )
             return payload
         except PyJWTError as e:
             logger.warning(f"JWT verification failed: {e}")

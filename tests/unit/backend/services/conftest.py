@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from backend.services.plugin_service_testing import PluginServiceStub
+from backend.plugins.plugin_service_testing import PluginServiceStub
 
 # ---------------------------------------------------------------------------
 # Deterministic audio fixtures

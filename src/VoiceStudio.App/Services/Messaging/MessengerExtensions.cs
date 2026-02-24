@@ -73,7 +73,7 @@ namespace VoiceStudio.App.Services.Messaging
           catch (Exception ex)
           {
             // Log the exception - in production this should use the error logging service
-            System.Diagnostics.ErrorLogger.LogWarning($"[AppMessenger] Async handler error: {ex.Message}", "MessengerExtensions");
+            ErrorLogger.LogWarning($"[AppMessenger] Async handler error: {ex.Message}", "MessengerExtensions");
           }
         });
       });
@@ -112,7 +112,7 @@ namespace VoiceStudio.App.Services.Messaging
           }
           catch (Exception ex)
           {
-            System.Diagnostics.ErrorLogger.LogWarning($"[AppMessenger] Async handler error: {ex.Message}", "MessengerExtensions");
+            ErrorLogger.LogWarning($"[AppMessenger] Async handler error: {ex.Message}", "MessengerExtensions");
           }
         }, cancellationToken);
       });

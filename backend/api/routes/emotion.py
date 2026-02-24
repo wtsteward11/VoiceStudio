@@ -35,6 +35,7 @@ def _scalar_float(value: Any, default: float = 0.0) -> float:
         return float(value[0]) if value else default
     return default
 
+
 router = APIRouter(prefix="/api/emotion", tags=["emotion"])
 
 # In-memory storage for emotion presets (replace with database in production)

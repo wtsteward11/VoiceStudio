@@ -67,7 +67,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Failed to update tag: {ex.Message}", "TagOrganizationViewModel");
+        ErrorLogger.LogWarning($"Failed to update tag: {ex.Message}", "TagOrganizationViewModel");
       }
     }
 
@@ -133,7 +133,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Error refreshing tags: {ex.Message}", "TagOrganizationViewModel");
+        ErrorLogger.LogWarning($"Error refreshing tags: {ex.Message}", "TagOrganizationViewModel");
       }
     }
 

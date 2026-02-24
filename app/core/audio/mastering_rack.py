@@ -439,7 +439,9 @@ class MasteringRack:
         dithered = audio + dither
 
         # Quantize
-        quantized: np.ndarray = np.round(dithered * (2.0 ** (bit_depth - 1))) / (2.0 ** (bit_depth - 1))
+        quantized: np.ndarray = np.round(dithered * (2.0 ** (bit_depth - 1))) / (
+            2.0 ** (bit_depth - 1)
+        )
 
         return quantized
 

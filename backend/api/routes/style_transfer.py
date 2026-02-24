@@ -30,6 +30,7 @@ def _scalar_float(value: Any, default: float = 0.0) -> float:
         return float(value[0]) if value else default
     return default
 
+
 router = APIRouter(prefix="/api/style-transfer", tags=["style-transfer"])
 
 # In-memory style transfer jobs (replace with database in production)

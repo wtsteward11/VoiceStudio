@@ -446,7 +446,9 @@ async def get_tag_usage(tag_id: str):
             )
 
     # Query projects that might use this tag (via profiles)
-    _projects_ref: Any = getattr(__import__("backend.api.routes.projects", fromlist=["_projects"]), "_projects", {})
+    _projects_ref: Any = getattr(
+        __import__("backend.api.routes.projects", fromlist=["_projects"]), "_projects", {}
+    )
 
     for project_id, project in _projects_ref.items():
         # Check if any profile in the project uses this tag

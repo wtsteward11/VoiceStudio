@@ -1,7 +1,7 @@
 from __future__ import annotations
-from typing import Any
 
 import os
+from typing import Any
 
 import PyPDF2
 from mcp.server.fastmcp import FastMCP

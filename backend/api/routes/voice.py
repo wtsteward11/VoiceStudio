@@ -38,8 +38,9 @@ try:
     import httpx
 
     HAS_HTTPX = True
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional httpx
     pass
+from backend.ml.models.engine_service import IEngineService, get_engine_service
 from fastapi import (
     APIRouter,
     Depends,
@@ -53,16 +54,17 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 
+from backend.audio.processing.audio_artifact_registry import get_audio_registry
+from backend.audio.processing.content_addressed_audio_cache import get_audio_cache
+from backend.core.circuit_breaker import (
+    get_engine_breaker,
+)
 from backend.core.security.file_validation import (
     FileCategory,
     FileValidationError,
     validate_audio_file,
     validate_media_for_audio_extraction,
 )
-from backend.core.circuit_breaker import (
-    get_engine_breaker,
-)
-from backend.ml.models.engine_service import IEngineService, get_engine_service
 from backend.ml.models.model_preflight import (
     PreflightError,
     ensure_piper,
@@ -71,8 +73,6 @@ from backend.ml.models.model_preflight import (
 )
 from backend.platform.config.unified_config import get_config
 
-from ...services.AudioArtifactRegistry import get_audio_registry
-from ...services.ContentAddressedAudioCache import get_audio_cache
 from ..deps import (
     EngineConfigServiceDep,
     EngineServiceDep,
@@ -963,7 +963,7 @@ def _extract_quality_metrics(
 @router.post("/synthesize", response_model=VoiceSynthesizeResponse)
 async def synthesize(
     req: VoiceSynthesizeRequest,
-    request: Request | None = None,
+    request: Request,
     config_service: EngineConfigServiceDep | None = None,
 ) -> VoiceSynthesizeResponse:
     """
@@ -977,7 +977,7 @@ async def synthesize(
     _ensure_engine_router()
 
     # Get request ID from middleware
-    request_id = getattr(request.state, "request_id", None) if request else None
+    request_id = getattr(request.state, "request_id", None)
 
     # Select default engine if not specified (XTTS -> Piper -> eSpeak fallback)
     if not req.engine or not req.engine.strip():
@@ -1523,7 +1523,7 @@ async def synthesize(
 @router.post("/synthesize/multipass", response_model=MultiPassSynthesisResponse)
 async def synthesize_multipass(
     req: MultiPassSynthesisRequest,
-    request: Request | None = None,
+    request: Request,
 ) -> MultiPassSynthesisResponse:
     """
     Multi-pass synthesis with quality refinement (IDEA 61).
@@ -2815,7 +2815,7 @@ async def post_process_pipeline(
                     import cv2
                     import numpy as np
 
-                    _fourcc_fn: Any = getattr(cv2, "VideoWriter_fourcc")
+                    _fourcc_fn: Any = cv2.VideoWriter_fourcc
                     processed_video_path = video_path
                     stages_applied = []
                     total_quality_improvement = 0.0

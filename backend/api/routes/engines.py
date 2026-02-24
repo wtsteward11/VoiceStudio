@@ -11,10 +11,10 @@ import contextlib
 import logging
 from typing import Any
 
+from backend.ml.models.engine_service import IEngineService, get_engine_service
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from backend.ml.models.engine_service import IEngineService, get_engine_service
 from backend.ml.models.model_preflight import run_preflight
 
 from ..optimization import cache_response

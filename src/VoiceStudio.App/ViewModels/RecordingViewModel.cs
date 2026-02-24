@@ -313,7 +313,7 @@ namespace VoiceStudio.App.ViewModels
           }
           catch (Exception deleteEx)
           {
-            System.Diagnostics.ErrorLogger.LogWarning($"Failed to delete cancelled recording: {deleteEx.Message}", "RecordingViewModel");
+            ErrorLogger.LogWarning($"Failed to delete cancelled recording: {deleteEx.Message}", "RecordingViewModel");
           }
         }
 

@@ -90,7 +90,7 @@ namespace VoiceStudio.App.Services
         {
           // Log error but continue loading other plugins
           var errorMessage = $"Failed to load plugin from {pluginDir}: {ex.Message}";
-          System.Diagnostics.ErrorLogger.LogWarning(errorMessage, "PluginManager");
+          ErrorLogger.LogWarning(errorMessage, "PluginManager");
 
           _errorLoggingService?.LogError(
               ex,
@@ -181,7 +181,7 @@ namespace VoiceStudio.App.Services
         catch (Exception ex)
         {
           var errorMessage = $"Error cleaning up plugin {plugin.Name}: {ex.Message}";
-          System.Diagnostics.ErrorLogger.LogWarning(errorMessage, "PluginManager");
+          ErrorLogger.LogWarning(errorMessage, "PluginManager");
 
           _errorLoggingService?.LogError(
               ex,

@@ -133,7 +133,7 @@ public class MacroRecorderService
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.ErrorLogger.LogWarning($"Failed to load macro {file}: {ex.Message}", "MacroRecorderService");
+                    ErrorLogger.LogWarning($"Failed to load macro {file}: {ex.Message}", "MacroRecorderService");
                 }
             }
 
@@ -141,7 +141,7 @@ public class MacroRecorderService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.ErrorLogger.LogWarning($"Failed to load macros: {ex.Message}", "MacroRecorderService");
+            ErrorLogger.LogWarning($"Failed to load macros: {ex.Message}", "MacroRecorderService");
         }
     }
 
@@ -391,7 +391,7 @@ public class MacroRecorderService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.ErrorLogger.LogWarning($"Failed to import macro: {ex.Message}", "MacroRecorderService");
+            ErrorLogger.LogWarning($"Failed to import macro: {ex.Message}", "MacroRecorderService");
         }
 
         return null;

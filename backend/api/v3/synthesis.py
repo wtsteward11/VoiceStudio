@@ -11,11 +11,10 @@ from __future__ import annotations
 import logging
 from enum import Enum
 
+from backend.ml.models.engine_service import IEngineService, get_engine_service
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-
-from backend.ml.models.engine_service import IEngineService, get_engine_service
 
 from .models import StandardResponse, success_response
 

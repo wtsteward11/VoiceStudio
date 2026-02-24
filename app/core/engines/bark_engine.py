@@ -15,7 +15,6 @@ import os
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-
 from typing import Any
 
 import numpy as np

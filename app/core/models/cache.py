@@ -322,11 +322,7 @@ class ModelCache:
             cur_mem = self.max_memory_mb
             orig_mem = self._original_max_memory_mb
             if cur_mem is not None and orig_mem is not None and cur_mem < orig_mem:
-                logger.info(
-                    f"Restoring memory limit: "
-                    f"{cur_mem:.1f}MB -> "
-                    f"{orig_mem:.1f}MB"
-                )
+                logger.info(f"Restoring memory limit: " f"{cur_mem:.1f}MB -> " f"{orig_mem:.1f}MB")
                 self.max_memory_mb = orig_mem
                 self._stats["dynamic_adjustments"] += 1
 
@@ -359,9 +355,7 @@ class ModelCache:
                 self._stats["proactive_evictions"] += 1
                 memory_usage = self._get_system_memory_usage()
                 if memory_usage is not None:
-                    logger.debug(
-                        f"Proactive eviction: {evicted_key} (usage: {memory_usage:.2%})"
-                    )
+                    logger.debug(f"Proactive eviction: {evicted_key} (usage: {memory_usage:.2%})")
             else:
                 break
 
@@ -395,8 +389,7 @@ class ModelCache:
                 memory_usage = self._get_system_memory_usage()
                 if memory_usage is not None:
                     logger.warning(
-                        f"Memory pressure eviction: {evicted_key} "
-                        f"(usage: {memory_usage:.2%})"
+                        f"Memory pressure eviction: {evicted_key} " f"(usage: {memory_usage:.2%})"
                     )
             else:
                 break

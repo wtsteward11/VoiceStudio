@@ -144,7 +144,11 @@ class KeyRotationService:
                         await self._on_expiry(key)
 
             # Check grace period
-            if key.in_grace_period and key.grace_period_ends is not None and now > key.grace_period_ends:
+            if (
+                key.in_grace_period
+                and key.grace_period_ends is not None
+                and now > key.grace_period_ends
+            ):
                 key.previous_key_hash = None
                 key.grace_period_ends = None
                 key.status = KeyStatus.ACTIVE

@@ -327,7 +327,7 @@ namespace VoiceStudio.App.Views.Panels
           }
           catch (Exception ex)
           {
-            System.Diagnostics.ErrorLogger.LogWarning($"Failed to process {file.Name}: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
+            ErrorLogger.LogWarning($"Failed to process {file.Name}: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
           }
         }
 
@@ -336,7 +336,7 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         StatusMessage = $"Error: {ex.Message}";
-        System.Diagnostics.ErrorLogger.LogWarning($"Pipeline application failed: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
+        ErrorLogger.LogWarning($"Pipeline application failed: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
       }
       finally
       {
@@ -382,7 +382,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"File selection failed: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
+        ErrorLogger.LogWarning($"File selection failed: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
       }
     }
 
@@ -460,13 +460,13 @@ namespace VoiceStudio.App.Views.Panels
             EnhancedQuality = 70.0 + (PipelineSteps.Count * 5.0);
             EnhancedQuality = Math.Min(100.0, EnhancedQuality);
             QualityImprovement = EnhancedQuality - OriginalQuality;
-            System.Diagnostics.ErrorLogger.LogWarning($"Preview API failed, using fallback: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
+            ErrorLogger.LogWarning($"Preview API failed, using fallback: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
           }
         }
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Preview failed: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
+        ErrorLogger.LogWarning($"Preview failed: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
       }
     }
   }

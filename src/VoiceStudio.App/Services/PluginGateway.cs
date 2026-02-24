@@ -112,7 +112,7 @@ namespace VoiceStudio.App.Services
             }
             catch (HttpRequestException ex)
             {
-                System.Diagnostics.ErrorLogger.LogDebug($"Plugin API unavailable: {ex.Message}", "PluginGateway");
+                ErrorLogger.LogDebug($"Plugin API unavailable: {ex.Message}", "PluginGateway");
             }
 
             // No sample data — return empty list; UI shows "No plugins available"
@@ -151,7 +151,7 @@ namespace VoiceStudio.App.Services
             }
             catch (HttpRequestException ex)
             {
-                System.Diagnostics.ErrorLogger.LogDebug($"Plugin API unavailable: {ex.Message}", "PluginGateway");
+                ErrorLogger.LogDebug($"Plugin API unavailable: {ex.Message}", "PluginGateway");
             }
 
             // No sample data — return null; UI shows "Plugin not found"
@@ -512,7 +512,7 @@ namespace VoiceStudio.App.Services
         {
             // Return empty result when API is unavailable
             // Do NOT return fake sample data to users
-            System.Diagnostics.ErrorLogger.LogDebug("Plugin catalog unavailable - returning empty results", "PluginGateway");
+            ErrorLogger.LogDebug("Plugin catalog unavailable - returning empty results", "PluginGateway");
             return new PluginSearchResult
             {
                 Plugins = new List<PluginInfo>(),

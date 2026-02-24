@@ -92,7 +92,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "DeepfakeCreatorView.xaml");
+        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "DeepfakeCreatorView.xaml");
       }
     }
 
@@ -133,7 +133,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "DeepfakeCreatorView.xaml");
+        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "DeepfakeCreatorView.xaml");
       }
     }
 

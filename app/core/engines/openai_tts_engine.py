@@ -14,6 +14,9 @@ import contextlib
 import hashlib
 import logging
 import os
+
+# Try importing requests for connection pooling
+import types
 from collections import OrderedDict
 from collections.abc import Iterator
 from pathlib import Path
@@ -22,13 +25,9 @@ from typing import Any, cast
 import numpy as np
 import numpy.typing as npt
 
-# Try importing requests for connection pooling
-import types
-
 _requests_mod: types.ModuleType | None = None
 try:
     import requests
-
     from requests.adapters import HTTPAdapter
     from urllib3.util.retry import Retry
 
@@ -407,7 +406,9 @@ class OpenAITTSEngine(EngineProtocol):
         except Exception as e:
             logger.error(f"OpenAI TTS stream synthesis failed: {e}")
 
-    def _convert_audio_to_numpy(self, audio_data: bytes, format: str) -> npt.NDArray[np.float32] | None:
+    def _convert_audio_to_numpy(
+        self, audio_data: bytes, format: str
+    ) -> npt.NDArray[np.float32] | None:
         """Convert audio bytes to numpy array."""
         try:
             import tempfile

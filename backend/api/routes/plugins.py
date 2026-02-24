@@ -7,6 +7,7 @@ and Wasm plugin execution (Phase 6A).
 
 from __future__ import annotations
 
+import importlib as _il
 import json
 import logging
 from pathlib import Path
@@ -17,8 +18,6 @@ from pydantic import BaseModel, Field
 
 from ..optimization import cache_response
 from ..plugins import get_plugin_loader
-
-import importlib as _il
 
 PLUGIN_SERVICE_AVAILABLE = False
 get_plugin_service: Any = None

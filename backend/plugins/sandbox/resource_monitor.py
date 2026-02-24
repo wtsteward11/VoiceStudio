@@ -328,11 +328,7 @@ class ResourceMonitor:
         soft_mem = self.limits.soft_memory_mb or 0
 
         # Check soft limit (warning)
-        if (
-            soft_mem
-            and current_mb > soft_mem
-            and current_mb <= max_mem
-        ):
+        if soft_mem and current_mb > soft_mem and current_mb <= max_mem:
             await self._handle_violation(
                 ViolationType.MEMORY_SOFT,
                 ViolationAction.WARN,
@@ -384,11 +380,7 @@ class ResourceMonitor:
         soft_cpu = self.limits.soft_cpu_percent or 0
 
         # Check soft limit (warning)
-        if (
-            soft_cpu
-            and current_cpu > soft_cpu
-            and current_cpu <= max_cpu
-        ):
+        if soft_cpu and current_cpu > soft_cpu and current_cpu <= max_cpu:
             await self._handle_violation(
                 ViolationType.CPU_SOFT,
                 ViolationAction.WARN,

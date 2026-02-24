@@ -221,7 +221,7 @@ namespace VoiceStudio.App.Views.Panels
             
             // Navigate to detail view
             // This would typically use a navigation service
-            System.Diagnostics.ErrorLogger.LogDebug($"[PluginGallery] Navigate to details: {plugin.Name}", "PluginGalleryView.xaml");
+            ErrorLogger.LogDebug($"[PluginGallery] Navigate to details: {plugin.Name}", "PluginGalleryView.xaml");
         }
 
         // GAP-B18: PrevPageButton_Click - Removed, now using Command binding in XAML

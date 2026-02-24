@@ -144,7 +144,7 @@ namespace VoiceStudio.App.Views.Panels
         }
         catch (Exception ex)
         {
-          System.Diagnostics.ErrorLogger.LogWarning($"Failed to subscribe to playback events: {ex.Message}", "AdvancedRealTimeVisualizationViewModel");
+          ErrorLogger.LogWarning($"Failed to subscribe to playback events: {ex.Message}", "AdvancedRealTimeVisualizationViewModel");
         }
       }
     }
@@ -164,7 +164,7 @@ namespace VoiceStudio.App.Views.Panels
         }
         catch (Exception ex)
         {
-          System.Diagnostics.ErrorLogger.LogWarning($"Failed to unsubscribe from playback events: {ex.Message}", "AdvancedRealTimeVisualizationViewModel");
+          ErrorLogger.LogWarning($"Failed to unsubscribe from playback events: {ex.Message}", "AdvancedRealTimeVisualizationViewModel");
         }
       }
     }

@@ -13,8 +13,6 @@ Compatible with:
 
 from __future__ import annotations
 
-from typing import Any
-
 import hashlib
 import json
 import logging
@@ -22,6 +20,7 @@ import os
 import time
 from collections import OrderedDict
 from pathlib import Path
+from typing import Any
 
 import torch
 from PIL import Image

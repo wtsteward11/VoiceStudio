@@ -5,13 +5,13 @@ Task 2.4.4: Auto-detect and protect PII.
 Detects and redacts personally identifiable information.
 """
 
-from typing import Any
 from __future__ import annotations
 
 import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

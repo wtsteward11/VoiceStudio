@@ -650,7 +650,7 @@ public partial class SynthesisViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            System.Diagnostics.ErrorLogger.LogWarning($"Error selecting voice profile: {ex.Message}", "SynthesisViewModel");
+            ErrorLogger.LogWarning($"Error selecting voice profile: {ex.Message}", "SynthesisViewModel");
             ErrorMessage = $"Failed to select voice profile: {ex.Message}";
         }
     }
@@ -679,7 +679,7 @@ public partial class SynthesisViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            System.Diagnostics.ErrorLogger.LogWarning($"Error loading voice profile: {ex.Message}", "SynthesisViewModel");
+            ErrorLogger.LogWarning($"Error loading voice profile: {ex.Message}", "SynthesisViewModel");
             ErrorMessage = $"Failed to load voice profile: {ex.Message}";
         }
     }

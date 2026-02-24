@@ -148,7 +148,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "ImageGenView.xaml");
+        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "ImageGenView.xaml");
       }
     }
 

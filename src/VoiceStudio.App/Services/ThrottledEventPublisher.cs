@@ -262,11 +262,11 @@ namespace VoiceStudio.App.Services
         catch (OperationCanceledException)
         {
           // Expected when cancelled - trailing edge processing stopped
-          System.Diagnostics.ErrorLogger.LogDebug("[ThrottledEventPublisher] Trailing publish cancelled (expected during disposal)", "ThrottledEventPublisher");
+          ErrorLogger.LogDebug("[ThrottledEventPublisher] Trailing publish cancelled (expected during disposal)", "ThrottledEventPublisher");
         }
         catch (Exception ex)
         {
-          System.Diagnostics.ErrorLogger.LogWarning($"[ThrottledEventPublisher] Error in trailing publish: {ex.Message}", "ThrottledEventPublisher");
+          ErrorLogger.LogWarning($"[ThrottledEventPublisher] Error in trailing publish: {ex.Message}", "ThrottledEventPublisher");
         }
       }, token);
     }

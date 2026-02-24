@@ -213,9 +213,7 @@ class AutoTrainer:
                                 mos_score = calculate_mos_score(synthesized_audio)
 
                                 if similarity is not None and mos_score is not None:
-                                    quality_score = (similarity * 0.6) + (
-                                        (mos_score / 5.0) * 0.4
-                                    )
+                                    quality_score = (similarity * 0.6) + ((mos_score / 5.0) * 0.4)
                                     quality_score = max(0.0, min(1.0, quality_score))
 
                                     logger.info(

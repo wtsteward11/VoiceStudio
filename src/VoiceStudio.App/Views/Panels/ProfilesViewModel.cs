@@ -366,7 +366,7 @@ namespace VoiceStudio.App.Views.Panels
       if (evt.SourcePanelId == PanelId)
         return;
 
-      System.Diagnostics.ErrorLogger.LogDebug($"[ProfilesViewModel] ProfileCreatedEvent received from {evt.SourcePanelId}: {evt.ProfileId}", "ProfilesViewModel");
+      ErrorLogger.LogDebug($"[ProfilesViewModel] ProfileCreatedEvent received from {evt.SourcePanelId}: {evt.ProfileId}", "ProfilesViewModel");
 
       // GAP-I15: Refresh profile list on the UI thread using disposal token
       Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()?.TryEnqueue(async () =>
@@ -2162,7 +2162,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Failed to get ProfilesViewModel state: {ex.Message}", "ProfilesViewModel");
+        ErrorLogger.LogWarning($"Failed to get ProfilesViewModel state: {ex.Message}", "ProfilesViewModel");
         return null;
       }
     }
@@ -2211,7 +2211,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Failed to restore ProfilesViewModel state: {ex.Message}", "ProfilesViewModel");
+        ErrorLogger.LogWarning($"Failed to restore ProfilesViewModel state: {ex.Message}", "ProfilesViewModel");
       }
     }
 

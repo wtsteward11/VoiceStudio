@@ -217,7 +217,9 @@ class EnhancedEnsembleRouter:
                         )
                         engine_qualities[engine_name] = quality
                         raw_score = quality.get("overall_quality_score", 0.0)
-                        quality_score = float(raw_score) if isinstance(raw_score, (int, float)) else 0.0
+                        quality_score = (
+                            float(raw_score) if isinstance(raw_score, (int, float)) else 0.0
+                        )
                         if quality_score < quality_threshold:
                             logger.warning(
                                 f"Engine {engine_name} quality {quality_score:.3f} below threshold {quality_threshold}"

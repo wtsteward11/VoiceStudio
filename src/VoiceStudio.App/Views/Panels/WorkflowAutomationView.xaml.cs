@@ -185,7 +185,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "WorkflowAutomationView.xaml");
+        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "WorkflowAutomationView.xaml");
       }
     }
 
@@ -224,7 +224,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        System.Diagnostics.ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "WorkflowAutomationView.xaml");
+        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "WorkflowAutomationView.xaml");
       }
     }
 

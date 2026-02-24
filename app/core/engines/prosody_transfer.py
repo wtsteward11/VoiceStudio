@@ -160,11 +160,13 @@ class ProsodyExtractor:
         try:
             import librosa
 
-            return np.asarray(librosa.feature.rms(
-                y=audio,
-                frame_length=self._frame_size,
-                hop_length=self._hop_size,
-            )[0])
+            return np.asarray(
+                librosa.feature.rms(
+                    y=audio,
+                    frame_length=self._frame_size,
+                    hop_length=self._hop_size,
+                )[0]
+            )
         except ImportError:
             logger.debug(
                 "librosa not available for RMS extraction, using fallback manual calculation"

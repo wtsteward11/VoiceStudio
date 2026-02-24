@@ -14,14 +14,14 @@ import uuid
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
+from backend.core.circuit_breaker import (
+    CircuitBreakerOpenError,
+    get_engine_breaker,
+)
 from backend.core.security.file_validation import (
     FileValidationError,
     validate_audio_file,
     validate_video_file,
-)
-from backend.core.circuit_breaker import (
-    CircuitBreakerOpenError,
-    get_engine_breaker,
 )
 from backend.ml.models.engine_service import get_engine_service
 
@@ -422,7 +422,7 @@ async def enhance_temporal_consistency(
 
                 # Re-read video and apply smoothing
                 cap = cv2.VideoCapture(video_path)
-                fourcc: int = getattr(cv2, "VideoWriter_fourcc")(*"mp4v")
+                fourcc: int = cv2.VideoWriter_fourcc(*"mp4v")
                 out = cv2.VideoWriter(
                     output_path,
                     fourcc,

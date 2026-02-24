@@ -45,9 +45,10 @@ HAS_LIBROSA = False
 librosa: Any = None
 try:
     import librosa as _librosa_mod
+
     librosa = _librosa_mod
     HAS_LIBROSA = True
-except ImportError:
+except ImportError:  # ALLOWED: bare except - optional librosa
     pass
 
 router = APIRouter(prefix="/api/embedding-explorer", tags=["embedding-explorer"])

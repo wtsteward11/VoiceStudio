@@ -170,7 +170,9 @@ class CorrelationLoggerAdapter(logging.LoggerAdapter):
         adapter.info("Processing")  # Includes correlation_id
     """
 
-    def process(self, msg: str, kwargs: MutableMapping[str, Any]) -> tuple[str, MutableMapping[str, Any]]:
+    def process(
+        self, msg: str, kwargs: MutableMapping[str, Any]
+    ) -> tuple[str, MutableMapping[str, Any]]:
         """Process log message to include correlation ID."""
         correlation_id = get_current_correlation_id()
 

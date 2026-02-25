@@ -72,6 +72,7 @@ namespace VoiceStudio.App.Views.Panels
       DeletePresetCommand = new AsyncRelayCommand(DeletePresetAsync, () => SelectedPreset != null);
       PreviewPresetCommand = new AsyncRelayCommand(PreviewPresetAsync, () => !string.IsNullOrWhiteSpace(PreviewText));
       ApplyToSynthesisCommand = new RelayCommand(ApplyToSynthesis, () => SelectedPreset != null);
+      AddEmotionCommand = new RelayCommand<string>(emotion => { if (!string.IsNullOrEmpty(emotion)) AddEmotion(emotion); });
 
       _ = LoadPresetsAsync();
     }
@@ -81,6 +82,7 @@ namespace VoiceStudio.App.Views.Panels
     public IAsyncRelayCommand DeletePresetCommand { get; }
     public IAsyncRelayCommand PreviewPresetCommand { get; }
     public IRelayCommand ApplyToSynthesisCommand { get; }
+    public RelayCommand<string> AddEmotionCommand { get; }
 
     partial void OnPresetNameChanged(string value)
     {

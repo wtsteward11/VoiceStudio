@@ -134,6 +134,10 @@ namespace VoiceStudio.App.Views.Panels
         await DeleteTranscriptionAsync(transcription, ct);
       }, t => t != null && !IsLoading);
 
+      CancelTranscriptionCommand = new RelayCommand(
+          () => (TranscribeCommand as EnhancedAsyncRelayCommand)?.Cancel(),
+          () => TranscribeCommand.IsRunning);
+
       // Multi-select commands
       SelectAllTranscriptionsCommand = new RelayCommand(SelectAllTranscriptions, () => Transcriptions?.Count > 0);
       ClearTranscriptionSelectionCommand = new RelayCommand(ClearTranscriptionSelection);
@@ -165,6 +169,8 @@ namespace VoiceStudio.App.Views.Panels
     // Multi-select commands
     public IRelayCommand SelectAllTranscriptionsCommand { get; }
     public IRelayCommand ClearTranscriptionSelectionCommand { get; }
+
+    public IRelayCommand CancelTranscriptionCommand { get; }
 
     /// <summary>Send selected transcription to Timeline as a subtitle track.</summary>
     public IRelayCommand SendToTimelineCommand { get; }

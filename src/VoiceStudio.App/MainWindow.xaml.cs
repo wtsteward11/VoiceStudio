@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using CommunityToolkit.Mvvm.Input;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.App.Views;
 using VoiceStudio.App.Services;
@@ -36,6 +37,7 @@ namespace VoiceStudio.App
     private readonly PanelStateService? _panelStateService;
     private readonly RecentProjectsService? _recentProjectsService;
     private readonly CommandRouter? _commandRouter;
+    public StatusBarViewModel StatusBar { get; } = new();
     private const string ShowWelcomeKey = "ShowWelcomeDialog";
     private bool _disposed;
     private bool _welcomeDialogShown;
@@ -125,6 +127,7 @@ namespace VoiceStudio.App
       using var profiler = PerformanceProfiler.Start("MainWindow Construction");
       profiler.Checkpoint("Start");
 
+      InitializeNavigateCommand();
       this.InitializeComponent();
       profiler.Checkpoint("InitializeComponent");
 
@@ -381,11 +384,46 @@ namespace VoiceStudio.App
     /// <summary>
     /// Executes a navigation command via CommandRouter, falling back to direct panel switch if unavailable.
     /// </summary>
+    public RelayCommand<string> NavigateCommand { get; private set; } = null!;
+
+    private void InitializeNavigateCommand()
+    {
+      NavigateCommand = new RelayCommand<string>(ExecuteNavigate);
+    }
+
+    private void ExecuteNavigate(string? target)
+    {
+      if (string.IsNullOrEmpty(target)) return;
+
+      try
+      {
+        var navMap = new Dictionary<string, (string commandId, string panel, PanelRegion region, Func<UserControl> factory, string button)>
+        {
+          ["Studio"] = ("nav.studio", "Timeline", PanelRegion.Center, () => new TimelineView(), "NavStudio"),
+          ["Profiles"] = ("nav.profiles", "Profiles", PanelRegion.Left, () => new ProfilesView(), "NavProfiles"),
+          ["Library"] = ("nav.library", "Library", PanelRegion.Left, () => new LibraryView(), "NavLibrary"),
+          ["Effects"] = ("nav.effects", "Effects Mixer", PanelRegion.Right, () => new EffectsMixerView(), "NavEffects"),
+          ["Train"] = ("nav.train", "Training", PanelRegion.Left, () => new TrainingView(), "NavTrain"),
+          ["Analyze"] = ("nav.analyze", "Analyzer", PanelRegion.Right, () => new AnalyzerView(), "NavAnalyze"),
+          ["Settings"] = ("nav.settings", "Settings", PanelRegion.Right, () => new SettingsView(), "NavSettings"),
+          ["Logs"] = ("nav.logs", "Diagnostics", PanelRegion.Bottom, () => new DiagnosticsView(), "NavLogs"),
+        };
+
+        if (navMap.TryGetValue(target, out var nav))
+        {
+          ExecuteNavCommand(nav.commandId, nav.panel, nav.region, nav.factory, nav.button);
+        }
+      }
+      catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"NavigateCommand({target}) EXCEPTION: {ex}", "MainWindow");
+      }
+    }
+
     private void ExecuteNavCommand(string commandId, string fallbackPanel, PanelRegion fallbackRegion, Func<UserControl> fallbackFactory, string buttonName)
     {
       if (_commandRouter != null)
       {
-        // Use CommandRouter for unified command execution
         _commandRouter.ExecuteFireAndForget(commandId);
         ErrorLogger.LogDebug($"Nav command executed via CommandRouter: {commandId}", "MainWindow");
       }
@@ -397,59 +435,14 @@ namespace VoiceStudio.App
       }
     }
 
-    private void NavStudio_Click(object _, RoutedEventArgs __)
-    {
-      ErrorLogger.LogDebug("NavStudio_Click fired", "MainWindow");
-      try
-      {
-        ExecuteNavCommand("nav.studio", "Timeline", PanelRegion.Center, () => new TimelineView(), "NavStudio");
-        ErrorLogger.LogDebug("NavStudio_Click completed", "MainWindow");
-      }
-      catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"NavStudio_Click EXCEPTION: {ex}", "MainWindow");
-        var diagPath = Path.Combine(
-          Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-          "VoiceStudio", "crashes", "click_diag.txt");
-        // ALLOWED: empty catch - diagnostic file write is best-effort
-        try { File.AppendAllText(diagPath, $"[{DateTime.UtcNow:O}] NavStudio_Click EXCEPTION: {ex}\n"); } catch (Exception diagEx) { ErrorLogger.LogWarning($"Click diagnostic write failed: {diagEx.Message}", "MainWindow"); }
-      }
-    }
-
-    private void NavProfiles_Click(object _, RoutedEventArgs __)
-    {
-      ExecuteNavCommand("nav.profiles", "Profiles", PanelRegion.Left, () => new ProfilesView(), "NavProfiles");
-    }
-
-    private void NavLibrary_Click(object _, RoutedEventArgs __)
-    {
-      ExecuteNavCommand("nav.library", "Library", PanelRegion.Left, () => new LibraryView(), "NavLibrary");
-    }
-
-    private void NavEffects_Click(object _, RoutedEventArgs __)
-    {
-      ExecuteNavCommand("nav.effects", "Effects Mixer", PanelRegion.Right, () => new EffectsMixerView(), "NavEffects");
-    }
-
-    private void NavTrain_Click(object _, RoutedEventArgs __)
-    {
-      ExecuteNavCommand("nav.train", "Training", PanelRegion.Left, () => new TrainingView(), "NavTrain");
-    }
-
-    private void NavAnalyze_Click(object _, RoutedEventArgs __)
-    {
-      ExecuteNavCommand("nav.analyze", "Analyzer", PanelRegion.Right, () => new AnalyzerView(), "NavAnalyze");
-    }
-
-    private void NavSettings_Click(object _, RoutedEventArgs __)
-    {
-      ExecuteNavCommand("nav.settings", "Settings", PanelRegion.Right, () => new SettingsView(), "NavSettings");
-    }
-
-    private void NavLogs_Click(object _, RoutedEventArgs __)
-    {
-      ExecuteNavCommand("nav.logs", "Diagnostics", PanelRegion.Bottom, () => new DiagnosticsView(), "NavLogs");
-    }
+    private void NavStudio_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Studio");
+    private void NavProfiles_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Profiles");
+    private void NavLibrary_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Library");
+    private void NavEffects_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Effects");
+    private void NavTrain_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Train");
+    private void NavAnalyze_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Analyze");
+    private void NavSettings_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Settings");
+    private void NavLogs_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Logs");
 
     #endregion Navigation Button Click Handlers
 
@@ -3276,6 +3269,14 @@ namespace VoiceStudio.App
         var ramText = FindNameOnContent("RamText") as Microsoft.UI.Xaml.Controls.TextBlock;
         var clockText = FindNameOnContent("ClockText") as Microsoft.UI.Xaml.Controls.TextBlock;
         var latencyText = FindNameOnContent("LatencyText") as Microsoft.UI.Xaml.Controls.TextBlock;
+
+        StatusBar.CpuPercent = _lastCpuPercent;
+        StatusBar.GpuPercent = _lastGpuPercent;
+        StatusBar.RamPercent = ramPct;
+        StatusBar.LatencyMs = _lastLatencyMs;
+        StatusBar.ClockText = DateTime.Now.ToString("HH:mm");
+        StatusBar.RunningJobCount = _lastRunningJobs;
+        StatusBar.CurrentJobProgress = _lastJobProgress >= 0 ? _lastJobProgress : 0;
 
         if (cpuText != null) cpuText.Text = $"CPU {_lastCpuPercent}%";
         if (gpuText != null) gpuText.Text = $"GPU {_lastGpuPercent}%";

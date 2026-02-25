@@ -1285,7 +1285,7 @@ namespace VoiceStudio.App.Views.Panels
       return Task.CompletedTask;
     }
 
-    private void ShowEffectProperties(Effect effect)
+    private async void ShowEffectProperties(Effect effect)
     {
       var dialog = new ContentDialog
       {
@@ -1295,7 +1295,7 @@ namespace VoiceStudio.App.Views.Panels
         XamlRoot = this.XamlRoot
       };
 
-      _ = dialog.ShowAsync();
+      await dialog.ShowAsync();
     }
 
     private UIElement CreateEffectPropertiesContent(Effect effect)

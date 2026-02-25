@@ -799,7 +799,7 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    private void ShowClipProperties(AudioClip clip)
+    private async void ShowClipProperties(AudioClip clip)
     {
       try
       {
@@ -811,7 +811,7 @@ namespace VoiceStudio.App.Views.Panels
           XamlRoot = this.XamlRoot
         };
 
-        _ = dialog.ShowAsync();
+        await dialog.ShowAsync();
       }
       catch (Exception ex)
       {

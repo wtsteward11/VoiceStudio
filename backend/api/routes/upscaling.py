@@ -48,6 +48,7 @@ class UpscalingJob(BaseModel):
     upscaled_width: int | None = None
     upscaled_height: int | None = None
     error_message: str | None = None
+    method: str | None = None
     created_at: str
     completed_at: str | None = None
 
@@ -446,6 +447,7 @@ async def _process_upscaling_job(job_id: str, file: UploadFile, request: Upscali
                     job.status = "completed"
                     job.progress = 100.0
                     job.output_file = str(output_file_path)
+                    job.method = "real_esrgan"
                     job.upscaled_width = upscaled_width
                     job.upscaled_height = upscaled_height
                     job.completed_at = datetime.utcnow().isoformat()
@@ -497,6 +499,7 @@ async def _process_upscaling_job(job_id: str, file: UploadFile, request: Upscali
                 job.status = "completed"
                 job.progress = 100.0
                 job.output_file = str(output_file_path)
+                job.method = "real_esrgan"
                 job.upscaled_width = int(width * request.scale_factor)
                 job.upscaled_height = int(height * request.scale_factor)
                 job.completed_at = datetime.utcnow().isoformat()
@@ -534,6 +537,7 @@ async def _process_upscaling_job(job_id: str, file: UploadFile, request: Upscali
                         job.status = "completed"
                         job.progress = 100.0
                         job.output_file = str(output_file_path)
+                        job.method = "pil_lanczos"
                         job.upscaled_width = new_size[0]
                         job.upscaled_height = new_size[1]
                         job.completed_at = datetime.utcnow().isoformat()

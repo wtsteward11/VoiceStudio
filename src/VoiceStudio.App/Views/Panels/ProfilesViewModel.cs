@@ -300,6 +300,14 @@ namespace VoiceStudio.App.Views.Panels
       FilteredProfiles = new ObservableCollection<VoiceProfile>();
       ClearSelectionCommand = new RelayCommand(ClearSelection);
 
+      SetFilterCommand = new RelayCommand<string>(filter => { if (filter != null) FilterMode = filter; });
+      EditSelectedProfileCommand = new RelayCommand(
+          () => { if (SelectedProfile != null) OnPropertyChanged(nameof(SelectedProfile)); },
+          () => SelectedProfile != null);
+      CloneSelectedProfileCommand = new RelayCommand(
+          () => { if (SelectedProfile != null) _ = DuplicateProfileAsync(SelectedProfile); },
+          () => SelectedProfile != null);
+
       DeleteSelectedCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("DeleteSelected");
@@ -390,6 +398,10 @@ namespace VoiceStudio.App.Views.Panels
     // Multi-select commands
     public IRelayCommand SelectAllCommand { get; }
     public IRelayCommand ClearSelectionCommand { get; }
+
+    public RelayCommand<string> SetFilterCommand { get; }
+    public RelayCommand EditSelectedProfileCommand { get; }
+    public RelayCommand CloneSelectedProfileCommand { get; }
     public EnhancedAsyncRelayCommand DeleteSelectedCommand { get; }
     // GAP-B18: Added ExportSelectedCommand for command binding pattern
     public EnhancedAsyncRelayCommand ExportSelectedCommand { get; }

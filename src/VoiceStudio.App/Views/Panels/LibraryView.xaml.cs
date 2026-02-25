@@ -598,7 +598,7 @@ namespace VoiceStudio.App.Views.Panels
           XamlRoot = this.XamlRoot
         };
 
-        _ = dialog.ShowAsync();
+        await dialog.ShowAsync();
       }
       catch (Exception ex)
       {

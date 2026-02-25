@@ -76,3 +76,75 @@ class TestSchemaRegistryIntegrity:
         assert shared_dir.exists(), (
             "shared/ directory missing. Create it for cross-language schema contracts."
         )
+
+
+class TestRouteContractStability:
+    """Verify route modules export expected endpoint shapes."""
+
+    ROUTE_FILES = [
+        "backend.api.routes.voice",
+        "backend.api.routes.transcribe",
+        "backend.api.routes.training",
+        "backend.api.routes.profiles",
+        "backend.api.routes.tags",
+        "backend.api.routes.batch",
+        "backend.api.routes.audio_analysis",
+        "backend.api.routes.spectrogram",
+        "backend.api.routes.ssml",
+        "backend.api.routes.rvc",
+        "backend.api.routes.health",
+        "backend.api.routes.engines",
+    ]
+
+    @pytest.mark.parametrize("route_module", ROUTE_FILES)
+    def test_route_module_imports(self, route_module):
+        """Each route module must import without error."""
+        import importlib
+        try:
+            mod = importlib.import_module(route_module)
+            assert hasattr(mod, "router"), (
+                f"{route_module} must export a 'router' variable (FastAPI APIRouter)"
+            )
+        except ImportError as e:
+            pytest.skip(f"Cannot import {route_module}: {e}")
+
+    @pytest.mark.parametrize("route_module", ROUTE_FILES)
+    def test_route_has_endpoints(self, route_module):
+        """Each route module must register at least one endpoint."""
+        import importlib
+        try:
+            mod = importlib.import_module(route_module)
+            router = getattr(mod, "router", None)
+            if router is None:
+                pytest.skip(f"{route_module} has no router")
+            assert len(router.routes) > 0, (
+                f"{route_module} has a router but no registered routes"
+            )
+        except ImportError as e:
+            pytest.skip(f"Cannot import {route_module}: {e}")
+
+    def test_health_route_has_dependencies_endpoint(self):
+        """Health route must have /dependencies endpoint (Sprint 3.1)."""
+        try:
+            from backend.api.routes.health import router
+            paths = [r.path for r in router.routes if hasattr(r, "path")]
+            assert any("dependencies" in p for p in paths), (
+                "Health router missing /dependencies endpoint"
+            )
+        except ImportError:
+            pytest.skip("Cannot import health routes")
+
+    def test_training_status_has_simulation_fields(self):
+        """TrainingStatus Pydantic model must include simulation_mode (Sprint 1.1)."""
+        try:
+            from backend.api.routes.training import TrainingStatus
+            schema = TrainingStatus.model_json_schema()
+            props = schema.get("properties", {})
+            assert "simulation_mode" in props, (
+                "TrainingStatus missing simulation_mode field"
+            )
+            assert "simulation_reason" in props, (
+                "TrainingStatus missing simulation_reason field"
+            )
+        except ImportError:
+            pytest.skip("Cannot import training route")

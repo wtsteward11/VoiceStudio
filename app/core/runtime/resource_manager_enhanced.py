@@ -99,6 +99,10 @@ class EnhancedResourceManager(ResourceManager):
         # VRAM fragmentation tracking
         self.vram_fragmentation: float = 0.0  # 0.0 to 1.0
 
+        # VRAM allocation tracking (TD-013)
+        self._vram_allocations: dict[str, dict[str, Any]] = {}
+        self.alert_callbacks: list = []
+
         # Resource alerts
         self.resource_alerts: list[dict[str, Any]] = []
         self.alert_thresholds = {
@@ -474,6 +478,125 @@ class EnhancedResourceManager(ResourceManager):
 
         cutoff = datetime.now() - timedelta(seconds=window_seconds)
         return [usage for usage in self.resource_history if usage.timestamp >= cutoff]
+
+    def request_vram_allocation(
+        self, engine_id: str, required_vram_gb: float
+    ) -> bool:
+        """
+        Request VRAM allocation for an engine. If insufficient VRAM is available,
+        evict the least-recently-used engine to make room.
+
+        Returns True if allocation succeeded (possibly after eviction).
+        """
+        with self.lock:
+            available = self._get_available_vram_gb()
+            if available >= required_vram_gb:
+                self._vram_allocations[engine_id] = {
+                    "allocated_gb": required_vram_gb,
+                    "last_used": time.time(),
+                }
+                logger.info(
+                    f"VRAM allocated: {engine_id} = {required_vram_gb:.1f}GB "
+                    f"(available: {available - required_vram_gb:.1f}GB)"
+                )
+                return True
+
+            freed = self._evict_lru_engines(required_vram_gb - available)
+            available = self._get_available_vram_gb()
+            if available >= required_vram_gb:
+                self._vram_allocations[engine_id] = {
+                    "allocated_gb": required_vram_gb,
+                    "last_used": time.time(),
+                }
+                logger.info(
+                    f"VRAM allocated after eviction: {engine_id} = {required_vram_gb:.1f}GB "
+                    f"(freed {freed:.1f}GB)"
+                )
+                return True
+
+            logger.warning(
+                f"VRAM allocation failed: {engine_id} needs {required_vram_gb:.1f}GB, "
+                f"only {available:.1f}GB available after eviction"
+            )
+            return False
+
+    def release_vram_allocation(self, engine_id: str) -> None:
+        """Release VRAM allocation for an engine."""
+        with self.lock:
+            if engine_id in self._vram_allocations:
+                freed = self._vram_allocations[engine_id]["allocated_gb"]
+                del self._vram_allocations[engine_id]
+                logger.info(f"VRAM released: {engine_id} = {freed:.1f}GB")
+
+    def touch_engine(self, engine_id: str) -> None:
+        """Mark an engine as recently used (prevents LRU eviction)."""
+        with self.lock:
+            if engine_id in self._vram_allocations:
+                self._vram_allocations[engine_id]["last_used"] = time.time()
+
+    def _get_available_vram_gb(self) -> float:
+        """Get available VRAM in GB."""
+        try:
+            import subprocess as sp
+
+            result = sp.run(
+                ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                free_mb = float(result.stdout.strip().split("\n")[0])
+                return free_mb / 1024.0
+        except Exception:
+            pass
+        total_allocated = sum(
+            a["allocated_gb"] for a in self._vram_allocations.values()
+        )
+        return max(0.0, 8.0 - total_allocated)
+
+    def _evict_lru_engines(self, needed_gb: float) -> float:
+        """Evict least-recently-used engines until enough VRAM is freed."""
+        if not self._vram_allocations:
+            return 0.0
+
+        sorted_engines = sorted(
+            self._vram_allocations.items(),
+            key=lambda x: x[1]["last_used"],
+        )
+
+        freed = 0.0
+        evicted = []
+        for engine_id, alloc in sorted_engines:
+            if freed >= needed_gb:
+                break
+            freed += alloc["allocated_gb"]
+            evicted.append(engine_id)
+
+        for engine_id in evicted:
+            del self._vram_allocations[engine_id]
+            logger.info(f"VRAM eviction: {engine_id} evicted (LRU)")
+            for cb in self.alert_callbacks:
+                try:
+                    cb("engine_evicted", f"Engine {engine_id} evicted from GPU (LRU)", {"engine_id": engine_id})
+                except Exception:
+                    pass
+
+        return freed
+
+    def get_vram_allocation_status(self) -> dict[str, Any]:
+        """Get current VRAM allocation status."""
+        with self.lock:
+            return {
+                "allocations": {
+                    eid: {"gb": a["allocated_gb"], "last_used": a["last_used"]}
+                    for eid, a in self._vram_allocations.items()
+                },
+                "total_allocated_gb": sum(
+                    a["allocated_gb"] for a in self._vram_allocations.values()
+                ),
+                "available_gb": self._get_available_vram_gb(),
+            }
 
     def shutdown(self):
         """Shutdown enhanced resource manager."""

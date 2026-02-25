@@ -586,7 +586,7 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    private void ShowAssetProperties(object fileData, string assetName)
+    private async void ShowAssetProperties(object fileData, string assetName)
     {
       try
       {

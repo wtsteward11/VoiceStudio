@@ -11,6 +11,11 @@
     <XamlCompilerExePath>$(MSBuildThisFileDirectory)tools\xaml-compiler-wrapper.cmd</XamlCompilerExePath>
   </PropertyGroup>
 
+  <!-- NuGet lock file enforcement for CI reproducibility -->
+  <PropertyGroup Condition="'$(ContinuousIntegrationBuild)' == 'true'">
+    <RestoreLockedMode>true</RestoreLockedMode>
+  </PropertyGroup>
+
   <!-- Force WinAppSDK version to override transitive dependencies -->
   <PropertyGroup>
     <!-- Allow ad-hoc overrides (e.g., try preview/servicing without editing files) -->

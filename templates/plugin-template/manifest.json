@@ -1,0 +1,12 @@
+{
+  "id": "com.example.normalize",
+  "name": "Audio Normalizer",
+  "version": "1.0.0",
+  "author": "VoiceStudio Team",
+  "description": "Normalizes audio volume to a target level. Example plugin demonstrating the VoiceStudio Plugin SDK.",
+  "schemaVersion": 1,
+  "pluginApiVersion": "^1.0.0",
+  "entryPoint": "normalize_plugin",
+  "capabilities": ["audio_read", "audio_write"],
+  "minAppVersion": "1.0.0"
+}

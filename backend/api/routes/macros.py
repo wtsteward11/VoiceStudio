@@ -625,8 +625,37 @@ def _execute_macro_node(
         return _execute_conditional_node(node, inputs)
     elif node_type == "output":
         return _execute_output_node(node, inputs)
+    elif node_type == "mcp_tool":
+        return _execute_mcp_tool_node(node, inputs)
     else:
         raise ValueError(f"Unknown node type: {node_type}")
+
+
+def _execute_mcp_tool_node(node: MacroNode, inputs: dict[str, Any]) -> dict[str, Any]:
+    """Execute an MCP tool node by calling the MCP server."""
+    tool_name = node.properties.get("tool_name", "")
+    if not tool_name:
+        return {"error": "MCP tool node missing 'tool_name' property"}
+
+    tool_args = dict(node.properties.get("tool_arguments", {}))
+    for key, val in inputs.items():
+        if val is not None:
+            tool_args[key] = val
+
+    try:
+        import asyncio
+
+        from backend.mcp.engine_server import execute_tool
+
+        loop = asyncio.new_event_loop()
+        try:
+            result = loop.run_until_complete(execute_tool(tool_name, tool_args))
+        finally:
+            loop.close()
+        return {"output": result}
+    except Exception as e:
+        logger.error(f"MCP tool execution failed: {tool_name}: {e}")
+        return {"error": str(e), "tool": tool_name}
 
 
 def _execute_source_node(node: MacroNode, inputs: dict[str, Any]) -> dict[str, Any]:

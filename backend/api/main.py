@@ -749,6 +749,11 @@ app = FastAPI(
 app.add_event_handler("startup", startup_event)
 app.add_event_handler("shutdown", shutdown_event)
 
+# Activate Prometheus instrumentation if available (Phase 8)
+if HAS_PROMETHEUS and Instrumentator is not None:
+    Instrumentator().instrument(app).expose(app, endpoint="/api/v1/metrics/prometheus")
+    logging.getLogger(__name__).info("Prometheus instrumentation activated at /api/v1/metrics/prometheus")
+
 
 # Lazy OpenAPI schema generation - only generate when requested
 _openapi_schema_generated = False

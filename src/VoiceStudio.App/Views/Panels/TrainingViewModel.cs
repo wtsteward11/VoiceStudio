@@ -112,6 +112,12 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private bool hasMultipleTrainingJobSelection;
 
+    [ObservableProperty]
+    private bool isSimulationMode;
+
+    [ObservableProperty]
+    private string? simulationReason;
+
     // Quality monitoring (IDEA 54)
     [ObservableProperty]
     private ObservableCollection<TrainingQualityMetrics> qualityHistory = new();
@@ -559,16 +565,15 @@ namespace VoiceStudio.App.Views.Panels
           SelectedDataset = Datasets.FirstOrDefault();
         }
 
-        // Note: Register undo action - DeleteTrainingDatasetAction not implemented
-        // if (_undoRedoService != null && datasetIndex >= 0)
-        // {
-        //     var action = new DeleteTrainingDatasetAction(
-        //         Datasets,
-        //         _backendClient,
-        //         dataset,
-        //         datasetIndex);
-        //     _undoRedoService.RegisterAction(action);
-        // }
+        if (_undoRedoService != null && datasetIndex >= 0)
+        {
+            var action = new DeleteTrainingDatasetAction(
+                Datasets,
+                _backendClient,
+                dataset,
+                datasetIndex);
+            _undoRedoService.RegisterAction(action);
+        }
 
         _toastNotificationService?.ShowSuccess(
             ResourceHelper.GetString("Toast.Title.DatasetDeleted", "Dataset Deleted"),
@@ -1070,6 +1075,9 @@ namespace VoiceStudio.App.Views.Panels
           if (SelectedTrainingJob != null && (SelectedTrainingJob.Status == "running" || SelectedTrainingJob.Status == "pending"))
           {
             var updatedStatus = await _backendClient.GetTrainingStatusAsync(SelectedTrainingJob.Id, cancellationToken);
+
+            IsSimulationMode = updatedStatus.SimulationMode;
+            SimulationReason = updatedStatus.SimulationReason;
 
             // Update in collection
             var index = TrainingJobs.IndexOf(SelectedTrainingJob);

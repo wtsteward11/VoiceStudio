@@ -1,0 +1,286 @@
+{
+  "version": "1.0.0",
+  "updated": "2026-02-25",
+  "triggers": {
+    "build_failure": {
+      "patterns": [
+        "error CS", "Build FAILED", "Build failed", "exit code 1",
+        "MSB3027", "MSB3021", "MSB3030", "NETSDK",
+        "dotnet build", "msbuild", "restore failed"
+      ],
+      "skills": ["xaml-build-doctor", "roles/build-tooling", "tools/verify"],
+      "tools": [
+        "scripts/verify.ps1",
+        "scripts/build-with-binlog.ps1",
+        "scripts/analyze-binlog.ps1",
+        "scripts/build.ps1",
+        "scripts/xaml-binary-search.ps1",
+        "scripts/proactive-xaml-check.ps1"
+      ],
+      "files": [
+        "Directory.Build.props",
+        "Directory.Build.targets",
+        "src/VoiceStudio.App/VoiceStudio.App.csproj",
+        "VoiceStudio.sln",
+        "global.json"
+      ]
+    },
+    "xaml_crash": {
+      "patterns": [
+        "WMC9999", "XamlCompiler", "XBF", "XamlCompilerExecutable",
+        "exit code 1", "silent", "xaml compiler",
+        "DisableXbfGeneration", "UseXamlCompilerExecutable"
+      ],
+      "skills": ["xaml-build-doctor", "roles/build-tooling"],
+      "tools": [
+        "scripts/build-with-binlog.ps1",
+        "scripts/analyze-binlog.ps1",
+        "scripts/xaml-binary-search.ps1",
+        "scripts/proactive-xaml-check.ps1",
+        "tools/xaml-compiler-wrapper.cmd"
+      ],
+      "files": [
+        "Directory.Build.props",
+        "Directory.Build.targets",
+        "docs/developer/XAML_CHANGE_PROTOCOL.md"
+      ]
+    },
+    "test_failure": {
+      "patterns": [
+        "FAILED", "pytest", "dotnet test", "Assert", "test failed",
+        "Tests failed", "Error Message:", "Stack Trace:",
+        "Expected:", "Actual:", "xUnit", "MSTest"
+      ],
+      "skills": ["test-orchestrator", "roles/build-tooling", "tools/verify"],
+      "tools": [
+        "scripts/verify.ps1",
+        "scripts/test.ps1",
+        "scripts/run-test-pipeline.ps1",
+        "scripts/e2e.ps1"
+      ],
+      "files": [
+        "src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj",
+        "tests/"
+      ]
+    },
+    "python_lint": {
+      "patterns": [
+        "ruff", "mypy", "flake8", "pylint", "type: ignore",
+        "SyntaxError", "IndentationError", "ImportError",
+        "ModuleNotFoundError"
+      ],
+      "skills": ["coding-guidelines", "best-practices"],
+      "tools": [
+        "scripts/verify.ps1"
+      ],
+      "files": [
+        "pyproject.toml",
+        "ruff.toml",
+        "backend/",
+        "app/core/"
+      ]
+    },
+    "ui_binding": {
+      "patterns": [
+        "x:Bind", "Binding", "DataContext", "ViewModel",
+        "button", "click", "Command", "ICommand",
+        "Bindings.Update", "Mode=OneWay", "Mode=OneTime",
+        "XAML", "xaml", "panel", "view"
+      ],
+      "skills": ["roles/ui-engineer", "xaml-build-doctor", "panel-migration-worker"],
+      "tools": [
+        "scripts/proactive-xaml-check.ps1",
+        "scripts/cursor_ui_debug.ps1",
+        "scripts/preflight_ui_tests.ps1"
+      ],
+      "files": [
+        "src/VoiceStudio.App/Views/",
+        "src/VoiceStudio.App/Controls/",
+        "src/VoiceStudio.App/ViewModels/"
+      ]
+    },
+    "backend_error": {
+      "patterns": [
+        "BackendClient", "HttpRequestException", "port 8000",
+        "uvicorn", "FastAPI", "backend", "health check",
+        "connection refused", "ECONNREFUSED", "timeout",
+        "BackendUnavailableException", "BackendProcessManager"
+      ],
+      "skills": ["roles/core-platform", "roles/debug-agent", "contract-validator"],
+      "tools": [
+        "scripts/start_backend.ps1",
+        "scripts/dev-launch.ps1",
+        "scripts/trace_workflow.ps1"
+      ],
+      "files": [
+        "src/VoiceStudio.App/Services/BackendClient.cs",
+        "src/VoiceStudio.App/Services/BackendProcessManager.cs",
+        "src/VoiceStudio.App/Services/DeferredServiceInitializer.cs",
+        "backend/api/main.py",
+        "backend/api/routes/"
+      ]
+    },
+    "engine_issue": {
+      "patterns": [
+        "engine", "XTTS", "Whisper", "Bark", "RVC", "Coqui",
+        "synthesis", "transcription", "TTS", "STT",
+        "CUDA", "GPU", "VRAM", "torch", "model",
+        "inference", "vocoder", "MOS", "quality"
+      ],
+      "skills": ["audio-engine-specialist", "roles/engine-engineer", "quality-metrics"],
+      "tools": [
+        "scripts/install-engine-deps.ps1",
+        "scripts/setup_gpu_venv.ps1",
+        "scripts/setup_xtts_venv.ps1",
+        "scripts/start_xtts_service.ps1",
+        "scripts/run-benchmarks.ps1",
+        "scripts/fix_numpy_xtts.ps1"
+      ],
+      "files": [
+        "app/core/engines/",
+        "engines/",
+        "backend/services/"
+      ]
+    },
+    "security": {
+      "patterns": [
+        "API key", "secret", "credential", "token",
+        "vulnerability", "CVE", "security", "auth",
+        "password", "encryption", "PII", "OWASP"
+      ],
+      "skills": ["security-auditor", "security-best-practices", "security-threat-model"],
+      "tools": [
+        "scripts/audit_dependencies.ps1"
+      ],
+      "files": [
+        "config/api-keys.json",
+        ".env.mcp.local"
+      ]
+    },
+    "release_packaging": {
+      "patterns": [
+        "installer", "MSIX", "Inno Setup", "publish",
+        "release", "package", "deploy", "version",
+        "changelog", "sign", "certificate"
+      ],
+      "skills": ["roles/release-engineer", "tools/verify"],
+      "tools": [
+        "scripts/gatec-publish-launch.ps1",
+        "scripts/prepare-release.ps1",
+        "scripts/verify_release.ps1",
+        "scripts/generate-release-notes.ps1",
+        "scripts/update-version.ps1",
+        "scripts/validate-changelog.ps1",
+        "scripts/check-branding.ps1"
+      ],
+      "files": [
+        "installer/"
+      ]
+    },
+    "architecture_decision": {
+      "patterns": [
+        "ADR", "architecture", "boundary", "contract",
+        "interface", "schema", "design", "pattern",
+        "dependency", "layer", "module", "seam"
+      ],
+      "skills": ["roles/system-architect", "contract-validator", "coupling-analysis"],
+      "tools": [],
+      "files": [
+        "docs/architecture/decisions/",
+        "shared/",
+        "src/VoiceStudio.Core/"
+      ]
+    },
+    "debugging": {
+      "patterns": [
+        "debug", "error", "exception", "crash", "bug",
+        "null", "NullReferenceException", "stack trace",
+        "traceback", "breakpoint", "diagnostic",
+        "root cause", "investigate", "diagnose"
+      ],
+      "skills": ["roles/debug-agent", "coding-guidelines"],
+      "tools": [
+        "scripts/trace_workflow.ps1",
+        "scripts/trace_audio_workflow.ps1",
+        "scripts/cursor_ui_debug.ps1",
+        "scripts/enable-wer-localdumps.ps1"
+      ],
+      "files": [
+        ".buildlogs/",
+        ".voicestudio/traces/",
+        ".audit/"
+      ]
+    },
+    "governance": {
+      "patterns": [
+        "gate", "verification", "closure", "state",
+        "ledger", "proof", "evidence", "milestone",
+        "compliance", "audit", "overseer"
+      ],
+      "skills": ["roles/overseer", "roles/skeptical-validator", "tools/gate-status", "tools/ledger-validate", "tools/completion-guard"],
+      "tools": [
+        "scripts/verify.ps1",
+        "scripts/run_validation.ps1"
+      ],
+      "files": [
+        ".cursor/STATE.md",
+        "docs/governance/"
+      ]
+    },
+    "mcp_integration": {
+      "patterns": [
+        "MCP", "Model Context Protocol", "connector",
+        "tool server", "mcp_bridge", "JSON-RPC"
+      ],
+      "skills": ["mcp-bridge-architect"],
+      "tools": [],
+      "files": [
+        "backend/mcp_bridge/",
+        "tools/chatgpt-localfiles/"
+      ]
+    },
+    "audio_workflow": {
+      "patterns": [
+        "audio", "WAV", "waveform", "playback",
+        "recording", "NAudio", "sample rate",
+        "import audio", "export audio", "timeline"
+      ],
+      "skills": ["audio-engine-specialist", "quality-metrics"],
+      "tools": [
+        "scripts/trace_audio_workflow.ps1",
+        "scripts/setup_test_audio.ps1"
+      ],
+      "files": [
+        "src/VoiceStudio.App/Features/Waveform/",
+        "src/VoiceStudio.App/Services/AudioPlayerService.cs"
+      ]
+    },
+    "app_crash": {
+      "patterns": [
+        "UnhandledException", "crash", "access violation",
+        "exited unexpectedly", "DllNotFoundException", "XamlRoot",
+        "KERNELBASE", "stopped working", "FailFast",
+        "COMException", "startup failed", "initialization failed",
+        "cannot start", "fatal error"
+      ],
+      "skills": ["roles/debug-agent", "xaml-build-doctor", "roles/build-tooling"],
+      "tools": [
+        "scripts/enable-wer-localdumps.ps1",
+        "scripts/cursor_ui_debug.ps1",
+        "scripts/dev-launch.ps1",
+        "scripts/trace_workflow.ps1",
+        "scripts/verify.ps1"
+      ],
+      "files": [
+        "src/VoiceStudio.App/App.xaml.cs",
+        "src/VoiceStudio.App/Program.cs",
+        "src/VoiceStudio.App/Services/DeferredServiceInitializer.cs"
+      ]
+    }
+  },
+  "fallback": {
+    "skills": ["coding-guidelines", "best-practices"],
+    "tools": ["scripts/verify.ps1"],
+    "files": [".cursor/STATE.md", "AGENTS.md"]
+  }
+}

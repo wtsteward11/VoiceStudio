@@ -21,9 +21,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/lexicon", tags=["lexicon"])
 
-# In-memory lexicons (replace with database in production)
-_lexicons: dict[str, dict] = {}
-_lexicon_entries: dict[str, list[dict]] = {}  # lexicon_id -> entries
+from backend.api.routes._persistent_store import PersistentStore
+
+_lexicons: PersistentStore = PersistentStore("lexicons")
+_lexicon_entries: PersistentStore = PersistentStore("lexicon_entries")
 _state_lock = asyncio.Lock()
 
 

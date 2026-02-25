@@ -90,8 +90,9 @@ class RestoreRequest(BaseModel):
     restore_models: bool = False
 
 
-# In-memory backup metadata (replace with database in production)
-_backups: dict[str, dict] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_backups: PersistentStore = PersistentStore("backups")
 _state_lock = asyncio.Lock()
 
 # Backup limits for memory management

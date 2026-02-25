@@ -352,7 +352,7 @@ public class AccessibilityService : IUnifiedAccessibilityService
         _settings.TextScaling = _uiSettings.TextScaleFactor;
     }
 
-    private async Task LoadSettingsAsync()
+    private Task LoadSettingsAsync()
     {
         try
         {
@@ -381,13 +381,13 @@ public class AccessibilityService : IUnifiedAccessibilityService
             ErrorLogger.LogWarning($"[Accessibility] Failed to load settings: {ex.Message}", "AccessibilityService");
         }
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     /// <summary>
     /// Saves settings to persistent storage.
     /// </summary>
-    public async Task SaveSettingsAsync()
+    public Task SaveSettingsAsync()
     {
         try
         {
@@ -404,7 +404,7 @@ public class AccessibilityService : IUnifiedAccessibilityService
             ErrorLogger.LogWarning($"[Accessibility] Failed to save settings: {ex.Message}", "AccessibilityService");
         }
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     /// <summary>

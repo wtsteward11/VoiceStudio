@@ -34,7 +34,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ssml", tags=["ssml"])
 
 # In-memory SSML documents storage (replace with database in production)
-_ssml_documents: dict[str, dict] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_ssml_documents: PersistentStore = PersistentStore("ssml_documents")
 _state_lock = asyncio.Lock()
 
 

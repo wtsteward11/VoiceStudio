@@ -17,12 +17,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/emotion-style", tags=["emotion-style"])
 
 # In-memory emotion/style presets (replace with database in production)
-_emotion_presets: dict[str, dict] = {}
-_style_presets: dict[str, dict] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_emotion_presets: PersistentStore = PersistentStore("emotion_presets")
+_style_presets: PersistentStore = PersistentStore("style_presets")
 _MAX_EMOTION_PRESETS = 200  # Maximum number of emotion presets
 _MAX_STYLE_PRESETS = 200  # Maximum number of style presets
-_emotion_preset_timestamps: dict[str, float] = {}  # preset_id -> creation_time
-_style_preset_timestamps: dict[str, float] = {}  # preset_id -> creation_time
+_emotion_preset_timestamps: PersistentStore = PersistentStore("emotion_preset_timestamps")
+_style_preset_timestamps: PersistentStore = PersistentStore("style_preset_timestamps")
 _state_lock = asyncio.Lock()
 
 

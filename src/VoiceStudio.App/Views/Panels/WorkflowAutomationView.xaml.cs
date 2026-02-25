@@ -191,10 +191,42 @@ namespace VoiceStudio.App.Views.Panels
 
     private async Task ShowStepConfigurationDialog(WorkflowStep step)
     {
+      var panel = new StackPanel { Spacing = 12, MinWidth = 360 };
+
+      var nameBox = new Microsoft.UI.Xaml.Controls.TextBox
+      {
+        Header = "Step Name",
+        Text = step.Name,
+        PlaceholderText = "Enter step name"
+      };
+      panel.Children.Add(nameBox);
+
+      var typeBox = new Microsoft.UI.Xaml.Controls.ComboBox
+      {
+        Header = "Step Type",
+        ItemsSource = new[] { "synthesize", "effect", "export", "control" },
+        SelectedItem = step.Type,
+        HorizontalAlignment = HorizontalAlignment.Stretch
+      };
+      panel.Children.Add(typeBox);
+
+      var propsEditors = new Dictionary<string, Microsoft.UI.Xaml.Controls.TextBox>();
+      foreach (var prop in step.Properties)
+      {
+        var propBox = new Microsoft.UI.Xaml.Controls.TextBox
+        {
+          Header = prop.Key,
+          Text = prop.Value?.ToString() ?? "",
+          PlaceholderText = $"Value for {prop.Key}"
+        };
+        panel.Children.Add(propBox);
+        propsEditors[prop.Key] = propBox;
+      }
+
       var dialog = new Microsoft.UI.Xaml.Controls.ContentDialog
       {
         Title = $"Configure {step.Name}",
-        Content = $"Configuration for step: {step.Name}\nType: {step.Type}",
+        Content = panel,
         PrimaryButtonText = "Save",
         CloseButtonText = "Cancel",
         XamlRoot = this.XamlRoot,
@@ -204,6 +236,12 @@ namespace VoiceStudio.App.Views.Panels
       var result = await dialog.ShowAsync();
       if (result == Microsoft.UI.Xaml.Controls.ContentDialogResult.Primary)
       {
+        step.Name = nameBox.Text;
+        step.Type = typeBox.SelectedItem?.ToString() ?? step.Type;
+        foreach (var kvp in propsEditors)
+        {
+          step.Properties[kvp.Key] = kvp.Value.Text;
+        }
         ViewModel.SelectedStep = step;
       }
     }

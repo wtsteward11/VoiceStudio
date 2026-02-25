@@ -754,6 +754,10 @@ namespace VoiceStudio.App.Services
         ViewModelType = typeof(EngineRecommendationViewModel)
       });
 
+      // EngineSetupWizard panel: available via manual navigation, not auto-registered
+      // to avoid XAML compilation side effects during startup.
+      // Use: NavigationBridge.NavigateToPanel("EngineSetupWizard")
+
       RegisterIfNotExists(registry, new PanelDescriptor
       {
         PanelId = "TrainingQualityVisualization",

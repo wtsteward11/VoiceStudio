@@ -137,14 +137,46 @@ namespace VoiceStudio.App.Views.Panels
     {
       try
       {
+        var panel = new StackPanel { Spacing = 12, MinWidth = 360 };
+
+        var stepsBox = new NumberBox { Header = "Steps", Value = ViewModel.Steps, Minimum = 1, Maximum = 150, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
+        panel.Children.Add(stepsBox);
+
+        var cfgBox = new NumberBox { Header = "CFG Scale", Value = ViewModel.CfgScale, Minimum = 1, Maximum = 30, SmallChange = 0.5, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
+        panel.Children.Add(cfgBox);
+
+        var widthBox = new NumberBox { Header = "Width", Value = ViewModel.Width, Minimum = 64, Maximum = 4096, SmallChange = 64, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
+        panel.Children.Add(widthBox);
+
+        var heightBox = new NumberBox { Header = "Height", Value = ViewModel.Height, Minimum = 64, Maximum = 4096, SmallChange = 64, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
+        panel.Children.Add(heightBox);
+
+        var qualityInfo = new TextBlock
+        {
+          Text = $"Quality Metrics (read-only):\nClarity: {ViewModel.ImageClarity:F1}%  |  Detail: {ViewModel.ImageDetail:F1}%\nStyle Fidelity: {ViewModel.ImageStyleFidelity:F1}%  |  Overall: {ViewModel.ImageOverallQuality:F1}%",
+          TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
+          Opacity = 0.7
+        };
+        panel.Children.Add(qualityInfo);
+
         var dialog = new ContentDialog
         {
           Title = "Quality Settings",
-          Content = $"Current Settings:\n\nSteps: {ViewModel.Steps}\nCFG Scale: {ViewModel.CfgScale:F1}\nWidth: {ViewModel.Width}\nHeight: {ViewModel.Height}\n\nQuality Preset: {ViewModel.SelectedQualityPreset?.Name ?? "Custom"}\n\nImage Clarity: {ViewModel.ImageClarity:F1}%\nImage Detail: {ViewModel.ImageDetail:F1}%\nStyle Fidelity: {ViewModel.ImageStyleFidelity:F1}%\nOverall Quality: {ViewModel.ImageOverallQuality:F1}%",
-          PrimaryButtonText = "OK",
-          XamlRoot = this.XamlRoot
+          Content = panel,
+          PrimaryButtonText = "Apply",
+          CloseButtonText = "Cancel",
+          XamlRoot = this.XamlRoot,
+          DefaultButton = ContentDialogButton.Primary
         };
-        await dialog.ShowAsync();
+
+        var result = await dialog.ShowAsync();
+        if (result == ContentDialogResult.Primary)
+        {
+          ViewModel.Steps = (int)stepsBox.Value;
+          ViewModel.CfgScale = cfgBox.Value;
+          ViewModel.Width = (int)widthBox.Value;
+          ViewModel.Height = (int)heightBox.Value;
+        }
       }
       catch (Exception ex)
       {

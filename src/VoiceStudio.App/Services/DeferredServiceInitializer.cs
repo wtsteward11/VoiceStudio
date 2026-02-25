@@ -216,7 +216,23 @@ namespace VoiceStudio.App.Services
                 },
                 ServicePriority.Normal);
             
-            // Normal priority: Backend health check
+            // High priority: Start backend process if not already running
+            initializer.RegisterAsync(
+                "BackendAutoStart",
+                async ct =>
+                {
+                    var bpm = serviceProvider.GetService(typeof(BackendProcessManager)) as BackendProcessManager;
+                    if (bpm != null)
+                    {
+                        var started = await bpm.EnsureBackendRunningAsync(ct);
+                        ErrorLogger.LogInfo(
+                            $"[DeferredInit] Backend auto-start: {(started ? "running" : "failed")}",
+                            "DeferredServiceInitializer");
+                    }
+                },
+                ServicePriority.High);
+
+            // Normal priority: Backend health check (runs after auto-start)
             initializer.RegisterAsync(
                 "BackendHealthCheck",
                 async ct =>
@@ -226,16 +242,125 @@ namespace VoiceStudio.App.Services
                     {
                         try
                         {
-                            await backendClient.CheckHealthAsync(ct);
+                            var healthy = await backendClient.CheckHealthAsync(ct);
+                            ErrorLogger.LogInfo(
+                                $"[DeferredInit] Backend health: {(healthy ? "connected" : "unreachable")}",
+                                "DeferredServiceInitializer");
                         }
-                        // ALLOWED: empty catch - Backend may not be running yet, acceptable
-                        catch
+                        catch (Exception ex)
                         {
+                            ErrorLogger.LogWarning(
+                                $"[DeferredInit] Backend health check failed: {ex.Message}",
+                                "DeferredServiceInitializer");
                         }
                     }
                 },
                 ServicePriority.Normal);
-            
+
+            // Normal priority: Initialize EngineManager (fetches real engine list from backend)
+            initializer.RegisterAsync(
+                "EngineManagerInit",
+                async ct =>
+                {
+                    var engineManager = serviceProvider.GetService(typeof(EngineManager)) as EngineManager;
+                    if (engineManager != null)
+                    {
+                        await engineManager.InitializeAsync(ct);
+                        var count = engineManager.GetEngines().Count();
+                        ErrorLogger.LogInfo(
+                            $"[DeferredInit] EngineManager initialized: {count} engine(s) discovered",
+                            "DeferredServiceInitializer");
+
+                        if (count == 0)
+                        {
+                            ErrorLogger.LogInfo(
+                                "[DeferredInit] No engines installed. Engine Setup Wizard available via Settings > Engines.",
+                                "DeferredServiceInitializer");
+                        }
+                    }
+                },
+                ServicePriority.Normal);
+
+            // Normal priority: Ensure a default project exists and set as active (unblocks Import, Timeline, Effects)
+            initializer.RegisterAsync(
+                "DefaultProjectCheck",
+                async ct =>
+                {
+                    var backendClient = serviceProvider.GetService(typeof(IBackendClient)) as IBackendClient;
+                    if (backendClient is BackendClient client)
+                    {
+                        try
+                        {
+                            var projects = await client.GetProjectsAsync(ct);
+                            VoiceStudio.Core.Models.Project? activeProject = null;
+
+                            if (projects == null || projects.Count == 0)
+                            {
+                                activeProject = await client.CreateProjectAsync("My Project", "Default project created automatically", ct);
+                                ErrorLogger.LogInfo(
+                                    $"[DeferredInit] Default project created: {activeProject?.Id ?? "unknown"}",
+                                    "DeferredServiceInitializer");
+                            }
+                            else
+                            {
+                                activeProject = projects[0];
+                                ErrorLogger.LogInfo(
+                                    $"[DeferredInit] Found {projects.Count} existing project(s), using: {activeProject.Name}",
+                                    "DeferredServiceInitializer");
+                            }
+
+                            if (activeProject != null)
+                            {
+                                var bootstrapper = VoiceStudio.App.Commands.CommandHandlerBootstrapper.Instance;
+                                if (bootstrapper?.FileHandler != null)
+                                {
+                                    bootstrapper.FileHandler.SetActiveProject(activeProject);
+                                    ErrorLogger.LogInfo(
+                                        $"[DeferredInit] Active project set: {activeProject.Name}",
+                                        "DeferredServiceInitializer");
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            ErrorLogger.LogWarning(
+                                $"[DeferredInit] Project check failed: {ex.Message}",
+                                "DeferredServiceInitializer");
+                        }
+                    }
+                },
+                ServicePriority.Normal);
+
+            // Low priority: Start backend connection monitor (polls health, fires Connected/Disconnected events)
+            initializer.RegisterAsync(
+                "BackendConnectionMonitor",
+                async ct =>
+                {
+                    var monitor = serviceProvider.GetService(typeof(BackendConnectionMonitor)) as BackendConnectionMonitor;
+                    if (monitor != null)
+                    {
+                        monitor.StartMonitoring();
+                        ErrorLogger.LogInfo("[DeferredInit] Backend connection monitor started", "DeferredServiceInitializer");
+                    }
+                    await Task.CompletedTask;
+                },
+                ServicePriority.Low);
+
+            // Low priority: Start status bar activity monitoring
+            initializer.RegisterAsync(
+                "StatusBarActivityMonitor",
+                async ct =>
+                {
+                    var activityService = serviceProvider.GetService(typeof(StatusBarActivityService)) as StatusBarActivityService;
+                    if (activityService != null)
+                    {
+                        activityService.StartMonitoring();
+                        ErrorLogger.LogInfo("[DeferredInit] Status bar activity monitor started", "DeferredServiceInitializer");
+                    }
+                    await Task.CompletedTask;
+                },
+                ServicePriority.Low);
+
             return initializer;
         }
     }

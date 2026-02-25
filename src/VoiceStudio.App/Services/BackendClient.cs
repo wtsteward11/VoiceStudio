@@ -223,8 +223,8 @@ namespace VoiceStudio.App.Services
     private const int MaxRetries = 3;
     private const int RetryDelayMs = 1000;
 
-    // Connection status tracking
-    private bool _isConnected = true;
+    // Connection status tracking — start as disconnected until first health check succeeds
+    private bool _isConnected = false;
     private DateTime _lastConnectionCheck = DateTime.MinValue;
     private const int ConnectionCheckIntervalSeconds = 5;
 

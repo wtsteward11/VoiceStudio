@@ -134,11 +134,12 @@ class AutomationCurveUpdateRequest(BaseModel):
     interpolation: str | None = None
 
 
-# In-memory storage (replace with database in production)
-_macros: dict[str, Macro] = {}  # macro_id -> Macro
-_automation_curves: dict[str, AutomationCurve] = {}  # curve_id -> AutomationCurve
-_macro_execution_status: dict[str, MacroExecutionStatus] = {}  # macro_id -> Status
-_macro_schedules: dict[str, dict[str, Any]] = {}  # macro_id -> Schedule info
+from backend.api.routes._persistent_store import PersistentStore
+
+_macros: PersistentStore = PersistentStore("macros")
+_automation_curves: PersistentStore = PersistentStore("macro_automation_curves")
+_macro_execution_status: PersistentStore = PersistentStore("macro_execution_status")
+_macro_schedules: PersistentStore = PersistentStore("macro_schedules")
 _state_lock = asyncio.Lock()
 _MAX_MACROS = 1000
 _MAX_AUTOMATION_CURVES = 2000

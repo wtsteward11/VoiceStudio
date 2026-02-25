@@ -502,6 +502,7 @@ async def startup_event():
                     "Authentication: DISABLED (local desktop mode). "
                     "Set VOICESTUDIO_REQUIRE_AUTH=true for network deployments."
                 )
+        # ALLOWED: bare except - auth_middleware is optional in local desktop mode
         except ImportError:
             pass
     except Exception as e:

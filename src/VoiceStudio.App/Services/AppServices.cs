@@ -118,6 +118,7 @@ namespace VoiceStudio.App.Services
         new CommandRouter(sp.GetRequiredService<IUnifiedCommandRegistry>()));
       services.AddSingleton<CollaborationService>();
       services.AddSingleton<BackendProcessManager>();
+      services.AddSingleton<BackendConnectionMonitor>();
       services.AddSingleton<IFeatureFlagsService, FeatureFlagsService>();
       services.AddSingleton<IErrorPresentationService, ErrorPresentationService>();
       services.AddSingleton<IAnalyticsService, AnalyticsService>();
@@ -254,6 +255,9 @@ namespace VoiceStudio.App.Services
         ErrorLogger.LogDebug("[AppServices] Warning: Could not wire command queue service", "AppServices");
       }
     }
+
+    public static IServiceProvider GetProvider() =>
+        _provider ?? throw new InvalidOperationException("AppServices not initialized. Call Initialize() first.");
 
     public static T? GetService<T>() where T : class => (T?)_provider?.GetService(typeof(T));
     public static T GetRequiredService<T>() where T : class =>

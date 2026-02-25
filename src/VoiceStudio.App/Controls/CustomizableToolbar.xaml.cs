@@ -164,21 +164,58 @@ namespace VoiceStudio.App.Controls
       var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 0, 0) };
       panel.Children.Add(new TextBlock { Text = "Engine:", Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
       var comboBox = new ComboBox { Width = 140 };
-      comboBox.Items.Add("XTTS v2");
-      comboBox.Items.Add("OpenVoice");
-      comboBox.Items.Add("RVC");
-      comboBox.Items.Add("Piper");
-      comboBox.Items.Add("Bark");
-      comboBox.SelectedIndex = 0; // Default to first engine
 
-      // Wire up selection changed to switch engines
+      try
+      {
+        var engineManager = AppServices.GetService<EngineManager>();
+        var engines = engineManager?.GetEngines().ToList();
+        if (engines != null && engines.Count > 0)
+        {
+          foreach (var engine in engines)
+          {
+            comboBox.Items.Add(engine.Name ?? engine.Id);
+          }
+        }
+        else
+        {
+          comboBox.Items.Add("XTTS v2");
+          comboBox.Items.Add("OpenVoice");
+          comboBox.Items.Add("RVC");
+          comboBox.Items.Add("Piper");
+          comboBox.Items.Add("Bark");
+        }
+      }
+      catch
+      {
+        comboBox.Items.Add("XTTS v2");
+        comboBox.Items.Add("OpenVoice");
+        comboBox.Items.Add("RVC");
+        comboBox.Items.Add("Piper");
+        comboBox.Items.Add("Bark");
+      }
+
+      comboBox.SelectedIndex = 0;
+
       comboBox.SelectionChanged += (sender, e) =>
       {
         if (sender is ComboBox cb && cb.SelectedItem is string engineName)
         {
           var toastService = ServiceProvider.TryGetToastNotificationService();
-          toastService?.ShowInfo("Engine", $"Selected: {engineName}");
-          ErrorLogger.LogDebug($"Engine switch requested: {engineName}", "CustomizableToolbar.xaml");
+          var engineManager = AppServices.GetService<EngineManager>();
+          var matchedEngine = engineManager?.GetEngines()
+              .FirstOrDefault(eng => (eng.Name ?? eng.Id) == engineName);
+
+          if (matchedEngine != null)
+          {
+            toastService?.ShowInfo($"Selected: {engineName}", "Engine");
+          }
+          else
+          {
+            toastService?.ShowWarning(
+                $"{engineName} is not available from the backend. Install engines via Settings > Engines.",
+                "Engine Unavailable");
+          }
+          ErrorLogger.LogDebug($"Engine switch requested: {engineName}, available: {matchedEngine != null}", "CustomizableToolbar.xaml");
         }
       };
 

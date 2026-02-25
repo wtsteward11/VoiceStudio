@@ -261,11 +261,9 @@ public class MacroRecorderService
             var filePath = Path.Combine(_macrosDirectory, $"{macroId}.json");
             if (File.Exists(filePath))
             {
-                File.Delete(filePath);
+                await Task.Run(() => File.Delete(filePath));
             }
         }
-
-        await Task.CompletedTask;
     }
 
     /// <summary>

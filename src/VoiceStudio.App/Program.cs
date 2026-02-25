@@ -78,6 +78,7 @@ namespace VoiceStudio.App
           Environment.SetEnvironmentVariable("VOICE_STUDIO_SMOKE_EXIT", "1");
         }
       }
+      // ALLOWED: empty catch - startup resilience, env var setup for smoke flags is non-critical
       catch
       {
         // Best effort
@@ -153,6 +154,7 @@ namespace VoiceStudio.App
             var payload = ex != null ? ex.ToString() : $"Unhandled: {evt.ExceptionObject}";
             WriteTextBestEffort(crashDir, "appdomain_unhandled", payload);
           }
+          // ALLOWED: empty catch - startup resilience, crash handler must not throw
           catch
           {
             // Best effort
@@ -166,12 +168,14 @@ namespace VoiceStudio.App
             WriteTextBestEffort(crashDir, "unobserved_task", evt.Exception.ToString());
             evt.SetObserved();
           }
+          // ALLOWED: empty catch - startup resilience, unobserved task handler must not throw
           catch
           {
             // Best effort
           }
         };
       }
+      // ALLOWED: empty catch - startup resilience, global exception handler registration is best-effort
       catch
       {
         // Best effort
@@ -201,6 +205,7 @@ namespace VoiceStudio.App
 
         File.WriteAllText(Path.Combine(crashDir, "boot_latest.json"), json);
       }
+      // ALLOWED: empty catch - startup resilience, boot diagnostic write must never prevent startup
       catch
       {
         // Best effort; this must never prevent startup.
@@ -233,6 +238,7 @@ namespace VoiceStudio.App
           Path.Combine(crashDir, "latest_startup_exception.log"),
           $"See: {logPath}");
       }
+      // ALLOWED: empty catch - startup resilience, crash log write is last-resort best-effort
       catch
       {
         // Best effort; nothing else to do.
@@ -248,6 +254,7 @@ namespace VoiceStudio.App
         var logPath = Path.Combine(crashDir, $"{prefix}_{timestamp}.log");
         File.WriteAllText(logPath, payload);
       }
+      // ALLOWED: empty catch - startup resilience, best-effort text write must not throw
       catch
       {
         // Best effort

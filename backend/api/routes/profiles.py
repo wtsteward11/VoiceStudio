@@ -114,7 +114,9 @@ class _ProfilesProxy:
 
 # Export for backward compatibility
 _profiles = _ProfilesProxy()
-_profile_timestamps: dict[str, float] = {}  # Timestamps not tracked in the new store
+from backend.api.routes._persistent_store import PersistentStore
+
+_profile_timestamps: PersistentStore = PersistentStore("profile_timestamps")
 _state_lock = asyncio.Lock()
 
 router = APIRouter(

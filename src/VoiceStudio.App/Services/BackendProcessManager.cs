@@ -127,8 +127,8 @@ public sealed class BackendProcessManager : IDisposable
             var pythonCandidates = new[]
             {
                 Path.Combine(repoRoot, "Runtime", "python", "python.exe"),
-                Path.Combine(repoRoot, "venv", "Scripts", "python.exe"),
                 Path.Combine(repoRoot, ".venv", "Scripts", "python.exe"),
+                Path.Combine(repoRoot, "venv", "Scripts", "python.exe"),
             };
 
             var venvPython = Array.Find(pythonCandidates, File.Exists);
@@ -157,6 +157,8 @@ public sealed class BackendProcessManager : IDisposable
             // Set environment
             psi.Environment["PYTHONPATH"] = repoRoot;
             psi.Environment["PYTHONUNBUFFERED"] = "1";
+            psi.Environment["COQUI_TOS_AGREED"] = "1";
+            psi.Environment["HF_HUB_DISABLE_TELEMETRY"] = "1";
 
             // Point to bundled FFmpeg if available
             var bundledFfmpeg = Path.Combine(repoRoot, "Runtime", "ffmpeg", "ffmpeg.exe");

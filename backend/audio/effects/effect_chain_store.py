@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from .json_file_store import JsonFileStore  # returns Any from get/list/etc.
+from backend.infrastructure.adapters.json_file_store import JsonFileStore
 
 logger = logging.getLogger(__name__)
 

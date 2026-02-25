@@ -308,3 +308,14 @@ class KeyRotationService:
             "auto_rotation": self.config.auto_rotation,
             "rotation_interval_days": self.config.rotation_interval_days,
         }
+
+
+_instance: KeyRotationService | None = None
+
+
+def get_key_rotation_service() -> KeyRotationService:
+    """Get or create the singleton KeyRotationService instance."""
+    global _instance
+    if _instance is None:
+        _instance = KeyRotationService()
+    return _instance

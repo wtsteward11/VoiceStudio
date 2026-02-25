@@ -391,10 +391,9 @@ namespace VoiceStudio.App
       }
       else
       {
-        // Fallback to direct panel switch
+        ErrorLogger.LogWarning($"CommandRouter unavailable for '{commandId}' — using direct panel switch fallback. DI may have failed.", "MainWindow");
         SwitchToPanel(fallbackRegion, fallbackPanel, fallbackFactory);
         SetActiveNavButton(buttonName);
-        ErrorLogger.LogDebug($"Nav fallback executed: {fallbackPanel}", "MainWindow");
       }
     }
 
@@ -803,14 +802,45 @@ namespace VoiceStudio.App
     private void WireUpStatusBarIndicators()
     {
       var activityService = ServiceProvider.TryGetStatusBarActivityService();
-      if (activityService == null)
-        return;
+      if (activityService != null)
+      {
+        activityService.ActivityStatusChanged += ActivityService_ActivityStatusChanged;
+        UpdateActivityIndicators(activityService);
+      }
 
-      // Subscribe to activity status changes
-      activityService.ActivityStatusChanged += ActivityService_ActivityStatusChanged;
+      var connectionMonitor = AppServices.GetService<BackendConnectionMonitor>();
+      if (connectionMonitor != null)
+      {
+        connectionMonitor.Connected += (_, _) =>
+        {
+          DispatcherQueue.TryEnqueue(() => UpdateBackendConnectionIndicator(true));
+        };
+        connectionMonitor.Disconnected += (_, _) =>
+        {
+          DispatcherQueue.TryEnqueue(() => UpdateBackendConnectionIndicator(false));
+        };
+      }
+    }
 
-      // Update initial state
-      UpdateActivityIndicators(activityService);
+    private void UpdateBackendConnectionIndicator(bool connected)
+    {
+      var indicator = FindNameOnContent("ProcessingIndicator") as Microsoft.UI.Xaml.Controls.Border;
+      if (indicator != null)
+      {
+        indicator.Background = connected
+            ? new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.LimeGreen)
+            : new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.OrangeRed);
+      }
+
+      var statusText = FindNameOnContent("StatusText") as Microsoft.UI.Xaml.Controls.TextBlock;
+      if (statusText != null && !connected)
+      {
+        statusText.Text = "Backend Disconnected";
+      }
+      else if (statusText != null && connected)
+      {
+        statusText.Text = "Ready";
+      }
     }
 
     /// <summary>
@@ -3174,6 +3204,19 @@ namespace VoiceStudio.App
     private int _lastCpuPercent;
     private int _lastGpuPercent;
     private int _lastLatencyMs = -1;
+    private double _lastJobProgress = -1;
+    private int _lastRunningJobs;
+
+    private sealed class JobQueueStatusDto
+    {
+      public int Running { get; set; }
+      public List<JobActiveItemDto>? ActiveJobs { get; set; }
+    }
+
+    private sealed class JobActiveItemDto
+    {
+      public double Progress { get; set; }
+    }
 
     private void StartStatusBarTimer()
     {
@@ -3240,6 +3283,38 @@ namespace VoiceStudio.App
         if (clockText != null) clockText.Text = DateTime.Now.ToString("HH:mm");
         if (latencyText != null && _lastLatencyMs >= 0) latencyText.Text = $"{_lastLatencyMs}ms";
 
+        var jobProgressBar = FindNameOnContent("JobProgressBar") as Microsoft.UI.Xaml.Controls.ProgressBar;
+        var jobStatusText = FindNameOnContent("JobStatusText") as Microsoft.UI.Xaml.Controls.TextBlock;
+
+        if (jobProgressBar != null)
+        {
+          if (_lastRunningJobs > 0 && _lastJobProgress >= 0)
+          {
+            jobProgressBar.IsIndeterminate = false;
+            jobProgressBar.Value = _lastJobProgress * 100;
+          }
+          else
+          {
+            jobProgressBar.IsIndeterminate = false;
+            jobProgressBar.Value = 0;
+          }
+        }
+
+        if (jobStatusText != null)
+        {
+          if (_lastRunningJobs > 0)
+          {
+            var pct = (int)(_lastJobProgress * 100);
+            jobStatusText.Text = _lastRunningJobs == 1
+              ? $"Running ({pct}%)"
+              : $"{_lastRunningJobs} Running ({pct}%)";
+          }
+          else
+          {
+            jobStatusText.Text = "Idle";
+          }
+        }
+
         // Async update for GPU and latency (non-blocking)
         _ = UpdateGpuAndLatencyAsync();
       }
@@ -3277,6 +3352,27 @@ namespace VoiceStudio.App
             // ALLOWED: empty catch - GPU telemetry is best-effort
             catch
             {
+            }
+
+            try
+            {
+              var jobStatus = await backendClient.GetAsync<JobQueueStatusDto>("/api/jobs/status");
+              if (jobStatus?.Running > 0 && jobStatus.ActiveJobs?.Count > 0)
+              {
+                _lastRunningJobs = jobStatus.Running;
+                _lastJobProgress = jobStatus.ActiveJobs.Average(j => j.Progress);
+              }
+              else
+              {
+                _lastRunningJobs = 0;
+                _lastJobProgress = -1;
+              }
+            }
+            catch (Exception ex)
+            {
+              ErrorLogger.LogWarning($"Job status poll failed: {ex.Message}", "MainWindow");
+              _lastRunningJobs = 0;
+              _lastJobProgress = -1;
             }
           }
         }

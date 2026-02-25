@@ -20,7 +20,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/markers", tags=["markers"])
 
 # In-memory markers storage (replace with database in production)
-_markers: dict[str, dict] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_markers: PersistentStore = PersistentStore("markers")
 _state_lock = asyncio.Lock()
 _MAX_MARKERS = 10000  # Maximum number of markers to keep
 

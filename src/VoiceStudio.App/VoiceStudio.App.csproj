@@ -41,10 +41,11 @@
     <!-- Avoid VC/meta-dependent Win32 codegen in XAML compiler -->
     <EnableWin32Codegen>false</EnableWin32Codegen>
     <UseVCMetaManaged>false</UseVCMetaManaged>
-    <!-- Legacy workaround (can be revisited once XAML pipeline is stable) -->
-    <!-- <DisableXbfGeneration>true</DisableXbfGeneration> -->
-    <!-- <EnableUIXamlCompilation>false</EnableUIXamlCompilation> -->
-    <!-- VS-0035 fix: Force external XamlCompiler via wrapper to avoid WMC9999 in-process failures. -->
+    <!-- VS-0035: WinUI XAML compiler cannot produce XBF for 188 files in one pass.
+         XBF is a performance optimization (pre-compiled XAML); the app runs correctly
+         without it by parsing .xaml at runtime. Re-enable once WinAppSDK fixes the
+         batch-compilation crash. -->
+    <DisableXbfGeneration>true</DisableXbfGeneration>
     <UseXamlCompilerExecutable>false</UseXamlCompilerExecutable>
     <CppWinRTFastAbi>false</CppWinRTFastAbi>
     <BaseOutputPath>$(SolutionDir).buildlogs\</BaseOutputPath>

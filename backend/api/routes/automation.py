@@ -21,7 +21,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/automation", tags=["automation"])
 
 # In-memory automation curves storage (replace with database in production)
-_automation_curves: dict[str, dict] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_automation_curves: PersistentStore = PersistentStore("automation_curves")
 _state_lock = asyncio.Lock()
 
 

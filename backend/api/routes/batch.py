@@ -35,8 +35,9 @@ _batch_store = get_job_state_store("batch_jobs")
 _enhanced_job_queue = None
 _resource_manager = None
 
-# In-memory cache (populated from disk on startup)
-_batch_jobs: dict[str, dict] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_batch_jobs: PersistentStore = PersistentStore("batch_jobs")
 _job_queue: list[str] = []  # Queue of job IDs
 _processing_jobs: set[str] = set()  # Jobs currently being processed
 _state_lock = asyncio.Lock()

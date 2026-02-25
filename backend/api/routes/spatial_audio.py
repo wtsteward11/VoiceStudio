@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/spatial-audio", tags=["spatial-audio"])
 
 # In-memory spatial audio configurations (replace with database in production)
-_spatial_configs: dict[str, dict] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_spatial_configs: PersistentStore = PersistentStore("spatial_configs")
 _state_lock = asyncio.Lock()
 
 

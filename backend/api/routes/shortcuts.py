@@ -21,7 +21,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/shortcuts", tags=["shortcuts"])
 
 # In-memory shortcuts storage (replace with database in production)
-_shortcuts: dict[str, dict] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_shortcuts: PersistentStore = PersistentStore("shortcuts")
 _state_lock = asyncio.Lock()
 
 

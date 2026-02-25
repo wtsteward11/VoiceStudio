@@ -6,6 +6,7 @@ Implements backend for IDEA 33: Workflow Automation UI.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import uuid

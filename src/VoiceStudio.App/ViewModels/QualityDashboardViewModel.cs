@@ -139,23 +139,15 @@ namespace VoiceStudio.App.ViewModels
       {
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Load visualization images from backend
-        // Backend will generate matplotlib/plotly charts and return image URLs
-        // These endpoints will be created when visualization libraries are integrated
+        var baseUrl = _backendClient.BaseAddress?.ToString().TrimEnd('/') ?? "http://localhost:8000";
         var timeRangeDays = GetDaysFromTimeRange(SelectedTimeRange);
-        const string baseUrl = "http://localhost:8000"; // Default backend URL
+        var vizType = Uri.EscapeDataString(SelectedVisualizationType);
 
-        // For trends visualization - construct URL for backend endpoint
-        // Endpoint: /api/quality/trends/visualization?type={type}&days={days}
-        TrendsVisualizationImageUrl = $"{baseUrl}/api/quality/trends/visualization?type={SelectedVisualizationType}&days={timeRangeDays}";
-
-        // For distribution visualization - construct URL for backend endpoint
-        // Endpoint: /api/quality/distribution/visualization?type={type}
-        DistributionVisualizationImageUrl = $"{baseUrl}/api/quality/distribution/visualization?type={SelectedVisualizationType}";
+        TrendsVisualizationImageUrl = $"{baseUrl}/api/quality/trends/visualization?type={vizType}&days={timeRangeDays}";
+        DistributionVisualizationImageUrl = $"{baseUrl}/api/quality/distribution/visualization?type={vizType}";
       }
       catch (OperationCanceledException)
       {
-        // User cancelled - expected
         return Task.CompletedTask;
       }
       catch (Exception ex)

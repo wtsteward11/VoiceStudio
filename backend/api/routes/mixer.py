@@ -34,8 +34,10 @@ except ImportError:
 router = APIRouter(prefix="/api/mixer", tags=["mixer"])
 
 # In-memory storage (replace with database in production)
-_mixer_states: dict[str, dict] = {}
-_mixer_presets: dict[str, dict] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_mixer_states: PersistentStore = PersistentStore("mixer_states")
+_mixer_presets: PersistentStore = PersistentStore("mixer_presets")
 _state_lock = asyncio.Lock()
 
 

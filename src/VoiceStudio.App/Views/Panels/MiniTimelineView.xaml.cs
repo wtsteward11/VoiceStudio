@@ -46,11 +46,8 @@ namespace VoiceStudio.App.Views.Panels
       // Setup keyboard navigation
       this.Loaded += MiniTimelineView_KeyboardNavigation_Loaded;
 
-      // Setup Escape key to close help overlay
-      KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
-      {
-        // Help overlay not implemented for MiniTimelineView
-      });
+      // MiniTimelineView does not have a help overlay; escape key handling is a no-op.
+      KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () => { });
 
       // Subscribe to property changes to update UI
       ViewModel.PropertyChanged += (_, e) =>

@@ -20,8 +20,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/templates", tags=["templates"])
 
-# In-memory templates storage (replace with database in production)
-_templates: dict[str, dict] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_templates: PersistentStore = PersistentStore("templates")
 _state_lock = asyncio.Lock()
 
 

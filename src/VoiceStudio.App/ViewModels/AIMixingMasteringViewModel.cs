@@ -349,24 +349,39 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private Task PreviewSuggestionAsync()
+    private async Task PreviewSuggestionAsync()
     {
-      if (SelectedSuggestion == null)
+      if (SelectedSuggestion == null || string.IsNullOrWhiteSpace(ProjectId))
       {
-        return Task.CompletedTask;
+        return;
       }
 
       try
       {
-        // Preview would apply suggestion temporarily and play audio
         StatusMessage = ResourceHelper.FormatString("AIMixingMastering.Previewing", SelectedSuggestion.Description);
+
+        var previewRequest = new
+        {
+          project_id = ProjectId,
+          suggestion_id = SelectedSuggestion.SuggestionId,
+          category = SelectedSuggestion.Category,
+          suggested_value = SelectedSuggestion.SuggestedValue,
+          preview = true
+        };
+
+        var response = await _backendClient.SendRequestAsync<object, MixApplyResponse>(
+            "/api/mix-assistant/mix/preview",
+            previewRequest,
+            System.Net.Http.HttpMethod.Post);
+
+        StatusMessage = !string.IsNullOrEmpty(response?.Message)
+            ? response.Message
+            : ResourceHelper.GetString("AIMixingMastering.PreviewGenerated", "Preview applied");
       }
       catch (Exception ex)
       {
         ErrorMessage = ResourceHelper.FormatString("AIMixingMastering.PreviewSuggestionFailed", ex.Message);
       }
-
-      return Task.CompletedTask;
     }
 
     private async Task AnalyzeMasteringAsync()

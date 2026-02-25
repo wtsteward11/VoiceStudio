@@ -21,7 +21,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/tags", tags=["tags"])
 
 # In-memory tags storage (replace with database in production)
-_tags: dict[str, dict] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_tags: PersistentStore = PersistentStore("tags")
 _state_lock = asyncio.Lock()
 _MAX_TAGS = 10000  # Maximum number of tags to prevent memory issues
 

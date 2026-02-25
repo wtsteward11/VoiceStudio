@@ -418,17 +418,49 @@ namespace VoiceStudio.App.ViewModels
       StatusMessage = ResourceHelper.GetString("DeepfakeCreator.Refreshed", "Refreshed");
     }
 
-    private Task EnhanceDeepfakeAsync(CancellationToken cancellationToken)
+    private async Task EnhanceDeepfakeAsync(CancellationToken cancellationToken)
     {
       cancellationToken.ThrowIfCancellationRequested();
 
-      StatusMessage = ResourceHelper.GetString("DeepfakeCreator.EnhancementNotAvailable",
-          "Deepfake enhancement requires backend support — feature coming soon");
-      _toastNotificationService?.ShowToast(ToastType.Info,
-          ResourceHelper.GetString("Toast.Title.FeatureNotAvailable", "Feature Not Available"),
-          StatusMessage);
+      if (SelectedJob == null)
+      {
+        StatusMessage = ResourceHelper.GetString("DeepfakeCreator.NoJobSelected", "Select a completed job to enhance");
+        return;
+      }
 
-      return Task.CompletedTask;
+      try
+      {
+        IsLoading = true;
+        StatusMessage = ResourceHelper.GetString("DeepfakeCreator.Enhancing", "Enhancing deepfake output...");
+
+        await _backendClient.SendRequestAsync<object, object>(
+            $"/api/deepfake-creator/jobs/{Uri.EscapeDataString(SelectedJob.JobId)}/enhance",
+            new { quality = "high" },
+            System.Net.Http.HttpMethod.Post,
+            cancellationToken);
+
+        StatusMessage = ResourceHelper.GetString("DeepfakeCreator.EnhancementComplete", "Enhancement complete");
+        _toastNotificationService?.ShowToast(ToastType.Success,
+            ResourceHelper.GetString("Toast.Title.Enhanced", "Enhanced"),
+            StatusMessage);
+
+        await LoadJobsAsync(cancellationToken);
+      }
+      catch (OperationCanceledException)
+      {
+        return;
+      }
+      catch (Exception ex)
+      {
+        StatusMessage = $"Enhancement failed: {ex.Message}";
+        _toastNotificationService?.ShowToast(ToastType.Error,
+            ResourceHelper.GetString("Toast.Title.EnhanceFailed", "Enhancement Failed"),
+            StatusMessage);
+      }
+      finally
+      {
+        IsLoading = false;
+      }
     }
 
     private async Task<DeepfakeJobResponse?> UploadFilesAndCreateDeepfakeAsync(string sourceFacePath, string targetMediaPath, DeepfakeRequest requestData, CancellationToken cancellationToken = default)

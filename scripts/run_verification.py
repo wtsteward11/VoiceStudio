@@ -51,7 +51,10 @@ def run_check(name, command, timeout=30):
 
     try:
         import shlex
-        cmd_list = shlex.split(command) if isinstance(command, str) else command
+        if isinstance(command, str):
+            cmd_list = shlex.split(command, posix=(sys.platform != "win32"))
+        else:
+            cmd_list = command
         result = subprocess.run(
             cmd_list,
             capture_output=True,

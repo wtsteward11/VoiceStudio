@@ -31,18 +31,35 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## Current Phase
 
-- **Phase**: Post-audit stabilization
+- **Phase**: Gap Report Remediation complete
 - **Master Plan Phase**: v1.0.3 maintenance
 - **Started**: 2026-02-24
-- **Context**: v1.0.3 merged to main. Two independent audits completed and remediated. Build: 0 errors, C# tests: 1017 pass, app launches cleanly.
+- **Context**: Gap analysis report (112 issues) investigated and remediated. 85+ issues were already resolved (gap report based on stale source reports). 5 genuine fixes applied. Build: 0 errors. Verification: PASS.
 
 ## Active Plan
 
-- **Plan**: Independent Project Audit (complete)
-- **Document**: `c:\Users\Tyler\.cursor\plans\independent_project_audit_401e6e07.plan.md`
+- **Plan**: Gap Report Remediation
+- **Document**: `c:\Users\Tyler\.cursor\plans\gap_report_remediation_9d09b9db.plan.md`
 - **Status**: COMPLETE
 
 ## Active Task
+
+- **ID**: GAP-REPORT-REMEDIATION
+- **Title**: UI/Backend Gap Analysis Report Remediation
+- **Status**: **COMPLETE** (2026-02-24)
+- **Last Milestone**: All 14 sprint items completed
+  - Sprint 0: Fixed XAML compiler crash (DisableXbfGeneration=true), shlex.split Windows bug, ledger path, empty catch in archive
+  - Sprint 1.1: Added simulation_mode to training status (Python + C# models)
+  - Sprint 1.2-1.3: JobProgressBar and FirstRunWizard already implemented (gap report incorrect)
+  - Sprint 2.1: Nav dual-wiring assessed as intentional resilience; upgraded fallback logging
+  - Sprint 2.2: Click handlers assessed (17 real vs 98+ claimed; HelpButton pattern overcounted)
+  - Sprint 2.3: CollaboratorsToggleButton collapsed with Coming Soon tooltip
+  - Sprint 3.1: Added /api/health/dependencies endpoint (11 optional packages)
+  - Sprint 3.2-3.3: BackendConnectionMonitor already polls health every 10s (gap report incorrect)
+  - Sprint 4.1-4.3: CommandQueueService already exists; {Binding}/Tag routing assessed as style debt
+- **Next**: v1.1.0 planning (voice.py split, main.py extraction)
+
+## Previous Active Task
 
 - **ID**: None
 - **Title**: All audit items complete
@@ -52,7 +69,6 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
   - 10 skipped tests unskipped and fixed (147 passing)
   - WriteDiagMarker restored from archive
   - voice.py split plan documented for v1.1.0
-- **Next**: v1.1.0 planning (voice.py split, main.py extraction, remaining architecture gaps)
 
 ## Previous Active Task
 

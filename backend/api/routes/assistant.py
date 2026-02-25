@@ -21,7 +21,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 
 # In-memory conversation history (future: persist via JsonFileStore)
-_conversations: dict[str, dict] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_conversations: PersistentStore = PersistentStore("assistant_conversations")
 _state_lock = asyncio.Lock()
 
 

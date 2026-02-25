@@ -56,14 +56,15 @@ router = APIRouter(
     dependencies=[Depends(require_auth_if_enabled)],
 )
 
-# In-memory cache backed by database repository
-_training_jobs: dict[str, dict] = {}
-_training_logs: dict[str, list[dict]] = {}
-_training_quality_history: dict[str, list[dict]] = {}  # job_id -> list of quality metrics (IDEA 54)
-_MAX_TRAINING_JOBS = 100  # Maximum number of training jobs
-_MAX_TRAINING_LOGS_PER_JOB = 1000  # Maximum log entries per job
-_MAX_QUALITY_HISTORY_PER_JOB = 1000  # Maximum quality history entries per job
-_training_job_timestamps: dict[str, float] = {}  # job_id -> creation_time
+from backend.api.routes._persistent_store import PersistentStore
+
+_training_jobs: PersistentStore = PersistentStore("training_jobs")
+_training_logs: PersistentStore = PersistentStore("training_logs")
+_training_quality_history: PersistentStore = PersistentStore("training_quality_history")
+_MAX_TRAINING_JOBS = 100
+_MAX_TRAINING_LOGS_PER_JOB = 1000
+_MAX_QUALITY_HISTORY_PER_JOB = 1000
+_training_job_timestamps: PersistentStore = PersistentStore("training_job_timestamps")
 _state_lock = asyncio.Lock()
 
 _training_repo = None
@@ -224,6 +225,9 @@ class TrainingStatus(BaseModel):
     validation_loss: float | None = None
     quality_alerts: list[TrainingQualityAlert] | None = None
     early_stopping_recommendation: EarlyStoppingRecommendation | None = None
+
+    simulation_mode: bool = False
+    simulation_reason: str | None = None
 
 
 class TrainingLogEntry(BaseModel):
@@ -929,6 +933,10 @@ async def _simulate_training(training_id: str, request: TrainingRequest):
         status_dict = _training_jobs[key]
         status_dict["status"] = "running"
         status_dict["started"] = datetime.utcnow().isoformat()
+        status_dict["simulation_mode"] = True
+        status_dict["simulation_reason"] = (
+            "Coqui TTS not installed. Install with: pip install coqui-tts==0.27.2"
+        )
 
         # Simulate epochs
         for epoch in range(1, request.epochs + 1):

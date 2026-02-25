@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/edit", tags=["text-speech-editor"])
 
 # In-memory storage for edit sessions (replace with database in production)
-_edit_sessions: dict[str, EditSession] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_edit_sessions: PersistentStore = PersistentStore("text_speech_edit_sessions")
 _state_lock = asyncio.Lock()
 
 

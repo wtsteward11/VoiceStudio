@@ -26,10 +26,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/presets", tags=["presets"])
 
-# In-memory storage (replace with database in production)
-_presets: dict[str, dict] = {}
-_MAX_PRESETS = 1000  # Maximum number of presets
-_preset_timestamps: dict[str, float] = {}  # preset_id -> creation_time
+from backend.api.routes._persistent_store import PersistentStore
+
+_presets: PersistentStore = PersistentStore("presets")
+_MAX_PRESETS = 1000
+_preset_timestamps: PersistentStore = PersistentStore("preset_timestamps")
 _state_lock = asyncio.Lock()
 
 

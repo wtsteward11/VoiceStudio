@@ -52,6 +52,16 @@ namespace VoiceStudio.App.Commands
         public string? CurrentProjectPath => _currentProjectPath;
         public bool HasUnsavedChanges { get; private set; }
 
+        /// <summary>
+        /// Sets the active project programmatically (e.g. during deferred init when auto-loading).
+        /// </summary>
+        public void SetActiveProject(Project project)
+        {
+            _currentProject = project;
+            _currentProjectPath = null;
+            HasUnsavedChanges = false;
+        }
+
         private void RegisterCommands()
         {
             // file.new

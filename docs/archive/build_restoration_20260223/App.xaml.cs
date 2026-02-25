@@ -35,6 +35,7 @@ namespace VoiceStudio.App
         File.WriteAllText(Path.Combine(dir, "diag_latest.txt"),
           $"{DateTime.UtcNow:O} | PID={Environment.ProcessId} | {stage}");
       }
+      // ALLOWED: empty catch - diagnostic write is best-effort in archived startup code
       catch { }
     }
 

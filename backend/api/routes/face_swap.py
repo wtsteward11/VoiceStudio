@@ -10,6 +10,7 @@ explicit consent from all parties. All invocations are logged for audit.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime
 from typing import Any

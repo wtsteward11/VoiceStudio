@@ -6,6 +6,7 @@ Endpoints for the step-by-step voice cloning wizard interface.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime

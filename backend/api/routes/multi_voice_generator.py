@@ -7,6 +7,7 @@ Essential for batch processing and A/B testing.
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import logging

@@ -24,8 +24,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/api-keys", tags=["api-keys"])
 
-# In-memory cache; persisted to JSON file (Phase 7 Sprint 2)
-_api_keys: dict[str, APIKey] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_api_keys: PersistentStore = PersistentStore("api_keys")
 _state_lock = asyncio.Lock()
 
 

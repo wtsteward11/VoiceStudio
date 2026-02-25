@@ -176,6 +176,7 @@ namespace VoiceStudio.App.Services
           }
         }
       }
+      // ALLOWED: empty catch - cancellation is expected during normal WebSocket shutdown
       catch (OperationCanceledException)
       {
         // Cancellation is normal during shutdown

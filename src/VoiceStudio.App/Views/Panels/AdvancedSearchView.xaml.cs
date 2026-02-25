@@ -1,11 +1,12 @@
+using System;
+using System.Collections.Generic;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VoiceStudio.App.Controls;
+using VoiceStudio.App.Logging;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Services;
-
-using VoiceStudio.App.Logging;
 namespace VoiceStudio.App.Views.Panels
 {
   /// <summary>
@@ -110,27 +111,35 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    private void NavigateToResult(SearchResult result)
+    private async void NavigateToResult(SearchResult result)
     {
-      // Navigate based on result type
-      var mainWindow = Microsoft.UI.Xaml.Application.Current as App;
-      if (mainWindow != null)
+      try
       {
-        // Switch to appropriate panel based on result type
+        var navigationService = ServiceProvider.TryGetNavigationService();
+        if (navigationService == null)
+        {
+          return;
+        }
+
         var type = result.Type.ToLower();
-        if (type == "profile")
+        var parameters = new Dictionary<string, object> { ["selectedId"] = result.Id };
+
+        var panelId = type switch
         {
-          // Navigate to Profiles panel and select the profile
-          // This would be handled by MainWindow panel switching logic
-        }
-        else if (type == "audio")
-        {
-          // Navigate to Timeline or Analyzer panel
-        }
-        else if (type == "project")
-        {
-          // Navigate to project view
-        }
+          "profile" => "Profiles",
+          "audio" => "Library",
+          "project" => "Library",
+          "engine" => "Settings",
+          "voice" => "Profiles",
+          "clip" => "Timeline",
+          _ => "Library",
+        };
+
+        await navigationService.NavigateToPanelAsync(panelId, parameters);
+      }
+      catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Navigation failed: {ex.Message}", "AdvancedSearchView");
       }
     }
 

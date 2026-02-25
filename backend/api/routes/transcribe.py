@@ -31,7 +31,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/transcribe", tags=["transcribe"])
 
-_transcriptions: dict[str, dict[str, Any]] = {}
+from backend.api.routes._persistent_store import PersistentStore
+
+_transcriptions: PersistentStore = PersistentStore("transcriptions")
 _state_lock = asyncio.Lock()
 
 

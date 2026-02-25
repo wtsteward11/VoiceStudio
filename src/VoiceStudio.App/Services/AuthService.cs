@@ -448,7 +448,7 @@ public class AuthService : IUnifiedAuthService
         }
     }
 
-    private async Task SaveSessionAsync()
+    private Task SaveSessionAsync()
     {
         try
         {
@@ -485,10 +485,10 @@ public class AuthService : IUnifiedAuthService
             ErrorLogger.LogWarning($"[AuthService] Session save failed: {ex.Message}", "AuthService");
         }
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
-    private async Task ClearSessionAsync()
+    private Task ClearSessionAsync()
     {
         try
         {
@@ -503,7 +503,7 @@ public class AuthService : IUnifiedAuthService
             ErrorLogger.LogWarning($"[AuthService] Session clear failed: {ex.Message}", "AuthService");
         }
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     private void RaiseAuthStateChanged(AuthenticatedUser? previous, AuthenticatedUser? current)

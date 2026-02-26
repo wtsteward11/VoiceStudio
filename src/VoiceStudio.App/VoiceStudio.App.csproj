@@ -24,29 +24,17 @@
     <PlatformTarget>x64</PlatformTarget>
     <IsPackable>false</IsPackable>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-    <!-- Use system-installed Windows App SDK runtime (unpackaged app via Bootstrap.Initialize). -->
+    <!-- WindowsAppSDKSelfContained=true bundles CoreMessagingXP.dll which crashes on
+         Windows Insider builds (STATUS_FAIL_FAST 0xc0000602). Use system runtime. -->
     <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
     <UseAppHost>true</UseAppHost>
-    <!-- Don't set RuntimeIdentifier explicitly - let the EnsureRuntimeIdentifierForWin2D target
-    handle it -->
-    <!-- Setting RuntimeIdentifier causes RID-specific output paths which break the XAML compiler
-    Exec task with double backslashes -->
-    <!-- <RuntimeIdentifier>win-x64</RuntimeIdentifier> -->
-    <!-- <RuntimeIdentifiers>win-x64</RuntimeIdentifiers> -->
-    <!-- Suppress RuntimeIdentifier errors for unsupported RIDs -->
-    <_SuppressWinRTError>true</_SuppressWinRTError>
-    <!-- Allow RID resolution for Win2D, but suppress other RID errors -->
-    <EnableDefaultRuntimeIdentifier>true</EnableDefaultRuntimeIdentifier>
-    <!-- Avoid VC/meta-dependent Win32 codegen in XAML compiler -->
-    <EnableWin32Codegen>false</EnableWin32Codegen>
-    <UseVCMetaManaged>false</UseVCMetaManaged>
-    <!-- VS-0035: WinUI XAML compiler cannot produce XBF for 188 files in one pass.
-         XBF disabled: WinAppSDK 1.8 XAML compiler Pass 2 does not produce .xbf files
-         even after fixing CS2002 duplicates (tested 2026-02-26, 187 MSB3030 errors).
-         The app parses XAML at runtime instead. Custom types resolve via
-         EnableTypeInfoReflection=true (Directory.Build.targets). Re-test with future
-         WinAppSDK updates. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- EnableWin32Codegen and UseVCMetaManaged set in Directory.Build.targets -->
+    <!-- XBF disabled: WinAppSDK 1.8.5 XAML compiler Pass 2 still does not produce
+         .xbf files (187 MSB3030 errors, tested 2026-02-26 with both 1.8.1 and 1.8.5).
+         The app parses XAML at runtime. Custom types via EnableTypeInfoReflection=true.
+         Re-test when WinAppSDK 1.9+ ships XBF pipeline fixes. -->
     <DisableXbfGeneration>true</DisableXbfGeneration>
     <CppWinRTFastAbi>false</CppWinRTFastAbi>
     <BaseOutputPath>$(SolutionDir).buildlogs\</BaseOutputPath>
@@ -85,41 +73,11 @@
     <WarningLevel>9999</WarningLevel>
   </PropertyGroup>
 
-  <!-- Ensure RuntimeIdentifier is preserved for Win2D before any targets that might clear it -->
-  <Target Name="EnsureRuntimeIdentifierForWin2D" BeforeTargets="ProcessFrameworkReferences;ResolvePackageAssets" Condition="'$(RuntimeIdentifier)' == ''">
-    <PropertyGroup>
-      <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-      <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
-    </PropertyGroup>
-  </Target>
+  <!-- EnsureRuntimeIdentifierForWin2D removed: explicit RuntimeIdentifier=win-x64 set above -->
 
-  <!-- Capture XAML compiler errors to file -->
-  <Target Name="CaptureXamlErrors" AfterTargets="MarkupCompilePass1" Condition="'$(BuildingProject)' == 'true'">
-    <PropertyGroup>
-      <XamlErrorLogFile>$(MSBuildProjectDirectory)\..\..\xaml-compiler-errors.txt</XamlErrorLogFile>
-    </PropertyGroup>
-    <Message Text="XAML compilation completed. Check $(XamlErrorLogFile) for errors." Importance="high" Condition="Exists('$(XamlErrorLogFile)')" />
-  </Target>
-
-  <!-- Exclude Windows App Runtime / WinUI native DLLs from publish output (Gate C/H).
-       When using WindowsAppSDKSelfContained=false, the unpackaged app relies on
-       Bootstrap.Initialize(...) to load these from the installed runtime packages.
-       Keeping loose copies can cause CoreMessagingXP.dll fail-fast or dependency-resolution issues. -->
-  <!-- Ensure compiled XAML (.xbf) is present in publish output for unpackaged Gate C/H artifacts.
-       Without this, ms-appx:///MainWindow.xaml fails in publish output because the build produces
-       XBFs under obj (IntermediateOutputPath) but publish doesn't automatically copy them. -->
-  <Target Name="IncludeXbfInPublishOutput" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">
-    <ItemGroup>
-      <!-- WinUI XamlCompiler generates compiled dictionaries/pages into obj
-      (IntermediateOutputPath). -->
-      <_XbfToPublish Include="$(MSBuildProjectDirectory)\$(IntermediateOutputPath)**\*.xbf" />
-      <_XbfToPublishWithDest Include="@(_XbfToPublish)">
-        <Dest>$(PublishDir)\%(RecursiveDir)%(Filename)%(Extension)</Dest>
-      </_XbfToPublishWithDest>
-    </ItemGroup>
-    <Message Text="IncludeXbfInPublishOutput: Copying @(_XbfToPublishWithDest-&gt;Count()) XBF files from $(TargetDir) -&gt; $(PublishDir)" Importance="high" Condition="'@(_XbfToPublishWithDest)' != ''" />
-    <Copy SourceFiles="@(_XbfToPublishWithDest->'%(FullPath)')" DestinationFiles="@(_XbfToPublishWithDest->'%(Dest)')" SkipUnchangedFiles="true" Condition="'@(_XbfToPublishWithDest)' != ''" />
-  </Target>
+  <!-- CaptureXamlErrors removed: diagnostic stub that never created output file -->
+  <!-- IncludeXbfInPublishOutput removed: DisableXbfGeneration=true means no XBF files exist.
+       Re-add when XBF generation is restored. -->
 
   <Target Name="ExcludeSystemDllsFromPublish" AfterTargets="Publish" Condition="'$(SelfContained)' == 'true' And '$(WindowsAppSDKSelfContained)' != 'true'">
     <ItemGroup>

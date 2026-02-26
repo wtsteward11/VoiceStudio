@@ -21,7 +21,7 @@
     <!-- Allow ad-hoc overrides (e.g., try preview/servicing without editing files) -->
     <MicrosoftWindowsAppSDKVersion Condition="'$(WinAppSdkVersionOverride)' != ''">
       $(WinAppSdkVersionOverride)</MicrosoftWindowsAppSDKVersion>
-    <MicrosoftWindowsAppSDKVersion Condition="'$(WinAppSdkVersionOverride)' == ''">1.8.251106002</MicrosoftWindowsAppSDKVersion>
+    <MicrosoftWindowsAppSDKVersion Condition="'$(WinAppSdkVersionOverride)' == ''">1.8.260209005</MicrosoftWindowsAppSDKVersion>
   </PropertyGroup>
 
   <!-- Package version overrides to ensure consistent versions -->

@@ -42,11 +42,12 @@
     <EnableWin32Codegen>false</EnableWin32Codegen>
     <UseVCMetaManaged>false</UseVCMetaManaged>
     <!-- VS-0035: WinUI XAML compiler cannot produce XBF for 188 files in one pass.
-         XBF is a performance optimization (pre-compiled XAML); the app runs correctly
-         without it by parsing .xaml at runtime. Re-enable once WinAppSDK fixes the
-         batch-compilation crash. -->
+         XBF disabled: WinAppSDK 1.8 XAML compiler Pass 2 does not produce .xbf files
+         even after fixing CS2002 duplicates (tested 2026-02-26, 187 MSB3030 errors).
+         The app parses XAML at runtime instead. Custom types resolve via
+         EnableTypeInfoReflection=true (Directory.Build.targets). Re-test with future
+         WinAppSDK updates. -->
     <DisableXbfGeneration>true</DisableXbfGeneration>
-    <UseXamlCompilerExecutable>false</UseXamlCompilerExecutable>
     <CppWinRTFastAbi>false</CppWinRTFastAbi>
     <BaseOutputPath>$(SolutionDir).buildlogs\</BaseOutputPath>
     <!-- FIX: Don't use architecture-specific sub-paths that cause double backslash in XAML compiler
@@ -216,24 +217,45 @@
     </Content>
   </ItemGroup>
 
-  <!-- De-dupe XAML generated Compile items in design-time builds (LSP/VS) -->
-  <Target Name="DeduplicateCompileItemsDesignTime" AfterTargets="DesignTimeMarkupCompilation;MarkupCompilePass1" Condition="'$(DesignTimeBuild)' == 'true' Or '$(BuildingInsideVisualStudio)' == 'true'">
+  <!-- De-dupe ALL XAML-generated Compile items in design-time builds (LSP/VS).
+       The default compile glob (EnableDefaultCompileItems) picks up obj/**/*.g.cs,
+       and the XAML compiler also adds them, causing CS2002 duplicate warnings.
+       This target removes duplicates for ALL .g.cs and .g.i.cs files, not just App. -->
+  <Target Name="DeduplicateCompileItemsDesignTime"
+      AfterTargets="DesignTimeMarkupCompilation;MarkupCompilePass1"
+      Condition="'$(DesignTimeBuild)' == 'true' Or '$(BuildingInsideVisualStudio)' == 'true'">
     <ItemGroup>
-      <!-- Collect only App.g.i.cs variants (absolute + relative) -->
-      <_AppGi Include="@(Compile)" Condition="$([System.String]::Copy('%(Compile.Identity)').EndsWith('App.g.i.cs'))" />
-      <_AppGi Include="@(Compile)" Condition="$([System.String]::Copy('%(Compile.FullPath)').EndsWith('App.g.i.cs'))" />
+      <_GenDup Include="@(Compile)"
+        Condition="$([System.String]::Copy('%(Compile.Identity)').EndsWith('.g.cs'))
+                Or $([System.String]::Copy('%(Compile.Identity)').EndsWith('.g.i.cs'))" />
     </ItemGroup>
-    <RemoveDuplicates Inputs="@(_AppGi->'%(FullPath)')">
-      <Output TaskParameter="Filtered" ItemName="_AppGiUnique" />
+    <RemoveDuplicates Inputs="@(_GenDup->'%(FullPath)')">
+      <Output TaskParameter="Filtered" ItemName="_GenUnique" />
     </RemoveDuplicates>
     <ItemGroup>
-      <!-- Drop all App.g.i.cs entries, then re-add one per full path -->
-      <Compile Remove="@(_AppGi)" />
-      <Compile Include="@(_AppGiUnique)" />
+      <Compile Remove="@(_GenDup)" />
+      <Compile Include="@(_GenUnique)" />
     </ItemGroup>
   </Target>
 
-  <!-- XAML compilation is enabled (per plan: make XAML compilation succeed normally) -->
-  <!-- Directory.Build.targets ensures XAML compiler has resolved reference assemblies -->
+  <!-- De-dupe XAML-generated Compile items before the C# compiler runs.
+       Must use BeforeTargets="CoreCompile" because CoreCompile (CSC) runs
+       between MarkupCompilePass1 and Pass2 in the WinUI pipeline. -->
+  <Target Name="DeduplicateGeneratedCompileItems"
+      BeforeTargets="CoreCompile"
+      Condition="'$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <_GenDupBuild Include="@(Compile)"
+        Condition="$([System.String]::Copy('%(Compile.Identity)').EndsWith('.g.cs'))
+                Or $([System.String]::Copy('%(Compile.Identity)').EndsWith('.g.i.cs'))" />
+    </ItemGroup>
+    <RemoveDuplicates Inputs="@(_GenDupBuild->'%(FullPath)')">
+      <Output TaskParameter="Filtered" ItemName="_GenUniqueBuild" />
+    </RemoveDuplicates>
+    <ItemGroup>
+      <Compile Remove="@(_GenDupBuild)" />
+      <Compile Include="@(_GenUniqueBuild)" />
+    </ItemGroup>
+  </Target>
 
 </Project>

@@ -3,10 +3,10 @@
   <!-- NOTE: Target overrides are in Directory.Build.targets to ensure they run AFTER NuGet imports -->
 
   <!-- XAML compiler routing (VS-0035 fix) -->
-  <!-- Use the WinUI XamlCompiler executable via our wrapper to avoid WMC9999 in-process failures -->
+  <!-- UseXamlCompilerExecutable is set in Directory.Build.targets (after NuGet imports) to ensure
+       it overrides the WinUI interop.targets default. Do NOT set it here - .targets wins. -->
   <!-- See: https://github.com/microsoft/microsoft-ui-xaml/issues/9813 -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'VoiceStudio.App'">
-    <UseXamlCompilerExecutable>false</UseXamlCompilerExecutable>
     <!-- Route Exec to repo-local wrapper for better diagnostics + false-positive exit code handling -->
     <XamlCompilerExePath>$(MSBuildThisFileDirectory)tools\xaml-compiler-wrapper.cmd</XamlCompilerExePath>
   </PropertyGroup>

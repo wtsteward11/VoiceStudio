@@ -104,7 +104,10 @@
     <PackageReference Include="JsonSchema.Net" Version="8.0.5" />
     <PackageReference Include="MessagePack" Version="3.1.4" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.0" />
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.3.2" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="$(MicrosoftWindowsAppSDKVersion)" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
@@ -155,6 +158,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="appsettings.*.json" Condition="Exists('appsettings.Development.json')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <None Include="Assets\**\*.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -174,6 +183,15 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <!-- XAML input validation guard: catches silent 1ms Pass 1 failures where the compiler
+       finds no Page items and produces an empty type registry. -->
+  <Target Name="ValidateXamlInputs" BeforeTargets="MarkupCompilePass1">
+    <Error Text="XAML BUILD GUARD: No Page items found. XAML compilation will produce empty output."
+           Condition="'@(Page)' == '' And '$(DisableXbfGeneration)' != 'true'" />
+    <Message Text="XAML Inputs: @(Page->Count()) Page items, @(ApplicationDefinition->Count()) AppDef items"
+             Importance="normal" />
+  </Target>
 
   <!-- De-dupe ALL XAML-generated Compile items in design-time builds (LSP/VS).
        The default compile glob (EnableDefaultCompileItems) picks up obj/**/*.g.cs,

@@ -1,6 +1,7 @@
 using System;
 using VoiceStudio.App.Logging;
 using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,6 +11,7 @@ using VoiceStudio.Core.Plugins;
 using VoiceStudio.Core.Services;
 using VoiceStudio.Core.State;
 using VoiceStudio.App.Core.Commands;
+using VoiceStudio.App.Configuration;
 using VoiceStudio.App.UseCases;
 using VoiceStudio.App.ViewModels;
 
@@ -39,15 +41,31 @@ namespace VoiceStudio.App.Services
     public static void Initialize()
     {
       var services = new ServiceCollection();
+      RegisterServices(services, null);
+      _provider = services.BuildServiceProvider();
+      PostInitialize();
+    }
 
-      // GAP-I12: Correlation ID provider for cross-layer request tracing
-      // Must be registered before ErrorLoggingService and BackendClient
+    /// <summary>
+    /// Registers all application services into the given collection.
+    /// Called by both Initialize() (direct build) and HostFactory (Generic Host).
+    /// </summary>
+    public static void RegisterServices(IServiceCollection services, IConfiguration? config)
+    {
+      if (config != null)
+      {
+        services.Configure<BackendOptions>(config.GetSection("Backend"));
+        services.Configure<AudioOptions>(config.GetSection("Audio"));
+      }
+
       services.AddSingleton<ICorrelationIdProvider, CorrelationIdProvider>();
 
-      // Config and backend - use environment variable with fallback to 8000
-      // NOTE: Backend starts on port 8000 (see scripts/start_backend.ps1 line 69)
-      var apiHost = Environment.GetEnvironmentVariable("VOICESTUDIO_API_HOST") ?? "localhost";
-      var apiPort = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT") ?? "8000";
+      var apiHost = config?.GetSection("Backend")?["Host"]
+                    ?? Environment.GetEnvironmentVariable("VOICESTUDIO_API_HOST")
+                    ?? "localhost";
+      var apiPort = config?.GetSection("Backend")?["Port"]
+                    ?? Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT")
+                    ?? "8000";
       var baseUrl = $"http://{apiHost}:{apiPort}";
       var wsUrl = $"ws://{apiHost}:{apiPort}/ws/realtime";
       services.AddSingleton(new BackendClientConfig { BaseUrl = baseUrl, WebSocketUrl = wsUrl });
@@ -210,12 +228,15 @@ namespace VoiceStudio.App.Services
           sp.GetService<ICommandMutexService>(),
           DispatcherQueue.GetForCurrentThread()));
 
-      _provider = services.BuildServiceProvider();
+    }
 
-      // Wire up command queue service to registry (GAP-B12)
+    /// <summary>
+    /// Post-initialization: wire command queue and register panels.
+    /// Must be called after the provider is set (via Initialize() or Initialize(provider)).
+    /// </summary>
+    public static void PostInitialize()
+    {
       WireCommandQueueService();
-
-      // Register all panels after services are ready
       RegisterAllPanels();
     }
 

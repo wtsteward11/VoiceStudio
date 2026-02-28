@@ -1,0 +1,109 @@
+<ContentDialog x:Class="VoiceStudio.App.Views.Dialogs.PluginPermissionDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Plugin Permission Request"
+    PrimaryButtonText="Grant Selected"
+    SecondaryButtonText="Deny All"
+    CloseButtonText="Cancel"
+    DefaultButton="Primary"
+    PrimaryButtonClick="OnPrimaryButtonClick"
+    SecondaryButtonClick="OnSecondaryButtonClick">
+    <Grid Width="480" MinHeight="300" Margin="0,0,0,16">
+        <StackPanel Spacing="16">
+            <!-- Plugin Info Header -->
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <FontIcon Glyph="&#xE8D7;" FontSize="32" FontFamily="Segoe Fluent Icons" 
+                    Foreground="{StaticResource VSQ.Accent.CyanBrush}" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="PluginNameText" 
+                        Text="Plugin Name" 
+                        Style="{StaticResource VSQ.Text.Title}" />
+                    <TextBlock x:Name="PluginIdText" 
+                        Text="plugin.id" 
+                        Style="{StaticResource VSQ.Text.Caption}" 
+                        Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                </StackPanel>
+            </StackPanel>
+
+            <TextBlock TextWrapping="Wrap" Style="{StaticResource VSQ.Text.Body}">
+                This plugin is requesting the following permissions to function properly.
+                Review each permission and decide which to grant.
+            </TextBlock>
+
+            <!-- Permissions List -->
+            <ScrollViewer MaxHeight="250" VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="PermissionsList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}" 
+                                CornerRadius="4" Padding="12" Margin="0,0,0,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Risk Indicator -->
+                                    <Border Grid.Column="0" 
+                                        Width="4" CornerRadius="2" Margin="0,0,12,0"
+                                        Background="{Binding RiskColor}" />
+
+                                    <!-- Permission Details -->
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{Binding DisplayName}" 
+                                                FontWeight="SemiBold"
+                                                Style="{StaticResource VSQ.Text.Body}" />
+                                            <Border Background="{Binding RiskBadgeBackground}" 
+                                                CornerRadius="2" Padding="4,2">
+                                                <TextBlock Text="{Binding RiskLevel}" 
+                                                    FontSize="10"
+                                                    Foreground="{Binding RiskBadgeForeground}" />
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Description}" 
+                                            TextWrapping="Wrap"
+                                            Style="{StaticResource VSQ.Text.Caption}" 
+                                            Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                                        <TextBlock Text="{Binding PermissionId}" 
+                                            Style="{StaticResource VSQ.Text.Caption}" 
+                                            Foreground="{StaticResource VSQ.Text.TertiaryBrush}"
+                                            FontFamily="Consolas" />
+                                    </StackPanel>
+
+                                    <!-- Grant Toggle -->
+                                    <CheckBox Grid.Column="2" 
+                                        IsChecked="{Binding IsGranted, Mode=TwoWay}"
+                                        VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- High Risk Warning -->
+            <Border x:Name="HighRiskWarning" 
+                Background="{StaticResource VSQ.Warning.Brush}" 
+                Opacity="0.15"
+                CornerRadius="4" Padding="12"
+                Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE7BA;" FontSize="16" FontFamily="Segoe Fluent Icons" 
+                        Foreground="{StaticResource VSQ.Warning.Brush}" />
+                    <TextBlock TextWrapping="Wrap" 
+                        Style="{StaticResource VSQ.Text.Caption}">
+                        <Run FontWeight="SemiBold">Warning:</Run>
+                        <Run>This plugin requests high-risk permissions. Only grant if you trust the source.</Run>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <!-- Remember Choice -->
+            <CheckBox x:Name="RememberChoiceCheckBox" 
+                Content="Remember my choice for this plugin" 
+                IsChecked="True" />
+        </StackPanel>
+    </Grid>
+</ContentDialog>

@@ -159,3 +159,5 @@ tools/chatgpt-localfiles/
 data/voicestudio.db
 .cursor\rules\openmemory.mdc
 AGENTS.md
+
+input_noxbf_marker.txt

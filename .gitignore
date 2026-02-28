@@ -49,6 +49,19 @@ xc_stderr.txt
 xaml_debug_chunk.txt
 xaml_debug_include_*.txt
 
+# Diagnostic artifacts (XAML compiler investigation)
+t1_*.txt
+t2_*.txt
+xc_*.txt
+input_noxbf*.json
+diagnose_compiler.ps1
+run_dumpbin.bat
+run_xaml_compiler.bat
+run_xaml_tests.bat
+test_compiler_approot.ps1
+test_xaml_compiler.ps1
+xaml_debug.log
+
 # Audit logs (local only, not committed)
 .audit/
 

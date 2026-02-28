@@ -1,5 +1,0 @@
-<Project>
-  <Target Name="PrintXamlSettings">
-    <Message Importance="high" Text="UseXamlCompilerExecutable = $(UseXamlCompilerExecutable)" />
-  </Target>
-</Project>

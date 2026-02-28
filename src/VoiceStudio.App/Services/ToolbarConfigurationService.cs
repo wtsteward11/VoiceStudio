@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -193,7 +192,7 @@ namespace VoiceStudio.App.Services
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Failed to load toolbar configuration: {ex.Message}", "ToolbarConfigurationService");
+        System.Diagnostics.Debug.WriteLine($"Failed to load toolbar configuration: {ex.Message}");
       }
 
       return null;
@@ -215,7 +214,7 @@ namespace VoiceStudio.App.Services
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Failed to load toolbar configuration: {ex.Message}", "ToolbarConfigurationService");
+        System.Diagnostics.Debug.WriteLine($"Failed to load toolbar configuration: {ex.Message}");
       }
 
       return null;
@@ -232,7 +231,7 @@ namespace VoiceStudio.App.Services
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Failed to save toolbar configuration: {ex.Message}", "ToolbarConfigurationService");
+        System.Diagnostics.Debug.WriteLine($"Failed to save toolbar configuration: {ex.Message}");
       }
     }
 
@@ -248,7 +247,7 @@ namespace VoiceStudio.App.Services
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Failed to save toolbar presets: {ex.Message}", "ToolbarConfigurationService");
+        System.Diagnostics.Debug.WriteLine($"Failed to save toolbar presets: {ex.Message}");
       }
     }
   }

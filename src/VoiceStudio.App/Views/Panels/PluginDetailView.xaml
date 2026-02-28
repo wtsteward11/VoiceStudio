@@ -86,7 +86,7 @@
                                        AutomationProperties.AutomationId="PluginDetail.Name"/>
                             <Border x:Name="VerifiedBadge"
                                     Visibility="Collapsed"
-                                    Background="{StaticResource VSQ.Status.VerifiedBrush}"
+                                    Background="#107C10"
                                     CornerRadius="4"
                                     Padding="8,4"
                                     VerticalAlignment="Center">
@@ -107,7 +107,7 @@
                         <!-- Stats Row -->
                         <StackPanel Orientation="Horizontal" Spacing="24" Margin="0,12,0,0">
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <FontIcon Glyph="&#xE735;" FontSize="14" Foreground="{StaticResource VSQ.Accent.GoldBrush}"/>
+                                <FontIcon Glyph="&#xE735;" FontSize="14" Foreground="#FFD700"/>
                                 <TextBlock x:Name="RatingText" 
                                            Text="4.5" 
                                            FontSize="14"/>

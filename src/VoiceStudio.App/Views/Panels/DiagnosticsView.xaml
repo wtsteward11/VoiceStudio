@@ -300,13 +300,12 @@
                                 </Grid>
                                 
                                 <!-- Active Jobs List -->
-                                <!-- GAP-CS-004: Added x:DataType for compile-time binding validation -->
                                 <ListView x:Name="ActiveJobsListView" 
                                           MaxHeight="200"
                                           SelectionMode="None"
                                           AutomationProperties.AutomationId="DiagnosticsView_ActiveJobsListView">
                                     <ListView.ItemTemplate>
-                                        <DataTemplate x:DataType="local:JobQueueItem">
+                                        <DataTemplate>
                                             <Grid Padding="8,4" MinHeight="40">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
@@ -378,31 +377,14 @@
                     </Grid.RowDefinitions>
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,0,12">
                         <ComboBox x:Name="LogLevelFilter" PlaceholderText="Log Level" Width="120"
-                                 SelectionChanged="LogLevelFilter_SelectionChanged"
-                                 AutomationProperties.AutomationId="DiagnosticsView_LogLevelFilter">
-                            <ComboBoxItem Content="All" IsSelected="True"/>
-                            <ComboBoxItem Content="ERROR"/>
-                            <ComboBoxItem Content="WARNING"/>
-                            <ComboBoxItem Content="INFO"/>
-                        </ComboBox>
+                                 AutomationProperties.AutomationId="DiagnosticsView_LogLevelFilter"/>
                         <TextBox x:Name="LogSearchBox" PlaceholderText="Search logs..." Width="200"
-                                TextChanged="LogSearchBox_TextChanged"
                                 AutomationProperties.AutomationId="DiagnosticsView_LogSearchBox"/>
                         <Button Content="Export"/>
                     </StackPanel>
                     <Border Grid.Row="1" Background="{StaticResource VSQ.Panel.Background}" CornerRadius="8">
                         <ListView x:Name="LogsListView" Padding="8"
-                                  AutomationProperties.AutomationId="DiagnosticsView_LogsListView">
-                            <ListView.ItemTemplate>
-                                <DataTemplate x:DataType="local:LogEntry">
-                                    <TextBlock Text="{x:Bind FormattedLine}"
-                                               FontFamily="Consolas"
-                                               FontSize="12"
-                                               TextWrapping="NoWrap"
-                                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
+                                  AutomationProperties.AutomationId="DiagnosticsView_LogsListView"/>
                     </Border>
                 </Grid>
             </Grid>
@@ -548,12 +530,11 @@
                             </Grid>
                             
                             <!-- Trace List with Timeline Bars -->
-                            <!-- GAP-CS-004: Added x:DataType for compile-time binding validation -->
                             <ListView x:Name="TracesListView" 
                                       Grid.Row="1"
                                       SelectionMode="Single">
                                 <ListView.ItemTemplate>
-                                    <DataTemplate x:DataType="local:TraceEntry">
+                                    <DataTemplate>
                                         <Grid Padding="4,8" MinHeight="40">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="200"/>
@@ -594,9 +575,8 @@
                                                             <StackPanel Orientation="Horizontal"/>
                                                         </ItemsPanelTemplate>
                                                     </ItemsControl.ItemsPanel>
-                                                    <!-- GAP-CS-004: Added x:DataType for compile-time binding validation -->
                                                     <ItemsControl.ItemTemplate>
-                                                        <DataTemplate x:DataType="local:SpanEntry">
+                                                        <DataTemplate>
                                                             <Border Width="{Binding WidthPercent}" 
                                                                     Height="12"
                                                                     Background="{Binding StatusColor}"
@@ -665,7 +645,7 @@
                                     <TextBlock Grid.Row="0" Text="Backend API:" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
                                     <TextBlock Grid.Row="0" Grid.Column="1" x:Name="BackendStatusText" Text="Connected" Foreground="Green"/>
                                     <TextBlock Grid.Row="1" Text="Base URL:" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="BaseUrlText" Text="Loading..." Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="BaseUrlText" Text="http://localhost:8001" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
                                     <TextBlock Grid.Row="2" Text="Last Ping:" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
                                     <TextBlock Grid.Row="2" Grid.Column="1" x:Name="LastPingText" Text="--" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
                                 </Grid>
@@ -682,215 +662,20 @@
 
             <!-- Engines Content -->
             <Grid x:Name="EnginesGrid" Visibility="Collapsed" Margin="0,48,0,0">
-                <ScrollViewer Padding="16">
-                    <StackPanel Spacing="16">
-                        <!-- Engine Controls -->
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <Button Content="Refresh Engines" x:Name="RefreshEnginesButton" Click="RefreshEngines_Click"
-                                        AutomationProperties.AutomationId="DiagnosticsView_RefreshEnginesButton"/>
-                            <Button Content="Stop All" x:Name="StopAllEnginesButton" Click="StopAllEngines_Click"/>
-                        </StackPanel>
-                        
-                        <!-- Engines List -->
-                        <Border Background="{StaticResource VSQ.Panel.Background}" CornerRadius="8" Padding="8">
-                            <ListView x:Name="EnginesListView" MaxHeight="300"
-                                      SelectionMode="None"
-                                      AutomationProperties.AutomationId="DiagnosticsView_EnginesListView">
-                                <ListView.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Padding="8,6" ColumnSpacing="12">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <FontIcon Grid.Column="0" Glyph="&#xE9F5;" FontSize="14"
-                                                      Foreground="{StaticResource VSQ.Accent.Brush}"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding}"
-                                                       VerticalAlignment="Center"/>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListView.ItemTemplate>
-                            </ListView>
-                        </Border>
-                        
-                        <!-- GAP-I24: Circuit Breakers Panel -->
-                        <Border Background="{StaticResource VSQ.Panel.Background}" 
-                                CornerRadius="8" 
-                                Padding="16"
-                                AutomationProperties.AutomationId="CircuitBreakerPanel">
-                            <StackPanel Spacing="12">
-                                <!-- Header -->
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <FontIcon Glyph="&#xE9F5;" FontSize="18"/>
-                                        <TextBlock Text="Circuit Breakers" 
-                                                   FontWeight="SemiBold"
-                                                   FontSize="{StaticResource VSQ.FontSize.Subtitle}"
-                                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-                                    </StackPanel>
-                                    <Button Grid.Column="1" 
-                                            x:Name="RefreshCircuitBreakersButton"
-                                            Content="Refresh"
-                                            Click="RefreshCircuitBreakers_Click"
-                                            Padding="8,4"/>
-                                </Grid>
-                                
-                                <!-- Circuit Breaker Summary -->
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    
-                                    <StackPanel Grid.Column="0" Spacing="4" HorizontalAlignment="Center">
-                                        <TextBlock Text="Total" 
-                                                   FontSize="12"
-                                                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
-                                                   HorizontalAlignment="Center"/>
-                                        <TextBlock x:Name="TotalCircuitBreakersCount" 
-                                                   Text="0" 
-                                                   FontSize="24"
-                                                   FontWeight="Bold"
-                                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
-                                                   HorizontalAlignment="Center"/>
-                                    </StackPanel>
-                                    
-                                    <StackPanel Grid.Column="1" Spacing="4" HorizontalAlignment="Center">
-                                        <TextBlock Text="Closed" 
-                                                   FontSize="12"
-                                                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
-                                                   HorizontalAlignment="Center"/>
-                                        <TextBlock x:Name="ClosedCircuitBreakersCount" 
-                                                   Text="0" 
-                                                   FontSize="24"
-                                                   FontWeight="Bold"
-                                                   Foreground="Green"
-                                                   HorizontalAlignment="Center"/>
-                                    </StackPanel>
-                                    
-                                    <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Center">
-                                        <TextBlock Text="Half-Open" 
-                                                   FontSize="12"
-                                                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
-                                                   HorizontalAlignment="Center"/>
-                                        <TextBlock x:Name="HalfOpenCircuitBreakersCount" 
-                                                   Text="0" 
-                                                   FontSize="24"
-                                                   FontWeight="Bold"
-                                                   Foreground="Orange"
-                                                   HorizontalAlignment="Center"/>
-                                    </StackPanel>
-                                    
-                                    <StackPanel Grid.Column="3" Spacing="4" HorizontalAlignment="Center">
-                                        <TextBlock Text="Open" 
-                                                   FontSize="12"
-                                                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
-                                                   HorizontalAlignment="Center"/>
-                                        <TextBlock x:Name="OpenCircuitBreakersCount" 
-                                                   Text="0" 
-                                                   FontSize="24"
-                                                   FontWeight="Bold"
-                                                   Foreground="Red"
-                                                   HorizontalAlignment="Center"/>
-                                    </StackPanel>
-                                </Grid>
-                                
-                                <!-- Circuit Breakers List -->
-                                <!-- GAP-CS-004: Added x:DataType for compile-time binding validation -->
-                                <ListView x:Name="CircuitBreakersListView" 
-                                          MaxHeight="250"
-                                          SelectionMode="None"
-                                          AutomationProperties.AutomationId="DiagnosticsView_CircuitBreakersListView">
-                                    <ListView.ItemTemplate>
-                                        <DataTemplate x:DataType="local:CircuitBreakerItem">
-                                            <Grid Padding="8,6" MinHeight="44">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="100"/>
-                                                    <ColumnDefinition Width="80"/>
-                                                    <ColumnDefinition Width="80"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                
-                                                <!-- Status Indicator -->
-                                                <Border Grid.Column="0" 
-                                                        Width="12" 
-                                                        Height="12"
-                                                        CornerRadius="6"
-                                                        Background="{Binding StateColor}"
-                                                        ToolTipService.ToolTip="{Binding State}"
-                                                        Margin="0,0,12,0"/>
-                                                
-                                                <!-- Engine Name -->
-                                                <StackPanel Grid.Column="1">
-                                                    <TextBlock Text="{Binding Name}" 
-                                                               FontWeight="SemiBold"
-                                                               TextTrimming="CharacterEllipsis"/>
-                                                    <TextBlock Text="{Binding State}" 
-                                                               FontSize="11"
-                                                               Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                                                </StackPanel>
-                                                
-                                                <!-- Failure Rate -->
-                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                                    <TextBlock Text="Failure Rate"
-                                                               FontSize="10"
-                                                               Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                                                    <TextBlock Text="{Binding FailureRateFormatted}" 
-                                                               FontWeight="SemiBold"
-                                                               Foreground="{Binding FailureRateColor}"/>
-                                                </StackPanel>
-                                                
-                                                <!-- Total Calls -->
-                                                <StackPanel Grid.Column="3" VerticalAlignment="Center">
-                                                    <TextBlock Text="Calls"
-                                                               FontSize="10"
-                                                               Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                                                    <TextBlock Text="{Binding TotalCalls}" 
-                                                               FontWeight="SemiBold"/>
-                                                </StackPanel>
-                                                
-                                                <!-- Blocked -->
-                                                <StackPanel Grid.Column="4" VerticalAlignment="Center">
-                                                    <TextBlock Text="Blocked"
-                                                               FontSize="10"
-                                                               Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                                                    <TextBlock Text="{Binding BlockedRequests}" 
-                                                               Foreground="Red"
-                                                               FontWeight="SemiBold"/>
-                                                </StackPanel>
-                                                
-                                                <!-- Reset Button -->
-                                                <Button Grid.Column="5" 
-                                                        Content="Reset" 
-                                                        Padding="8,4"
-                                                        Click="ResetCircuitBreaker_Click"
-                                                        Tag="{Binding Name}"
-                                                        ToolTipService.ToolTip="Reset circuit breaker to CLOSED state"
-                                                        Visibility="{Binding ShowResetButton}"/>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListView.ItemTemplate>
-                                </ListView>
-                                
-                                <!-- Empty State -->
-                                <TextBlock x:Name="NoCircuitBreakersText"
-                                           Text="No circuit breakers registered"
-                                           FontSize="12"
-                                           Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
-                                           HorizontalAlignment="Center"
-                                           Visibility="Collapsed"/>
-                            </StackPanel>
-                        </Border>
+                <Grid Padding="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,0,12">
+                        <Button Content="Refresh Engines" x:Name="RefreshEnginesButton" Click="RefreshEngines_Click"
+                                    AutomationProperties.AutomationId="DiagnosticsView_RefreshEnginesButton"/>
+                        <Button Content="Stop All" x:Name="StopAllEnginesButton" Click="StopAllEngines_Click"/>
                     </StackPanel>
-                </ScrollViewer>
+                    <Border Grid.Row="1" Background="{StaticResource VSQ.Panel.Background}" CornerRadius="8">
+                        <ListView x:Name="EnginesListView" Padding="8"/>
+                    </Border>
+                </Grid>
             </Grid>
 
             <!-- Commands Content -->
@@ -1018,9 +803,8 @@
                                     </Grid>
                                 </DataTemplate>
                             </ListView.HeaderTemplate>
-                            <!-- GAP-CS-004: Added x:DataType for compile-time binding validation -->
                             <ListView.ItemTemplate>
-                                <DataTemplate x:DataType="local:CommandHealthItem">
+                                <DataTemplate>
                                     <Grid Padding="8,4" MinHeight="36">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="50"/>
@@ -1116,29 +900,7 @@
                             <TextBlock Text="Environment Variables" 
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-                            <ListView x:Name="EnvVarsListView" MaxHeight="400"
-                                      SelectionMode="None"
-                                      AutomationProperties.AutomationId="DiagnosticsView_EnvVarsListView">
-                                <ListView.ItemTemplate>
-                                    <DataTemplate x:DataType="local:EnvironmentInfoItem">
-                                        <Grid Padding="4,2" ColumnSpacing="16">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="250"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{x:Bind Key}"
-                                                       FontFamily="Consolas" FontSize="12"
-                                                       FontWeight="SemiBold"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-                                            <TextBlock Grid.Column="1" Text="{x:Bind Value}"
-                                                       FontFamily="Consolas" FontSize="12"
-                                                       TextWrapping="Wrap"
-                                                       Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListView.ItemTemplate>
-                            </ListView>
+                            <ListView x:Name="EnvVarsListView" MaxHeight="400"/>
                         </StackPanel>
                     </Border>
                 </ScrollViewer>

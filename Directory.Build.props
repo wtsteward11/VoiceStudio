@@ -1,28 +1,19 @@
 <Project>
-  <!-- Build hardening: deterministic output for CI reproducibility -->
-  <PropertyGroup>
-    <Deterministic>true</Deterministic>
-    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
-    <!-- TODO: Enable after warning count reaches 0
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    -->
-  </PropertyGroup>
-
   <!-- XAML compilation is enabled (per plan: make XAML compilation succeed normally) -->
   <!-- NOTE: Target overrides are in Directory.Build.targets to ensure they run AFTER NuGet imports -->
 
   <!-- XAML compiler routing (VS-0035 fix) -->
-  <!-- UseXamlCompilerExecutable is set in Directory.Build.targets (after NuGet imports) to ensure
-       it overrides the WinUI interop.targets default. Do NOT set it here - .targets wins. -->
+  <!-- Use the WinUI XamlCompiler executable via our wrapper to avoid WMC9999 in-process failures -->
   <!-- See: https://github.com/microsoft/microsoft-ui-xaml/issues/9813 -->
+  <!-- XAML compiler routing (VS-0035 fix) -->
+  <!-- Use the WinUI XamlCompiler executable via our wrapper to avoid WMC9999 in-process failures -->
+  <!-- See: https://github.com/microsoft/microsoft-ui-xaml/issues/9813 -->
+  <!-- XAML compiler routing (VS-0035 fix): Route via wrapper for false-positive handling.
+       The WinUI SDK forces UseXamlCompilerExecutable=true regardless of project settings.
+       The wrapper handles exit code 1 by generating output.json from discovered .g.i.cs files. -->
+  <!-- Use executable XAML compiler -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'VoiceStudio.App'">
-    <!-- Route Exec to repo-local wrapper for better diagnostics + false-positive exit code handling -->
-    <XamlCompilerExePath>$(MSBuildThisFileDirectory)tools\xaml-compiler-wrapper.cmd</XamlCompilerExePath>
-  </PropertyGroup>
-
-  <!-- NuGet lock file enforcement for CI reproducibility -->
-  <PropertyGroup Condition="'$(ContinuousIntegrationBuild)' == 'true'">
-    <RestoreLockedMode>true</RestoreLockedMode>
+    <UseXamlCompilerExecutable>true</UseXamlCompilerExecutable>
   </PropertyGroup>
 
   <!-- Force WinAppSDK version to override transitive dependencies -->
@@ -30,7 +21,7 @@
     <!-- Allow ad-hoc overrides (e.g., try preview/servicing without editing files) -->
     <MicrosoftWindowsAppSDKVersion Condition="'$(WinAppSdkVersionOverride)' != ''">
       $(WinAppSdkVersionOverride)</MicrosoftWindowsAppSDKVersion>
-    <MicrosoftWindowsAppSDKVersion Condition="'$(WinAppSdkVersionOverride)' == ''">1.8.260209005</MicrosoftWindowsAppSDKVersion>
+    <MicrosoftWindowsAppSDKVersion Condition="'$(WinAppSdkVersionOverride)' == ''">1.8.251106002</MicrosoftWindowsAppSDKVersion>
   </PropertyGroup>
 
   <!-- Package version overrides to ensure consistent versions -->

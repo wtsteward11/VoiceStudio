@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -167,7 +166,7 @@ namespace VoiceStudio.App.ViewModels
           catch (Exception ex)
           {
             // Log error but continue with other profiles
-            ErrorLogger.LogWarning($"Error checking health for profile {profile.Id}: {ex.Message}", "ProfileHealthDashboardViewModel");
+            System.Diagnostics.Debug.WriteLine($"Error checking health for profile {profile.Id}: {ex.Message}");
             healthItem.HealthStatus = HealthStatus.Unknown;
           }
 

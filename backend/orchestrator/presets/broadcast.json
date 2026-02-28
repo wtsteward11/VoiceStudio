@@ -1,0 +1,24 @@
+{
+  "preset_id": "broadcast",
+  "name": "Broadcast",
+  "category": "broadcast",
+  "description": "FM-ready output with high SNR and broadcast-grade polish",
+  "default_chain": {
+    "schema_version": "1.0",
+    "name": "Broadcast Pipeline",
+    "steps": [
+      {"step_id": "s1", "type": "synthesis", "parameters": {"temperature": 0.55, "speed": 1.0}},
+      {"step_id": "s2", "type": "quality_evaluation"},
+      {"step_id": "s3", "type": "post_processing", "parameters": {"preset": "broadcast_polish"}}
+    ]
+  },
+  "default_quality_policy": {
+    "min_mos": 4.0,
+    "min_similarity": 0.8,
+    "min_naturalness": 0.85,
+    "max_artifact_score": 0.03,
+    "min_snr_db": 35,
+    "auto_enhance_if_below": true,
+    "fail_if_unmet": false
+  }
+}

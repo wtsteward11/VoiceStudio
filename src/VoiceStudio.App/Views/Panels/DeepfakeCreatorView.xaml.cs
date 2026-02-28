@@ -6,7 +6,6 @@ using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using System;
-using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -92,7 +91,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "DeepfakeCreatorView.xaml");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -133,7 +132,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "DeepfakeCreatorView.xaml");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 

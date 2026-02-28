@@ -24,16 +24,6 @@ Example usage:
 
 from __future__ import annotations
 
-from .allowed_apis import (
-    ALLOWED_HOST_METHODS,
-    ALLOWED_NOTIFICATION_METHODS,
-    ALLOWED_PLUGIN_OUTGOING,
-    is_allowed_host_method,
-    is_allowed_notification,
-    is_allowed_plugin_outgoing,
-    validate_host_method,
-    validate_notification,
-)
 from .protocol_spec import (
     STANDARD_ERROR_CODES,
     ErrorCodeSpec,
@@ -47,21 +37,18 @@ from .protocol_spec import (
 )
 
 __all__ = [
-    "ALLOWED_HOST_METHODS",
-    "ALLOWED_NOTIFICATION_METHODS",
-    "ALLOWED_PLUGIN_OUTGOING",
+    # Constants
     "STANDARD_ERROR_CODES",
     "ErrorCodeSpec",
+    # Enums
     "MethodDirection",
     "MethodSpec",
+    # Core spec classes
     "ProtocolSpec",
+    # SDK generation
     "SDKGenerator",
     "SchemaSpec",
+    # Functions
     "get_protocol_spec",
-    "is_allowed_host_method",
-    "is_allowed_notification",
-    "is_allowed_plugin_outgoing",
     "reset_spec",
-    "validate_host_method",
-    "validate_notification",
 ]

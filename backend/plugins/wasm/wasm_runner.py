@@ -570,7 +570,7 @@ class WasmRunner:
         try:
             memory = instance.exports(store).get("memory")
             if memory is not None:
-                return int(memory.data_len(store))
+                return memory.data_len(store)
         except Exception as e:
             # GAP-PY-001: Best effort memory measurement, log at debug level
             logger.debug(f"Failed to get Wasm memory usage: {e}")

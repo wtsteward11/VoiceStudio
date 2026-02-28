@@ -364,11 +364,10 @@ class PluginRatingsStore:
             return 0
 
         with self._get_connection() as conn:
-            # Use json_each for IN clause - constant SQL, no string interpolation
+            placeholders = ",".join("?" * len(rating_ids))
             cursor = conn.execute(
-                "UPDATE ratings SET synced = 1 WHERE rating_id IN "
-                "(SELECT value FROM json_each(?))",
-                (json.dumps(rating_ids),),
+                f"UPDATE ratings SET synced = 1 WHERE rating_id IN ({placeholders})",
+                rating_ids,
             )
             conn.commit()
             return cursor.rowcount

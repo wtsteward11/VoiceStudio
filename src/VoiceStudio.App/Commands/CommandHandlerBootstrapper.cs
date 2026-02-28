@@ -1,6 +1,6 @@
 using System;
+using System.Diagnostics;
 using VoiceStudio.App.Core.Commands;
-using VoiceStudio.App.Logging;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.UseCases;
 using VoiceStudio.Core.Services;
@@ -39,14 +39,14 @@ namespace VoiceStudio.App.Commands
         {
             if (_instance != null)
             {
-                ErrorLogger.LogDebug("[CommandHandlerBootstrapper] Already initialized, skipping");
+                Debug.WriteLine("[CommandHandlerBootstrapper] Already initialized, skipping");
                 return;
             }
 
             var registry = AppServices.TryGetCommandRegistry();
             if (registry == null)
             {
-                ErrorLogger.LogDebug("[CommandHandlerBootstrapper] Registry not available");
+                Debug.WriteLine("[CommandHandlerBootstrapper] Registry not available");
                 return;
             }
 
@@ -67,7 +67,7 @@ namespace VoiceStudio.App.Commands
         /// </summary>
         private void InitializeHandlers()
         {
-            ErrorLogger.LogDebug("[CommandHandlerBootstrapper] Initializing command handlers...");
+            Debug.WriteLine("[CommandHandlerBootstrapper] Initializing command handlers...");
 
             try
             {
@@ -80,14 +80,14 @@ namespace VoiceStudio.App.Commands
                 // Log health report after initialization
                 if (_registry is UnifiedCommandRegistry unifiedRegistry)
                 {
-                    ErrorLogger.LogDebug(unifiedRegistry.GetHealthReportString(), "CommandHandlerBootstrapper");
+                    Debug.WriteLine(unifiedRegistry.GetHealthReportString());
                 }
 
-                ErrorLogger.LogDebug("[CommandHandlerBootstrapper] Command handler initialization complete");
+                Debug.WriteLine("[CommandHandlerBootstrapper] Command handler initialization complete");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Initialization failed: {ex.Message}", "CommandHandlerBootstrapper");
+                Debug.WriteLine($"[CommandHandlerBootstrapper] Initialization failed: {ex.Message}");
                 throw;
             }
         }
@@ -104,16 +104,16 @@ namespace VoiceStudio.App.Commands
                 if (projectRepo != null && dialogService != null)
                 {
                     _fileHandler = new FileOperationsHandler(_registry, projectRepo, dialogService, backendClient, toastService);
-                    ErrorLogger.LogDebug("[CommandHandlerBootstrapper] FileOperationsHandler initialized");
+                    Debug.WriteLine("[CommandHandlerBootstrapper] FileOperationsHandler initialized");
                 }
                 else
                 {
-                    ErrorLogger.LogDebug("[CommandHandlerBootstrapper] FileOperationsHandler skipped: missing dependencies");
+                    Debug.WriteLine("[CommandHandlerBootstrapper] FileOperationsHandler skipped: missing dependencies");
                 }
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogDebug($"[CommandHandlerBootstrapper] FileOperationsHandler failed: {ex.Message}");
+                Debug.WriteLine($"[CommandHandlerBootstrapper] FileOperationsHandler failed: {ex.Message}");
             }
         }
 
@@ -128,16 +128,16 @@ namespace VoiceStudio.App.Commands
                 if (profilesUseCase != null && dialogService != null)
                 {
                     _profileHandler = new ProfileOperationsHandler(_registry, profilesUseCase, dialogService, toastService);
-                    ErrorLogger.LogDebug("[CommandHandlerBootstrapper] ProfileOperationsHandler initialized");
+                    Debug.WriteLine("[CommandHandlerBootstrapper] ProfileOperationsHandler initialized");
                 }
                 else
                 {
-                    ErrorLogger.LogDebug("[CommandHandlerBootstrapper] ProfileOperationsHandler skipped: missing dependencies");
+                    Debug.WriteLine("[CommandHandlerBootstrapper] ProfileOperationsHandler skipped: missing dependencies");
                 }
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogDebug($"[CommandHandlerBootstrapper] ProfileOperationsHandler failed: {ex.Message}");
+                Debug.WriteLine($"[CommandHandlerBootstrapper] ProfileOperationsHandler failed: {ex.Message}");
             }
         }
 
@@ -151,16 +151,16 @@ namespace VoiceStudio.App.Commands
                 if (audioPlayer != null)
                 {
                     _playbackHandler = new PlaybackOperationsHandler(_registry, audioPlayer, toastService);
-                    ErrorLogger.LogDebug("[CommandHandlerBootstrapper] PlaybackOperationsHandler initialized");
+                    Debug.WriteLine("[CommandHandlerBootstrapper] PlaybackOperationsHandler initialized");
                 }
                 else
                 {
-                    ErrorLogger.LogDebug("[CommandHandlerBootstrapper] PlaybackOperationsHandler skipped: missing dependencies");
+                    Debug.WriteLine("[CommandHandlerBootstrapper] PlaybackOperationsHandler skipped: missing dependencies");
                 }
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogDebug($"[CommandHandlerBootstrapper] PlaybackOperationsHandler failed: {ex.Message}");
+                Debug.WriteLine($"[CommandHandlerBootstrapper] PlaybackOperationsHandler failed: {ex.Message}");
             }
         }
 
@@ -174,16 +174,16 @@ namespace VoiceStudio.App.Commands
                 if (navigationService != null)
                 {
                     _navigationHandler = new NavigationHandler(_registry, navigationService, toastService);
-                    ErrorLogger.LogDebug("[CommandHandlerBootstrapper] NavigationHandler initialized");
+                    Debug.WriteLine("[CommandHandlerBootstrapper] NavigationHandler initialized");
                 }
                 else
                 {
-                    ErrorLogger.LogDebug("[CommandHandlerBootstrapper] NavigationHandler skipped: missing dependencies");
+                    Debug.WriteLine("[CommandHandlerBootstrapper] NavigationHandler skipped: missing dependencies");
                 }
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogDebug($"[CommandHandlerBootstrapper] NavigationHandler failed: {ex.Message}");
+                Debug.WriteLine($"[CommandHandlerBootstrapper] NavigationHandler failed: {ex.Message}");
             }
         }
 
@@ -198,16 +198,16 @@ namespace VoiceStudio.App.Commands
                 if (settingsService != null && dialogService != null)
                 {
                     _settingsHandler = new SettingsOperationsHandler(_registry, settingsService, dialogService, toastService);
-                    ErrorLogger.LogDebug("[CommandHandlerBootstrapper] SettingsOperationsHandler initialized");
+                    Debug.WriteLine("[CommandHandlerBootstrapper] SettingsOperationsHandler initialized");
                 }
                 else
                 {
-                    ErrorLogger.LogDebug("[CommandHandlerBootstrapper] SettingsOperationsHandler skipped: missing dependencies");
+                    Debug.WriteLine("[CommandHandlerBootstrapper] SettingsOperationsHandler skipped: missing dependencies");
                 }
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogDebug($"[CommandHandlerBootstrapper] SettingsOperationsHandler failed: {ex.Message}");
+                Debug.WriteLine($"[CommandHandlerBootstrapper] SettingsOperationsHandler failed: {ex.Message}");
             }
         }
 

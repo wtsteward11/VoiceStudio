@@ -1,5 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.UI.Dispatching;
 using VoiceStudio.App.Services;
+using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.Fixtures
@@ -11,6 +14,7 @@ namespace VoiceStudio.App.Tests.Fixtures
     /// </summary>
     public static class TestAppServicesHelper
     {
+        private static DispatcherQueueController? _dispatcherController;
         private static bool _initialized;
         private static readonly object _lock = new();
 
@@ -47,8 +51,10 @@ namespace VoiceStudio.App.Tests.Fixtures
                     // Not initialized at all, continue with initialization
                 }
 
-                // Use MockViewModelContext to avoid DispatcherQueue crash in MSTest environment
-                var context = new MockViewModelContext();
+                // Create dispatcher on dedicated thread (required for DispatcherQueueTimer)
+                _dispatcherController = DispatcherQueueController.CreateOnDedicatedThread();
+                var dispatcher = _dispatcherController.DispatcherQueue;
+                var context = new ViewModelContext(NullLogger.Instance, dispatcher);
 
                 // Build service collection with required services
                 var services = new ServiceCollection();
@@ -74,23 +80,26 @@ namespace VoiceStudio.App.Tests.Fixtures
         }
 
         /// <summary>
-        /// Gets the mock dispatcher queue used for tests.
-        /// Returns the MockDispatcherQueue which executes actions synchronously.
+        /// Gets the dispatcher queue used for tests.
         /// Call EnsureInitialized() before using this.
         /// </summary>
-        public static object? GetDispatcher()
+        public static DispatcherQueue? GetDispatcher()
         {
-            var context = AppServices.GetService<IViewModelContext>();
-            return context?.DispatcherQueue;
+            return _dispatcherController?.DispatcherQueue;
         }
 
         /// <summary>
-        /// Cleans up test resources.
-        /// Note: With MockViewModelContext, no special cleanup is required.
+        /// Cleans up the dispatcher controller.
+        /// Call this in [AssemblyCleanup] or at the end of test runs.
+        /// Note: AppServices cannot be reset, so tests share the same instance.
         /// </summary>
         public static void Cleanup()
         {
-            // No dispatcher cleanup needed with MockViewModelContext
+            if (_dispatcherController != null)
+            {
+                _dispatcherController.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
+                _dispatcherController = null;
+            }
         }
     }
 }

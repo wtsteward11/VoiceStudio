@@ -144,3 +144,5 @@ tools/chatgpt-localfiles/
 
 # Local database (user data)
 data/voicestudio.db
+.cursor\rules\openmemory.mdc
+AGENTS.md

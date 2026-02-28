@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
 
 namespace VoiceStudio.Core.Plugins.Models
 {
@@ -278,33 +277,6 @@ namespace VoiceStudio.Core.Plugins.Models
         /// Total bytes to download.
         /// </summary>
         public long TotalBytes { get; set; }
-    }
-
-    /// <summary>
-    /// User review for a plugin (Phase 7 Marketplace).
-    /// </summary>
-    public class PluginReview
-    {
-        [JsonPropertyName("rating_id")]
-        public string RatingId { get; set; } = string.Empty;
-
-        [JsonPropertyName("plugin_id")]
-        public string PluginId { get; set; } = string.Empty;
-
-        [JsonPropertyName("version")]
-        public string Version { get; set; } = string.Empty;
-
-        [JsonPropertyName("rating")]
-        public int Rating { get; set; }
-
-        [JsonPropertyName("review")]
-        public string Review { get; set; } = string.Empty;
-
-        [JsonPropertyName("created_at")]
-        public string CreatedAt { get; set; } = string.Empty;
-
-        [JsonPropertyName("updated_at")]
-        public string UpdatedAt { get; set; } = string.Empty;
     }
 
     /// <summary>

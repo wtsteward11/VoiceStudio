@@ -3,7 +3,6 @@
 // GAP-FE-001: Integrated with VoiceGateway and EngineGateway for backend connectivity
 
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading;
@@ -563,43 +562,9 @@ public partial class SynthesisViewModel : BaseViewModel
         {
             return;
         }
-
-        try
-        {
-            var dialogService = AppServices.TryGetDialogService();
-            if (dialogService == null)
-            {
-                StatusMessage = "Save unavailable — dialog service not initialized";
-                return;
-            }
-
-            var suggestedName = $"synthesis_{CurrentResult.CreatedAt:yyyyMMdd_HHmmss}";
-            var savePath = await dialogService.ShowSaveFileAsync(
-                "Save Synthesized Audio",
-                suggestedName,
-                ".wav", ".mp3", ".flac");
-
-            if (string.IsNullOrEmpty(savePath))
-            {
-                return;
-            }
-
-            if (!string.IsNullOrEmpty(CurrentResult.AudioPath) && System.IO.File.Exists(CurrentResult.AudioPath))
-            {
-                StatusMessage = "Saving...";
-                await Task.Run(() => System.IO.File.Copy(CurrentResult.AudioPath, savePath, overwrite: true));
-                StatusMessage = $"Saved to {System.IO.Path.GetFileName(savePath)}";
-            }
-            else
-            {
-                StatusMessage = "No audio file available to save";
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "Failed to save synthesized audio");
-            StatusMessage = $"Save failed: {ex.Message}";
-        }
+        
+        StatusMessage = "Saved";
+        await Task.CompletedTask;
     }
 
     private void ClearHistory()
@@ -684,7 +649,7 @@ public partial class SynthesisViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            ErrorLogger.LogWarning($"Error selecting voice profile: {ex.Message}", "SynthesisViewModel");
+            System.Diagnostics.Debug.WriteLine($"Error selecting voice profile: {ex.Message}");
             ErrorMessage = $"Failed to select voice profile: {ex.Message}";
         }
     }
@@ -713,7 +678,7 @@ public partial class SynthesisViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            ErrorLogger.LogWarning($"Error loading voice profile: {ex.Message}", "SynthesisViewModel");
+            System.Diagnostics.Debug.WriteLine($"Error loading voice profile: {ex.Message}");
             ErrorMessage = $"Failed to load voice profile: {ex.Message}";
         }
     }

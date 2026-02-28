@@ -20,24 +20,18 @@
     </Grid.RowDefinitions>
     <StackPanel Orientation="Horizontal" Spacing="8">
       <ToggleButton x:Name="AutomationToggleButton"
-        AutomationProperties.AutomationId="MacroView_AutomationToggleButton"
         Content="Automation"
         IsChecked="{x:Bind ViewModel.ShowAutomationView, Mode=OneWay}"
         Checked="AutomationToggleButton_Checked"
         Unchecked="AutomationToggleButton_Unchecked" />
-      <Button Content="New Macro" AutomationProperties.AutomationId="MacroView_NewMacroButton" Click="NewMacroButton_Click" />
-      <ComboBox x:Name="ParameterCombo" AutomationProperties.AutomationId="MacroView_ParameterCombo" Width="140">
+      <Button Content="New Macro" Click="NewMacroButton_Click" />
+      <ComboBox x:Name="ParameterCombo" Width="140">
         <ComboBoxItem Content="Volume" Tag="volume" IsSelected="True" />
         <ComboBoxItem Content="Pitch" Tag="pitch" />
         <ComboBoxItem Content="Speed" Tag="speed" />
       </ComboBox>
-      <Button Content="Create Curve" AutomationProperties.AutomationId="MacroView_CreateCurveButton" Click="CreateCurveButton_Click" />
-      <Button Content="Help" AutomationProperties.AutomationId="MacroView_HelpButton" Click="HelpButton_Click" />
-      <Button Content="Cancel Execution"
-        AutomationProperties.AutomationId="MacroView_CancelExecutionButton"
-        Command="{x:Bind ViewModel.CancelMacroExecutionCommand}"
-        Visibility="{x:Bind ViewModel.IsExecutingMacro, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
-        Style="{ThemeResource AccentButtonStyle}" />
+      <Button Content="Create Curve" Click="CreateCurveButton_Click" />
+      <Button Content="Help" Click="HelpButton_Click" />
     </StackPanel>
 
     <Grid Grid.Row="1" ColumnSpacing="12">
@@ -47,7 +41,6 @@
       </Grid.ColumnDefinitions>
 
       <ListView x:Name="MacrosListView"
-        AutomationProperties.AutomationId="MacroView_MacrosListView"
         ItemsSource="{x:Bind ViewModel.Macros, Mode=OneWay}"
         SelectedItem="{x:Bind ViewModel.SelectedMacro, Mode=TwoWay}"
         RightTapped="Macro_RightTapped"
@@ -57,7 +50,7 @@
             <StackPanel Padding="6">
               <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" />
               <TextBlock Text="{x:Bind Description}" Opacity="0.7" FontSize="11" />
-              <Button Content="Edit" AutomationProperties.AutomationId="MacroView_EditMacroButton" Click="EditMacroButton_Click" CommandParameter="{x:Bind}"
+              <Button Content="Edit" Click="EditMacroButton_Click" CommandParameter="{x:Bind}"
                 HorizontalAlignment="Left" />
             </StackPanel>
           </DataTemplate>
@@ -65,7 +58,6 @@
       </ListView>
 
       <ListView x:Name="AutomationCurvesListView"
-        AutomationProperties.AutomationId="MacroView_AutomationCurvesListView"
         ItemsSource="{x:Bind ViewModel.AutomationCurves, Mode=OneWay}"
         SelectedItem="{x:Bind ViewModel.SelectedAutomationCurve, Mode=TwoWay}"
         RightTapped="AutomationCurve_RightTapped"

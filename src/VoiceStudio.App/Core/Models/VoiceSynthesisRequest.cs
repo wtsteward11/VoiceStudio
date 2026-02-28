@@ -4,17 +4,12 @@ namespace VoiceStudio.Core.Models
 {
   public class VoiceSynthesisRequest
   {
-    public string Engine { get; set; } = "xtts";
+    public string Engine { get; set; } = "xtts"; // chatterbox, xtts, tortoise
     public string ProfileId { get; set; } = string.Empty;
     public string Text { get; set; } = string.Empty;
     public string Language { get; set; } = "en";
     public string? Emotion { get; set; }
-    public bool EnhanceQuality { get; set; }
-    public double Speed { get; set; } = 1.0;
-    public double Pitch { get; set; } = 0.0;
-    public double Stability { get; set; } = 0.72;
-    public double Clarity { get; set; } = 0.58;
-    public double Temperature { get; set; } = 0.35;
+    public bool EnhanceQuality { get; set; }  // Enable quality enhancement pipeline
   }
 
   public class VoiceSynthesisResponse
@@ -36,7 +31,6 @@ namespace VoiceStudio.Core.Models
   {
     public string? Text { get; set; }
     public string Engine { get; set; } = "xtts";
-    public bool ConsentAcknowledged { get; set; } = true;  // Arch Review 1.5: Required for clone
     public string QualityMode { get; set; } = "standard"; // fast, standard, high, ultra
     public bool EnhanceQuality { get; set; }  // Apply advanced quality enhancement pipeline
     public bool UseMultiReference { get; set; }  // Use ensemble approach when multiple references provided

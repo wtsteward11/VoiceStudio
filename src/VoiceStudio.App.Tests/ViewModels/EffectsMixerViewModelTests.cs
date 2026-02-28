@@ -387,48 +387,5 @@ namespace VoiceStudio.App.Tests.ViewModels
     }
 
     #endregion
-
-    #region Phase 2 Tests - Sends/Returns/SubGroups
-
-    [TestMethod]
-    public async Task CreateMixerSendAsync_CallsBackend()
-    {
-      var send = new MixerSend { Name = "Send 1" };
-      _mockBackendClient
-          .Setup(x => x.CreateMixerSendAsync(It.IsAny<string>(), It.IsAny<MixerSend>(), It.IsAny<CancellationToken>()))
-          .ReturnsAsync(send);
-
-      var result = await _mockBackendClient.Object.CreateMixerSendAsync("proj-1", send);
-      Assert.IsNotNull(result);
-      Assert.AreEqual("Send 1", result.Name);
-    }
-
-    [TestMethod]
-    public async Task CreateMixerReturnAsync_CallsBackend()
-    {
-      var ret = new MixerReturn { Name = "Return 1" };
-      _mockBackendClient
-          .Setup(x => x.CreateMixerReturnAsync(It.IsAny<string>(), It.IsAny<MixerReturn>(), It.IsAny<CancellationToken>()))
-          .ReturnsAsync(ret);
-
-      var result = await _mockBackendClient.Object.CreateMixerReturnAsync("proj-1", ret);
-      Assert.IsNotNull(result);
-      Assert.AreEqual("Return 1", result.Name);
-    }
-
-    [TestMethod]
-    public async Task CreateMixerSubGroupAsync_CallsBackend()
-    {
-      var sg = new MixerSubGroup { Name = "SubGroup 1" };
-      _mockBackendClient
-          .Setup(x => x.CreateMixerSubGroupAsync(It.IsAny<string>(), It.IsAny<MixerSubGroup>(), It.IsAny<CancellationToken>()))
-          .ReturnsAsync(sg);
-
-      var result = await _mockBackendClient.Object.CreateMixerSubGroupAsync("proj-1", sg);
-      Assert.IsNotNull(result);
-      Assert.AreEqual("SubGroup 1", result.Name);
-    }
-
-    #endregion
   }
 }

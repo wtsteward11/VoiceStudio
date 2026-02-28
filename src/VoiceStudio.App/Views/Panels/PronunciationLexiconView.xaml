@@ -2,12 +2,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:VoiceStudio.App.Controls"
-    xmlns:converters="using:VoiceStudio.App.Converters"
     xmlns:local="using:VoiceStudio.App.Views.Panels"
     x:DataType="local:PronunciationLexiconView">
-    <UserControl.Resources>
-        <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
-    </UserControl.Resources>
     <Grid x:Name="PronunciationLexiconView_Root" 
           AutomationProperties.AutomationId="PronunciationLexiconView_Root"
           Background="{StaticResource VSQ.Panel.Background}">
@@ -19,153 +15,10 @@
         <Border Grid.Row="0" 
                 Background="{StaticResource VSQ.Panel.Background.HeaderBrush}" 
                 Padding="{StaticResource VSQ.Spacing.Medium}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="Pronunciation Lexicon" 
-                           FontSize="{StaticResource VSQ.FontSize.Title}" 
-                           Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
-                    <Button Command="{x:Bind ViewModel.ImportLexiconCommand}"
-                            AutomationProperties.AutomationId="PronunciationLexiconView_ImportButton"
-                            ToolTipService.ToolTip="Import">
-                        <FontIcon Glyph="&#xE8B5;" FontSize="14"/>
-                    </Button>
-                    <Button Command="{x:Bind ViewModel.ExportLexiconCommand}"
-                            AutomationProperties.AutomationId="PronunciationLexiconView_ExportButton"
-                            ToolTipService.ToolTip="Export">
-                        <FontIcon Glyph="&#xEDE1;" FontSize="14"/>
-                    </Button>
-                    <Button Command="{x:Bind ViewModel.RefreshCommand}"
-                            AutomationProperties.AutomationId="PronunciationLexiconView_RefreshButton"
-                            ToolTipService.ToolTip="Refresh">
-                        <FontIcon Glyph="&#xE72C;" FontSize="14"/>
-                    </Button>
-                </StackPanel>
-            </Grid>
+            <TextBlock Text="Pronunciation Lexicon" 
+                       FontSize="{StaticResource VSQ.FontSize.Title}" 
+                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
         </Border>
-
-        <ScrollViewer Grid.Row="1">
-            <StackPanel Padding="16" Spacing="12">
-
-                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Add / Edit Entry" FontSize="13" FontWeight="SemiBold"
-                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-                        <Grid ColumnSpacing="8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <ComboBox Grid.Column="0"
-                                      ItemsSource="{x:Bind ViewModel.AvailableLanguages, Mode=OneWay}"
-                                      SelectedItem="{x:Bind ViewModel.SelectedLanguage, Mode=TwoWay}"
-                                      PlaceholderText="Language" HorizontalAlignment="Stretch"
-                                      AutomationProperties.AutomationId="PronunciationLexiconView_LanguageSelector"/>
-                            <Button Grid.Column="1" Command="{x:Bind ViewModel.LoadEntriesCommand}"
-                                    AutomationProperties.AutomationId="PronunciationLexiconView_LoadButton"
-                                    ToolTipService.ToolTip="Load entries for language">
-                                <FontIcon Glyph="&#xE896;" FontSize="14"/>
-                            </Button>
-                        </Grid>
-                        <TextBox Text="{x:Bind ViewModel.NewWord, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                 PlaceholderText="Word"
-                                 AutomationProperties.AutomationId="PronunciationLexiconView_WordInput"/>
-                        <Grid ColumnSpacing="8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox Text="{x:Bind ViewModel.NewPronunciation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     PlaceholderText="IPA Pronunciation (e.g. /hɛˈloʊ/)"
-                                     AutomationProperties.AutomationId="PronunciationLexiconView_PronunciationInput"/>
-                            <Button Grid.Column="1" Command="{x:Bind ViewModel.EstimatePhonemesCommand}"
-                                    AutomationProperties.AutomationId="PronunciationLexiconView_EstimateButton"
-                                    ToolTipService.ToolTip="Auto-estimate pronunciation">
-                                <FontIcon Glyph="&#xE945;" FontSize="14"/>
-                            </Button>
-                        </Grid>
-
-                        <TextBlock Text="{x:Bind ViewModel.PhonemeEstimate, Mode=OneWay}"
-                                   FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
-                                   Visibility="{x:Bind ViewModel.PhonemeEstimate, Converter={StaticResource NullToVisibilityConverter}, Mode=OneWay, FallbackValue=Collapsed}"/>
-
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <Button Command="{x:Bind ViewModel.AddEntryCommand}"
-                                    Style="{StaticResource VSQ.Button.Primary}"
-                                    AutomationProperties.AutomationId="PronunciationLexiconView_AddButton">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon Glyph="&#xE710;" FontSize="12"/>
-                                    <TextBlock Text="Add"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Command="{x:Bind ViewModel.UpdateEntryCommand}"
-                                    AutomationProperties.AutomationId="PronunciationLexiconView_UpdateButton">
-                                <FontIcon Glyph="&#xE70F;" FontSize="12"/>
-                            </Button>
-                            <Button Command="{x:Bind ViewModel.DeleteEntryCommand}"
-                                    AutomationProperties.AutomationId="PronunciationLexiconView_DeleteButton">
-                                <FontIcon Glyph="&#xE74D;" FontSize="12"/>
-                            </Button>
-                            <Button Command="{x:Bind ViewModel.TestPronunciationCommand}"
-                                    AutomationProperties.AutomationId="PronunciationLexiconView_TestButton"
-                                    ToolTipService.ToolTip="Test pronunciation">
-                                <FontIcon Glyph="&#xE768;" FontSize="12"/>
-                            </Button>
-                        </StackPanel>
-
-                        <ItemsControl ItemsSource="{x:Bind ViewModel.ValidationErrors, Mode=OneWay}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding}" FontSize="11" Foreground="OrangeRed"/>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
-
-                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Entries" FontSize="13" FontWeight="SemiBold"
-                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-                        <ListView ItemsSource="{x:Bind ViewModel.Entries, Mode=OneWay}"
-                                  SelectedItem="{x:Bind ViewModel.SelectedEntry, Mode=TwoWay}"
-                                  MaxHeight="350"
-                                  AutomationProperties.AutomationId="PronunciationLexiconView_EntryList">
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Padding="4" ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{Binding Word}" FontWeight="SemiBold"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding Pronunciation}" FontStyle="Italic"/>
-                                        <TextBlock Grid.Column="2" Text="{Binding Language}" FontSize="11" Opacity="0.6"/>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
-                    </StackPanel>
-                </Border>
-
-                <ItemsControl ItemsSource="{x:Bind ViewModel.Conflicts, Mode=OneWay}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <InfoBar IsOpen="True" Severity="Warning" Title="Conflict" Message="{Binding}" IsClosable="False"/>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-
-                <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" FontSize="12"
-                           Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-            </StackPanel>
-        </ScrollViewer>
 
         <controls:HelpOverlay x:Name="HelpOverlay" 
                               Grid.RowSpan="2"

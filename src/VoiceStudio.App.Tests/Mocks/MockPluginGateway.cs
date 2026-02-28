@@ -360,28 +360,6 @@ namespace VoiceStudio.App.Tests.Mocks
             CatalogRefreshed?.Invoke(this, EventArgs.Empty);
         }
 
-        public async Task<bool> SubmitReviewAsync(string pluginId, int rating, string review = "", string? version = null, CancellationToken cancellationToken = default)
-        {
-            await SimulateDelay(cancellationToken);
-            return !SimulateApiFailure;
-        }
-
-        public async Task<IReadOnlyList<PluginReview>> GetReviewsAsync(string pluginId, CancellationToken cancellationToken = default)
-        {
-            await SimulateDelay(cancellationToken);
-            if (SimulateApiFailure)
-                return new List<PluginReview>();
-            return new List<PluginReview>();
-        }
-
-        public async Task<PluginReview?> GetMyReviewAsync(string pluginId, CancellationToken cancellationToken = default)
-        {
-            await SimulateDelay(cancellationToken);
-            if (SimulateApiFailure)
-                return null;
-            return null;
-        }
-
         #endregion
 
         #region Helper Methods

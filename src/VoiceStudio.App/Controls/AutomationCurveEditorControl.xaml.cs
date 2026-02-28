@@ -33,11 +33,7 @@ namespace VoiceStudio.App.Controls
             SizeChanged += (_, _) => UpdateVisual();
         }
 
-        public Task LoadCurvesAsync()
-        {
-            DispatcherQueue?.TryEnqueue(() => UpdateVisual());
-            return Task.CompletedTask;
-        }
+        public Task LoadCurvesAsync() => Task.CompletedTask;
 
         private void UpdateVisual()
         {

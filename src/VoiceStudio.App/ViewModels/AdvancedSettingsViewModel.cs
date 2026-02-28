@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading;
@@ -209,7 +208,7 @@ namespace VoiceStudio.App.ViewModels
       {
         // GPU device loading is optional - don't show error if it fails
         // Just leave AvailableGpuDevices empty
-        ErrorLogger.LogWarning($"Failed to load GPU devices: {ex.Message}", "AdvancedSettingsViewModel");
+        System.Diagnostics.Debug.WriteLine($"Failed to load GPU devices: {ex.Message}");
       }
     }
 

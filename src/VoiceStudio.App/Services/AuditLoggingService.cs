@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -187,7 +186,7 @@ namespace VoiceStudio.App.Services
             catch (Exception ex)
             {
                 // Git info is optional - log at debug level only
-                ErrorLogger.LogWarning($"[AuditLogging] Git info read failed: {ex.Message}", "AuditLoggingService");
+                System.Diagnostics.Debug.WriteLine($"[AuditLogging] Git info read failed: {ex.Message}");
             }
             return string.Empty;
         }

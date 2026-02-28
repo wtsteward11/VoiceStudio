@@ -1,6 +1,6 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Controls;
@@ -71,7 +71,7 @@ namespace VoiceStudio.App.Services
         {
             if (!_panelRegistry.TryGetValue(panelId, out var panelInfo))
             {
-                ErrorLogger.LogDebug($"[NavigationBridge] Unknown panel ID: {panelId}", "NavigationBridge");
+                Debug.WriteLine($"[NavigationBridge] Unknown panel ID: {panelId}");
                 return Task.CompletedTask;
             }
 
@@ -113,7 +113,7 @@ namespace VoiceStudio.App.Services
                 IsBackNavigation = false
             });
 
-            ErrorLogger.LogInfo($"[NavigationBridge] Navigated to: {panelId}", "NavigationBridge");
+            Debug.WriteLine($"[NavigationBridge] Navigated to: {panelId}");
             return Task.CompletedTask;
         }
 
@@ -162,7 +162,7 @@ namespace VoiceStudio.App.Services
                 IsBackNavigation = true
             });
 
-            ErrorLogger.LogInfo($"[NavigationBridge] Navigated back to: {lastEntry.PanelId}", "NavigationBridge");
+            Debug.WriteLine($"[NavigationBridge] Navigated back to: {lastEntry.PanelId}");
             return Task.CompletedTask;
         }
 
@@ -217,7 +217,7 @@ namespace VoiceStudio.App.Services
                 IsBackNavigation = false // This is forward navigation
             });
 
-            ErrorLogger.LogInfo($"[NavigationBridge] Navigated forward to: {nextEntry.PanelId}", "NavigationBridge");
+            Debug.WriteLine($"[NavigationBridge] Navigated forward to: {nextEntry.PanelId}");
             return Task.CompletedTask;
         }
 

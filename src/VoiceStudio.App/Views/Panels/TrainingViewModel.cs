@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -30,9 +29,6 @@ namespace VoiceStudio.App.Views.Panels
     private MultiSelectState? _multiSelectState;
     private CancellationTokenSource? _pollingCts;
     private bool _isPolling;
-
-    // GAP-I15: Disposal token for fire-and-forget operations
-    private readonly CancellationTokenSource _disposalCts = new();
 
     // Phase 3: WebSocket client for real-time training progress updates
     private readonly JobProgressWebSocketClient? _jobProgressClient;
@@ -111,12 +107,6 @@ namespace VoiceStudio.App.Views.Panels
 
     [ObservableProperty]
     private bool hasMultipleTrainingJobSelection;
-
-    [ObservableProperty]
-    private bool isSimulationMode;
-
-    [ObservableProperty]
-    private string? simulationReason;
 
     // Quality monitoring (IDEA 54)
     [ObservableProperty]
@@ -397,10 +387,9 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (value != null)
       {
-        // GAP-I15: Auto-load logs and quality history when job is selected
-        // Use disposal token for fire-and-forget operations
-        _ = LoadLogsAsync(_disposalCts.Token);
-        _ = LoadQualityHistoryAsync(_disposalCts.Token);
+        // Auto-load logs and quality history when job is selected
+        _ = LoadLogsAsync(CancellationToken.None);
+        _ = LoadQualityHistoryAsync(CancellationToken.None);
       }
       else
       {
@@ -565,15 +554,16 @@ namespace VoiceStudio.App.Views.Panels
           SelectedDataset = Datasets.FirstOrDefault();
         }
 
-        if (_undoRedoService != null && datasetIndex >= 0)
-        {
-            var action = new DeleteTrainingDatasetAction(
-                Datasets,
-                _backendClient,
-                dataset,
-                datasetIndex);
-            _undoRedoService.RegisterAction(action);
-        }
+        // Note: Register undo action - DeleteTrainingDatasetAction not implemented
+        // if (_undoRedoService != null && datasetIndex >= 0)
+        // {
+        //     var action = new DeleteTrainingDatasetAction(
+        //         Datasets,
+        //         _backendClient,
+        //         dataset,
+        //         datasetIndex);
+        //     _undoRedoService.RegisterAction(action);
+        // }
 
         _toastNotificationService?.ShowSuccess(
             ResourceHelper.GetString("Toast.Title.DatasetDeleted", "Dataset Deleted"),
@@ -875,11 +865,11 @@ namespace VoiceStudio.App.Views.Panels
       {
         await _jobProgressClient.ConnectAsync();
         _isWebSocketConnected = _jobProgressClient.IsConnected;
-        ErrorLogger.LogDebug($"TrainingViewModel: WebSocket connected: {_isWebSocketConnected}", "TrainingViewModel");
+        System.Diagnostics.Debug.WriteLine($"TrainingViewModel: WebSocket connected: {_isWebSocketConnected}");
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"TrainingViewModel: WebSocket connection failed: {ex.Message}", "TrainingViewModel");
+        System.Diagnostics.Debug.WriteLine($"TrainingViewModel: WebSocket connection failed: {ex.Message}");
         _isWebSocketConnected = false;
       }
     }
@@ -896,7 +886,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"TrainingViewModel: WebSocket disconnect error: {ex.Message}", "TrainingViewModel");
+        System.Diagnostics.Debug.WriteLine($"TrainingViewModel: WebSocket disconnect error: {ex.Message}");
       }
     }
 
@@ -956,20 +946,11 @@ namespace VoiceStudio.App.Views.Panels
           
           // Show success notification
           _toastNotificationService?.ShowSuccess($"Training job completed successfully");
-
-          // GAP-B05: Publish ProfileCreatedEvent for cross-panel synchronization
-          // This allows ProfilesView to refresh and show the newly trained profile
-          if (!string.IsNullOrEmpty(job.ProfileId) && _eventAggregator != null)
-          {
-            var profileName = $"Trained Profile ({job.Engine})";
-            _eventAggregator.Publish(new ProfileCreatedEvent(PanelId, job.ProfileId, profileName));
-            ErrorLogger.LogDebug($"[TrainingViewModel] Published ProfileCreatedEvent: {job.ProfileId}", "TrainingViewModel");
-          }
         }
 
-        // GAP-I15: Refresh logs and jobs to get final state using disposal token
-        await LoadLogsAsync(_disposalCts.Token);
-        await LoadTrainingJobsAsync(_disposalCts.Token);
+        // Refresh logs and jobs to get final state
+        await LoadLogsAsync(CancellationToken.None);
+        await LoadTrainingJobsAsync(CancellationToken.None);
       });
     }
 
@@ -1005,9 +986,9 @@ namespace VoiceStudio.App.Views.Panels
         if (!_isPolling)
         {
           _isPolling = true;
-          // GAP-I15: Load once using disposal token, then rely on WebSocket for updates
-          _ = LoadDatasetsAsync(_disposalCts.Token);
-          _ = LoadTrainingJobsAsync(_disposalCts.Token);
+          // Load once, then rely on WebSocket for updates
+          _ = LoadDatasetsAsync(CancellationToken.None);
+          _ = LoadTrainingJobsAsync(CancellationToken.None);
         }
         return;
       }
@@ -1076,9 +1057,6 @@ namespace VoiceStudio.App.Views.Panels
           {
             var updatedStatus = await _backendClient.GetTrainingStatusAsync(SelectedTrainingJob.Id, cancellationToken);
 
-            IsSimulationMode = updatedStatus.SimulationMode;
-            SimulationReason = updatedStatus.SimulationReason;
-
             // Update in collection
             var index = TrainingJobs.IndexOf(SelectedTrainingJob);
             if (index >= 0)
@@ -1104,7 +1082,7 @@ namespace VoiceStudio.App.Views.Panels
         catch (Exception ex)
         {
           // Log but don't show error for polling failures
-          ErrorLogger.LogWarning($"Polling error: {ex.Message}", "TrainingViewModel");
+          System.Diagnostics.Debug.WriteLine($"Polling error: {ex.Message}");
         }
 
         await Task.Delay(2000, cancellationToken); // Poll every 2 seconds

@@ -25,13 +25,6 @@ public sealed partial class FirstRunWizard : Window
   private const int TotalSteps = 4;
   private readonly CancellationTokenSource _cts = new();
   private bool _backendRunning;
-  private bool _hasDependencyInfo;
-
-  /// <summary>
-  /// GAP-X02: Tracks whether the wizard was completed successfully.
-  /// True if user clicked Finish or Skip, false if user closed window early.
-  /// </summary>
-  public bool WasCompleted { get; private set; }
 
   public bool DontShowAgain => DontShowAgainCheckBox?.IsChecked ?? false;
 
@@ -95,8 +88,7 @@ public sealed partial class FirstRunWizard : Window
     }
     else
     {
-      // GAP-X02: Mark wizard as completed and save preference
-      WasCompleted = true;
+      // Save preference and close
       await SaveFirstRunCompleteAsync();
       this.Close();
     }
@@ -113,8 +105,6 @@ public sealed partial class FirstRunWizard : Window
 
   private async void SkipButton_Click(object sender, RoutedEventArgs e)
   {
-    // GAP-X02: Mark wizard as completed (skipped counts as completed)
-    WasCompleted = true;
     await SaveFirstRunCompleteAsync();
     this.Close();
   }
@@ -287,7 +277,7 @@ public sealed partial class FirstRunWizard : Window
 
       try
       {
-        var response = await httpClient.GetAsync("http://localhost:8000/health", _cts.Token);
+        var response = await httpClient.GetAsync("http://localhost:8001/health", _cts.Token);
         _backendRunning = response.IsSuccessStatusCode;
 
         SetCheckStatus(BackendIcon, BackendStatus, _backendRunning,
@@ -295,31 +285,16 @@ public sealed partial class FirstRunWizard : Window
 
         if (_backendRunning)
         {
+          // Check engines
           SetCheckStatus(EnginesIcon, EnginesStatus, false, "Checking...");
           await Task.Delay(500);
 
           try
           {
-            var enginesResponse = await httpClient.GetAsync("http://localhost:8000/api/engines", _cts.Token);
+            var enginesResponse = await httpClient.GetAsync("http://localhost:8001/api/engines", _cts.Token);
             var enginesOk = enginesResponse.IsSuccessStatusCode;
             SetCheckStatus(EnginesIcon, EnginesStatus, enginesOk,
                 enginesOk ? "Available" : "Error loading");
-
-            // GAP-X02: Check optional dependencies for engine setup guidance
-            try
-            {
-              var depsResponse = await httpClient.GetAsync("http://localhost:8000/api/health/dependencies", _cts.Token);
-              if (depsResponse.IsSuccessStatusCode)
-              {
-                var depsJson = await depsResponse.Content.ReadAsStringAsync(_cts.Token);
-                _hasDependencyInfo = true;
-                ErrorLogger.LogDebug($"Dependencies check completed: {depsJson.Length} chars", "FirstRunWizard");
-              }
-            }
-            catch (Exception depEx)
-            {
-              ErrorLogger.LogWarning($"Dependencies check skipped: {depEx.Message}", "FirstRunWizard");
-            }
           }
           catch
           {

@@ -250,13 +250,9 @@ namespace VoiceStudio.App.ViewModels
   public class StylePreset
   {
     public string Id { get; set; } = string.Empty;
-    public string SetId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
     public string Style { get; set; } = string.Empty;
-    public string VoiceProfileId { get; set; } = string.Empty;
     public System.Collections.Generic.Dictionary<string, double> Parameters { get; set; } = new();
-    public System.Collections.Generic.Dictionary<string, double> StyleCharacteristics { get; set; } = new();
     public string Created { get; set; } = string.Empty;
   }
 

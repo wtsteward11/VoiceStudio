@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.UI.Xaml;
@@ -164,58 +163,21 @@ namespace VoiceStudio.App.Controls
       var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 0, 0) };
       panel.Children.Add(new TextBlock { Text = "Engine:", Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
       var comboBox = new ComboBox { Width = 140 };
+      comboBox.Items.Add("XTTS v2");
+      comboBox.Items.Add("OpenVoice");
+      comboBox.Items.Add("RVC");
+      comboBox.Items.Add("Piper");
+      comboBox.Items.Add("Bark");
+      comboBox.SelectedIndex = 0; // Default to first engine
 
-      try
-      {
-        var engineManager = AppServices.GetService<EngineManager>();
-        var engines = engineManager?.GetEngines().ToList();
-        if (engines != null && engines.Count > 0)
-        {
-          foreach (var engine in engines)
-          {
-            comboBox.Items.Add(engine.Name ?? engine.Id);
-          }
-        }
-        else
-        {
-          comboBox.Items.Add("XTTS v2");
-          comboBox.Items.Add("OpenVoice");
-          comboBox.Items.Add("RVC");
-          comboBox.Items.Add("Piper");
-          comboBox.Items.Add("Bark");
-        }
-      }
-      catch
-      {
-        comboBox.Items.Add("XTTS v2");
-        comboBox.Items.Add("OpenVoice");
-        comboBox.Items.Add("RVC");
-        comboBox.Items.Add("Piper");
-        comboBox.Items.Add("Bark");
-      }
-
-      comboBox.SelectedIndex = 0;
-
+      // Wire up selection changed to switch engines
       comboBox.SelectionChanged += (sender, e) =>
       {
         if (sender is ComboBox cb && cb.SelectedItem is string engineName)
         {
           var toastService = ServiceProvider.TryGetToastNotificationService();
-          var engineManager = AppServices.GetService<EngineManager>();
-          var matchedEngine = engineManager?.GetEngines()
-              .FirstOrDefault(eng => (eng.Name ?? eng.Id) == engineName);
-
-          if (matchedEngine != null)
-          {
-            toastService?.ShowInfo($"Selected: {engineName}", "Engine");
-          }
-          else
-          {
-            toastService?.ShowWarning(
-                $"{engineName} is not available from the backend. Install engines via Settings > Engines.",
-                "Engine Unavailable");
-          }
-          ErrorLogger.LogDebug($"Engine switch requested: {engineName}, available: {matchedEngine != null}", "CustomizableToolbar.xaml");
+          toastService?.ShowInfo("Engine", $"Selected: {engineName}");
+          System.Diagnostics.Debug.WriteLine($"Engine switch requested: {engineName}");
         }
       };
 
@@ -365,13 +327,13 @@ namespace VoiceStudio.App.Controls
           toastService?.ShowInfo("Workspace", $"Selected: {GetDisplayNameFromProfileId(workspaceId)}");
         }
 
-        ErrorLogger.LogDebug($"Workspace switch: {workspaceId}", "CustomizableToolbar.xaml");
+        System.Diagnostics.Debug.WriteLine($"Workspace switch: {workspaceId}");
       }
       catch (Exception ex)
       {
         var toastService = ServiceProvider.TryGetToastNotificationService();
         toastService?.ShowError("Workspace Error", ex.Message);
-        ErrorLogger.LogWarning($"Workspace switch error: {ex}", "CustomizableToolbar.xaml");
+        System.Diagnostics.Debug.WriteLine($"Workspace switch error: {ex}");
       }
     }
 
@@ -423,7 +385,7 @@ namespace VoiceStudio.App.Controls
       void Log(string msg)
       {
         var line = $"[{DateTime.Now:HH:mm:ss.fff}] {msg}";
-        ErrorLogger.LogDebug(line, "CustomizableToolbar.xaml");
+        System.Diagnostics.Debug.WriteLine(line);
         // ALLOWED: empty catch - Best effort debug logging, failure is acceptable
         try { System.IO.File.AppendAllText(logPath, line + Environment.NewLine); } catch { }
       }
@@ -446,7 +408,7 @@ namespace VoiceStudio.App.Controls
             Log($"[Toolbar] MainWindowInstance NOT available: {App.MainWindowInstance?.GetType().Name ?? "null"}");
             var toastService = ServiceProvider.TryGetToastNotificationService();
             toastService?.ShowError("Import Error", "MainWindow not available");
-            ErrorLogger.LogWarning($"Import failed: App.MainWindowInstance is {App.MainWindowInstance?.GetType().Name ?? "null"}", "CustomizableToolbar.xaml");
+            System.Diagnostics.Debug.WriteLine($"Import failed: App.MainWindowInstance is {App.MainWindowInstance?.GetType().Name ?? "null"}");
           }
           return;
         case "loop":
@@ -460,7 +422,7 @@ namespace VoiceStudio.App.Controls
           }
           catch (Exception ex)
           {
-            ErrorLogger.LogWarning($"[Toolbar] Loop toggle failed: {ex.Message}", "CustomizableToolbar.xaml");
+            System.Diagnostics.Debug.WriteLine($"[Toolbar] Loop toggle failed: {ex.Message}");
           }
           return;
       }

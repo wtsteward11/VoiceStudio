@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Core.Commands;
-using VoiceStudio.App.Logging;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.UseCases;
 using VoiceStudio.Core.Models;
@@ -151,7 +151,7 @@ namespace VoiceStudio.App.Commands
                 _ => true
             );
 
-            ErrorLogger.LogDebug("Registered 6 profile commands", "ProfileOperationsHandler");
+            Debug.WriteLine("[ProfileOperationsHandler] Registered 6 profile commands");
         }
 
         public async Task CreateProfileAsync(CancellationToken ct = default)
@@ -176,11 +176,11 @@ namespace VoiceStudio.App.Commands
                 ProfilesChanged?.Invoke(this, EventArgs.Empty);
                 _toastService?.ShowSuccess($"Created profile: {name}");
 
-                ErrorLogger.LogInfo($"Created profile: {name} (ID: {profile.Id})", "ProfileOperationsHandler");
+                Debug.WriteLine($"[ProfileOperationsHandler] Created profile: {name} (ID: {profile.Id})");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Create failed: {ex.Message}", "ProfileOperationsHandler");
+                Debug.WriteLine($"[ProfileOperationsHandler] Create failed: {ex.Message}");
                 await _dialogService.ShowErrorAsync(
                     "Create Failed",
                     $"Failed to create profile: {ex.Message}");
@@ -241,11 +241,11 @@ namespace VoiceStudio.App.Commands
                 ProfilesChanged?.Invoke(this, EventArgs.Empty);
                 _toastService?.ShowSuccess($"Profile updated: {newName}");
 
-                ErrorLogger.LogInfo($"Updated profile: {newName}", "ProfileOperationsHandler");
+                Debug.WriteLine($"[ProfileOperationsHandler] Updated profile: {newName}");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Edit failed: {ex.Message}", "ProfileOperationsHandler");
+                Debug.WriteLine($"[ProfileOperationsHandler] Edit failed: {ex.Message}");
                 await _dialogService.ShowErrorAsync(
                     "Edit Failed",
                     $"Failed to update profile: {ex.Message}");
@@ -297,7 +297,7 @@ namespace VoiceStudio.App.Commands
                     ProfilesChanged?.Invoke(this, EventArgs.Empty);
                     _toastService?.ShowSuccess($"Profile deleted: {profileName ?? profileId}");
 
-                    ErrorLogger.LogInfo($"Deleted profile: {profileId}", "ProfileOperationsHandler");
+                    Debug.WriteLine($"[ProfileOperationsHandler] Deleted profile: {profileId}");
                 }
                 else
                 {
@@ -306,7 +306,7 @@ namespace VoiceStudio.App.Commands
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Delete failed: {ex.Message}", "ProfileOperationsHandler");
+                Debug.WriteLine($"[ProfileOperationsHandler] Delete failed: {ex.Message}");
                 await _dialogService.ShowErrorAsync(
                     "Delete Failed",
                     $"Failed to delete profile: {ex.Message}");
@@ -332,11 +332,11 @@ namespace VoiceStudio.App.Commands
                     ct);
 
                 _toastService?.ShowSuccess($"Profile saved: {_selectedProfile.Name}");
-                ErrorLogger.LogInfo($"Saved profile: {_selectedProfile.Name}", "ProfileOperationsHandler");
+                Debug.WriteLine($"[ProfileOperationsHandler] Saved profile: {_selectedProfile.Name}");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Save failed: {ex.Message}", "ProfileOperationsHandler");
+                Debug.WriteLine($"[ProfileOperationsHandler] Save failed: {ex.Message}");
                 await _dialogService.ShowErrorAsync(
                     "Save Failed",
                     $"Failed to save profile: {ex.Message}");
@@ -368,7 +368,7 @@ namespace VoiceStudio.App.Commands
                 {
                     SelectProfile(profile);
                     _toastService?.ShowInfo($"Loaded profile: {profile.Name}");
-                    ErrorLogger.LogInfo($"Loaded profile: {profile.Name}", "ProfileOperationsHandler");
+                    Debug.WriteLine($"[ProfileOperationsHandler] Loaded profile: {profile.Name}");
                 }
                 else
                 {
@@ -377,7 +377,7 @@ namespace VoiceStudio.App.Commands
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Load failed: {ex.Message}", "ProfileOperationsHandler");
+                Debug.WriteLine($"[ProfileOperationsHandler] Load failed: {ex.Message}");
                 await _dialogService.ShowErrorAsync(
                     "Load Failed",
                     $"Failed to load profile: {ex.Message}");
@@ -435,11 +435,11 @@ namespace VoiceStudio.App.Commands
                 ProfilesChanged?.Invoke(this, EventArgs.Empty);
                 _toastService?.ShowSuccess($"Profile cloned: {newName}");
 
-                ErrorLogger.LogInfo($"Cloned profile '{original.Name}' to '{newName}'", "ProfileOperationsHandler");
+                Debug.WriteLine($"[ProfileOperationsHandler] Cloned profile '{original.Name}' to '{newName}'");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Clone failed: {ex.Message}", "ProfileOperationsHandler");
+                Debug.WriteLine($"[ProfileOperationsHandler] Clone failed: {ex.Message}");
                 await _dialogService.ShowErrorAsync(
                     "Clone Failed",
                     $"Failed to clone profile: {ex.Message}");
@@ -450,7 +450,7 @@ namespace VoiceStudio.App.Commands
         {
             _selectedProfile = profile;
             SelectedProfileChanged?.Invoke(this, profile);
-            ErrorLogger.LogDebug($"Selected profile: {profile?.Name ?? "(none)"}", "ProfileOperationsHandler");
+            Debug.WriteLine($"[ProfileOperationsHandler] Selected profile: {profile?.Name ?? "(none)"}");
         }
     }
 }

@@ -1319,6 +1319,8 @@ def _register_all_routes():
         "pipeline",
         # Comprehensive Gap Remediation (2026-02-10)
         "realtime_settings",
+        # Phase X-A: Intelligent Engine Orchestrator
+        "orchestrator",
     ]
 
     route_modules = {}
@@ -1469,6 +1471,9 @@ def _register_all_routes():
     _include_route("integrations")
     _include_route("pipeline")
     _include_route("realtime_settings")
+
+    # Phase X-A: Intelligent Engine Orchestrator
+    _include_route("orchestrator")
 
     # Register additional sub-routers for UI compatibility
     try:

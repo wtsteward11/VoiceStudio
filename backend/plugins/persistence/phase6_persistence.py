@@ -598,31 +598,38 @@ class Phase6Persistence:
         limit: int = 1000,
     ) -> list[PersistedAnalyticsEvent]:
         """Query analytics events with filtering."""
-        # Use ? IS NULL OR col = ? pattern - no string interpolation, fully parameterized
-        sql = """
-            SELECT * FROM analytics_events
-            WHERE (? IS NULL OR plugin_id = ?)
-              AND (? IS NULL OR event_type = ?)
-              AND (? IS NULL OR timestamp >= ?)
-              AND (? IS NULL OR timestamp <= ?)
-            ORDER BY timestamp DESC
-            LIMIT ?
-            """
-        params: list[Any] = [
-            plugin_id,
-            plugin_id,
-            event_type,
-            event_type,
-            start_time.isoformat() if start_time else None,
-            start_time.isoformat() if start_time else None,
-            end_time.isoformat() if end_time else None,
-            end_time.isoformat() if end_time else None,
-            limit,
-        ]
+        conditions = []
+        params: list[Any] = []
+
+        if plugin_id:
+            conditions.append("plugin_id = ?")
+            params.append(plugin_id)
+
+        if event_type:
+            conditions.append("event_type = ?")
+            params.append(event_type)
+
+        if start_time:
+            conditions.append("timestamp >= ?")
+            params.append(start_time.isoformat())
+
+        if end_time:
+            conditions.append("timestamp <= ?")
+            params.append(end_time.isoformat())
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, params)
+            cursor.execute(
+                f"""
+                SELECT * FROM analytics_events
+                WHERE {where_clause}
+                ORDER BY timestamp DESC
+                LIMIT ?
+                """,
+                params + [limit],
+            )
 
             events = []
             for row in cursor.fetchall():
@@ -657,32 +664,31 @@ class Phase6Persistence:
                 row = cursor.fetchone()
 
                 if row:
-                    # Constant SQL with COALESCE - no string interpolation
-                    cursor.execute(
-                        """
-                        UPDATE plugin_metrics SET
-                            total_installs = COALESCE(?, total_installs),
-                            active_installs = COALESCE(?, active_installs),
-                            total_views = COALESCE(?, total_views),
-                            total_uses = COALESCE(?, total_uses),
-                            total_errors = COALESCE(?, total_errors),
-                            avg_rating = COALESCE(?, avg_rating),
-                            rating_count = COALESCE(?, rating_count),
-                            last_updated = ?
-                        WHERE plugin_id = ?
-                        """,
-                        (
-                            kwargs.get("total_installs"),
-                            kwargs.get("active_installs"),
-                            kwargs.get("total_views"),
-                            kwargs.get("total_uses"),
-                            kwargs.get("total_errors"),
-                            kwargs.get("avg_rating"),
-                            kwargs.get("rating_count"),
-                            datetime.utcnow().isoformat(),
-                            plugin_id,
-                        ),
-                    )
+                    # Update existing
+                    updates = []
+                    params = []
+                    for key, value in kwargs.items():
+                        if key in (
+                            "total_installs",
+                            "active_installs",
+                            "total_views",
+                            "total_uses",
+                            "total_errors",
+                            "avg_rating",
+                            "rating_count",
+                        ):
+                            updates.append(f"{key} = ?")
+                            params.append(value)
+
+                    if updates:
+                        updates.append("last_updated = ?")
+                        params.append(datetime.utcnow().isoformat())
+                        params.append(plugin_id)
+
+                        cursor.execute(
+                            f"UPDATE plugin_metrics SET {', '.join(updates)} WHERE plugin_id = ?",
+                            params,
+                        )
                 else:
                     # Insert new
                     cursor.execute(

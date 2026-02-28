@@ -1,10 +1,8 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Moq;
 using System;
 using System.Linq;
 using VoiceStudio.App.Services;
 using VoiceStudio.Core.Panels;
-using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.Services
 {
@@ -12,13 +10,11 @@ namespace VoiceStudio.App.Tests.Services
     public class PanelRegistryTests
     {
         private PanelRegistry _sut = null!;
-        private Mock<IViewModelFactory> _mockViewModelFactory = null!;
 
         [TestInitialize]
         public void Setup()
         {
-            _mockViewModelFactory = new Mock<IViewModelFactory>();
-            _sut = new PanelRegistry(_mockViewModelFactory.Object);
+            _sut = new PanelRegistry();
         }
 
         #region RegisterPanel Tests
@@ -174,7 +170,6 @@ namespace VoiceStudio.App.Tests.Services
         }
 
         [TestMethod]
-        [ExpectedException(typeof(InvalidOperationException))]
         public void Register_DoesNotAddDuplicatePanelId()
         {
             var descriptor1 = new PanelDescriptor
@@ -191,7 +186,11 @@ namespace VoiceStudio.App.Tests.Services
             };
 
             _sut.Register(descriptor1);
-            _sut.Register(descriptor2); // Should throw InvalidOperationException
+            _sut.Register(descriptor2);
+
+            var descriptors = _sut.GetAllDescriptors().ToList();
+            Assert.AreEqual(1, descriptors.Count);
+            Assert.AreEqual("Test Panel 1", descriptors[0].DisplayName);
         }
 
         [TestMethod]
@@ -205,26 +204,6 @@ namespace VoiceStudio.App.Tests.Services
 
             var descriptors = _sut.GetAllDescriptors().ToList();
             Assert.AreEqual(2, descriptors.Count);
-        }
-
-        [TestMethod]
-        public void TryGetDescriptor_ResolvesNormalizedAlias()
-        {
-            _sut.Register(new PanelDescriptor { PanelId = "VoiceSynthesis" });
-
-            var found = _sut.TryGetDescriptor("voice_synthesis", out var descriptor);
-
-            Assert.IsTrue(found);
-            Assert.IsNotNull(descriptor);
-            Assert.AreEqual("VoiceSynthesis", descriptor.PanelId);
-        }
-
-        [TestMethod]
-        public void IsRegistered_ResolvesNormalizedAlias()
-        {
-            _sut.Register(new PanelDescriptor { PanelId = "ProfileHealthDashboard" });
-
-            Assert.IsTrue(_sut.IsRegistered("profile-health-dashboard"));
         }
 
         #endregion

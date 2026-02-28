@@ -1,7 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
-using VoiceStudio.App.Logging;
 using System.Threading.Tasks;
 using VoiceStudio.Core.Plugins;
 using VoiceStudio.Core.Plugins.Models;
@@ -123,7 +122,7 @@ namespace VoiceStudio.App.Views.Panels
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"[PluginDetail] Failed to load versions: {ex.Message}", "PluginDetailView.xaml");
+                System.Diagnostics.Debug.WriteLine($"[PluginDetail] Failed to load versions: {ex.Message}");
             }
         }
 

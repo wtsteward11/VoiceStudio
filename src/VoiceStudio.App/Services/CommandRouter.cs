@@ -1,5 +1,5 @@
 using System;
-using VoiceStudio.App.Logging;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
@@ -65,7 +65,7 @@ namespace VoiceStudio.App.Services
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"[CommandRouter] Command '{commandId}' failed: {ex.Message}", "CommandRouter");
+                Debug.WriteLine($"[CommandRouter] Command '{commandId}' failed: {ex.Message}");
                 return false;
             }
         }
@@ -163,7 +163,7 @@ namespace VoiceStudio.App.Services
             {
                 // Fallback to click handler if command not found
                 button.Click += CreateClickHandler(commandId, parameter);
-                ErrorLogger.LogDebug($"[CommandRouter] Warning: Command '{commandId}' not found, using click handler fallback", "CommandRouter");
+                Debug.WriteLine($"[CommandRouter] Warning: Command '{commandId}' not found, using click handler fallback");
             }
         }
 
@@ -183,7 +183,7 @@ namespace VoiceStudio.App.Services
             else
             {
                 menuItem.Click += CreateClickHandler(commandId, parameter);
-                ErrorLogger.LogDebug($"[CommandRouter] Warning: Command '{commandId}' not found for menu item", "CommandRouter");
+                Debug.WriteLine($"[CommandRouter] Warning: Command '{commandId}' not found for menu item");
             }
         }
 
@@ -206,21 +206,12 @@ namespace VoiceStudio.App.Services
         /// Wires multiple buttons to their respective commands based on Tag values.
         /// Each button's Tag should contain the command ID.
         /// </summary>
-        /// <remarks>
-        /// GAP-B19: Tag values are validated against CommandIds for compile-time safety.
-        /// </remarks>
         public void WireButtonsByTag(params ButtonBase[] buttons)
         {
             foreach (var button in buttons)
             {
                 if (button?.Tag is string commandId && !string.IsNullOrEmpty(commandId))
                 {
-                    // GAP-B19: Validate Tag against known command IDs
-                    if (!CommandIds.IsKnown(commandId))
-                    {
-                        ErrorLogger.LogDebug($"[CommandRouter] WARNING: Button Tag '{commandId}' is not a known command ID. " +
-                            $"Add it to CommandIds.cs or fix the Tag value.", "CommandRouter");
-                    }
                     WireButton(button, commandId);
                 }
             }
@@ -229,21 +220,12 @@ namespace VoiceStudio.App.Services
         /// <summary>
         /// Wires multiple menu items to their respective commands based on Tag values.
         /// </summary>
-        /// <remarks>
-        /// GAP-B19: Tag values are validated against CommandIds for compile-time safety.
-        /// </remarks>
         public void WireMenuItemsByTag(params MenuFlyoutItem[] menuItems)
         {
             foreach (var item in menuItems)
             {
                 if (item?.Tag is string commandId && !string.IsNullOrEmpty(commandId))
                 {
-                    // GAP-B19: Validate Tag against known command IDs
-                    if (!CommandIds.IsKnown(commandId))
-                    {
-                        ErrorLogger.LogDebug($"[CommandRouter] WARNING: MenuItem Tag '{commandId}' is not a known command ID. " +
-                            $"Add it to CommandIds.cs or fix the Tag value.", "CommandRouter");
-                    }
                     WireMenuItem(item, commandId);
                 }
             }

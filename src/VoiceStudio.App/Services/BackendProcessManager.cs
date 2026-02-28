@@ -45,7 +45,7 @@ public sealed class BackendProcessManager : IDisposable
     /// </summary>
     public bool IsStarting => _isStarting;
 
-    public BackendProcessManager(string backendUrl = "http://localhost:8000")
+    public BackendProcessManager(string backendUrl = "http://localhost:8001")
     {
         _backendUrl = backendUrl;
         _httpClient = new HttpClient
@@ -65,7 +65,7 @@ public sealed class BackendProcessManager : IDisposable
         // Check if already running
         if (await IsBackendHealthyAsync(cancellationToken))
         {
-            ErrorLogger.LogDebug("Backend already running", "BackendProcessManager");
+            Debug.WriteLine("[BackendProcessManager] Backend already running");
             BackendStarted?.Invoke(this, EventArgs.Empty);
             return true;
         }
@@ -73,7 +73,7 @@ public sealed class BackendProcessManager : IDisposable
         // Check if process is running but not responding
         if (IsRunning)
         {
-            ErrorLogger.LogDebug("Process running but not healthy, waiting...", "BackendProcessManager");
+            Debug.WriteLine("[BackendProcessManager] Process running but not healthy, waiting...");
             // Give it more time
             if (await WaitForHealthAsync(TimeSpan.FromSeconds(10), cancellationToken))
             {
@@ -103,7 +103,7 @@ public sealed class BackendProcessManager : IDisposable
     {
         if (_isStarting)
         {
-            ErrorLogger.LogDebug("Already starting", "BackendProcessManager");
+            Debug.WriteLine("[BackendProcessManager] Already starting");
             return false;
         }
 
@@ -115,7 +115,7 @@ public sealed class BackendProcessManager : IDisposable
             if (repoRoot == null)
             {
                 var error = "Could not find VoiceStudio repository root";
-                ErrorLogger.LogWarning(error, "BackendProcessManager");
+                Debug.WriteLine($"[BackendProcessManager] {error}");
                 BackendStartFailed?.Invoke(this, error);
                 return false;
             }
@@ -127,8 +127,8 @@ public sealed class BackendProcessManager : IDisposable
             var pythonCandidates = new[]
             {
                 Path.Combine(repoRoot, "Runtime", "python", "python.exe"),
-                Path.Combine(repoRoot, ".venv", "Scripts", "python.exe"),
                 Path.Combine(repoRoot, "venv", "Scripts", "python.exe"),
+                Path.Combine(repoRoot, ".venv", "Scripts", "python.exe"),
             };
 
             var venvPython = Array.Find(pythonCandidates, File.Exists);
@@ -137,7 +137,7 @@ public sealed class BackendProcessManager : IDisposable
             {
                 var error = "Python runtime not found. Checked: " +
                     string.Join(", ", pythonCandidates.Select(p => Path.GetDirectoryName(p) ?? p));
-                ErrorLogger.LogWarning(error, "BackendProcessManager");
+                Debug.WriteLine($"[BackendProcessManager] {error}");
                 BackendStartFailed?.Invoke(this, error);
                 return false;
             }
@@ -146,7 +146,7 @@ public sealed class BackendProcessManager : IDisposable
             var psi = new ProcessStartInfo
             {
                 FileName = venvPython,
-                Arguments = "-m uvicorn backend.api.main:app --host 127.0.0.1 --port 8000",
+                Arguments = "-m uvicorn backend.api.main:app --host 127.0.0.1 --port 8001",
                 WorkingDirectory = repoRoot,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -157,8 +157,6 @@ public sealed class BackendProcessManager : IDisposable
             // Set environment
             psi.Environment["PYTHONPATH"] = repoRoot;
             psi.Environment["PYTHONUNBUFFERED"] = "1";
-            psi.Environment["COQUI_TOS_AGREED"] = "1";
-            psi.Environment["HF_HUB_DISABLE_TELEMETRY"] = "1";
 
             // Point to bundled FFmpeg if available
             var bundledFfmpeg = Path.Combine(repoRoot, "Runtime", "ffmpeg", "ffmpeg.exe");
@@ -174,31 +172,31 @@ public sealed class BackendProcessManager : IDisposable
                 psi.Environment["VOICESTUDIO_DATA_DIR"] = Path.Combine(repoRoot, "data");
                 psi.Environment["VOICESTUDIO_MODELS_DIR"] = Path.Combine(repoRoot, "models");
                 psi.Environment["VOICESTUDIO_DB_PATH"] = Path.Combine(repoRoot, "data", "voicestudio.db");
-                ErrorLogger.LogDebug("Portable mode active - data stored relative to app root", "BackendProcessManager");
+                Debug.WriteLine("[BackendProcessManager] Portable mode active - data stored relative to app root");
             }
 
-            ErrorLogger.LogDebug($"Starting backend: {psi.FileName} {psi.Arguments}", "BackendProcessManager");
-            ErrorLogger.LogDebug($"Working directory: {repoRoot}", "BackendProcessManager");
+            Debug.WriteLine($"[BackendProcessManager] Starting backend: {psi.FileName} {psi.Arguments}");
+            Debug.WriteLine($"[BackendProcessManager] Working directory: {repoRoot}");
 
             _backendProcess = new Process { StartInfo = psi };
             _backendProcess.OutputDataReceived += (s, e) =>
             {
                 if (!string.IsNullOrEmpty(e.Data))
                 {
-                    ErrorLogger.LogDebug(e.Data ?? "", "Backend");
+                    Debug.WriteLine($"[Backend] {e.Data}");
                 }
             };
             _backendProcess.ErrorDataReceived += (s, e) =>
             {
                 if (!string.IsNullOrEmpty(e.Data))
                 {
-                    ErrorLogger.LogWarning(e.Data ?? "", "Backend");
+                    Debug.WriteLine($"[Backend ERR] {e.Data}");
                 }
             };
             _backendProcess.EnableRaisingEvents = true;
             _backendProcess.Exited += (s, e) =>
             {
-                ErrorLogger.LogDebug("Backend process exited", "BackendProcessManager");
+                Debug.WriteLine("[BackendProcessManager] Backend process exited");
                 BackendExited?.Invoke(this, EventArgs.Empty);
             };
 
@@ -206,19 +204,19 @@ public sealed class BackendProcessManager : IDisposable
             _backendProcess.BeginOutputReadLine();
             _backendProcess.BeginErrorReadLine();
 
-            ErrorLogger.LogInfo($"Backend process started (PID: {_backendProcess.Id})", "BackendProcessManager");
+            Debug.WriteLine($"[BackendProcessManager] Backend process started (PID: {_backendProcess.Id})");
 
             // Wait for backend to become healthy
             if (await WaitForHealthAsync(TimeSpan.FromSeconds(30), cancellationToken))
             {
-                ErrorLogger.LogDebug("Backend is healthy", "BackendProcessManager");
+                Debug.WriteLine("[BackendProcessManager] Backend is healthy");
                 BackendStarted?.Invoke(this, EventArgs.Empty);
                 return true;
             }
             else
             {
                 var error = "Backend started but did not become healthy within timeout";
-                ErrorLogger.LogWarning(error, "BackendProcessManager");
+                Debug.WriteLine($"[BackendProcessManager] {error}");
                 BackendStartFailed?.Invoke(this, error);
                 return false;
             }
@@ -226,7 +224,7 @@ public sealed class BackendProcessManager : IDisposable
         catch (Exception ex)
         {
             var error = $"Failed to start backend: {ex.Message}";
-            ErrorLogger.LogWarning(error, "BackendProcessManager");
+            Debug.WriteLine($"[BackendProcessManager] {error}");
             ErrorLogger.LogError($"Failed to start backend: {ex.Message}", "BackendProcessManager.StartBackendProcessAsync");
             BackendStartFailed?.Invoke(this, error);
             return false;
@@ -284,10 +282,10 @@ public sealed class BackendProcessManager : IDisposable
 
         try
         {
-            ErrorLogger.LogDebug("Stopping backend...", "BackendProcessManager");
+            Debug.WriteLine("[BackendProcessManager] Stopping backend...");
             _backendProcess.Kill(entireProcessTree: true);
             _backendProcess.WaitForExit(5000);
-            ErrorLogger.LogDebug("Backend stopped", "BackendProcessManager");
+            Debug.WriteLine("[BackendProcessManager] Backend stopped");
         }
         catch (Exception ex)
         {

@@ -8,7 +8,6 @@ namespace VoiceStudio.Core.Models
   public class ModelInfo
   {
     public string Engine { get; set; } = string.Empty;
-    public string EngineId { get => Engine; set => Engine = value; }
     public string ModelName { get; set; } = string.Empty;
     public string ModelPath { get; set; } = string.Empty;
     public string Checksum { get; set; } = string.Empty;

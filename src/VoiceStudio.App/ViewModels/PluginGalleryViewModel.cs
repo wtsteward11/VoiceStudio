@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -90,13 +89,10 @@ namespace VoiceStudio.App.ViewModels
         [ObservableProperty]
         private int _totalPlugins;
 
-        // GAP-B18: NotifyCanExecuteChangedFor enables proper button state updates via Command binding
         [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(NextPageCommand))]
         private bool _hasNextPage;
 
         [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(PreviousPageCommand))]
         private bool _hasPreviousPage;
 
         #endregion
@@ -182,11 +178,6 @@ namespace VoiceStudio.App.ViewModels
                 }, TaskContinuationOptions.OnlyOnRanToCompletion);
         }
 
-        partial void OnSelectedPluginChanged(CoreModels.PluginInfo? value)
-        {
-            _ = LoadReviewsForSelectedPluginAsync();
-        }
-
         partial void OnSelectedCategoryChanged(CoreModels.PluginCategory? value)
         {
             CurrentPage = 1;
@@ -268,8 +259,7 @@ namespace VoiceStudio.App.ViewModels
 
         #region Pagination
 
-        // GAP-B18: Added CanExecute for proper button state management via Command binding
-        [RelayCommand(CanExecute = nameof(CanNextPage))]
+        [RelayCommand]
         private async Task NextPageAsync()
         {
             if (HasNextPage)
@@ -279,10 +269,7 @@ namespace VoiceStudio.App.ViewModels
             }
         }
 
-        private bool CanNextPage() => HasNextPage;
-
-        // GAP-B18: Added CanExecute for proper button state management via Command binding
-        [RelayCommand(CanExecute = nameof(CanPreviousPage))]
+        [RelayCommand]
         private async Task PreviousPageAsync()
         {
             if (HasPreviousPage)
@@ -291,8 +278,6 @@ namespace VoiceStudio.App.ViewModels
                 await SearchAsync();
             }
         }
-
-        private bool CanPreviousPage() => HasPreviousPage;
 
         #endregion
 
@@ -453,96 +438,7 @@ namespace VoiceStudio.App.ViewModels
         private void ViewPluginDetails(CoreModels.PluginInfo plugin)
         {
             SelectedPlugin = plugin;
-        }
-
-        #endregion
-
-        #region Marketplace Reviews (Phase 7)
-
-        [ObservableProperty]
-        private ObservableCollection<CoreModels.PluginReview> _reviews = new();
-
-        [ObservableProperty]
-        private CoreModels.PluginReview? _myReview;
-
-        [ObservableProperty]
-        private int _selectedPluginRating;
-
-        [ObservableProperty]
-        private string _selectedPluginReviewText = string.Empty;
-
-        [RelayCommand]
-        private async Task SubmitReviewAsync()
-        {
-            if (SelectedPlugin == null) return;
-            if (SelectedPluginRating < 1 || SelectedPluginRating > 5) return;
-
-            try
-            {
-                var success = await _gateway.SubmitReviewAsync(
-                    SelectedPlugin.Id,
-                    SelectedPluginRating,
-                    SelectedPluginReviewText,
-                    SelectedPlugin.Version,
-                    CancellationToken.None);
-
-                if (success)
-                {
-                    StatusMessage = "Review submitted successfully";
-                    await LoadReviewsForSelectedPluginAsync();
-                }
-                else
-                {
-                    ErrorMessage = "Failed to submit review";
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorMessage = $"Review failed: {ex.Message}";
-            }
-        }
-
-        private async Task LoadReviewsForSelectedPluginAsync()
-        {
-            if (SelectedPlugin == null)
-            {
-                Reviews.Clear();
-                MyReview = null;
-                SelectedPluginRating = 0;
-                SelectedPluginReviewText = string.Empty;
-                return;
-            }
-
-            try
-            {
-                var reviewsTask = _gateway.GetReviewsAsync(SelectedPlugin.Id);
-                var myReviewTask = _gateway.GetMyReviewAsync(SelectedPlugin.Id);
-
-                var reviews = await reviewsTask;
-                var myReview = await myReviewTask;
-
-                Reviews.Clear();
-                foreach (var r in reviews)
-                {
-                    Reviews.Add(r);
-                }
-
-                MyReview = myReview;
-                if (MyReview != null)
-                {
-                    SelectedPluginRating = MyReview.Rating;
-                    SelectedPluginReviewText = MyReview.Review;
-                }
-                else
-                {
-                    SelectedPluginRating = 0;
-                    SelectedPluginReviewText = string.Empty;
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorMessage = $"Failed to load reviews: {ex.Message}";
-            }
+            // Navigation to detail view would be handled by the view
         }
 
         #endregion
@@ -551,17 +447,17 @@ namespace VoiceStudio.App.ViewModels
 
         private void OnInstallStarted(object? sender, CoreModels.PluginInfo e)
         {
-            ErrorLogger.LogDebug($"[PluginGallery] Install started: {e.Name}", "PluginGalleryViewModel");
+            System.Diagnostics.Debug.WriteLine($"[PluginGallery] Install started: {e.Name}");
         }
 
         private void OnInstallCompleted(object? sender, CoreModels.PluginInstallResult e)
         {
-            ErrorLogger.LogInfo($"[PluginGallery] Install completed: {e.Success}", "PluginGalleryViewModel");
+            System.Diagnostics.Debug.WriteLine($"[PluginGallery] Install completed: {e.Success}");
         }
 
         private void OnCatalogRefreshed(object? sender, EventArgs e)
         {
-            ErrorLogger.LogDebug("[PluginGallery] Catalog refreshed", "PluginGalleryViewModel");
+            System.Diagnostics.Debug.WriteLine("[PluginGallery] Catalog refreshed");
         }
 
         #endregion

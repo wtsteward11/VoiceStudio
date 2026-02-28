@@ -87,7 +87,7 @@ class PluginFeatures:
 
     def get_feature_set(self) -> Set[str]:
         """Get all features as a set for similarity calculation."""
-        features: set[str] = set()
+        features = set()
         features.update(f"cat:{c}" for c in self.categories)
         features.update(f"tag:{t}" for t in self.tags)
         features.update(f"cap:{c}" for c in self.capabilities)

@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -152,7 +151,7 @@ public sealed partial class ThemeEditorView : UserControl
         }
         catch (Exception ex)
         {
-            ErrorLogger.LogWarning($"[ThemeEditor] Failed to load saved themes: {ex.Message}", "ThemeEditorView.xaml");
+            System.Diagnostics.Debug.WriteLine($"[ThemeEditor] Failed to load saved themes: {ex.Message}");
         }
     }
 
@@ -183,11 +182,11 @@ public sealed partial class ThemeEditorView : UserControl
             CustomThemeNameBox.Text = string.Empty;
             LoadSavedThemesList();
 
-            ErrorLogger.LogDebug($"[ThemeEditor] Saved custom theme: {themeName}", "ThemeEditorView.xaml");
+            System.Diagnostics.Debug.WriteLine($"[ThemeEditor] Saved custom theme: {themeName}");
         }
         catch (Exception ex)
         {
-            ErrorLogger.LogWarning($"[ThemeEditor] Failed to save theme: {ex.Message}", "ThemeEditorView.xaml");
+            System.Diagnostics.Debug.WriteLine($"[ThemeEditor] Failed to save theme: {ex.Message}");
         }
     }
 
@@ -227,12 +226,12 @@ public sealed partial class ThemeEditorView : UserControl
                 InitializeControls();
                 _isInitializing = false;
 
-                ErrorLogger.LogDebug($"[ThemeEditor] Loaded custom theme from: {filePath}", "ThemeEditorView.xaml");
+                System.Diagnostics.Debug.WriteLine($"[ThemeEditor] Loaded custom theme from: {filePath}");
             }
         }
         catch (Exception ex)
         {
-            ErrorLogger.LogWarning($"[ThemeEditor] Failed to load theme: {ex.Message}", "ThemeEditorView.xaml");
+            System.Diagnostics.Debug.WriteLine($"[ThemeEditor] Failed to load theme: {ex.Message}");
         }
     }
 
@@ -262,7 +261,7 @@ public sealed partial class ThemeEditorView : UserControl
         };
 
         _themeService.SetAccent(customAccent);
-        ErrorLogger.LogDebug($"[ThemeEditor] Applied custom accent color: #{color.R:X2}{color.G:X2}{color.B:X2}", "ThemeEditorView.xaml");
+        System.Diagnostics.Debug.WriteLine($"[ThemeEditor] Applied custom accent color: #{color.R:X2}{color.G:X2}{color.B:X2}");
     }
 
     private void DeleteThemeButton_Click(object sender, RoutedEventArgs e)
@@ -278,11 +277,11 @@ public sealed partial class ThemeEditorView : UserControl
         {
             File.Delete(filePath);
             LoadSavedThemesList();
-            ErrorLogger.LogDebug($"[ThemeEditor] Deleted custom theme: {filePath}", "ThemeEditorView.xaml");
+            System.Diagnostics.Debug.WriteLine($"[ThemeEditor] Deleted custom theme: {filePath}");
         }
         catch (Exception ex)
         {
-            ErrorLogger.LogWarning($"[ThemeEditor] Failed to delete theme: {ex.Message}", "ThemeEditorView.xaml");
+            System.Diagnostics.Debug.WriteLine($"[ThemeEditor] Failed to delete theme: {ex.Message}");
         }
     }
 }

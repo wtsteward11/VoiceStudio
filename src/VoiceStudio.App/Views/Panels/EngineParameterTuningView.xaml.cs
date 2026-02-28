@@ -4,7 +4,6 @@ using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
 
-using VoiceStudio.App.Logging;
 namespace VoiceStudio.App.Views.Panels
 {
   /// <summary>
@@ -67,7 +66,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EngineParameterTuningView.xaml");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
   }

@@ -283,7 +283,8 @@ namespace VoiceStudio.App.Services
       if (_currentWorkflow != null && _currentWorkflow.Status == WorkflowStatus.Running)
       {
         _currentWorkflow.Status = WorkflowStatus.Cancelled;
-        ErrorLogger.LogDebug($"[WorkflowCoordinator] Workflow cancelled: {_currentWorkflow.WorkflowId}", "WorkflowCoordinatorService");
+        System.Diagnostics.Debug.WriteLine(
+          $"[WorkflowCoordinator] Workflow cancelled: {_currentWorkflow.WorkflowId}");
       }
     }
 
@@ -305,14 +306,16 @@ namespace VoiceStudio.App.Services
       _currentWorkflow = context;
       context.Status = WorkflowStatus.Running;
       WorkflowStarted?.Invoke(this, context);
-      ErrorLogger.LogDebug($"[WorkflowCoordinator] Workflow started: {context.WorkflowId} ({context.ExecutionId})", "WorkflowCoordinatorService");
+      System.Diagnostics.Debug.WriteLine(
+        $"[WorkflowCoordinator] Workflow started: {context.WorkflowId} ({context.ExecutionId})");
     }
 
     private void CompleteWorkflow(WorkflowContext context)
     {
       context.Status = WorkflowStatus.Completed;
       WorkflowCompleted?.Invoke(this, context);
-      ErrorLogger.LogInfo($"[WorkflowCoordinator] Workflow completed: {context.WorkflowId} ({context.ExecutionId})", "WorkflowCoordinatorService");
+      System.Diagnostics.Debug.WriteLine(
+        $"[WorkflowCoordinator] Workflow completed: {context.WorkflowId} ({context.ExecutionId})");
     }
 
     private void FailWorkflow(WorkflowContext context, string errorMessage)

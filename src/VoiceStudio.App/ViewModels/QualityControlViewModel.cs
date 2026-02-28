@@ -132,25 +132,6 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool isGeneratingVisualizations;
 
-    // Artifact Removal (IDEA 63)
-    [ObservableProperty]
-    private string? artifactRemovalAudioId;
-
-    [ObservableProperty]
-    private bool isRemovingArtifacts;
-
-    [ObservableProperty]
-    private bool hasArtifactRemovalResult;
-
-    [ObservableProperty]
-    private string? cleanedAudioId;
-
-    [ObservableProperty]
-    private int artifactsRemovedCount;
-
-    [ObservableProperty]
-    private double cleanedQualityScore;
-
     public QualityControlViewModel(IViewModelContext context, IBackendClient backendClient)
         : base(context)
     {
@@ -252,13 +233,6 @@ namespace VoiceStudio.App.ViewModels
         await ExportReportAsync(ct);
       });
 
-      // Artifact Removal command (IDEA 63)
-      RemoveArtifactsCommand = new EnhancedAsyncRelayCommand(async (ct) =>
-      {
-        using var profiler = PerformanceProfiler.StartCommand("RemoveArtifacts");
-        await RemoveArtifactsAsync(ct);
-      }, () => !string.IsNullOrEmpty(ArtifactRemovalAudioId) && !IsRemovingArtifacts);
-
       // Load initial data
       _ = LoadPresetsAsync(CancellationToken.None);
     }
@@ -285,9 +259,6 @@ namespace VoiceStudio.App.ViewModels
     public EnhancedAsyncRelayCommand PredictQualityCommand { get; }
     public EnhancedAsyncRelayCommand GetInsightsCommand { get; }
     public EnhancedAsyncRelayCommand ExportReportCommand { get; }
-
-    // Artifact Removal command (IDEA 63)
-    public EnhancedAsyncRelayCommand RemoveArtifactsCommand { get; }
 
     private async Task LoadPresetsAsync(CancellationToken cancellationToken)
     {
@@ -841,62 +812,6 @@ namespace VoiceStudio.App.ViewModels
       return Task.FromResult(qualityData);
     }
 
-    // Artifact Removal method (IDEA 63)
-    private async Task RemoveArtifactsAsync(CancellationToken cancellationToken)
-    {
-      if (string.IsNullOrEmpty(ArtifactRemovalAudioId))
-        return;
-
-      IsRemovingArtifacts = true;
-      IsLoading = true;
-      ErrorMessage = null;
-      HasArtifactRemovalResult = false;
-      RemoveArtifactsCommand.NotifyCanExecuteChanged();
-
-      try
-      {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var request = new ArtifactRemovalRequest
-        {
-          AudioId = ArtifactRemovalAudioId
-        };
-
-        var response = await _backendClient.PostAsync<ArtifactRemovalRequest, ArtifactRemovalResponse>(
-            "/api/voice/remove-artifacts", request, cancellationToken);
-
-        HasArtifactRemovalResult = response != null;
-
-        if (response != null)
-        {
-          CleanedAudioId = response.CleanedAudioId;
-          ArtifactsRemovedCount = response.ArtifactsRemoved;
-          CleanedQualityScore = response.CleanedQualityScore;
-        }
-      }
-      catch (OperationCanceledException)
-      {
-        return;
-      }
-      catch (Exception ex)
-      {
-        ErrorMessage = $"Artifact removal failed: {ex.Message}";
-        _errorService?.ShowError(ex, ResourceHelper.GetString("QualityControl.RemoveArtifactsFailed", "Failed to remove artifacts"));
-        _logService?.LogError(ex, "RemoveArtifacts");
-      }
-      finally
-      {
-        IsRemovingArtifacts = false;
-        IsLoading = false;
-        RemoveArtifactsCommand.NotifyCanExecuteChanged();
-      }
-    }
-
-    partial void OnArtifactRemovalAudioIdChanged(string? value)
-    {
-      RemoveArtifactsCommand.NotifyCanExecuteChanged();
-    }
-
     private async Task ExportReportAsync(CancellationToken cancellationToken = default)
     {
       try
@@ -1005,20 +920,6 @@ namespace VoiceStudio.App.ViewModels
       {
         IsLoading = false;
       }
-    }
-
-    // Artifact Removal models (IDEA 63)
-    private class ArtifactRemovalRequest
-    {
-      public string AudioId { get; set; } = string.Empty;
-    }
-
-    private class ArtifactRemovalResponse
-    {
-      public string CleanedAudioId { get; set; } = string.Empty;
-      public string? CleanedAudioUrl { get; set; }
-      public int ArtifactsRemoved { get; set; }
-      public double CleanedQualityScore { get; set; }
     }
   }
 }

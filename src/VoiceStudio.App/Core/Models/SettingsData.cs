@@ -57,7 +57,7 @@ namespace VoiceStudio.Core.Models
   /// </summary>
   public class BackendSettings
   {
-    public string ApiUrl { get; set; } = "http://localhost:8000";
+    public string ApiUrl { get; set; } = "http://localhost:8001";
     public int Timeout { get; set; } = 30; // seconds
     public int RetryCount { get; set; } = 3;
   }

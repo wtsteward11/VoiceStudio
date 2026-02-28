@@ -161,7 +161,7 @@ class SubprocessBridge:
 
     async def _handle_response(self, message: Dict[str, Any]) -> None:
         """Handle a response to one of our requests."""
-        request_id: int = message.get("id", 0)
+        request_id = message.get("id")
         future = self._pending.pop(request_id, None)
 
         if future and not future.done():
@@ -219,7 +219,7 @@ class SubprocessBridge:
         params: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Send a notification to the host (no response expected)."""
-        notification: Dict[str, Any] = {
+        notification = {
             "jsonrpc": "2.0",
             "method": method,
         }
@@ -263,15 +263,13 @@ class PluginContext:
         self.plugin_id = plugin_id
         self.permissions: Dict[str, Any] = {}
 
-    async def audio_play(self, **kwargs: Any) -> Dict[str, Any]:
+    async def audio_play(self, **kwargs) -> Dict[str, Any]:
         """Play audio through the host."""
-        result: Dict[str, Any] = await self._bridge.call_host("host.audio.play", kwargs)
-        return result
+        return await self._bridge.call_host("host.audio.play", kwargs)
 
-    async def audio_stop(self, **kwargs: Any) -> Dict[str, Any]:
+    async def audio_stop(self, **kwargs) -> Dict[str, Any]:
         """Stop audio playback."""
-        result: Dict[str, Any] = await self._bridge.call_host("host.audio.stop", kwargs)
-        return result
+        return await self._bridge.call_host("host.audio.stop", kwargs)
 
     async def ui_notify(
         self,
@@ -280,11 +278,10 @@ class PluginContext:
         level: str = "info",
     ) -> Dict[str, Any]:
         """Show a notification in the UI."""
-        result: Dict[str, Any] = await self._bridge.call_host(
+        return await self._bridge.call_host(
             "host.ui.notify",
             {"title": title, "message": message, "level": level},
         )
-        return result
 
     async def storage_get(self, key: str) -> Any:
         """Get a value from plugin storage."""
@@ -292,10 +289,7 @@ class PluginContext:
 
     async def storage_set(self, key: str, value: Any) -> Dict[str, Any]:
         """Set a value in plugin storage."""
-        result: Dict[str, Any] = await self._bridge.call_host(
-            "host.storage.set", {"key": key, "value": value}
-        )
-        return result
+        return await self._bridge.call_host("host.storage.set", {"key": key, "value": value})
 
     async def settings_get(self, key: str) -> Any:
         """Get a setting value."""
@@ -308,11 +302,10 @@ class PluginContext:
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Invoke a method on another engine."""
-        result: Dict[str, Any] = await self._bridge.call_host(
+        return await self._bridge.call_host(
             "host.engine.invoke",
             {"engine_id": engine_id, "method": method, "params": params or {}},
         )
-        return result
 
     async def log(self, level: str, message: str) -> None:
         """Send a log message to the host."""
@@ -391,10 +384,10 @@ async def run_plugin_subprocess(entry_module: str) -> None:
 
     async def handle_invoke_capability(**params) -> Any:
         """Handle capability invocation."""
-        capability: str = params.get("capability", "")
+        capability = params.get("capability")
         cap_params = params.get("params", {})
 
-        if plugin_instance and capability and hasattr(plugin_instance, capability):
+        if plugin_instance and hasattr(plugin_instance, capability):
             method = getattr(plugin_instance, capability)
             return await method(**cap_params)
         else:

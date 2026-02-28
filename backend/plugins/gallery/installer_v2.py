@@ -15,7 +15,6 @@ Features:
 from __future__ import annotations
 
 import hashlib
-import importlib as _il
 import json
 import logging
 import shutil
@@ -41,14 +40,14 @@ from .models import (
     UpdateInfo,
 )
 
-SIGNER_AVAILABLE = False
-verify_package_auto: Any = None
+# GAP-PY-007: Import signature verification
 try:
-    _scm = _il.import_module("backend.plugins.supply_chain.signer")
-    verify_package_auto = _scm.verify_package_auto
+    from backend.plugins.supply_chain.signer import verify_package_auto
+
     SIGNER_AVAILABLE = True
-except (ImportError, AttributeError):
-    pass
+except ImportError:
+    SIGNER_AVAILABLE = False
+    verify_package_auto = None
 
 logger = logging.getLogger(__name__)
 
@@ -386,11 +385,10 @@ class PluginInstallerV2:
             if staging_path and staging_path.exists():
                 shutil.rmtree(staging_path, ignore_errors=True)
 
-            _manifest: dict[str, Any] | None = locals().get("manifest")
             return AtomicInstallResult(
                 success=False,
-                plugin_id=_manifest.get("id", "") if _manifest else "",
-                version=_manifest.get("version", "") if _manifest else "",
+                plugin_id=manifest.get("id", "") if "manifest" in locals() else "",
+                version=manifest.get("version", "") if "manifest" in locals() else "",
                 transaction_id=transaction_id,
                 rollback_available=backup is not None if "backup" in locals() else False,
                 error=str(e),
@@ -714,7 +712,7 @@ class PluginInstallerV2:
 
     def get_backups(self, plugin_id: str) -> list[BackupInfo]:
         """Get all backups for a plugin."""
-        backups: list[BackupInfo] = []
+        backups = []
         plugin_backup_dir = self._backups_dir / plugin_id
 
         if not plugin_backup_dir.exists():
@@ -775,8 +773,7 @@ class PluginInstallerV2:
                 for manifest_name in ["plugin.json", "manifest.json", "voicestudio-plugin.json"]:
                     try:
                         manifest_data = zf.read(manifest_name)
-                        result: dict[str, Any] = json.loads(manifest_data)
-                        return result
+                        return json.loads(manifest_data)
                     except KeyError:
                         continue
 
@@ -903,9 +900,9 @@ class PluginInstallerV2:
 
     async def _check_dependencies(self, dependencies: dict[str, str]) -> DependencyCheckResult:
         """Check if dependencies are satisfied."""
-        missing: list[str] = []
-        incompatible: list[str] = []
-        details: dict[str, dict[str, object]] = {}
+        missing = []
+        incompatible = []
+        details = {}
 
         for dep_name, version_spec in dependencies.items():
             if version_spec.startswith("optional:"):

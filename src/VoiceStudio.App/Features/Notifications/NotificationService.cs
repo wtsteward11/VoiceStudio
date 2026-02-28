@@ -345,22 +345,11 @@ public class NotificationService
         _isProcessingToasts = false;
     }
 
-    private Task ShowInAppToastAsync(Notification notification)
+    private async Task ShowInAppToastAsync(Notification notification)
     {
-        NotificationAdded?.Invoke(this, notification);
-
-        if (notification.AutoDismissAfter.HasValue)
-        {
-            var timer = new DispatcherTimer { Interval = notification.AutoDismissAfter.Value };
-            timer.Tick += (_, _) =>
-            {
-                timer.Stop();
-                Dismiss(notification.Id);
-            };
-            timer.Start();
-        }
-
-        return Task.CompletedTask;
+        // In-app toast display logic would go here
+        // This could trigger a toast UI element
+        await Task.CompletedTask;
     }
 
     private void OnNotificationInvoked(

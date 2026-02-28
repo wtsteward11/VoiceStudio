@@ -2,7 +2,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
-using CommunityToolkit.Mvvm.Input;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.App.Views;
 using VoiceStudio.App.Services;
@@ -37,7 +36,6 @@ namespace VoiceStudio.App
     private readonly PanelStateService? _panelStateService;
     private readonly RecentProjectsService? _recentProjectsService;
     private readonly CommandRouter? _commandRouter;
-    public StatusBarViewModel StatusBar { get; } = new();
     private const string ShowWelcomeKey = "ShowWelcomeDialog";
     private bool _disposed;
     private bool _welcomeDialogShown;
@@ -57,60 +55,70 @@ namespace VoiceStudio.App
     private MenuFlyoutItem? _keyboardShortcutsMenuItem;
 
     /// <summary>
-    /// Gets the unified panel registry from DI container.
-    /// Use CreatePanelFromRegistry() for panel creation.
+    /// Panel registry mapping panel IDs to their factory functions.
+    /// Used for restoring panels from saved workspace layouts.
     /// </summary>
-    private IPanelRegistry UnifiedPanelRegistry => AppServices.GetPanelRegistry();
-
-    /// <summary>
-    /// Creates a panel using the unified registry with DI-resolved ViewModels.
-    /// </summary>
-    /// <param name="panelId">The panel ID to create.</param>
-    /// <returns>A UserControl instance with ViewModel set, or null if not found.</returns>
-    private UserControl? CreatePanelFromRegistry(string panelId)
+    private readonly Dictionary<string, (PanelRegion DefaultRegion, string Title, Func<UserControl> Factory)> _panelRegistry = new(StringComparer.OrdinalIgnoreCase)
     {
-      try
-      {
-        var panel = UnifiedPanelRegistry.CreatePanel(panelId);
-        return panel as UserControl;
-      }
-      catch (KeyNotFoundException)
-      {
-        ErrorLogger.LogDebug($"Panel '{panelId}' not found in unified registry", "MainWindow");
-        return null;
-      }
-      catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Failed to create panel '{panelId}': {ex.Message}", "MainWindow");
-        return null;
-      }
-    }
-
-    /// <summary>
-    /// Gets the default region for a panel.
-    /// </summary>
-    private PanelRegion GetPanelRegion(string panelId)
-    {
-      if (UnifiedPanelRegistry.TryGetDescriptor(panelId, out var descriptor) && descriptor != null)
-      {
-        return descriptor.DefaultRegion;
-      }
-
-      return PanelRegion.Center; // Default
-    }
-
-    /// <summary>
-    /// Gets the display name for a panel.
-    /// </summary>
-    private string GetPanelTitle(string panelId)
-    {
-      if (UnifiedPanelRegistry.TryGetDescriptor(panelId, out var descriptor) && descriptor != null)
-      {
-        return descriptor.DisplayName;
-      }
-
-      return panelId; // Fall back to ID
-    }
+      // Core synthesis panels
+      ["VoiceSynthesis"] = (PanelRegion.Center, "Voice Synthesis", () => new VoiceSynthesisView()),
+      ["EnsembleSynthesis"] = (PanelRegion.Center, "Ensemble Synthesis", () => new EnsembleSynthesisView()),
+      ["BatchProcessing"] = (PanelRegion.Center, "Batch Processing", () => new BatchProcessingView()),
+      ["TextSpeechEditor"] = (PanelRegion.Center, "Text Speech Editor", () => new TextSpeechEditorView()),
+      // Training panels
+      ["TrainingDatasetEditor"] = (PanelRegion.Center, "Training Dataset Editor", () => new TrainingDatasetEditorView()),
+      ["ModelManager"] = (PanelRegion.Center, "Model Manager", () => new ModelManagerView()),
+      ["Training"] = (PanelRegion.Left, "Training", () => new TrainingView()),
+      // Audio processing panels
+      ["Transcribe"] = (PanelRegion.Center, "Transcribe", () => new TranscribeView()),
+      ["Recording"] = (PanelRegion.Center, "Recording", () => new RecordingView()),
+      ["AudioAnalysis"] = (PanelRegion.Center, "Audio Analysis", () => new AudioAnalysisView()),
+      ["QualityControl"] = (PanelRegion.Right, "Quality Control", () => new QualityControlView()),
+      // Navigation panels
+      ["Timeline"] = (PanelRegion.Center, "Timeline", () => new TimelineView()),
+      ["Profiles"] = (PanelRegion.Left, "Profiles", () => new ProfilesView()),
+      ["Library"] = (PanelRegion.Left, "Library", () => new LibraryView()),
+      // Effect panels
+      ["EffectsMixer"] = (PanelRegion.Right, "Effects Mixer", () => new EffectsMixerView()),
+      ["Analyzer"] = (PanelRegion.Right, "Analyzer", () => new AnalyzerView()),
+      ["VoiceMorph"] = (PanelRegion.Center, "Voice Morph", () => new VoiceMorphView()),
+      ["Prosody"] = (PanelRegion.Right, "Prosody", () => new ProsodyView()),
+      ["EmotionControl"] = (PanelRegion.Right, "Emotion Control", () => new EmotionControlView()),
+      // Utility panels
+      ["Diagnostics"] = (PanelRegion.Bottom, "Diagnostics", () => new DiagnosticsView()),
+      ["Settings"] = (PanelRegion.Right, "Settings", () => new SettingsView()),
+      ["Help"] = (PanelRegion.Right, "Help", () => new HelpView()),
+      // Advanced panels
+      ["SSMLControl"] = (PanelRegion.Right, "SSML Control", () => new SSMLControlView()),
+      // Appearance panels
+      ["ThemeEditor"] = (PanelRegion.Right, "Theme Editor", () => new ThemeEditorView()),
+      // Voice cloning panels
+      ["VoiceQuickClone"] = (PanelRegion.Center, "Quick Clone", () => new VoiceQuickCloneView()),
+      ["VoiceMorphingBlending"] = (PanelRegion.Center, "Voice Morphing & Blending", () => new VoiceMorphingBlendingView()),
+      // Audio processing panels
+      ["SpatialAudio"] = (PanelRegion.Center, "Spatial Audio", () => new SpatialAudioView()),
+      ["AIMixingMastering"] = (PanelRegion.Center, "AI Mixing & Mastering", () => new AIMixingMasteringView()),
+      // Quality panels
+      ["QualityDashboard"] = (PanelRegion.Center, "Quality Dashboard", () => new QualityDashboardView()),
+      ["QualityBenchmark"] = (PanelRegion.Center, "Quality Benchmark", () => new QualityBenchmarkView()),
+      // Image/Video panels
+      ["ImageGen"] = (PanelRegion.Center, "Image Generation", () => new ImageGenView()),
+      ["VideoGen"] = (PanelRegion.Center, "Video Generation", () => new VideoGenView()),
+      ["DeepfakeCreator"] = (PanelRegion.Center, "Deepfake Creator", () => new DeepfakeCreatorView()),
+      // Script/Scene panels
+      ["DatasetQA"] = (PanelRegion.Center, "Dataset QA", () => new DatasetQAView()),
+      ["ScriptEditor"] = (PanelRegion.Center, "Script Editor", () => new ScriptEditorView()),
+      ["SceneBuilder"] = (PanelRegion.Center, "Scene Builder", () => new SceneBuilderView()),
+      // Automation panels
+      ["Macro"] = (PanelRegion.Center, "Macro", () => new MacroView()),
+      ["WorkflowAutomation"] = (PanelRegion.Center, "Workflow Automation", () => new WorkflowAutomationView()),
+      // Settings panels
+      ["AdvancedSettings"] = (PanelRegion.Right, "Advanced Settings", () => new AdvancedSettingsView()),
+      ["APIKeyManager"] = (PanelRegion.Right, "API Key Manager", () => new APIKeyManagerView()),
+      ["GPUStatus"] = (PanelRegion.Right, "GPU Status", () => new GPUStatusView()),
+      // Todo panel
+      ["TodoPanel"] = (PanelRegion.Right, "Todo Panel", () => new TodoPanelView()),
+    };
 
     private T? FindInContent<T>(string name) where T : class
     {
@@ -127,7 +135,6 @@ namespace VoiceStudio.App
       using var profiler = PerformanceProfiler.Start("MainWindow Construction");
       profiler.Checkpoint("Start");
 
-      InitializeNavigateCommand();
       this.InitializeComponent();
       profiler.Checkpoint("InitializeComponent");
 
@@ -194,7 +201,7 @@ namespace VoiceStudio.App
           }
           catch (Exception ex)
           {
-            ErrorLogger.LogWarning($"Failed to initialize: {ex.Message}", "Theme");
+            System.Diagnostics.Debug.WriteLine($"[Theme] Failed to initialize: {ex.Message}");
           }
 
           // Log visual tree info after loaded
@@ -218,7 +225,7 @@ namespace VoiceStudio.App
             System.IO.File.WriteAllText(diagPath, sb.ToString());
           }
           // ALLOWED: empty catch - diagnostic file write is best-effort
-          catch (Exception ex) { ErrorLogger.LogWarning($"Diagnostic write failed: {ex.Message}", "MainWindow"); }
+          catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Diagnostic write failed: {ex.Message}"); }
           
           // Add pointer event handler
           contentFE.AddHandler(
@@ -234,7 +241,7 @@ namespace VoiceStudio.App
                 System.IO.File.AppendAllText(inputDiagPath, $"[{DateTime.UtcNow:O}] PointerPressed at ({point.Position.X:F0}, {point.Position.Y:F0}) Handled={args.Handled}\n"); 
               }
               // ALLOWED: empty catch - diagnostic file write is best-effort
-              catch (Exception ex) { ErrorLogger.LogWarning($"Input diagnostic write failed: {ex.Message}", "MainWindow"); }
+              catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Input diagnostic write failed: {ex.Message}"); }
             }),
             true); // handledEventsToo = true
         };
@@ -274,12 +281,12 @@ namespace VoiceStudio.App
         if (navigationService != null)
         {
           navigationService.NavigationChanged += OnNavigationChanged;
-          ErrorLogger.LogDebug("Subscribed to NavigationService.NavigationChanged", "MainWindow");
+          Debug.WriteLine("[MainWindow] Subscribed to NavigationService.NavigationChanged");
         }
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Failed to subscribe to NavigationService: {ex.Message}", "MainWindow");
+        Debug.WriteLine($"[MainWindow] Failed to subscribe to NavigationService: {ex.Message}");
       }
       profiler.Checkpoint("NavigationService Subscription");
 
@@ -376,7 +383,7 @@ namespace VoiceStudio.App
 
       profiler.Checkpoint("MainWindow Construction Complete");
 
-      ErrorLogger.LogDebug(profiler.GetReport(), "MainWindow");
+      Debug.WriteLine(profiler.GetReport());
     }
 
     #region Navigation Button Click Handlers
@@ -384,65 +391,76 @@ namespace VoiceStudio.App
     /// <summary>
     /// Executes a navigation command via CommandRouter, falling back to direct panel switch if unavailable.
     /// </summary>
-    public RelayCommand<string> NavigateCommand { get; private set; } = null!;
-
-    private void InitializeNavigateCommand()
-    {
-      NavigateCommand = new RelayCommand<string>(ExecuteNavigate);
-    }
-
-    private void ExecuteNavigate(string? target)
-    {
-      if (string.IsNullOrEmpty(target)) return;
-
-      try
-      {
-        var navMap = new Dictionary<string, (string commandId, string panel, PanelRegion region, Func<UserControl> factory, string button)>
-        {
-          ["Studio"] = ("nav.studio", "Timeline", PanelRegion.Center, () => new TimelineView(), "NavStudio"),
-          ["Profiles"] = ("nav.profiles", "Profiles", PanelRegion.Left, () => new ProfilesView(), "NavProfiles"),
-          ["Library"] = ("nav.library", "Library", PanelRegion.Left, () => new LibraryView(), "NavLibrary"),
-          ["Effects"] = ("nav.effects", "Effects Mixer", PanelRegion.Right, () => new EffectsMixerView(), "NavEffects"),
-          ["Train"] = ("nav.train", "Training", PanelRegion.Left, () => new TrainingView(), "NavTrain"),
-          ["Analyze"] = ("nav.analyze", "Analyzer", PanelRegion.Right, () => new AnalyzerView(), "NavAnalyze"),
-          ["Settings"] = ("nav.settings", "Settings", PanelRegion.Right, () => new SettingsView(), "NavSettings"),
-          ["Logs"] = ("nav.logs", "Diagnostics", PanelRegion.Bottom, () => new DiagnosticsView(), "NavLogs"),
-        };
-
-        if (navMap.TryGetValue(target, out var nav))
-        {
-          ExecuteNavCommand(nav.commandId, nav.panel, nav.region, nav.factory, nav.button);
-        }
-      }
-      catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"NavigateCommand({target}) EXCEPTION: {ex}", "MainWindow");
-      }
-    }
-
     private void ExecuteNavCommand(string commandId, string fallbackPanel, PanelRegion fallbackRegion, Func<UserControl> fallbackFactory, string buttonName)
     {
       if (_commandRouter != null)
       {
+        // Use CommandRouter for unified command execution
         _commandRouter.ExecuteFireAndForget(commandId);
-        ErrorLogger.LogDebug($"Nav command executed via CommandRouter: {commandId}", "MainWindow");
+        Debug.WriteLine($"[MainWindow] Nav command executed via CommandRouter: {commandId}");
       }
       else
       {
-        ErrorLogger.LogWarning($"CommandRouter unavailable for '{commandId}' — using direct panel switch fallback. DI may have failed.", "MainWindow");
+        // Fallback to direct panel switch
         SwitchToPanel(fallbackRegion, fallbackPanel, fallbackFactory);
         SetActiveNavButton(buttonName);
+        Debug.WriteLine($"[MainWindow] Nav fallback executed: {fallbackPanel}");
       }
     }
 
-    private void NavStudio_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Studio");
-    private void NavProfiles_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Profiles");
-    private void NavLibrary_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Library");
-    private void NavEffects_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Effects");
-    private void NavTrain_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Train");
-    private void NavAnalyze_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Analyze");
-    private void NavSettings_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Settings");
-    private void NavLogs_Click(object _, RoutedEventArgs __) => ExecuteNavigate("Logs");
+    private void NavStudio_Click(object _, RoutedEventArgs __)
+    {
+      Debug.WriteLine("[DEBUG] NavStudio_Click fired");
+      try
+      {
+        ExecuteNavCommand("nav.studio", "Timeline", PanelRegion.Center, () => new TimelineView(), "NavStudio");
+        Debug.WriteLine("[DEBUG] NavStudio_Click completed");
+      }
+      catch (Exception ex)
+      {
+        Debug.WriteLine($"[DEBUG] NavStudio_Click EXCEPTION: {ex}");
+        var diagPath = Path.Combine(
+          Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+          "VoiceStudio", "crashes", "click_diag.txt");
+        // ALLOWED: empty catch - diagnostic file write is best-effort
+        try { File.AppendAllText(diagPath, $"[{DateTime.UtcNow:O}] NavStudio_Click EXCEPTION: {ex}\n"); } catch (Exception diagEx) { System.Diagnostics.Debug.WriteLine($"Click diagnostic write failed: {diagEx.Message}"); }
+      }
+    }
+
+    private void NavProfiles_Click(object _, RoutedEventArgs __)
+    {
+      ExecuteNavCommand("nav.profiles", "Profiles", PanelRegion.Left, () => new ProfilesView(), "NavProfiles");
+    }
+
+    private void NavLibrary_Click(object _, RoutedEventArgs __)
+    {
+      ExecuteNavCommand("nav.library", "Library", PanelRegion.Left, () => new LibraryView(), "NavLibrary");
+    }
+
+    private void NavEffects_Click(object _, RoutedEventArgs __)
+    {
+      ExecuteNavCommand("nav.effects", "Effects Mixer", PanelRegion.Right, () => new EffectsMixerView(), "NavEffects");
+    }
+
+    private void NavTrain_Click(object _, RoutedEventArgs __)
+    {
+      ExecuteNavCommand("nav.train", "Training", PanelRegion.Left, () => new TrainingView(), "NavTrain");
+    }
+
+    private void NavAnalyze_Click(object _, RoutedEventArgs __)
+    {
+      ExecuteNavCommand("nav.analyze", "Analyzer", PanelRegion.Right, () => new AnalyzerView(), "NavAnalyze");
+    }
+
+    private void NavSettings_Click(object _, RoutedEventArgs __)
+    {
+      ExecuteNavCommand("nav.settings", "Settings", PanelRegion.Right, () => new SettingsView(), "NavSettings");
+    }
+
+    private void NavLogs_Click(object _, RoutedEventArgs __)
+    {
+      ExecuteNavCommand("nav.logs", "Diagnostics", PanelRegion.Bottom, () => new DiagnosticsView(), "NavLogs");
+    }
 
     #endregion Navigation Button Click Handlers
 
@@ -460,7 +478,7 @@ namespace VoiceStudio.App
 
       // Map panel ID to panel info and switch
       var panelId = e.NewPanelId.ToLowerInvariant();
-      ErrorLogger.LogDebug($"OnNavigationChanged: {panelId}", "MainWindow");
+      Debug.WriteLine($"[MainWindow] OnNavigationChanged: {panelId}");
 
       // Dispatch to UI thread
       DispatcherQueue.TryEnqueue(() =>
@@ -507,24 +525,21 @@ namespace VoiceStudio.App
               SwitchToPanel(PanelRegion.Center, "Voice Synthesis", () => new VoiceSynthesisView());
               break;
             default:
-              // Try unified panel registry lookup (GAP-F04)
-              var panel = CreatePanelFromRegistry(panelId);
-              if (panel != null)
+              // Try generic panel registry lookup
+              if (_panelRegistry.TryGetValue(panelId, out var panelInfo))
               {
-                var region = GetPanelRegion(panelId);
-                var title = GetPanelTitle(panelId);
-                SwitchToPanel(region, title, () => panel);
+                SwitchToPanel(panelInfo.DefaultRegion, panelInfo.Title, panelInfo.Factory);
               }
               else
               {
-                ErrorLogger.LogDebug($"Unknown panel ID in navigation: {panelId}", "MainWindow");
+                Debug.WriteLine($"[MainWindow] Unknown panel ID in navigation: {panelId}");
               }
               break;
           }
         }
         catch (Exception ex)
         {
-          ErrorLogger.LogWarning($"Navigation failed: {ex.Message}", "MainWindow");
+          Debug.WriteLine($"[MainWindow] Navigation failed: {ex.Message}");
         }
       });
     }
@@ -795,45 +810,14 @@ namespace VoiceStudio.App
     private void WireUpStatusBarIndicators()
     {
       var activityService = ServiceProvider.TryGetStatusBarActivityService();
-      if (activityService != null)
-      {
-        activityService.ActivityStatusChanged += ActivityService_ActivityStatusChanged;
-        UpdateActivityIndicators(activityService);
-      }
+      if (activityService == null)
+        return;
 
-      var connectionMonitor = AppServices.GetService<BackendConnectionMonitor>();
-      if (connectionMonitor != null)
-      {
-        connectionMonitor.Connected += (_, _) =>
-        {
-          DispatcherQueue.TryEnqueue(() => UpdateBackendConnectionIndicator(true));
-        };
-        connectionMonitor.Disconnected += (_, _) =>
-        {
-          DispatcherQueue.TryEnqueue(() => UpdateBackendConnectionIndicator(false));
-        };
-      }
-    }
+      // Subscribe to activity status changes
+      activityService.ActivityStatusChanged += ActivityService_ActivityStatusChanged;
 
-    private void UpdateBackendConnectionIndicator(bool connected)
-    {
-      var indicator = FindNameOnContent("ProcessingIndicator") as Microsoft.UI.Xaml.Controls.Border;
-      if (indicator != null)
-      {
-        indicator.Background = connected
-            ? new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.LimeGreen)
-            : new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.OrangeRed);
-      }
-
-      var statusText = FindNameOnContent("StatusText") as Microsoft.UI.Xaml.Controls.TextBlock;
-      if (statusText != null && !connected)
-      {
-        statusText.Text = "Backend Disconnected";
-      }
-      else if (statusText != null && connected)
-      {
-        statusText.Text = "Ready";
-      }
+      // Update initial state
+      UpdateActivityIndicators(activityService);
     }
 
     /// <summary>
@@ -1621,49 +1605,6 @@ namespace VoiceStudio.App
       RegisterPanelQuickSwitchShortcut(7, PanelRegion.Right, 0, "Effects Mixer", () => new EffectsMixerView());
       RegisterPanelQuickSwitchShortcut(8, PanelRegion.Right, 1, "Analyzer", () => new AnalyzerView());
       RegisterPanelQuickSwitchShortcut(9, PanelRegion.Right, 2, "Quality Control", () => new QualityControlView());
-
-      // GAP-E02: Panel region cycling and direct focus
-      _keyboardShortcutService.RegisterShortcut(
-          "panel.cycleNext",
-          VirtualKey.Tab,
-          VirtualKeyModifiers.Control,
-          CyclePanelNext,
-          "Cycle to Next Panel");
-
-      _keyboardShortcutService.RegisterShortcut(
-          "panel.cyclePrevious",
-          VirtualKey.Tab,
-          VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift,
-          CyclePanelPrevious,
-          "Cycle to Previous Panel");
-
-      _keyboardShortcutService.RegisterShortcut(
-          "panel.focusLeft",
-          VirtualKey.Number1,
-          VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu,
-          () => FocusPanelRegion(PanelRegion.Left),
-          "Focus Left Panel");
-
-      _keyboardShortcutService.RegisterShortcut(
-          "panel.focusCenter",
-          VirtualKey.Number2,
-          VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu,
-          () => FocusPanelRegion(PanelRegion.Center),
-          "Focus Center Panel");
-
-      _keyboardShortcutService.RegisterShortcut(
-          "panel.focusRight",
-          VirtualKey.Number3,
-          VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu,
-          () => FocusPanelRegion(PanelRegion.Right),
-          "Focus Right Panel");
-
-      _keyboardShortcutService.RegisterShortcut(
-          "panel.focusBottom",
-          VirtualKey.Number4,
-          VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu,
-          () => FocusPanelRegion(PanelRegion.Bottom),
-          "Focus Bottom Panel");
     }
 
     /// <summary>
@@ -1811,86 +1752,6 @@ namespace VoiceStudio.App
       };
       timer.Start();
     }
-
-    #region GAP-E02: Panel Region Focus and Cycling
-
-    /// <summary>
-    /// List of panel hosts in cycling order (Left → Center → Right → Bottom).
-    /// </summary>
-    private readonly PanelRegion[] _panelCycleOrder = [PanelRegion.Left, PanelRegion.Center, PanelRegion.Right, PanelRegion.Bottom];
-
-    /// <summary>
-    /// Tracks the currently focused panel region for cycling.
-    /// </summary>
-    private int _currentPanelIndex;
-
-    /// <summary>
-    /// Cycles focus to the next panel region (Ctrl+Tab).
-    /// </summary>
-    private void CyclePanelNext()
-    {
-      _currentPanelIndex = (_currentPanelIndex + 1) % _panelCycleOrder.Length;
-      FocusPanelRegion(_panelCycleOrder[_currentPanelIndex]);
-    }
-
-    /// <summary>
-    /// Cycles focus to the previous panel region (Ctrl+Shift+Tab).
-    /// </summary>
-    private void CyclePanelPrevious()
-    {
-      _currentPanelIndex = (_currentPanelIndex - 1 + _panelCycleOrder.Length) % _panelCycleOrder.Length;
-      FocusPanelRegion(_panelCycleOrder[_currentPanelIndex]);
-    }
-
-    /// <summary>
-    /// Focuses a specific panel region for keyboard navigation.
-    /// </summary>
-    private void FocusPanelRegion(PanelRegion region)
-    {
-      Controls.PanelHost? targetHost = region switch
-      {
-        PanelRegion.Left => FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
-        PanelRegion.Center => FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
-        PanelRegion.Right => FindNameOnContent("RightPanelHost") as Controls.PanelHost,
-        PanelRegion.Bottom => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
-        _ => null
-      };
-
-      if (targetHost == null)
-        return;
-
-      // Update current index for cycling continuity
-      _currentPanelIndex = Array.IndexOf(_panelCycleOrder, region);
-
-      // Focus the panel host
-      if (targetHost.Content is FrameworkElement content)
-      {
-        // Try to focus the content first (more useful for interaction)
-        content.Focus(FocusState.Keyboard);
-      }
-      else
-      {
-        // Fall back to the panel host itself
-        targetHost.Focus(FocusState.Keyboard);
-      }
-
-      // Show visual indicator
-      string panelName = region switch
-      {
-        PanelRegion.Left => "Left Panel",
-        PanelRegion.Center => "Center Panel",
-        PanelRegion.Right => "Right Panel",
-        PanelRegion.Bottom => "Bottom Panel",
-        _ => "Panel"
-      };
-
-      if (!IsGateCSmokeMode())
-      {
-        ShowPanelQuickSwitchIndicator(panelName, region, targetHost);
-      }
-    }
-
-    #endregion
 
     private async void CheckForUpdatesMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
@@ -2147,59 +2008,12 @@ namespace VoiceStudio.App
       void Log(string msg)
       {
         var line = $"[{DateTime.Now:HH:mm:ss.fff}] {msg}";
-        ErrorLogger.LogDebug(msg, "MainWindow");
+        Debug.WriteLine(line);
         // ALLOWED: empty catch - Best effort debug logging, failure is acceptable
         try { System.IO.File.AppendAllText(logPath, line + Environment.NewLine); } catch { }
       }
       
       Log("[MainWindow] ImportAudioFile() called");
-      
-      // Phase 3 Fix 3: Check for active project and offer to create one
-      if (!AppServices.HasActiveProject())
-      {
-        Log("[MainWindow] No active project - prompting user");
-        var dialogService = AppServices.TryGetDialogService();
-        if (dialogService != null)
-        {
-          var createProject = await dialogService.ShowConfirmationAsync(
-            "No Active Project",
-            "You need a project to work with imported audio. Create a new project now?",
-            "Create Project",
-            "Cancel");
-          
-          if (createProject)
-          {
-            Log("[MainWindow] User chose to create project");
-            // Execute New Project command
-            var commandRegistry = AppServices.TryGetCommandRegistry();
-            var newProjectCommand = commandRegistry?.GetCommand("file.new");
-            if (newProjectCommand != null && newProjectCommand.CanExecute(null))
-            {
-              newProjectCommand.Execute(null);
-              // Wait a moment for project creation to complete
-              await Task.Delay(100);
-              Log($"[MainWindow] Project created: {AppServices.GetCurrentProject()?.Name ?? "unknown"}");
-            }
-            else
-            {
-              var toastService = ServiceProvider.GetToastNotificationService();
-              toastService?.ShowToast(Services.ToastType.Warning, "Project Required", "Use File > New Project (Ctrl+N) first");
-              return;
-            }
-          }
-          else
-          {
-            Log("[MainWindow] User cancelled project creation");
-            return;
-          }
-        }
-        else
-        {
-          var toastService = ServiceProvider.GetToastNotificationService();
-          toastService?.ShowToast(Services.ToastType.Warning, "Project Required", "Create a project first (Ctrl+N) before importing audio");
-          return;
-        }
-      }
       
       // Check if we're on UI thread
       var dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
@@ -2252,7 +2066,7 @@ namespace VoiceStudio.App
           if (backendClient != null)
           {
             var uploadResult = await backendClient.UploadAudioFileAsync(filePath);
-            ErrorLogger.LogInfo($"Audio uploaded: {System.IO.Path.GetFileName(filePath)} -> {uploadResult.Id}", "MainWindow");
+            Debug.WriteLine($"[MainWindow] Audio uploaded: {System.IO.Path.GetFileName(filePath)} -> {uploadResult.Id}");
 
             // Publish AssetAddedEvent so Library and other panels refresh
             var eventAggregator = AppServices.TryGetEventAggregator();
@@ -2291,7 +2105,7 @@ namespace VoiceStudio.App
         {
           Log($"[MainWindow] COM HResult: 0x{comEx.HResult:X8}");
         }
-        ErrorLogger.LogWarning($"ImportAudioFile failed: {ex.Message}", "MainWindow");
+        Debug.WriteLine($"[MainWindow] ImportAudioFile failed: {ex.Message}");
         var toastService = ServiceProvider.GetToastNotificationService();
         toastService?.ShowToast(
             Services.ToastType.Error,
@@ -2758,7 +2572,7 @@ namespace VoiceStudio.App
       else
       {
         // Fallback - just log that command router isn't available
-        item.Click += (_, __) => ErrorLogger.LogDebug($"Command '{commandId}' unavailable - no CommandRouter", "MainWindow");
+        item.Click += (_, __) => Debug.WriteLine($"[MainWindow] Command '{commandId}' unavailable - no CommandRouter");
       }
 
       return item;
@@ -3094,7 +2908,7 @@ namespace VoiceStudio.App
         // Check if there are any saved regions to restore
         if (layout.Regions == null || layout.Regions.Count == 0)
         {
-          ErrorLogger.LogDebug("No saved regions to restore, using defaults.", "MainWindow");
+          System.Diagnostics.Debug.WriteLine("No saved regions to restore, using defaults.");
           return false;
         }
 
@@ -3115,29 +2929,25 @@ namespace VoiceStudio.App
           if (targetHost == null)
             continue;
 
-          // Try to restore the active panel for this region (GAP-F04)
+          // Try to restore the active panel for this region
           var activePanelId = regionState.ActivePanelId;
-          if (!string.IsNullOrEmpty(activePanelId))
+          if (!string.IsNullOrEmpty(activePanelId) && _panelRegistry.TryGetValue(activePanelId, out var panelInfo))
           {
-            var panel = CreatePanelFromRegistry(activePanelId);
-            if (panel != null)
+            try
             {
-              try
-              {
-                targetHost.Content = panel;
-                targetHost.PanelTitle = GetPanelTitle(activePanelId);
-                restoredAny = true;
-                ErrorLogger.LogInfo($"Restored panel '{activePanelId}' to {regionState.Region}", "MainWindow");
-              }
-              catch (Exception panelEx)
-              {
-                ErrorLogger.LogWarning($"Failed to restore panel '{activePanelId}': {panelEx.Message}", "MainWindow");
-              }
+              targetHost.Content = panelInfo.Factory();
+              targetHost.PanelTitle = panelInfo.Title;
+              restoredAny = true;
+              System.Diagnostics.Debug.WriteLine($"Restored panel '{activePanelId}' to {regionState.Region}");
             }
-            else
+            catch (Exception panelEx)
             {
-              ErrorLogger.LogDebug($"Panel ID '{activePanelId}' not found in registry for region {regionState.Region}; skipping.", "MainWindow");
+              System.Diagnostics.Debug.WriteLine($"Failed to restore panel '{activePanelId}': {panelEx.Message}");
             }
+          }
+          else if (!string.IsNullOrEmpty(activePanelId))
+          {
+            System.Diagnostics.Debug.WriteLine($"Panel ID '{activePanelId}' not found in registry for region {regionState.Region}; skipping.");
           }
         }
 
@@ -3145,7 +2955,7 @@ namespace VoiceStudio.App
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Failed to restore panels from layout: {ex.Message}", "MainWindow");
+        System.Diagnostics.Debug.WriteLine($"Failed to restore panels from layout: {ex.Message}");
         return false;
       }
     }
@@ -3172,7 +2982,7 @@ namespace VoiceStudio.App
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Failed to save workspace layout: {ex.Message}", "MainWindow");
+        System.Diagnostics.Debug.WriteLine($"Failed to save workspace layout: {ex.Message}");
       }
     }
 
@@ -3187,7 +2997,7 @@ namespace VoiceStudio.App
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Failed to handle workspace profile change: {ex.Message}", "MainWindow");
+        System.Diagnostics.Debug.WriteLine($"Failed to handle workspace profile change: {ex.Message}");
       }
     }
 
@@ -3197,19 +3007,6 @@ namespace VoiceStudio.App
     private int _lastCpuPercent;
     private int _lastGpuPercent;
     private int _lastLatencyMs = -1;
-    private double _lastJobProgress = -1;
-    private int _lastRunningJobs;
-
-    private sealed class JobQueueStatusDto
-    {
-      public int Running { get; set; }
-      public List<JobActiveItemDto>? ActiveJobs { get; set; }
-    }
-
-    private sealed class JobActiveItemDto
-    {
-      public double Progress { get; set; }
-    }
 
     private void StartStatusBarTimer()
     {
@@ -3226,7 +3023,7 @@ namespace VoiceStudio.App
         _lastCpuCheck = DateTime.UtcNow;
       }
       // ALLOWED: empty catch - CPU telemetry is non-critical
-      catch (Exception ex) { ErrorLogger.LogWarning($"CPU telemetry init failed: {ex.Message}", "MainWindow"); }
+      catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"CPU telemetry init failed: {ex.Message}"); }
 
       // Update immediately
       UpdateStatusBarMetrics();
@@ -3270,58 +3067,18 @@ namespace VoiceStudio.App
         var clockText = FindNameOnContent("ClockText") as Microsoft.UI.Xaml.Controls.TextBlock;
         var latencyText = FindNameOnContent("LatencyText") as Microsoft.UI.Xaml.Controls.TextBlock;
 
-        StatusBar.CpuPercent = _lastCpuPercent;
-        StatusBar.GpuPercent = _lastGpuPercent;
-        StatusBar.RamPercent = ramPct;
-        StatusBar.LatencyMs = _lastLatencyMs;
-        StatusBar.ClockText = DateTime.Now.ToString("HH:mm");
-        StatusBar.RunningJobCount = _lastRunningJobs;
-        StatusBar.CurrentJobProgress = _lastJobProgress >= 0 ? _lastJobProgress : 0;
-
         if (cpuText != null) cpuText.Text = $"CPU {_lastCpuPercent}%";
         if (gpuText != null) gpuText.Text = $"GPU {_lastGpuPercent}%";
         if (ramText != null) ramText.Text = $"RAM {ramPct}%";
         if (clockText != null) clockText.Text = DateTime.Now.ToString("HH:mm");
         if (latencyText != null && _lastLatencyMs >= 0) latencyText.Text = $"{_lastLatencyMs}ms";
 
-        var jobProgressBar = FindNameOnContent("JobProgressBar") as Microsoft.UI.Xaml.Controls.ProgressBar;
-        var jobStatusText = FindNameOnContent("JobStatusText") as Microsoft.UI.Xaml.Controls.TextBlock;
-
-        if (jobProgressBar != null)
-        {
-          if (_lastRunningJobs > 0 && _lastJobProgress >= 0)
-          {
-            jobProgressBar.IsIndeterminate = false;
-            jobProgressBar.Value = _lastJobProgress * 100;
-          }
-          else
-          {
-            jobProgressBar.IsIndeterminate = false;
-            jobProgressBar.Value = 0;
-          }
-        }
-
-        if (jobStatusText != null)
-        {
-          if (_lastRunningJobs > 0)
-          {
-            var pct = (int)(_lastJobProgress * 100);
-            jobStatusText.Text = _lastRunningJobs == 1
-              ? $"Running ({pct}%)"
-              : $"{_lastRunningJobs} Running ({pct}%)";
-          }
-          else
-          {
-            jobStatusText.Text = "Idle";
-          }
-        }
-
         // Async update for GPU and latency (non-blocking)
         _ = UpdateGpuAndLatencyAsync();
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Status bar update error: {ex.Message}", "MainWindow");
+        System.Diagnostics.Debug.WriteLine($"Status bar update error: {ex.Message}");
       }
     }
 
@@ -3353,27 +3110,6 @@ namespace VoiceStudio.App
             // ALLOWED: empty catch - GPU telemetry is best-effort
             catch
             {
-            }
-
-            try
-            {
-              var jobStatus = await backendClient.GetAsync<JobQueueStatusDto>("/api/jobs/status");
-              if (jobStatus?.Running > 0 && jobStatus.ActiveJobs?.Count > 0)
-              {
-                _lastRunningJobs = jobStatus.Running;
-                _lastJobProgress = jobStatus.ActiveJobs.Average(j => j.Progress);
-              }
-              else
-              {
-                _lastRunningJobs = 0;
-                _lastJobProgress = -1;
-              }
-            }
-            catch (Exception ex)
-            {
-              ErrorLogger.LogWarning($"Job status poll failed: {ex.Message}", "MainWindow");
-              _lastRunningJobs = 0;
-              _lastJobProgress = -1;
             }
           }
         }
@@ -3469,24 +3205,24 @@ namespace VoiceStudio.App
             catch (System.IO.IOException)
             {
               // File in use -- skip, will be cleaned next exit
-              ErrorLogger.LogDebug($"Temp file in use, skipped: {file}", "MainWindow");
+              Debug.WriteLine("[MainWindow] Temp file in use, skipped: " + file);
             }
             catch (UnauthorizedAccessException)
             {
               // Permission denied -- skip
-              ErrorLogger.LogDebug($"Temp file access denied, skipped: {file}", "MainWindow");
+              Debug.WriteLine("[MainWindow] Temp file access denied, skipped: " + file);
             }
           }
         }
 
         if (cleaned > 0)
         {
-          ErrorLogger.LogInfo($"Cleaned up {cleaned} temporary audio file(s)", "MainWindow");
+          Debug.WriteLine($"[MainWindow] Cleaned up {cleaned} temporary audio file(s)");
         }
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Temp cleanup failed (non-critical): {ex.Message}", "MainWindow");
+        Debug.WriteLine($"[MainWindow] Temp cleanup failed (non-critical): {ex.Message}");
       }
     }
 

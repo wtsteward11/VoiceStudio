@@ -24,18 +24,31 @@
     <PlatformTarget>x64</PlatformTarget>
     <IsPackable>false</IsPackable>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-    <!-- WindowsAppSDKSelfContained=true bundles CoreMessagingXP.dll which crashes on
-         Windows Insider builds (STATUS_FAIL_FAST 0xc0000602). Use system runtime. -->
+    <!-- Use system-installed Windows App SDK runtime (unpackaged app via Bootstrap.Initialize). -->
     <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
-    <SelfContained>true</SelfContained>
+    <!-- SelfContained only for Release to avoid needing runtime packages during development.
+         For production, set RuntimeFrameworkVersion to an available NuGet version if 8.0.24 is unavailable. -->
+    <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
+    <SelfContained Condition="'$(Configuration)' != 'Release'">false</SelfContained>
     <UseAppHost>true</UseAppHost>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <!-- EnableWin32Codegen and UseVCMetaManaged set in Directory.Build.targets -->
-    <!-- XBF disabled: WinAppSDK 1.8.5 XAML compiler Pass 2 still does not produce
-         .xbf files (187 MSB3030 errors, tested 2026-02-26 with both 1.8.1 and 1.8.5).
-         The app parses XAML at runtime. Custom types via EnableTypeInfoReflection=true.
-         Re-test when WinAppSDK 1.9+ ships XBF pipeline fixes. -->
-    <DisableXbfGeneration>true</DisableXbfGeneration>
+    <!-- Don't set RuntimeIdentifier explicitly - let the EnsureRuntimeIdentifierForWin2D target
+    handle it -->
+    <!-- Setting RuntimeIdentifier causes RID-specific output paths which break the XAML compiler
+    Exec task with double backslashes -->
+    <!-- <RuntimeIdentifier>win-x64</RuntimeIdentifier> -->
+    <!-- <RuntimeIdentifiers>win-x64</RuntimeIdentifiers> -->
+    <!-- Suppress RuntimeIdentifier errors for unsupported RIDs -->
+    <_SuppressWinRTError>true</_SuppressWinRTError>
+    <!-- Allow RID resolution for Win2D, but suppress other RID errors -->
+    <EnableDefaultRuntimeIdentifier>true</EnableDefaultRuntimeIdentifier>
+    <!-- Avoid VC/meta-dependent Win32 codegen in XAML compiler -->
+    <EnableWin32Codegen>false</EnableWin32Codegen>
+    <UseVCMetaManaged>false</UseVCMetaManaged>
+    <!-- Legacy workaround (can be revisited once XAML pipeline is stable) -->
+    <!-- <DisableXbfGeneration>true</DisableXbfGeneration> -->
+    <!-- <EnableUIXamlCompilation>false</EnableUIXamlCompilation> -->
+    <!-- VS-0035 fix: Force external XamlCompiler via wrapper to avoid WMC9999 in-process failures. -->
+    <UseXamlCompilerExecutable>false</UseXamlCompilerExecutable>
     <CppWinRTFastAbi>false</CppWinRTFastAbi>
     <BaseOutputPath>$(SolutionDir).buildlogs\</BaseOutputPath>
     <!-- FIX: Don't use architecture-specific sub-paths that cause double backslash in XAML compiler
@@ -73,11 +86,42 @@
     <WarningLevel>9999</WarningLevel>
   </PropertyGroup>
 
-  <!-- EnsureRuntimeIdentifierForWin2D removed: explicit RuntimeIdentifier=win-x64 set above -->
+  <!-- Ensure RuntimeIdentifier is preserved for Win2D before any targets that might clear it.
+       Skip for Debug builds to avoid needing runtime packages that may not be on NuGet yet. -->
+  <Target Name="EnsureRuntimeIdentifierForWin2D" BeforeTargets="ProcessFrameworkReferences;ResolvePackageAssets" Condition="'$(RuntimeIdentifier)' == '' And '$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+      <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    </PropertyGroup>
+  </Target>
 
-  <!-- CaptureXamlErrors removed: diagnostic stub that never created output file -->
-  <!-- IncludeXbfInPublishOutput removed: DisableXbfGeneration=true means no XBF files exist.
-       Re-add when XBF generation is restored. -->
+  <!-- Capture XAML compiler errors to file -->
+  <Target Name="CaptureXamlErrors" AfterTargets="MarkupCompilePass1" Condition="'$(BuildingProject)' == 'true'">
+    <PropertyGroup>
+      <XamlErrorLogFile>$(MSBuildProjectDirectory)\..\..\xaml-compiler-errors.txt</XamlErrorLogFile>
+    </PropertyGroup>
+    <Message Text="XAML compilation completed. Check $(XamlErrorLogFile) for errors." Importance="high" Condition="Exists('$(XamlErrorLogFile)')" />
+  </Target>
+
+  <!-- Exclude Windows App Runtime / WinUI native DLLs from publish output (Gate C/H).
+       When using WindowsAppSDKSelfContained=false, the unpackaged app relies on
+       Bootstrap.Initialize(...) to load these from the installed runtime packages.
+       Keeping loose copies can cause CoreMessagingXP.dll fail-fast or dependency-resolution issues. -->
+  <!-- Ensure compiled XAML (.xbf) is present in publish output for unpackaged Gate C/H artifacts.
+       Without this, ms-appx:///MainWindow.xaml fails in publish output because the build produces
+       XBFs under obj (IntermediateOutputPath) but publish doesn't automatically copy them. -->
+  <Target Name="IncludeXbfInPublishOutput" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">
+    <ItemGroup>
+      <!-- WinUI XamlCompiler generates compiled dictionaries/pages into obj
+      (IntermediateOutputPath). -->
+      <_XbfToPublish Include="$(MSBuildProjectDirectory)\$(IntermediateOutputPath)**\*.xbf" />
+      <_XbfToPublishWithDest Include="@(_XbfToPublish)">
+        <Dest>$(PublishDir)\%(RecursiveDir)%(Filename)%(Extension)</Dest>
+      </_XbfToPublishWithDest>
+    </ItemGroup>
+    <Message Text="IncludeXbfInPublishOutput: Copying @(_XbfToPublishWithDest-&gt;Count()) XBF files from $(TargetDir) -&gt; $(PublishDir)" Importance="high" Condition="'@(_XbfToPublishWithDest)' != ''" />
+    <Copy SourceFiles="@(_XbfToPublishWithDest->'%(FullPath)')" DestinationFiles="@(_XbfToPublishWithDest->'%(Dest)')" SkipUnchangedFiles="true" Condition="'@(_XbfToPublishWithDest)' != ''" />
+  </Target>
 
   <Target Name="ExcludeSystemDllsFromPublish" AfterTargets="Publish" Condition="'$(SelfContained)' == 'true' And '$(WindowsAppSDKSelfContained)' != 'true'">
     <ItemGroup>
@@ -97,6 +141,7 @@
   </Target>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="VoiceStudio.App.Tests" />
     <ProjectReference Include="..\VoiceStudio.Core\VoiceStudio.Core.csproj" />
   </ItemGroup>
 
@@ -104,10 +149,7 @@
     <PackageReference Include="JsonSchema.Net" Version="8.0.5" />
     <PackageReference Include="MessagePack" Version="3.1.4" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.0" />
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.3.2" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="$(MicrosoftWindowsAppSDKVersion)" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
@@ -158,15 +200,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="appsettings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="appsettings.*.json" Condition="Exists('appsettings.Development.json')">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <None Include="Assets\**\*.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Resources\Workspaces\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
@@ -184,54 +226,24 @@
     </Content>
   </ItemGroup>
 
-  <!-- XAML input validation guard: catches silent 1ms Pass 1 failures where the compiler
-       finds no Page items and produces an empty type registry. -->
-  <Target Name="ValidateXamlInputs" BeforeTargets="MarkupCompilePass1">
-    <Error Text="XAML BUILD GUARD: No Page items found. XAML compilation will produce empty output."
-           Condition="'@(Page)' == '' And '$(DisableXbfGeneration)' != 'true'" />
-    <Message Text="XAML Inputs: @(Page->Count()) Page items, @(ApplicationDefinition->Count()) AppDef items"
-             Importance="normal" />
-  </Target>
-
-  <!-- De-dupe ALL XAML-generated Compile items in design-time builds (LSP/VS).
-       The default compile glob (EnableDefaultCompileItems) picks up obj/**/*.g.cs,
-       and the XAML compiler also adds them, causing CS2002 duplicate warnings.
-       This target removes duplicates for ALL .g.cs and .g.i.cs files, not just App. -->
-  <Target Name="DeduplicateCompileItemsDesignTime"
-      AfterTargets="DesignTimeMarkupCompilation;MarkupCompilePass1"
-      Condition="'$(DesignTimeBuild)' == 'true' Or '$(BuildingInsideVisualStudio)' == 'true'">
+  <!-- De-dupe XAML generated Compile items in design-time builds (LSP/VS) -->
+  <Target Name="DeduplicateCompileItemsDesignTime" AfterTargets="DesignTimeMarkupCompilation;MarkupCompilePass1" Condition="'$(DesignTimeBuild)' == 'true' Or '$(BuildingInsideVisualStudio)' == 'true'">
     <ItemGroup>
-      <_GenDup Include="@(Compile)"
-        Condition="$([System.String]::Copy('%(Compile.Identity)').EndsWith('.g.cs'))
-                Or $([System.String]::Copy('%(Compile.Identity)').EndsWith('.g.i.cs'))" />
+      <!-- Collect only App.g.i.cs variants (absolute + relative) -->
+      <_AppGi Include="@(Compile)" Condition="$([System.String]::Copy('%(Compile.Identity)').EndsWith('App.g.i.cs'))" />
+      <_AppGi Include="@(Compile)" Condition="$([System.String]::Copy('%(Compile.FullPath)').EndsWith('App.g.i.cs'))" />
     </ItemGroup>
-    <RemoveDuplicates Inputs="@(_GenDup->'%(FullPath)')">
-      <Output TaskParameter="Filtered" ItemName="_GenUnique" />
+    <RemoveDuplicates Inputs="@(_AppGi->'%(FullPath)')">
+      <Output TaskParameter="Filtered" ItemName="_AppGiUnique" />
     </RemoveDuplicates>
     <ItemGroup>
-      <Compile Remove="@(_GenDup)" />
-      <Compile Include="@(_GenUnique)" />
+      <!-- Drop all App.g.i.cs entries, then re-add one per full path -->
+      <Compile Remove="@(_AppGi)" />
+      <Compile Include="@(_AppGiUnique)" />
     </ItemGroup>
   </Target>
 
-  <!-- De-dupe XAML-generated Compile items before the C# compiler runs.
-       Must use BeforeTargets="CoreCompile" because CoreCompile (CSC) runs
-       between MarkupCompilePass1 and Pass2 in the WinUI pipeline. -->
-  <Target Name="DeduplicateGeneratedCompileItems"
-      BeforeTargets="CoreCompile"
-      Condition="'$(DesignTimeBuild)' != 'true'">
-    <ItemGroup>
-      <_GenDupBuild Include="@(Compile)"
-        Condition="$([System.String]::Copy('%(Compile.Identity)').EndsWith('.g.cs'))
-                Or $([System.String]::Copy('%(Compile.Identity)').EndsWith('.g.i.cs'))" />
-    </ItemGroup>
-    <RemoveDuplicates Inputs="@(_GenDupBuild->'%(FullPath)')">
-      <Output TaskParameter="Filtered" ItemName="_GenUniqueBuild" />
-    </RemoveDuplicates>
-    <ItemGroup>
-      <Compile Remove="@(_GenDupBuild)" />
-      <Compile Include="@(_GenUniqueBuild)" />
-    </ItemGroup>
-  </Target>
+  <!-- XAML compilation is enabled (per plan: make XAML compilation succeed normally) -->
+  <!-- Directory.Build.targets ensures XAML compiler has resolved reference assemblies -->
 
 </Project>

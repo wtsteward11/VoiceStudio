@@ -1,8 +1,8 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Core.Commands;
-using VoiceStudio.App.Logging;
 using VoiceStudio.App.Services;
 using VoiceStudio.Core.Services;
 
@@ -106,7 +106,7 @@ namespace VoiceStudio.App.Commands
                 _ => true
             );
 
-            ErrorLogger.LogDebug("Registered 5 settings commands", "SettingsOperationsHandler");
+            Debug.WriteLine("[SettingsOperationsHandler] Registered 5 settings commands");
         }
 
         public async Task SaveSettingsAsync(CancellationToken ct = default)
@@ -117,11 +117,11 @@ namespace VoiceStudio.App.Commands
                 var settings = await _settingsService.LoadSettingsAsync(ct);
                 await _settingsService.SaveSettingsAsync(settings, ct);
                 _toastService?.ShowSuccess("Settings saved");
-                ErrorLogger.LogInfo("Settings saved", "SettingsOperationsHandler");
+                Debug.WriteLine("[SettingsOperationsHandler] Settings saved");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Save failed: {ex.Message}", "SettingsOperationsHandler");
+                Debug.WriteLine($"[SettingsOperationsHandler] Save failed: {ex.Message}");
                 await _dialogService.ShowErrorAsync(
                     "Save Failed",
                     $"Failed to save settings: {ex.Message}");
@@ -145,11 +145,11 @@ namespace VoiceStudio.App.Commands
                 await _settingsService.ResetSettingsAsync(ct);
                 SettingsChanged?.Invoke(this, EventArgs.Empty);
                 _toastService?.ShowSuccess("Settings reset to defaults");
-                ErrorLogger.LogInfo("Settings reset to defaults", "SettingsOperationsHandler");
+                Debug.WriteLine("[SettingsOperationsHandler] Settings reset to defaults");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Reset failed: {ex.Message}", "SettingsOperationsHandler");
+                Debug.WriteLine($"[SettingsOperationsHandler] Reset failed: {ex.Message}");
                 await _dialogService.ShowErrorAsync(
                     "Reset Failed",
                     $"Failed to reset settings: {ex.Message}");
@@ -175,11 +175,11 @@ namespace VoiceStudio.App.Commands
                 var json = System.Text.Json.JsonSerializer.Serialize(settings, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
                 await System.IO.File.WriteAllTextAsync(path, json, ct);
                 _toastService?.ShowSuccess($"Settings exported to: {System.IO.Path.GetFileName(path)}");
-                ErrorLogger.LogInfo($"Settings exported to: {path}", "SettingsOperationsHandler");
+                Debug.WriteLine($"[SettingsOperationsHandler] Settings exported to: {path}");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Export failed: {ex.Message}", "SettingsOperationsHandler");
+                Debug.WriteLine($"[SettingsOperationsHandler] Export failed: {ex.Message}");
                 await _dialogService.ShowErrorAsync(
                     "Export Failed",
                     $"Failed to export settings: {ex.Message}");
@@ -217,12 +217,12 @@ namespace VoiceStudio.App.Commands
                     await _settingsService.SaveSettingsAsync(settings, ct);
                     SettingsChanged?.Invoke(this, EventArgs.Empty);
                     _toastService?.ShowSuccess("Settings imported successfully");
-                    ErrorLogger.LogInfo($"Settings imported from: {path}", "SettingsOperationsHandler");
+                    Debug.WriteLine($"[SettingsOperationsHandler] Settings imported from: {path}");
                 }
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Import failed: {ex.Message}", "SettingsOperationsHandler");
+                Debug.WriteLine($"[SettingsOperationsHandler] Import failed: {ex.Message}");
                 await _dialogService.ShowErrorAsync(
                     "Import Failed",
                     $"Failed to import settings: {ex.Message}");
@@ -240,11 +240,11 @@ namespace VoiceStudio.App.Commands
                 
                 SettingsChanged?.Invoke(this, EventArgs.Empty);
                 _toastService?.ShowInfo($"Switched to {newTheme} theme");
-                ErrorLogger.LogInfo($"Theme changed to: {newTheme}", "SettingsOperationsHandler");
+                Debug.WriteLine($"[SettingsOperationsHandler] Theme changed to: {newTheme}");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Theme toggle failed: {ex.Message}", "SettingsOperationsHandler");
+                Debug.WriteLine($"[SettingsOperationsHandler] Theme toggle failed: {ex.Message}");
             }
         }
     }

@@ -16,7 +16,6 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
-using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -337,7 +336,7 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         _toastService?.ShowToast(ToastType.Error, "Clone Reference", $"Failed to navigate: {ex.Message}");
-        ErrorLogger.LogWarning($"NavigateToCloneWithAudio error: {ex}", "LibraryView");
+        System.Diagnostics.Debug.WriteLine($"[LibraryView] NavigateToCloneWithAudio error: {ex}");
       }
     }
 
@@ -386,7 +385,7 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         _toastService?.ShowToast(ToastType.Error, "Error", $"Failed to {action}: {ex.Message}");
-        ErrorLogger.LogWarning($"Error handling file menu action '{action}': {ex.Message}", "LibraryView");
+        System.Diagnostics.Debug.WriteLine($"Error handling file menu action '{action}': {ex.Message}");
       }
     }
 
@@ -544,7 +543,7 @@ namespace VoiceStudio.App.Views.Panels
         }
         else
         {
-          ErrorLogger.LogDebug($"NavigationService not available. assetId: {assetId}", "LibraryView");
+          System.Diagnostics.Debug.WriteLine($"NavigationService not available. assetId: {assetId}");
         }
       }
       catch (Exception ex)
@@ -577,7 +576,7 @@ namespace VoiceStudio.App.Views.Panels
         }
         else
         {
-          ErrorLogger.LogDebug($"NavigationService not available. assetId: {assetId}", "LibraryView");
+          System.Diagnostics.Debug.WriteLine($"NavigationService not available. assetId: {assetId}");
         }
       }
       catch (Exception ex)
@@ -586,7 +585,7 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    private async void ShowAssetProperties(object fileData, string assetName)
+    private void ShowAssetProperties(object fileData, string assetName)
     {
       try
       {
@@ -598,7 +597,7 @@ namespace VoiceStudio.App.Views.Panels
           XamlRoot = this.XamlRoot
         };
 
-        await dialog.ShowAsync();
+        _ = dialog.ShowAsync();
       }
       catch (Exception ex)
       {
@@ -771,7 +770,7 @@ namespace VoiceStudio.App.Views.Panels
         // 3. Add clip to selected track
 
         _toastService?.ShowToast(ToastType.Info, "Timeline", $"Adding {assetName} to timeline...");
-        ErrorLogger.LogDebug($"Add asset {assetId} to timeline", "LibraryView");
+        System.Diagnostics.Debug.WriteLine($"Add asset {assetId} to timeline");
       }
       catch (Exception ex)
       {
@@ -808,7 +807,7 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         _toastService?.ShowToast(ToastType.Error, "Error", $"Failed to {action}: {ex.Message}");
-        ErrorLogger.LogWarning($"Error handling folder menu action '{action}': {ex.Message}", "LibraryView");
+        System.Diagnostics.Debug.WriteLine($"Error handling folder menu action '{action}': {ex.Message}");
       }
     }
 
@@ -869,7 +868,7 @@ namespace VoiceStudio.App.Views.Panels
 
           // Note: Backend API call for folder rename will be implemented when endpoint is available
           _toastService?.ShowToast(ToastType.Info, "Rename", $"Renaming folder to '{newName}'...");
-          ErrorLogger.LogDebug($"Rename folder {folderId} to {newName}", "LibraryView");
+          System.Diagnostics.Debug.WriteLine($"Rename folder {folderId} to {newName}");
 
           // Register undo action
           if (_undoRedoService != null)
@@ -934,7 +933,7 @@ namespace VoiceStudio.App.Views.Panels
 
         // Note: Backend API call for folder deletion will be implemented when endpoint is available
         _toastService?.ShowToast(ToastType.Info, "Delete", $"Deleting folder '{folderName}'...");
-        ErrorLogger.LogDebug($"Delete folder {folderId}", "LibraryView");
+        System.Diagnostics.Debug.WriteLine($"Delete folder {folderId}");
 
         // Register undo action
         if (_undoRedoService != null)
@@ -1169,7 +1168,7 @@ namespace VoiceStudio.App.Views.Panels
           catch (Exception ex)
           {
             failedCount++;
-            ErrorLogger.LogWarning($"Failed to export asset: {ex.Message}", "LibraryView");
+            System.Diagnostics.Debug.WriteLine($"Failed to export asset: {ex.Message}");
           }
         }
 
@@ -1291,7 +1290,7 @@ namespace VoiceStudio.App.Views.Panels
             if (!SupportedAudioExtensions.Contains(ext))
             {
               skipped++;
-              ErrorLogger.LogDebug($"Skipped non-audio file: {file.Name}", "LibraryView");
+              System.Diagnostics.Debug.WriteLine($"[LibraryView] Skipped non-audio file: {file.Name}");
               continue;
             }
 
@@ -1299,12 +1298,12 @@ namespace VoiceStudio.App.Views.Panels
             {
               // Upload to backend
               var uploadResult = await backendClient.UploadAudioFileAsync(file.Path);
-              ErrorLogger.LogInfo($"Uploaded: {file.Name} -> {uploadResult.Id}", "LibraryView");
+              System.Diagnostics.Debug.WriteLine($"[LibraryView] Uploaded: {file.Name} -> {uploadResult.Id}");
               imported++;
             }
             catch (Exception ex)
             {
-              ErrorLogger.LogWarning($"Failed to import {file.Name}: {ex.Message}", "LibraryView");
+              System.Diagnostics.Debug.WriteLine($"[LibraryView] Failed to import {file.Name}: {ex.Message}");
             }
           }
         }
@@ -1332,7 +1331,7 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         _toastService?.ShowToast(ToastType.Error, "Import Failed", $"Drag-drop import failed: {ex.Message}");
-        ErrorLogger.LogWarning($"Drag-drop import error: {ex}", "LibraryView");
+        System.Diagnostics.Debug.WriteLine($"[LibraryView] Drag-drop import error: {ex}");
       }
     }
 
@@ -1389,7 +1388,7 @@ namespace VoiceStudio.App.Views.Panels
 
                 // Note: Backend API call for moving asset to folder will be implemented when endpoint is available
                 _toastService?.ShowToast(ToastType.Info, "Move", $"Moving '{_draggedAsset.Name}' to '{targetFolderName}'...");
-                ErrorLogger.LogDebug($"Move asset {assetId} to folder {targetFolderId}", "LibraryView");
+                System.Diagnostics.Debug.WriteLine($"Move asset {assetId} to folder {targetFolderId}");
 
                 // Refresh assets after move
                 if (ViewModel?.LoadAssetsCommand?.CanExecute(null) == true)
@@ -1413,7 +1412,7 @@ namespace VoiceStudio.App.Views.Panels
 
                 // Note: Asset reordering will be implemented in ViewModel when reorder command is available
                 _toastService?.ShowToast(ToastType.Info, "Reorder", $"Reordering '{_draggedAsset.Name}'...");
-                ErrorLogger.LogDebug($"Reorder asset {_draggedAsset.Name} {dropPosition} {targetFolderName}", "LibraryView");
+                System.Diagnostics.Debug.WriteLine($"Reorder asset {_draggedAsset.Name} {dropPosition} {targetFolderName}");
 
                 // Refresh assets after reorder
                 if (ViewModel?.LoadAssetsCommand?.CanExecute(null) == true)

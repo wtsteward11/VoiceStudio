@@ -5,8 +5,10 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
+using VoiceStudio.App.Commands;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Utilities;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App
 {
@@ -16,28 +18,13 @@ namespace VoiceStudio.App
     private static DateTime _appStartTime;
     public static Window? MainWindowInstance { get; private set; }
     private static readonly object _bindingFailureLock = new();
-    private static readonly List<string> _bindingFailures = new();
-    private static bool _bindingFailureLoggingEnabled = false;
+    private static readonly List<string> _bindingFailures = [];
+    private static bool _bindingFailureLoggingEnabled;
     private static string? _bindingFailureLogPath;
-
-    private static void WriteDiagMarker(string stage)
-    {
-      try
-      {
-        var dir = Path.Combine(
-          Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-          "VoiceStudio", "crashes");
-        Directory.CreateDirectory(dir);
-        File.WriteAllText(Path.Combine(dir, "diag_latest.txt"),
-          $"{DateTime.UtcNow:O} | PID={Environment.ProcessId} | {stage}");
-      }
-      // ALLOWED: empty catch - startup resilience, best-effort crash diagnostic write
-      catch { /* best effort diagnostic */ }
-    }
+    private static readonly System.Text.Json.JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
 
     public App()
     {
-      WriteDiagMarker("constructor_entered");
       this.UnhandledException += App_UnhandledException;
       _appStartTime = DateTime.UtcNow;
       _startupProfiler = PerformanceProfiler.Start("Application Startup");
@@ -45,19 +32,32 @@ namespace VoiceStudio.App
 
       this.InitializeComponent();
       _startupProfiler.Checkpoint("InitializeComponent");
-      WriteDiagMarker("xaml_initialized");
 
-      // Initialize service provider with error recovery
-      try
-      {
-        ServiceProvider.Initialize();
-      }
-      catch (Exception ex)
-      {
-        WriteDiagMarker($"service_provider_failed|{ex.GetType().Name}|{ex.Message}");
-        System.Diagnostics.Debug.WriteLine($"ServiceProvider.Initialize failed: {ex}");
-      }
+      // Initialize service provider
+      ServiceProvider.Initialize();
       _startupProfiler.Checkpoint("ServiceProvider.Initialize");
+
+      // Command handlers are bootstrapped in OnLaunched after MainWindow is created
+      // (DialogService requires Window which is only available after window creation)
+
+      // Start backend process in background (non-blocking)
+      _ = Task.Run(async () =>
+      {
+        try
+        {
+          var backendManager = ServiceProvider.TryGetBackendProcessManager();
+          if (backendManager != null)
+          {
+            var started = await backendManager.EnsureBackendRunningAsync();
+            Debug.WriteLine($"[App] Backend auto-start: {(started ? "SUCCESS" : "FAILED")}");
+          }
+        }
+        catch (Exception ex)
+        {
+          Debug.WriteLine($"[App] Backend auto-start error: {ex.Message}");
+          ErrorLogger.LogWarning($"Backend auto-start failed: {ex.Message}", "App.Constructor");
+        }
+      });
 
       // Gate C UI smoke relies on capturing binding failures deterministically.
       if (IsUiSmokeRequested())
@@ -73,9 +73,9 @@ namespace VoiceStudio.App
 
     private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
-      WriteDiagMarker($"unhandled_exception|{e.Exception?.GetType().Name}|{e.Exception?.Message}");
       try
       {
+        // Write to deterministic location: %LOCALAPPDATA%\VoiceStudio\crashes\
         var crashDir = System.IO.Path.Combine(
           Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
           "VoiceStudio", "crashes");
@@ -88,22 +88,23 @@ namespace VoiceStudio.App
 
         // Construct detailed crash log
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("═══════════════════════════════════════════════════");
-        sb.AppendLine("VoiceStudio Unhandled Exception Report");
-        sb.AppendLine("═══════════════════════════════════════════════════");
-        sb.AppendLine();
-        sb.AppendLine($"Timestamp (UTC): {timestamp}");
-        sb.AppendLine($"Process ID: {System.Diagnostics.Process.GetCurrentProcess().Id}");
-        sb.AppendLine($"Thread ID: {System.Threading.Thread.CurrentThread.ManagedThreadId}");
-        sb.AppendLine();
+        sb.AppendLine("═══════════════════════════════════════════════════")
+          .AppendLine("VoiceStudio Unhandled Exception Report")
+          .AppendLine("═══════════════════════════════════════════════════")
+          .AppendLine()
+          .AppendLine($"Timestamp (UTC): {timestamp}")
+          .AppendLine($"Process ID: {Environment.ProcessId}")
+          .AppendLine($"Thread ID: {Environment.CurrentManagedThreadId}")
+          .AppendLine()
+          .AppendLine("--- Startup Stage ---")
+          .AppendLine($"App Startup Time: {_appStartTime:yyyy-MM-dd_HH:mm:ss.fff}")
+          .AppendLine($"Uptime at crash: {(DateTime.UtcNow - _appStartTime).TotalSeconds:F3}s");
 
         // Startup stage indicator
-        sb.AppendLine("--- Startup Stage ---");
-        sb.AppendLine($"App Startup Time: {_appStartTime:yyyy-MM-dd_HH:mm:ss.fff}");
-        sb.AppendLine($"Uptime at crash: {(DateTime.UtcNow - _appStartTime).TotalSeconds:F3}s");
+
         if (_startupProfiler != null)
         {
-          sb.AppendLine($"Startup Profiler: Active (within startup phase)");
+          sb.AppendLine("Startup Profiler: Active (within startup phase)");
         }
         sb.AppendLine();
 
@@ -151,47 +152,24 @@ namespace VoiceStudio.App
           }
           System.IO.File.WriteAllText(latestLink, $"See: {logPath}");
         }
-        // ALLOWED: empty catch - startup resilience, best-effort latest-link symlink
-        catch { /* Best effort */ }
+        catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.Unknown"); }
 
+        // Debug output
         Debug.WriteLine($"Unhandled exception logged to: {logPath}");
       }
       catch (Exception logEx)
       {
+        // Fallback to debug output if file writing fails
         Debug.WriteLine($"Failed to write crash log: {logEx.Message}");
       }
 
-      // Selective exception handling: survive recoverable exceptions in production,
-      // crash on fatal ones. Set VOICESTUDIO_CRASH_ON_UNHANDLED=1 during development
-      // to always crash for visibility.
-      var crashOnUnhandled = Environment.GetEnvironmentVariable("VOICESTUDIO_CRASH_ON_UNHANDLED");
-      if (string.Equals(crashOnUnhandled, "1", StringComparison.Ordinal))
-      {
-        return;
-      }
-
-      if (e.Exception != null && IsFatalException(e.Exception))
-      {
-        return;
-      }
-
+      // Mark as handled to prevent app termination for non-fatal exceptions
+      // This allows the UI to continue operating even when individual operations fail
       e.Handled = true;
-    }
-
-    private static bool IsFatalException(Exception ex)
-    {
-      return ex is OutOfMemoryException
-          || ex is StackOverflowException
-          || ex is AccessViolationException
-          || ex is System.Runtime.InteropServices.SEHException
-          || (ex is System.Runtime.InteropServices.COMException comEx
-              && (comEx.HResult == unchecked((int)0x80040154)    // CLASS_E_CLASSNOTREGISTERED
-               || comEx.HResult == unchecked((int)0x800401F0))); // CO_E_NOTINITIALIZED
     }
 
     protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
-      WriteDiagMarker("on_launched");
       _startupProfiler?.Checkpoint("OnLaunched Start");
 
       if (IsSmokeHinted())
@@ -229,11 +207,10 @@ namespace VoiceStudio.App
             var pluginManager = ServiceProvider.GetPluginManager();
             await pluginManager.LoadPluginsAsync();
           }
-          // ALLOWED: empty catch - startup resilience, plugins are optional
-          catch
-          {
-            // Silently fail - plugins are optional
-          }
+          catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.OnLaunched");
+      }
         });
       }
 
@@ -258,15 +235,25 @@ namespace VoiceStudio.App
             var staleSteps = Path.Combine(crashDir, "ui_smoke_steps_latest.log");
             if (File.Exists(staleSteps)) File.Delete(staleSteps);
           }
-          // ALLOWED: empty catch - startup resilience, stale smoke file cleanup is non-critical
-          catch
-          {
-            // Best effort
-          }
+          catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.Unknown");
+      }
 
           m_window = new MainWindow();
           MainWindowInstance = m_window;
           _startupProfiler?.Checkpoint("MainWindow Created");
+
+          // Bootstrap command handlers now that MainWindow is available (DialogService requires Window)
+          try
+          {
+            CommandHandlerBootstrapper.Initialize();
+            _startupProfiler?.Checkpoint("CommandHandlerBootstrapper.Initialize");
+          }
+          catch (Exception ex)
+          {
+            Debug.WriteLine($"[App] Command handler initialization failed: {ex.Message}");
+          }
 
           if (IsSmokeHinted())
           {
@@ -274,7 +261,6 @@ namespace VoiceStudio.App
           }
 
           m_window.Activate();
-          WriteDiagMarker("window_activated");
           _startupProfiler?.Checkpoint("MainWindow Activated");
 
           if (IsSmokeHinted())
@@ -297,10 +283,9 @@ namespace VoiceStudio.App
                 Directory.CreateDirectory(crashDir);
                 File.WriteAllText(Path.Combine(crashDir, "ui_smoke_exception.log"), ex.ToString());
               }
-              // ALLOWED: empty catch - startup resilience, exception log write is best-effort
-              catch
+              catch (Exception logEx)
               {
-                // Best effort
+                ErrorLogger.LogWarning($"Best effort operation failed: {logEx.Message}", "App.UiSmoke");
               }
 
               result = new GateCUiSmokeResult
@@ -308,8 +293,8 @@ namespace VoiceStudio.App
                 ExitCode = 3,
                 ExePath = Environment.ProcessPath ?? string.Empty,
                 BindingLogPath = _bindingFailureLogPath ?? Path.Combine(crashDir, "binding_failures_latest.log"),
-                NavSteps = Array.Empty<string>(),
-                BindingFailures = Array.Empty<string>(),
+                NavSteps = [],
+                BindingFailures = [],
               };
             }
 
@@ -325,10 +310,9 @@ namespace VoiceStudio.App
             Directory.CreateDirectory(crashDir);
             File.WriteAllText(Path.Combine(crashDir, "ui_smoke_exception.log"), ex.ToString());
           }
-          // ALLOWED: empty catch - startup resilience, exception log write is best-effort
-          catch
+          catch (Exception logEx)
           {
-            // Best effort
+            ErrorLogger.LogWarning($"Best effort operation failed: {logEx.Message}", "App.UiSmoke");
           }
 
           // Ensure the automation always gets a summary file, even if MainWindow cannot be created.
@@ -337,8 +321,8 @@ namespace VoiceStudio.App
             ExitCode = 4,
             ExePath = Environment.ProcessPath ?? string.Empty,
             BindingLogPath = _bindingFailureLogPath ?? Path.Combine(crashDir, "binding_failures_latest.log"),
-            NavSteps = Array.Empty<string>(),
-            BindingFailures = Array.Empty<string>(),
+            NavSteps = [],
+            BindingFailures = [],
           };
 
           WriteGateCUiSmokeSummary(crashDir, result);
@@ -347,30 +331,20 @@ namespace VoiceStudio.App
         }
       }
 
-      // First-run wizard (GAP-X02): show on first launch before MainWindow
-      if (!isSmokeMode && await Views.FirstRunWizard.ShouldShowWizardAsync())
-      {
-        _startupProfiler?.Checkpoint("FirstRunWizard Check: Showing");
-        var wizard = new Views.FirstRunWizard();
-        var wizardClosed = new TaskCompletionSource();
-        wizard.Closed += (_, _) => wizardClosed.SetResult();
-        wizard.Activate();
-        await wizardClosed.Task;
-        _startupProfiler?.Checkpoint("FirstRunWizard Closed");
-      }
-
       m_window = new MainWindow();
       MainWindowInstance = m_window;
       _startupProfiler?.Checkpoint("MainWindow Created");
 
+      // Bootstrap command handlers now that MainWindow is available (DialogService requires Window)
       try
       {
-        Commands.CommandHandlerBootstrapper.Initialize();
+        CommandHandlerBootstrapper.Initialize();
         _startupProfiler?.Checkpoint("CommandHandlerBootstrapper.Initialize");
       }
       catch (Exception ex)
       {
-        Logging.ErrorLogger.LogWarning($"Command handler initialization failed: {ex.Message}", "App");
+        Debug.WriteLine($"[App] Command handler initialization failed: {ex.Message}");
+        // Non-fatal - app can continue without command handlers
       }
 
       if (IsSmokeHinted())
@@ -379,7 +353,6 @@ namespace VoiceStudio.App
       }
 
       m_window.Activate();
-      WriteDiagMarker("window_activated");
       _startupProfiler?.Checkpoint("MainWindow Activated");
 
       if (IsSmokeHinted())
@@ -387,34 +360,25 @@ namespace VoiceStudio.App
         WriteUiSmokeDebugSnapshot(phase: "mainwindow_activated", args: args, smokeExit: smokeExit, uiSmoke: uiSmoke);
       }
 
-      // Start deferred initialization in background after window is visible.
-      // This orchestrates backend auto-start, health checks, connection monitoring,
-      // and plugin discovery via DeferredServiceInitializer.
+      // Start deferred initialization in background after window is visible
+      // This improves perceived startup time by delaying non-critical services
       if (!isSmokeMode)
       {
         _ = Task.Run(async () =>
         {
           try
           {
+            // Small delay to let the window fully render
             await Task.Delay(500);
 
-            var initializer = Services.DeferredServiceInitializer.CreateDefault(
-                AppServices.GetProvider());
+            var initializer = DeferredServiceInitializer.CreateDefault(new ServiceProviderAdapter());
             await initializer.InitializeAllAsync();
-            Logging.ErrorLogger.LogInfo(
-                "[App] Deferred service initialization completed", "App");
+            Debug.WriteLine("[App] Deferred service initialization completed");
           }
           catch (Exception ex)
           {
-            Logging.ErrorLogger.LogWarning(
-                $"[App] Deferred initialization error: {ex.Message}", "App");
-            m_window?.DispatcherQueue?.TryEnqueue(() =>
-            {
-              var toast = AppServices.TryGetToastNotificationService();
-              toast?.ShowWarning(
-                  "The VoiceStudio backend failed to start. Some features may be unavailable.",
-                  "Backend Unavailable");
-            });
+            Debug.WriteLine($"[App] Deferred initialization error: {ex.Message}");
+            ErrorLogger.LogWarning($"Deferred initialization failed: {ex.Message}", "App.DeferredInit");
           }
         });
       }
@@ -436,11 +400,10 @@ namespace VoiceStudio.App
           {
             Microsoft.UI.Xaml.Application.Current.Exit();
           }
-          // ALLOWED: empty catch - startup resilience, fallback shutdown must not throw
-          catch
-          {
-            // Best effort shutdown; process exit will end the smoke run.
-          }
+          catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.Unknown");
+      }
         }
       }
 
@@ -470,7 +433,7 @@ namespace VoiceStudio.App
       try
       {
         var arguments = args?.Arguments ?? string.Empty;
-        if (arguments.IndexOf("--smoke-exit", StringComparison.OrdinalIgnoreCase) >= 0
+        if (arguments.Contains("--smoke-exit", StringComparison.OrdinalIgnoreCase)
             || HasCommandLineFlag("--smoke-exit"))
         {
           return true;
@@ -496,8 +459,8 @@ namespace VoiceStudio.App
       try
       {
         var arguments = args?.Arguments ?? string.Empty;
-        if (arguments.IndexOf("--smoke-ui", StringComparison.OrdinalIgnoreCase) >= 0
-            || arguments.IndexOf("--ui-smoke", StringComparison.OrdinalIgnoreCase) >= 0)
+        if (arguments.Contains("--smoke-ui", StringComparison.OrdinalIgnoreCase)
+            || arguments.Contains("--ui-smoke", StringComparison.OrdinalIgnoreCase))
         {
           return true;
         }
@@ -531,15 +494,14 @@ namespace VoiceStudio.App
 
         var raw = Environment.CommandLine ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(raw)
-            && raw.IndexOf(flag, StringComparison.OrdinalIgnoreCase) >= 0)
+            && raw.Contains(flag, StringComparison.OrdinalIgnoreCase))
         {
           return true;
         }
       }
-      // ALLOWED: empty catch - startup resilience, command-line flag parsing is best-effort
-      catch
+      catch (Exception ex)
       {
-        // Best effort
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.HasCommandLineFlag");
       }
 
       return false;
@@ -563,8 +525,8 @@ namespace VoiceStudio.App
         }
 
         var raw = Environment.CommandLine ?? string.Empty;
-        return raw.IndexOf("--smoke", StringComparison.OrdinalIgnoreCase) >= 0
-            || raw.IndexOf("--ui-smoke", StringComparison.OrdinalIgnoreCase) >= 0;
+        return raw.Contains("--smoke", StringComparison.OrdinalIgnoreCase)
+            || raw.Contains("--ui-smoke", StringComparison.OrdinalIgnoreCase);
       }
       catch
       {
@@ -616,16 +578,13 @@ namespace VoiceStudio.App
           computed_ui_smoke = uiSmoke,
         };
 
-        var json = System.Text.Json.JsonSerializer.Serialize(
-          payload,
-          new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        var json = System.Text.Json.JsonSerializer.Serialize(payload, _jsonOptions);
 
         File.WriteAllText(path, json, Encoding.UTF8);
       }
-      // ALLOWED: empty catch - startup resilience, debug snapshot write is non-critical
-      catch
+      catch (Exception ex)
       {
-        // Best effort
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.WriteUiSmokeDebugSnapshot");
       }
     }
 
@@ -653,10 +612,9 @@ namespace VoiceStudio.App
         this.DebugSettings.IsBindingTracingEnabled = true;
         this.DebugSettings.BindingFailed += OnBindingFailed;
       }
-      // ALLOWED: empty catch - startup resilience, binding tracing may not be available on all runtimes
-      catch
+      catch (Exception ex)
       {
-        // Best effort: if the event isn't available on this platform/runtime, smoke will still run.
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.EnableBindingFailureLogging");
       }
     }
 
@@ -673,10 +631,9 @@ namespace VoiceStudio.App
         Directory.CreateDirectory(Path.GetDirectoryName(path) ?? GetCrashDir());
         File.WriteAllText(path, string.Empty);
       }
-      // ALLOWED: empty catch - startup resilience, binding failure log clear is non-critical
-      catch
+      catch (Exception ex)
       {
-        // Best effort
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.ClearBindingFailures");
       }
     }
 
@@ -698,10 +655,9 @@ namespace VoiceStudio.App
           File.AppendAllText(path, message + Environment.NewLine);
         }
       }
-      // ALLOWED: empty catch - startup resilience, binding failure log append is non-critical
-      catch
+      catch (Exception ex)
       {
-        // Best effort
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.OnBindingFailed");
       }
     }
 
@@ -709,9 +665,9 @@ namespace VoiceStudio.App
     {
       public int ExitCode { get; init; }
       public string ExePath { get; init; } = string.Empty;
-      public string[] NavSteps { get; init; } = Array.Empty<string>();
+      public string[] NavSteps { get; init; } = [];
       public string BindingLogPath { get; init; } = string.Empty;
-      public string[] BindingFailures { get; init; } = Array.Empty<string>();
+      public string[] BindingFailures { get; init; } = [];
     }
 
     private static async Task<GateCUiSmokeResult> RunGateCUiSmokeAsync(Window window, string crashDir)
@@ -743,11 +699,10 @@ namespace VoiceStudio.App
               Path.Combine(crashDir, "ui_smoke_exception.log"),
               $"UI smoke timed out after a panel switch. Step: {timedOutStep ?? "(unknown)"}{Environment.NewLine}See: ui_smoke_steps_latest.log");
           }
-          // ALLOWED: empty catch - startup resilience, smoke timeout log write is best-effort
-          catch
-          {
-            // Best effort
-          }
+          catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.Task");
+      }
         }
 
         // Allow any async binding/visual tree work to flush.
@@ -759,7 +714,19 @@ namespace VoiceStudio.App
           failures = _bindingFailures.ToArray();
         }
 
-        var exitCode = timedOut ? 5 : (failures.Length == 0 ? 0 : 1);
+        int exitCode;
+        if (timedOut)
+        {
+          exitCode = 5;
+        }
+        else if (failures.Length == 0)
+        {
+          exitCode = 0;
+        }
+        else
+        {
+          exitCode = 1;
+        }
 
         return new GateCUiSmokeResult
         {
@@ -777,10 +744,9 @@ namespace VoiceStudio.App
           Directory.CreateDirectory(crashDir);
           File.WriteAllText(Path.Combine(crashDir, "ui_smoke_exception.log"), ex.ToString());
         }
-        // ALLOWED: empty catch - startup resilience, exception log write is best-effort
-        catch
+        catch (Exception logEx)
         {
-          // Best effort
+          ErrorLogger.LogWarning($"Best effort operation failed: {logEx.Message}", "App.UiSmokeResult");
         }
 
         return result with { ExitCode = 3 };
@@ -805,16 +771,13 @@ namespace VoiceStudio.App
           binding_failures = result.BindingFailures,
         };
 
-        var json = System.Text.Json.JsonSerializer.Serialize(
-          payload,
-          new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        var json = System.Text.Json.JsonSerializer.Serialize(payload, _jsonOptions);
 
         File.WriteAllText(summaryPath, json, Encoding.UTF8);
       }
-      // ALLOWED: empty catch - startup resilience, smoke summary write is non-critical
-      catch
+      catch (Exception ex)
       {
-        // Best effort
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.WriteGateCUiSmokeSummary");
       }
     }
 
@@ -823,5 +786,30 @@ namespace VoiceStudio.App
 
     private Window? m_window;
   }
-}
 
+  /// <summary>
+  /// Adapter to expose the static ServiceProvider as an IServiceProvider.
+  /// Used by DeferredServiceInitializer to resolve services.
+  /// </summary>
+  internal class ServiceProviderAdapter : IServiceProvider
+  {
+    public object? GetService(Type serviceType)
+    {
+      // Map service types to static ServiceProvider methods
+      if (serviceType == typeof(PluginManager))
+        return ServiceProvider.GetPluginManager();
+
+      if (serviceType == typeof(RecentProjectsService))
+        return ServiceProvider.TryGetRecentProjectsService();
+
+      if (serviceType == typeof(CrashRecoveryService))
+        return null; // CrashRecoveryService not exposed via ServiceProvider; init handled elsewhere
+
+      if (serviceType == typeof(VoiceStudio.Core.Services.IBackendClient))
+        return ServiceProvider.GetBackendClient();
+
+      // Default: return null (service not available)
+      return null;
+    }
+  }
+}

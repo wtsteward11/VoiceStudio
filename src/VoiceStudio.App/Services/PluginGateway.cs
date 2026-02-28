@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -21,7 +20,7 @@ namespace VoiceStudio.App.Services
         private DateTime _lastCatalogRefresh = DateTime.MinValue;
         private readonly TimeSpan _cacheExpiry = TimeSpan.FromMinutes(5);
 
-        public PluginGateway(HttpClient httpClient, string baseUrl = "http://localhost:8000")
+        public PluginGateway(HttpClient httpClient, string baseUrl = "http://localhost:8001")
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _baseUrl = baseUrl.TrimEnd('/');
@@ -112,7 +111,7 @@ namespace VoiceStudio.App.Services
             }
             catch (HttpRequestException ex)
             {
-                ErrorLogger.LogDebug($"Plugin API unavailable: {ex.Message}", "PluginGateway");
+                System.Diagnostics.Debug.WriteLine($"Plugin API unavailable: {ex.Message}");
             }
 
             // No sample data — return empty list; UI shows "No plugins available"
@@ -151,7 +150,7 @@ namespace VoiceStudio.App.Services
             }
             catch (HttpRequestException ex)
             {
-                ErrorLogger.LogDebug($"Plugin API unavailable: {ex.Message}", "PluginGateway");
+                System.Diagnostics.Debug.WriteLine($"Plugin API unavailable: {ex.Message}");
             }
 
             // No sample data — return null; UI shows "Plugin not found"
@@ -421,62 +420,6 @@ namespace VoiceStudio.App.Services
             CatalogRefreshed?.Invoke(this, EventArgs.Empty);
         }
 
-        public async Task<bool> SubmitReviewAsync(string pluginId, int rating, string review = "", string? version = null, CancellationToken cancellationToken = default)
-        {
-            try
-            {
-                var payload = new { rating, review, version = version ?? "latest" };
-                var response = await _httpClient.PostAsJsonAsync(
-                    $"{_baseUrl}/api/marketplace/reviews/{Uri.EscapeDataString(pluginId)}",
-                    payload,
-                    cancellationToken);
-                return response.IsSuccessStatusCode;
-            }
-            catch (HttpRequestException)
-            {
-                return false;
-            }
-        }
-
-        public async Task<IReadOnlyList<PluginReview>> GetReviewsAsync(string pluginId, CancellationToken cancellationToken = default)
-        {
-            try
-            {
-                var response = await _httpClient.GetAsync(
-                    $"{_baseUrl}/api/marketplace/reviews/{Uri.EscapeDataString(pluginId)}",
-                    cancellationToken);
-                if (response.IsSuccessStatusCode)
-                {
-                    var list = await response.Content.ReadFromJsonAsync<List<PluginReview>>(cancellationToken: cancellationToken);
-                    return list ?? new List<PluginReview>();
-                }
-            }
-            catch (HttpRequestException ex)
-            {
-                ErrorLogger.LogDebug($"Marketplace reviews request failed: {ex.Message}", "PluginGateway.GetReviewsAsync");
-            }
-            return new List<PluginReview>();
-        }
-
-        public async Task<PluginReview?> GetMyReviewAsync(string pluginId, CancellationToken cancellationToken = default)
-        {
-            try
-            {
-                var response = await _httpClient.GetAsync(
-                    $"{_baseUrl}/api/marketplace/reviews/{Uri.EscapeDataString(pluginId)}/mine",
-                    cancellationToken);
-                if (response.IsSuccessStatusCode)
-                {
-                    return await response.Content.ReadFromJsonAsync<PluginReview>(cancellationToken: cancellationToken);
-                }
-            }
-            catch (HttpRequestException ex)
-            {
-                ErrorLogger.LogDebug($"Marketplace my-review request failed: {ex.Message}", "PluginGateway.GetMyReviewAsync");
-            }
-            return null;
-        }
-
         #endregion
 
         #region Helper Methods
@@ -512,7 +455,7 @@ namespace VoiceStudio.App.Services
         {
             // Return empty result when API is unavailable
             // Do NOT return fake sample data to users
-            ErrorLogger.LogDebug("Plugin catalog unavailable - returning empty results", "PluginGateway");
+            System.Diagnostics.Debug.WriteLine("Plugin catalog unavailable - returning empty results");
             return new PluginSearchResult
             {
                 Plugins = new List<PluginInfo>(),

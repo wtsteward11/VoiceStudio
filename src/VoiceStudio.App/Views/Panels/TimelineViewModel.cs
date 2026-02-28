@@ -93,13 +93,6 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private bool isPreviewing;
 
-    // Phase 3 Fix 4: Guidance InfoBar properties
-    [ObservableProperty]
-    private bool showGuidanceInfoBar;
-
-    [ObservableProperty]
-    private string guidanceMessage = string.Empty;
-
     // Current audio file path for preview (stored when playing audio)
     private string? _currentAudioFilePath;
 
@@ -122,12 +115,6 @@ namespace VoiceStudio.App.Views.Panels
 
     [ObservableProperty]
     private double timelineZoom = 1.0;
-
-    [ObservableProperty]
-    private bool isLoopEnabled;
-
-    [ObservableProperty]
-    private bool isRecording;
 
     // Multi-select support
     private readonly MultiSelectService _multiSelectService;
@@ -454,9 +441,6 @@ namespace VoiceStudio.App.Views.Panels
         eventAggregator.Subscribe<AddToTimelineEvent>(OnAddToTimeline);
         // C.4: Subscribe to TranscriptionCompletedEvent for subtitle track
         eventAggregator.Subscribe<TranscriptionCompletedEvent>(OnTranscriptionCompleted);
-        // Phase 3 Fix: Subscribe to ProjectChangedEvent from FileOperationsHandler
-        // Bridges the gap between File menu project operations and Timeline panel state
-        eventAggregator.Subscribe<ProjectChangedEvent>(OnExternalProjectChanged);
       }
 
       // Load preview settings
@@ -564,49 +548,6 @@ namespace VoiceStudio.App.Views.Panels
       _toastNotificationService?.ShowSuccess(
         "Subtitles Loaded",
         $"{e.Segments.Count} segments added to timeline");
-    }
-
-    /// <summary>
-    /// Phase 3 Fix: Handle project changed events from FileOperationsHandler.
-    /// Syncs the Timeline's SelectedProject with File menu operations (New, Open, Close).
-    /// </summary>
-    private void OnExternalProjectChanged(ProjectChangedEvent e)
-    {
-      // Skip events from this panel to avoid loops
-      if (e.SourcePanelId == PanelId || e.SourcePanelId == "timeline")
-        return;
-
-      if (string.IsNullOrEmpty(e.ProjectId))
-      {
-        // Project was closed
-        SelectedProject = null;
-        _toastNotificationService?.ShowInfo("Project", "Project closed");
-        return;
-      }
-
-      // Find existing project or create a placeholder
-      var existingProject = Projects.FirstOrDefault(p => p.Id == e.ProjectId);
-      if (existingProject != null)
-      {
-        SelectedProject = existingProject;
-      }
-      else
-      {
-        // Create a placeholder project and add it
-        var newProject = new Project
-        {
-          Id = e.ProjectId,
-          Name = e.ProjectName ?? "Untitled",
-          CreatedAt = DateTime.UtcNow.ToString("o"),
-          UpdatedAt = DateTime.UtcNow.ToString("o")
-        };
-        Projects.Add(newProject);
-        SelectedProject = newProject;
-      }
-
-      _toastNotificationService?.ShowInfo(
-        "Project Activated",
-        $"'{SelectedProject?.Name ?? "Project"}' is now active in Timeline");
     }
 
     private async Task AddTrackAndClipAsync(AddToTimelineEvent e)
@@ -1108,36 +1049,11 @@ namespace VoiceStudio.App.Views.Panels
         ProjectAudioFiles.Clear();
         SelectedAudioFile = null;
       }
-      UpdateGuidanceState();
     }
 
     partial void OnSelectedTrackChanged(AudioTrack? value)
     {
       AddClipToTrackCommand.NotifyCanExecuteChanged();
-      UpdateGuidanceState();
-    }
-
-    /// <summary>
-    /// Phase 3 Fix 4: Update guidance InfoBar state based on current timeline state.
-    /// Shows contextual help when user needs to take action.
-    /// </summary>
-    private void UpdateGuidanceState()
-    {
-      if (SelectedProject == null)
-      {
-        ShowGuidanceInfoBar = true;
-        GuidanceMessage = "Create or open a project to start working (File > New Project or Ctrl+N)";
-      }
-      else if (Tracks.Count == 0)
-      {
-        ShowGuidanceInfoBar = true;
-        GuidanceMessage = "Add a track to begin (click + in transport bar or drag audio from Library)";
-      }
-      else
-      {
-        ShowGuidanceInfoBar = false;
-        GuidanceMessage = string.Empty;
-      }
     }
 
     partial void OnVisualizationModeChanged(string value)
@@ -1636,7 +1552,7 @@ namespace VoiceStudio.App.Views.Panels
       {
         // Log but don't fail - visualization is optional
         _logService?.LogError(ex, "LoadVisualizationData");
-        ErrorLogger.LogWarning($"Failed to load visualization data: {ex.Message}", "TimelineViewModel");
+        System.Diagnostics.Debug.WriteLine($"Failed to load visualization data: {ex.Message}");
       }
     }
 
@@ -1662,7 +1578,7 @@ namespace VoiceStudio.App.Views.Panels
       {
         // Log but don't show error - waveform will show empty state
         _logService?.LogError(ex, "LoadClipWaveform");
-        ErrorLogger.LogWarning($"Failed to load waveform for clip {clip.Id}: {ex.Message}", "TimelineViewModel");
+        System.Diagnostics.Debug.WriteLine($"Failed to load waveform for clip {clip.Id}: {ex.Message}");
       }
     }
 

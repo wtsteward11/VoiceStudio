@@ -20,13 +20,7 @@ namespace VoiceStudio.App.ViewModels
   public abstract class BaseViewModel : ObservableObject, IDisposable
   {
     protected ILogger Logger { get; }
-    
-    /// <summary>
-    /// Gets the dispatcher queue for UI thread marshaling.
-    /// May be null in test environments where WinUI dispatcher is unavailable.
-    /// Use TryDispatch() helper method for safe dispatching.
-    /// </summary>
-    protected DispatcherQueue? Dispatcher { get; }
+    protected DispatcherQueue Dispatcher { get; }
 
     protected IErrorLoggingService? ErrorLoggingService { get; }
     protected IErrorDialogService? ErrorDialogService { get; }
@@ -87,10 +81,7 @@ namespace VoiceStudio.App.ViewModels
       if (context == null) throw new ArgumentNullException(nameof(context));
 
       Logger = context.Logger ?? throw new ArgumentNullException(nameof(context.Logger));
-      
-      // Allow null dispatcher for test environments where WinUI dispatcher is unavailable
-      // In production, this will always be a real DispatcherQueue
-      Dispatcher = context.DispatcherQueue as DispatcherQueue;
+      Dispatcher = context.DispatcherQueue as DispatcherQueue ?? throw new ArgumentNullException(nameof(context.DispatcherQueue));
 
       ErrorLoggingService = errorLoggingService;
       ErrorDialogService = errorDialogService;
@@ -98,26 +89,6 @@ namespace VoiceStudio.App.ViewModels
       OperationQueueService = operationQueueService;
       StateCacheService = stateCacheService;
       GracefulDegradationService = gracefulDegradationService;
-    }
-    
-    /// <summary>
-    /// Safely dispatches an action to the UI thread.
-    /// In test environments where Dispatcher is null, executes the action synchronously.
-    /// </summary>
-    /// <param name="action">The action to dispatch.</param>
-    /// <returns>True if the action was dispatched or executed successfully.</returns>
-    protected bool TryDispatch(Action action)
-    {
-      if (action == null) return false;
-      
-      if (Dispatcher != null)
-      {
-        return Dispatcher.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, () => action());
-      }
-      
-      // In test mode, execute synchronously
-      action();
-      return true;
     }
 
     // NOTE: Legacy parameterless constructor was removed 2026-02-06.

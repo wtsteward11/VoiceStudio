@@ -136,6 +136,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
+        System.Diagnostics.Debug.WriteLine($"Error creating profile: {ex.Message}");
         _errorLoggingService?.LogError(ex, "CreateProfileButton_Click");
       }
     }
@@ -338,6 +339,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
+        System.Diagnostics.Debug.WriteLine($"Error in ProfileCard_PointerPressed: {ex.Message}");
         _errorLoggingService?.LogError(ex, "ProfileCard_PointerPressed");
       }
     }
@@ -437,58 +439,33 @@ namespace VoiceStudio.App.Views.Panels
     {
       // Search filtering is handled by the ViewModel's FilteredProfiles binding
       // This handler can be used for debounced search or additional UI updates
+      if (sender is Microsoft.UI.Xaml.Controls.TextBox textBox)
+      {
+        System.Diagnostics.Debug.WriteLine($"Profile search: {textBox.Text}");
+      }
     }
 
     private void EditProfileButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
+      // Navigate to profile edit mode
       if (ViewModel?.SelectedProfile != null)
       {
-        HandleProfileMenuClick("edit", ViewModel.SelectedProfile);
+        System.Diagnostics.Debug.WriteLine($"Edit profile: {ViewModel.SelectedProfile.Name}");
       }
     }
 
-    private void PreviewVoiceButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async void BatchExport_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)
     {
-      if (ViewModel?.SelectedProfile != null)
+      try
       {
-        ViewModel.PreviewProfileCommand.Execute(ViewModel.SelectedProfile.Id);
+        _errorLoggingService?.LogInfo($"Batch export requested for {ViewModel.SelectedCount} profiles", "ProfilesView");
+        await ViewModel.ExportSelectedProfilesAsync();
+      }
+      catch (Exception ex)
+      {
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
-
-    private async void CloneProfileButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-    {
-      if (ViewModel?.SelectedProfile != null)
-      {
-        await ViewModel.DuplicateProfileAsync(ViewModel.SelectedProfile);
-      }
-    }
-
-    private void FilterAll_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-    {
-      if (ViewModel != null)
-      {
-        ViewModel.FilterMode = "all";
-      }
-    }
-
-    private void FilterFavorites_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-    {
-      if (ViewModel != null)
-      {
-        ViewModel.FilterMode = "favorites";
-      }
-    }
-
-    private void FilterRecent_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-    {
-      if (ViewModel != null)
-      {
-        ViewModel.FilterMode = "recent";
-      }
-    }
-
-    // GAP-B18: BatchExport_Click - Removed, now using Command binding in XAML
-    // The export functionality is now handled by ViewModel.ExportSelectedCommand
 
     private void Profile_DragStarting(UIElement sender, DragStartingEventArgs e)
     {

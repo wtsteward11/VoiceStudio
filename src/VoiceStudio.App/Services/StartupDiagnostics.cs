@@ -59,7 +59,7 @@ namespace VoiceStudio.App.Services
         public StartupDiagnostics()
         {
             _backendBaseUrl = Environment.GetEnvironmentVariable("VOICESTUDIO_BACKEND_URL")
-                ?? "http://localhost:8000";
+                ?? "http://localhost:8001";
             _jsonOptions = new JsonSerializerOptions
             {
                 WriteIndented = true,

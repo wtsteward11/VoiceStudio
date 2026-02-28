@@ -13,7 +13,6 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any
 
 # Import both unified Plugin (preferred) and deprecated Plugin for backward compatibility
 from app.core.plugins_api import Plugin as UnifiedPlugin
@@ -48,7 +47,7 @@ class PluginLoader:
             plugin_dirs: Directories to scan for plugins
         """
         self._plugin_dirs = plugin_dirs or []
-        self._loaded_modules: dict[str, Any] = {}
+        self._loaded_modules: dict[str, any] = {}
 
     def add_plugin_directory(self, path: Path) -> None:
         """Add a directory to scan for plugins."""
@@ -155,13 +154,14 @@ class PluginLoader:
                 logger.info(f"Loaded plugin: {plugin_id}")
                 return plugin
             else:
+                # Legacy Plugin takes config dict
                 merged_config = {**metadata.default_config, **(config or {})}
-                legacy_plugin: Any = plugin_class(merged_config)
+                plugin = plugin_class(merged_config)
 
-                if await legacy_plugin.load():
+                # Load the plugin (legacy async lifecycle)
+                if await plugin.load():
                     logger.info(f"Loaded plugin: {plugin_id}")
-                    loaded_plugin: Plugin = legacy_plugin
-                    return loaded_plugin
+                    return plugin
                 else:
                     logger.error(f"Plugin load failed: {plugin_id}")
                     return None
@@ -178,7 +178,7 @@ class PluginLoader:
                 return candidate
         return None
 
-    def _load_module(self, plugin_dir: Path, plugin_id: str) -> Any | None:
+    def _load_module(self, plugin_dir: Path, plugin_id: str) -> any | None:
         """Load the plugin Python module."""
         module_path = plugin_dir / "__init__.py"
 
@@ -208,7 +208,7 @@ class PluginLoader:
 
         return None
 
-    def _find_plugin_class(self, module: Any) -> type[UnifiedPlugin] | type[LegacyPlugin] | None:
+    def _find_plugin_class(self, module: any) -> type[UnifiedPlugin] | type[LegacyPlugin] | None:
         """Find the Plugin subclass in a module.
 
         Supports both unified Plugin (Phase 4+) and legacy Plugin (deprecated).

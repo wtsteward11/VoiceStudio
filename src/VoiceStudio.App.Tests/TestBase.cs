@@ -1,6 +1,5 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
-using VoiceStudio.App.Tests.Fixtures;
 
 namespace VoiceStudio.App.Tests
 {
@@ -19,9 +18,6 @@ namespace VoiceStudio.App.Tests
     [TestInitialize]
     public virtual void TestInitialize()
     {
-      // Initialize AppServices with MockViewModelContext for tests that create ViewModels
-      TestAppServicesHelper.EnsureInitialized();
-      
       // Common initialization logic
       // Log test start
       TestContext?.WriteLine($"Starting test: {TestContext?.TestName}");
@@ -30,9 +26,6 @@ namespace VoiceStudio.App.Tests
     [TestCleanup]
     public virtual void TestCleanup()
     {
-      // Cleanup AppServices
-      TestAppServicesHelper.Cleanup();
-      
       // Common cleanup logic
       // Log test completion
       TestContext?.WriteLine($"Completed test: {TestContext?.TestName}");

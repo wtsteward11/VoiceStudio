@@ -52,48 +52,4 @@ namespace VoiceStudio.App.Services.UndoableActions
       }
     }
   }
-
-  /// <summary>
-  /// Undoable action for deleting a training dataset.
-  /// Undo re-inserts the dataset at its original position.
-  /// </summary>
-  public class DeleteTrainingDatasetAction : IUndoableAction
-  {
-    private readonly ObservableCollection<TrainingDataset> _datasets;
-    private readonly IBackendClient _backendClient;
-    private readonly TrainingDataset _dataset;
-    private readonly int _originalIndex;
-
-    public string ActionName => $"Delete Training Dataset '{_dataset.Name ?? "Unnamed"}'";
-
-    public DeleteTrainingDatasetAction(
-        ObservableCollection<TrainingDataset> datasets,
-        IBackendClient backendClient,
-        TrainingDataset dataset,
-        int originalIndex)
-    {
-      _datasets = datasets ?? throw new ArgumentNullException(nameof(datasets));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
-      _dataset = dataset ?? throw new ArgumentNullException(nameof(dataset));
-      _originalIndex = Math.Max(0, originalIndex);
-    }
-
-    public void Undo()
-    {
-      if (!_datasets.Any(d => d.Id == _dataset.Id))
-      {
-        var insertAt = Math.Min(_originalIndex, _datasets.Count);
-        _datasets.Insert(insertAt, _dataset);
-      }
-    }
-
-    public void Redo()
-    {
-      var datasetToRemove = _datasets.FirstOrDefault(d => d.Id == _dataset.Id);
-      if (datasetToRemove != null)
-      {
-        _datasets.Remove(datasetToRemove);
-      }
-    }
-  }
 }

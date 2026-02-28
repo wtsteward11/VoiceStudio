@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -408,7 +407,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Auto-optimization failed: {ex.Message}", "EngineParameterTuningViewModel");
+        System.Diagnostics.Debug.WriteLine($"Auto-optimization failed: {ex.Message}");
       }
     }
 
@@ -449,7 +448,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Failed to apply parameters: {ex.Message}", "EngineParameterTuningViewModel");
+        System.Diagnostics.Debug.WriteLine($"Failed to apply parameters: {ex.Message}");
       }
     }
   }

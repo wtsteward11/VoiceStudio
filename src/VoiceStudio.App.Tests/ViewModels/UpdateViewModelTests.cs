@@ -1,10 +1,11 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.UI.Dispatching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Services;
-using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -19,7 +20,8 @@ namespace VoiceStudio.App.Tests.ViewModels
     public class UpdateViewModelTests
     {
         private Mock<IUpdateService> _mockUpdateService = null!;
-        private MockViewModelContext _mockContext = null!;
+        private IViewModelContext _context = null!;
+        private DispatcherQueueController? _dispatcherController;
 
         [TestInitialize]
         public void Setup()
@@ -28,18 +30,20 @@ namespace VoiceStudio.App.Tests.ViewModels
             _mockUpdateService.Setup(x => x.CurrentVersion).Returns(new Version(1, 0, 0));
             _mockUpdateService.Setup(x => x.UpdateDownloadPath).Returns(string.Empty);
 
-            _mockContext = new MockViewModelContext();
+            _dispatcherController = DispatcherQueueController.CreateOnDedicatedThread();
+            var dispatcher = _dispatcherController.DispatcherQueue;
+            _context = new VoiceStudio.App.ViewModels.ViewModelContext(NullLogger.Instance, dispatcher);
         }
 
         [TestCleanup]
         public void Cleanup()
         {
-            // No dispatcher cleanup needed with MockViewModelContext
+            _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
         }
 
         private UpdateViewModel CreateViewModel()
         {
-            return new UpdateViewModel(_mockContext, _mockUpdateService.Object);
+            return new UpdateViewModel(_context, _mockUpdateService.Object);
         }
 
         #region Initialization Tests
@@ -83,7 +87,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullUpdateService_ThrowsArgumentNullException()
         {
-            _ = new UpdateViewModel(_mockContext, null!);
+            _ = new UpdateViewModel(_context, null!);
         }
 
         #endregion

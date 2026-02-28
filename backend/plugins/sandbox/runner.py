@@ -463,11 +463,10 @@ except ImportError:
             )
 
             # Wait for process to exit
-            if self._process is not None:
-                await asyncio.wait_for(
-                    self._process.wait(),
-                    timeout=self.config.shutdown_timeout_ms / 1000.0,
-                )
+            await asyncio.wait_for(
+                self._process.wait(),
+                timeout=self.config.shutdown_timeout_ms / 1000.0,
+            )
 
             self._set_state(ProcessState.STOPPED)
 

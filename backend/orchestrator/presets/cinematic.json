@@ -1,0 +1,24 @@
+{
+  "preset_id": "cinematic",
+  "name": "Cinematic Narration",
+  "category": "cinematic",
+  "description": "High-drama narration with rich tonal depth and maximum quality",
+  "default_chain": {
+    "schema_version": "1.0",
+    "name": "Cinematic Pipeline",
+    "steps": [
+      {"step_id": "s1", "type": "synthesis", "parameters": {"temperature": 0.8, "speed": 0.95, "emotion": "dramatic"}},
+      {"step_id": "s2", "type": "quality_evaluation"},
+      {"step_id": "s3", "type": "post_processing", "parameters": {"preset": "cinematic_master"}}
+    ]
+  },
+  "default_quality_policy": {
+    "min_mos": 4.2,
+    "min_similarity": 0.85,
+    "min_naturalness": 0.9,
+    "max_artifact_score": 0.03,
+    "min_snr_db": 35,
+    "auto_enhance_if_below": true,
+    "fail_if_unmet": false
+  }
+}

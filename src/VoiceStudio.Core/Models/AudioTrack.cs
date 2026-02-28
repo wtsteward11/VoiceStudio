@@ -14,9 +14,7 @@ namespace VoiceStudio.Core.Models
     public List<AudioClip> Clips { get; set; } = new List<AudioClip>();
     public int TrackNumber { get; set; }
     public string? Engine { get; set; } // Engine used for this track
-    public bool IsMuted { get; set; }
-    public bool IsSolo { get; set; }
-    public bool IsRecordArmed { get; set; }
-    public double Volume { get; set; } = 0.8;
+    public bool IsMuted { get; set; } = false; // Track mute state
+    public bool IsSolo { get; set; } = false; // Track solo state
   }
 }

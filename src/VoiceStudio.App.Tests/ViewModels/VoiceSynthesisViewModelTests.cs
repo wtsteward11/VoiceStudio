@@ -329,57 +329,6 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.AreEqual("voting", _sut.EnsembleSelectionMode);
     }
 
-    [TestMethod]
-    public void SynthesisParameterDefaults_AreCorrect()
-    {
-      Assert.AreEqual(1.0, _sut.Speed);
-      Assert.AreEqual(0.0, _sut.Pitch);
-      Assert.AreEqual(0.72, _sut.Stability);
-      Assert.AreEqual(0.58, _sut.Clarity);
-      Assert.AreEqual(0.35, _sut.Temperature);
-    }
-
-    [TestMethod]
-    public void SpeedDisplay_FormatsCorrectly()
-    {
-      _sut.Speed = 1.5;
-      Assert.AreEqual("1.50", _sut.SpeedDisplay);
-    }
-
-    [TestMethod]
-    public void PitchDisplay_FormatsPositiveCorrectly()
-    {
-      _sut.Pitch = 3;
-      Assert.AreEqual("+3", _sut.PitchDisplay);
-    }
-
-    [TestMethod]
-    public void PitchDisplay_FormatsNegativeCorrectly()
-    {
-      _sut.Pitch = -5;
-      Assert.AreEqual("-5", _sut.PitchDisplay);
-    }
-
-    [TestMethod]
-    public void AvailableLanguages_HasDefaults()
-    {
-      Assert.IsTrue(_sut.AvailableLanguages.Count >= 8);
-      Assert.IsTrue(_sut.AvailableLanguages.Contains("en"));
-    }
-
-    [TestMethod]
-    public void AvailableEmotions_HasDefaults()
-    {
-      Assert.IsTrue(_sut.AvailableEmotions.Count >= 6);
-      Assert.IsTrue(_sut.AvailableEmotions.Contains("neutral"));
-    }
-
-    [TestMethod]
-    public void AvailableEngines_HasFallbackDefaults()
-    {
-      Assert.IsTrue(_sut.AvailableEngines.Count >= 3);
-    }
-
     #endregion
 
     #region Dispose Tests

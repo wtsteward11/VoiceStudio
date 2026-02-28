@@ -100,7 +100,7 @@ namespace VoiceStudio.App.Views.Panels
         {
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
             _backendBaseUrl = Environment.GetEnvironmentVariable("VOICESTUDIO_BACKEND_URL")
-                ?? "http://localhost:8000";
+                ?? "http://localhost:8001";
 
             RefreshCommand = new AsyncRelayCommand(LoadHealthChecksAsync);
         }

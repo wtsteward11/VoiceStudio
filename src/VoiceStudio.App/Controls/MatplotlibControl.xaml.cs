@@ -98,7 +98,7 @@ namespace VoiceStudio.App.Controls
         else
         {
           // For relative URLs, construct full URL (assuming backend base URL)
-          const string baseUrl = "http://localhost:8000";
+          const string baseUrl = "http://localhost:8001";
           var fullUrl = _imageUrl.StartsWith("/") ? baseUrl + _imageUrl : $"{baseUrl}/{_imageUrl}";
           if (Uri.TryCreate(fullUrl, UriKind.Absolute, out var fullUri))
           {

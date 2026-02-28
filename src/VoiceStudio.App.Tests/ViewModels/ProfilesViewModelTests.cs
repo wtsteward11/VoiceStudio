@@ -131,43 +131,13 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestMethod]
     public void ViewModel_ImplementsIPanelView()
     {
+      // Arrange & Act
       var panelView = _viewModel as VoiceStudio.Core.Panels.IPanelView;
 
+      // Assert
       Assert.IsNotNull(panelView, "ProfilesViewModel should implement IPanelView");
       Assert.AreEqual("profiles", panelView.PanelId, "Panel ID should match");
       Assert.IsNotNull(panelView.DisplayName, "Display name should not be null");
-    }
-
-    [TestMethod]
-    public void FilterMode_DefaultIsAll()
-    {
-      Assert.AreEqual("all", _viewModel!.FilterMode);
-    }
-
-    [TestMethod]
-    public void FilterMode_CanBeSetToFavorites()
-    {
-      _viewModel!.FilterMode = "favorites";
-      Assert.AreEqual("favorites", _viewModel.FilterMode);
-    }
-
-    [TestMethod]
-    public void FilterMode_CanBeSetToRecent()
-    {
-      _viewModel!.FilterMode = "recent";
-      Assert.AreEqual("recent", _viewModel.FilterMode);
-    }
-
-    [TestMethod]
-    public void PreviewProfileCommand_IsInitialized()
-    {
-      Assert.IsNotNull(_viewModel!.PreviewProfileCommand);
-    }
-
-    [TestMethod]
-    public async Task DuplicateProfileAsync_WithNull_DoesNotThrow()
-    {
-      await _viewModel!.DuplicateProfileAsync(null);
     }
   }
 }

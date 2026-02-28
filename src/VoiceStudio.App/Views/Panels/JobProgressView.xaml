@@ -4,167 +4,25 @@
     xmlns:controls="using:VoiceStudio.App.Controls"
     xmlns:local="using:VoiceStudio.App.Views.Panels"
     x:DataType="local:JobProgressView">
-    <Grid x:Name="JobProgressView_Root"
+    <Grid x:Name="JobProgressView_Root" 
           AutomationProperties.AutomationId="JobProgressView_Root"
           Background="{StaticResource VSQ.Panel.Background}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <Border Grid.Row="0"
-                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+        <Border Grid.Row="0" 
+                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}" 
                 Padding="{StaticResource VSQ.Spacing.Medium}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE895;" FontSize="20"/>
-                    <TextBlock Text="Job Progress"
-                               FontWeight="SemiBold"
-                               FontSize="{StaticResource VSQ.FontSize.Title}"
-                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-                </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
-                    <Button Command="{x:Bind ViewModel.ClearCompletedCommand}"
-                            ToolTipService.ToolTip="Clear completed"
-                            AutomationProperties.AutomationId="JobProgressView_ClearButton">
-                        <FontIcon Glyph="&#xE74D;" FontSize="14"/>
-                    </Button>
-                    <Button Command="{x:Bind ViewModel.RefreshCommand}"
-                            ToolTipService.ToolTip="Refresh"
-                            AutomationProperties.AutomationId="JobProgressView_RefreshButton">
-                        <FontIcon Glyph="&#xE72C;" FontSize="14"/>
-                    </Button>
-                    <Button Click="HelpButton_Click" ToolTipService.ToolTip="Help"
-                            AutomationProperties.AutomationId="JobProgressView_HelpButton">
-                        <FontIcon Glyph="&#xE897;" FontSize="14"/>
-                    </Button>
-                </StackPanel>
-            </Grid>
+            <TextBlock Text="Job Progress" 
+                       FontSize="{StaticResource VSQ.FontSize.Title}" 
+                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
         </Border>
 
-        <!-- Content -->
-        <ScrollViewer Grid.Row="1">
-            <StackPanel Padding="16" Spacing="12">
-
-                <!-- Summary -->
-                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="Running" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                            <TextBlock Text="{x:Bind ViewModel.Summary.Running, Mode=OneWay}" FontSize="18" FontWeight="Bold"
-                                       AutomationProperties.AutomationId="JobProgressView_RunningCount"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="Pending" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                            <TextBlock Text="{x:Bind ViewModel.Summary.Pending, Mode=OneWay}" FontSize="18" FontWeight="Bold"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Completed" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                            <TextBlock Text="{x:Bind ViewModel.Summary.Completed, Mode=OneWay}" FontSize="18" FontWeight="Bold"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="3">
-                            <TextBlock Text="Failed" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                            <TextBlock Text="{x:Bind ViewModel.Summary.Failed, Mode=OneWay}" FontSize="18" FontWeight="Bold"/>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <!-- Filters -->
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <ComboBox Header="Type" ItemsSource="{x:Bind ViewModel.AvailableJobTypes, Mode=OneWay}"
-                              SelectedItem="{x:Bind ViewModel.SelectedJobType, Mode=TwoWay}"
-                              HorizontalAlignment="Stretch"
-                              AutomationProperties.AutomationId="JobProgressView_TypeFilter"/>
-                    <ComboBox Grid.Column="1" Header="Status" ItemsSource="{x:Bind ViewModel.AvailableStatuses, Mode=OneWay}"
-                              SelectedItem="{x:Bind ViewModel.SelectedStatus, Mode=TwoWay}"
-                              HorizontalAlignment="Stretch"
-                              AutomationProperties.AutomationId="JobProgressView_StatusFilter"/>
-                    <ToggleSwitch Grid.Column="2" IsOn="{x:Bind ViewModel.AutoRefresh, Mode=TwoWay}"
-                                  Header="Auto" VerticalAlignment="Bottom"
-                                  AutomationProperties.AutomationId="JobProgressView_AutoRefreshToggle"/>
-                </Grid>
-
-                <!-- Jobs List -->
-                <ListView ItemsSource="{x:Bind ViewModel.Jobs, Mode=OneWay}"
-                          SelectedItem="{x:Bind ViewModel.SelectedJob, Mode=TwoWay}"
-                          RightTapped="Job_RightTapped"
-                          AutomationProperties.AutomationId="JobProgressView_JobList">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                                    CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12" Margin="0,4">
-                                <StackPanel Spacing="6">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding Type}" FontSize="11" Opacity="0.6"/>
-                                        </StackPanel>
-                                        <TextBlock Grid.Column="1" Text="{Binding Status}" FontWeight="SemiBold"
-                                                   VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <StackPanel Spacing="4">
-                                        <ProgressBar Value="{Binding Progress}" Maximum="100" Minimum="0"/>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding StepDisplay}" FontSize="11"
-                                                       Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding ProgressDisplay}" FontSize="11"
-                                                       Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                                        </Grid>
-                                    </StackPanel>
-                                    <TextBlock Text="{Binding ErrorMessage}" FontSize="11" Foreground="IndianRed"
-                                               TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
-
-            </StackPanel>
-        </ScrollViewer>
-
-        <!-- Status Bar -->
-        <Border Grid.Row="2" Padding="8,4"
-                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
-                BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="0,1,0,0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Width="16" Height="16"/>
-                <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                           FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
-                           VerticalAlignment="Center" Margin="8,0,0,0"
-                           AutomationProperties.AutomationId="JobProgressView_StatusText"/>
-            </Grid>
-        </Border>
-
-        <controls:HelpOverlay x:Name="HelpOverlay" Grid.RowSpan="3" IsVisible="False" Visibility="Collapsed"/>
+        <controls:HelpOverlay x:Name="HelpOverlay" 
+                              Grid.RowSpan="2"
+                              IsVisible="False" 
+                              Visibility="Collapsed" />
     </Grid>
 </UserControl>

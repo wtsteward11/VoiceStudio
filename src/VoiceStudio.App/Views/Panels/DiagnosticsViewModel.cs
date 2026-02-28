@@ -664,7 +664,7 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         // Silently fail - memory monitoring should not break the UI
-        ErrorLogger.LogWarning($"Failed to update memory metrics: {ex.Message}", "DiagnosticsViewModel");
+        System.Diagnostics.Debug.WriteLine($"Failed to update memory metrics: {ex.Message}");
       }
     }
 

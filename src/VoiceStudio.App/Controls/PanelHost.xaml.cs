@@ -2,11 +2,9 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
-using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Utilities;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -18,16 +16,13 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Animation;
 using Windows.ApplicationModel.DataTransfer;
-using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Controls
 {
   public sealed partial class PanelHost : UserControl
   {
     private PanelStateService? _panelStateService;
-    private IPanelRegistry? _panelRegistry;
-    private readonly ConcurrentDictionary<string, UserControl> _loadedPanels = new();
-    private readonly SemaphoreSlim _loadLock = new(1, 1);
+    private PanelLoader? _panelLoader;
     private string? _previousPanelId;
     private PanelRegion _region = PanelRegion.Center;
     private DragDropVisualFeedbackService? _dragDropService;
@@ -157,7 +152,14 @@ namespace VoiceStudio.App.Controls
       this.InitializeComponent();
       _panelStateService = ServiceProvider.GetPanelStateService();
       _dragDropService = ServiceProvider.TryGetDragDropVisualFeedbackService();
-      _panelRegistry = AppServices.GetPanelRegistry();
+      _panelLoader = ServiceProvider.TryGetPanelLoader();
+
+      // Subscribe to PanelLoader events for loading indicator
+      if (_panelLoader != null)
+      {
+        _panelLoader.PanelLoading += OnPanelLoading;
+        _panelLoader.PanelLoaded += OnPanelLoaded;
+      }
 
       // Wire up resize handles to resize this PanelHost (defensive null checks)
       var rightHandle = this.FindName("RightResizeHandle") as PanelResizeHandle;
@@ -174,12 +176,16 @@ namespace VoiceStudio.App.Controls
       // Enable drop on the entire PanelHost for docking
       this.AllowDrop = true;
 
-      // Cleanup when unloaded
+      // Unsubscribe from events when unloaded
       this.Unloaded += (_, _) =>
       {
+        if (_panelLoader != null)
+        {
+          _panelLoader.PanelLoading -= OnPanelLoading;
+          _panelLoader.PanelLoaded -= OnPanelLoaded;
+        }
         _loadingCts?.Cancel();
         _loadingCts?.Dispose();
-        _loadLock.Dispose();
       };
     }
 
@@ -226,7 +232,7 @@ namespace VoiceStudio.App.Controls
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Error during content change: {ex.Message}", "PanelHost");
+        System.Diagnostics.Debug.WriteLine($"[PanelHost] Error during content change: {ex.Message}");
       }
     }
 
@@ -249,7 +255,7 @@ namespace VoiceStudio.App.Controls
         }
         catch (Exception ex)
         {
-          ErrorLogger.LogWarning($"Error activating panel: {ex.Message}", "PanelHost");
+          System.Diagnostics.Debug.WriteLine($"[PanelHost] Error activating panel: {ex.Message}");
         }
       }
       else
@@ -278,7 +284,7 @@ namespace VoiceStudio.App.Controls
         }
         catch (Exception ex)
         {
-          ErrorLogger.LogWarning($"Error deactivating panel: {ex.Message}", "PanelHost");
+          System.Diagnostics.Debug.WriteLine($"[PanelHost] Error deactivating panel: {ex.Message}");
         }
       }
       else
@@ -412,7 +418,7 @@ namespace VoiceStudio.App.Controls
                   panelState.CustomState[kvp.Key] = kvp.Value;
               }
               
-              ErrorLogger.LogDebug($"Saved custom state for panel: {panelId}", "PanelHost");
+              System.Diagnostics.Debug.WriteLine($"Saved custom state for panel: {panelId}");
             }
           }
 
@@ -422,7 +428,7 @@ namespace VoiceStudio.App.Controls
       catch (Exception ex)
       {
         // Don't break panel switching if state saving fails
-        ErrorLogger.LogWarning($"Failed to save panel state: {ex.Message}", "PanelHost");
+        System.Diagnostics.Debug.WriteLine($"Failed to save panel state: {ex.Message}");
       }
     }
 
@@ -497,13 +503,13 @@ namespace VoiceStudio.App.Controls
         }
         else
         {
-          ErrorLogger.LogDebug($"Panel {panelId} does not implement IPanelStatePersistable - skipping custom state restoration", "PanelHost");
+          System.Diagnostics.Debug.WriteLine($"Panel {panelId} does not implement IPanelStatePersistable - skipping custom state restoration");
         }
       }
       catch (Exception ex)
       {
         // Don't break panel loading if state restoration fails
-        ErrorLogger.LogWarning($"Failed to restore panel state: {ex.Message}", "PanelHost");
+        System.Diagnostics.Debug.WriteLine($"Failed to restore panel state: {ex.Message}");
       }
     }
     
@@ -515,11 +521,11 @@ namespace VoiceStudio.App.Controls
       try
       {
         await persistable.RestoreStateAsync(stateData);
-        ErrorLogger.LogInfo($"Successfully restored custom state for panel: {panelId}", "PanelHost");
+        System.Diagnostics.Debug.WriteLine($"Successfully restored custom state for panel: {panelId}");
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Failed to restore custom state for panel {panelId}: {ex.Message}", "PanelHost");
+        System.Diagnostics.Debug.WriteLine($"Failed to restore custom state for panel {panelId}: {ex.Message}");
       }
     }
 
@@ -590,7 +596,7 @@ namespace VoiceStudio.App.Controls
       catch (Exception ex)
       {
         // Don't break panel switching if disposal fails
-        ErrorLogger.LogWarning($"Failed to dispose previous ViewModel: {ex.Message}", "PanelHost");
+        System.Diagnostics.Debug.WriteLine($"Failed to dispose previous ViewModel: {ex.Message}");
       }
     }
 
@@ -619,29 +625,22 @@ namespace VoiceStudio.App.Controls
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Failed to save region state: {ex.Message}", "PanelHost");
+        System.Diagnostics.Debug.WriteLine($"Failed to save region state: {ex.Message}");
       }
     }
 
     /// <summary>
-    /// Loads a panel lazily using PanelRegistry.
+    /// Loads a panel lazily using PanelLoader.
     /// Shows loading indicator while panel is being loaded.
     /// </summary>
     /// <param name="panelId">The panel ID to load</param>
     /// <returns>The loaded panel, or null if loading failed</returns>
     public async System.Threading.Tasks.Task<UserControl?> LoadPanelAsync(string panelId)
     {
-      if (_panelRegistry == null)
+      if (_panelLoader == null)
       {
-        ErrorLogger.LogDebug($"PanelRegistry not available, cannot lazy load {panelId}", "PanelHost");
+        System.Diagnostics.Debug.WriteLine($"[PanelHost] PanelLoader not available, cannot lazy load {panelId}");
         return null;
-      }
-
-      // Return cached panel if already loaded
-      if (_loadedPanels.TryGetValue(panelId, out var cached))
-      {
-        Content = cached;
-        return cached;
       }
 
       // Cancel any previous loading operation
@@ -654,33 +653,14 @@ namespace VoiceStudio.App.Controls
         IsLoading = true;
         LoadingMessage = $"Loading {panelId}...";
 
-        await _loadLock.WaitAsync(_loadingCts.Token);
-        try
+        var panel = await _panelLoader.GetPanelAsync(panelId, _loadingCts.Token);
+
+        if (panel != null && !_loadingCts.IsCancellationRequested)
         {
-          // Double-check after acquiring lock
-          if (_loadedPanels.TryGetValue(panelId, out var existing))
-          {
-            Content = existing;
-            return existing;
-          }
-
-          var startTime = DateTime.UtcNow;
-          var panel = _panelRegistry.CreatePanel(panelId) as UserControl;
-
-          if (panel != null && !_loadingCts.IsCancellationRequested)
-          {
-            _loadedPanels[panelId] = panel;
-            Content = panel;
-            var loadTime = DateTime.UtcNow - startTime;
-            ErrorLogger.LogDebug($"Loaded panel {panelId} in {loadTime.TotalMilliseconds:F1}ms", "PanelHost");
-          }
-
-          return panel;
+          Content = panel;
         }
-        finally
-        {
-          _loadLock.Release();
-        }
+
+        return panel;
       }
       catch (OperationCanceledException)
       {
@@ -689,7 +669,7 @@ namespace VoiceStudio.App.Controls
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Error loading panel {panelId}: {ex.Message}", "PanelHost");
+        System.Diagnostics.Debug.WriteLine($"[PanelHost] Error loading panel {panelId}: {ex.Message}");
         return null;
       }
       finally
@@ -699,49 +679,41 @@ namespace VoiceStudio.App.Controls
     }
 
     /// <summary>
-    /// Loads a panel synchronously (falls back to creating if not already loaded).
+    /// Loads a panel synchronously (falls back to lazy if not already loaded).
     /// Prefer LoadPanelAsync for better UI responsiveness.
     /// </summary>
     /// <param name="panelId">The panel ID to load</param>
     /// <returns>The loaded panel, or null if loading failed</returns>
     public UserControl? LoadPanel(string panelId)
     {
-      if (_panelRegistry == null)
+      if (_panelLoader == null)
       {
-        ErrorLogger.LogDebug($"PanelRegistry not available, cannot load {panelId}", "PanelHost");
+        System.Diagnostics.Debug.WriteLine($"[PanelHost] PanelLoader not available, cannot load {panelId}");
         return null;
-      }
-
-      // Return cached panel if already loaded
-      if (_loadedPanels.TryGetValue(panelId, out var cached))
-      {
-        Content = cached;
-        return cached;
       }
 
       try
       {
-        var panel = _panelRegistry.CreatePanel(panelId) as UserControl;
+        var panel = _panelLoader.GetPanel(panelId);
         if (panel != null)
         {
-          _loadedPanels[panelId] = panel;
           Content = panel;
         }
         return panel;
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Error loading panel {panelId}: {ex.Message}", "PanelHost");
+        System.Diagnostics.Debug.WriteLine($"[PanelHost] Error loading panel {panelId}: {ex.Message}");
         return null;
       }
     }
 
     /// <summary>
-    /// Checks if a panel is loaded in the cache.
+    /// Checks if a panel is loaded in the PanelLoader cache.
     /// </summary>
     public bool IsPanelLoaded(string panelId)
     {
-      return _loadedPanels.ContainsKey(panelId);
+      return _panelLoader?.IsPanelLoaded(panelId) ?? false;
     }
 
     /// <summary>
@@ -749,20 +721,37 @@ namespace VoiceStudio.App.Controls
     /// </summary>
     public void UnloadPanel(string panelId)
     {
-      if (_loadedPanels.TryRemove(panelId, out var panel))
+      _panelLoader?.UnloadPanel(panelId);
+    }
+
+    /// <summary>
+    /// Handler for PanelLoader.PanelLoading event.
+    /// </summary>
+    private void OnPanelLoading(object? sender, PanelLoadingEventArgs e)
+    {
+      // Only update if this is the currently active panel being loaded
+      if (Content == null || _previousPanelId == null)
+        return;
+
+      // Show loading state if we're waiting for a panel
+      if (IsLoading)
       {
-        if (panel is IDisposable disposable)
-        {
-          disposable.Dispose();
-        }
-        ErrorLogger.LogDebug($"Unloaded panel: {panelId}", "PanelHost");
+        LoadingMessage = $"Loading {e.PanelId}...";
       }
     }
 
     /// <summary>
-    /// Gets the PanelRegistry instance for external access.
+    /// Handler for PanelLoader.PanelLoaded event.
     /// </summary>
-    public IPanelRegistry? PanelRegistryInstance => _panelRegistry;
+    private void OnPanelLoaded(object? sender, PanelLoadedEventArgs e)
+    {
+      System.Diagnostics.Debug.WriteLine($"[PanelHost] Panel {e.PanelId} loaded in {e.LoadTime.TotalMilliseconds:F1}ms");
+    }
+
+    /// <summary>
+    /// Gets the PanelLoader instance for external access.
+    /// </summary>
+    public PanelLoader? PanelLoaderInstance => _panelLoader;
 
     /// <summary>
     /// Updates the context-sensitive action bar based on the current panel content.

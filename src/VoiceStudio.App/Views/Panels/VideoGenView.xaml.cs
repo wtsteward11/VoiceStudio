@@ -8,7 +8,6 @@ using VoiceStudio.App.ViewModels;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using System;
-using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -76,50 +75,18 @@ namespace VoiceStudio.App.Views.Panels
     {
       try
       {
-        var panel = new StackPanel { Spacing = 12, MinWidth = 360 };
-
-        var stepsBox = new NumberBox { Header = "Steps", Value = ViewModel.Steps, Minimum = 1, Maximum = 150, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
-        panel.Children.Add(stepsBox);
-
-        var cfgBox = new NumberBox { Header = "CFG Scale", Value = ViewModel.CfgScale, Minimum = 1, Maximum = 30, SmallChange = 0.5, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
-        panel.Children.Add(cfgBox);
-
-        var widthBox = new NumberBox { Header = "Width", Value = ViewModel.Width, Minimum = 64, Maximum = 4096, SmallChange = 64, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
-        panel.Children.Add(widthBox);
-
-        var heightBox = new NumberBox { Header = "Height", Value = ViewModel.Height, Minimum = 64, Maximum = 4096, SmallChange = 64, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
-        panel.Children.Add(heightBox);
-
-        var fpsBox = new NumberBox { Header = "FPS", Value = ViewModel.Fps, Minimum = 1, Maximum = 120, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
-        panel.Children.Add(fpsBox);
-
-        var durationBox = new NumberBox { Header = "Duration (seconds)", Value = ViewModel.Duration, Minimum = 1, Maximum = 300, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
-        panel.Children.Add(durationBox);
-
         var dialog = new ContentDialog
         {
           Title = "Quality Settings",
-          Content = panel,
-          PrimaryButtonText = "Apply",
-          CloseButtonText = "Cancel",
-          XamlRoot = this.XamlRoot,
-          DefaultButton = ContentDialogButton.Primary
+          Content = $"Current Settings:\n\nSteps: {ViewModel.Steps}\nCFG Scale: {ViewModel.CfgScale:F1}\nWidth: {ViewModel.Width}\nHeight: {ViewModel.Height}\nFPS: {ViewModel.Fps}\nDuration: {ViewModel.Duration}s\n\nQuality Preset: {ViewModel.SelectedQualityPreset?.Name ?? "Custom"}",
+          PrimaryButtonText = "OK",
+          XamlRoot = this.XamlRoot
         };
-
-        var result = await dialog.ShowAsync();
-        if (result == ContentDialogResult.Primary)
-        {
-          ViewModel.Steps = (int)stepsBox.Value;
-          ViewModel.CfgScale = cfgBox.Value;
-          ViewModel.Width = (int)widthBox.Value;
-          ViewModel.Height = (int)heightBox.Value;
-          ViewModel.Fps = (int)fpsBox.Value;
-          ViewModel.Duration = (int)durationBox.Value;
-        }
+        await dialog.ShowAsync();
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "VideoGenView.xaml");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 

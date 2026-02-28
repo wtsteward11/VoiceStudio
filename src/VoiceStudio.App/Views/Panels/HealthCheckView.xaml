@@ -89,34 +89,34 @@
 
                 <!-- Component Counts -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
-                    <Ellipse Width="10" Height="10" Fill="{StaticResource VSQ.Status.HealthyBrush}"/>
+                    <Ellipse Width="10" Height="10" Fill="#10B981"/>
                     <TextBlock
                         Text="{x:Bind ViewModel.HealthyCount, Mode=OneWay}"
-                        Foreground="{StaticResource VSQ.Status.HealthyBrush}"/>
+                        Foreground="#10B981"/>
                     <TextBlock Text="Healthy" Opacity="0.7"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="16,0,0,0">
-                    <Ellipse Width="10" Height="10" Fill="{StaticResource VSQ.Status.DegradedBrush}"/>
+                    <Ellipse Width="10" Height="10" Fill="#F59E0B"/>
                     <TextBlock
                         Text="{x:Bind ViewModel.WarningCount, Mode=OneWay}"
-                        Foreground="{StaticResource VSQ.Status.DegradedBrush}"/>
+                        Foreground="#F59E0B"/>
                     <TextBlock Text="Warning" Opacity="0.7"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" Margin="16,0,0,0">
-                    <Ellipse Width="10" Height="10" Fill="{StaticResource VSQ.Status.UnhealthyBrush}"/>
+                    <Ellipse Width="10" Height="10" Fill="#EF4444"/>
                     <TextBlock
                         Text="{x:Bind ViewModel.CriticalCount, Mode=OneWay}"
-                        Foreground="{StaticResource VSQ.Status.UnhealthyBrush}"/>
+                        Foreground="#EF4444"/>
                     <TextBlock Text="Critical" Opacity="0.7"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" Margin="16,0,0,0">
-                    <Ellipse Width="10" Height="10" Fill="{StaticResource VSQ.Status.UnknownBrush}"/>
+                    <Ellipse Width="10" Height="10" Fill="#6B7280"/>
                     <TextBlock
                         Text="{x:Bind ViewModel.UnknownCount, Mode=OneWay}"
-                        Foreground="{StaticResource VSQ.Status.UnknownBrush}"/>
+                        Foreground="#6B7280"/>
                     <TextBlock Text="Unknown" Opacity="0.7"/>
                 </StackPanel>
             </Grid>
@@ -241,13 +241,13 @@
                     <TextBlock TextWrapping="Wrap" Style="{StaticResource BodyTextBlockStyle}">
                         <Run FontWeight="SemiBold">Status Colors:</Run>
                         <LineBreak/>
-                        <Run Foreground="{StaticResource VSQ.Status.HealthyBrush}">● Green</Run> - Component is healthy
+                        <Run Foreground="#10B981">● Green</Run> - Component is healthy
                         <LineBreak/>
-                        <Run Foreground="{StaticResource VSQ.Status.DegradedBrush}">● Yellow</Run> - Component has warnings
+                        <Run Foreground="#F59E0B">● Yellow</Run> - Component has warnings
                         <LineBreak/>
-                        <Run Foreground="{StaticResource VSQ.Status.UnhealthyBrush}">● Red</Run> - Component is critical/down
+                        <Run Foreground="#EF4444">● Red</Run> - Component is critical/down
                         <LineBreak/>
-                        <Run Foreground="{StaticResource VSQ.Status.UnknownBrush}">● Gray</Run> - Status unknown
+                        <Run Foreground="#6B7280">● Gray</Run> - Status unknown
                     </TextBlock>
                     <Button
                         Content="Close"

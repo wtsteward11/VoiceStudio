@@ -2,8 +2,8 @@
 // Licensed under the MIT License.
 
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 
@@ -97,8 +97,8 @@ namespace VoiceStudio.App.Logging
 
             var json = JsonSerializer.Serialize(entry);
 
-            // Write to debug output (use Debug.WriteLine to avoid recursion)
-            System.Diagnostics.Debug.WriteLine($"[{level}] [{source}] {message}");
+            // Write to debug output
+            Debug.WriteLine($"[{level}] [{source}] {message}");
 
             // Write to file
             try
@@ -111,7 +111,7 @@ namespace VoiceStudio.App.Logging
             catch
             {
                 // Best effort logging - don't fail if log write fails
-                System.Diagnostics.Debug.WriteLine($"[ErrorLogger] Failed to write log entry to file: {_logFilePath}");
+                Debug.WriteLine($"Failed to write log entry to file: {_logFilePath}");
             }
         }
 

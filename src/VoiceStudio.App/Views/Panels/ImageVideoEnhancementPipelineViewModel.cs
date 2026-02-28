@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -327,7 +326,7 @@ namespace VoiceStudio.App.Views.Panels
           }
           catch (Exception ex)
           {
-            ErrorLogger.LogWarning($"Failed to process {file.Name}: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
+            System.Diagnostics.Debug.WriteLine($"Failed to process {file.Name}: {ex.Message}");
           }
         }
 
@@ -336,7 +335,7 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         StatusMessage = $"Error: {ex.Message}";
-        ErrorLogger.LogWarning($"Pipeline application failed: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
+        System.Diagnostics.Debug.WriteLine($"Pipeline application failed: {ex.Message}");
       }
       finally
       {
@@ -382,7 +381,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"File selection failed: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
+        System.Diagnostics.Debug.WriteLine($"File selection failed: {ex.Message}");
       }
     }
 
@@ -460,13 +459,13 @@ namespace VoiceStudio.App.Views.Panels
             EnhancedQuality = 70.0 + (PipelineSteps.Count * 5.0);
             EnhancedQuality = Math.Min(100.0, EnhancedQuality);
             QualityImprovement = EnhancedQuality - OriginalQuality;
-            ErrorLogger.LogWarning($"Preview API failed, using fallback: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
+            System.Diagnostics.Debug.WriteLine($"Preview API failed, using fallback: {ex.Message}");
           }
         }
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Preview failed: {ex.Message}", "ImageVideoEnhancementPipelineViewModel");
+        System.Diagnostics.Debug.WriteLine($"Preview failed: {ex.Message}");
       }
     }
   }

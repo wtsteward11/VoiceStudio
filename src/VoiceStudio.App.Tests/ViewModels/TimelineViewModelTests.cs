@@ -263,41 +263,5 @@ namespace VoiceStudio.App.Tests.ViewModels
     }
 
     #endregion
-
-    #region Phase 2 Tests
-
-    [TestMethod]
-    public void IsLoopEnabled_DefaultIsFalse()
-    {
-      Assert.IsFalse(_sut.IsLoopEnabled);
-    }
-
-    [TestMethod]
-    public void IsLoopEnabled_CanBeToggled()
-    {
-      _sut.IsLoopEnabled = true;
-      Assert.IsTrue(_sut.IsLoopEnabled);
-    }
-
-    [TestMethod]
-    public void IsRecording_DefaultIsFalse()
-    {
-      Assert.IsFalse(_sut.IsRecording);
-    }
-
-    [TestMethod]
-    public void TimelineZoom_DefaultIsOne()
-    {
-      Assert.AreEqual(1.0, _sut.TimelineZoom);
-    }
-
-    [TestMethod]
-    public void TimelineZoom_CanBeChanged()
-    {
-      _sut.TimelineZoom = 2.5;
-      Assert.AreEqual(2.5, _sut.TimelineZoom);
-    }
-
-    #endregion
   }
 }

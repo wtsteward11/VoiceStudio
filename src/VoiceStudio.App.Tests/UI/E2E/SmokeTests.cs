@@ -15,7 +15,6 @@ namespace VoiceStudio.App.Tests.UI.E2E
     /// <summary>
     /// Smoke tests for critical user journeys using FlaUI.
     /// These tests verify that the application starts and core UI components are accessible.
-    /// GAP-TC-006: Refactored Assert.Inconclusive to use proper conditional skip pattern.
     /// </summary>
     [TestClass]
     [TestCategory("E2E")]
@@ -26,7 +25,6 @@ namespace VoiceStudio.App.Tests.UI.E2E
         private static UIA3Automation? _automation;
         private static Window? _mainWindow;
         private static string? _appPath;
-        private static string? _skipReason;
 
         [ClassInitialize]
         public static void ClassInitialize(TestContext context)
@@ -36,7 +34,7 @@ namespace VoiceStudio.App.Tests.UI.E2E
             
             if (string.IsNullOrEmpty(_appPath) || !File.Exists(_appPath))
             {
-                _skipReason = "VoiceStudio.App.exe not found. Ensure the application is built.";
+                Assert.Inconclusive("VoiceStudio.App.exe not found. Ensure the application is built.");
                 return;
             }
 
@@ -56,29 +54,12 @@ namespace VoiceStudio.App.Tests.UI.E2E
                 
                 if (_mainWindow == null)
                 {
-                    _skipReason = "Main window did not appear within timeout.";
+                    Assert.Inconclusive("Main window did not appear within timeout.");
                 }
             }
             catch (Exception ex)
             {
-                _skipReason = $"Failed to launch application: {ex.Message}";
-            }
-        }
-
-        /// <summary>
-        /// Guard method to skip tests when preconditions are not met.
-        /// Call at the start of each test method.
-        /// </summary>
-        private static void SkipIfNotReady()
-        {
-            if (!string.IsNullOrEmpty(_skipReason))
-            {
-                Assert.Inconclusive(_skipReason);
-            }
-            
-            if (_mainWindow == null || _automation == null)
-            {
-                Assert.Inconclusive("Test infrastructure not initialized.");
+                Assert.Inconclusive($"Failed to launch application: {ex.Message}");
             }
         }
 
@@ -96,14 +77,11 @@ namespace VoiceStudio.App.Tests.UI.E2E
         [TestMethod]
         public void Journey1_ApplicationLaunches_MainWindowVisible()
         {
-            // Guard: Skip if app not available
-            SkipIfNotReady();
-            
             // Arrange & Act - Done in ClassInitialize
             
             // Assert
             Assert.IsNotNull(_mainWindow, "Main window should be available");
-            Assert.IsTrue(_mainWindow!.IsOffscreen == false, "Main window should be visible on screen");
+            Assert.IsTrue(_mainWindow.IsOffscreen == false, "Main window should be visible on screen");
             Assert.AreEqual("VoiceStudio", _mainWindow.Title, "Window title should be VoiceStudio");
         }
 
@@ -113,9 +91,6 @@ namespace VoiceStudio.App.Tests.UI.E2E
         [TestMethod]
         public void Journey2_NavigationPanel_IsAccessible()
         {
-            // Guard: Skip if app not available
-            SkipIfNotReady();
-            
             // Arrange
             var cf = _automation!.ConditionFactory;
             
@@ -140,9 +115,6 @@ namespace VoiceStudio.App.Tests.UI.E2E
         [TestMethod]
         public void Journey3_ContentArea_DisplaysOnNavigation()
         {
-            // Guard: Skip if app not available
-            SkipIfNotReady();
-            
             // Arrange
             var cf = _automation!.ConditionFactory;
             
@@ -161,9 +133,6 @@ namespace VoiceStudio.App.Tests.UI.E2E
         [TestMethod]
         public void Journey4_Settings_CanBeAccessed()
         {
-            // Guard: Skip if app not available
-            SkipIfNotReady();
-            
             // Arrange
             var cf = _automation!.ConditionFactory;
             
@@ -207,9 +176,6 @@ namespace VoiceStudio.App.Tests.UI.E2E
         [TestMethod]
         public void Journey5_ThemeSwitch_CompletesWithoutError()
         {
-            // Guard: Skip if app not available
-            SkipIfNotReady();
-            
             // Arrange
             var cf = _automation!.ConditionFactory;
             
@@ -218,12 +184,12 @@ namespace VoiceStudio.App.Tests.UI.E2E
             
             if (themeCombo == null)
             {
-                // Theme selector not accessible - skip gracefully
-                Assert.Inconclusive("Theme selector not found in current view. This test requires settings panel access.");
+                Assert.Inconclusive("Theme selector not found in current view");
+                return;
             }
 
             // Act - Try to interact with theme selector
-            var comboBox = themeCombo!.AsComboBox();
+            var comboBox = themeCombo.AsComboBox();
             Assert.IsNotNull(comboBox, "Theme control should be a ComboBox");
             
             // Expand and verify items exist

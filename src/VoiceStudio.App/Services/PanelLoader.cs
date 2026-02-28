@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Logging;
@@ -13,13 +14,6 @@ namespace VoiceStudio.App.Services
     /// Provides lazy loading and caching for UI panels.
     /// Improves startup time by deferring panel initialization until needed.
     /// </summary>
-    /// <remarks>
-    /// DEPRECATED (GAP-F04): This class is being phased out in favor of the unified
-    /// <see cref="PanelRegistry"/> which uses <see cref="IViewModelFactory"/> for
-    /// DI-based panel creation. New code should use <see cref="IPanelRegistry.CreatePanel"/>
-    /// instead of this loader. This class will be removed in a future release.
-    /// </remarks>
-    [Obsolete("Use PanelRegistry.CreatePanel() instead. This class will be removed in a future release.")]
     public class PanelLoader : IDisposable
     {
         private readonly ConcurrentDictionary<string, PanelInfo> _panelRegistry;
@@ -157,7 +151,7 @@ namespace VoiceStudio.App.Services
                     disposable.Dispose();
                 }
                 
-                ErrorLogger.LogDebug($"[PanelLoader] Unloaded panel: {panelId}", "PanelLoader");
+                Debug.WriteLine($"[PanelLoader] Unloaded panel: {panelId}");
             }
         }
         
@@ -275,7 +269,7 @@ namespace VoiceStudio.App.Services
                     
                     var loadTime = DateTime.UtcNow - startTime;
                     PanelLoaded?.Invoke(this, new PanelLoadedEventArgs(panelId, loadTime));
-                    ErrorLogger.LogDebug($"[PanelLoader] Loaded panel {panelId} in {loadTime.TotalMilliseconds:F1}ms", "PanelLoader");
+                    Debug.WriteLine($"[PanelLoader] Loaded panel {panelId} in {loadTime.TotalMilliseconds:F1}ms");
                 }
                 
                 return panel;

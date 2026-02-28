@@ -1,10 +1,11 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.UI.Dispatching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -15,14 +16,14 @@ namespace VoiceStudio.App.Tests.ViewModels
     public class VoiceBrowserViewModelTests
     {
         private Mock<IBackendClient>? _mockBackendClient;
-        private static MockViewModelContext? _sharedContext;
+        private static IViewModelContext? _sharedContext;
         private VoiceBrowserViewModel? _viewModel;
 
         [TestInitialize]
         public void Setup()
         {
             _mockBackendClient = new Mock<IBackendClient>();
-            _sharedContext ??= new MockViewModelContext();
+            _sharedContext ??= CreateTestViewModelContext();
             SetupVoiceSearchResponse(Array.Empty<VoiceProfileSummary>(), 0);
             SetupLanguagesResponse(Array.Empty<string>());
             SetupTagsResponse(Array.Empty<string>());
@@ -35,6 +36,13 @@ namespace VoiceStudio.App.Tests.ViewModels
             _viewModel?.Dispose();
             _viewModel = null;
             _mockBackendClient = null;
+        }
+
+        private static IViewModelContext CreateTestViewModelContext()
+        {
+            var dispatcher = DispatcherQueue.GetForCurrentThread()
+                ?? DispatcherQueueController.CreateOnDedicatedThread().DispatcherQueue;
+            return new ViewModelContext(NullLogger.Instance, dispatcher);
         }
 
         private void SetupVoiceSearchResponse(VoiceProfileSummary[] voices, int total)

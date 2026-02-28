@@ -13,7 +13,6 @@ namespace VoiceStudio.App.Services
 {
   /// <summary>
   /// Implementation of IErrorLoggingService for centralized error logging with structured logging support.
-  /// GAP-I12: Enhanced with correlation ID provider for cross-layer tracing.
   /// </summary>
   public class ErrorLoggingService : IErrorLoggingService, IDisposable
   {
@@ -27,26 +26,12 @@ namespace VoiceStudio.App.Services
     private readonly string _logFilePath;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly StreamWriter? _logFileWriter;
-    private readonly ICorrelationIdProvider? _correlationProvider;
     private bool _disposed;
 
     public event EventHandler<ErrorLogEntry>? ErrorLogged;
 
-    /// <summary>
-    /// Initializes a new instance of ErrorLoggingService without correlation provider.
-    /// </summary>
-    public ErrorLoggingService() : this(null)
+    public ErrorLoggingService()
     {
-    }
-
-    /// <summary>
-    /// GAP-I12: Initializes a new instance with optional correlation ID provider.
-    /// </summary>
-    /// <param name="correlationProvider">Optional provider for correlation context.</param>
-    public ErrorLoggingService(ICorrelationIdProvider? correlationProvider)
-    {
-      _correlationProvider = correlationProvider;
-
       // Set up log directory
       var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
       _logDirectory = Path.Combine(appDataPath, "VoiceStudio", "Logs");
@@ -83,9 +68,6 @@ namespace VoiceStudio.App.Services
       if (exception == null)
         return;
 
-      // GAP-I12: Include correlation ID for cross-layer tracing
-      var correlationId = GetCurrentCorrelationId();
-
       var entry = new ErrorLogEntry
       {
         Timestamp = DateTime.UtcNow,
@@ -94,8 +76,7 @@ namespace VoiceStudio.App.Services
         Context = context,
         ExceptionType = exception.GetType().Name,
         StackTrace = exception.StackTrace,
-        Metadata = LogRedactionHelper.RedactMetadata(metadata),
-        CorrelationId = correlationId
+        Metadata = LogRedactionHelper.RedactMetadata(metadata)
       };
 
       // Add BackendException-specific metadata
@@ -186,7 +167,6 @@ namespace VoiceStudio.App.Services
 
     /// <summary>
     /// Writes a structured log entry to file in JSON Lines format (JSONL).
-    /// GAP-I12: Enhanced with correlation, trace, and span IDs.
     /// </summary>
     private void WriteStructuredLog(ErrorLogEntry entry)
     {
@@ -195,21 +175,13 @@ namespace VoiceStudio.App.Services
 
       try
       {
-        // GAP-I12: Capture correlation context
-        var correlationId = entry.CorrelationId ?? GetCurrentCorrelationId() ?? "N/A";
-        var traceId = GetCurrentTraceId() ?? "N/A";
-        var spanId = GetCurrentSpanId() ?? "N/A";
-
-        // Create structured log object with correlation context
+        // Create structured log object
         var structuredLog = new
         {
           timestamp = entry.Timestamp.ToString("O"), // ISO 8601 format
           level = entry.Level,
           message = entry.Message,
           context = entry.Context ?? string.Empty,
-          correlationId = correlationId,
-          traceId = traceId,
-          spanId = spanId,
           exceptionType = entry.ExceptionType ?? string.Empty,
           stackTrace = entry.StackTrace ?? string.Empty,
           metadata = entry.Metadata ?? new Dictionary<string, object>()
@@ -459,22 +431,10 @@ namespace VoiceStudio.App.Services
       }
     }
 
-    /// <summary>
-    /// GAP-I12: Gets the current correlation ID from provider or internal context.
-    /// </summary>
     private string? GetCurrentCorrelationId()
     {
-      // GAP-I12: First try the injected correlation provider (AsyncLocal-based)
-      if (_correlationProvider != null)
-      {
-        var providedId = _correlationProvider.GetCurrentCorrelationId();
-        if (!string.IsNullOrEmpty(providedId))
-        {
-          return providedId;
-        }
-      }
-
-      // Fallback to internal correlation context tracking
+      // Try to get correlation ID from AsyncLocal or current context
+      // For now, return the most recent correlation ID
       lock (_lock)
       {
         var mostRecent = _correlations.Values
@@ -484,22 +444,6 @@ namespace VoiceStudio.App.Services
 
         return mostRecent?.CorrelationId;
       }
-    }
-
-    /// <summary>
-    /// GAP-I12: Gets the current trace ID from correlation provider.
-    /// </summary>
-    private string? GetCurrentTraceId()
-    {
-      return _correlationProvider?.GetCurrentTraceId();
-    }
-
-    /// <summary>
-    /// GAP-I12: Gets the current span ID from correlation provider.
-    /// </summary>
-    private string? GetCurrentSpanId()
-    {
-      return _correlationProvider?.GetCurrentSpanId();
     }
 
     private class CorrelationContext

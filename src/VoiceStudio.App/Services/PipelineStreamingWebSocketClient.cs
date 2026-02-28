@@ -231,7 +231,7 @@ namespace VoiceStudio.App.Services
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Failed to process pipeline streaming message: {ex.Message}", "PipelineStreamingWebSocketClient");
+        System.Diagnostics.Debug.WriteLine($"Failed to process pipeline streaming message: {ex.Message}");
       }
     }
 

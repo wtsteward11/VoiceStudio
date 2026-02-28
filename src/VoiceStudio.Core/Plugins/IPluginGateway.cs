@@ -158,21 +158,6 @@ namespace VoiceStudio.Core.Plugins
         /// <param name="cancellationToken">Cancellation token.</param>
         Task RefreshCatalogAsync(CancellationToken cancellationToken = default);
 
-        /// <summary>
-        /// Submit or update a rating/review for a plugin (Phase 7 Marketplace).
-        /// </summary>
-        Task<bool> SubmitReviewAsync(string pluginId, int rating, string review = "", string? version = null, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Get reviews for a plugin.
-        /// </summary>
-        Task<IReadOnlyList<PluginReview>> GetReviewsAsync(string pluginId, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Get current user's review for a plugin.
-        /// </summary>
-        Task<PluginReview?> GetMyReviewAsync(string pluginId, CancellationToken cancellationToken = default);
-
         #endregion
 
         #region Events

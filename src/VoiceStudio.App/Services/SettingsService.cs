@@ -396,7 +396,7 @@ namespace VoiceStudio.App.Services
         },
         Backend = new BackendSettings
         {
-          ApiUrl = "http://localhost:8000",
+          ApiUrl = "http://localhost:8001",
           Timeout = 30,
           RetryCount = 3
         },

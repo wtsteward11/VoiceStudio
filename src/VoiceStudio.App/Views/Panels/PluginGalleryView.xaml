@@ -34,19 +34,17 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                <!-- GAP-B18: Migrated from Click handler to Command binding -->
                 <Button x:Name="RefreshButton"
                         Content="Refresh"
-                        Command="{x:Bind ViewModel.RefreshCommand}"
+                        Click="RefreshButton_Click"
                         AutomationProperties.AutomationId="PluginGallery.Button.Refresh">
                     <Button.KeyboardAccelerators>
                         <KeyboardAccelerator Key="F5" Modifiers="None"/>
                     </Button.KeyboardAccelerators>
                 </Button>
-                <!-- GAP-B18: Migrated from Click handler to Command binding -->
                 <Button x:Name="CheckUpdatesButton"
                         Content="Check Updates"
-                        Command="{x:Bind ViewModel.CheckForUpdatesCommand}"
+                        Click="CheckUpdatesButton_Click"
                         AutomationProperties.AutomationId="PluginGallery.Button.CheckUpdates"/>
             </StackPanel>
         </Grid>
@@ -186,7 +184,7 @@
                                             <StackPanel Grid.Row="2" Orientation="Horizontal" 
                                                         Spacing="16" Margin="0,12,0,0">
                                                 <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <FontIcon Glyph="&#xE735;" FontSize="12" Foreground="{StaticResource VSQ.Accent.GoldBrush}"/>
+                                                    <FontIcon Glyph="&#xE735;" FontSize="12" Foreground="#FFD700"/>
                                                     <TextBlock Text="{x:Bind Rating}" 
                                                                FontSize="12"
                                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
@@ -259,7 +257,7 @@
 
                                                 <Border Grid.Column="2"
                                                         Visibility="{x:Bind IsVerified}"
-                                                        Background="{StaticResource VSQ.Status.VerifiedBrush}"
+                                                        Background="#107C10"
                                                         CornerRadius="4"
                                                         Padding="6,2">
                                                     <FontIcon Glyph="&#xE73E;" FontSize="10" Foreground="White"/>
@@ -285,7 +283,7 @@
 
                                                 <StackPanel Orientation="Horizontal" Spacing="16">
                                                     <StackPanel Orientation="Horizontal" Spacing="4">
-                                                        <FontIcon Glyph="&#xE735;" FontSize="12" Foreground="{StaticResource VSQ.Accent.GoldBrush}"/>
+                                                        <FontIcon Glyph="&#xE735;" FontSize="12" Foreground="#FFD700"/>
                                                         <TextBlock Text="{x:Bind Rating}" 
                                                                    FontSize="12"
                                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
@@ -350,19 +348,19 @@
 
                 <!-- Pagination -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                    <!-- GAP-B18: Migrated from Click handler to Command binding -->
                     <Button x:Name="PrevPageButton"
                             Content="Previous"
-                            Command="{x:Bind ViewModel.PreviousPageCommand}"
+                            Click="PrevPageButton_Click"
+                            IsEnabled="False"
                             AutomationProperties.AutomationId="PluginGallery.Button.PrevPage"/>
                     <TextBlock x:Name="PageText"
                                Text="Page 1 of 1"
                                VerticalAlignment="Center"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                    <!-- GAP-B18: Migrated from Click handler to Command binding -->
                     <Button x:Name="NextPageButton"
                             Content="Next"
-                            Command="{x:Bind ViewModel.NextPageCommand}"
+                            Click="NextPageButton_Click"
+                            IsEnabled="False"
                             AutomationProperties.AutomationId="PluginGallery.Button.NextPage"/>
                 </StackPanel>
             </Grid>
@@ -395,10 +393,9 @@
                                FontSize="13"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                HorizontalAlignment="Center"/>
-                    <!-- GAP-B18: Migrated from Click handler to Command binding -->
                     <Button Content="Cancel"
                             HorizontalAlignment="Center"
-                            Command="{x:Bind ViewModel.CancelInstallCommand}"
+                            Click="CancelInstall_Click"
                             AutomationProperties.AutomationId="PluginGallery.Button.CancelInstall"/>
                 </StackPanel>
             </Border>

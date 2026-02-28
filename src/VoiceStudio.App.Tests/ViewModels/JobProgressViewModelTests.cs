@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.UI.Dispatching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
@@ -5,7 +7,6 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Services;
-using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -21,7 +22,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     {
         private Mock<IBackendClient>? _mockBackendClient;
         private JobProgressViewModel? _viewModel;
-        private static MockViewModelContext? _mockContext;
+        private static IViewModelContext? _testContext;
 
         [TestInitialize]
         public override void TestInitialize()
@@ -29,8 +30,8 @@ namespace VoiceStudio.App.Tests.ViewModels
             base.TestInitialize();
             _mockBackendClient = new Mock<IBackendClient>();
 
-            // Use MockViewModelContext to avoid DispatcherQueue crash in MSTest
-            _mockContext ??= new MockViewModelContext();
+            // JobProgressViewModel requires a real DispatcherQueue (from BaseViewModel)
+            _testContext ??= CreateTestViewModelContext();
 
             // No WebSocket - ViewModel will use polling fallback
             _mockBackendClient.Setup(x => x.WebSocketService).Returns((IWebSocketService?)null);
@@ -53,7 +54,7 @@ namespace VoiceStudio.App.Tests.ViewModels
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new JobProgressViewModel.JobSummary());
 
-            _viewModel = new JobProgressViewModel(_mockContext, _mockBackendClient.Object);
+            _viewModel = new JobProgressViewModel(_testContext, _mockBackendClient.Object);
         }
 
         [TestCleanup]
@@ -63,6 +64,13 @@ namespace VoiceStudio.App.Tests.ViewModels
             _viewModel = null;
             _mockBackendClient = null;
             base.TestCleanup();
+        }
+
+        private static IViewModelContext CreateTestViewModelContext()
+        {
+            var dispatcher = DispatcherQueue.GetForCurrentThread()
+                ?? DispatcherQueueController.CreateOnDedicatedThread().DispatcherQueue;
+            return new ViewModelContext(NullLogger.Instance, dispatcher);
         }
 
         #region Initialization Tests
@@ -80,7 +88,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
         {
             // Arrange & Act
-            _ = new JobProgressViewModel(_mockContext!, null!);
+            _ = new JobProgressViewModel(_testContext!, null!);
         }
 
         [TestMethod]

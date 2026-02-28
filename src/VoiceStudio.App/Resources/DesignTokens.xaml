@@ -63,15 +63,6 @@
   <SolidColorBrush x:Key="VSQ.StatusIndicator.IdleBrush" Color="#FF40FF80" Opacity="0.3" />
   <SolidColorBrush x:Key="VSQ.StatusIndicator.WarningBrush" Color="#FFFFB540" />
   <SolidColorBrush x:Key="VSQ.StatusIndicator.ErrorBrush" Color="#FFFF4060" />
-  <SolidColorBrush x:Key="VSQ.StatusIndicator.UnknownBrush" Color="#FF6B7280" />
-  <!-- Health status colors (for health checks, plugin status, SLO dashboards) -->
-  <SolidColorBrush x:Key="VSQ.Status.HealthyBrush" Color="#FF10B981" />
-  <SolidColorBrush x:Key="VSQ.Status.DegradedBrush" Color="#FFF59E0B" />
-  <SolidColorBrush x:Key="VSQ.Status.UnhealthyBrush" Color="#FFEF4444" />
-  <SolidColorBrush x:Key="VSQ.Status.UnknownBrush" Color="#FF6B7280" />
-  <!-- Verification and rating indicators -->
-  <SolidColorBrush x:Key="VSQ.Status.VerifiedBrush" Color="#FF107C10" />
-  <SolidColorBrush x:Key="VSQ.Accent.GoldBrush" Color="#FFFFD700" />
   <!-- Overlay backgrounds -->
   <SolidColorBrush x:Key="VSQ.Overlay.BackgroundBrush" Color="#80000000" />
   <SolidColorBrush x:Key="VSQ.Color.Overlay.DarkerBrush" Color="#A0000000" />

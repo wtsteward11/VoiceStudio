@@ -3,7 +3,6 @@
 // GAP-FE-001: Integrated with TimelineGateway for backend connectivity
 
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -210,7 +209,7 @@ public partial class TimelineViewModel : BaseViewModel, IPanelStatePersistable
     private void OnAssetSelected(AssetSelectedEvent e)
     {
         // When an audio asset is selected in the Library, we could offer to add it to the timeline
-        ErrorLogger.LogDebug($"TimelineViewModel: Asset selected - {e.AssetId} ({e.AssetType})", "TimelineViewModel");
+        System.Diagnostics.Debug.WriteLine($"TimelineViewModel: Asset selected - {e.AssetId} ({e.AssetType})");
         // Future: could show "Add to Timeline" action or highlight compatible tracks
     }
 
@@ -221,7 +220,7 @@ public partial class TimelineViewModel : BaseViewModel, IPanelStatePersistable
     private void OnProfileSelected(ProfileSelectedEvent e)
     {
         // When a profile is selected, update the default voice profile for new voice clips
-        ErrorLogger.LogDebug($"TimelineViewModel: Profile selected - {e.ProfileId} ({e.ProfileName})", "TimelineViewModel");
+        System.Diagnostics.Debug.WriteLine($"TimelineViewModel: Profile selected - {e.ProfileId} ({e.ProfileName})");
         // Future: could set this as the active profile for synthesis operations
     }
 
@@ -881,7 +880,7 @@ public partial class TimelineViewModel : BaseViewModel, IPanelStatePersistable
         }
         catch (Exception ex)
         {
-            ErrorLogger.LogWarning($"Failed to get TimelineViewModel state: {ex.Message}", "TimelineViewModel");
+            System.Diagnostics.Debug.WriteLine($"Failed to get TimelineViewModel state: {ex.Message}");
             return null;
         }
     }
@@ -956,7 +955,7 @@ public partial class TimelineViewModel : BaseViewModel, IPanelStatePersistable
         }
         catch (Exception ex)
         {
-            ErrorLogger.LogWarning($"Failed to restore TimelineViewModel state: {ex.Message}", "TimelineViewModel");
+            System.Diagnostics.Debug.WriteLine($"Failed to restore TimelineViewModel state: {ex.Message}");
         }
     }
 

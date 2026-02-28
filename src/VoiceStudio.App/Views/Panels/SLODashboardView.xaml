@@ -26,7 +26,7 @@
                     <TextBlock Text="SLO Dashboard" 
                                FontSize="{StaticResource VSQ.FontSize.Title}" 
                                Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
-                    <Border Background="{StaticResource VSQ.Status.HealthyBrush}" 
+                    <Border Background="#4CAF50" 
                             CornerRadius="4" 
                             Padding="8,4" 
                             VerticalAlignment="Center"
@@ -84,7 +84,7 @@
                     <TextBlock Text="{x:Bind ViewModel.HealthySloCount, Mode=OneWay}" 
                                FontSize="24" 
                                FontWeight="SemiBold"
-                               Foreground="{StaticResource VSQ.Status.HealthyBrush}"/>
+                               Foreground="#4CAF50"/>
                 </StackPanel>
 
                 <!-- Warning -->
@@ -96,7 +96,7 @@
                     <TextBlock Text="{x:Bind ViewModel.WarningSloCount, Mode=OneWay}" 
                                FontSize="24" 
                                FontWeight="SemiBold"
-                               Foreground="{StaticResource VSQ.Status.DegradedBrush}"/>
+                               Foreground="#FFC107"/>
                 </StackPanel>
 
                 <!-- Critical -->
@@ -108,7 +108,7 @@
                     <TextBlock Text="{x:Bind ViewModel.CriticalSloCount, Mode=OneWay}" 
                                FontSize="24" 
                                FontWeight="SemiBold"
-                               Foreground="{StaticResource VSQ.Status.UnhealthyBrush}"/>
+                               Foreground="#F44336"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -200,7 +200,7 @@
                                         <TextBlock Grid.Column="1" 
                                                    Text="{x:Bind WarningThresholdFormatted}" 
                                                    FontSize="11" 
-                                                   Foreground="{StaticResource VSQ.Status.DegradedBrush}"/>
+                                                   Foreground="#FFC107"/>
                                     </Grid>
                                 </StackPanel>
 

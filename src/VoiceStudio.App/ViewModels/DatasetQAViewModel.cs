@@ -96,11 +96,6 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-      OptimizeDatasetCommand = new EnhancedAsyncRelayCommand(async (ct) =>
-      {
-        using var profiler = PerformanceProfiler.StartCommand("OptimizeDataset");
-        await OptimizeDatasetAsync(ct);
-      }, () => !string.IsNullOrEmpty(SelectedDatasetId) && !IsLoading);
 
       _ = LoadDatasetsAsync(CancellationToken.None);
     }
@@ -109,7 +104,6 @@ namespace VoiceStudio.App.ViewModels
     public IAsyncRelayCommand RunQACommand { get; }
     public IAsyncRelayCommand CullLowQualityCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
-    public IAsyncRelayCommand OptimizeDatasetCommand { get; }
 
     private async Task LoadDatasetsAsync(CancellationToken cancellationToken)
     {
@@ -291,53 +285,6 @@ namespace VoiceStudio.App.ViewModels
       catch (Exception ex)
       {
         await HandleErrorAsync(ex, "CullLowQuality");
-      }
-      finally
-      {
-        IsLoading = false;
-      }
-    }
-
-    private async Task OptimizeDatasetAsync(CancellationToken cancellationToken)
-    {
-      if (string.IsNullOrEmpty(SelectedDatasetId))
-      {
-        ErrorMessage = ResourceHelper.GetString("DatasetQA.DatasetRequired", "Please select a dataset");
-        return;
-      }
-
-      try
-      {
-        IsLoading = true;
-        ErrorMessage = null;
-
-        var request = new Dictionary<string, object>
-        {
-          { "dataset_id", SelectedDatasetId }
-        };
-
-        await _backendClient.SendRequestAsync<Dictionary<string, object>, object>(
-            $"/api/training/datasets/{Uri.EscapeDataString(SelectedDatasetId)}/optimize",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
-
-        StatusMessage = ResourceHelper.GetString("DatasetQA.OptimizationComplete", "Dataset optimization completed successfully");
-        _toastNotificationService?.ShowToast(ToastType.Success,
-            ResourceHelper.GetString("Toast.Title.OptimizationComplete", "Optimization Complete"),
-            StatusMessage);
-      }
-      catch (OperationCanceledException)
-      {
-        return;
-      }
-      catch (Exception ex)
-      {
-        ErrorMessage = ResourceHelper.FormatString("DatasetQA.OptimizationFailed", ex.Message);
-        _toastNotificationService?.ShowToast(ToastType.Error,
-            ResourceHelper.GetString("Toast.Title.OptimizationFailed", "Optimization Failed"),
-            ErrorMessage);
       }
       finally
       {

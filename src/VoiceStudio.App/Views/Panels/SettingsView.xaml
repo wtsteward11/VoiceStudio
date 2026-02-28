@@ -384,7 +384,7 @@
                   VerticalAlignment="Center" />
                 <TextBox Text="{x:Bind ViewModel.ApiUrl, Mode=TwoWay}"
                   Width="300"
-                  PlaceholderText="http://localhost:8000" />
+                  PlaceholderText="http://localhost:8001" />
               </StackPanel>
 
               <StackPanel Orientation="Horizontal"

@@ -142,7 +142,7 @@ namespace VoiceStudio.App.Services
       catch (Exception ex)
       {
         // Log error but don't throw
-        ErrorLogger.LogWarning($"Failed to process job progress message: {ex.Message}", "JobProgressWebSocketClient");
+        System.Diagnostics.Debug.WriteLine($"Failed to process job progress message: {ex.Message}");
       }
     }
 

@@ -183,16 +183,6 @@
         </Grid>
       </Border>
     </Grid>
-    <!-- Error InfoBar -->
-    <InfoBar Grid.Row="1"
-             IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
-             Severity="Error"
-             Title="Error"
-             Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
-             IsClosable="True"
-             VerticalAlignment="Bottom"
-             Margin="0,0,0,8"
-             AutomationProperties.AutomationId="RealTimeVoiceConverterView_ErrorInfoBar"/>
     <!-- Loading Overlay -->
     <controls:LoadingOverlay Grid.Row="1" IsLoading="{x:Bind ViewModel.IsLoading, Mode=OneWay}" LoadingMessage="Processing..."/>
     <!-- Help Overlay -->

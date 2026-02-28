@@ -23,7 +23,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public MockBackendClient()
         : base(new BackendClientConfig
         {
-          BaseUrl = "http://localhost:8000",
+          BaseUrl = "http://localhost:8001",
           WebSocketUrl = string.Empty,
           RequestTimeout = TimeSpan.FromSeconds(30)
         })

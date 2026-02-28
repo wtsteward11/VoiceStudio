@@ -118,15 +118,9 @@
                              TextChanged="ProfileSearchBox_TextChanged"
                              Height="32" />
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                        <Button Content="All" FontSize="11" Padding="8,2" MinHeight="24"
-                                AutomationProperties.AutomationId="ProfilesView_FilterAll"
-                                Click="FilterAll_Click" />
-                        <Button Content="Favorites" FontSize="11" Padding="8,2" MinHeight="24" Background="Transparent"
-                                AutomationProperties.AutomationId="ProfilesView_FilterFavorites"
-                                Click="FilterFavorites_Click" />
-                        <Button Content="Recent" FontSize="11" Padding="8,2" MinHeight="24" Background="Transparent"
-                                AutomationProperties.AutomationId="ProfilesView_FilterRecent"
-                                Click="FilterRecent_Click" />
+                        <Button Content="All" FontSize="11" Padding="8,2" MinHeight="24" />
+                        <Button Content="Favorites" FontSize="11" Padding="8,2" MinHeight="24" Background="Transparent" />
+                        <Button Content="Recent" FontSize="11" Padding="8,2" MinHeight="24" Background="Transparent" />
                     </StackPanel>
                 </StackPanel>
 
@@ -269,16 +263,12 @@
                             <ProgressBar Value="{x:Bind ViewModel.SelectedProfile.QualityScore, Mode=OneWay}" Maximum="1.0" Height="6" />
                         </StackPanel>
 
+                        <!-- Action buttons -->
                         <StackPanel Spacing="6" Margin="0,8,0,0">
-                            <Button Content="Preview Voice" HorizontalAlignment="Stretch"
-                                    AutomationProperties.AutomationId="ProfilesView_PreviewVoiceButton"
-                                    Click="PreviewVoiceButton_Click" />
+                            <Button Content="Preview Voice" HorizontalAlignment="Stretch" />
                             <Button Content="Edit Profile" HorizontalAlignment="Stretch"
-                                    AutomationProperties.AutomationId="ProfilesView_EditProfileButton"
                                     Click="EditProfileButton_Click" />
-                            <Button Content="Clone Profile" HorizontalAlignment="Stretch"
-                                    AutomationProperties.AutomationId="ProfilesView_CloneProfileButton"
-                                    Click="CloneProfileButton_Click" />
+                            <Button Content="Clone Profile" HorizontalAlignment="Stretch" />
                         </StackPanel>
                     </StackPanel>
 
@@ -292,9 +282,8 @@
                             <TextBlock Text="Batch Actions"
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
-                            <!-- GAP-B18: Migrated from Click handler to Command binding -->
                             <Button Content="Export Selected"
-                                    Command="{x:Bind ViewModel.ExportSelectedCommand}"
+                                    Click="BatchExport_Click"
                                     AutomationProperties.AutomationId="ProfilesView_BatchExportButton"
                                     HorizontalAlignment="Stretch" />
                             <Button Content="Delete Selected"

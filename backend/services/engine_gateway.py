@@ -9,7 +9,7 @@ This enforces the architecture boundary: routes -> gateway -> engine_service -> 
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +22,10 @@ class EngineGateway:
     fallback chain.
     """
 
-    def __init__(self):
-        self._engine_service = None
+    def __init__(self) -> None:
+        self._engine_service: Any = None
 
-    def _get_engine_service(self):
+    def _get_engine_service(self) -> Any:
         if self._engine_service is None:
             try:
                 from backend.services.engine_service import EngineService
@@ -45,7 +45,8 @@ class EngineGateway:
         svc = self._get_engine_service()
         if svc is None:
             return {"error": "Engine service unavailable"}
-        return await svc.synthesize(text, engine=engine, profile_id=profile_id, **(params or {}))
+        result = await svc.synthesize(text, engine=engine, profile_id=profile_id, **(params or {}))
+        return cast(dict[str, Any], result)
 
     async def clone_voice(
         self,
@@ -54,11 +55,18 @@ class EngineGateway:
         engine: str | None = None,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Initiate voice cloning."""
+        """Initiate voice cloning. Delegates to engine service."""
         svc = self._get_engine_service()
         if svc is None:
             return {"error": "Engine service unavailable"}
-        return {"status": "initiated", "name": name, "engine": engine}
+        try:
+            result = await svc.clone_voice(
+                audio_paths=audio_paths, name=name, engine=engine, **(params or {})
+            )
+            return cast(dict[str, Any], result)
+        except Exception as e:
+            logger.exception("Voice cloning failed via gateway")
+            return {"error": str(e), "name": name, "engine": engine}
 
     async def transcribe(
         self,
@@ -66,17 +74,35 @@ class EngineGateway:
         engine: str | None = None,
         language: str | None = None,
     ) -> dict[str, Any]:
-        """Transcribe audio to text."""
+        """Transcribe audio to text. Delegates to engine service."""
         svc = self._get_engine_service()
         if svc is None:
             return {"error": "Engine service unavailable"}
-        return {"status": "transcription_requested", "audio_path": audio_path}
+        try:
+            result = await svc.transcribe(
+                audio_path=audio_path, engine=engine, language=language
+            )
+            return cast(dict[str, Any], result)
+        except Exception as e:
+            logger.exception("Transcription failed via gateway")
+            return {"error": str(e), "audio_path": audio_path}
 
     async def analyze_audio(self, audio_path: str) -> dict[str, Any]:
-        """Analyze audio quality metrics."""
-        return {"status": "analysis_requested", "audio_path": audio_path}
+        """Analyze audio quality metrics. Delegates to engine service."""
+        svc = self._get_engine_service()
+        if svc is None:
+            return {"error": "Engine service unavailable"}
+        try:
+            result = await svc.analyze_audio(audio_path=audio_path)
+            return cast(dict[str, Any], result)
+        except AttributeError:
+            logger.debug("analyze_audio not available on engine service")
+            return {"error": "Audio analysis not available"}
+        except Exception as e:
+            logger.exception("Audio analysis failed via gateway")
+            return {"error": str(e), "audio_path": audio_path}
 
-    def get_quality_presets(self) -> list[dict[str, Any]]:
+    def get_quality_presets(self) -> dict[str, dict[str, Any]] | list[dict[str, Any]]:
         """Get available quality presets without direct engine import."""
         try:
             from app.core.engines.quality_presets import list_quality_presets
@@ -101,7 +127,7 @@ class EngineGateway:
         except ImportError:
             return ""
 
-    def get_quality_comparison(self):
+    def get_quality_comparison(self) -> Any | None:
         """Get quality comparison utility."""
         try:
             from app.core.engines.quality_comparison import QualityComparison
@@ -109,7 +135,7 @@ class EngineGateway:
         except ImportError:
             return None
 
-    def get_quality_optimizer(self):
+    def get_quality_optimizer(self) -> Any | None:
         """Get quality optimizer utility."""
         try:
             from app.core.engines.quality_optimizer import QualityOptimizer
@@ -117,13 +143,13 @@ class EngineGateway:
         except ImportError:
             return None
 
-    def get_llm_config_classes(self):
+    def get_llm_config_classes(self) -> tuple[type[Any] | None, type[Any] | None, type[Any] | None]:
         """Get LLM interface classes for assistant routes."""
         try:
             from app.core.engines.llm_interface import LLMConfig, Message, MessageRole
             return LLMConfig, Message, MessageRole
         except ImportError:
-            return None, None, None
+            return (None, None, None)
 
     def get_status(self) -> dict[str, Any]:
         """Get overall engine gateway status."""

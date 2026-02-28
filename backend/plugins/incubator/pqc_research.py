@@ -404,7 +404,7 @@ class PQCResearchModule:
                 PQCAlgorithm.SPHINCS_SHA2_128F,
             ]
 
-        comparison: dict[str, Any] = {
+        comparison = {
             "algorithms": {},
             "summary": {},
         }

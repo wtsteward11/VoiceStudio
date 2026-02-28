@@ -63,7 +63,7 @@
                 <Border x:Name="VerifiedBadge"
                         Grid.Column="2"
                         Visibility="Collapsed"
-                        Background="{StaticResource VSQ.Status.VerifiedBrush}"
+                        Background="#107C10"
                         CornerRadius="4"
                         Padding="6,2">
                     <StackPanel Orientation="Horizontal" Spacing="4">
@@ -98,7 +98,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <FontIcon Glyph="&#xE735;" 
                                   FontSize="12" 
-                                  Foreground="{StaticResource VSQ.Accent.GoldBrush}"/>
+                                  Foreground="#FFD700"/>
                         <TextBlock x:Name="RatingText"
                                    Text="4.5"
                                    FontSize="12"
@@ -126,14 +126,13 @@
                                AutomationProperties.AutomationId="PluginCard.Version"/>
                 </StackPanel>
 
-                <!-- GAP-B18: Migrated from Click handler to Command binding -->
+                <!-- Action Button -->
                 <Button x:Name="ActionButton"
                         Grid.Column="1"
                         Content="Install"
                         Style="{ThemeResource AccentButtonStyle}"
                         MinWidth="80"
-                        Command="{x:Bind ActionCommand, Mode=OneWay}"
-                        CommandParameter="{x:Bind Plugin, Mode=OneWay}"
+                        Click="ActionButton_Click"
                         AutomationProperties.AutomationId="PluginCard.ActionButton"/>
             </Grid>
         </Grid>

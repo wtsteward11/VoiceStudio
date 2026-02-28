@@ -10,7 +10,6 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using SelectionChangedEventArgsAlias = Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs;
-using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -313,7 +312,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -393,7 +392,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -430,7 +429,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -496,7 +495,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -524,7 +523,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -539,7 +538,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -554,7 +553,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -569,7 +568,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -584,7 +583,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -599,7 +598,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -614,7 +613,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -629,7 +628,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -644,7 +643,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -659,7 +658,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -674,7 +673,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -689,7 +688,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -704,7 +703,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -719,7 +718,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -753,7 +752,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "EffectsMixerView");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -1285,7 +1284,7 @@ namespace VoiceStudio.App.Views.Panels
       return Task.CompletedTask;
     }
 
-    private async void ShowEffectProperties(Effect effect)
+    private void ShowEffectProperties(Effect effect)
     {
       var dialog = new ContentDialog
       {
@@ -1295,7 +1294,7 @@ namespace VoiceStudio.App.Views.Panels
         XamlRoot = this.XamlRoot
       };
 
-      await dialog.ShowAsync();
+      _ = dialog.ShowAsync();
     }
 
     private UIElement CreateEffectPropertiesContent(Effect effect)

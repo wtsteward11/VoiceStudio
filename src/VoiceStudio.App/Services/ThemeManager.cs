@@ -74,12 +74,6 @@ namespace VoiceStudio.App.Services
     /// </summary>
     private void ApplyAccentToResources(ThemeAccent accent)
     {
-      // Guard: Skip resource manipulation in test context
-      if (Application.Current?.Resources == null)
-      {
-        return;
-      }
-
       if (Application.Current.Resources.ContainsKey("SystemAccentColor"))
       {
         Application.Current.Resources["SystemAccentColor"] = accent.Primary;
@@ -149,14 +143,6 @@ namespace VoiceStudio.App.Services
         _ => AppTheme.Dark
       };
 
-      // Guard: Skip resource dictionary manipulation in test context
-      if (Application.Current?.Resources?.MergedDictionaries == null)
-      {
-        Persist();
-        RaiseThemeChanged();
-        return;
-      }
-
       // Remove existing theme dictionaries
       var toRemove = new System.Collections.Generic.List<ResourceDictionary>();
       foreach (var dict in Application.Current.Resources.MergedDictionaries)
@@ -185,13 +171,6 @@ namespace VoiceStudio.App.Services
     public void ApplyLayoutDensity(string density)
     {
       Density = density;
-
-      // Guard: Skip resource manipulation in test context
-      if (Application.Current?.Resources?.MergedDictionaries == null)
-      {
-        RaiseThemeChanged();
-        return;
-      }
 
       // Remove existing density dictionaries
       var toRemove = new System.Collections.Generic.List<ResourceDictionary>();

@@ -499,8 +499,7 @@ namespace VoiceStudio.App.ViewModels
           Engine = SelectedEngine ?? "xtts",
           QualityMode = SelectedQualityMode ?? "standard",
           ProfileName = profileNameValue,
-          ProfileDescription = ProfileDescription,
-          ConsentAcknowledged = true
+          ProfileDescription = ProfileDescription
         };
 
         var response = await _backendClient.SendRequestAsync<WizardStartRequest, WizardStartResponse>(
@@ -614,7 +613,7 @@ namespace VoiceStudio.App.ViewModels
               CurrentStep = 4;
               StatusMessage = ResourceHelper.GetString("VoiceCloningWizard.CloningCompleted", "Voice cloning completed successfully");
 
-              TryDispatch(() =>
+              Dispatcher.TryEnqueue(() =>
               {
                 var profileName = ProfileName ?? "Unknown Profile";
                 _toastNotificationService?.ShowSuccess(
@@ -627,7 +626,7 @@ namespace VoiceStudio.App.ViewModels
             {
               ErrorMessage = status.ErrorMessage ?? ResourceHelper.GetString("VoiceCloningWizard.ProcessingFailedStatus", "Processing failed");
 
-              TryDispatch(() =>
+              Dispatcher.TryEnqueue(() =>
               {
                 _toastNotificationService?.ShowError(
                                   ResourceHelper.GetString("VoiceCloningWizard.ProcessingFailed", "Processing Failed"),
@@ -810,7 +809,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Error loading clone reference in wizard: {ex.Message}", "VoiceCloningWizardViewModel");
+        System.Diagnostics.Debug.WriteLine($"Error loading clone reference in wizard: {ex.Message}");
         ErrorMessage = $"Failed to load audio: {ex.Message}";
       }
     }
@@ -881,8 +880,6 @@ namespace VoiceStudio.App.ViewModels
     private class WizardStartRequest
     {
       public string ReferenceAudioId { get; set; } = string.Empty;
-      [System.Text.Json.Serialization.JsonPropertyName("consent_acknowledged")]
-      public bool ConsentAcknowledged { get; set; }
       public string Engine { get; set; } = "xtts";
       public string QualityMode { get; set; } = "standard";
       public string ProfileName { get; set; } = string.Empty;

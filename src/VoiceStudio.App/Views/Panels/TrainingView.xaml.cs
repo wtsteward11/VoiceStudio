@@ -52,14 +52,6 @@ namespace VoiceStudio.App.Views.Panels
         // Close any open dialogs or overlays
       });
 
-      ViewModel.PropertyChanged += (s, e) =>
-      {
-        if (e.PropertyName == nameof(ViewModel.IsSimulationMode))
-        {
-          UpdateSimulationBanner();
-        }
-      };
-
       // Subscribe to quality history changes to update chart
       ViewModel.PropertyChanged += (s, e) =>
       {
@@ -78,31 +70,11 @@ namespace VoiceStudio.App.Views.Panels
 
     private void UpdateProgressChart()
     {
-      if (ViewModel?.QualityHistory == null || ViewModel.QualityHistory.Count == 0)
-      {
-        return;
-      }
-
-      var latest = ViewModel.QualityHistory.LastOrDefault();
-      if (latest != null)
-      {
-        ViewModel.StatusMessage = $"Epoch {latest.Epoch}: Loss={latest.TrainingLoss:F4}, Quality={latest.QualityScore:F2}";
-      }
-    }
-
-    private void UpdateSimulationBanner()
-    {
-      DispatcherQueue.TryEnqueue(() =>
-      {
-        if (ViewModel.IsSimulationMode)
-        {
-          _toastService?.ShowToast(
-            Services.ToastType.Warning,
-            ViewModel.SimulationReason ?? "Training is running in simulation mode.",
-            "Simulation Mode",
-            autoDismissMs: 0);
-        }
-      });
+      // Note: ProgressChart control not implemented in XAML
+      // if (ProgressChart != null && ViewModel?.QualityHistory != null)
+      // {
+      //     ProgressChart.UpdateChart(ViewModel.QualityHistory);
+      // }
     }
 
     private void TrainingView_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
@@ -275,15 +247,14 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    private void StatusFilter_SelectionChanged(object sender, Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs e)
+    private void StatusFilter_SelectionChanged(object _, Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs __)
     {
-      if (sender is Microsoft.UI.Xaml.Controls.ComboBox comboBox
-          && comboBox.SelectedItem is Microsoft.UI.Xaml.Controls.ComboBoxItem item)
-      {
-        var status = item.Tag as string;
-        ViewModel.FilterStatus = string.IsNullOrEmpty(status) ? null : status;
-        ViewModel.LoadTrainingJobsCommand.Execute(null);
-      }
+      // Note: StatusFilter ComboBox not implemented in XAML
+      // if (StatusFilter.SelectedItem is Microsoft.UI.Xaml.Controls.ComboBoxItem item && item.Tag is string status)
+      // {
+      //     ViewModel.FilterStatus = string.IsNullOrEmpty(status) ? null : status;
+      //     _ = ViewModel.LoadTrainingJobsCommand.ExecuteAsync(null);
+      // }
     }
 
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)

@@ -11,7 +11,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from backend.security.audit_logger import (
+from backend.services.audit_logger import (
     AuditAction,
     AuditEntry,
     AuditLogger,

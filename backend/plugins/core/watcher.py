@@ -15,7 +15,7 @@ import logging
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from backend.plugins.core.safe_reload import SafePluginReloader
@@ -59,7 +59,7 @@ class PluginFileWatcher:
     ):
         self._plugins_dir = Path(plugins_dir).resolve()
         self._debounce_ms = debounce_ms
-        self._observer: Any = None
+        self._observer = None
         self._handlers: list[Callable] = []
         self._pending_changes: dict[str, float] = {}
         self._debounce_task: asyncio.Task | None = None

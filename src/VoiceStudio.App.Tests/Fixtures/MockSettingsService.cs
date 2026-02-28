@@ -203,7 +203,7 @@ namespace VoiceStudio.App.Tests.Fixtures
                 },
                 Backend = new BackendSettings
                 {
-                    ApiUrl = "http://localhost:8000"
+                    ApiUrl = "http://localhost:8001"
                 },
                 Performance = new PerformanceSettings
                 {

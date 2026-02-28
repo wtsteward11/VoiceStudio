@@ -2,7 +2,6 @@
 // Task 5.2.3: Macro Recording - Record command sequences, save/load macros
 
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -133,7 +132,7 @@ public class MacroRecorderService
                 }
                 catch (Exception ex)
                 {
-                    ErrorLogger.LogWarning($"Failed to load macro {file}: {ex.Message}", "MacroRecorderService");
+                    System.Diagnostics.Debug.WriteLine($"Failed to load macro {file}: {ex.Message}");
                 }
             }
 
@@ -141,7 +140,7 @@ public class MacroRecorderService
         }
         catch (Exception ex)
         {
-            ErrorLogger.LogWarning($"Failed to load macros: {ex.Message}", "MacroRecorderService");
+            System.Diagnostics.Debug.WriteLine($"Failed to load macros: {ex.Message}");
         }
     }
 
@@ -261,9 +260,11 @@ public class MacroRecorderService
             var filePath = Path.Combine(_macrosDirectory, $"{macroId}.json");
             if (File.Exists(filePath))
             {
-                await Task.Run(() => File.Delete(filePath));
+                File.Delete(filePath);
             }
         }
+
+        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -389,7 +390,7 @@ public class MacroRecorderService
         }
         catch (Exception ex)
         {
-            ErrorLogger.LogWarning($"Failed to import macro: {ex.Message}", "MacroRecorderService");
+            System.Diagnostics.Debug.WriteLine($"Failed to import macro: {ex.Message}");
         }
 
         return null;

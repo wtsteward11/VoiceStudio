@@ -27,7 +27,7 @@
             </Button>
             <Button ToolTipService.ToolTip="Record (R)" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8"
                 Background="Transparent" BorderThickness="0">
-                <FontIcon Glyph="&#xE7C8;" FontSize="16" Foreground="{StaticResource VSQ.Accent.RedBrush}" FontFamily="Segoe Fluent Icons" />
+                <FontIcon Glyph="&#xE7C8;" FontSize="16" Foreground="#FF4060" FontFamily="Segoe Fluent Icons" />
             </Button>
         </StackPanel>
         <!-- Project Section -->

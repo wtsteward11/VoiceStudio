@@ -1,7 +1,8 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.UI.Dispatching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using VoiceStudio.App.Services;
-using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Services;
 
@@ -10,19 +11,22 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class SettingsViewModelTests
     {
-        private MockViewModelContext _mockContext = null!;
+        private IViewModelContext _context = null!;
         private Mock<ISettingsService> _mockSettingsService = null!;
         private Mock<IBackendClient> _mockBackendClient = null!;
+        private DispatcherQueueController? _dispatcherController;
         private SettingsViewModel _viewModel = null!;
 
         [TestInitialize]
         public void Setup()
         {
-            _mockContext = new MockViewModelContext();
+            _dispatcherController = DispatcherQueueController.CreateOnDedicatedThread();
+            var dispatcher = _dispatcherController.DispatcherQueue;
+            _context = new ViewModelContext(NullLogger.Instance, dispatcher);
             _mockSettingsService = new Mock<ISettingsService>();
             _mockBackendClient = new Mock<IBackendClient>();
             _viewModel = new SettingsViewModel(
-                _mockContext,
+                _context,
                 _mockSettingsService.Object,
                 _mockBackendClient.Object);
         }
@@ -30,7 +34,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestCleanup]
         public void Cleanup()
         {
-            // No dispatcher cleanup needed with MockViewModelContext
+            _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
         }
 
         [TestMethod]
@@ -84,9 +88,9 @@ namespace VoiceStudio.App.Tests.ViewModels
         }
 
         [TestMethod]
-        public void ApiUrl_DefaultsToLocalhost8000()
+        public void ApiUrl_DefaultsToLocalhost8001()
         {
-            Assert.AreEqual("http://localhost:8000", _viewModel.ApiUrl);
+            Assert.AreEqual("http://localhost:8001", _viewModel.ApiUrl);
         }
 
         [TestMethod]

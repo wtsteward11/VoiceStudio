@@ -1,0 +1,24 @@
+{
+  "preset_id": "game_character",
+  "name": "Game Character",
+  "category": "game_character",
+  "description": "Expressive voice acting with dynamic emotion and high naturalness",
+  "default_chain": {
+    "schema_version": "1.0",
+    "name": "Game Character Pipeline",
+    "steps": [
+      {"step_id": "s1", "type": "synthesis", "parameters": {"temperature": 0.9, "emotion": "dynamic"}},
+      {"step_id": "s2", "type": "quality_evaluation"},
+      {"step_id": "s3", "type": "enhancement", "parameters": {"enhance_expression": true}}
+    ]
+  },
+  "default_quality_policy": {
+    "min_mos": 3.8,
+    "min_similarity": 0.75,
+    "min_naturalness": 0.85,
+    "max_artifact_score": 0.06,
+    "min_snr_db": 28,
+    "auto_enhance_if_below": true,
+    "fail_if_unmet": false
+  }
+}

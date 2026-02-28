@@ -1,0 +1,23 @@
+{
+  "preset_id": "conversational",
+  "name": "Conversational",
+  "category": "conversational",
+  "description": "Fast, natural speech optimized for speed without sacrificing clarity",
+  "default_chain": {
+    "schema_version": "1.0",
+    "name": "Conversational Pipeline",
+    "steps": [
+      {"step_id": "s1", "type": "synthesis", "parameters": {"temperature": 0.65, "speed": 1.1}},
+      {"step_id": "s2", "type": "quality_evaluation"}
+    ]
+  },
+  "default_quality_policy": {
+    "min_mos": 3.5,
+    "min_similarity": 0.7,
+    "min_naturalness": 0.8,
+    "max_artifact_score": 0.08,
+    "min_snr_db": 25,
+    "auto_enhance_if_below": false,
+    "fail_if_unmet": false
+  }
+}

@@ -1,8 +1,8 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Core.Commands;
-using VoiceStudio.App.Logging;
 using VoiceStudio.App.Services;
 using VoiceStudio.Core.Services;
 
@@ -213,7 +213,7 @@ namespace VoiceStudio.App.Commands
                 _ => true
             );
 
-            ErrorLogger.LogDebug("Registered 10 playback commands", "PlaybackOperationsHandler");
+            Debug.WriteLine("[PlaybackOperationsHandler] Registered 10 playback commands");
         }
 
         public async Task PlayAsync(CancellationToken ct = default)
@@ -235,11 +235,11 @@ namespace VoiceStudio.App.Commands
                 _isPaused = false;
 
                 PlaybackStateChanged?.Invoke(this, PlaybackState.Playing);
-                ErrorLogger.LogInfo("Playback started", "PlaybackOperationsHandler");
+                Debug.WriteLine("[PlaybackOperationsHandler] Playback started");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Play failed: {ex.Message}", "PlaybackOperationsHandler");
+                Debug.WriteLine($"[PlaybackOperationsHandler] Play failed: {ex.Message}");
                 throw;
             }
 
@@ -254,11 +254,11 @@ namespace VoiceStudio.App.Commands
                 _isPaused = true;
 
                 PlaybackStateChanged?.Invoke(this, PlaybackState.Paused);
-                ErrorLogger.LogInfo("Playback paused", "PlaybackOperationsHandler");
+                Debug.WriteLine("[PlaybackOperationsHandler] Playback paused");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Pause failed: {ex.Message}", "PlaybackOperationsHandler");
+                Debug.WriteLine($"[PlaybackOperationsHandler] Pause failed: {ex.Message}");
                 throw;
             }
 
@@ -288,11 +288,11 @@ namespace VoiceStudio.App.Commands
 
                 PlaybackStateChanged?.Invoke(this, PlaybackState.Stopped);
                 PositionChanged?.Invoke(this, TimeSpan.Zero);
-                ErrorLogger.LogInfo("Playback stopped", "PlaybackOperationsHandler");
+                Debug.WriteLine("[PlaybackOperationsHandler] Playback stopped");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Stop failed: {ex.Message}", "PlaybackOperationsHandler");
+                Debug.WriteLine($"[PlaybackOperationsHandler] Stop failed: {ex.Message}");
                 throw;
             }
 
@@ -327,17 +327,17 @@ namespace VoiceStudio.App.Commands
                 _isRecording = true;
                 PlaybackStateChanged?.Invoke(this, PlaybackState.Recording);
                 _toastService?.ShowInfo("Recording started - speak into your microphone");
-                ErrorLogger.LogInfo("Recording started via MicrophoneRecordingService", "PlaybackOperationsHandler");
+                Debug.WriteLine("[PlaybackOperationsHandler] Recording started via MicrophoneRecordingService");
             }
             catch (InvalidOperationException ex) when (ex.Message.Contains("No audio input"))
             {
                 _toastService?.ShowError("No Microphone", "No microphone found. Please connect a microphone and try again.");
-                ErrorLogger.LogWarning($"No microphone: {ex.Message}", "PlaybackOperationsHandler");
+                Debug.WriteLine($"[PlaybackOperationsHandler] No microphone: {ex.Message}");
             }
             catch (Exception ex)
             {
                 _toastService?.ShowError("Recording Failed", $"Failed to start recording: {ex.Message}");
-                ErrorLogger.LogWarning($"Start recording failed: {ex.Message}", "PlaybackOperationsHandler");
+                Debug.WriteLine($"[PlaybackOperationsHandler] Start recording failed: {ex.Message}");
                 throw;
             }
         }
@@ -359,13 +359,15 @@ namespace VoiceStudio.App.Commands
                 PlaybackStateChanged?.Invoke(this, PlaybackState.Stopped);
 
                 _toastService?.ShowSuccess($"Recording saved ({duration.TotalSeconds:F1}s)");
-                ErrorLogger.LogInfo($"Recording stopped: {duration.TotalSeconds:F1}s -> {recordingPath}", "PlaybackOperationsHandler");
+                Debug.WriteLine(
+                    $"[PlaybackOperationsHandler] Recording stopped: " +
+                    $"{duration.TotalSeconds:F1}s -> {recordingPath}");
             }
             catch (Exception ex)
             {
                 _isRecording = false;
                 PlaybackStateChanged?.Invoke(this, PlaybackState.Stopped);
-                ErrorLogger.LogWarning($"Stop recording failed: {ex.Message}", "PlaybackOperationsHandler");
+                Debug.WriteLine($"[PlaybackOperationsHandler] Stop recording failed: {ex.Message}");
                 throw;
             }
         }
@@ -384,11 +386,11 @@ namespace VoiceStudio.App.Commands
                 _currentPosition = position;
 
                 PositionChanged?.Invoke(this, position);
-                ErrorLogger.LogDebug($"Seeked to: {position}", "PlaybackOperationsHandler");
+                Debug.WriteLine($"[PlaybackOperationsHandler] Seeked to: {position}");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Seek failed: {ex.Message}", "PlaybackOperationsHandler");
+                Debug.WriteLine($"[PlaybackOperationsHandler] Seek failed: {ex.Message}");
                 throw;
             }
 
@@ -404,7 +406,7 @@ namespace VoiceStudio.App.Commands
         public void SetDuration(TimeSpan duration)
         {
             _duration = duration;
-            ErrorLogger.LogDebug($"Duration set: {duration}", "PlaybackOperationsHandler");
+            Debug.WriteLine($"[PlaybackOperationsHandler] Duration set: {duration}");
         }
 
         public void UpdatePosition(TimeSpan position)
@@ -421,7 +423,9 @@ namespace VoiceStudio.App.Commands
             object? sender,
             Services.RecordingCompletedEventArgs e)
         {
-            ErrorLogger.LogInfo($"Recording completed: {e.Duration.TotalSeconds:F1}s -> {e.FilePath}", "PlaybackOperationsHandler");
+            Debug.WriteLine(
+                $"[PlaybackOperationsHandler] Recording completed: " +
+                $"{e.Duration.TotalSeconds:F1}s -> {e.FilePath}");
             RecordingCompleted?.Invoke(this, e);
         }
 
@@ -430,7 +434,8 @@ namespace VoiceStudio.App.Commands
             _isRecording = false;
             PlaybackStateChanged?.Invoke(this, PlaybackState.Stopped);
             _toastService?.ShowError("Recording Error", errorMessage);
-            ErrorLogger.LogWarning($"Recording error: {errorMessage}", "PlaybackOperationsHandler");
+            Debug.WriteLine(
+                $"[PlaybackOperationsHandler] Recording error: {errorMessage}");
         }
     }
 

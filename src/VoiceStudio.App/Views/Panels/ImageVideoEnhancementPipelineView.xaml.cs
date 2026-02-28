@@ -4,7 +4,6 @@ using VoiceStudio.App.Services;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Services;
 using System.Runtime.InteropServices.WindowsRuntime;
-using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -56,56 +55,25 @@ namespace VoiceStudio.App.Views.Panels
       {
         if (sender is Button button && button.CommandParameter is PipelineStep step)
         {
-          var panel = new StackPanel { Spacing = 12, MinWidth = 360 };
-
-          panel.Children.Add(new TextBlock
-          {
-            Text = $"Step {step.StepNumber}: {step.Description}",
-            TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
-            Opacity = 0.7
-          });
-
-          var paramEditors = new Dictionary<string, TextBox>();
-          foreach (var param in step.Parameters)
-          {
-            var paramBox = new TextBox
-            {
-              Header = param.Key,
-              Text = param.Value?.ToString() ?? "",
-              PlaceholderText = $"Value for {param.Key}"
-            };
-            panel.Children.Add(paramBox);
-            paramEditors[param.Key] = paramBox;
-          }
-
-          if (step.Parameters.Count == 0)
-          {
-            panel.Children.Add(new TextBlock { Text = "No parameters to configure for this step.", Opacity = 0.5 });
-          }
-
           var dialog = new Microsoft.UI.Xaml.Controls.ContentDialog
           {
             Title = $"Configure: {step.Name}",
-            Content = panel,
+            Content = $"Step: {step.StepNumber}\n\nDescription: {step.Description}\n\nParameters: {step.ParametersSummary ?? "No parameters configured"}",
             PrimaryButtonText = "Save",
             CloseButtonText = "Cancel",
             XamlRoot = this.XamlRoot
           };
-
           var result = await dialog.ShowAsync();
           if (result == Microsoft.UI.Xaml.Controls.ContentDialogResult.Primary)
           {
-            foreach (var kvp in paramEditors)
-            {
-              step.Parameters[kvp.Key] = kvp.Value.Text;
-            }
+            // Parameters can be configured via ViewModel if needed
             ViewModel.StatusMessage = $"Configuration saved for {step.Name}";
           }
         }
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "ImageVideoEnhancementPipelineView.xaml");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 

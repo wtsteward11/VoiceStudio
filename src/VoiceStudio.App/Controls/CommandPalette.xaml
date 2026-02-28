@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="using:Microsoft.UI.Xaml.Controls"
              xmlns:services="using:VoiceStudio.Core.Services">
-    <Border Background="{StaticResource VSQ.Surface.Default}"
+    <Border Background="#1A1F28"
             BorderBrush="{StaticResource VSQ.Panel.BorderBrush}"
             BorderThickness="1"
             CornerRadius="8"

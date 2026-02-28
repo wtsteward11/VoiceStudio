@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -352,7 +351,7 @@ public class AccessibilityService : IUnifiedAccessibilityService
         _settings.TextScaling = _uiSettings.TextScaleFactor;
     }
 
-    private Task LoadSettingsAsync()
+    private async Task LoadSettingsAsync()
     {
         try
         {
@@ -378,16 +377,16 @@ public class AccessibilityService : IUnifiedAccessibilityService
         }
         catch (Exception ex)
         {
-            ErrorLogger.LogWarning($"[Accessibility] Failed to load settings: {ex.Message}", "AccessibilityService");
+            System.Diagnostics.Debug.WriteLine($"[Accessibility] Failed to load settings: {ex.Message}");
         }
 
-        return Task.CompletedTask;
+        await Task.CompletedTask;
     }
 
     /// <summary>
     /// Saves settings to persistent storage.
     /// </summary>
-    public Task SaveSettingsAsync()
+    public async Task SaveSettingsAsync()
     {
         try
         {
@@ -401,10 +400,10 @@ public class AccessibilityService : IUnifiedAccessibilityService
         }
         catch (Exception ex)
         {
-            ErrorLogger.LogWarning($"[Accessibility] Failed to save settings: {ex.Message}", "AccessibilityService");
+            System.Diagnostics.Debug.WriteLine($"[Accessibility] Failed to save settings: {ex.Message}");
         }
 
-        return Task.CompletedTask;
+        await Task.CompletedTask;
     }
 
     /// <summary>

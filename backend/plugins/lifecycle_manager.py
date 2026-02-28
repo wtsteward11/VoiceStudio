@@ -109,6 +109,19 @@ class LifecycleManager:
             if not module_path.exists():
                 raise FileNotFoundError(f"Entry point not found: {entry_point}")
 
+            manifest_permissions = getattr(plugin_info.manifest, "permissions", None)
+            if manifest_permissions:
+                try:
+                    from backend.plugins.sandbox.permissions import PermissionEnforcer
+                    enforcer = PermissionEnforcer(
+                        plugin_id=plugin_id,
+                        permissions=manifest_permissions if isinstance(manifest_permissions, dict) else {},
+                    )
+                    plugin_info.permission_enforcer = enforcer
+                    logger.info("Sandbox permissions enforcer created for plugin %s", plugin_id)
+                except Exception as perm_err:
+                    logger.debug("Permission enforcement skipped for %s: %s", plugin_id, perm_err)
+
             spec = importlib.util.spec_from_file_location(
                 f"plugin_{plugin_id}",
                 module_path,

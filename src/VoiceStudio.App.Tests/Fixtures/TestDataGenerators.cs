@@ -167,7 +167,7 @@ namespace VoiceStudio.App.Tests.Fixtures
                 StartTime = startSeconds,
                 Duration = TimeSpan.FromSeconds(durationSeconds),
                 AudioId = GenerateId("audio"),
-                AudioUrl = $"http://localhost:8000/audio/{GenerateId("audio")}.wav"
+                AudioUrl = $"http://localhost:8001/audio/{GenerateId("audio")}.wav"
             };
         }
 
@@ -221,7 +221,7 @@ namespace VoiceStudio.App.Tests.Fixtures
                 },
                 Backend = new BackendSettings
                 {
-                    ApiUrl = "http://localhost:8000"
+                    ApiUrl = "http://localhost:8001"
                 },
                 Performance = new PerformanceSettings
                 {

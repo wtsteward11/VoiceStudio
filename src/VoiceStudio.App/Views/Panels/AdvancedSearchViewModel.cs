@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -124,7 +123,7 @@ namespace VoiceStudio.App.Views.Panels
       catch
       {
         // Silently fail - history will be lost but app continues
-        ErrorLogger.LogWarning("Failed to save search history", "AdvancedSearchViewModel");
+        System.Diagnostics.Debug.WriteLine("Failed to save search history");
       }
     }
 
@@ -271,7 +270,7 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         // Log error and show empty results
-        ErrorLogger.LogWarning($"Search failed: {ex.Message}", "AdvancedSearchViewModel");
+        System.Diagnostics.Debug.WriteLine($"Search failed: {ex.Message}");
         SearchResults.Clear();
         ActiveFilters.Clear();
       }
@@ -374,7 +373,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Failed to export results: {ex.Message}", "AdvancedSearchViewModel");
+        System.Diagnostics.Debug.WriteLine($"Failed to export results: {ex.Message}");
       }
     }
 

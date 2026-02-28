@@ -141,8 +141,7 @@ class MetricsExporter:
         collectors = get_all_collectors()
 
         if plugin_id:
-            matched = collectors.get(plugin_id)
-            collectors = {plugin_id: matched} if matched is not None else {}
+            collectors = {plugin_id: collectors.get(plugin_id)} if plugin_id in collectors else {}
 
         for pid, collector in collectors.items():
             if collector is None:

@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Hosting;
-using VoiceStudio.App.Hosting;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.UseCases;
@@ -18,21 +16,9 @@ namespace VoiceStudio.App.Services
   public static class ServiceProvider
   {
     /// <summary>
-    /// The Generic Host instance. Available after Initialize().
+    /// Initializes the app service container. Called from App constructor.
     /// </summary>
-    public static IHost? Host { get; private set; }
-
-    /// <summary>
-    /// Initializes the app service container via Generic Host.
-    /// The host builds the DI container with IConfiguration and ILogging,
-    /// then passes its IServiceProvider to AppServices for backward compatibility.
-    /// </summary>
-    public static void Initialize()
-    {
-      Host = HostFactory.BuildHost([]);
-      AppServices.Initialize(Host.Services);
-      AppServices.PostInitialize();
-    }
+    public static void Initialize() => AppServices.Initialize();
 
     public static IBackendClient GetBackendClient() => AppServices.GetBackendClient();
     public static IAudioPlayerService GetAudioPlayerService() => AppServices.GetAudioPlayerService();
@@ -52,8 +38,6 @@ namespace VoiceStudio.App.Services
     public static IUpdateService GetUpdateService() => AppServices.GetUpdateService();
     public static ISettingsService GetSettingsService() => AppServices.GetSettingsService();
     public static PluginManager GetPluginManager() => AppServices.GetPluginManager();
-    public static PluginBridgeService GetPluginBridgeService() => AppServices.GetPluginBridgeService();
-    public static PluginBridgeService? TryGetPluginBridgeService() => AppServices.TryGetPluginBridgeService();
     public static IPanelRegistry GetPanelRegistry() => AppServices.GetPanelRegistry();
     public static IHelpOverlayService GetHelpOverlayService() => AppServices.GetHelpOverlayService();
     public static RealTimeQualityService GetRealTimeQualityService() => AppServices.GetRealTimeQualityService();
@@ -149,6 +133,8 @@ namespace VoiceStudio.App.Services
     }
     public static ModuleLoader GetModuleLoader() => AppServices.GetModuleLoader();
     public static ModuleLoader? TryGetModuleLoader() => AppServices.TryGetModuleLoader();
+    public static PanelLoader GetPanelLoader() => AppServices.GetPanelLoader();
+    public static PanelLoader? TryGetPanelLoader() => AppServices.TryGetPanelLoader();
     public static IErrorCoordinator GetErrorCoordinator() => AppServices.GetErrorCoordinator();
     public static IErrorCoordinator? TryGetErrorCoordinator() => AppServices.TryGetErrorCoordinator();
     public static IViewModelFactory GetViewModelFactory() => AppServices.GetViewModelFactory();

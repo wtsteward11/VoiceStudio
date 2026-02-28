@@ -5,7 +5,6 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:controls="using:VoiceStudio.App.Controls"
     xmlns:local="using:VoiceStudio.App.Views.Panels"
-    xmlns:models="using:VoiceStudio.Core.Models"
     mc:Ignorable="d"
     d:DataContext="{d:DesignInstance Type=local:TimelineViewModel, IsDesignTimeCreatable=False}"
     x:DataType="local:TimelineView">
@@ -26,22 +25,9 @@
         <Border Grid.Row="0" 
                 Background="{StaticResource VSQ.Panel.Background.HeaderBrush}" 
                 Padding="{StaticResource VSQ.Spacing.Medium}">
-            <Grid>
-                <TextBlock Text="Timeline" 
-                           FontSize="{StaticResource VSQ.FontSize.Title}" 
-                           Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
-                
-                <!-- Phase 3 Fix 4: Guidance InfoBar -->
-                <InfoBar x:Name="GuidanceInfoBar"
-                         IsOpen="{x:Bind ViewModel.ShowGuidanceInfoBar, Mode=OneWay}"
-                         Severity="Informational"
-                         Title="Getting Started"
-                         Message="{x:Bind ViewModel.GuidanceMessage, Mode=OneWay}"
-                         IsClosable="True"
-                         HorizontalAlignment="Stretch"
-                         VerticalAlignment="Top"
-                         Margin="80,0,0,0" />
-            </Grid>
+            <TextBlock Text="Timeline" 
+                       FontSize="{StaticResource VSQ.FontSize.Title}" 
+                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
         </Border>
 
         <!-- Transport Bar -->
@@ -53,35 +39,31 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
-                    <Button Command="{x:Bind ViewModel.PlayAudioCommand}" AutomationProperties.AutomationId="TimelineView_PlayButton" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Play">
+                    <Button Command="{x:Bind ViewModel.PlayAudioCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Play">
                         <FontIcon Glyph="&#xE768;" FontSize="16" FontFamily="Segoe Fluent Icons" />
                     </Button>
-                    <Button Command="{x:Bind ViewModel.StopAudioCommand}" AutomationProperties.AutomationId="TimelineView_StopButton" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Stop">
+                    <Button Command="{x:Bind ViewModel.StopAudioCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Stop">
                         <FontIcon Glyph="&#xE71A;" FontSize="16" FontFamily="Segoe Fluent Icons" />
                     </Button>
-                    <ToggleButton IsChecked="{x:Bind ViewModel.IsRecording, Mode=TwoWay}"
-                                  AutomationProperties.AutomationId="TimelineView_RecordButton"
-                                  MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Record">
-                        <FontIcon Glyph="&#xE7C8;" FontSize="16" Foreground="{StaticResource VSQ.Accent.RedBrush}" FontFamily="Segoe Fluent Icons" />
-                    </ToggleButton>
+                    <Button MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Record">
+                        <FontIcon Glyph="&#xE7C8;" FontSize="16" Foreground="#FF4060" FontFamily="Segoe Fluent Icons" />
+                    </Button>
                     <Rectangle Width="1" Height="24" Fill="{StaticResource VSQ.Panel.BorderBrush}" Margin="4,0" />
-                    <ToggleButton IsChecked="{x:Bind ViewModel.IsLoopEnabled, Mode=TwoWay}"
-                                  AutomationProperties.AutomationId="TimelineView_LoopButton"
-                                  MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Loop">
+                    <ToggleButton MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Loop">
                         <FontIcon Glyph="&#xE8EE;" FontSize="14" FontFamily="Segoe Fluent Icons" />
                     </ToggleButton>
                 </StackPanel>
-                <TextBlock Grid.Column="1" x:Name="TimePositionDisplay" AutomationProperties.Name="Time position display" Text="00:00.000" FontSize="16" FontWeight="SemiBold"
+                <TextBlock Grid.Column="1" x:Name="TimePositionDisplay" Text="00:00.000" FontSize="16" FontWeight="SemiBold"
                            Foreground="{StaticResource VSQ.Accent.CyanBrush}" FontFamily="Consolas"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
-                    <Button Command="{x:Bind ViewModel.AddTrackCommand}" AutomationProperties.AutomationId="TimelineView_AddTrackButton" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Add Track">
+                    <Button Command="{x:Bind ViewModel.AddTrackCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Add Track">
                         <FontIcon Glyph="&#xE710;" FontSize="16" FontFamily="Segoe Fluent Icons" />
                     </Button>
-                    <Button Command="{x:Bind ViewModel.ZoomInCommand}" AutomationProperties.AutomationId="TimelineView_ZoomInButton" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Zoom In">
+                    <Button Command="{x:Bind ViewModel.ZoomInCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Zoom In">
                         <FontIcon Glyph="&#xE8A3;" FontSize="14" FontFamily="Segoe Fluent Icons" />
                     </Button>
-                    <Button Command="{x:Bind ViewModel.ZoomOutCommand}" AutomationProperties.AutomationId="TimelineView_ZoomOutButton" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Zoom Out">
+                    <Button Command="{x:Bind ViewModel.ZoomOutCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Zoom Out">
                         <FontIcon Glyph="&#xE71F;" FontSize="14" FontFamily="Segoe Fluent Icons" />
                     </Button>
                 </StackPanel>
@@ -105,10 +87,9 @@
         <!-- Timeline Area -->
         <Grid Grid.Row="3">
             <ScrollViewer x:Name="TimelineScrollViewer" />
-            <!-- GAP-CS-004: Added x:DataType for compile-time binding validation -->
-            <ListView x:Name="TracksListView" AutomationProperties.AutomationId="TimelineView_TracksListView" ItemsSource="{x:Bind ViewModel.Tracks, Mode=OneWay}">
+            <ListView x:Name="TracksListView" ItemsSource="{x:Bind ViewModel.Tracks, Mode=OneWay}">
                 <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="models:AudioTrack">
+                    <DataTemplate>
                         <Grid Height="60" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
                               BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="0,0,0,1">
                             <Grid.ColumnDefinitions>
@@ -125,15 +106,10 @@
                                     <TextBlock Grid.Row="0" Text="{Binding Name, FallbackValue='Track'}"
                                                FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
                                     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="2" Margin="0,4,0,0">
-                                        <ToggleButton Content="M" Width="24" Height="20" FontSize="9" Padding="0"
-                                                      IsChecked="{Binding IsMuted, Mode=TwoWay}" ToolTipService.ToolTip="Mute" />
-                                        <ToggleButton Content="S" Width="24" Height="20" FontSize="9" Padding="0"
-                                                      IsChecked="{Binding IsSolo, Mode=TwoWay}" ToolTipService.ToolTip="Solo" />
-                                        <ToggleButton Content="R" Width="24" Height="20" FontSize="9" Padding="0"
-                                                      IsChecked="{Binding IsRecordArmed, Mode=TwoWay}"
-                                                      Foreground="{StaticResource VSQ.Accent.RedBrush}" ToolTipService.ToolTip="Record Arm" />
-                                        <Slider Minimum="0" Maximum="1" Value="{Binding Volume, Mode=TwoWay}"
-                                                Width="50" Height="16" Margin="4,0,0,0" />
+                                        <ToggleButton Content="M" Width="24" Height="20" FontSize="9" Padding="0" ToolTipService.ToolTip="Mute" />
+                                        <ToggleButton Content="S" Width="24" Height="20" FontSize="9" Padding="0" ToolTipService.ToolTip="Solo" />
+                                        <ToggleButton Content="R" Width="24" Height="20" FontSize="9" Padding="0" Foreground="#FF4060" ToolTipService.ToolTip="Record Arm" />
+                                        <Slider Minimum="0" Maximum="1" Value="0.8" Width="50" Height="16" Margin="4,0,0,0" />
                                     </StackPanel>
                                 </Grid>
                             </Border>

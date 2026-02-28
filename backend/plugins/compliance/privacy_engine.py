@@ -464,18 +464,19 @@ class PrivacyEngine:
             # Try to parse as JSON
             try:
                 data = json.loads(content)
-                anonymized_data = self._anonymize_dict(data)
-                file_path.write_text(json.dumps(anonymized_data, indent=2))
+                anonymized = self._anonymize_dict(data)
+                file_path.write_text(json.dumps(anonymized, indent=2))
             except json.JSONDecodeError:
-                anonymized_text = self._anonymize_text(content)
-                file_path.write_text(anonymized_text)
+                # Plain text - anonymize PII patterns
+                anonymized = self._anonymize_text(content)
+                file_path.write_text(anonymized)
 
         except Exception as e:
             logger.error(f"Error anonymizing {file_path}: {e}")
 
     def _anonymize_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Anonymize PII fields in a dictionary."""
-        anonymized: Dict[str, Any] = {}
+        anonymized = {}
 
         pii_fields = {
             "email",

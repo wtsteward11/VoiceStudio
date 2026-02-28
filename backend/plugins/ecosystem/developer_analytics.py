@@ -326,8 +326,8 @@ class DeveloperAnalytics:
         stats = DeveloperStats(developer_id=developer_id)
         stats.total_plugins = len(plugin_ids)
 
-        total_rating_sum: float = 0.0
-        total_rating_count: float = 0.0
+        total_rating_sum = 0
+        total_rating_count = 0
 
         for plugin_id in plugin_ids:
             metrics = self.get_plugin_metrics(plugin_id)
@@ -419,7 +419,7 @@ class DeveloperAnalytics:
             )
 
             dates.append(date_str)
-            values.append(float(count))
+            values.append(count)
 
         return TrendData(dates=dates, values=values, metric_name=metric)
 
@@ -496,13 +496,13 @@ class DeveloperAnalytics:
             logger.warning("Phase 6 persistence not available, event not saved")
             return False
 
-        row_id = persistence.record_analytics_event(
+        return persistence.record_analytics_event(
             plugin_id=event.plugin_id,
             event_type=event.event_type.value,
             user_id=event.user_id,
             metadata=event.metadata,
+            version=event.version,
         )
-        return row_id > 0
 
     def save_metrics_to_db(self, plugin_id: str) -> bool:
         """
@@ -527,17 +527,16 @@ class DeveloperAnalytics:
             logger.warning("Phase 6 persistence not available, metrics not saved")
             return False
 
-        persistence.update_plugin_metrics(
+        return persistence.update_plugin_metrics(
             plugin_id=plugin_id,
             total_installs=metrics.total_installs,
+            total_uninstalls=metrics.total_uninstalls,
             active_installs=metrics.active_installs,
-            total_views=metrics.total_views,
-            total_uses=metrics.total_uses,
-            total_errors=metrics.total_errors,
+            monthly_active_users=metrics.monthly_active_users,
             avg_rating=metrics.avg_rating,
             rating_count=metrics.rating_count,
+            error_rate=metrics.error_rate,
         )
-        return True
 
     def load_metrics_from_db(self, plugin_id: str) -> bool:
         """
@@ -564,12 +563,12 @@ class DeveloperAnalytics:
         self._metrics[plugin_id] = PluginMetrics(
             plugin_id=pm.plugin_id,
             total_installs=pm.total_installs,
+            total_uninstalls=pm.total_uninstalls,
             active_installs=pm.active_installs,
-            total_views=pm.total_views,
-            total_uses=pm.total_uses,
-            total_errors=pm.total_errors,
+            monthly_active_users=pm.monthly_active_users,
             avg_rating=pm.avg_rating,
             rating_count=pm.rating_count,
+            error_rate=pm.error_rate,
             last_updated=pm.last_updated,
         )
 
@@ -616,11 +615,13 @@ class DeveloperAnalytics:
 
             events.append(
                 AnalyticsEvent(
+                    event_id=pe.event_id,
                     plugin_id=pe.plugin_id,
                     event_type=et,
                     timestamp=pe.timestamp,
                     user_id=pe.user_id,
                     metadata=pe.metadata,
+                    version=pe.version,
                 )
             )
 

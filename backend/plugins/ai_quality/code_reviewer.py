@@ -542,7 +542,7 @@ Format as JSON:
                 start = response.find("{")
                 end = response.rfind("}") + 1
                 if start >= 0 and end > start:
-                    return dict(json.loads(response[start:end]))
+                    return json.loads(response[start:end])
             except json.JSONDecodeError as e:
                 # GAP-PY-001: AI response wasn't valid JSON, fallback to raw
                 logger.debug(f"Failed to parse AI response as JSON: {e}")

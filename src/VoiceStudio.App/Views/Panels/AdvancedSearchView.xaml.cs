@@ -1,12 +1,10 @@
-using System;
-using System.Collections.Generic;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VoiceStudio.App.Controls;
-using VoiceStudio.App.Logging;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Services;
+
 namespace VoiceStudio.App.Views.Panels
 {
   /// <summary>
@@ -54,7 +52,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "AdvancedSearchView.xaml");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -83,7 +81,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Unhandled error in event handler: {ex.Message}", "AdvancedSearchView.xaml");
+        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
       }
     }
 
@@ -111,35 +109,27 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    private async void NavigateToResult(SearchResult result)
+    private void NavigateToResult(SearchResult result)
     {
-      try
+      // Navigate based on result type
+      var mainWindow = Microsoft.UI.Xaml.Application.Current as App;
+      if (mainWindow != null)
       {
-        var navigationService = ServiceProvider.TryGetNavigationService();
-        if (navigationService == null)
-        {
-          return;
-        }
-
+        // Switch to appropriate panel based on result type
         var type = result.Type.ToLower();
-        var parameters = new Dictionary<string, object> { ["selectedId"] = result.Id };
-
-        var panelId = type switch
+        if (type == "profile")
         {
-          "profile" => "Profiles",
-          "audio" => "Library",
-          "project" => "Library",
-          "engine" => "Settings",
-          "voice" => "Profiles",
-          "clip" => "Timeline",
-          _ => "Library",
-        };
-
-        await navigationService.NavigateToPanelAsync(panelId, parameters);
-      }
-      catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Navigation failed: {ex.Message}", "AdvancedSearchView");
+          // Navigate to Profiles panel and select the profile
+          // This would be handled by MainWindow panel switching logic
+        }
+        else if (type == "audio")
+        {
+          // Navigate to Timeline or Analyzer panel
+        }
+        else if (type == "project")
+        {
+          // Navigate to project view
+        }
       }
     }
 

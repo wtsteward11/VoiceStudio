@@ -15,12 +15,10 @@ namespace VoiceStudio.App.ViewModels
 {
   /// <summary>
   /// ViewModel for Plugin Management Panel.
-  /// Phase 1: Refactored to use PluginBridgeService for synchronized state.
   /// </summary>
   public partial class PluginManagementViewModel : BaseViewModel, IPanelView
   {
     private readonly PluginManager? _pluginManager;
-    private readonly PluginBridgeService? _pluginBridge;
 
     public string PanelId => "pluginmanagement";
     public string DisplayName => ResourceHelper.GetString("Panel.PluginManagement.DisplayName", "Plugin Management");
@@ -50,75 +48,30 @@ namespace VoiceStudio.App.ViewModels
       try
       {
         _pluginManager = AppServices.GetPluginManager();
-        _pluginBridge = AppServices.TryGetPluginBridgeService();
-        
-        // Subscribe to bridge events for real-time updates
-        if (_pluginBridge != null)
-        {
-          _pluginBridge.PluginStateChanged += OnPluginStateChanged;
-          _pluginBridge.SyncError += OnSyncError;
-        }
       }
       catch
       {
         _pluginManager = null;
-        _pluginBridge = null;
       }
 
       LoadPluginsCommand = new AsyncRelayCommand(async (ct) => await LoadPluginsAsync(ct));
       RefreshPluginsCommand = new AsyncRelayCommand(async (ct) => await RefreshPluginsAsync(ct));
-      EnablePluginCommand = new AsyncRelayCommand<PluginInfo>(EnablePluginAsync, CanModifyPlugin);
-      DisablePluginCommand = new AsyncRelayCommand<PluginInfo>(DisablePluginAsync, CanModifyPlugin);
-      ReloadPluginCommand = new AsyncRelayCommand<PluginInfo>(ReloadPluginAsync, CanModifyPlugin);
+      EnablePluginCommand = new RelayCommand<PluginInfo>(EnablePlugin, CanModifyPlugin);
+      DisablePluginCommand = new RelayCommand<PluginInfo>(DisablePlugin, CanModifyPlugin);
+      ReloadPluginCommand = new RelayCommand<PluginInfo>(ReloadPlugin, CanModifyPlugin);
 
       _ = LoadPluginsAsync(CancellationToken.None);
-    }
-    
-    private void OnPluginStateChanged(object? sender, PluginStateChangedEventArgs e)
-    {
-      // Update UI on state change from WebSocket (or synchronously in test context)
-      TryDispatch(() =>
-      {
-        if (e.WasRemoved)
-        {
-          var toRemove = Plugins.FirstOrDefault(p => p.Name == e.PluginId);
-          if (toRemove != null)
-          {
-            Plugins.Remove(toRemove);
-            ApplyFilters();
-          }
-        }
-        else if (e.NewState != null)
-        {
-          var existing = Plugins.FirstOrDefault(p => p.Name == e.PluginId);
-          if (existing != null)
-          {
-            existing.IsEnabled = e.NewState.State == PluginState.Active;
-            existing.Status = e.NewState.StatusDescription;
-            existing.ErrorMessage = e.NewState.ErrorMessage;
-            ApplyFilters();
-          }
-        }
-      });
-    }
-    
-    private void OnSyncError(object? sender, PluginSyncErrorEventArgs e)
-    {
-      TryDispatch(() =>
-      {
-        ErrorMessage = e.Error;
-      });
     }
 
     public IAsyncRelayCommand LoadPluginsCommand { get; }
     public IAsyncRelayCommand RefreshPluginsCommand { get; }
-    public IAsyncRelayCommand<PluginInfo> EnablePluginCommand { get; }
-    public IAsyncRelayCommand<PluginInfo> DisablePluginCommand { get; }
-    public IAsyncRelayCommand<PluginInfo> ReloadPluginCommand { get; }
+    public IRelayCommand<PluginInfo> EnablePluginCommand { get; }
+    public IRelayCommand<PluginInfo> DisablePluginCommand { get; }
+    public IRelayCommand<PluginInfo> ReloadPluginCommand { get; }
 
     private async Task LoadPluginsAsync(CancellationToken cancellationToken)
     {
-      if (_pluginManager == null && _pluginBridge == null)
+      if (_pluginManager == null)
       {
         ErrorMessage = ResourceHelper.GetString("PluginManagement.PluginManagerNotAvailable", "Plugin Manager is not available");
         return;
@@ -130,21 +83,13 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        // Use bridge service if available for synchronized state
-        if (_pluginBridge != null)
-        {
-          // Request full sync from backend to populate state
-          await _pluginBridge.RequestFullSyncAsync(cancellationToken);
-          cancellationToken.ThrowIfCancellationRequested();
-          UpdatePluginListFromSyncState();
-        }
-        else if (_pluginManager != null)
-        {
-          // Fallback to direct plugin manager
-          await _pluginManager.LoadPluginsAsync();
-          cancellationToken.ThrowIfCancellationRequested();
-          UpdatePluginListFromManager();
-        }
+        // Check if PluginManager.LoadPluginsAsync accepts CancellationToken
+        // Since SettingsViewModel uses it with cancellationToken, we'll try to pass it
+        // If it doesn't compile, we'll need to update PluginManager first
+        await _pluginManager.LoadPluginsAsync();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        UpdatePluginList();
 
         StatusMessage = ResourceHelper.FormatString("PluginManagement.PluginsLoaded", Plugins.Count);
       }
@@ -165,49 +110,11 @@ namespace VoiceStudio.App.ViewModels
 
     private async Task RefreshPluginsAsync(CancellationToken cancellationToken)
     {
-      if (_pluginBridge != null)
-      {
-        await _pluginBridge.RequestFullSyncAsync(cancellationToken);
-      }
       await LoadPluginsAsync(cancellationToken);
       StatusMessage = ResourceHelper.GetString("PluginManagement.PluginsRefreshed", "Plugins refreshed");
     }
 
-    /// <summary>
-    /// Updates the plugin list from the bridge service's synchronized state.
-    /// </summary>
-    private void UpdatePluginListFromSyncState()
-    {
-      if (_pluginBridge == null)
-        return;
-
-      Plugins.Clear();
-      foreach (var kvp in _pluginBridge.GetAllPluginStatuses())
-      {
-        var syncState = kvp.Value;
-        Plugins.Add(new PluginInfo
-        {
-          Name = syncState.PluginId,
-          Version = syncState.Version,
-          Author = string.Empty, // Not available in sync state
-          Description = string.Empty, // Not available in sync state
-          IsEnabled = syncState.State == PluginState.Active,
-          IsInitialized = syncState.BackendLoaded || syncState.FrontendLoaded,
-          Status = syncState.StatusDescription,
-          ErrorMessage = syncState.ErrorMessage,
-          IsSynchronized = true, // Considered synchronized if from bridge service
-          BackendLoaded = syncState.BackendLoaded,
-          FrontendLoaded = syncState.FrontendLoaded
-        });
-      }
-
-      ApplyFilters();
-    }
-
-    /// <summary>
-    /// Fallback: updates plugin list from local PluginManager only.
-    /// </summary>
-    private void UpdatePluginListFromManager()
+    private void UpdatePluginList()
     {
       if (_pluginManager == null)
         return;
@@ -232,23 +139,13 @@ namespace VoiceStudio.App.ViewModels
       ApplyFilters();
     }
 
-    private async Task EnablePluginAsync(PluginInfo? plugin)
+    private void EnablePlugin(PluginInfo? plugin)
     {
       if (plugin == null)
         return;
 
       try
       {
-        if (_pluginBridge != null)
-        {
-          var result = await _pluginBridge.EnablePluginAsync(plugin.Name);
-          if (!result.Success)
-          {
-            ErrorMessage = result.Message ?? "Failed to enable plugin";
-            return;
-          }
-        }
-        
         plugin.IsEnabled = true;
         StatusMessage = ResourceHelper.FormatString("PluginManagement.PluginEnabled", plugin.Name);
         ApplyFilters();
@@ -259,23 +156,13 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task DisablePluginAsync(PluginInfo? plugin)
+    private void DisablePlugin(PluginInfo? plugin)
     {
       if (plugin == null)
         return;
 
       try
       {
-        if (_pluginBridge != null)
-        {
-          var result = await _pluginBridge.DisablePluginAsync(plugin.Name);
-          if (!result.Success)
-          {
-            ErrorMessage = result.Message ?? "Failed to disable plugin";
-            return;
-          }
-        }
-        
         plugin.IsEnabled = false;
         StatusMessage = ResourceHelper.FormatString("PluginManagement.PluginDisabled", plugin.Name);
         ApplyFilters();
@@ -286,7 +173,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task ReloadPluginAsync(PluginInfo? plugin)
+    private void ReloadPlugin(PluginInfo? plugin)
     {
       if (plugin == null)
         return;
@@ -294,18 +181,7 @@ namespace VoiceStudio.App.ViewModels
       try
       {
         StatusMessage = ResourceHelper.FormatString("PluginManagement.ReloadingPlugin", plugin.Name);
-        
-        if (_pluginBridge != null)
-        {
-          var result = await _pluginBridge.ReloadPluginAsync(plugin.Name);
-          if (!result.Success)
-          {
-            ErrorMessage = result.Message ?? "Failed to reload plugin";
-            return;
-          }
-        }
-        
-        await RefreshPluginsAsync(CancellationToken.None);
+        _ = RefreshPluginsAsync(CancellationToken.None);
       }
       catch (Exception ex)
       {
@@ -375,7 +251,6 @@ namespace VoiceStudio.App.ViewModels
 
   /// <summary>
   /// Plugin information model for UI binding.
-  /// Phase 1: Extended with synchronization state properties.
   /// </summary>
   public class PluginInfo : ObservableObject
   {
@@ -387,10 +262,5 @@ namespace VoiceStudio.App.ViewModels
     public bool IsInitialized { get; set; }
     public string Status { get; set; } = ResourceHelper.GetString("PluginManagement.PluginStatusUnknown", "Unknown");
     public string? ErrorMessage { get; set; }
-    
-    // Phase 1: Synchronization state properties
-    public bool IsSynchronized { get; set; } = true;
-    public bool BackendLoaded { get; set; }
-    public bool FrontendLoaded { get; set; }
   }
 }

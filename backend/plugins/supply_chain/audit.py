@@ -247,252 +247,6 @@ CREATE TABLE IF NOT EXISTS schema_version (
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 """
 
-# Allowed columns for ORDER BY (whitelist to prevent SQL injection)
-_ALLOWED_ORDER_COLUMNS = frozenset(
-    {
-        "event_id",
-        "event_type",
-        "category",
-        "severity",
-        "plugin_id",
-        "plugin_version",
-        "actor",
-        "timestamp",
-        "details",
-        "metadata",
-        "created_at",
-    }
-)
-
-# Pre-built full condition strings for IN filters (1-20 items) to avoid string concatenation.
-# Max 20 items per IN filter; larger lists are truncated. Index 0 = 1 item, index 19 = 20 items.
-_EVENT_TYPE_IN = (
-    "event_type IN (?)",
-    "event_type IN (?,?)",
-    "event_type IN (?,?,?)",
-    "event_type IN (?,?,?,?)",
-    "event_type IN (?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-    "event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-)
-_SEVERITY_IN = tuple(s.replace("event_type", "severity") for s in _EVENT_TYPE_IN)
-_CATEGORY_IN = tuple(s.replace("event_type", "category") for s in _EVENT_TYPE_IN)
-
-# Pre-built query strings - each is a single literal (no + concatenation) to satisfy Bandit B608
-_QUERY_EVENTS_SQL = {
-    ("event_id", "DESC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY event_id DESC LIMIT ? OFFSET ?"
-    ),
-    ("event_id", "ASC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY event_id ASC LIMIT ? OFFSET ?"
-    ),
-    ("event_type", "DESC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY event_type DESC LIMIT ? OFFSET ?"
-    ),
-    ("event_type", "ASC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY event_type ASC LIMIT ? OFFSET ?"
-    ),
-    ("category", "DESC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY category DESC LIMIT ? OFFSET ?"
-    ),
-    ("category", "ASC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY category ASC LIMIT ? OFFSET ?"
-    ),
-    ("severity", "DESC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY severity DESC LIMIT ? OFFSET ?"
-    ),
-    ("severity", "ASC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY severity ASC LIMIT ? OFFSET ?"
-    ),
-    ("plugin_id", "DESC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY plugin_id DESC LIMIT ? OFFSET ?"
-    ),
-    ("plugin_id", "ASC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY plugin_id ASC LIMIT ? OFFSET ?"
-    ),
-    ("plugin_version", "DESC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY plugin_version DESC LIMIT ? OFFSET ?"
-    ),
-    ("plugin_version", "ASC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY plugin_version ASC LIMIT ? OFFSET ?"
-    ),
-    ("actor", "DESC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY actor DESC LIMIT ? OFFSET ?"
-    ),
-    ("actor", "ASC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY actor ASC LIMIT ? OFFSET ?"
-    ),
-    ("timestamp", "DESC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY timestamp DESC LIMIT ? OFFSET ?"
-    ),
-    ("timestamp", "ASC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY timestamp ASC LIMIT ? OFFSET ?"
-    ),
-    ("details", "DESC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY details DESC LIMIT ? OFFSET ?"
-    ),
-    ("details", "ASC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY details ASC LIMIT ? OFFSET ?"
-    ),
-    ("metadata", "DESC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY metadata DESC LIMIT ? OFFSET ?"
-    ),
-    ("metadata", "ASC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY metadata ASC LIMIT ? OFFSET ?"
-    ),
-    ("created_at", "DESC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY created_at DESC LIMIT ? OFFSET ?"
-    ),
-    ("created_at", "ASC"): (
-        "SELECT * FROM audit_events WHERE "
-        "(? IS NULL OR plugin_id = ?) AND "
-        "(? IS NULL OR event_type IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR severity IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR category IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)) AND "
-        "(? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) AND (? IS NULL OR actor = ?) "
-        "ORDER BY created_at ASC LIMIT ? OFFSET ?"
-    ),
-}
-
 
 # =============================================================================
 # Audit Logger
@@ -715,37 +469,51 @@ class AuditLogger:
             return None
 
     def query_events(self, query: AuditQuery) -> List[AuditEvent]:
-        """Query events with flexible filtering. Uses fixed SQL with (? IS NULL OR ...) for all filters."""
-        order_col = query.order_by if query.order_by in _ALLOWED_ORDER_COLUMNS else "timestamp"
+        """Query events with flexible filtering."""
+        conditions = []
+        params = []
+
+        if query.plugin_id:
+            conditions.append("plugin_id = ?")
+            params.append(query.plugin_id)
+
+        if query.event_types:
+            placeholders = ",".join("?" * len(query.event_types))
+            conditions.append(f"event_type IN ({placeholders})")
+            params.extend(et.value for et in query.event_types)
+
+        if query.severities:
+            placeholders = ",".join("?" * len(query.severities))
+            conditions.append(f"severity IN ({placeholders})")
+            params.extend(s.value for s in query.severities)
+
+        if query.categories:
+            placeholders = ",".join("?" * len(query.categories))
+            conditions.append(f"category IN ({placeholders})")
+            params.extend(c.value for c in query.categories)
+
+        if query.start_time:
+            conditions.append("timestamp >= ?")
+            params.append(query.start_time)
+
+        if query.end_time:
+            conditions.append("timestamp <= ?")
+            params.append(query.end_time)
+
+        if query.actor:
+            conditions.append("actor = ?")
+            params.append(query.actor)
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
         order_dir = "DESC" if query.order_desc else "ASC"
-        sql = _QUERY_EVENTS_SQL.get(
-            (order_col, order_dir),
-            _QUERY_EVENTS_SQL[("timestamp", "DESC")],
-        )
 
-        # Build params: plugin_id (2), event_type sentinel + 20 slots (21), severity sentinel + 20 (21),
-        # category sentinel + 20 (21), start_time (2), end_time (2), actor (2), limit, offset
-        def _pad(vals: List[str], size: int) -> tuple:
-            if not vals:
-                return (None,) * (1 + size)  # sentinel + slots
-            n = min(len(vals), size)
-            pad_val = vals[0] if vals else None
-            return (1,) + tuple(vals[:n]) + (pad_val,) * (size - n)
-
-        et_vals = [et.value for et in query.event_types] if query.event_types else []
-        sev_vals = [s.value for s in query.severities] if query.severities else []
-        cat_vals = [c.value for c in query.categories] if query.categories else []
-
-        params = (
-            (query.plugin_id, query.plugin_id)
-            + _pad(et_vals, 20)
-            + _pad(sev_vals, 20)
-            + _pad(cat_vals, 20)
-            + (query.start_time, query.start_time)
-            + (query.end_time, query.end_time)
-            + (query.actor, query.actor)
-            + (query.limit, query.offset)
-        )
+        sql = f"""
+            SELECT * FROM audit_events
+            WHERE {where_clause}
+            ORDER BY {query.order_by} {order_dir}
+            LIMIT ? OFFSET ?
+        """
+        params.extend([query.limit, query.offset])
 
         with self._get_connection() as conn:
             rows = conn.execute(sql, params).fetchall()
@@ -804,62 +572,75 @@ class AuditLogger:
         end_time: Optional[str] = None,
     ) -> AuditSummary:
         """Get summary statistics for audit events."""
-        # Fixed SQL with optional filters via (? IS NULL OR col = ?) - no string concatenation
-        summary = AuditSummary()
-        params = (plugin_id, plugin_id, start_time, start_time, end_time, end_time)
+        conditions = []
+        params = []
 
-        count_sql = (
-            "SELECT COUNT(*) as cnt FROM audit_events WHERE "
-            "(? IS NULL OR plugin_id = ?) AND (? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?)"
-        )
-        type_sql = (
-            "SELECT event_type, COUNT(*) as cnt FROM audit_events WHERE "
-            "(? IS NULL OR plugin_id = ?) AND (? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) "
-            "GROUP BY event_type"
-        )
-        severity_sql = (
-            "SELECT severity, COUNT(*) as cnt FROM audit_events WHERE "
-            "(? IS NULL OR plugin_id = ?) AND (? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) "
-            "GROUP BY severity"
-        )
-        category_sql = (
-            "SELECT category, COUNT(*) as cnt FROM audit_events WHERE "
-            "(? IS NULL OR plugin_id = ?) AND (? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) "
-            "GROUP BY category"
-        )
-        plugin_sql = (
-            "SELECT plugin_id, COUNT(*) as cnt FROM audit_events WHERE "
-            "(? IS NULL OR plugin_id = ?) AND (? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?) "
-            "GROUP BY plugin_id ORDER BY cnt DESC LIMIT 20"
-        )
-        minmax_sql = (
-            "SELECT MIN(timestamp) as first_ts, MAX(timestamp) as last_ts FROM audit_events WHERE "
-            "(? IS NULL OR plugin_id = ?) AND (? IS NULL OR timestamp >= ?) AND (? IS NULL OR timestamp <= ?)"
-        )
+        if plugin_id:
+            conditions.append("plugin_id = ?")
+            params.append(plugin_id)
+        if start_time:
+            conditions.append("timestamp >= ?")
+            params.append(start_time)
+        if end_time:
+            conditions.append("timestamp <= ?")
+            params.append(end_time)
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+        summary = AuditSummary()
 
         with self._get_connection() as conn:
             # Total count
-            row = conn.execute(count_sql, params).fetchone()
+            row = conn.execute(
+                f"SELECT COUNT(*) as cnt FROM audit_events WHERE {where_clause}",
+                params,
+            ).fetchone()
             summary.total_events = row["cnt"]
 
             # By type
-            rows = conn.execute(type_sql, params).fetchall()
+            rows = conn.execute(
+                f"""SELECT event_type, COUNT(*) as cnt
+                    FROM audit_events WHERE {where_clause}
+                    GROUP BY event_type""",
+                params,
+            ).fetchall()
             summary.by_type = {row["event_type"]: row["cnt"] for row in rows}
 
             # By severity
-            rows = conn.execute(severity_sql, params).fetchall()
+            rows = conn.execute(
+                f"""SELECT severity, COUNT(*) as cnt
+                    FROM audit_events WHERE {where_clause}
+                    GROUP BY severity""",
+                params,
+            ).fetchall()
             summary.by_severity = {row["severity"]: row["cnt"] for row in rows}
 
             # By category
-            rows = conn.execute(category_sql, params).fetchall()
+            rows = conn.execute(
+                f"""SELECT category, COUNT(*) as cnt
+                    FROM audit_events WHERE {where_clause}
+                    GROUP BY category""",
+                params,
+            ).fetchall()
             summary.by_category = {row["category"]: row["cnt"] for row in rows}
 
             # By plugin
-            rows = conn.execute(plugin_sql, params).fetchall()
+            rows = conn.execute(
+                f"""SELECT plugin_id, COUNT(*) as cnt
+                    FROM audit_events WHERE {where_clause}
+                    GROUP BY plugin_id
+                    ORDER BY cnt DESC
+                    LIMIT 20""",
+                params,
+            ).fetchall()
             summary.by_plugin = {row["plugin_id"]: row["cnt"] for row in rows}
 
             # First and last events
-            row = conn.execute(minmax_sql, params).fetchone()
+            row = conn.execute(
+                f"""SELECT MIN(timestamp) as first_ts, MAX(timestamp) as last_ts
+                    FROM audit_events WHERE {where_clause}""",
+                params,
+            ).fetchone()
             summary.first_event = row["first_ts"]
             summary.last_event = row["last_ts"]
 
@@ -871,17 +652,24 @@ class AuditLogger:
         event_type: Optional[AuditEventType] = None,
     ) -> int:
         """Count events matching criteria."""
-        # Fixed SQL with optional filters via (? IS NULL OR col = ?) - no string concatenation
-        event_val = event_type.value if event_type else None
-        params = (plugin_id, plugin_id, event_val, event_val)
-        sql = (
-            "SELECT COUNT(*) as cnt FROM audit_events WHERE "
-            "(? IS NULL OR plugin_id = ?) AND (? IS NULL OR event_type = ?)"
-        )
+        conditions = []
+        params = []
+
+        if plugin_id:
+            conditions.append("plugin_id = ?")
+            params.append(plugin_id)
+        if event_type:
+            conditions.append("event_type = ?")
+            params.append(event_type.value)
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
 
         with self._get_connection() as conn:
-            row = conn.execute(sql, params).fetchone()
-            return int(row["cnt"])
+            row = conn.execute(
+                f"SELECT COUNT(*) as cnt FROM audit_events WHERE {where_clause}",
+                params,
+            ).fetchone()
+            return row["cnt"]
 
     def delete_old_events(
         self,
@@ -889,12 +677,20 @@ class AuditLogger:
         plugin_id: Optional[str] = None,
     ) -> int:
         """Delete events older than a given timestamp."""
-        # Fixed SQL with optional plugin filter via (? IS NULL OR plugin_id = ?) - no string concatenation
-        params = (older_than, plugin_id, plugin_id)
-        sql = "DELETE FROM audit_events WHERE timestamp < ? AND (? IS NULL OR plugin_id = ?)"
+        conditions = ["timestamp < ?"]
+        params = [older_than]
+
+        if plugin_id:
+            conditions.append("plugin_id = ?")
+            params.append(plugin_id)
+
+        where_clause = " AND ".join(conditions)
 
         with self._get_connection() as conn:
-            cursor = conn.execute(sql, params)
+            cursor = conn.execute(
+                f"DELETE FROM audit_events WHERE {where_clause}",
+                params,
+            )
             conn.commit()
             return cursor.rowcount
 
@@ -1032,7 +828,7 @@ def log_installation(
     signature_verified: Optional[bool] = None,
 ) -> AuditEvent:
     """Log a plugin installation event."""
-    details: dict[str, Any] = {"source": source}
+    details = {"source": source}
     if signature_verified is not None:
         details["signature_verified"] = signature_verified
 

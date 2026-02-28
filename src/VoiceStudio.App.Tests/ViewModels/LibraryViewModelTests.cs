@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.UI.Dispatching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using VoiceStudio.App.Tests.Fixtures;
@@ -9,23 +11,26 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class LibraryViewModelTests
     {
-        private MockViewModelContext _mockContext = null!;
+        private IViewModelContext _context = null!;
         private Mock<IBackendClient> _mockBackendClient = null!;
+        private DispatcherQueueController? _dispatcherController;
         private LibraryViewModel _viewModel = null!;
 
         [TestInitialize]
         public void Setup()
         {
             TestAppServicesHelper.EnsureInitialized();
-            _mockContext = new MockViewModelContext();
+            _dispatcherController = DispatcherQueueController.CreateOnDedicatedThread();
+            var dispatcher = _dispatcherController.DispatcherQueue;
+            _context = new ViewModelContext(NullLogger.Instance, dispatcher);
             _mockBackendClient = new Mock<IBackendClient>();
-            _viewModel = new LibraryViewModel(_mockContext, _mockBackendClient.Object);
+            _viewModel = new LibraryViewModel(_context, _mockBackendClient.Object);
         }
 
         [TestCleanup]
         public void Cleanup()
         {
-            // No dispatcher cleanup needed with MockViewModelContext
+            _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
         }
 
         [TestMethod]

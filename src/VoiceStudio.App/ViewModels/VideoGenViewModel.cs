@@ -57,12 +57,6 @@ namespace VoiceStudio.App.ViewModels
     private string _enhancementMethod = "None";
     private double _enhancementStrength = 50.0;
 
-    // Temporal Consistency (IDEA 67)
-    private bool _isCheckingTemporalConsistency;
-    private bool _hasTemporalConsistencyResult;
-    private double _temporalConsistencyScore;
-    private string? _temporalConsistencyReport;
-
     public VideoGenViewModel(IViewModelContext context, IBackendClient backendClient)
         : base(context)
     {
@@ -96,13 +90,6 @@ namespace VoiceStudio.App.ViewModels
         await UpscaleVideoAsync(ct);
       }, () => SelectedVideo != null && !IsLoading);
       AutoOptimizeQualityCommand = new RelayCommand(AutoOptimizeQuality, () => !IsLoading);
-
-      // Temporal Consistency command (IDEA 67)
-      CheckTemporalConsistencyCommand = new EnhancedAsyncRelayCommand(async (ct) =>
-      {
-        using var profiler = PerformanceProfiler.StartCommand("CheckTemporalConsistency");
-        await CheckTemporalConsistencyAsync(ct);
-      }, () => SelectedVideo != null && !IsLoading && !IsCheckingTemporalConsistency);
 
       LoadQualityPresets();
 
@@ -310,46 +297,11 @@ namespace VoiceStudio.App.ViewModels
       set => SetProperty(ref _enhancementStrength, value);
     }
 
-    // Temporal Consistency properties (IDEA 67)
-    public bool IsCheckingTemporalConsistency
-    {
-      get => _isCheckingTemporalConsistency;
-      private set
-      {
-        if (SetProperty(ref _isCheckingTemporalConsistency, value))
-        {
-          if (CheckTemporalConsistencyCommand is EnhancedAsyncRelayCommand cmd)
-            cmd.NotifyCanExecuteChanged();
-        }
-      }
-    }
-
-    public bool HasTemporalConsistencyResult
-    {
-      get => _hasTemporalConsistencyResult;
-      private set => SetProperty(ref _hasTemporalConsistencyResult, value);
-    }
-
-    public double TemporalConsistencyScore
-    {
-      get => _temporalConsistencyScore;
-      private set => SetProperty(ref _temporalConsistencyScore, value);
-    }
-
-    public string? TemporalConsistencyReport
-    {
-      get => _temporalConsistencyReport;
-      private set => SetProperty(ref _temporalConsistencyReport, value);
-    }
-
     public ICommand GenerateCommand { get; }
     public ICommand SelectImageCommand { get; }
     public ICommand SelectAudioCommand { get; }
     public ICommand UpscaleCommand { get; }
     public ICommand AutoOptimizeQualityCommand { get; }
-
-    // Temporal Consistency command (IDEA 67)
-    public ICommand CheckTemporalConsistencyCommand { get; }
 
     public ObservableCollection<VideoQualityPreset> QualityPresets { get; }
 
@@ -398,10 +350,6 @@ namespace VoiceStudio.App.ViewModels
       if (AutoOptimizeQualityCommand is RelayCommand autoOptimize)
       {
         autoOptimize.NotifyCanExecuteChanged();
-      }
-      if (CheckTemporalConsistencyCommand is EnhancedAsyncRelayCommand checkTemporal)
-      {
-        checkTemporal.NotifyCanExecuteChanged();
       }
     }
 
@@ -808,72 +756,6 @@ namespace VoiceStudio.App.ViewModels
       {
         IsLoading = false;
       }
-    }
-
-    // Temporal Consistency method (IDEA 67)
-    private async Task CheckTemporalConsistencyAsync(CancellationToken cancellationToken)
-    {
-      if (SelectedVideo == null)
-        return;
-
-      IsCheckingTemporalConsistency = true;
-      IsLoading = true;
-      ErrorMessage = null;
-      HasTemporalConsistencyResult = false;
-      StatusMessage = ResourceHelper.GetString("VideoGen.CheckingTemporalConsistency", "Checking temporal consistency...");
-
-      try
-      {
-        var request = new TemporalConsistencyRequest
-        {
-          VideoId = SelectedVideo.VideoId
-        };
-
-        var response = await _backendClient.PostAsync<TemporalConsistencyRequest, TemporalConsistencyResponse>(
-            "/api/video/temporal-consistency", request, cancellationToken);
-
-        HasTemporalConsistencyResult = response != null;
-
-        if (response != null)
-        {
-          TemporalConsistencyScore = response.ConsistencyScore;
-          TemporalConsistencyReport = response.Report;
-
-          StatusMessage = $"Temporal consistency: {response.ConsistencyScore:P0}";
-          _toastNotificationService?.ShowSuccess(
-              ResourceHelper.GetString("VideoGen.TemporalConsistencyComplete", "Temporal Consistency Check Complete"),
-              $"Score: {response.ConsistencyScore:P0}");
-        }
-      }
-      catch (OperationCanceledException)
-      {
-        return;
-      }
-      catch (Exception ex)
-      {
-        ErrorMessage = ErrorHandler.GetUserFriendlyMessage(ex);
-        await HandleErrorAsync(ex, "CheckTemporalConsistency");
-        _toastNotificationService?.ShowError(
-            ResourceHelper.FormatString("VideoGen.TemporalConsistencyFailed", ErrorHandler.GetUserFriendlyMessage(ex)),
-            ResourceHelper.GetString("Toast.Title.TemporalConsistencyFailed", "Temporal Consistency Failed"));
-      }
-      finally
-      {
-        IsCheckingTemporalConsistency = false;
-        IsLoading = false;
-      }
-    }
-
-    // Temporal Consistency models (IDEA 67)
-    private class TemporalConsistencyRequest
-    {
-      public string VideoId { get; set; } = string.Empty;
-    }
-
-    private class TemporalConsistencyResponse
-    {
-      public double ConsistencyScore { get; set; }
-      public string? Report { get; set; }
     }
   }
 

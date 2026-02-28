@@ -1,7 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
-using VoiceStudio.App.Logging;
 using System.Threading;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
@@ -142,7 +141,8 @@ namespace VoiceStudio.App.Views.Panels
         {
             ResultCountText.Text = $"{_viewModel.TotalPlugins} plugins";
             PageText.Text = $"Page {_viewModel.CurrentPage} of {_viewModel.TotalPages}";
-            // GAP-B18: IsEnabled is now controlled by Command.CanExecute via binding
+            PrevPageButton.IsEnabled = _viewModel.HasPreviousPage;
+            NextPageButton.IsEnabled = _viewModel.HasNextPage;
         }
 
         private void UpdateEmptyState()
@@ -196,8 +196,15 @@ namespace VoiceStudio.App.Views.Panels
             _viewModel.ShowUpdatesOnly = UpdatesOnlyCheck.IsChecked ?? false;
         }
 
-        // GAP-B18: RefreshButton_Click - Removed, now using Command binding in XAML
-        // GAP-B18: CheckUpdatesButton_Click - Removed, now using Command binding in XAML
+        private async void RefreshButton_Click(object sender, RoutedEventArgs e)
+        {
+            await _viewModel.RefreshCommand.ExecuteAsync(null);
+        }
+
+        private async void CheckUpdatesButton_Click(object sender, RoutedEventArgs e)
+        {
+            await _viewModel.CheckForUpdatesCommand.ExecuteAsync(null);
+        }
 
         private void FeaturedGridView_ItemClick(object sender, ItemClickEventArgs e)
         {
@@ -221,11 +228,18 @@ namespace VoiceStudio.App.Views.Panels
             
             // Navigate to detail view
             // This would typically use a navigation service
-            ErrorLogger.LogDebug($"[PluginGallery] Navigate to details: {plugin.Name}", "PluginGalleryView.xaml");
+            System.Diagnostics.Debug.WriteLine($"[PluginGallery] Navigate to details: {plugin.Name}");
         }
 
-        // GAP-B18: PrevPageButton_Click - Removed, now using Command binding in XAML
-        // GAP-B18: NextPageButton_Click - Removed, now using Command binding in XAML
+        private async void PrevPageButton_Click(object sender, RoutedEventArgs e)
+        {
+            await _viewModel.PreviousPageCommand.ExecuteAsync(null);
+        }
+
+        private async void NextPageButton_Click(object sender, RoutedEventArgs e)
+        {
+            await _viewModel.NextPageCommand.ExecuteAsync(null);
+        }
 
         private void ClearFilters_Click(object sender, RoutedEventArgs e)
         {
@@ -237,8 +251,14 @@ namespace VoiceStudio.App.Views.Panels
             UpdatesOnlyCheck.IsChecked = false;
         }
 
-        // GAP-B18: CancelInstall_Click - Removed, now using Command binding in XAML
-        // The overlay visibility is controlled via ViewModel.IsInstalling property change
+        private void CancelInstall_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is PluginGalleryViewModel viewModel)
+            {
+                viewModel.CancelInstallCommand.Execute(null);
+            }
+            InstallProgressOverlay.Visibility = Visibility.Collapsed;
+        }
 
         #endregion
     }

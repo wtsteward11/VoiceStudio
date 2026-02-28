@@ -183,22 +183,7 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private bool hasPipelineComparison;
 
-    // Multi-Pass Synthesis (IDEA 61)
-    [ObservableProperty]
-    private bool isMultiPassSynthesizing;
-
-    [ObservableProperty]
-    private int multiPassCount = 3;
-
-    [ObservableProperty]
-    private bool hasMultiPassResult;
-
-    [ObservableProperty]
-    private int multiPassPassesCompleted;
-
-    [ObservableProperty]
-    private double multiPassBestQualityScore;
-
+    // Synthesis parameters (Phase 1.5 - wire sliders to API)
     [ObservableProperty]
     private double speed = 1.0;
 
@@ -214,24 +199,6 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private double temperature = 0.35;
 
-    [ObservableProperty]
-    private ObservableCollection<string> availableLanguages = new() { "en", "es", "fr", "de", "it", "pt", "zh", "ja" };
-
-    [ObservableProperty]
-    private ObservableCollection<string> availableEmotions = new() { "neutral", "happy", "sad", "angry", "excited", "calm" };
-
-    public string SpeedDisplay => Speed.ToString("F2");
-    public string PitchDisplay => Pitch >= 0 ? $"+{(int)Pitch}" : $"{(int)Pitch}";
-    public string StabilityDisplay => Stability.ToString("F2");
-    public string ClarityDisplay => Clarity.ToString("F2");
-    public string TemperatureDisplay => Temperature.ToString("F2");
-
-    partial void OnSpeedChanged(double value) => OnPropertyChanged(nameof(SpeedDisplay));
-    partial void OnPitchChanged(double value) => OnPropertyChanged(nameof(PitchDisplay));
-    partial void OnStabilityChanged(double value) => OnPropertyChanged(nameof(StabilityDisplay));
-    partial void OnClarityChanged(double value) => OnPropertyChanged(nameof(ClarityDisplay));
-    partial void OnTemperatureChanged(double value) => OnPropertyChanged(nameof(TemperatureDisplay));
-
     public VoiceSynthesisViewModel(IBackendClient backendClient, IAudioPlayerService audioPlayer)
         : base(AppServices.GetViewModelContext())
     {
@@ -240,7 +207,7 @@ namespace VoiceStudio.App.Views.Panels
 
       // Get backend base URL - try to get from local settings, otherwise use default
       // This matches the default in ServiceProvider and BackendClientConfig
-      _backendBaseUrl = "http://localhost:8000";
+      _backendBaseUrl = "http://localhost:8001";
       try
       {
         // Use UnpackagedSettingsHelper for file-based settings (works for both packaged and unpackaged apps)
@@ -324,9 +291,8 @@ namespace VoiceStudio.App.Views.Panels
       StopAudioCommand = new RelayCommand(StopAudio, () => _audioPlayer.IsPlaying);
 
       // Add to Timeline command (Audit X-6: Synthesis -> Timeline)
-      // GAP-B04: Disabled when busy or no synthesis output
       AddToTimelineCommand = new RelayCommand(AddSynthesizedAudioToTimeline,
-          () => !string.IsNullOrEmpty(LastSynthesizedAudioId) && !IsLoading);
+          () => !string.IsNullOrEmpty(LastSynthesizedAudioId));
 
       // Streaming synthesis commands
       StartStreamingCommand = new EnhancedAsyncRelayCommand(async (ct) =>
@@ -383,13 +349,6 @@ namespace VoiceStudio.App.Views.Panels
         using var profiler = PerformanceProfiler.Start("Command: CheckEnsembleStatus", PerformanceBudgets.CommandExecutionMs);
         await CheckEnsembleStatusAsync(ct);
       }, () => !string.IsNullOrEmpty(EnsembleJobId) && !IsEnsembleProcessing);
-
-      // Multi-Pass Synthesis command (IDEA 61)
-      MultiPassSynthesizeCommand = new EnhancedAsyncRelayCommand(async (ct) =>
-      {
-        using var profiler = PerformanceProfiler.Start("Command: MultiPassSynthesize", PerformanceBudgets.CommandExecutionMs);
-        await MultiPassSynthesizeAsync(ct);
-      }, () => SelectedProfile != null && !string.IsNullOrWhiteSpace(Text) && !IsMultiPassSynthesizing && !IsLoading);
 
       // Load profiles on initialization
       var loadCt = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
@@ -451,9 +410,6 @@ namespace VoiceStudio.App.Views.Panels
     public EnhancedAsyncRelayCommand LoadPipelinesCommand { get; }
     public EnhancedAsyncRelayCommand PreviewPipelineCommand { get; }
     public EnhancedAsyncRelayCommand ComparePipelineCommand { get; }
-
-    // Multi-Pass Synthesis command (IDEA 61)
-    public EnhancedAsyncRelayCommand MultiPassSynthesizeCommand { get; }
 
     public bool CanSynthesize =>
         SelectedProfile != null &&
@@ -519,30 +475,10 @@ namespace VoiceStudio.App.Views.Panels
               ResourceHelper.GetString("VoiceSynthesis.ProfilesLoaded", "Profiles Loaded"),
               ResourceHelper.FormatString("VoiceSynthesis.ProfilesLoadedCount", Profiles.Count));
         }
-
-        try
-        {
-          var engines = await _backendClient.GetEnginesAsync(cancellationToken);
-          if (engines != null && engines.Count > 0)
-          {
-            AvailableEngines.Clear();
-            foreach (var engine in engines)
-            {
-              AvailableEngines.Add(engine);
-            }
-            if (!AvailableEngines.Contains(SelectedEngine))
-            {
-              SelectedEngine = AvailableEngines[0];
-            }
-          }
-        }
-        catch (Exception ex)
-        {
-          _errorLoggingService?.LogError(ex, "LoadEngines");
-        }
       }
       catch (OperationCanceledException)
       {
+        // User cancelled - expected
         return;
       }
       catch (Exception ex)
@@ -618,12 +554,7 @@ namespace VoiceStudio.App.Views.Panels
           Text = Text!,
           Language = Language,
           Emotion = Emotion,
-          EnhanceQuality = EnhanceQuality,
-          Speed = Speed,
-          Pitch = Pitch,
-          Stability = Stability,
-          Clarity = Clarity,
-          Temperature = Temperature
+          EnhanceQuality = EnhanceQuality
         };
 
         // Update progress estimate (synthesis starting)
@@ -866,7 +797,6 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnIsLoadingChanged(bool value)
     {
       SynthesizeCommand.NotifyCanExecuteChanged();
-      AddToTimelineCommand.NotifyCanExecuteChanged(); // GAP-B04
     }
 
     partial void OnSelectedEngineChanged(string value)
@@ -1236,10 +1166,13 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
+        // Get available engines (typically xtts, chatterbox, tortoise)
+        var availableEngines = new List<string> { "xtts", "chatterbox", "tortoise" };
+
         QualityRecommendation = await _backendClient.GetQualityRecommendationAsync(
             Text,
             Language,
-            AvailableEngines.ToList(),
+            availableEngines,
             null, // No target quality - auto-determine
             cancellationToken
         );
@@ -1681,85 +1614,6 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    // Multi-Pass Synthesis method (IDEA 61)
-    private async Task MultiPassSynthesizeAsync(CancellationToken cancellationToken)
-    {
-      if (SelectedProfile == null || string.IsNullOrWhiteSpace(Text))
-        return;
-
-      IsMultiPassSynthesizing = true;
-      IsLoading = true;
-      ErrorMessage = null;
-      HasError = false;
-      HasMultiPassResult = false;
-      MultiPassSynthesizeCommand.NotifyCanExecuteChanged();
-      StatusMessage = ResourceHelper.GetString("Status.MultiPassSynthesizing", "Running multi-pass synthesis...");
-
-      try
-      {
-        var request = new MultiPassSynthesisRequest
-        {
-          Text = Text,
-          ProfileId = SelectedProfile.Id,
-          Engine = SelectedEngine,
-          Passes = MultiPassCount,
-          Language = Language,
-          Emotion = Emotion,
-          EnhanceQuality = EnhanceQuality,
-          Speed = Speed,
-          Pitch = Pitch,
-          Stability = Stability,
-          Clarity = Clarity,
-          Temperature = Temperature
-        };
-
-        var response = await _backendClient.PostAsync<MultiPassSynthesisRequest, MultiPassSynthesisResponse>(
-            "/api/voice/synthesize/multipass", request, cancellationToken);
-
-        HasMultiPassResult = response != null;
-
-        if (response != null)
-        {
-          MultiPassPassesCompleted = response.PassesCompleted;
-          MultiPassBestQualityScore = response.BestQualityScore;
-          LastSynthesizedAudioId = response.BestAudioId;
-          LastSynthesizedAudioUrl = response.BestAudioUrl;
-          CanPlayAudio = !string.IsNullOrWhiteSpace(response.BestAudioUrl);
-          PlayAudioCommand.NotifyCanExecuteChanged();
-          AddToTimelineCommand.NotifyCanExecuteChanged();
-
-          StatusMessage = $"Multi-pass synthesis complete ({response.PassesCompleted} passes, best quality: {response.BestQualityScore:F2})";
-          _toastNotificationService?.ShowSuccess(
-              "Multi-Pass Complete",
-              $"{response.PassesCompleted} passes completed. Best MOS: {response.BestQualityScore:F2}");
-        }
-      }
-      catch (OperationCanceledException)
-      {
-        StatusMessage = "Multi-pass synthesis cancelled";
-        return;
-      }
-      catch (Exception ex)
-      {
-        _errorLoggingService?.LogError(ex, "MultiPassSynthesize", new Dictionary<string, object>
-        {
-          { "Engine", SelectedEngine },
-          { "ProfileId", SelectedProfile?.Id ?? "unknown" },
-          { "Passes", MultiPassCount }
-        });
-        ErrorMessage = $"Multi-pass synthesis failed: {ErrorHandler.GetUserFriendlyMessage(ex)}";
-        HasError = true;
-        StatusMessage = string.Empty;
-        _errorService?.ShowError(ex, "Multi-pass synthesis failed");
-      }
-      finally
-      {
-        IsMultiPassSynthesizing = false;
-        IsLoading = false;
-        MultiPassSynthesizeCommand.NotifyCanExecuteChanged();
-      }
-    }
-
     private async Task<Stream?> LoadAudioStreamAsync(string url)
     {
       try
@@ -1794,31 +1648,6 @@ namespace VoiceStudio.App.Views.Panels
       var tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"voicestudio_preview_{Guid.NewGuid()}.wav");
       await System.IO.File.WriteAllBytesAsync(tempPath, audioData);
       return tempPath;
-    }
-
-    // Multi-Pass Synthesis models (IDEA 61)
-    private class MultiPassSynthesisRequest
-    {
-      public string Text { get; set; } = string.Empty;
-      public string ProfileId { get; set; } = string.Empty;
-      public string Engine { get; set; } = string.Empty;
-      public int Passes { get; set; } = 3;
-      public string Language { get; set; } = "en";
-      public string? Emotion { get; set; }
-      public bool EnhanceQuality { get; set; }
-      public double Speed { get; set; } = 1.0;
-      public double Pitch { get; set; }
-      public double Stability { get; set; } = 0.72;
-      public double Clarity { get; set; } = 0.58;
-      public double Temperature { get; set; } = 0.35;
-    }
-
-    private class MultiPassSynthesisResponse
-    {
-      public string BestAudioId { get; set; } = string.Empty;
-      public string? BestAudioUrl { get; set; }
-      public int PassesCompleted { get; set; }
-      public double BestQualityScore { get; set; }
     }
 
     protected override void Dispose(bool disposing)

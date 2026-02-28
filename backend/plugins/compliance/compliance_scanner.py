@@ -360,7 +360,7 @@ class ComplianceScanner:
 
     async def _check_dependency_licenses(self, plugin_path: Path) -> List[ComplianceIssue]:
         """Check dependency licenses for compatibility."""
-        issues: list[ComplianceIssue] = []
+        issues = []
 
         # Check requirements.txt
         req_file = plugin_path / "requirements.txt"

@@ -4,10 +4,10 @@
     xmlns:local="using:VoiceStudio.App.Controls"
     x:DataType="local:PanelQuickSwitchIndicator">
     <!-- Phase 0: keep XAML minimal to avoid XamlCompiler.exe crashes. -->
-    <Border Background="{StaticResource VSQ.PanelHost.HeaderBackgroundBrush}"
+    <Border Background="#181D26"
         CornerRadius="8"
         Padding="12"
-        BorderBrush="{StaticResource VSQ.Border.DefaultBrush}"
+        BorderBrush="#333333"
         BorderThickness="1"
         MinWidth="200">
         <StackPanel Spacing="6">
@@ -18,7 +18,7 @@
             <TextBlock x:Name="PanelRegionText"
                 Text="Region"
                 FontSize="12"
-                Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                Foreground="#BBBBBB"
                 HorizontalAlignment="Center" />
         </StackPanel>
     </Border>

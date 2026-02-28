@@ -340,33 +340,39 @@ class MetricsPersistence:
         Returns:
             List of metric records
         """
-        # Use ? IS NULL OR col = ? pattern - no string interpolation, fully parameterized
-        sql = """
-            SELECT id, plugin_id, metric_type, value, timestamp, labels, session_id
-            FROM metrics
-            WHERE (? IS NULL OR plugin_id = ?)
-              AND (? IS NULL OR metric_type = ?)
-              AND (? IS NULL OR timestamp >= ?)
-              AND (? IS NULL OR timestamp <= ?)
-            ORDER BY timestamp DESC
-            LIMIT ? OFFSET ?
-            """
-        params: list[Any] = [
-            plugin_id,
-            plugin_id,
-            metric_type,
-            metric_type,
-            start_time.isoformat() if start_time else None,
-            start_time.isoformat() if start_time else None,
-            end_time.isoformat() if end_time else None,
-            end_time.isoformat() if end_time else None,
-            limit,
-            offset,
-        ]
+        conditions = []
+        params: list[Any] = []
+
+        if plugin_id:
+            conditions.append("plugin_id = ?")
+            params.append(plugin_id)
+
+        if metric_type:
+            conditions.append("metric_type = ?")
+            params.append(metric_type)
+
+        if start_time:
+            conditions.append("timestamp >= ?")
+            params.append(start_time.isoformat())
+
+        if end_time:
+            conditions.append("timestamp <= ?")
+            params.append(end_time.isoformat())
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, params)
+            cursor.execute(
+                f"""
+                SELECT id, plugin_id, metric_type, value, timestamp, labels, session_id
+                FROM metrics
+                WHERE {where_clause}
+                ORDER BY timestamp DESC
+                LIMIT ? OFFSET ?
+                """,
+                params + [limit, offset],
+            )
 
             records = []
             for row in cursor.fetchall():
@@ -407,38 +413,43 @@ class MetricsPersistence:
         start_time = start_time or (datetime.now() - timedelta(days=7))
         end_time = end_time or datetime.now()
 
-        # Use ? IS NULL OR col = ? pattern - no string interpolation, fully parameterized
-        sql = """
-            SELECT
-                plugin_id,
-                metric_type,
-                strftime('%Y-%m-%dT%H:00:00', timestamp) as window_start,
-                COUNT(*) as count,
-                SUM(value) as sum_value,
-                MIN(value) as min_value,
-                MAX(value) as max_value,
-                AVG(value) as avg_value
-            FROM metrics
-            WHERE timestamp >= ? AND timestamp <= ?
-              AND (? IS NULL OR plugin_id = ?)
-              AND (? IS NULL OR metric_type = ?)
-            GROUP BY plugin_id, metric_type, strftime('%Y-%m-%dT%H:00:00', timestamp)
-            ORDER BY window_start DESC
-            """
-        params: list[Any] = [
-            start_time.isoformat(),
-            end_time.isoformat(),
-            plugin_id,
-            plugin_id,
-            metric_type,
-            metric_type,
-        ]
+        conditions = ["timestamp >= ?", "timestamp <= ?"]
+        params: list[Any] = [start_time.isoformat(), end_time.isoformat()]
+
+        if plugin_id:
+            conditions.append("plugin_id = ?")
+            params.append(plugin_id)
+
+        if metric_type:
+            conditions.append("metric_type = ?")
+            params.append(metric_type)
+
+        where_clause = " AND ".join(conditions)
 
         # SQLite doesn't have great time-bucket functions, so we use string manipulation
         # to group by hour (or configurable window)
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, params)
+
+            # Use strftime to bucket by window
+            cursor.execute(
+                f"""
+                SELECT
+                    plugin_id,
+                    metric_type,
+                    strftime('%Y-%m-%dT%H:00:00', timestamp) as window_start,
+                    COUNT(*) as count,
+                    SUM(value) as sum_value,
+                    MIN(value) as min_value,
+                    MAX(value) as max_value,
+                    AVG(value) as avg_value
+                FROM metrics
+                WHERE {where_clause}
+                GROUP BY plugin_id, metric_type, strftime('%Y-%m-%dT%H:00:00', timestamp)
+                ORDER BY window_start DESC
+                """,
+                params,
+            )
 
             results = []
             for row in cursor.fetchall():
@@ -494,7 +505,7 @@ class MetricsPersistence:
                 (plugin_id, since.isoformat()),
             )
 
-            summary: dict[str, Any] = {
+            summary = {
                 "plugin_id": plugin_id,
                 "since": since.isoformat(),
                 "metrics": {},

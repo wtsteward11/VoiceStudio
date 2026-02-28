@@ -3,172 +3,26 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:VoiceStudio.App.Controls"
     xmlns:local="using:VoiceStudio.App.Views.Panels"
-    xmlns:models="using:VoiceStudio.Core.Models"
     x:DataType="local:ModelManagerView">
+    <Grid x:Name="ModelManagerView_Root" 
+          AutomationProperties.AutomationId="ModelManagerView_Root"
+          Background="{StaticResource VSQ.Panel.Background}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-  <Grid Padding="16" AutomationProperties.AutomationId="ModelManagerView_Root">
-    <Grid.RowDefinitions>
-      <RowDefinition Height="Auto"/>
-      <RowDefinition Height="*"/>
-      <RowDefinition Height="Auto"/>
-    </Grid.RowDefinitions>
+        <Border Grid.Row="0" 
+                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}" 
+                Padding="{StaticResource VSQ.Spacing.Medium}">
+            <TextBlock Text="Model Manager" 
+                       FontSize="{StaticResource VSQ.FontSize.Title}" 
+                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
+        </Border>
 
-    <!-- Header -->
-    <Grid Grid.Row="0" Margin="0,0,0,12">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*"/>
-        <ColumnDefinition Width="Auto"/>
-      </Grid.ColumnDefinitions>
-      <StackPanel Orientation="Horizontal" Spacing="12">
-        <FontIcon Glyph="&#xE71C;" FontSize="24" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
-        <TextBlock Text="Model Manager" FontSize="20" FontWeight="SemiBold"
-                   VerticalAlignment="Center" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-      </StackPanel>
-      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-        <Button Command="{x:Bind ViewModel.RefreshCommand}" ToolTipService.ToolTip="Refresh"
-                AutomationProperties.AutomationId="ModelManagerView_RefreshBtn">
-          <FontIcon Glyph="&#xE72C;" FontSize="14"/>
-        </Button>
-        <Button Command="{x:Bind ViewModel.ImportModelCommand}" ToolTipService.ToolTip="Import Model"
-                AutomationProperties.AutomationId="ModelManagerView_ImportBtn">
-          <FontIcon Glyph="&#xE8B5;" FontSize="14"/>
-        </Button>
-        <Button Click="HelpButton_Click" ToolTipService.ToolTip="Help"
-                AutomationProperties.AutomationId="ModelManagerView_HelpBtn">
-          <FontIcon Glyph="&#xE897;" FontSize="14"/>
-        </Button>
-      </StackPanel>
+        <controls:HelpOverlay x:Name="HelpOverlay" 
+                              Grid.RowSpan="2"
+                              IsVisible="False" 
+                              Visibility="Collapsed" />
     </Grid>
-
-    <!-- Content -->
-    <ScrollViewer Grid.Row="1">
-      <StackPanel Spacing="12">
-
-        <!-- Engine Filter -->
-        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16">
-          <StackPanel Spacing="12">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <FontIcon Glyph="&#xE71C;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
-              <TextBlock Text="Filter by Engine" FontSize="13" FontWeight="SemiBold"
-                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-            </StackPanel>
-            <ComboBox ItemsSource="{x:Bind ViewModel.Engines}"
-                      SelectedItem="{x:Bind ViewModel.SelectedEngine, Mode=TwoWay}"
-                      PlaceholderText="All engines" HorizontalAlignment="Stretch"
-                      AutomationProperties.AutomationId="ModelManagerView_EngineFilter"/>
-          </StackPanel>
-        </Border>
-
-        <!-- Storage Stats -->
-        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16">
-          <StackPanel Spacing="8">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <FontIcon Glyph="&#xE958;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
-              <TextBlock Text="Storage" FontSize="13" FontWeight="SemiBold"
-                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-            </StackPanel>
-            <Grid ColumnSpacing="24">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-              </Grid.ColumnDefinitions>
-              <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Text="Total Models" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                <TextBlock Text="{x:Bind ViewModel.StorageStats.TotalModels, Mode=OneWay, FallbackValue='--'}"
-                           FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
-                           AutomationProperties.AutomationId="ModelManagerView_TotalModels"/>
-              </StackPanel>
-              <StackPanel Grid.Column="1" Spacing="4">
-                <TextBlock Text="Size (MB)" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                <TextBlock Text="{x:Bind ViewModel.StorageStats.TotalSizeMb, Mode=OneWay, FallbackValue='--'}"
-                           FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
-                           AutomationProperties.AutomationId="ModelManagerView_TotalSizeMb"/>
-              </StackPanel>
-              <StackPanel Grid.Column="2" Spacing="4">
-                <TextBlock Text="Size (GB)" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                <TextBlock Text="{x:Bind ViewModel.StorageStats.TotalSizeGb, Mode=OneWay, FallbackValue='--'}"
-                           FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
-                           AutomationProperties.AutomationId="ModelManagerView_TotalSizeGb"/>
-              </StackPanel>
-            </Grid>
-          </StackPanel>
-        </Border>
-
-        <!-- Verification Result -->
-        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16"
-                Visibility="{x:Bind ViewModel.IsVerifying, Mode=OneWay}">
-          <StackPanel Spacing="4">
-            <ProgressRing IsActive="{x:Bind ViewModel.IsVerifying, Mode=OneWay}" Width="24" Height="24"/>
-            <TextBlock Text="{x:Bind ViewModel.VerificationResult, Mode=OneWay, FallbackValue='', TargetNullValue=''}"
-                       FontSize="13" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" TextWrapping="Wrap"/>
-          </StackPanel>
-        </Border>
-
-        <!-- Models List -->
-        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16">
-          <StackPanel Spacing="8">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <FontIcon Glyph="&#xE8F1;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
-              <TextBlock Text="Models" FontSize="13" FontWeight="SemiBold"
-                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-            </StackPanel>
-            <ListView ItemsSource="{x:Bind ViewModel.Models, Mode=OneWay}"
-                      SelectedItem="{x:Bind ViewModel.SelectedModel, Mode=TwoWay}"
-                      RightTapped="Model_RightTapped" MaxHeight="400"
-                      AutomationProperties.AutomationId="ModelManagerView_ModelsList">
-              <ListView.ItemTemplate>
-                <DataTemplate x:DataType="models:ModelInfo">
-                  <Grid Padding="8,6" ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="*"/>
-                      <ColumnDefinition Width="Auto"/>
-                      <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Spacing="2">
-                      <TextBlock Text="{x:Bind ModelName}" FontSize="13" FontWeight="SemiBold"/>
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="{x:Bind Engine}" FontSize="11" Opacity="0.7"/>
-                        <TextBlock Text="{x:Bind Version, TargetNullValue=''}" FontSize="11" Opacity="0.5"/>
-                      </StackPanel>
-                    </StackPanel>
-                    <TextBlock Grid.Column="1" Text="{x:Bind Size}" FontSize="12"
-                               VerticalAlignment="Center" Opacity="0.6"/>
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                      <Button Click="VerifyButton_Click" CommandParameter="{x:Bind}"
-                              ToolTipService.ToolTip="Verify checksum" Padding="6,4"
-                              AutomationProperties.AutomationId="ModelManagerView_VerifyItemBtn">
-                        <FontIcon Glyph="&#xE73E;" FontSize="12"/>
-                      </Button>
-                      <Button Click="DeleteButton_Click" CommandParameter="{x:Bind}"
-                              ToolTipService.ToolTip="Delete model" Padding="6,4"
-                              AutomationProperties.AutomationId="ModelManagerView_DeleteItemBtn">
-                        <FontIcon Glyph="&#xE74D;" FontSize="12"/>
-                      </Button>
-                    </StackPanel>
-                  </Grid>
-                </DataTemplate>
-              </ListView.ItemTemplate>
-            </ListView>
-          </StackPanel>
-        </Border>
-
-      </StackPanel>
-    </ScrollViewer>
-
-    <!-- Error InfoBar -->
-    <InfoBar Grid.Row="2" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}" Severity="Error"
-             Title="Model Manager Error"
-             Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, FallbackValue='An error occurred', TargetNullValue='An error occurred'}"
-             IsClosable="True" AutomationProperties.AutomationId="ModelManagerView_ErrorInfoBar"/>
-
-    <!-- Overlays -->
-    <controls:HelpOverlay x:Name="HelpOverlay" Grid.RowSpan="3" IsVisible="False" Visibility="Collapsed"/>
-    <controls:LoadingOverlay Grid.RowSpan="3" IsLoading="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
-                             AutomationProperties.AutomationId="ModelManagerView_LoadingOverlay"/>
-  </Grid>
 </UserControl>

@@ -190,7 +190,7 @@ class PluginPackager:
         manifest_path = self.config.plugin_path / "plugin.json"
         if manifest_path.exists():
             try:
-                return dict(json.loads(manifest_path.read_text(encoding="utf-8")))
+                return json.loads(manifest_path.read_text(encoding="utf-8"))
             except json.JSONDecodeError as e:
                 logger.warning(f"Invalid plugin.json: {e}")
 
@@ -201,7 +201,7 @@ class PluginPackager:
                 import tomllib
             except ImportError:
                 try:
-                    import tomli as tomllib
+                    import tomli as tomllib  # type: ignore
                 except ImportError:
                     logger.warning("TOML parser not available")
                     return {}

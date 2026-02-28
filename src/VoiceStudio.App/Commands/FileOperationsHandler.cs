@@ -1,6 +1,6 @@
 using System;
+using System.Diagnostics;
 using System.IO;
-using VoiceStudio.App.Logging;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,7 +23,6 @@ namespace VoiceStudio.App.Commands
         private readonly IDialogService _dialogService;
         private readonly IBackendClient? _backendClient;
         private readonly ToastNotificationService? _toastService;
-        private readonly IEventAggregator? _eventAggregator;
 
         private Project? _currentProject;
         private string? _currentProjectPath;
@@ -35,15 +34,13 @@ namespace VoiceStudio.App.Commands
             IProjectRepository projectRepository,
             IDialogService dialogService,
             IBackendClient? backendClient = null,
-            ToastNotificationService? toastService = null,
-            IEventAggregator? eventAggregator = null)
+            ToastNotificationService? toastService = null)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _projectRepository = projectRepository ?? throw new ArgumentNullException(nameof(projectRepository));
             _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
             _backendClient = backendClient;
             _toastService = toastService;
-            _eventAggregator = eventAggregator ?? AppServices.TryGetEventAggregator();
 
             RegisterCommands();
         }
@@ -51,16 +48,6 @@ namespace VoiceStudio.App.Commands
         public Project? CurrentProject => _currentProject;
         public string? CurrentProjectPath => _currentProjectPath;
         public bool HasUnsavedChanges { get; private set; }
-
-        /// <summary>
-        /// Sets the active project programmatically (e.g. during deferred init when auto-loading).
-        /// </summary>
-        public void SetActiveProject(Project project)
-        {
-            _currentProject = project;
-            _currentProjectPath = null;
-            HasUnsavedChanges = false;
-        }
 
         private void RegisterCommands()
         {
@@ -168,7 +155,7 @@ namespace VoiceStudio.App.Commands
                 _ => _currentProject != null
             );
 
-            ErrorLogger.LogDebug("[FileOperationsHandler] Registered 7 file commands");
+            Debug.WriteLine("[FileOperationsHandler] Registered 7 file commands");
         }
 
         public async Task NewProjectAsync(CancellationToken ct = default)
@@ -209,10 +196,9 @@ namespace VoiceStudio.App.Commands
             HasUnsavedChanges = true;
 
             CurrentProjectChanged?.Invoke(this, _currentProject);
-            _eventAggregator?.Publish(new ProjectChangedEvent("file.handler", _currentProject.Id, _currentProject.Name, isNew: true));
             _toastService?.ShowInfo($"Created new project: {name}");
 
-            ErrorLogger.LogDebug($"[FileOperationsHandler] New project created: {name}");
+            Debug.WriteLine($"[FileOperationsHandler] New project created: {name}");
         }
 
         public async Task OpenProjectAsync(string? projectPath = null, CancellationToken ct = default)
@@ -255,10 +241,9 @@ namespace VoiceStudio.App.Commands
                     HasUnsavedChanges = false;
 
                     CurrentProjectChanged?.Invoke(this, _currentProject);
-                    _eventAggregator?.Publish(new ProjectChangedEvent("file.handler", _currentProject?.Id, _currentProject?.Name, isNew: false));
                     _toastService?.ShowSuccess($"Opened project: {project.Name}");
 
-                    ErrorLogger.LogDebug($"[FileOperationsHandler] Opened project: {project.Name}");
+                    Debug.WriteLine($"[FileOperationsHandler] Opened project: {project.Name}");
                 }
                 else
                 {
@@ -270,7 +255,7 @@ namespace VoiceStudio.App.Commands
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Open failed: {ex.Message}", "FileOperationsHandler");
+                Debug.WriteLine($"[FileOperationsHandler] Open failed: {ex.Message}");
                 await _dialogService.ShowErrorAsync(
                     "Open Failed",
                     $"Failed to open project: {ex.Message}");
@@ -292,11 +277,11 @@ namespace VoiceStudio.App.Commands
                 HasUnsavedChanges = false;
 
                 _toastService?.ShowSuccess("Project saved");
-                ErrorLogger.LogDebug($"[FileOperationsHandler] Project saved: {_currentProject.Name}");
+                Debug.WriteLine($"[FileOperationsHandler] Project saved: {_currentProject.Name}");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Save failed: {ex.Message}", "FileOperationsHandler");
+                Debug.WriteLine($"[FileOperationsHandler] Save failed: {ex.Message}");
                 await _dialogService.ShowErrorAsync(
                     "Save Failed",
                     $"Failed to save project: {ex.Message}");
@@ -340,14 +325,13 @@ namespace VoiceStudio.App.Commands
                 HasUnsavedChanges = false;
 
                 CurrentProjectChanged?.Invoke(this, _currentProject);
-                _eventAggregator?.Publish(new ProjectChangedEvent("file.handler", _currentProject?.Id, _currentProject?.Name, isNew: false));
                 _toastService?.ShowSuccess($"Project saved as: {name}");
 
-                ErrorLogger.LogDebug($"[FileOperationsHandler] Project saved as: {name}");
+                Debug.WriteLine($"[FileOperationsHandler] Project saved as: {name}");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Save As failed: {ex.Message}", "FileOperationsHandler");
+                Debug.WriteLine($"[FileOperationsHandler] Save As failed: {ex.Message}");
                 await _dialogService.ShowErrorAsync(
                     "Save As Failed",
                     $"Failed to save project: {ex.Message}");
@@ -363,24 +347,24 @@ namespace VoiceStudio.App.Commands
 
         public async Task ImportAudioAsync(CancellationToken ct = default)
         {
-            ErrorLogger.LogDebug("[FileOperationsHandler] ImportAudioAsync called");
+            Debug.WriteLine("[FileOperationsHandler] ImportAudioAsync called");
             FileLog("[FileOperationsHandler] ImportAudioAsync called");
             
             string[]? files;
             try
             {
-                ErrorLogger.LogDebug("[FileOperationsHandler] Calling ShowOpenFilesAsync...");
+                Debug.WriteLine("[FileOperationsHandler] Calling ShowOpenFilesAsync...");
                 FileLog("[FileOperationsHandler] Calling ShowOpenFilesAsync...");
                 // Use centralized format list for all supported audio formats
                 files = await _dialogService.ShowOpenFilesAsync(
                     "Import Audio Files",
                     AudioFileFormats.ImportExtensions.ToArray());
-                ErrorLogger.LogDebug($"[FileOperationsHandler] ShowOpenFilesAsync returned: {(files == null ? "null" : $"{files.Length} files")}");
+                Debug.WriteLine($"[FileOperationsHandler] ShowOpenFilesAsync returned: {(files == null ? "null" : $"{files.Length} files")}");
                 FileLog($"[FileOperationsHandler] ShowOpenFilesAsync returned: {(files == null ? "null" : $"{files.Length} files")}");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"ShowOpenFilesAsync EXCEPTION: {ex.GetType().Name}: {ex.Message}", "FileOperationsHandler");
+                Debug.WriteLine($"[FileOperationsHandler] ShowOpenFilesAsync EXCEPTION: {ex.GetType().Name}: {ex.Message}");
                 FileLog($"[FileOperationsHandler] ShowOpenFilesAsync EXCEPTION: {ex.GetType().Name}: {ex.Message}");
                 FileLog($"[FileOperationsHandler] Stack: {ex.StackTrace}");
                 if (ex is System.Runtime.InteropServices.COMException comEx)
@@ -420,7 +404,7 @@ namespace VoiceStudio.App.Commands
                         {
                             // Upload to backend for processing
                             var result = await _backendClient.UploadAudioFileAsync(files[i], ct);
-                            ErrorLogger.LogDebug($"[FileOperationsHandler] Uploaded: {fileName} -> {result.Id}");
+                            Debug.WriteLine($"[FileOperationsHandler] Uploaded: {fileName} -> {result.Id}");
 
                             // If project exists, save to project
                             if (_currentProject != null)
@@ -439,13 +423,13 @@ namespace VoiceStudio.App.Commands
                         else
                         {
                             // Fallback: copy to local project folder
-                            ErrorLogger.LogDebug($"[FileOperationsHandler] Backend not available, skipping upload for: {fileName}");
+                            Debug.WriteLine($"[FileOperationsHandler] Backend not available, skipping upload for: {fileName}");
                         }
                         successCount++;
                     }
                     catch (Exception ex)
                     {
-                        ErrorLogger.LogWarning($"Failed to import {fileName}: {ex.Message}", "FileOperationsHandler");
+                        Debug.WriteLine($"[FileOperationsHandler] Failed to import {fileName}: {ex.Message}");
                         // Continue with other files
                     }
                 }
@@ -459,7 +443,7 @@ namespace VoiceStudio.App.Commands
                 {
                     _toastService?.ShowWarning("Import", "No files were imported");
                 }
-                ErrorLogger.LogDebug($"[FileOperationsHandler] Imported {successCount}/{files.Length} files");
+                Debug.WriteLine($"[FileOperationsHandler] Imported {successCount}/{files.Length} files");
             }
             finally
             {
@@ -538,12 +522,12 @@ namespace VoiceStudio.App.Commands
                         progress.SetProgress(1.0);
 
                         _toastService?.ShowSuccess($"Audio exported to: {Path.GetFileName(path)}");
-                        ErrorLogger.LogDebug($"[FileOperationsHandler] Exported to: {path} (format: {targetExtension})");
+                        Debug.WriteLine($"[FileOperationsHandler] Exported to: {path} (format: {targetExtension})");
                     }
                     else
                     {
                         _toastService?.ShowWarning("Export", "No audio files in project to export");
-                        ErrorLogger.LogDebug("[FileOperationsHandler] No audio files to export");
+                        Debug.WriteLine("[FileOperationsHandler] No audio files to export");
                     }
                 }
                 else
@@ -551,12 +535,12 @@ namespace VoiceStudio.App.Commands
                     // Backend not available - show message
                     progress.SetProgress(1.0);
                     _toastService?.ShowWarning("Export", "Backend service not available for export");
-                    ErrorLogger.LogDebug("[FileOperationsHandler] Backend not available for export");
+                    Debug.WriteLine("[FileOperationsHandler] Backend not available for export");
                 }
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Export failed: {ex.Message}", "FileOperationsHandler");
+                Debug.WriteLine($"[FileOperationsHandler] Export failed: {ex.Message}");
                 _toastService?.ShowError("Export Failed", ex.Message);
             }
             finally
@@ -591,10 +575,9 @@ namespace VoiceStudio.App.Commands
             HasUnsavedChanges = false;
 
             CurrentProjectChanged?.Invoke(this, null);
-            _eventAggregator?.Publish(new ProjectChangedEvent("file.handler", null, null, isNew: false));
             _toastService?.ShowInfo($"Closed project: {projectName}");
 
-            ErrorLogger.LogDebug($"[FileOperationsHandler] Project closed: {projectName}");
+            Debug.WriteLine($"[FileOperationsHandler] Project closed: {projectName}");
         }
 
         public void MarkDirty()

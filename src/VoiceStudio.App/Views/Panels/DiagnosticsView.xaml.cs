@@ -6,7 +6,6 @@ using VoiceStudio.App.Core.Commands;
 using VoiceStudio.App.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls.Primitives;
-using SelectionChangedEventArgs = global::Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
@@ -20,7 +19,6 @@ namespace VoiceStudio.App.Views.Panels
   {
     public DiagnosticsViewModel ViewModel { get; }
     private ToastNotificationService? _toastService;
-    private IErrorLoggingService? _errorLoggingService;
     private IUnifiedCommandRegistry? _commandRegistry;
     private ObservableCollection<CommandHealthItem> _commandHealthItems = new();
     private DispatcherTimer? _resourceMonitorTimer;
@@ -29,8 +27,6 @@ namespace VoiceStudio.App.Views.Panels
     private GPUStatusResponse? _cachedGpuStatus;
     private DateTime _lastGpuUpdate = DateTime.MinValue;
     private readonly TimeSpan _gpuUpdateInterval = TimeSpan.FromSeconds(5);
-    private ObservableCollection<CircuitBreakerItem> _circuitBreakerItems = new();
-    private ObservableCollection<LogEntry> _filteredLogs = new();
 
     public DiagnosticsView()
     {
@@ -41,7 +37,6 @@ namespace VoiceStudio.App.Views.Panels
 
       // Initialize services
       _toastService = ServiceProvider.GetToastNotificationService();
-      _errorLoggingService = AppServices.TryGetErrorLoggingService();
       _commandRegistry = AppServices.TryGetCommandRegistry();
 
       // Subscribe to ViewModel events for toast notifications
@@ -68,26 +63,6 @@ namespace VoiceStudio.App.Views.Panels
 
       // Initialize resource monitoring
       InitializeResourceMonitoring();
-
-      // Wire logs display and filtering
-      LogsListView.ItemsSource = ViewModel.Logs;
-      ViewModel.Logs.CollectionChanged += (_, _) =>
-      {
-        if (IsLogFilterActive())
-          ApplyLogFilters();
-      };
-
-      // Set backend URL from actual configuration
-      try
-      {
-        var backendAddress = ServiceProvider.GetBackendClient().BaseAddress;
-        BaseUrlText.Text = backendAddress?.ToString() ?? "Not configured";
-      }
-      catch (Exception ex)
-      {
-        _errorLoggingService?.LogError(ex, "DiagnosticsView_ctor_BackendUrl");
-        BaseUrlText.Text = "Not available";
-      }
     }
 
     private void DiagnosticsView_Unloaded(object sender, RoutedEventArgs e)
@@ -120,7 +95,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "InitializeResourceMonitoring");
+        Debug.WriteLine($"[DiagnosticsView] Failed to initialize resource monitoring: {ex.Message}");
       }
     }
 
@@ -176,7 +151,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "UpdateGpuMetricsAsync");
+        Debug.WriteLine($"[DiagnosticsView] Failed to update GPU metrics from backend: {ex.Message}");
       }
     }
 
@@ -223,7 +198,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "UpdateResourceGauges");
+        Debug.WriteLine($"[DiagnosticsView] Failed to update resource gauges: {ex.Message}");
       }
     }
 
@@ -263,7 +238,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "GetMemoryInfo");
+        Debug.WriteLine($"[DiagnosticsView] Failed to get memory info: {ex.Message}");
         return null;
       }
     }
@@ -287,7 +262,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "GetGpuInfo");
+        Debug.WriteLine($"[DiagnosticsView] Failed to get GPU info: {ex.Message}");
         return null;
       }
     }
@@ -328,7 +303,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "UpdateJobQueueAsync");
+        Debug.WriteLine($"[DiagnosticsView] Failed to update job queue: {ex.Message}");
         // Show empty state on error
         NoActiveJobsText.Visibility = Visibility.Visible;
       }
@@ -358,7 +333,7 @@ namespace VoiceStudio.App.Views.Panels
       VirtualizedListHelper.ConfigureListView(EnvVarsListView);
     }
 
-    private void TabView_SelectionChanged(object? sender, global::Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs e)
+    private void TabView_SelectionChanged(object? sender, Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs e)
     {
       // Show/hide tab content based on selection
       if (DiagnosticsTabView?.SelectedItem is TabViewItem selectedTab)
@@ -388,7 +363,6 @@ namespace VoiceStudio.App.Views.Panels
             break;
           case "Logs":
             LogsGrid.Visibility = Visibility.Visible;
-            ApplyLogFilters();
             break;
           case "Traces":
             TracesGrid.Visibility = Visibility.Visible;
@@ -399,8 +373,6 @@ namespace VoiceStudio.App.Views.Panels
             break;
           case "Engines":
             EnginesGrid.Visibility = Visibility.Visible;
-            _ = LoadCircuitBreakersAsync();
-            _ = LoadEnginesAsync();
             break;
           case "Commands":
             CommandsGrid.Visibility = Visibility.Visible;
@@ -408,7 +380,6 @@ namespace VoiceStudio.App.Views.Panels
             break;
           case "Environment":
             EnvironmentGrid.Visibility = Visibility.Visible;
-            LoadEnvironmentVariables();
             break;
           case "Errors":
             ErrorsTabGrid.Visibility = Visibility.Visible;
@@ -463,7 +434,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (_commandRegistry == null)
       {
-        _errorLoggingService?.LogWarning("Command registry not available", "LoadCommandHealth");
+        Debug.WriteLine("[DiagnosticsView] Command registry not available");
         return;
       }
 
@@ -522,120 +493,14 @@ namespace VoiceStudio.App.Views.Panels
         TotalExecutionsCount.Text = totalExecutions.ToString();
 
         CommandsListView.ItemsSource = _commandHealthItems;
+
+        Debug.WriteLine($"[DiagnosticsView] Loaded {totalCommands} commands");
       }
       catch (System.Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "LoadCommandHealth");
+        Debug.WriteLine($"[DiagnosticsView] Failed to load command health: {ex.Message}");
       }
     }
-
-    #region Log Filtering
-
-    private void LogLevelFilter_SelectionChanged(object? sender, global::Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs e)
-    {
-      ApplyLogFilters();
-    }
-
-    private void LogSearchBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-      ApplyLogFilters();
-    }
-
-    private bool IsLogFilterActive()
-    {
-      var levelFilter = (LogLevelFilter?.SelectedItem as ComboBoxItem)?.Content?.ToString();
-      var searchText = LogSearchBox?.Text?.Trim();
-      return (levelFilter != null && levelFilter != "All") || !string.IsNullOrEmpty(searchText);
-    }
-
-    private void ApplyLogFilters()
-    {
-      if (LogsListView == null || ViewModel?.Logs == null)
-        return;
-
-      var levelFilter = (LogLevelFilter?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "All";
-      var searchText = LogSearchBox?.Text?.Trim() ?? "";
-
-      if (levelFilter == "All" && string.IsNullOrEmpty(searchText))
-      {
-        LogsListView.ItemsSource = ViewModel.Logs;
-        return;
-      }
-
-      IEnumerable<LogEntry> filtered = ViewModel.Logs;
-
-      if (levelFilter != "All")
-      {
-        filtered = filtered.Where(l => string.Equals(l.Level, levelFilter, StringComparison.OrdinalIgnoreCase));
-      }
-
-      if (!string.IsNullOrEmpty(searchText))
-      {
-        filtered = filtered.Where(l =>
-            l.Message?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true);
-      }
-
-      _filteredLogs.Clear();
-      foreach (var log in filtered)
-      {
-        _filteredLogs.Add(log);
-      }
-      LogsListView.ItemsSource = _filteredLogs;
-    }
-
-    #endregion
-
-    #region Data Loading
-
-    private async Task LoadEnginesAsync()
-    {
-      try
-      {
-        var backendClient = ServiceProvider.GetBackendClient();
-        if (backendClient == null) return;
-
-        var engines = await backendClient.GetEnginesAsync();
-        if (engines?.Count > 0)
-        {
-          EnginesListView.ItemsSource = engines;
-        }
-        else
-        {
-          EnginesListView.ItemsSource = new List<string> { "(No engines available)" };
-        }
-      }
-      catch (Exception ex)
-      {
-        _errorLoggingService?.LogError(ex, "LoadEnginesAsync");
-        EnginesListView.ItemsSource = new List<string> { $"(Failed to load: {ex.Message})" };
-      }
-    }
-
-    private void LoadEnvironmentVariables()
-    {
-      try
-      {
-        var envVars = System.Environment.GetEnvironmentVariables();
-        var items = new List<EnvironmentInfoItem>();
-
-        foreach (System.Collections.DictionaryEntry entry in envVars)
-        {
-          items.Add(new EnvironmentInfoItem
-          {
-            Key = entry.Key?.ToString() ?? "",
-            Value = entry.Value?.ToString() ?? ""
-          });
-        }
-
-        EnvVarsListView.ItemsSource = items.OrderBy(i => i.Key).ToList();
-      }
-      catch (Exception ex)
-      {
-        _errorLoggingService?.LogError(ex, "LoadEnvironmentVariables");
-      }
-    }
-
-    #endregion
 
     #region Additional Button Handlers
 
@@ -654,24 +519,14 @@ namespace VoiceStudio.App.Views.Panels
         var file = await savePicker.PickSaveFileAsync();
         if (file != null)
         {
-          // GAP-CS-002: Export real logs from ViewModel
-          var logContent = new System.Text.StringBuilder();
-          logContent.AppendLine($"VoiceStudio Log Export - {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-          logContent.AppendLine($"Total entries: {ViewModel.Logs.Count}");
-          logContent.AppendLine(new string('-', 80));
-          
-          foreach (var log in ViewModel.Logs)
-          {
-            logContent.AppendLine(log.FormattedLine);
-          }
-          
-          await Windows.Storage.FileIO.WriteTextAsync(file, logContent.ToString());
-          _toastService?.ShowToast(ToastType.Success, "Export Complete", $"Exported {ViewModel.Logs.Count} log entries");
+          // Export logs - placeholder for actual implementation
+          await Windows.Storage.FileIO.WriteTextAsync(file, "VoiceStudio Log Export\n" + DateTime.Now.ToString());
+          _toastService?.ShowToast(ToastType.Success, "Export Complete", "Logs exported successfully");
         }
       }
       catch (Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "ExportLogs_Click");
+        Debug.WriteLine($"[DiagnosticsView] Failed to export logs: {ex.Message}");
         _toastService?.ShowToast(ToastType.Error, "Export Failed", ex.Message);
       }
     }
@@ -686,7 +541,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "RefreshTraces_Click");
+        Debug.WriteLine($"[DiagnosticsView] Failed to refresh traces: {ex.Message}");
       }
     }
 
@@ -704,40 +559,14 @@ namespace VoiceStudio.App.Views.Panels
         var file = await savePicker.PickSaveFileAsync();
         if (file != null)
         {
-          // GAP-CS-002: Export real traces from ViewModel
-          var traceData = new
-          {
-            exported_at = DateTime.UtcNow,
-            total_traces = ViewModel.TotalTracesCount,
-            success_rate = ViewModel.TraceSuccessRate,
-            avg_duration = ViewModel.TraceAvgDuration,
-            traces = ViewModel.Traces.Select(t => new
-            {
-              trace_id = t.TraceId,
-              start_time = t.StartTime,
-              duration_ms = t.DurationMs,
-              status = t.Status,
-              operation = t.OperationName,
-              spans = t.Spans?.Select(s => new
-              {
-                span_id = s.SpanId,
-                name = s.Name,
-                duration_ms = s.DurationMs,
-                status = s.Status
-              })
-            }).ToList()
-          };
-          
-          var json = System.Text.Json.JsonSerializer.Serialize(
-            traceData, 
-            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-          await Windows.Storage.FileIO.WriteTextAsync(file, json);
-          _toastService?.ShowToast(ToastType.Success, "Export Complete", $"Exported {ViewModel.TotalTracesCount} traces");
+          // Export traces - placeholder for actual implementation
+          await Windows.Storage.FileIO.WriteTextAsync(file, "{ \"traces\": [] }");
+          _toastService?.ShowToast(ToastType.Success, "Export Complete", "Traces exported successfully");
         }
       }
       catch (Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "ExportTraces_Click");
+        Debug.WriteLine($"[DiagnosticsView] Failed to export traces: {ex.Message}");
         _toastService?.ShowToast(ToastType.Error, "Export Failed", ex.Message);
       }
     }
@@ -757,7 +586,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "TestConnection_Click");
+        Debug.WriteLine($"[DiagnosticsView] Connection test failed: {ex.Message}");
         _toastService?.ShowToast(ToastType.Error, "Connection Error", ex.Message);
       }
     }
@@ -776,7 +605,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "Reconnect_Click");
+        Debug.WriteLine($"[DiagnosticsView] Reconnect failed: {ex.Message}");
         _toastService?.ShowToast(ToastType.Error, "Reconnect Failed", ex.Message);
       }
     }
@@ -791,7 +620,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "RefreshEngines_Click");
+        Debug.WriteLine($"[DiagnosticsView] Failed to refresh engines: {ex.Message}");
       }
     }
 
@@ -805,86 +634,8 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        _errorLoggingService?.LogError(ex, "StopAllEngines_Click");
+        Debug.WriteLine($"[DiagnosticsView] Failed to stop engines: {ex.Message}");
         _toastService?.ShowToast(ToastType.Error, "Stop Failed", ex.Message);
-      }
-    }
-
-    // GAP-I24: Circuit Breaker handlers
-    private void RefreshCircuitBreakers_Click(object sender, RoutedEventArgs e)
-    {
-      _ = LoadCircuitBreakersAsync();
-    }
-
-    private async void ResetCircuitBreaker_Click(object sender, RoutedEventArgs e)
-    {
-      try
-      {
-        if (sender is Button button && button.Tag is string engineId)
-        {
-          var backendClient = ServiceProvider.GetBackendClient();
-          var response = await backendClient.PostAsync<object, CircuitBreakerResetResponse>(
-            $"/api/health/circuit-breakers/{engineId}/reset", new { });
-          
-          if (response?.Success == true)
-          {
-            _toastService?.ShowToast(ToastType.Success, "Circuit Breaker Reset", $"'{engineId}' reset to CLOSED");
-            await LoadCircuitBreakersAsync();
-          }
-          else
-          {
-            _toastService?.ShowToast(ToastType.Warning, "Reset Failed", response?.Message ?? "Unknown error");
-          }
-        }
-      }
-      catch (Exception ex)
-      {
-        _errorLoggingService?.LogError(ex, "ResetCircuitBreaker_Click");
-        _toastService?.ShowToast(ToastType.Error, "Reset Failed", ex.Message);
-      }
-    }
-
-    private async Task LoadCircuitBreakersAsync()
-    {
-      try
-      {
-        var backendClient = ServiceProvider.GetBackendClient();
-        if (backendClient == null) return;
-
-        var response = await backendClient.GetAsync<CircuitBreakerHealthResponse>("/api/health/circuit-breakers");
-        
-        if (response != null)
-        {
-          // Update summary counts
-          TotalCircuitBreakersCount.Text = response.Summary?.Total.ToString() ?? "0";
-          ClosedCircuitBreakersCount.Text = response.Summary?.Closed.ToString() ?? "0";
-          HalfOpenCircuitBreakersCount.Text = response.Summary?.HalfOpen.ToString() ?? "0";
-          OpenCircuitBreakersCount.Text = response.Summary?.Open.ToString() ?? "0";
-
-          // Populate list
-          _circuitBreakerItems.Clear();
-          foreach (var cb in response.CircuitBreakers ?? new List<CircuitBreakerInfo>())
-          {
-            _circuitBreakerItems.Add(new CircuitBreakerItem
-            {
-              Name = cb.Name ?? "Unknown",
-              State = cb.State ?? "UNKNOWN",
-              FailureCount = cb.FailureCount,
-              SuccessCount = cb.SuccessCount,
-              TotalCalls = cb.TotalCalls,
-              BlockedRequests = cb.BlockedRequests,
-              FailureRate = cb.FailureRate
-            });
-          }
-
-          CircuitBreakersListView.ItemsSource = _circuitBreakerItems;
-          NoCircuitBreakersText.Visibility = _circuitBreakerItems.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        }
-      }
-      catch (Exception ex)
-      {
-        _errorLoggingService?.LogError(ex, "LoadCircuitBreakersAsync");
-        NoCircuitBreakersText.Visibility = Visibility.Visible;
       }
     }
 
@@ -1047,92 +798,4 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
   }
-
-  #region GAP-I24: Circuit Breaker Models
-
-  /// <summary>
-  /// Response model for circuit breaker health API (GAP-I24).
-  /// </summary>
-  public sealed class CircuitBreakerHealthResponse
-  {
-    public string? Timestamp { get; set; }
-    public List<CircuitBreakerInfo>? CircuitBreakers { get; set; }
-    public CircuitBreakerSummary? Summary { get; set; }
-    public string? Error { get; set; }
-  }
-
-  /// <summary>
-  /// Summary of circuit breaker states (GAP-I24).
-  /// </summary>
-  public sealed class CircuitBreakerSummary
-  {
-    public int Total { get; set; }
-    public int Open { get; set; }
-    public int HalfOpen { get; set; }
-    public int Closed { get; set; }
-  }
-
-  /// <summary>
-  /// Individual circuit breaker information (GAP-I24).
-  /// </summary>
-  public sealed class CircuitBreakerInfo
-  {
-    public string? Name { get; set; }
-    public string? State { get; set; }
-    public int FailureCount { get; set; }
-    public int SuccessCount { get; set; }
-    public int TotalCalls { get; set; }
-    public int BlockedRequests { get; set; }
-    public double FailureRate { get; set; }
-    public double? LastFailureTime { get; set; }
-    public double? LastStateChange { get; set; }
-  }
-
-  /// <summary>
-  /// Response model for circuit breaker reset API (GAP-I24).
-  /// </summary>
-  public sealed class CircuitBreakerResetResponse
-  {
-    public bool Success { get; set; }
-    public string? Message { get; set; }
-    public string? Error { get; set; }
-  }
-
-  /// <summary>
-  /// View model for circuit breaker display in diagnostics (GAP-I24).
-  /// </summary>
-  public sealed class CircuitBreakerItem
-  {
-    public string Name { get; set; } = "";
-    public string State { get; set; } = "UNKNOWN";
-    public int FailureCount { get; set; }
-    public int SuccessCount { get; set; }
-    public int TotalCalls { get; set; }
-    public int BlockedRequests { get; set; }
-    public double FailureRate { get; set; }
-
-    public SolidColorBrush StateColor => State switch
-    {
-      "CLOSED" => new SolidColorBrush(UIColors.Green),
-      "HALF_OPEN" => new SolidColorBrush(UIColors.Orange),
-      "OPEN" => new SolidColorBrush(UIColors.Red),
-      _ => new SolidColorBrush(UIColors.Gray)
-    };
-
-    public string FailureRateFormatted => $"{FailureRate * 100:F1}%";
-
-    public SolidColorBrush FailureRateColor
-    {
-      get
-      {
-        if (FailureRate >= 0.5) return new SolidColorBrush(UIColors.Red);
-        if (FailureRate >= 0.2) return new SolidColorBrush(UIColors.Orange);
-        return new SolidColorBrush(UIColors.Green);
-      }
-    }
-
-    public Visibility ShowResetButton => State != "CLOSED" ? Visibility.Visible : Visibility.Collapsed;
-  }
-
-  #endregion
 }

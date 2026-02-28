@@ -169,8 +169,6 @@ namespace VoiceStudio.App.Tests.ViewModels
         {
             // Arrange
             var viewModel = CreateViewModel();
-            // Set a video path and duration first to enable trim value setting
-            viewModel.VideoDuration = 60.0;
             var propertyChanged = false;
             viewModel.PropertyChanged += (s, e) =>
             {
@@ -191,8 +189,6 @@ namespace VoiceStudio.App.Tests.ViewModels
         {
             // Arrange
             var viewModel = CreateViewModel();
-            // Set a video duration first to enable trim value setting
-            viewModel.VideoDuration = 60.0;
             var propertyChanged = false;
             viewModel.PropertyChanged += (s, e) =>
             {

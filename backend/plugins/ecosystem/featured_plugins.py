@@ -278,7 +278,7 @@ class FeaturedPluginsManager:
 
         growth_rate = (recent - older) / older
         # Normalize to 0-1
-        return float(max(0.0, min(1.0, 0.5 + growth_rate * 0.25)))
+        return max(0.0, min(1.0, 0.5 + growth_rate * 0.25))
 
     def _calculate_recency(self, plugin_id: str) -> float:
         """Calculate recency score based on publish date."""

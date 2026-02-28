@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -142,7 +141,7 @@ namespace VoiceStudio.App.Services
           int hr = CoCreateInstance(ref clsid, IntPtr.Zero, CLSCTX_INPROC_SERVER, ref iid, out IntPtr pDialog);
           if (hr != 0)
           {
-            ErrorLogger.LogWarning($"[NativeFileDialog] CoCreateInstance failed: 0x{hr:X8}", "NativeFileDialog");
+            System.Diagnostics.Debug.WriteLine($"[NativeFileDialog] CoCreateInstance failed: 0x{hr:X8}");
             return null;
           }
 
@@ -179,7 +178,7 @@ namespace VoiceStudio.App.Services
           if (hr != 0)
           {
             // User cancelled (hr = 0x800704C7 means cancelled)
-            ErrorLogger.LogWarning($"[NativeFileDialog] Dialog cancelled or failed: 0x{hr:X8}", "NativeFileDialog");
+            System.Diagnostics.Debug.WriteLine($"[NativeFileDialog] Dialog cancelled or failed: 0x{hr:X8}");
             return null;
           }
 
@@ -193,7 +192,7 @@ namespace VoiceStudio.App.Services
         }
         catch (Exception ex)
         {
-          ErrorLogger.LogWarning($"[NativeFileDialog] Exception: {ex.Message}", "NativeFileDialog");
+          System.Diagnostics.Debug.WriteLine($"[NativeFileDialog] Exception: {ex.Message}");
           return null;
         }
       });
@@ -214,7 +213,7 @@ namespace VoiceStudio.App.Services
           int hr = CoCreateInstance(ref clsid, IntPtr.Zero, CLSCTX_INPROC_SERVER, ref iid, out IntPtr pDialog);
           if (hr != 0)
           {
-            ErrorLogger.LogWarning($"[NativeFileDialog] CoCreateInstance failed: 0x{hr:X8}", "NativeFileDialog");
+            System.Diagnostics.Debug.WriteLine($"[NativeFileDialog] CoCreateInstance failed: 0x{hr:X8}");
             return null;
           }
 
@@ -250,7 +249,7 @@ namespace VoiceStudio.App.Services
           hr = dialog.Show(hwndOwner);
           if (hr != 0)
           {
-            ErrorLogger.LogWarning($"[NativeFileDialog] Dialog cancelled or failed: 0x{hr:X8}", "NativeFileDialog");
+            System.Diagnostics.Debug.WriteLine($"[NativeFileDialog] Dialog cancelled or failed: 0x{hr:X8}");
             return null;
           }
 
@@ -275,7 +274,7 @@ namespace VoiceStudio.App.Services
         }
         catch (Exception ex)
         {
-          ErrorLogger.LogWarning($"[NativeFileDialog] Exception: {ex.Message}", "NativeFileDialog");
+          System.Diagnostics.Debug.WriteLine($"[NativeFileDialog] Exception: {ex.Message}");
           return null;
         }
       });

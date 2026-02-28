@@ -10,168 +10,18 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0" 
                 Background="{StaticResource VSQ.Panel.Background.HeaderBrush}" 
                 Padding="{StaticResource VSQ.Spacing.Medium}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock Text="Quality Optimization Wizard" 
-                               FontSize="{StaticResource VSQ.FontSize.Title}" 
-                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
-                    <TextBlock FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}">
-                        <Run Text="Step "/>
-                        <Run Text="{x:Bind ViewModel.CurrentStep, Mode=OneWay}"/>
-                        <Run Text=" of "/>
-                        <Run Text="{x:Bind ViewModel.TotalSteps, Mode=OneWay}"/>
-                    </TextBlock>
-                </StackPanel>
-                <Button Grid.Column="1" Command="{x:Bind ViewModel.ResetWizardCommand}"
-                        AutomationProperties.AutomationId="QualityOptimizationWizardView_ResetButton"
-                        ToolTipService.ToolTip="Reset wizard">
-                    <FontIcon Glyph="&#xE72C;" FontSize="14"/>
-                </Button>
-            </Grid>
-        </Border>
-
-        <ScrollViewer Grid.Row="1">
-            <StackPanel Padding="16" Spacing="12">
-
-                <ProgressBar Minimum="1" Maximum="{x:Bind ViewModel.TotalSteps, Mode=OneWay}"
-                             Value="{x:Bind ViewModel.CurrentStep, Mode=OneWay}"
-                             AutomationProperties.AutomationId="QualityOptimizationWizardView_StepProgress"/>
-
-                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16"
-                        Visibility="{x:Bind ViewModel.IsStep1, Mode=OneWay}">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Step 1: Select Voice Profile" FontSize="15" FontWeight="SemiBold"
-                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-                        <ComboBox ItemsSource="{x:Bind ViewModel.AvailableProfiles, Mode=OneWay}"
-                                  SelectedItem="{x:Bind ViewModel.SelectedProfile, Mode=TwoWay}"
-                                  DisplayMemberPath="Name" PlaceholderText="Select a voice profile"
-                                  HorizontalAlignment="Stretch"
-                                  AutomationProperties.AutomationId="QualityOptimizationWizardView_ProfileSelector"/>
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="Target Quality Tier" FontSize="12"
-                                       Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                            <ComboBox ItemsSource="{x:Bind ViewModel.AvailableTiers, Mode=OneWay}"
-                                      SelectedItem="{x:Bind ViewModel.TargetTier, Mode=TwoWay}"
-                                      HorizontalAlignment="Stretch"
-                                      AutomationProperties.AutomationId="QualityOptimizationWizardView_TierSelector"/>
-                        </StackPanel>
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="Test Text" FontSize="12"
-                                       Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                            <TextBox Text="{x:Bind ViewModel.TestText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     PlaceholderText="Enter test text..." TextWrapping="Wrap" MinHeight="60"
-                                     AutomationProperties.AutomationId="QualityOptimizationWizardView_TestText"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16"
-                        Visibility="{x:Bind ViewModel.IsStep2, Mode=OneWay}">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Step 2: Analyzing Quality..." FontSize="15" FontWeight="SemiBold"
-                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-                        <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsAnalyzing, Mode=OneWay}"
-                                     Visibility="{x:Bind ViewModel.IsAnalyzing, Mode=OneWay}"/>
-                        <TextBlock Text="Running quality analysis on the selected voice profile..."
-                                   FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                    </StackPanel>
-                </Border>
-
-                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16"
-                        Visibility="{x:Bind ViewModel.IsStep3, Mode=OneWay}">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Step 3: Analysis Results" FontSize="15" FontWeight="SemiBold"
-                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-                        <TextBlock FontSize="14">
-                            <Run Text="Quality Score: "/>
-                            <Run Text="{x:Bind ViewModel.AnalysisResult.QualityScoreDisplay, Mode=OneWay, FallbackValue='--'}"/>
-                        </TextBlock>
-                        <ListView ItemsSource="{x:Bind ViewModel.AnalysisResult.Recommendations, Mode=OneWay}"
-                                  MaxHeight="200"
-                                  AutomationProperties.AutomationId="QualityOptimizationWizardView_Recommendations">
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Padding="4">
-                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
-                                        <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.7"
-                                                   TextWrapping="Wrap"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
-                    </StackPanel>
-                </Border>
-
-                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16"
-                        Visibility="{x:Bind ViewModel.IsStep4, Mode=OneWay}">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Step 4: Optimizing..." FontSize="15" FontWeight="SemiBold"
-                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-                        <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsOptimizing, Mode=OneWay}"
-                                     Visibility="{x:Bind ViewModel.IsOptimizing, Mode=OneWay}"/>
-                        <TextBlock Text="Applying quality optimizations..."
-                                   FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                    </StackPanel>
-                </Border>
-
-                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16"
-                        Visibility="{x:Bind ViewModel.IsStep5, Mode=OneWay}">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Step 5: Optimization Complete" FontSize="15" FontWeight="SemiBold"
-                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-                        <TextBlock Text="{x:Bind ViewModel.OptimizationResult.OptimizedParamsDisplay, Mode=OneWay, FallbackValue='No results'}"
-                                   FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" TextWrapping="Wrap"
-                                   AutomationProperties.AutomationId="QualityOptimizationWizardView_OptimizedParams"/>
-                    </StackPanel>
-                </Border>
-
-                <InfoBar IsOpen="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Severity="Informational"
-                         Title="Processing..." IsClosable="False"/>
-            </StackPanel>
-        </ScrollViewer>
-
-        <Border Grid.Row="2" Background="{StaticResource VSQ.Panel.Background.DarkBrush}" Padding="16">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <Button Grid.Column="0" Command="{x:Bind ViewModel.PreviousStepCommand}"
-                        AutomationProperties.AutomationId="QualityOptimizationWizardView_PrevButton">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE76B;" FontSize="12"/>
-                        <TextBlock Text="Back"/>
-                    </StackPanel>
-                </Button>
-                <Button Grid.Column="2" Command="{x:Bind ViewModel.NextStepCommand}"
-                        Style="{StaticResource VSQ.Button.Primary}"
-                        AutomationProperties.AutomationId="QualityOptimizationWizardView_NextButton">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <TextBlock Text="Next"/>
-                        <FontIcon Glyph="&#xE76C;" FontSize="12"/>
-                    </StackPanel>
-                </Button>
-            </Grid>
+            <TextBlock Text="Quality Optimization Wizard" 
+                       FontSize="{StaticResource VSQ.FontSize.Title}" 
+                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
         </Border>
 
         <controls:HelpOverlay x:Name="HelpOverlay" 
-                              Grid.RowSpan="3"
+                              Grid.RowSpan="2"
                               IsVisible="False" 
                               Visibility="Collapsed" />
     </Grid>

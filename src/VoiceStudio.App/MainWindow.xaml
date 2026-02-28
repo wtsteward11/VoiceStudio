@@ -150,9 +150,8 @@
           <TextBlock x:Name="SampleRateText" Text="48 kHz" FontSize="10" Foreground="{StaticResource VSQ.Accent.CyanBrush}" />
           <TextBlock x:Name="LatencyText" Text="--ms" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
           <Rectangle Width="1" Height="12" Fill="{StaticResource VSQ.Panel.BorderBrush}" Margin="4,0" />
-          <Button x:Name="CollaboratorsToggleButton" ToolTipService.ToolTip="Show Collaborators (Coming Soon)"
-            Click="CollaboratorsToggleButton_Click" Padding="2" Background="Transparent" BorderThickness="0"
-            Visibility="Collapsed">
+          <Button x:Name="CollaboratorsToggleButton" ToolTipService.ToolTip="Show Collaborators"
+            Click="CollaboratorsToggleButton_Click" Padding="2" Background="Transparent" BorderThickness="0">
             <FontIcon Glyph="&#xE716;" FontSize="12" FontFamily="Segoe Fluent Icons" />
           </Button>
           <Rectangle Width="1" Height="12" Fill="{StaticResource VSQ.Panel.BorderBrush}" Margin="4,0" />

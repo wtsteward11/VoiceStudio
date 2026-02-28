@@ -11,6 +11,7 @@
       <RowDefinition Height="*"/>
     </Grid.RowDefinitions>
     
+    <!-- Header -->
     <Border Grid.Row="0" 
             Background="{StaticResource VSQ.Panel.Background.HeaderBrush}" 
             Padding="16,12">
@@ -26,133 +27,44 @@
                      FontSize="{StaticResource VSQ.FontSize.Title}"
                      Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
         </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
-          <Button Command="{x:Bind ViewModel.ClearSearchCommand}"
-                  AutomationProperties.AutomationId="AdvancedSearchView_ClearButton"
-                  ToolTipService.ToolTip="Clear Search">
-            <FontIcon Glyph="&#xE711;" FontSize="14"/>
-          </Button>
-          <Button Command="{x:Bind ViewModel.ExportResultsCommand}"
-                  AutomationProperties.AutomationId="AdvancedSearchView_ExportButton"
-                  ToolTipService.ToolTip="Export Results">
-            <FontIcon Glyph="&#xEDE1;" FontSize="14"/>
-          </Button>
-          <Button Click="HelpButton_Click"
-                  AutomationProperties.AutomationId="AdvancedSearchView_HelpButton"
-                  ToolTipService.ToolTip="Help">
-            <FontIcon Glyph="&#xE897;" FontSize="14"/>
-          </Button>
-        </StackPanel>
+        <Button Grid.Column="1" Content="?" Click="HelpButton_Click" ToolTipService.ToolTip="Help"/>
       </Grid>
     </Border>
     
-    <ScrollViewer Grid.Row="1">
-      <StackPanel Padding="16" Spacing="12">
-
+    <!-- Content: Under Development -->
+    <Grid Grid.Row="1" Padding="32">
+      <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16" MaxWidth="400">
+        <FontIcon Glyph="&#xE946;" FontSize="64" Opacity="0.4" HorizontalAlignment="Center"/>
+        <TextBlock Text="Advanced Search"
+                   FontSize="{StaticResource VSQ.FontSize.Subtitle}"
+                   FontWeight="SemiBold"
+                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                   HorizontalAlignment="Center"/>
+        <TextBlock Text="This feature is under development. Advanced search capabilities including regex patterns, fuzzy matching, and cross-panel search will be available in a future update."
+                   FontSize="{StaticResource VSQ.FontSize.Body}"
+                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                   TextWrapping="Wrap"
+                   TextAlignment="Center"/>
         <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16">
+                CornerRadius="8"
+                Padding="16"
+                Margin="0,16,0,0">
           <StackPanel Spacing="8">
-            <AutoSuggestBox Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay}"
-                            PlaceholderText="Search across all panels and assets..."
-                            QueryIcon="Find"
-                            QuerySubmitted="SearchBox_QuerySubmitted"
-                            TextChanged="SearchBox_TextChanged"
-                            SuggestionChosen="SearchBox_SuggestionChosen"
-                            AutomationProperties.AutomationId="AdvancedSearchView_SearchBox"/>
-          </StackPanel>
-        </Border>
-
-        <ItemsControl ItemsSource="{x:Bind ViewModel.ActiveFilters, Mode=OneWay}"
-                       AutomationProperties.AutomationId="AdvancedSearchView_ActiveFilters">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <StackPanel Orientation="Horizontal" Spacing="6"/>
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                      CornerRadius="12" Padding="8,4">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <TextBlock FontSize="12">
-                    <Run Text="{Binding Name}"/>
-                    <Run Text=": "/>
-                    <Run Text="{Binding Value}" FontWeight="SemiBold"/>
-                  </TextBlock>
-                  <Button Click="RemoveFilter_Click" CommandParameter="{Binding}"
-                          Padding="2" MinWidth="0" MinHeight="0">
-                    <FontIcon Glyph="&#xE711;" FontSize="10"/>
-                  </Button>
-                </StackPanel>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-
-        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16">
-          <StackPanel Spacing="8">
-            <TextBlock FontSize="13" FontWeight="SemiBold"
-                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}">
-              <Run Text="Results ("/>
-              <Run Text="{x:Bind ViewModel.ResultsCount, Mode=OneWay}"/>
-              <Run Text=")"/>
-            </TextBlock>
-
-            <ListView ItemsSource="{x:Bind ViewModel.SearchResults, Mode=OneWay}"
-                      IsItemClickEnabled="True"
-                      MaxHeight="500"
-                      AutomationProperties.AutomationId="AdvancedSearchView_ResultsList">
-              <ListView.ItemTemplate>
-                <DataTemplate>
-                  <Grid Padding="8" ColumnSpacing="12" Tag="{Binding}"
-                        PointerPressed="ResultItem_PointerPressed">
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="Auto"/>
-                      <ColumnDefinition Width="*"/>
-                      <ColumnDefinition Width="Auto"/>
-                      <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="{Binding Icon}" FontSize="20" VerticalAlignment="Center"/>
-                    <StackPanel Grid.Column="1">
-                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
-                      <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.7"
-                                 TextTrimming="CharacterEllipsis" MaxLines="1"/>
-                    </StackPanel>
-                    <TextBlock Grid.Column="2" Text="{Binding Type}" FontSize="11" Opacity="0.6"
-                               VerticalAlignment="Center"/>
-                    <Button Grid.Column="3" Click="OpenResult_Click" CommandParameter="{Binding}"
-                            ToolTipService.ToolTip="Open" VerticalAlignment="Center">
-                      <FontIcon Glyph="&#xE8A7;" FontSize="12"/>
-                    </Button>
-                  </Grid>
-                </DataTemplate>
-              </ListView.ItemTemplate>
-            </ListView>
-          </StackPanel>
-        </Border>
-
-        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16">
-          <StackPanel Spacing="8">
-            <TextBlock Text="Recent Searches" FontSize="13" FontWeight="SemiBold"
+            <TextBlock Text="Planned Features:"
+                       FontWeight="SemiBold"
                        Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-            <ListView ItemsSource="{x:Bind ViewModel.QueryHistory, Mode=OneWay}"
-                      IsItemClickEnabled="True"
-                      ItemClick="QueryHistory_ItemClick"
-                      MaxHeight="150"
-                      AutomationProperties.AutomationId="AdvancedSearchView_QueryHistory">
-              <ListView.ItemTemplate>
-                <DataTemplate>
-                  <TextBlock Text="{Binding}" FontSize="12" Padding="4"/>
-                </DataTemplate>
-              </ListView.ItemTemplate>
-            </ListView>
+            <TextBlock Text="- Search across all panels and assets"
+                       Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+            <TextBlock Text="- Regex and wildcard pattern matching"
+                       Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+            <TextBlock Text="- Search history and saved queries"
+                       Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+            <TextBlock Text="- Filter by date, type, and metadata"
+                       Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
           </StackPanel>
         </Border>
-
       </StackPanel>
-    </ScrollViewer>
+    </Grid>
     
     <controls:HelpOverlay x:Name="HelpOverlay" Grid.RowSpan="2" IsVisible="False" Visibility="Collapsed"/>
   </Grid>

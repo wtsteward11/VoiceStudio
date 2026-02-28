@@ -381,7 +381,7 @@ class PluginInstallService:
     async def _check_dependencies(self, version: PluginVersion) -> DependencyCheckResult:
         """Check if dependencies are satisfied."""
         missing = []
-        incompatible: list[str] = []
+        incompatible = []
         details = {}
 
         for dep_name, version_spec in version.dependencies.items():

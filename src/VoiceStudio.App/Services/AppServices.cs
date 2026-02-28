@@ -1,17 +1,12 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.Generic;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Dispatching;
 using VoiceStudio.Core.Panels;
-using VoiceStudio.Core.Plugins;
 using VoiceStudio.Core.Services;
 using VoiceStudio.Core.State;
 using VoiceStudio.App.Core.Commands;
-using VoiceStudio.App.Configuration;
 using VoiceStudio.App.UseCases;
 using VoiceStudio.App.ViewModels;
 
@@ -41,44 +36,14 @@ namespace VoiceStudio.App.Services
     public static void Initialize()
     {
       var services = new ServiceCollection();
-      RegisterServices(services, null);
-      _provider = services.BuildServiceProvider();
-      PostInitialize();
-    }
 
-    /// <summary>
-    /// Registers all application services into the given collection.
-    /// Called by both Initialize() (direct build) and HostFactory (Generic Host).
-    /// </summary>
-    public static void RegisterServices(IServiceCollection services, IConfiguration? config)
-    {
-      if (config != null)
-      {
-        services.Configure<BackendOptions>(config.GetSection("Backend"));
-        services.Configure<AudioOptions>(config.GetSection("Audio"));
-      }
-
-      services.AddSingleton<ICorrelationIdProvider, CorrelationIdProvider>();
-
-      var apiHost = config?.GetSection("Backend")?["Host"]
-                    ?? Environment.GetEnvironmentVariable("VOICESTUDIO_API_HOST")
-                    ?? "localhost";
-      var apiPort = config?.GetSection("Backend")?["Port"]
-                    ?? Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT")
-                    ?? "8000";
+      // Config and backend - use environment variable with fallback to 8001
+      var apiHost = Environment.GetEnvironmentVariable("VOICESTUDIO_API_HOST") ?? "localhost";
+      var apiPort = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT") ?? "8001";
       var baseUrl = $"http://{apiHost}:{apiPort}";
       var wsUrl = $"ws://{apiHost}:{apiPort}/ws/realtime";
       services.AddSingleton(new BackendClientConfig { BaseUrl = baseUrl, WebSocketUrl = wsUrl });
-      // GAP-I12: Inject correlation provider into BackendClient
-      services.AddSingleton<IBackendClient>(sp => new BackendClient(
-        sp.GetRequiredService<BackendClientConfig>(),
-        sp.GetRequiredService<ICorrelationIdProvider>()));
-
-      // GAP-CS-001: WebSocket services for real-time streaming support
-      services.AddSingleton<IWebSocketService>(sp => new WebSocketService(
-          sp.GetRequiredService<BackendClientConfig>().WebSocketUrl));
-      services.AddSingleton<IWebSocketClientFactory>(sp => new WebSocketClientFactory(
-          sp.GetService<IWebSocketService>()));
+      services.AddSingleton<IBackendClient, BackendClient>();
 
       // Use cases
       services.AddSingleton<IProfilesUseCase, ProfilesUseCase>();
@@ -105,9 +70,7 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<PanelStateService>();
       services.AddSingleton<INavigationService, NavigationService>();
       services.AddSingleton<IErrorDialogService, ErrorDialogService>();
-      // GAP-I12: Inject correlation provider into ErrorLoggingService
-      services.AddSingleton<IErrorLoggingService>(sp => new ErrorLoggingService(
-        sp.GetRequiredService<ICorrelationIdProvider>()));
+      services.AddSingleton<IErrorLoggingService, ErrorLoggingService>();
       services.AddSingleton<IAuditLoggingService>(sp => new AuditLoggingService(sp.GetRequiredService<IErrorLoggingService>()));
       services.AddSingleton<IHelpOverlayService, HelpOverlayService>();
       services.AddSingleton<IAudioPlayerService, AudioPlayerService>();
@@ -116,9 +79,6 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<StateCacheService>();
       services.AddSingleton<GracefulDegradationService>();
       services.AddSingleton<PluginManager>();
-      // Plugin Bridge Service for frontend-backend plugin state synchronization (Phase 1)
-      services.AddSingleton<IPluginBridgeService, PluginBridgeService>(sp => new PluginBridgeService(
-          sp.GetRequiredService<ILogger<PluginBridgeService>>()));
       services.AddSingleton<RealTimeQualityService>();
       // NOTE: ToastNotificationService requires a StackPanel container and cannot be auto-resolved.
       // It must be registered manually via RegisterToastNotificationService() after UI is created.
@@ -136,7 +96,6 @@ namespace VoiceStudio.App.Services
         new CommandRouter(sp.GetRequiredService<IUnifiedCommandRegistry>()));
       services.AddSingleton<CollaborationService>();
       services.AddSingleton<BackendProcessManager>();
-      services.AddSingleton<BackendConnectionMonitor>();
       services.AddSingleton<IFeatureFlagsService, FeatureFlagsService>();
       services.AddSingleton<IErrorPresentationService, ErrorPresentationService>();
       services.AddSingleton<IAnalyticsService, AnalyticsService>();
@@ -215,70 +174,17 @@ namespace VoiceStudio.App.Services
       // Module loader for UI modules
       services.AddSingleton<ModuleLoader>();
 
+      // Panel lazy loading
+      services.AddSingleton<PanelLoader>();
+
       // Error coordination service
       services.AddSingleton<IErrorCoordinator, ErrorCoordinator>();
 
       // ViewModel factory (needs service provider, so use factory registration)
       services.AddSingleton<IViewModelFactory>(sp => new ViewModelFactory(sp));
 
-      // GAP-B12: Command queue service for busy-state handling
-      services.AddSingleton<ICommandQueueService>(sp =>
-        new CommandQueueService(
-          sp.GetRequiredService<IUnifiedCommandRegistry>(),
-          sp.GetService<ICommandMutexService>(),
-          DispatcherQueue.GetForCurrentThread()));
-
+      _provider = services.BuildServiceProvider();
     }
-
-    /// <summary>
-    /// Post-initialization: wire command queue and register panels.
-    /// Must be called after the provider is set (via Initialize() or Initialize(provider)).
-    /// </summary>
-    public static void PostInitialize()
-    {
-      WireCommandQueueService();
-      RegisterAllPanels();
-    }
-
-    /// <summary>
-    /// Registers all panels in the unified PanelRegistry.
-    /// Called after DI container is built.
-    /// </summary>
-    private static void RegisterAllPanels()
-    {
-      var registry = GetPanelRegistry();
-
-      // Register advanced panels (TextSpeechEditor, Prosody, SpatialAudio, etc.)
-      AdvancedPanelRegistrationService.RegisterAdvancedPanels(registry);
-
-      // Register core panels - these were previously hardcoded in MainWindow
-      CorePanelRegistrationService.RegisterCorePanels(registry);
-
-      ErrorLogger.LogInfo($"[AppServices] Registered {registry.GetAllDescriptors().Count()} panels in PanelRegistry", "AppServices");
-    }
-
-    /// <summary>
-    /// Wires the command queue service to the unified command registry.
-    /// GAP-B12: Enables busy-state command queueing.
-    /// </summary>
-    private static void WireCommandQueueService()
-    {
-      var registry = GetCommandRegistry() as UnifiedCommandRegistry;
-      var queueService = GetService<ICommandQueueService>();
-
-      if (registry != null && queueService != null)
-      {
-        registry.SetQueueService(queueService);
-        ErrorLogger.LogDebug("[AppServices] Command queue service wired to registry (GAP-B12)", "AppServices");
-      }
-      else
-      {
-        ErrorLogger.LogDebug("[AppServices] Warning: Could not wire command queue service", "AppServices");
-      }
-    }
-
-    public static IServiceProvider GetProvider() =>
-        _provider ?? throw new InvalidOperationException("AppServices not initialized. Call Initialize() first.");
 
     public static T? GetService<T>() where T : class => (T?)_provider?.GetService(typeof(T));
     public static T GetRequiredService<T>() where T : class =>
@@ -303,8 +209,6 @@ namespace VoiceStudio.App.Services
     public static IUpdateService GetUpdateService() => GetRequiredService<IUpdateService>();
     public static ISettingsService GetSettingsService() => GetRequiredService<ISettingsService>();
     public static PluginManager GetPluginManager() => GetRequiredService<PluginManager>();
-    public static PluginBridgeService GetPluginBridgeService() => GetRequiredService<PluginBridgeService>();
-    public static PluginBridgeService? TryGetPluginBridgeService() => GetService<PluginBridgeService>();
     public static IPanelRegistry GetPanelRegistry() => GetRequiredService<IPanelRegistry>();
     public static IHelpOverlayService GetHelpOverlayService() => GetRequiredService<IHelpOverlayService>();
     public static RealTimeQualityService GetRealTimeQualityService() => GetRequiredService<RealTimeQualityService>();
@@ -352,6 +256,8 @@ namespace VoiceStudio.App.Services
     public static IProjectRepository? TryGetProjectRepository() => GetService<IProjectRepository>();
     public static ModuleLoader GetModuleLoader() => GetRequiredService<ModuleLoader>();
     public static ModuleLoader? TryGetModuleLoader() => GetService<ModuleLoader>();
+    public static PanelLoader GetPanelLoader() => GetRequiredService<PanelLoader>();
+    public static PanelLoader? TryGetPanelLoader() => GetService<PanelLoader>();
     public static IErrorCoordinator GetErrorCoordinator() => GetRequiredService<IErrorCoordinator>();
     public static IErrorCoordinator? TryGetErrorCoordinator() => GetService<IErrorCoordinator>();
     public static IViewModelFactory GetViewModelFactory() => GetRequiredService<IViewModelFactory>();
@@ -360,8 +266,6 @@ namespace VoiceStudio.App.Services
     public static IUnifiedCommandRegistry? TryGetCommandRegistry() => GetService<IUnifiedCommandRegistry>();
     public static CommandRouter GetCommandRouter() => GetRequiredService<CommandRouter>();
     public static CommandRouter? TryGetCommandRouter() => GetService<CommandRouter>();
-    public static ICommandQueueService GetCommandQueueService() => GetRequiredService<ICommandQueueService>();
-    public static ICommandQueueService? TryGetCommandQueueService() => GetService<ICommandQueueService>();
     public static IDialogService GetDialogService() => GetRequiredService<IDialogService>();
     public static IDialogService? TryGetDialogService() => GetService<IDialogService>();
     public static BackendProcessManager GetBackendProcessManager() => GetRequiredService<BackendProcessManager>();
@@ -394,21 +298,6 @@ namespace VoiceStudio.App.Services
     public static IJobService? TryGetJobService() => GetService<IJobService>();
     public static ISelectionStack GetSelectionStack() => GetRequiredService<ISelectionStack>();
     public static ISelectionStack? TryGetSelectionStack() => GetService<ISelectionStack>();
-
-    /// <summary>
-    /// Gets the current active project from FileOperationsHandler (if any).
-    /// Phase 3 Fix: Bridge project state for cross-component access.
-    /// </summary>
-    public static VoiceStudio.Core.Models.Project? GetCurrentProject()
-    {
-      var bootstrapper = VoiceStudio.App.Commands.CommandHandlerBootstrapper.Instance;
-      return bootstrapper?.FileHandler?.CurrentProject;
-    }
-
-    /// <summary>
-    /// Checks if there's an active project.
-    /// </summary>
-    public static bool HasActiveProject() => GetCurrentProject() != null;
   }
 
   /// <summary>
@@ -431,19 +320,19 @@ namespace VoiceStudio.App.Services
     public void TrackEvent(string eventName, IDictionary<string, object>? properties = null)
     {
       // No-op by design: local-first, privacy-respecting telemetry
-      ErrorLogger.LogDebug($"[Telemetry] Event: {eventName}", "AppServices");
+      System.Diagnostics.Debug.WriteLine($"[Telemetry] Event: {eventName}");
     }
 
     public void TrackMetric(string metricName, double value, IDictionary<string, string>? dimensions = null)
     {
       // No-op by design: metrics stay local
-      ErrorLogger.LogDebug($"[Telemetry] Metric: {metricName}={value}", "AppServices");
+      System.Diagnostics.Debug.WriteLine($"[Telemetry] Metric: {metricName}={value}");
     }
 
     public void TrackException(Exception exception, IDictionary<string, string>? properties = null)
     {
       // Log exceptions locally for debugging
-      ErrorLogger.LogWarning($"[Telemetry] Exception: {exception.GetType().Name}: {exception.Message}", "AppServices");
+      System.Diagnostics.Debug.WriteLine($"[Telemetry] Exception: {exception.GetType().Name}: {exception.Message}");
     }
 
     public IDisposable TrackOperation(string operationName) => new TelemetryOperationStub(operationName);
@@ -468,13 +357,13 @@ namespace VoiceStudio.App.Services
     {
       _operationName = operationName;
       _stopwatch = System.Diagnostics.Stopwatch.StartNew();
-      ErrorLogger.LogDebug($"[Telemetry] Operation started: {operationName}", "AppServices");
+      System.Diagnostics.Debug.WriteLine($"[Telemetry] Operation started: {operationName}");
     }
 
     public void Dispose()
     {
       _stopwatch.Stop();
-      ErrorLogger.LogInfo($"[Telemetry] Operation completed: {_operationName} ({_stopwatch.ElapsedMilliseconds}ms)", "AppServices");
+      System.Diagnostics.Debug.WriteLine($"[Telemetry] Operation completed: {_operationName} ({_stopwatch.ElapsedMilliseconds}ms)");
     }
   }
 }

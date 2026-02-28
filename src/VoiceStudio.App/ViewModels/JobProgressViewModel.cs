@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -271,7 +270,7 @@ namespace VoiceStudio.App.ViewModels
         }
         catch (Exception ex)
         {
-          ErrorLogger.LogWarning($"Error polling jobs: {ex.Message}", "JobProgressViewModel");
+          System.Diagnostics.Debug.WriteLine($"Error polling jobs: {ex.Message}");
           await Task.Delay(5000, cancellationToken); // Wait longer on error
         }
       }

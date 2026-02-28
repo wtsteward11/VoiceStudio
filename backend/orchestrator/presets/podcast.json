@@ -1,0 +1,24 @@
+{
+  "preset_id": "podcast",
+  "name": "Podcast",
+  "category": "podcast",
+  "description": "Conversational tone with loudness normalization for podcast distribution",
+  "default_chain": {
+    "schema_version": "1.0",
+    "name": "Podcast Pipeline",
+    "steps": [
+      {"step_id": "s1", "type": "synthesis", "parameters": {"temperature": 0.7, "speed": 1.05}},
+      {"step_id": "s2", "type": "quality_evaluation"},
+      {"step_id": "s3", "type": "mastering", "parameters": {"loudness": "EBU_R128"}}
+    ]
+  },
+  "default_quality_policy": {
+    "min_mos": 3.8,
+    "min_similarity": 0.8,
+    "min_naturalness": 0.85,
+    "max_artifact_score": 0.05,
+    "min_snr_db": 30,
+    "auto_enhance_if_below": true,
+    "fail_if_unmet": false
+  }
+}

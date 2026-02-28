@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -457,7 +456,7 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         // Silently fail - use default engines
-        ErrorLogger.LogWarning($"Failed to load engines: {ex.Message}", "ImageGenViewModel");
+        System.Diagnostics.Debug.WriteLine($"Failed to load engines: {ex.Message}");
       }
 
       return Task.CompletedTask;

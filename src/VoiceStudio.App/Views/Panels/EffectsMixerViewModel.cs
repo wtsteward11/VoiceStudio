@@ -1,5 +1,4 @@
 using System;
-using VoiceStudio.App.Logging;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Linq;
@@ -338,12 +337,6 @@ namespace VoiceStudio.App.Views.Panels
         await UpdateSubGroupAsync(sg, ct);
       }, sg => sg != null && !IsLoading);
 
-      RunPostProcessingCommand = new EnhancedAsyncRelayCommand(async (ct) =>
-      {
-        using var profiler = PerformanceProfiler.StartCommand("RunPostProcessing");
-        await RunPostProcessingAsync(ct);
-      }, () => !IsLoading && !string.IsNullOrWhiteSpace(SelectedAudioId));
-
       // Initialize with default channels (will be replaced when mixer state loads)
       for (int i = 1; i <= 4; i++)
       {
@@ -389,7 +382,6 @@ namespace VoiceStudio.App.Views.Panels
     public EnhancedAsyncRelayCommand<MixerReturn> UpdateReturnCommand { get; }
     public EnhancedAsyncRelayCommand<MixerSubGroup> DeleteSubGroupCommand { get; }
     public EnhancedAsyncRelayCommand<MixerSubGroup> UpdateSubGroupCommand { get; }
-    public EnhancedAsyncRelayCommand RunPostProcessingCommand { get; }
 
     // Multi-select commands
     public IRelayCommand SelectAllChannelsCommand { get; }
@@ -445,7 +437,6 @@ namespace VoiceStudio.App.Views.Panels
       LoadMixerPresetsCommand.NotifyCanExecuteChanged();
       CreateMixerPresetCommand.NotifyCanExecuteChanged();
       ApplyMixerPresetCommand.NotifyCanExecuteChanged();
-      RunPostProcessingCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnMixerStateChanged(MixerState? value)
@@ -457,7 +448,6 @@ namespace VoiceStudio.App.Views.Panels
     {
       LoadMetersCommand.NotifyCanExecuteChanged();
       ToggleRealTimeUpdatesCommand.NotifyCanExecuteChanged();
-      RunPostProcessingCommand.NotifyCanExecuteChanged();
 
       // Stop polling if audio ID changes
       if (IsRealTimeUpdatesEnabled)
@@ -528,7 +518,7 @@ namespace VoiceStudio.App.Views.Panels
         catch (Exception ex)
         {
           // Log error but continue polling
-          ErrorLogger.LogWarning($"Error polling meters: {ex.Message}", "EffectsMixerViewModel");
+          System.Diagnostics.Debug.WriteLine($"Error polling meters: {ex.Message}");
           await Task.Delay(1000, cancellationToken); // Wait longer on error
         }
       }
@@ -610,7 +600,7 @@ namespace VoiceStudio.App.Views.Panels
         // Don't show error message for meter polling failures (too noisy)
         // Only log for debugging
         _logService?.LogError(ex, "LoadMeters");
-        ErrorLogger.LogWarning($"Error loading meters: {ex.Message}", "EffectsMixerViewModel");
+        System.Diagnostics.Debug.WriteLine($"Error loading meters: {ex.Message}");
       }
     }
 
@@ -1168,56 +1158,6 @@ namespace VoiceStudio.App.Views.Panels
         _logService?.LogError(ex, "SaveEffectChain");
         _toastNotificationService?.ShowError(
             ResourceHelper.GetString("EffectsMixer.EffectChainSaveFailed", "Failed to Save Effect Chain"),
-            ErrorHandler.GetUserFriendlyMessage(ex));
-      }
-      finally
-      {
-        IsLoading = false;
-      }
-    }
-
-    private async Task RunPostProcessingAsync(CancellationToken cancellationToken)
-    {
-      if (string.IsNullOrWhiteSpace(SelectedAudioId))
-        return;
-
-      IsLoading = true;
-      ErrorMessage = null;
-
-      try
-      {
-        var request = new Dictionary<string, object>
-        {
-          { "audio_id", SelectedAudioId }
-        };
-
-        if (!string.IsNullOrWhiteSpace(SelectedProjectId))
-        {
-          request["project_id"] = SelectedProjectId;
-        }
-
-        await _backendClient.SendRequestAsync<Dictionary<string, object>, object>(
-            "/api/voice/post-process",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
-
-        _toastNotificationService?.ShowSuccess(
-            ResourceHelper.GetString("EffectsMixer.PostProcessingComplete", "Post-Processing Complete"),
-            ResourceHelper.GetString("EffectsMixer.PostProcessingCompleteDetail", "Audio post-processing pipeline completed successfully"));
-      }
-      catch (OperationCanceledException)
-      {
-        return;
-      }
-      catch (Exception ex)
-      {
-        ErrorMessage = ErrorHandler.GetUserFriendlyMessage(ex);
-        _errorService?.ShowError(ex, ResourceHelper.GetString("EffectsMixer.PostProcessingFailed", "Failed to run post-processing"));
-        _logService?.LogError(ex, "RunPostProcessing");
-        _toastNotificationService?.ShowError(
-            ResourceHelper.GetString("EffectsMixer.PostProcessingFailed", "Post-Processing Failed"),
             ErrorHandler.GetUserFriendlyMessage(ex));
       }
       finally

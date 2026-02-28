@@ -521,8 +521,7 @@ class LicenseChecker:
             LicenseCategory enum value
         """
         if license_id in SPDX_LICENSES:
-            cat = SPDX_LICENSES[license_id].get("category", LicenseCategory.UNKNOWN)
-            return LicenseCategory(cat) if not isinstance(cat, LicenseCategory) else cat
+            return SPDX_LICENSES[license_id].get("category", LicenseCategory.UNKNOWN)
         return LicenseCategory.UNKNOWN
 
     def is_copyleft(self, license_id: str) -> bool:
@@ -536,7 +535,7 @@ class LicenseChecker:
             True if copyleft license
         """
         if license_id in SPDX_LICENSES:
-            return bool(SPDX_LICENSES[license_id].get("copyleft", False))
+            return SPDX_LICENSES[license_id].get("copyleft", False)
 
         # Heuristic: check for GPL/AGPL/LGPL in name
         copyleft_patterns = ["GPL", "AGPL", "LGPL", "MPL", "EPL"]

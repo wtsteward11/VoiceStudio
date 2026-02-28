@@ -301,6 +301,7 @@ public class DeferredServiceInitializerTests : TestBase
         {
             await _initializer.InitializeAllAsync(cts.Token);
         }
+        // ALLOWED: empty catch - test expects OperationCanceledException; we only need to catch it to assert cancellation path
         catch (OperationCanceledException)
         {
             // Expected when cancellation is requested

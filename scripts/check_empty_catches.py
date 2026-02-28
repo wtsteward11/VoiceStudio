@@ -66,6 +66,7 @@ SKIP_DIRS = {
     'runtime', 'env',  # External dependencies and virtual environments
     '.cursor',  # Cursor hooks and skills (intentional patterns)
     'tests',  # Test code often uses except: pass for teardown/skip (allowed in tests)
+    'docs',  # Archived code snapshots (e.g. pre_restore_20260228) are not live code
 }
 
 # Directory prefixes to skip (partial match for venv_* patterns)

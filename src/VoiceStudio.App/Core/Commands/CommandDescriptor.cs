@@ -57,6 +57,13 @@ namespace VoiceStudio.App.Core.Commands
         /// Whether the command is currently enabled.
         /// </summary>
         public bool IsEnabled { get; init; } = true;
+
+        /// <summary>
+        /// Whether the command bypasses the busy-state check.
+        /// GAP-B12: Commands with BypassBusy=true execute immediately even when IsBusy=true.
+        /// Use for critical commands like "Stop", "Cancel", etc.
+        /// </summary>
+        public bool BypassBusy { get; init; } = false;
     }
 
     /// <summary>

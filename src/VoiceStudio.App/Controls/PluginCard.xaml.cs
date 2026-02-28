@@ -117,13 +117,8 @@ namespace VoiceStudio.App.Controls
 
         #region Event Handlers
 
-        private void ActionButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (ActionCommand?.CanExecute(Plugin) == true)
-            {
-                ActionCommand.Execute(Plugin);
-            }
-        }
+        // GAP-B18: ActionButton_Click - Removed, now using Command binding in XAML
+        // The command binding directly connects ActionCommand with Plugin as CommandParameter
 
         private void Card_PointerPressed(object sender, PointerRoutedEventArgs e)
         {

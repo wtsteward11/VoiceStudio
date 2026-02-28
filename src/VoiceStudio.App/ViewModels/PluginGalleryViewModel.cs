@@ -89,10 +89,13 @@ namespace VoiceStudio.App.ViewModels
         [ObservableProperty]
         private int _totalPlugins;
 
+        // GAP-B18: NotifyCanExecuteChangedFor enables proper button state updates via Command binding
         [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(NextPageCommand))]
         private bool _hasNextPage;
 
         [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(PreviousPageCommand))]
         private bool _hasPreviousPage;
 
         #endregion
@@ -259,7 +262,8 @@ namespace VoiceStudio.App.ViewModels
 
         #region Pagination
 
-        [RelayCommand]
+        // GAP-B18: Added CanExecute for proper button state management via Command binding
+        [RelayCommand(CanExecute = nameof(CanNextPage))]
         private async Task NextPageAsync()
         {
             if (HasNextPage)
@@ -269,7 +273,10 @@ namespace VoiceStudio.App.ViewModels
             }
         }
 
-        [RelayCommand]
+        private bool CanNextPage() => HasNextPage;
+
+        // GAP-B18: Added CanExecute for proper button state management via Command binding
+        [RelayCommand(CanExecute = nameof(CanPreviousPage))]
         private async Task PreviousPageAsync()
         {
             if (HasPreviousPage)
@@ -278,6 +285,8 @@ namespace VoiceStudio.App.ViewModels
                 await SearchAsync();
             }
         }
+
+        private bool CanPreviousPage() => HasPreviousPage;
 
         #endregion
 

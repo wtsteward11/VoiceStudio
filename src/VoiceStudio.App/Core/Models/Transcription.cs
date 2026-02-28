@@ -62,4 +62,18 @@ namespace VoiceStudio.Core.Models
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
   }
+
+  /// <summary>
+  /// Information about an available transcription engine.
+  /// GAP-CS-003: Dynamic engine discovery from backend API.
+  /// </summary>
+  public class TranscriptionEngine
+  {
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public bool SupportsWordTimestamps { get; set; } = true;
+    public bool SupportsDiarization { get; set; } = false;
+    public bool SupportsVad { get; set; } = false;
+  }
 }

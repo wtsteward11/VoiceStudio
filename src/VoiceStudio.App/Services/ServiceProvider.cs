@@ -38,6 +38,8 @@ namespace VoiceStudio.App.Services
     public static IUpdateService GetUpdateService() => AppServices.GetUpdateService();
     public static ISettingsService GetSettingsService() => AppServices.GetSettingsService();
     public static PluginManager GetPluginManager() => AppServices.GetPluginManager();
+    public static PluginBridgeService GetPluginBridgeService() => AppServices.GetPluginBridgeService();
+    public static PluginBridgeService? TryGetPluginBridgeService() => AppServices.TryGetPluginBridgeService();
     public static IPanelRegistry GetPanelRegistry() => AppServices.GetPanelRegistry();
     public static IHelpOverlayService GetHelpOverlayService() => AppServices.GetHelpOverlayService();
     public static RealTimeQualityService GetRealTimeQualityService() => AppServices.GetRealTimeQualityService();
@@ -133,8 +135,6 @@ namespace VoiceStudio.App.Services
     }
     public static ModuleLoader GetModuleLoader() => AppServices.GetModuleLoader();
     public static ModuleLoader? TryGetModuleLoader() => AppServices.TryGetModuleLoader();
-    public static PanelLoader GetPanelLoader() => AppServices.GetPanelLoader();
-    public static PanelLoader? TryGetPanelLoader() => AppServices.TryGetPanelLoader();
     public static IErrorCoordinator GetErrorCoordinator() => AppServices.GetErrorCoordinator();
     public static IErrorCoordinator? TryGetErrorCoordinator() => AppServices.TryGetErrorCoordinator();
     public static IViewModelFactory GetViewModelFactory() => AppServices.GetViewModelFactory();

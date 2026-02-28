@@ -27,6 +27,7 @@ namespace VoiceStudio.App.Views.Panels
     private GPUStatusResponse? _cachedGpuStatus;
     private DateTime _lastGpuUpdate = DateTime.MinValue;
     private readonly TimeSpan _gpuUpdateInterval = TimeSpan.FromSeconds(5);
+    private ObservableCollection<CircuitBreakerItem> _circuitBreakerItems = new();
 
     public DiagnosticsView()
     {
@@ -373,6 +374,7 @@ namespace VoiceStudio.App.Views.Panels
             break;
           case "Engines":
             EnginesGrid.Visibility = Visibility.Visible;
+            _ = LoadCircuitBreakersAsync();
             break;
           case "Commands":
             CommandsGrid.Visibility = Visibility.Visible;
@@ -519,9 +521,19 @@ namespace VoiceStudio.App.Views.Panels
         var file = await savePicker.PickSaveFileAsync();
         if (file != null)
         {
-          // Export logs - placeholder for actual implementation
-          await Windows.Storage.FileIO.WriteTextAsync(file, "VoiceStudio Log Export\n" + DateTime.Now.ToString());
-          _toastService?.ShowToast(ToastType.Success, "Export Complete", "Logs exported successfully");
+          // GAP-CS-002: Export real logs from ViewModel
+          var logContent = new System.Text.StringBuilder();
+          logContent.AppendLine($"VoiceStudio Log Export - {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+          logContent.AppendLine($"Total entries: {ViewModel.Logs.Count}");
+          logContent.AppendLine(new string('-', 80));
+          
+          foreach (var log in ViewModel.Logs)
+          {
+            logContent.AppendLine(log.FormattedLine);
+          }
+          
+          await Windows.Storage.FileIO.WriteTextAsync(file, logContent.ToString());
+          _toastService?.ShowToast(ToastType.Success, "Export Complete", $"Exported {ViewModel.Logs.Count} log entries");
         }
       }
       catch (Exception ex)
@@ -559,9 +571,35 @@ namespace VoiceStudio.App.Views.Panels
         var file = await savePicker.PickSaveFileAsync();
         if (file != null)
         {
-          // Export traces - placeholder for actual implementation
-          await Windows.Storage.FileIO.WriteTextAsync(file, "{ \"traces\": [] }");
-          _toastService?.ShowToast(ToastType.Success, "Export Complete", "Traces exported successfully");
+          // GAP-CS-002: Export real traces from ViewModel
+          var traceData = new
+          {
+            exported_at = DateTime.UtcNow,
+            total_traces = ViewModel.TotalTracesCount,
+            success_rate = ViewModel.TraceSuccessRate,
+            avg_duration = ViewModel.TraceAvgDuration,
+            traces = ViewModel.Traces.Select(t => new
+            {
+              trace_id = t.TraceId,
+              start_time = t.StartTime,
+              duration_ms = t.DurationMs,
+              status = t.Status,
+              operation = t.OperationName,
+              spans = t.Spans?.Select(s => new
+              {
+                span_id = s.SpanId,
+                name = s.Name,
+                duration_ms = s.DurationMs,
+                status = s.Status
+              })
+            }).ToList()
+          };
+          
+          var json = System.Text.Json.JsonSerializer.Serialize(
+            traceData, 
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+          await Windows.Storage.FileIO.WriteTextAsync(file, json);
+          _toastService?.ShowToast(ToastType.Success, "Export Complete", $"Exported {ViewModel.TotalTracesCount} traces");
         }
       }
       catch (Exception ex)
@@ -636,6 +674,84 @@ namespace VoiceStudio.App.Views.Panels
       {
         Debug.WriteLine($"[DiagnosticsView] Failed to stop engines: {ex.Message}");
         _toastService?.ShowToast(ToastType.Error, "Stop Failed", ex.Message);
+      }
+    }
+
+    // GAP-I24: Circuit Breaker handlers
+    private void RefreshCircuitBreakers_Click(object sender, RoutedEventArgs e)
+    {
+      _ = LoadCircuitBreakersAsync();
+    }
+
+    private async void ResetCircuitBreaker_Click(object sender, RoutedEventArgs e)
+    {
+      try
+      {
+        if (sender is Button button && button.Tag is string engineId)
+        {
+          var backendClient = ServiceProvider.GetBackendClient();
+          var response = await backendClient.PostAsync<object, CircuitBreakerResetResponse>(
+            $"/api/health/circuit-breakers/{engineId}/reset", new { });
+          
+          if (response?.Success == true)
+          {
+            _toastService?.ShowToast(ToastType.Success, "Circuit Breaker Reset", $"'{engineId}' reset to CLOSED");
+            await LoadCircuitBreakersAsync();
+          }
+          else
+          {
+            _toastService?.ShowToast(ToastType.Warning, "Reset Failed", response?.Message ?? "Unknown error");
+          }
+        }
+      }
+      catch (Exception ex)
+      {
+        Debug.WriteLine($"[DiagnosticsView] Failed to reset circuit breaker: {ex.Message}");
+        _toastService?.ShowToast(ToastType.Error, "Reset Failed", ex.Message);
+      }
+    }
+
+    private async Task LoadCircuitBreakersAsync()
+    {
+      try
+      {
+        var backendClient = ServiceProvider.GetBackendClient();
+        if (backendClient == null) return;
+
+        var response = await backendClient.GetAsync<CircuitBreakerHealthResponse>("/api/health/circuit-breakers");
+        
+        if (response != null)
+        {
+          // Update summary counts
+          TotalCircuitBreakersCount.Text = response.Summary?.Total.ToString() ?? "0";
+          ClosedCircuitBreakersCount.Text = response.Summary?.Closed.ToString() ?? "0";
+          HalfOpenCircuitBreakersCount.Text = response.Summary?.HalfOpen.ToString() ?? "0";
+          OpenCircuitBreakersCount.Text = response.Summary?.Open.ToString() ?? "0";
+
+          // Populate list
+          _circuitBreakerItems.Clear();
+          foreach (var cb in response.CircuitBreakers ?? new List<CircuitBreakerInfo>())
+          {
+            _circuitBreakerItems.Add(new CircuitBreakerItem
+            {
+              Name = cb.Name ?? "Unknown",
+              State = cb.State ?? "UNKNOWN",
+              FailureCount = cb.FailureCount,
+              SuccessCount = cb.SuccessCount,
+              TotalCalls = cb.TotalCalls,
+              BlockedRequests = cb.BlockedRequests,
+              FailureRate = cb.FailureRate
+            });
+          }
+
+          CircuitBreakersListView.ItemsSource = _circuitBreakerItems;
+          NoCircuitBreakersText.Visibility = _circuitBreakerItems.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+      }
+      catch (Exception ex)
+      {
+        Debug.WriteLine($"[DiagnosticsView] Failed to load circuit breakers: {ex.Message}");
+        NoCircuitBreakersText.Visibility = Visibility.Visible;
       }
     }
 
@@ -798,4 +914,92 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
   }
+
+  #region GAP-I24: Circuit Breaker Models
+
+  /// <summary>
+  /// Response model for circuit breaker health API (GAP-I24).
+  /// </summary>
+  public sealed class CircuitBreakerHealthResponse
+  {
+    public string? Timestamp { get; set; }
+    public List<CircuitBreakerInfo>? CircuitBreakers { get; set; }
+    public CircuitBreakerSummary? Summary { get; set; }
+    public string? Error { get; set; }
+  }
+
+  /// <summary>
+  /// Summary of circuit breaker states (GAP-I24).
+  /// </summary>
+  public sealed class CircuitBreakerSummary
+  {
+    public int Total { get; set; }
+    public int Open { get; set; }
+    public int HalfOpen { get; set; }
+    public int Closed { get; set; }
+  }
+
+  /// <summary>
+  /// Individual circuit breaker information (GAP-I24).
+  /// </summary>
+  public sealed class CircuitBreakerInfo
+  {
+    public string? Name { get; set; }
+    public string? State { get; set; }
+    public int FailureCount { get; set; }
+    public int SuccessCount { get; set; }
+    public int TotalCalls { get; set; }
+    public int BlockedRequests { get; set; }
+    public double FailureRate { get; set; }
+    public double? LastFailureTime { get; set; }
+    public double? LastStateChange { get; set; }
+  }
+
+  /// <summary>
+  /// Response model for circuit breaker reset API (GAP-I24).
+  /// </summary>
+  public sealed class CircuitBreakerResetResponse
+  {
+    public bool Success { get; set; }
+    public string? Message { get; set; }
+    public string? Error { get; set; }
+  }
+
+  /// <summary>
+  /// View model for circuit breaker display in diagnostics (GAP-I24).
+  /// </summary>
+  public sealed class CircuitBreakerItem
+  {
+    public string Name { get; set; } = "";
+    public string State { get; set; } = "UNKNOWN";
+    public int FailureCount { get; set; }
+    public int SuccessCount { get; set; }
+    public int TotalCalls { get; set; }
+    public int BlockedRequests { get; set; }
+    public double FailureRate { get; set; }
+
+    public SolidColorBrush StateColor => State switch
+    {
+      "CLOSED" => new SolidColorBrush(UIColors.Green),
+      "HALF_OPEN" => new SolidColorBrush(UIColors.Orange),
+      "OPEN" => new SolidColorBrush(UIColors.Red),
+      _ => new SolidColorBrush(UIColors.Gray)
+    };
+
+    public string FailureRateFormatted => $"{FailureRate * 100:F1}%";
+
+    public SolidColorBrush FailureRateColor
+    {
+      get
+      {
+        if (FailureRate >= 0.5) return new SolidColorBrush(UIColors.Red);
+        if (FailureRate >= 0.2) return new SolidColorBrush(UIColors.Orange);
+        return new SolidColorBrush(UIColors.Green);
+      }
+    }
+
+    public Visibility ShowResetButton => State != "CLOSED" ? Visibility.Visible : Visibility.Collapsed;
+  }
+
+  #endregion
 }

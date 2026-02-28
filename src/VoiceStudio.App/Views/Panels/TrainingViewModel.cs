@@ -30,6 +30,9 @@ namespace VoiceStudio.App.Views.Panels
     private CancellationTokenSource? _pollingCts;
     private bool _isPolling;
 
+    // GAP-I15: Disposal token for fire-and-forget operations
+    private readonly CancellationTokenSource _disposalCts = new();
+
     // Phase 3: WebSocket client for real-time training progress updates
     private readonly JobProgressWebSocketClient? _jobProgressClient;
     private bool _isWebSocketConnected;
@@ -387,9 +390,10 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (value != null)
       {
-        // Auto-load logs and quality history when job is selected
-        _ = LoadLogsAsync(CancellationToken.None);
-        _ = LoadQualityHistoryAsync(CancellationToken.None);
+        // GAP-I15: Auto-load logs and quality history when job is selected
+        // Use disposal token for fire-and-forget operations
+        _ = LoadLogsAsync(_disposalCts.Token);
+        _ = LoadQualityHistoryAsync(_disposalCts.Token);
       }
       else
       {
@@ -946,11 +950,21 @@ namespace VoiceStudio.App.Views.Panels
           
           // Show success notification
           _toastNotificationService?.ShowSuccess($"Training job completed successfully");
+
+          // GAP-B05: Publish ProfileCreatedEvent for cross-panel synchronization
+          // This allows ProfilesView to refresh and show the newly trained profile
+          if (!string.IsNullOrEmpty(job.ProfileId) && _eventAggregator != null)
+          {
+            var profileName = $"Trained Profile ({job.Engine})";
+            _eventAggregator.Publish(new ProfileCreatedEvent(PanelId, job.ProfileId, profileName));
+            System.Diagnostics.Debug.WriteLine(
+              $"[TrainingViewModel] Published ProfileCreatedEvent: {job.ProfileId}");
+          }
         }
 
-        // Refresh logs and jobs to get final state
-        await LoadLogsAsync(CancellationToken.None);
-        await LoadTrainingJobsAsync(CancellationToken.None);
+        // GAP-I15: Refresh logs and jobs to get final state using disposal token
+        await LoadLogsAsync(_disposalCts.Token);
+        await LoadTrainingJobsAsync(_disposalCts.Token);
       });
     }
 
@@ -986,9 +1000,9 @@ namespace VoiceStudio.App.Views.Panels
         if (!_isPolling)
         {
           _isPolling = true;
-          // Load once, then rely on WebSocket for updates
-          _ = LoadDatasetsAsync(CancellationToken.None);
-          _ = LoadTrainingJobsAsync(CancellationToken.None);
+          // GAP-I15: Load once using disposal token, then rely on WebSocket for updates
+          _ = LoadDatasetsAsync(_disposalCts.Token);
+          _ = LoadTrainingJobsAsync(_disposalCts.Token);
         }
         return;
       }

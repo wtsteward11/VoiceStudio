@@ -26,6 +26,12 @@ public sealed partial class FirstRunWizard : Window
   private readonly CancellationTokenSource _cts = new();
   private bool _backendRunning;
 
+  /// <summary>
+  /// GAP-X02: Tracks whether the wizard was completed successfully.
+  /// True if user clicked Finish or Skip, false if user closed window early.
+  /// </summary>
+  public bool WasCompleted { get; private set; }
+
   public bool DontShowAgain => DontShowAgainCheckBox?.IsChecked ?? false;
 
   public FirstRunWizard()
@@ -88,7 +94,8 @@ public sealed partial class FirstRunWizard : Window
     }
     else
     {
-      // Save preference and close
+      // GAP-X02: Mark wizard as completed and save preference
+      WasCompleted = true;
       await SaveFirstRunCompleteAsync();
       this.Close();
     }
@@ -105,6 +112,8 @@ public sealed partial class FirstRunWizard : Window
 
   private async void SkipButton_Click(object sender, RoutedEventArgs e)
   {
+    // GAP-X02: Mark wizard as completed (skipped counts as completed)
+    WasCompleted = true;
     await SaveFirstRunCompleteAsync();
     this.Close();
   }

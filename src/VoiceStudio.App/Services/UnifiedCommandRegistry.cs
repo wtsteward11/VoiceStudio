@@ -21,6 +21,36 @@ namespace VoiceStudio.App.Services
         private readonly KeyboardShortcutService? _shortcutService;
         private readonly object _lock = new();
 
+        // GAP-B12: Command queue service for busy-state handling
+        private ICommandQueueService? _queueService;
+        private volatile bool _isBusy;
+
+        /// <summary>
+        /// Gets or sets whether the registry is in "busy" mode.
+        /// When busy, non-essential commands are queued instead of executed immediately.
+        /// </summary>
+        public bool IsBusy
+        {
+            get => _isBusy;
+            set
+            {
+                if (_isBusy != value)
+                {
+                    _isBusy = value;
+                    Debug.WriteLine($"[CommandRegistry] Busy state changed: {value}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Sets the queue service for busy-state command queueing.
+        /// GAP-B12: Commands are queued when IsBusy is true and BypassBusy is false.
+        /// </summary>
+        public void SetQueueService(ICommandQueueService queueService)
+        {
+            _queueService = queueService ?? throw new ArgumentNullException(nameof(queueService));
+        }
+
         public event EventHandler<CommandExecutedEventArgs>? CommandExecuted;
         public event EventHandler<CommandFailedEventArgs>? CommandFailed;
         public event EventHandler<CommandDescriptor>? CommandRegistered;
@@ -89,6 +119,13 @@ namespace VoiceStudio.App.Services
         {
             var commandId = entry.Descriptor.Id;
 
+            // GAP-B19: Validate command ID against known IDs
+            if (!CommandIds.IsKnown(commandId))
+            {
+                Debug.WriteLine($"[CommandRegistry] WARNING: Unregistered command ID: {commandId}. " +
+                    $"Add it to CommandIds.cs for compile-time safety.");
+            }
+
             _commands[commandId] = entry;
             _commandWrappers[commandId] = new RegistryRelayCommand(this, commandId);
 
@@ -152,6 +189,16 @@ namespace VoiceStudio.App.Services
                 FileLog($"[CommandRegistry] Command disabled: {commandId}");
                 return;
             }
+
+            // GAP-B12: Queue command if busy and command doesn't bypass busy state
+            if (_isBusy && !entry.Descriptor.BypassBusy && _queueService != null)
+            {
+                Debug.WriteLine($"[CommandRegistry] Busy - queueing command: {commandId}");
+                FileLog($"[CommandRegistry] Busy - queueing command: {commandId}");
+                _queueService.EnqueueIfBusy(commandId, parameter);
+                return;
+            }
+
             Debug.WriteLine($"[CommandRegistry] Executing handler for: {commandId}");
             FileLog($"[CommandRegistry] Executing handler for: {commandId}");
 

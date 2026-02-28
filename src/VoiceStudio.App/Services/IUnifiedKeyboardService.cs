@@ -2,7 +2,8 @@
 // Task 5.0.4: Unified Keyboard Service Interface
 // This interface unifies KeyboardShortcutService and Features/PowerUser/ShortcutManager
 //
-// Note: ShortcutBinding and ShortcutExecutedEventArgs are defined in KeyboardShortcutService.cs
+// Note: ShortcutBinding, ShortcutExecutedEventArgs, ShortcutConflictEventArgs, and ShortcutContext 
+// are defined in KeyboardShortcutService.cs
 
 using System;
 using System.Collections.Generic;
@@ -151,12 +152,43 @@ public interface IUnifiedKeyboardService
 
     #endregion
 
+    #region GAP-B23/B24: Enhanced Registration and Customization
+
+    /// <summary>
+    /// GAP-B23/B24: Register a shortcut with conflict detection.
+    /// </summary>
+    /// <returns>True if registration succeeded, false if conflict blocked it.</returns>
+    bool TryRegisterShortcut(
+        string commandId,
+        VirtualKey key,
+        VirtualKeyModifiers modifiers,
+        string description,
+        ShortcutContext context = ShortcutContext.Global,
+        bool allowOverwrite = false);
+
+    /// <summary>
+    /// GAP-B23/B24: Set a custom shortcut with auto-save.
+    /// </summary>
+    Task<bool> SetCustomShortcutAsync(string commandId, VirtualKey key, VirtualKeyModifiers modifiers);
+
+    /// <summary>
+    /// GAP-B23/B24: Initialize the service by loading saved customizations.
+    /// </summary>
+    Task InitializeAsync();
+
+    #endregion
+
     #region Events
 
     /// <summary>
     /// Event raised when a shortcut is executed.
     /// </summary>
     event EventHandler<ShortcutExecutedEventArgs>? ShortcutExecuted;
+
+    /// <summary>
+    /// GAP-B23/B24: Event raised when a shortcut conflict is detected.
+    /// </summary>
+    event EventHandler<ShortcutConflictEventArgs>? ConflictDetected;
 
     #endregion
 }

@@ -55,10 +55,86 @@ namespace VoiceStudio.App
     private MenuFlyoutItem? _keyboardShortcutsMenuItem;
 
     /// <summary>
-    /// Panel registry mapping panel IDs to their factory functions.
-    /// Used for restoring panels from saved workspace layouts.
+    /// Gets the unified panel registry from DI container.
+    /// Use CreatePanelFromRegistry() for panel creation.
     /// </summary>
-    private readonly Dictionary<string, (PanelRegion DefaultRegion, string Title, Func<UserControl> Factory)> _panelRegistry = new(StringComparer.OrdinalIgnoreCase)
+    private IPanelRegistry UnifiedPanelRegistry => AppServices.GetPanelRegistry();
+
+    /// <summary>
+    /// Creates a panel using the unified registry with DI-resolved ViewModels.
+    /// </summary>
+    /// <param name="panelId">The panel ID to create.</param>
+    /// <returns>A UserControl instance with ViewModel set, or null if not found.</returns>
+    private UserControl? CreatePanelFromRegistry(string panelId)
+    {
+      try
+      {
+        if (UnifiedPanelRegistry.TryGetDescriptor(panelId, out var descriptor) && descriptor != null)
+        {
+          var panel = UnifiedPanelRegistry.CreatePanel(panelId);
+          return panel as UserControl;
+        }
+
+        // Fall back to legacy registry if panel not in unified registry
+        if (_legacyPanelRegistry.TryGetValue(panelId, out var legacyEntry))
+        {
+          Debug.WriteLine(
+            $"[MainWindow] Panel '{panelId}' using legacy factory (migrate to unified registry)");
+          return legacyEntry.Factory();
+        }
+
+        Debug.WriteLine($"[MainWindow] Panel '{panelId}' not found in any registry");
+        return null;
+      }
+      catch (Exception ex)
+      {
+        Debug.WriteLine($"[MainWindow] Failed to create panel '{panelId}': {ex.Message}");
+        return null;
+      }
+    }
+
+    /// <summary>
+    /// Gets the default region for a panel.
+    /// </summary>
+    private PanelRegion GetPanelRegion(string panelId)
+    {
+      if (UnifiedPanelRegistry.TryGetDescriptor(panelId, out var descriptor) && descriptor != null)
+      {
+        return descriptor.DefaultRegion;
+      }
+
+      if (_legacyPanelRegistry.TryGetValue(panelId, out var legacyEntry))
+      {
+        return legacyEntry.DefaultRegion;
+      }
+
+      return PanelRegion.Center; // Default
+    }
+
+    /// <summary>
+    /// Gets the display name for a panel.
+    /// </summary>
+    private string GetPanelTitle(string panelId)
+    {
+      if (UnifiedPanelRegistry.TryGetDescriptor(panelId, out var descriptor) && descriptor != null)
+      {
+        return descriptor.DisplayName;
+      }
+
+      if (_legacyPanelRegistry.TryGetValue(panelId, out var legacyEntry))
+      {
+        return legacyEntry.Title;
+      }
+
+      return panelId; // Fall back to ID
+    }
+
+    /// <summary>
+    /// [DEPRECATED] Legacy panel registry mapping panel IDs to their factory functions.
+    /// Used for backward compatibility during migration to unified PanelRegistry.
+    /// New panels should be registered via CorePanelRegistrationService.
+    /// </summary>
+    private readonly Dictionary<string, (PanelRegion DefaultRegion, string Title, Func<UserControl> Factory)> _legacyPanelRegistry = new(StringComparer.OrdinalIgnoreCase)
     {
       // Core synthesis panels
       ["VoiceSynthesis"] = (PanelRegion.Center, "Voice Synthesis", () => new VoiceSynthesisView()),
@@ -525,10 +601,13 @@ namespace VoiceStudio.App
               SwitchToPanel(PanelRegion.Center, "Voice Synthesis", () => new VoiceSynthesisView());
               break;
             default:
-              // Try generic panel registry lookup
-              if (_panelRegistry.TryGetValue(panelId, out var panelInfo))
+              // Try unified panel registry lookup (GAP-F04)
+              var panel = CreatePanelFromRegistry(panelId);
+              if (panel != null)
               {
-                SwitchToPanel(panelInfo.DefaultRegion, panelInfo.Title, panelInfo.Factory);
+                var region = GetPanelRegion(panelId);
+                var title = GetPanelTitle(panelId);
+                SwitchToPanel(region, title, () => panel);
               }
               else
               {
@@ -1605,6 +1684,49 @@ namespace VoiceStudio.App
       RegisterPanelQuickSwitchShortcut(7, PanelRegion.Right, 0, "Effects Mixer", () => new EffectsMixerView());
       RegisterPanelQuickSwitchShortcut(8, PanelRegion.Right, 1, "Analyzer", () => new AnalyzerView());
       RegisterPanelQuickSwitchShortcut(9, PanelRegion.Right, 2, "Quality Control", () => new QualityControlView());
+
+      // GAP-E02: Panel region cycling and direct focus
+      _keyboardShortcutService.RegisterShortcut(
+          "panel.cycleNext",
+          VirtualKey.Tab,
+          VirtualKeyModifiers.Control,
+          CyclePanelNext,
+          "Cycle to Next Panel");
+
+      _keyboardShortcutService.RegisterShortcut(
+          "panel.cyclePrevious",
+          VirtualKey.Tab,
+          VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift,
+          CyclePanelPrevious,
+          "Cycle to Previous Panel");
+
+      _keyboardShortcutService.RegisterShortcut(
+          "panel.focusLeft",
+          VirtualKey.Number1,
+          VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu,
+          () => FocusPanelRegion(PanelRegion.Left),
+          "Focus Left Panel");
+
+      _keyboardShortcutService.RegisterShortcut(
+          "panel.focusCenter",
+          VirtualKey.Number2,
+          VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu,
+          () => FocusPanelRegion(PanelRegion.Center),
+          "Focus Center Panel");
+
+      _keyboardShortcutService.RegisterShortcut(
+          "panel.focusRight",
+          VirtualKey.Number3,
+          VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu,
+          () => FocusPanelRegion(PanelRegion.Right),
+          "Focus Right Panel");
+
+      _keyboardShortcutService.RegisterShortcut(
+          "panel.focusBottom",
+          VirtualKey.Number4,
+          VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu,
+          () => FocusPanelRegion(PanelRegion.Bottom),
+          "Focus Bottom Panel");
     }
 
     /// <summary>
@@ -1752,6 +1874,86 @@ namespace VoiceStudio.App
       };
       timer.Start();
     }
+
+    #region GAP-E02: Panel Region Focus and Cycling
+
+    /// <summary>
+    /// List of panel hosts in cycling order (Left → Center → Right → Bottom).
+    /// </summary>
+    private readonly PanelRegion[] _panelCycleOrder = [PanelRegion.Left, PanelRegion.Center, PanelRegion.Right, PanelRegion.Bottom];
+
+    /// <summary>
+    /// Tracks the currently focused panel region for cycling.
+    /// </summary>
+    private int _currentPanelIndex;
+
+    /// <summary>
+    /// Cycles focus to the next panel region (Ctrl+Tab).
+    /// </summary>
+    private void CyclePanelNext()
+    {
+      _currentPanelIndex = (_currentPanelIndex + 1) % _panelCycleOrder.Length;
+      FocusPanelRegion(_panelCycleOrder[_currentPanelIndex]);
+    }
+
+    /// <summary>
+    /// Cycles focus to the previous panel region (Ctrl+Shift+Tab).
+    /// </summary>
+    private void CyclePanelPrevious()
+    {
+      _currentPanelIndex = (_currentPanelIndex - 1 + _panelCycleOrder.Length) % _panelCycleOrder.Length;
+      FocusPanelRegion(_panelCycleOrder[_currentPanelIndex]);
+    }
+
+    /// <summary>
+    /// Focuses a specific panel region for keyboard navigation.
+    /// </summary>
+    private void FocusPanelRegion(PanelRegion region)
+    {
+      Controls.PanelHost? targetHost = region switch
+      {
+        PanelRegion.Left => FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
+        PanelRegion.Center => FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
+        PanelRegion.Right => FindNameOnContent("RightPanelHost") as Controls.PanelHost,
+        PanelRegion.Bottom => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
+        _ => null
+      };
+
+      if (targetHost == null)
+        return;
+
+      // Update current index for cycling continuity
+      _currentPanelIndex = Array.IndexOf(_panelCycleOrder, region);
+
+      // Focus the panel host
+      if (targetHost.Content is FrameworkElement content)
+      {
+        // Try to focus the content first (more useful for interaction)
+        content.Focus(FocusState.Keyboard);
+      }
+      else
+      {
+        // Fall back to the panel host itself
+        targetHost.Focus(FocusState.Keyboard);
+      }
+
+      // Show visual indicator
+      string panelName = region switch
+      {
+        PanelRegion.Left => "Left Panel",
+        PanelRegion.Center => "Center Panel",
+        PanelRegion.Right => "Right Panel",
+        PanelRegion.Bottom => "Bottom Panel",
+        _ => "Panel"
+      };
+
+      if (!IsGateCSmokeMode())
+      {
+        ShowPanelQuickSwitchIndicator(panelName, region, targetHost);
+      }
+    }
+
+    #endregion
 
     private async void CheckForUpdatesMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
@@ -2929,25 +3131,29 @@ namespace VoiceStudio.App
           if (targetHost == null)
             continue;
 
-          // Try to restore the active panel for this region
+          // Try to restore the active panel for this region (GAP-F04)
           var activePanelId = regionState.ActivePanelId;
-          if (!string.IsNullOrEmpty(activePanelId) && _panelRegistry.TryGetValue(activePanelId, out var panelInfo))
+          if (!string.IsNullOrEmpty(activePanelId))
           {
-            try
+            var panel = CreatePanelFromRegistry(activePanelId);
+            if (panel != null)
             {
-              targetHost.Content = panelInfo.Factory();
-              targetHost.PanelTitle = panelInfo.Title;
-              restoredAny = true;
-              System.Diagnostics.Debug.WriteLine($"Restored panel '{activePanelId}' to {regionState.Region}");
+              try
+              {
+                targetHost.Content = panel;
+                targetHost.PanelTitle = GetPanelTitle(activePanelId);
+                restoredAny = true;
+                System.Diagnostics.Debug.WriteLine($"Restored panel '{activePanelId}' to {regionState.Region}");
+              }
+              catch (Exception panelEx)
+              {
+                System.Diagnostics.Debug.WriteLine($"Failed to restore panel '{activePanelId}': {panelEx.Message}");
+              }
             }
-            catch (Exception panelEx)
+            else
             {
-              System.Diagnostics.Debug.WriteLine($"Failed to restore panel '{activePanelId}': {panelEx.Message}");
+              System.Diagnostics.Debug.WriteLine($"Panel ID '{activePanelId}' not found in registry for region {regionState.Region}; skipping.");
             }
-          }
-          else if (!string.IsNullOrEmpty(activePanelId))
-          {
-            System.Diagnostics.Debug.WriteLine($"Panel ID '{activePanelId}' not found in registry for region {regionState.Region}; skipping.");
           }
         }
 

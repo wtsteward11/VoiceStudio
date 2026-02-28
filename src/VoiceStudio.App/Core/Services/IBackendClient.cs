@@ -234,6 +234,8 @@ namespace VoiceStudio.Core.Services
 
     // Transcription
     Task<List<SupportedLanguage>> GetSupportedLanguagesAsync(CancellationToken cancellationToken = default);
+    // GAP-CS-003: Dynamic engine discovery
+    Task<List<TranscriptionEngine>> GetTranscriptionEnginesAsync(CancellationToken cancellationToken = default);
     Task<TranscriptionResponse> TranscribeAudioAsync(TranscriptionRequest request, string? projectId = null, CancellationToken cancellationToken = default);
     Task<TranscriptionResponse> GetTranscriptionAsync(string transcriptionId, CancellationToken cancellationToken = default);
     Task<List<TranscriptionResponse>> ListTranscriptionsAsync(string? audioId = null, string? projectId = null, CancellationToken cancellationToken = default);
@@ -411,5 +413,102 @@ namespace VoiceStudio.Core.Services
 
     // Base address property
     System.Uri? BaseAddress { get; }
+
+    // Plugin Health Dashboard endpoints (Phase 4)
+    /// <summary>
+    /// Gets the plugin health dashboard data with system and per-plugin health summaries.
+    /// </summary>
+    Task<PluginHealthDashboardResponse?> GetPluginHealthDashboardAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets detailed metrics for a specific plugin.
+    /// </summary>
+    Task<PluginMetricsResponse?> GetPluginMetricsAsync(string pluginId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Exports all plugin metrics in the specified format.
+    /// </summary>
+    Task<string> ExportPluginMetricsAsync(string format = "json", CancellationToken cancellationToken = default);
+  }
+
+  // Plugin Health Dashboard Models
+  public class PluginHealthDashboardResponse
+  {
+    public PluginSystemHealth? System { get; set; }
+    public List<PluginHealthData>? Plugins { get; set; }
+    public PluginHealthAlerts? Alerts { get; set; }
+    public List<PluginHealthData>? TopByCalls { get; set; }
+    public List<PluginHealthData>? TopByErrors { get; set; }
+    public string? LastUpdated { get; set; }
+  }
+
+  public class PluginSystemHealth
+  {
+    public int TotalPlugins { get; set; }
+    public int HealthyPlugins { get; set; }
+    public int DegradedPlugins { get; set; }
+    public int UnhealthyPlugins { get; set; }
+    public int TotalCalls { get; set; }
+    public int TotalErrors { get; set; }
+    public double SystemErrorRate { get; set; }
+    public double AvgLatencyMs { get; set; }
+    public long TotalMemoryBytes { get; set; }
+    public string? Timestamp { get; set; }
+  }
+
+  public class PluginHealthData
+  {
+    public string PluginId { get; set; } = string.Empty;
+    public string? Status { get; set; }
+    public double ErrorRate { get; set; }
+    public double AvgLatencyMs { get; set; }
+    public int TotalCalls { get; set; }
+    public int TotalErrors { get; set; }
+    public long? MemoryBytes { get; set; }
+    public int CrashCount { get; set; }
+    public string? LastActivity { get; set; }
+  }
+
+  public class PluginHealthAlerts
+  {
+    public int UnhealthyCount { get; set; }
+    public List<PluginHealthData>? UnhealthyPlugins { get; set; }
+  }
+
+  public class PluginMetricsResponse
+  {
+    public string? PluginId { get; set; }
+    public string? CreatedAt { get; set; }
+    public string? LastActivity { get; set; }
+    public PluginMetricsSummary? Summary { get; set; }
+    public Dictionary<string, PluginMethodMetrics>? Execution { get; set; }
+    public Dictionary<string, int>? Counters { get; set; }
+    public Dictionary<string, double>? Gauges { get; set; }
+    public int ErrorCount { get; set; }
+  }
+
+  public class PluginMetricsSummary
+  {
+    public int TotalCalls { get; set; }
+    public int TotalErrors { get; set; }
+    public double TotalDurationMs { get; set; }
+    public double ErrorRate { get; set; }
+    public int MethodsTracked { get; set; }
+  }
+
+  public class PluginMethodMetrics
+  {
+    public string Method { get; set; } = string.Empty;
+    public int CallCount { get; set; }
+    public int SuccessCount { get; set; }
+    public int ErrorCount { get; set; }
+    public double SuccessRate { get; set; }
+    public double TotalDurationMs { get; set; }
+    public double AvgDurationMs { get; set; }
+    public double MinDurationMs { get; set; }
+    public double MaxDurationMs { get; set; }
+    public double P50DurationMs { get; set; }
+    public double P95DurationMs { get; set; }
+    public double P99DurationMs { get; set; }
   }
 }

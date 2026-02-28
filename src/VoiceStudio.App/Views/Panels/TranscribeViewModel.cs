@@ -74,15 +74,12 @@ namespace VoiceStudio.App.Views.Panels
 
     public bool IsTranscriptionSelected(string transcriptionId) => _multiSelectState?.SelectedIds.Contains(transcriptionId) ?? false;
 
-    // TODO: TECH-DEBT - Implement dynamic engine discovery from backend manifests
-    // WhisperX removed until proper availability detection is implemented
-    // See: docs/governance/TECH_DEBT_REGISTER.md entry VS-TRANSC-001
-    public ObservableCollection<string> Engines { get; } = new()
-        {
-            "whisper",
-            "whisper-cpp",
-            "vosk"
-        };
+    // GAP-CS-003: Dynamic engine discovery from backend API
+    // Replaces hardcoded list with backend-sourced engines
+    public ObservableCollection<string> Engines { get; } = new();
+    
+    [ObservableProperty]
+    private bool isLoadingEngines;
 
     public ObservableCollection<SupportedLanguage> Languages { get; } = new();
 
@@ -124,6 +121,12 @@ namespace VoiceStudio.App.Views.Panels
         using var profiler = PerformanceProfiler.StartCommand("LoadTranscriptions");
         await LoadTranscriptionsAsync(ct);
       }, () => !IsLoading);
+      // GAP-CS-003: Dynamic engine discovery command
+      LoadEnginesCommand = new EnhancedAsyncRelayCommand(async (ct) =>
+      {
+        using var profiler = PerformanceProfiler.StartCommand("LoadEngines");
+        await LoadEnginesAsync(ct);
+      }, () => !IsLoadingEngines);
       DeleteTranscriptionCommand = new EnhancedAsyncRelayCommand<TranscriptionResponse>(async (transcription, ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("DeleteTranscription");
@@ -154,6 +157,8 @@ namespace VoiceStudio.App.Views.Panels
     public IAsyncRelayCommand LoadLanguagesCommand { get; }
     public IAsyncRelayCommand TranscribeCommand { get; }
     public IAsyncRelayCommand LoadTranscriptionsCommand { get; }
+    // GAP-CS-003: Dynamic engine discovery
+    public IAsyncRelayCommand LoadEnginesCommand { get; }
     public IAsyncRelayCommand<TranscriptionResponse> DeleteTranscriptionCommand { get; }
 
     // Multi-select commands
@@ -218,6 +223,60 @@ namespace VoiceStudio.App.Views.Panels
       finally
       {
         IsLoading = false;
+      }
+    }
+
+    // GAP-CS-003: Dynamic engine discovery from backend API
+    private async Task LoadEnginesAsync(CancellationToken cancellationToken = default)
+    {
+      IsLoadingEngines = true;
+      ErrorMessage = null;
+
+      try
+      {
+        var engines = await _backendClient.GetTranscriptionEnginesAsync(cancellationToken);
+        
+        Engines.Clear();
+        foreach (var engine in engines)
+        {
+          Engines.Add(engine.Id);
+        }
+
+        // Set default engine if current selection is not available
+        if (Engines.Count > 0 && !Engines.Contains(SelectedEngine))
+        {
+          SelectedEngine = Engines[0];
+        }
+        
+        // Add fallback engines if none were discovered
+        if (Engines.Count == 0)
+        {
+          Engines.Add("whisper_cpp");
+          Engines.Add("whisper");
+          Engines.Add("vosk");
+          SelectedEngine = "whisper_cpp";
+        }
+      }
+      catch (OperationCanceledException)
+      {
+        return; // User cancelled
+      }
+      catch (Exception ex)
+      {
+        // On error, populate with fallback engines
+        if (Engines.Count == 0)
+        {
+          Engines.Add("whisper_cpp");
+          Engines.Add("whisper");
+          Engines.Add("vosk");
+        }
+        
+        // Log but don't show error to user since we have fallback
+        System.Diagnostics.Debug.WriteLine($"Failed to load engines from backend: {ex.Message}");
+      }
+      finally
+      {
+        IsLoadingEngines = false;
       }
     }
 

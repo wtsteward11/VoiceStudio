@@ -26,6 +26,11 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
     private bool _isEnabled = true;
 
     public event EventHandler<ShortcutExecutedEventArgs>? ShortcutExecuted;
+    
+    /// <summary>
+    /// GAP-B23/B24: Event fired when a shortcut conflict is detected during registration.
+    /// </summary>
+    public event EventHandler<ShortcutConflictEventArgs>? ConflictDetected;
 
     public KeyboardShortcutService()
     {
@@ -42,6 +47,98 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
     /// Gets all registered shortcuts.
     /// </summary>
     public IReadOnlyDictionary<string, ShortcutBinding> Shortcuts => _shortcuts;
+
+    #region GAP-B08/B09: Context Detection
+
+    // Track whether a modal dialog is currently open
+    private bool _isModalDialogOpen;
+
+    /// <summary>
+    /// Sets the modal dialog state. Call this when opening/closing ContentDialogs.
+    /// </summary>
+    public void SetModalDialogOpen(bool isOpen)
+    {
+        _isModalDialogOpen = isOpen;
+    }
+
+    /// <summary>
+    /// Gets the current shortcut context based on focus state.
+    /// Higher priority contexts win when multiple shortcuts match.
+    /// </summary>
+    public ShortcutContext GetCurrentContext()
+    {
+        // Modal dialogs take precedence
+        if (IsModalDialogOpen())
+            return ShortcutContext.Modal;
+
+        // Check if focused element accepts text input
+        if (IsTextInputFocused())
+            return ShortcutContext.TextEditing;
+
+        // Check if focus is in a panel
+        if (GetFocusedPanel() != null)
+            return ShortcutContext.Panel;
+
+        return ShortcutContext.Global;
+    }
+
+    /// <summary>
+    /// Checks if a modal dialog is currently open.
+    /// </summary>
+    private bool IsModalDialogOpen()
+    {
+        return _isModalDialogOpen;
+    }
+
+    /// <summary>
+    /// Checks if the focused element is a text input control.
+    /// </summary>
+    private bool IsTextInputFocused()
+    {
+        try
+        {
+            var focusedElement = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(null);
+            return focusedElement is Microsoft.UI.Xaml.Controls.TextBox
+                || focusedElement is Microsoft.UI.Xaml.Controls.RichEditBox
+                || focusedElement is Microsoft.UI.Xaml.Controls.PasswordBox
+                || focusedElement is Microsoft.UI.Xaml.Controls.AutoSuggestBox;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Gets the currently focused panel name, or null if none.
+    /// </summary>
+    private string? GetFocusedPanel()
+    {
+        try
+        {
+            var focusedElement = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(null) as DependencyObject;
+            if (focusedElement == null)
+                return null;
+
+            // Walk up the visual tree looking for a panel identifier
+            var current = focusedElement;
+            while (current != null)
+            {
+                if (current is FrameworkElement fe && !string.IsNullOrEmpty(fe.Name) && fe.Name.EndsWith("Panel"))
+                {
+                    return fe.Name;
+                }
+                current = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(current);
+            }
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// Register default keyboard shortcuts.
@@ -63,11 +160,15 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
         RegisterShortcut("edit.copy", VirtualKey.C, VirtualKeyModifiers.Control, "Copy");
         RegisterShortcut("edit.paste", VirtualKey.V, VirtualKeyModifiers.Control, "Paste");
         RegisterShortcut("edit.selectAll", VirtualKey.A, VirtualKeyModifiers.Control, "Select All");
-        RegisterShortcut("edit.delete", VirtualKey.Delete, VirtualKeyModifiers.None, "Delete");
+        // GAP-B08/B09: Delete at Global context, overridden by timeline when panel focused
+        RegisterShortcut("edit.delete", VirtualKey.Delete, VirtualKeyModifiers.None, "Delete", ShortcutContext.Global);
+        RegisterShortcut("timeline.deleteClip", VirtualKey.Delete, VirtualKeyModifiers.None, "Delete Clip", ShortcutContext.Panel);
 
         // Playback controls
         RegisterShortcut("playback.play", VirtualKey.Space, VirtualKeyModifiers.None, "Play/Pause");
-        RegisterShortcut("playback.stop", VirtualKey.Escape, VirtualKeyModifiers.None, "Stop");
+        // GAP-B08/B09: Escape at Global context, overridden by modal dialogs
+        RegisterShortcut("playback.stop", VirtualKey.Escape, VirtualKeyModifiers.None, "Stop", ShortcutContext.Global);
+        RegisterShortcut("dialog.close", VirtualKey.Escape, VirtualKeyModifiers.None, "Close Dialog", ShortcutContext.Modal);
         RegisterShortcut("playback.record", VirtualKey.R, VirtualKeyModifiers.Control, "Record");
         RegisterShortcut("playback.loop", VirtualKey.L, VirtualKeyModifiers.Control, "Toggle Loop");
         RegisterShortcut("playback.rewind", VirtualKey.Home, VirtualKeyModifiers.None, "Go to Start");
@@ -93,6 +194,14 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
         RegisterShortcut("panel.effects", VirtualKey.Number4, VirtualKeyModifiers.Control, "Effects Panel");
         RegisterShortcut("panel.settings", (VirtualKey)188, VirtualKeyModifiers.Control, "Settings"); // 188 = comma key
 
+        // GAP-E02: Panel region focus and cycling
+        RegisterShortcut("panel.cycleNext", VirtualKey.Tab, VirtualKeyModifiers.Control, "Cycle to Next Panel");
+        RegisterShortcut("panel.cyclePrevious", VirtualKey.Tab, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Cycle to Previous Panel");
+        RegisterShortcut("panel.focusLeft", VirtualKey.Number1, VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu, "Focus Left Panel");
+        RegisterShortcut("panel.focusCenter", VirtualKey.Number2, VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu, "Focus Center Panel");
+        RegisterShortcut("panel.focusRight", VirtualKey.Number3, VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu, "Focus Right Panel");
+        RegisterShortcut("panel.focusBottom", VirtualKey.Number4, VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu, "Focus Bottom Panel");
+
         // Tools
         RegisterShortcut("tools.commandPalette", VirtualKey.P, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, "Command Palette");
         RegisterShortcut("tools.search", VirtualKey.F, VirtualKeyModifiers.Control, "Search");
@@ -100,13 +209,31 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
     }
 
     /// <summary>
-    /// Register a keyboard shortcut.
+    /// Register a keyboard shortcut with Global context (interface implementation).
     /// </summary>
     public void RegisterShortcut(
         string commandId,
         VirtualKey key,
         VirtualKeyModifiers modifiers,
         string description)
+    {
+        RegisterShortcut(commandId, key, modifiers, description, ShortcutContext.Global);
+    }
+
+    /// <summary>
+    /// Register a keyboard shortcut with context priority.
+    /// </summary>
+    /// <param name="commandId">The command identifier.</param>
+    /// <param name="key">The key.</param>
+    /// <param name="modifiers">The key modifiers.</param>
+    /// <param name="description">Human-readable description.</param>
+    /// <param name="context">GAP-B08/B09: Context priority for conflict resolution.</param>
+    public void RegisterShortcut(
+        string commandId,
+        VirtualKey key,
+        VirtualKeyModifiers modifiers,
+        string description,
+        ShortcutContext context)
     {
         _shortcuts[commandId] = new ShortcutBinding
         {
@@ -115,20 +242,22 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
             Modifiers = modifiers,
             Description = description,
             IsDefault = !_customizedShortcuts.Contains(commandId),
+            Context = context,
         };
     }
 
     /// <summary>
-    /// Register a keyboard shortcut with an action handler.
+    /// Register a keyboard shortcut with an action handler and context priority.
     /// </summary>
     public void RegisterShortcut(
         string commandId,
         VirtualKey key,
         VirtualKeyModifiers modifiers,
         Action handler,
-        string description)
+        string description,
+        ShortcutContext context = ShortcutContext.Global)
     {
-        RegisterShortcut(commandId, key, modifiers, description);
+        RegisterShortcut(commandId, key, modifiers, description, context);
         RegisterHandler(commandId, handler);
     }
 
@@ -164,18 +293,31 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
     }
 
     /// <summary>
-    /// Handle keyboard input.
+    /// Handle keyboard input with context-priority resolution.
+    /// GAP-B08/B09: When multiple shortcuts match the same key, the highest priority
+    /// context that is applicable wins.
     /// </summary>
     public bool HandleKeyDown(VirtualKey key, VirtualKeyModifiers modifiers)
     {
         if (!_isEnabled)
             return false;
 
-        var binding = _shortcuts.Values.FirstOrDefault(s =>
-            s.Key == key && s.Modifiers == modifiers);
+        var currentContext = GetCurrentContext();
+
+        // GAP-B08/B09: Find all matching shortcuts, ordered by context priority (highest first)
+        var candidates = _shortcuts.Values
+            .Where(s => s.Key == key && s.Modifiers == modifiers)
+            .OrderByDescending(s => s.Context)
+            .ToList();
+
+        // Execute the highest priority shortcut that applies to the current context
+        // A shortcut applies if its context level is <= the current context level
+        var binding = candidates.FirstOrDefault(s => s.Context <= currentContext);
 
         if (binding != null)
         {
+            System.Diagnostics.Debug.WriteLine(
+                $"[KeyboardShortcuts] Executing '{binding.CommandId}' (context: {binding.Context}, current: {currentContext})");
             ExecuteShortcut(binding.CommandId);
             return true;
         }
@@ -240,6 +382,96 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
         _customizedShortcuts.Clear();
         _shortcuts.Clear();
         RegisterDefaultShortcuts();
+    }
+
+    /// <summary>
+    /// GAP-B23/B24: Register a shortcut with conflict detection.
+    /// </summary>
+    /// <param name="commandId">Command identifier.</param>
+    /// <param name="key">Key binding.</param>
+    /// <param name="modifiers">Key modifiers.</param>
+    /// <param name="description">Human-readable description.</param>
+    /// <param name="context">Context priority.</param>
+    /// <param name="allowOverwrite">If true, overwrites existing conflicting shortcut.</param>
+    /// <returns>True if registration succeeded, false if conflict blocked it.</returns>
+    public bool TryRegisterShortcut(
+        string commandId,
+        VirtualKey key,
+        VirtualKeyModifiers modifiers,
+        string description,
+        ShortcutContext context = ShortcutContext.Global,
+        bool allowOverwrite = false)
+    {
+        var conflict = CheckForConflict(commandId, key, modifiers);
+        if (conflict != null)
+        {
+            if (!allowOverwrite)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[Shortcuts] Conflict: {commandId} vs {conflict.ConflictingCommandId}");
+                ConflictDetected?.Invoke(this, new ShortcutConflictEventArgs(commandId, conflict));
+                return false;
+            }
+            
+            // Remove conflicting shortcut when overwrite allowed
+            UnregisterShortcut(conflict.ConflictingCommandId);
+            System.Diagnostics.Debug.WriteLine(
+                $"[Shortcuts] Overwrote conflicting shortcut: {conflict.ConflictingCommandId}");
+        }
+
+        // Proceed with registration
+        RegisterShortcut(commandId, key, modifiers, description, context);
+        return true;
+    }
+
+    /// <summary>
+    /// GAP-B23/B24: Set a custom shortcut with conflict resolution and auto-save.
+    /// </summary>
+    /// <param name="commandId">Command identifier.</param>
+    /// <param name="key">New key binding.</param>
+    /// <param name="modifiers">New key modifiers.</param>
+    /// <returns>True if customization succeeded.</returns>
+    public async Task<bool> SetCustomShortcutAsync(
+        string commandId,
+        VirtualKey key,
+        VirtualKeyModifiers modifiers)
+    {
+        // Check for conflicts, allowing overwrite for user customizations
+        var conflict = CheckForConflict(commandId, key, modifiers);
+        if (conflict != null)
+        {
+            // For user customizations, we allow overwrite but log the conflict
+            System.Diagnostics.Debug.WriteLine(
+                $"[Shortcuts] User customization overwrites {conflict.ConflictingCommandId}");
+            UnregisterShortcut(conflict.ConflictingCommandId);
+        }
+
+        // Get existing binding or create new
+        if (_shortcuts.TryGetValue(commandId, out var binding))
+        {
+            binding.Key = key;
+            binding.Modifiers = modifiers;
+            binding.IsDefault = false;
+            _customizedShortcuts.Add(commandId);
+            
+            // Auto-save customizations
+            await SaveCustomShortcutsAsync();
+            return true;
+        }
+        
+        return false;
+    }
+
+    /// <summary>
+    /// GAP-B23/B24: Initialize the service by loading saved customizations.
+    /// Call this after construction to restore user preferences.
+    /// </summary>
+    public async Task InitializeAsync()
+    {
+        // Load user customizations (overrides defaults registered in constructor)
+        await LoadCustomShortcutsAsync();
+        System.Diagnostics.Debug.WriteLine(
+            $"[Shortcuts] Initialized with {_customizedShortcuts.Count} custom shortcuts");
     }
 
     /// <summary>
@@ -415,18 +647,29 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
     }
 
     /// <summary>
-    /// Handles a key press event asynchronously.
+    /// Handles a key press event asynchronously with context-priority resolution.
+    /// GAP-B08/B09: Uses the same priority logic as HandleKeyDown.
     /// </summary>
     public async Task<bool> HandleKeyPressAsync(VirtualKey key, VirtualKeyModifiers modifiers)
     {
         if (!_isEnabled)
             return false;
 
-        var binding = _shortcuts.Values.FirstOrDefault(s =>
-            s.Key == key && s.Modifiers == modifiers);
+        var currentContext = GetCurrentContext();
+
+        // GAP-B08/B09: Find all matching shortcuts, ordered by context priority (highest first)
+        var candidates = _shortcuts.Values
+            .Where(s => s.Key == key && s.Modifiers == modifiers)
+            .OrderByDescending(s => s.Context)
+            .ToList();
+
+        // Execute the highest priority shortcut that applies to the current context
+        var binding = candidates.FirstOrDefault(s => s.Context <= currentContext);
 
         if (binding != null)
         {
+            System.Diagnostics.Debug.WriteLine(
+                $"[KeyboardShortcuts] Async executing '{binding.CommandId}' (context: {binding.Context}, current: {currentContext})");
             await ExecuteShortcutAsync(binding.CommandId);
             return true;
         }
@@ -543,6 +786,25 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
 }
 
 /// <summary>
+/// GAP-B08/B09: Context priority for shortcut conflict resolution.
+/// Higher values take precedence when multiple shortcuts match the same key combination.
+/// </summary>
+public enum ShortcutContext
+{
+    /// <summary>Global shortcuts (lowest priority, always active).</summary>
+    Global = 0,
+    
+    /// <summary>Panel-specific shortcuts (active when panel has focus).</summary>
+    Panel = 10,
+    
+    /// <summary>Modal dialog shortcuts (dialogs take precedence over panels).</summary>
+    Modal = 20,
+    
+    /// <summary>Text editing shortcuts (highest priority, active when text input focused).</summary>
+    TextEditing = 30,
+}
+
+/// <summary>
 /// Keyboard shortcut binding.
 /// </summary>
 public class ShortcutBinding
@@ -552,6 +814,12 @@ public class ShortcutBinding
     public VirtualKeyModifiers Modifiers { get; set; }
     public string Description { get; set; } = string.Empty;
     public bool IsDefault { get; set; } = true;
+    
+    /// <summary>
+    /// GAP-B08/B09: Context priority for conflict resolution.
+    /// Default is Global (active everywhere, lowest priority).
+    /// </summary>
+    public ShortcutContext Context { get; set; } = ShortcutContext.Global;
 
     public string GetDisplayString()
     {
@@ -606,5 +874,27 @@ public class ShortcutExecutedEventArgs : EventArgs
     public ShortcutExecutedEventArgs(string commandId)
     {
         CommandId = commandId;
+    }
+}
+
+/// <summary>
+/// GAP-B23/B24: Event args for shortcut conflict detection.
+/// </summary>
+public class ShortcutConflictEventArgs : EventArgs
+{
+    /// <summary>
+    /// The command ID that was being registered.
+    /// </summary>
+    public string CommandId { get; }
+    
+    /// <summary>
+    /// The conflict information.
+    /// </summary>
+    public ShortcutConflict Conflict { get; }
+
+    public ShortcutConflictEventArgs(string commandId, ShortcutConflict conflict)
+    {
+        CommandId = commandId;
+        Conflict = conflict;
     }
 }

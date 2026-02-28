@@ -14,6 +14,13 @@ namespace VoiceStudio.App.Services
     /// Provides lazy loading and caching for UI panels.
     /// Improves startup time by deferring panel initialization until needed.
     /// </summary>
+    /// <remarks>
+    /// DEPRECATED (GAP-F04): This class is being phased out in favor of the unified
+    /// <see cref="PanelRegistry"/> which uses <see cref="IViewModelFactory"/> for
+    /// DI-based panel creation. New code should use <see cref="IPanelRegistry.CreatePanel"/>
+    /// instead of this loader. This class will be removed in a future release.
+    /// </remarks>
+    [Obsolete("Use PanelRegistry.CreatePanel() instead. This class will be removed in a future release.")]
     public class PanelLoader : IDisposable
     {
         private readonly ConcurrentDictionary<string, PanelInfo> _panelRegistry;

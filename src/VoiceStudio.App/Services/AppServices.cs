@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Dispatching;
 using VoiceStudio.Core.Panels;
+using VoiceStudio.Core.Plugins;
 using VoiceStudio.Core.Services;
 using VoiceStudio.Core.State;
 using VoiceStudio.App.Core.Commands;
@@ -37,13 +39,26 @@ namespace VoiceStudio.App.Services
     {
       var services = new ServiceCollection();
 
+      // GAP-I12: Correlation ID provider for cross-layer request tracing
+      // Must be registered before ErrorLoggingService and BackendClient
+      services.AddSingleton<ICorrelationIdProvider, CorrelationIdProvider>();
+
       // Config and backend - use environment variable with fallback to 8001
       var apiHost = Environment.GetEnvironmentVariable("VOICESTUDIO_API_HOST") ?? "localhost";
       var apiPort = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT") ?? "8001";
       var baseUrl = $"http://{apiHost}:{apiPort}";
       var wsUrl = $"ws://{apiHost}:{apiPort}/ws/realtime";
       services.AddSingleton(new BackendClientConfig { BaseUrl = baseUrl, WebSocketUrl = wsUrl });
-      services.AddSingleton<IBackendClient, BackendClient>();
+      // GAP-I12: Inject correlation provider into BackendClient
+      services.AddSingleton<IBackendClient>(sp => new BackendClient(
+        sp.GetRequiredService<BackendClientConfig>(),
+        sp.GetRequiredService<ICorrelationIdProvider>()));
+
+      // GAP-CS-001: WebSocket services for real-time streaming support
+      services.AddSingleton<IWebSocketService>(sp => new WebSocketService(
+          sp.GetRequiredService<BackendClientConfig>().WebSocketUrl));
+      services.AddSingleton<IWebSocketClientFactory>(sp => new WebSocketClientFactory(
+          sp.GetService<IWebSocketService>()));
 
       // Use cases
       services.AddSingleton<IProfilesUseCase, ProfilesUseCase>();
@@ -70,7 +85,9 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<PanelStateService>();
       services.AddSingleton<INavigationService, NavigationService>();
       services.AddSingleton<IErrorDialogService, ErrorDialogService>();
-      services.AddSingleton<IErrorLoggingService, ErrorLoggingService>();
+      // GAP-I12: Inject correlation provider into ErrorLoggingService
+      services.AddSingleton<IErrorLoggingService>(sp => new ErrorLoggingService(
+        sp.GetRequiredService<ICorrelationIdProvider>()));
       services.AddSingleton<IAuditLoggingService>(sp => new AuditLoggingService(sp.GetRequiredService<IErrorLoggingService>()));
       services.AddSingleton<IHelpOverlayService, HelpOverlayService>();
       services.AddSingleton<IAudioPlayerService, AudioPlayerService>();
@@ -79,6 +96,9 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<StateCacheService>();
       services.AddSingleton<GracefulDegradationService>();
       services.AddSingleton<PluginManager>();
+      // Plugin Bridge Service for frontend-backend plugin state synchronization (Phase 1)
+      services.AddSingleton<IPluginBridgeService, PluginBridgeService>(sp => new PluginBridgeService(
+          sp.GetRequiredService<ILogger<PluginBridgeService>>()));
       services.AddSingleton<RealTimeQualityService>();
       // NOTE: ToastNotificationService requires a StackPanel container and cannot be auto-resolved.
       // It must be registered manually via RegisterToastNotificationService() after UI is created.
@@ -174,16 +194,66 @@ namespace VoiceStudio.App.Services
       // Module loader for UI modules
       services.AddSingleton<ModuleLoader>();
 
-      // Panel lazy loading
-      services.AddSingleton<PanelLoader>();
-
       // Error coordination service
       services.AddSingleton<IErrorCoordinator, ErrorCoordinator>();
 
       // ViewModel factory (needs service provider, so use factory registration)
       services.AddSingleton<IViewModelFactory>(sp => new ViewModelFactory(sp));
 
+      // GAP-B12: Command queue service for busy-state handling
+      services.AddSingleton<ICommandQueueService>(sp =>
+        new CommandQueueService(
+          sp.GetRequiredService<IUnifiedCommandRegistry>(),
+          sp.GetService<ICommandMutexService>(),
+          DispatcherQueue.GetForCurrentThread()));
+
       _provider = services.BuildServiceProvider();
+
+      // Wire up command queue service to registry (GAP-B12)
+      WireCommandQueueService();
+
+      // Register all panels after services are ready
+      RegisterAllPanels();
+    }
+
+    /// <summary>
+    /// Registers all panels in the unified PanelRegistry.
+    /// Called after DI container is built.
+    /// </summary>
+    private static void RegisterAllPanels()
+    {
+      var registry = GetPanelRegistry();
+
+      // Register advanced panels (TextSpeechEditor, Prosody, SpatialAudio, etc.)
+      AdvancedPanelRegistrationService.RegisterAdvancedPanels(registry);
+
+      // Register core panels - these were previously hardcoded in MainWindow
+      CorePanelRegistrationService.RegisterCorePanels(registry);
+
+      System.Diagnostics.Debug.WriteLine(
+        $"[AppServices] Registered {registry.GetAllDescriptors().Count()} panels in PanelRegistry");
+    }
+
+    /// <summary>
+    /// Wires the command queue service to the unified command registry.
+    /// GAP-B12: Enables busy-state command queueing.
+    /// </summary>
+    private static void WireCommandQueueService()
+    {
+      var registry = GetCommandRegistry() as UnifiedCommandRegistry;
+      var queueService = GetService<ICommandQueueService>();
+
+      if (registry != null && queueService != null)
+      {
+        registry.SetQueueService(queueService);
+        System.Diagnostics.Debug.WriteLine(
+          "[AppServices] Command queue service wired to registry (GAP-B12)");
+      }
+      else
+      {
+        System.Diagnostics.Debug.WriteLine(
+          "[AppServices] Warning: Could not wire command queue service");
+      }
     }
 
     public static T? GetService<T>() where T : class => (T?)_provider?.GetService(typeof(T));
@@ -209,6 +279,8 @@ namespace VoiceStudio.App.Services
     public static IUpdateService GetUpdateService() => GetRequiredService<IUpdateService>();
     public static ISettingsService GetSettingsService() => GetRequiredService<ISettingsService>();
     public static PluginManager GetPluginManager() => GetRequiredService<PluginManager>();
+    public static PluginBridgeService GetPluginBridgeService() => GetRequiredService<PluginBridgeService>();
+    public static PluginBridgeService? TryGetPluginBridgeService() => GetService<PluginBridgeService>();
     public static IPanelRegistry GetPanelRegistry() => GetRequiredService<IPanelRegistry>();
     public static IHelpOverlayService GetHelpOverlayService() => GetRequiredService<IHelpOverlayService>();
     public static RealTimeQualityService GetRealTimeQualityService() => GetRequiredService<RealTimeQualityService>();
@@ -256,8 +328,6 @@ namespace VoiceStudio.App.Services
     public static IProjectRepository? TryGetProjectRepository() => GetService<IProjectRepository>();
     public static ModuleLoader GetModuleLoader() => GetRequiredService<ModuleLoader>();
     public static ModuleLoader? TryGetModuleLoader() => GetService<ModuleLoader>();
-    public static PanelLoader GetPanelLoader() => GetRequiredService<PanelLoader>();
-    public static PanelLoader? TryGetPanelLoader() => GetService<PanelLoader>();
     public static IErrorCoordinator GetErrorCoordinator() => GetRequiredService<IErrorCoordinator>();
     public static IErrorCoordinator? TryGetErrorCoordinator() => GetService<IErrorCoordinator>();
     public static IViewModelFactory GetViewModelFactory() => GetRequiredService<IViewModelFactory>();
@@ -266,6 +336,8 @@ namespace VoiceStudio.App.Services
     public static IUnifiedCommandRegistry? TryGetCommandRegistry() => GetService<IUnifiedCommandRegistry>();
     public static CommandRouter GetCommandRouter() => GetRequiredService<CommandRouter>();
     public static CommandRouter? TryGetCommandRouter() => GetService<CommandRouter>();
+    public static ICommandQueueService GetCommandQueueService() => GetRequiredService<ICommandQueueService>();
+    public static ICommandQueueService? TryGetCommandQueueService() => GetService<ICommandQueueService>();
     public static IDialogService GetDialogService() => GetRequiredService<IDialogService>();
     public static IDialogService? TryGetDialogService() => GetService<IDialogService>();
     public static BackendProcessManager GetBackendProcessManager() => GetRequiredService<BackendProcessManager>();

@@ -206,12 +206,21 @@ namespace VoiceStudio.App.Services
         /// Wires multiple buttons to their respective commands based on Tag values.
         /// Each button's Tag should contain the command ID.
         /// </summary>
+        /// <remarks>
+        /// GAP-B19: Tag values are validated against CommandIds for compile-time safety.
+        /// </remarks>
         public void WireButtonsByTag(params ButtonBase[] buttons)
         {
             foreach (var button in buttons)
             {
                 if (button?.Tag is string commandId && !string.IsNullOrEmpty(commandId))
                 {
+                    // GAP-B19: Validate Tag against known command IDs
+                    if (!CommandIds.IsKnown(commandId))
+                    {
+                        Debug.WriteLine($"[CommandRouter] WARNING: Button Tag '{commandId}' is not a known command ID. " +
+                            $"Add it to CommandIds.cs or fix the Tag value.");
+                    }
                     WireButton(button, commandId);
                 }
             }
@@ -220,12 +229,21 @@ namespace VoiceStudio.App.Services
         /// <summary>
         /// Wires multiple menu items to their respective commands based on Tag values.
         /// </summary>
+        /// <remarks>
+        /// GAP-B19: Tag values are validated against CommandIds for compile-time safety.
+        /// </remarks>
         public void WireMenuItemsByTag(params MenuFlyoutItem[] menuItems)
         {
             foreach (var item in menuItems)
             {
                 if (item?.Tag is string commandId && !string.IsNullOrEmpty(commandId))
                 {
+                    // GAP-B19: Validate Tag against known command IDs
+                    if (!CommandIds.IsKnown(commandId))
+                    {
+                        Debug.WriteLine($"[CommandRouter] WARNING: MenuItem Tag '{commandId}' is not a known command ID. " +
+                            $"Add it to CommandIds.cs or fix the Tag value.");
+                    }
                     WireMenuItem(item, commandId);
                 }
             }

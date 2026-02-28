@@ -291,8 +291,9 @@ namespace VoiceStudio.App.Views.Panels
       StopAudioCommand = new RelayCommand(StopAudio, () => _audioPlayer.IsPlaying);
 
       // Add to Timeline command (Audit X-6: Synthesis -> Timeline)
+      // GAP-B04: Disabled when busy or no synthesis output
       AddToTimelineCommand = new RelayCommand(AddSynthesizedAudioToTimeline,
-          () => !string.IsNullOrEmpty(LastSynthesizedAudioId));
+          () => !string.IsNullOrEmpty(LastSynthesizedAudioId) && !IsLoading);
 
       // Streaming synthesis commands
       StartStreamingCommand = new EnhancedAsyncRelayCommand(async (ct) =>
@@ -797,6 +798,7 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnIsLoadingChanged(bool value)
     {
       SynthesizeCommand.NotifyCanExecuteChanged();
+      AddToTimelineCommand.NotifyCanExecuteChanged(); // GAP-B04
     }
 
     partial void OnSelectedEngineChanged(string value)

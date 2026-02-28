@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
 using System.Threading.Tasks;
 using VoiceStudio.Core.Plugins;
 using VoiceStudio.Core.Panels;
@@ -27,7 +26,8 @@ namespace VoiceStudio.App.Services
     public PluginManager(
         IPanelRegistry panelRegistry,
         IBackendClient backendClient,
-        string? pluginsDirectory = null)
+        string? pluginsDirectory = null,
+        string? schemaPath = null)
     {
       _panelRegistry = panelRegistry;
       _backendClient = backendClient;
@@ -44,6 +44,9 @@ namespace VoiceStudio.App.Services
           AppDomain.CurrentDomain.BaseDirectory,
           "Plugins"
       );
+      
+      // PluginSchemaValidator requires JsonSchema.Net (not in current csproj);
+      // manifest validation uses direct JSON deserialization instead.
     }
 
     /// <summary>
@@ -113,10 +116,10 @@ namespace VoiceStudio.App.Services
         return; // Skip directories without manifest
       }
 
-      // Load manifest
-      var manifestJson = await File.ReadAllTextAsync(manifestPath);
-      var manifest = JsonSerializer.Deserialize<PluginManifest>(manifestJson);
-
+      var manifestJson = await Task.Run(() => File.ReadAllText(manifestPath));
+      var manifest = System.Text.Json.JsonSerializer.Deserialize<PluginManifest>(
+          manifestJson,
+          new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
       if (manifest == null)
       {
         throw new InvalidOperationException(
@@ -124,10 +127,11 @@ namespace VoiceStudio.App.Services
         );
       }
 
-      // Check for C# plugin assembly
+      // Check for C# plugin assembly (use entry_points.frontend or Name + Plugin.dll)
+      var assemblyName = manifest.EntryPoints?.Frontend ?? $"{manifest.Name}Plugin.dll";
       var pluginAssemblyPath = Path.Combine(
           pluginDirectory,
-          $"{manifest.Name}Plugin.dll"
+          assemblyName
       );
 
       if (File.Exists(pluginAssemblyPath))
@@ -182,17 +186,6 @@ namespace VoiceStudio.App.Services
 
       _plugins.Clear();
       _initialized = false;
-    }
-
-    /// <summary>
-    /// Plugin manifest model.
-    /// </summary>
-    private class PluginManifest
-    {
-      public string Name { get; set; } = string.Empty;
-      public string Version { get; set; } = string.Empty;
-      public string Author { get; set; } = string.Empty;
-      public string Description { get; set; } = string.Empty;
     }
   }
 }

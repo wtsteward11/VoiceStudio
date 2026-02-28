@@ -179,6 +179,9 @@ namespace VoiceStudio.App.Views.Panels
     // Cancellation token source for profile change async operations
     private CancellationTokenSource? _profileChangeCts;
 
+    // GAP-I15: Disposal token for fire-and-forget operations
+    private readonly CancellationTokenSource _disposalCts = new();
+
     [ObservableProperty]
     private int selectedCount;
 
@@ -243,22 +246,25 @@ namespace VoiceStudio.App.Views.Panels
         await LoadProfilesAsync(ct);
       });
 
+      // GAP-I15: Propagate cancellation token from command
       CreateProfileCommand = new EnhancedAsyncRelayCommand<string>(async (name, ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("CreateProfile");
-        await CreateProfileAsync(name, CancellationToken.None);
+        await CreateProfileAsync(name, ct);
       });
 
+      // GAP-I15: Propagate cancellation token from command
       DeleteProfileCommand = new EnhancedAsyncRelayCommand<string>(async (profileId, ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("DeleteProfile");
-        await DeleteProfileAsync(profileId, CancellationToken.None);
+        await DeleteProfileAsync(profileId, ct);
       }, (string? profileId) => SelectedProfile != null && !IsLoading);
 
+      // GAP-I15: Propagate cancellation token from command
       PreviewProfileCommand = new EnhancedAsyncRelayCommand<string>(async (profileId, ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("PreviewProfile");
-        await PreviewProfileAsync(profileId, CancellationToken.None);
+        await PreviewProfileAsync(profileId, ct);
       }, (string? profileId) => CanPreview && !IsLoading && !IsPreviewing);
 
       StopPreviewCommand = new RelayCommand(StopPreview, () => IsPreviewing || _audioPlayer.IsPlaying);
@@ -297,6 +303,14 @@ namespace VoiceStudio.App.Views.Panels
         await DeleteSelectedAsync(ct);
       }, () => SelectedCount > 0);
 
+      // GAP-B18: Added command for batch export - enables direct XAML command binding
+      ExportSelectedCommand = new EnhancedAsyncRelayCommand(async (ct) =>
+      {
+        using var profiler = PerformanceProfiler.StartCommand("ExportSelected");
+        _logService?.LogInfo($"Batch export requested for {SelectedCount} profiles", "ProfilesViewModel");
+        await ExportSelectedProfilesAsync();
+      }, () => SelectedCount > 0);
+
       // Quality history commands
       LoadQualityHistoryCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -333,6 +347,30 @@ namespace VoiceStudio.App.Views.Panels
           OnPropertyChanged(nameof(HasMultipleSelection));
         }
       };
+
+      // GAP-B05: Subscribe to ProfileCreatedEvent to refresh list when new profiles
+      // are created in other panels (e.g., TrainingView, VoiceCloningWizard)
+      _eventAggregator?.Subscribe<ProfileCreatedEvent>(OnProfileCreatedRefresh);
+    }
+
+    /// <summary>
+    /// Handles ProfileCreatedEvent by refreshing the profiles list.
+    /// GAP-B05: Ensures newly trained/cloned profiles appear without manual refresh.
+    /// </summary>
+    private void OnProfileCreatedRefresh(ProfileCreatedEvent evt)
+    {
+      // Skip if this panel published the event (we already updated)
+      if (evt.SourcePanelId == PanelId)
+        return;
+
+      System.Diagnostics.Debug.WriteLine(
+        $"[ProfilesViewModel] ProfileCreatedEvent received from {evt.SourcePanelId}: {evt.ProfileId}");
+
+      // GAP-I15: Refresh profile list on the UI thread using disposal token
+      Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()?.TryEnqueue(async () =>
+      {
+        await LoadProfilesAsync(_disposalCts.Token);
+      });
     }
 
     public EnhancedAsyncRelayCommand LoadProfilesCommand { get; }
@@ -351,6 +389,8 @@ namespace VoiceStudio.App.Views.Panels
     public IRelayCommand SelectAllCommand { get; }
     public IRelayCommand ClearSelectionCommand { get; }
     public EnhancedAsyncRelayCommand DeleteSelectedCommand { get; }
+    // GAP-B18: Added ExportSelectedCommand for command binding pattern
+    public EnhancedAsyncRelayCommand ExportSelectedCommand { get; }
 
     // Quality degradation detection commands (IDEA 56)
     public EnhancedAsyncRelayCommand CheckQualityDegradationCommand { get; }
@@ -360,7 +400,8 @@ namespace VoiceStudio.App.Views.Panels
     public EnhancedAsyncRelayCommand LoadQualityHistoryCommand { get; }
     public EnhancedAsyncRelayCommand LoadQualityTrendsCommand { get; }
 
-    public async Task ImportProfilesAsync()
+    // GAP-I15: Added CancellationToken parameter for proper propagation
+    public async Task ImportProfilesAsync(CancellationToken cancellationToken = default)
     {
       try
       {
@@ -412,7 +453,7 @@ namespace VoiceStudio.App.Views.Panels
               language,
               emotion,
               tags,
-              CancellationToken.None);
+              cancellationToken);
           if (profile != null)
           {
             Profiles.Add(profile);
@@ -597,7 +638,8 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    public async Task DuplicateProfileAsync(VoiceProfile? profile)
+    // GAP-I15: Added CancellationToken parameter for proper propagation
+    public async Task DuplicateProfileAsync(VoiceProfile? profile, CancellationToken cancellationToken = default)
     {
       if (profile == null)
       {
@@ -616,7 +658,7 @@ namespace VoiceStudio.App.Views.Panels
             profile.Language,
             profile.Emotion,
             profile.Tags?.ToList(),
-            CancellationToken.None);
+            cancellationToken);
 
         if (newProfile != null)
         {
@@ -653,12 +695,14 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    // GAP-I15: Added CancellationToken parameter for proper propagation
     public async Task UpdateProfileAsync(
         VoiceProfile? profile,
         string? name,
         string? language,
         string? emotion,
-        string? tagsText)
+        string? tagsText,
+        CancellationToken cancellationToken = default)
     {
       if (profile == null || string.IsNullOrWhiteSpace(profile.Id))
       {
@@ -685,7 +729,7 @@ namespace VoiceStudio.App.Views.Panels
             string.IsNullOrWhiteSpace(language) ? null : language!.Trim(),
             string.IsNullOrWhiteSpace(emotion) ? null : emotion!.Trim(),
             tags,
-            CancellationToken.None);
+            cancellationToken);
 
         ReplaceProfile(updated);
         SelectedProfile = updated;
@@ -724,7 +768,8 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    public async Task AnalyzeProfileQualityAsync(VoiceProfile? profile)
+    // GAP-I15: Added CancellationToken parameter for proper propagation
+    public async Task AnalyzeProfileQualityAsync(VoiceProfile? profile, CancellationToken cancellationToken = default)
     {
       if (profile == null)
       {
@@ -733,9 +778,9 @@ namespace VoiceStudio.App.Views.Panels
       }
 
       SelectedProfile = profile;
-      await LoadQualityHistoryAsync(CancellationToken.None);
-      await LoadQualityTrendsAsync(CancellationToken.None);
-      await CheckQualityDegradationAsync(CancellationToken.None);
+      await LoadQualityHistoryAsync(cancellationToken);
+      await LoadQualityTrendsAsync(cancellationToken);
+      await CheckQualityDegradationAsync(cancellationToken);
 
       var message = string.Format(
           ResourceHelper.GetString("Profile.AnalyzeSuccess", "Analysis completed for {0}"),

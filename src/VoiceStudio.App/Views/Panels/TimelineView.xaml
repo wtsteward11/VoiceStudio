@@ -5,6 +5,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:controls="using:VoiceStudio.App.Controls"
     xmlns:local="using:VoiceStudio.App.Views.Panels"
+    xmlns:models="using:VoiceStudio.Core.Models"
     mc:Ignorable="d"
     d:DataContext="{d:DesignInstance Type=local:TimelineViewModel, IsDesignTimeCreatable=False}"
     x:DataType="local:TimelineView">
@@ -87,9 +88,10 @@
         <!-- Timeline Area -->
         <Grid Grid.Row="3">
             <ScrollViewer x:Name="TimelineScrollViewer" />
+            <!-- GAP-CS-004: Added x:DataType for compile-time binding validation -->
             <ListView x:Name="TracksListView" ItemsSource="{x:Bind ViewModel.Tracks, Mode=OneWay}">
                 <ListView.ItemTemplate>
-                    <DataTemplate>
+                    <DataTemplate x:DataType="models:AudioTrack">
                         <Grid Height="60" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
                               BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="0,0,0,1">
                             <Grid.ColumnDefinitions>

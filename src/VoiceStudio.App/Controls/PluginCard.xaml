@@ -126,13 +126,14 @@
                                AutomationProperties.AutomationId="PluginCard.Version"/>
                 </StackPanel>
 
-                <!-- Action Button -->
+                <!-- GAP-B18: Migrated from Click handler to Command binding -->
                 <Button x:Name="ActionButton"
                         Grid.Column="1"
                         Content="Install"
                         Style="{ThemeResource AccentButtonStyle}"
                         MinWidth="80"
-                        Click="ActionButton_Click"
+                        Command="{x:Bind ActionCommand, Mode=OneWay}"
+                        CommandParameter="{x:Bind Plugin, Mode=OneWay}"
                         AutomationProperties.AutomationId="PluginCard.ActionButton"/>
             </Grid>
         </Grid>

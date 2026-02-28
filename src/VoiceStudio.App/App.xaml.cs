@@ -9,6 +9,7 @@ using VoiceStudio.App.Commands;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Utilities;
 using VoiceStudio.App.Logging;
+using VoiceStudio.App.Views;
 
 namespace VoiceStudio.App
 {
@@ -327,6 +328,31 @@ namespace VoiceStudio.App
 
           WriteGateCUiSmokeSummary(crashDir, result);
           Environment.Exit(result.ExitCode);
+          return;
+        }
+      }
+
+      // GAP-X02: Check if first-run wizard should be shown
+      if (!isSmokeMode && await FirstRunWizard.ShouldShowWizardAsync())
+      {
+        _startupProfiler?.Checkpoint("FirstRunWizard Check - Should Show");
+
+        // Show wizard as modal before main window
+        var wizard = new FirstRunWizard();
+        wizard.Activate();
+
+        // Wait for wizard completion
+        var tcs = new TaskCompletionSource<bool>();
+        wizard.Closed += (_, _) => tcs.TrySetResult(wizard.WasCompleted);
+        await tcs.Task;
+
+        _startupProfiler?.Checkpoint($"FirstRunWizard Closed (Completed: {wizard.WasCompleted})");
+
+        if (!wizard.WasCompleted)
+        {
+          // User cancelled - exit gracefully
+          ErrorLogger.LogInfo("First-run wizard cancelled by user, exiting application.");
+          Application.Current.Exit();
           return;
         }
       }

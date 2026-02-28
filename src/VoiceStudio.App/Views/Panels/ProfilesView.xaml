@@ -282,8 +282,9 @@
                             <TextBlock Text="Batch Actions"
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
+                            <!-- GAP-B18: Migrated from Click handler to Command binding -->
                             <Button Content="Export Selected"
-                                    Click="BatchExport_Click"
+                                    Command="{x:Bind ViewModel.ExportSelectedCommand}"
                                     AutomationProperties.AutomationId="ProfilesView_BatchExportButton"
                                     HorizontalAlignment="Stretch" />
                             <Button Content="Delete Selected"

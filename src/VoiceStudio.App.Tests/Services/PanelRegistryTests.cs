@@ -1,8 +1,10 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 using System;
 using System.Linq;
 using VoiceStudio.App.Services;
 using VoiceStudio.Core.Panels;
+using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.Services
 {
@@ -10,11 +12,13 @@ namespace VoiceStudio.App.Tests.Services
     public class PanelRegistryTests
     {
         private PanelRegistry _sut = null!;
+        private Mock<IViewModelFactory> _mockViewModelFactory = null!;
 
         [TestInitialize]
         public void Setup()
         {
-            _sut = new PanelRegistry();
+            _mockViewModelFactory = new Mock<IViewModelFactory>();
+            _sut = new PanelRegistry(_mockViewModelFactory.Object);
         }
 
         #region RegisterPanel Tests

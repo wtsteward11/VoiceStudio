@@ -454,18 +454,8 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    private async void BatchExport_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)
-    {
-      try
-      {
-        _errorLoggingService?.LogInfo($"Batch export requested for {ViewModel.SelectedCount} profiles", "ProfilesView");
-        await ViewModel.ExportSelectedProfilesAsync();
-      }
-      catch (Exception ex)
-      {
-        System.Diagnostics.Debug.WriteLine($"Unhandled error in event handler: {ex.Message}");
-      }
-    }
+    // GAP-B18: BatchExport_Click - Removed, now using Command binding in XAML
+    // The export functionality is now handled by ViewModel.ExportSelectedCommand
 
     private void Profile_DragStarting(UIElement sender, DragStartingEventArgs e)
     {

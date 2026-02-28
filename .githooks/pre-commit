@@ -1,0 +1,6 @@
+#!/bin/sh
+# VoiceStudio pre-commit hook
+# Invokes the PowerShell build guard to protect build config files.
+# Install: git config core.hooksPath .githooks
+
+exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(git rev-parse --show-toplevel)/tools/build/GitHook-PreCommit.ps1"

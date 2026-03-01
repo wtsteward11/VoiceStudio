@@ -1,4 +1,4 @@
-"""
+﻿"""
 Voice Cloning and Synthesis Routes
 
 High-quality voice cloning endpoints with support for multiple engines.

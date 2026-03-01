@@ -196,6 +196,31 @@ New-Item -ItemType Directory -Path $StageLogsDir -Force | Out-Null
 New-Item -ItemType Directory -Path $ScreenshotsDir -Force | Out-Null
 New-Item -ItemType Directory -Path $TestResultsDir -Force | Out-Null
 
+# Gap 3: Write proof_stamp.txt with environment metadata
+$proofCommit = git rev-parse HEAD 2>$null
+if (-not $proofCommit) { $proofCommit = 'unknown' }
+$proofBranch = git branch --show-current 2>$null
+if (-not $proofBranch) { $proofBranch = 'unknown' }
+$proofDotnet = dotnet --version 2>$null
+$proofPython = python --version 2>$null
+$proofStampPath = Join-Path $ArtifactsDir 'proof_stamp.txt'
+$proofLines = @(
+    "VoiceStudio Verification Proof Stamp",
+    "=====================================",
+    "Timestamp:   $Timestamp",
+    "Commit:      $proofCommit",
+    "Branch:      $proofBranch",
+    "Machine:     $env:COMPUTERNAME",
+    "OS:          $([System.Environment]::OSVersion)",
+    ".NET SDK:    $proofDotnet",
+    "Python:      $proofPython",
+    "Config:      $Configuration",
+    "Quick:       $Quick",
+    "RealUI:      $RealUI",
+    "StrictMypy:  $StrictMypy"
+)
+$proofLines -join "`n" | Out-File -FilePath $proofStampPath -Encoding utf8
+
 # Stage tracking
 $Stages = @()
 $OverallStartTime = Get-Date
@@ -301,12 +326,18 @@ function Invoke-Stage {
         
         $duration = ((Get-Date) - $stageStart).TotalSeconds
         
-        # Sanity check: if stage failed and log is empty, report harness error
+        # HARNESS INTEGRITY CHECK: if stage failed and log is empty, the
+        # harness itself is broken. This is NOT a stage failure -- it means
+        # we cannot trust any results from this run.
         if ($exitCode -ne 0 -and (Test-Path $logFile)) {
             $logSize = (Get-Item $logFile).Length
             if ($logSize -eq 0) {
-                Write-Host "HARNESS WARNING: Stage failed but log file is empty (0 bytes). Output may not have been captured." -ForegroundColor Yellow
-                "HARNESS WARNING: Log capture produced 0 bytes for a failing stage." | Out-File -FilePath $logFile -Encoding utf8
+                $integrityMsg = "HARNESS INTEGRITY FAILURE: Stage '$Name' exited $exitCode but log is 0 bytes. Output was not captured. Fix the harness before trusting results."
+                Write-Host $integrityMsg -ForegroundColor Red
+                $integrityMsg | Out-File -FilePath $logFile -Encoding utf8
+                Add-StageResult -Name $Name -Status "FAILED" -ExitCode 99 -DurationSeconds $duration -LogFile $logFile
+                $script:OverallPassed = $false
+                return $false
             }
         }
 
@@ -438,8 +469,27 @@ function Write-Report {
     try {
         cmd /c mklink /J "$LatestLink" "$ArtifactsDir" 2>&1 | Out-Null
     } catch {
-        # Fall back to copying if junction fails
         Copy-Item $ArtifactsDir $LatestLink -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # Gap 2: Write latest_pointer.json and verify junction resolves correctly
+    $commitHash = git rev-parse HEAD 2>$null
+    if (-not $commitHash) { $commitHash = 'unknown' }
+    $pointerData = @{
+        run_dir = $ArtifactsDir
+        timestamp = (Get-Date -Format 'o')
+        commit_hash = $commitHash
+        overall_status = $overallStatus
+    }
+    $pointerPath = Join-Path (Split-Path $LatestLink) 'latest_pointer.json'
+    $pointerData | ConvertTo-Json | Out-File -FilePath $pointerPath -Encoding utf8
+
+    # Verify junction target matches current run
+    if (Test-Path $LatestLink) {
+        $resolvedTarget = (Get-Item $LatestLink).Target
+        if ($resolvedTarget -and $resolvedTarget -ne $ArtifactsDir) {
+            Write-Host "POINTER WARNING: latest junction resolves to $resolvedTarget but expected $ArtifactsDir" -ForegroundColor Yellow
+        }
     }
 }
 

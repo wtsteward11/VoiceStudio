@@ -488,6 +488,29 @@ if (-not $stage1Passed -and -not $SkipBuild) {
     exit 1
 }
 
+# Post-build checks (run after build, before other stages; fast and critical)
+if ($stage1Passed -and -not $SkipBuild) {
+    Invoke-Stage -Name "XAML Health" -Description "Verify XAML compiler produced valid output" -Action {
+        $healthScript = Join-Path $RootDir "tools\build\Check-XamlHealth.ps1"
+        if (Test-Path $healthScript) {
+            & powershell -ExecutionPolicy Bypass -File $healthScript
+            return $LASTEXITCODE
+        }
+        Write-Host "[SKIP] Check-XamlHealth.ps1 not found" -ForegroundColor Yellow
+        return 0
+    }
+
+    Invoke-Stage -Name "Resolved Packages" -Description "Verify no banned 9.0+ Microsoft.Extensions packages" -Action {
+        $pkgScript = Join-Path $RootDir "tools\build\Verify-ResolvedPackages.ps1"
+        if (Test-Path $pkgScript) {
+            & powershell -ExecutionPolicy Bypass -File $pkgScript
+            return $LASTEXITCODE
+        }
+        Write-Host "[SKIP] Verify-ResolvedPackages.ps1 not found" -ForegroundColor Yellow
+        return 0
+    }
+}
+
 # ============================================================================
 # STAGE 2: Python Quality Checks
 # ============================================================================

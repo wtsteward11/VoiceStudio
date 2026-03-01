@@ -4,7 +4,71 @@
   xmlns:controls="using:VoiceStudio.App.Controls"
   xmlns:local="using:VoiceStudio.App.Views.Panels"
   x:DataType="local:SceneBuilderView">
-  <Grid AutomationProperties.AutomationId="SceneBuilderView_Root">
-    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed" />
+
+  <Grid AutomationProperties.AutomationId="SceneBuilderView_Root" Padding="16">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="280"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+
+    <Grid Grid.Column="0" Margin="0,0,12,0">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+
+      <TextBlock Grid.Row="0" Text="Scene Builder" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,0,0,8"/>
+
+      <Grid Grid.Row="1" Margin="0,0,0,8">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <TextBox Grid.Column="0" Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay}"
+                 PlaceholderText="Search scenes..." Margin="0,0,8,0"/>
+        <Button Grid.Column="1" Command="{x:Bind ViewModel.CreateSceneCommand}" Content="New"/>
+      </Grid>
+
+      <ListView Grid.Row="2"
+                ItemsSource="{x:Bind ViewModel.Scenes, Mode=OneWay}"
+                SelectedItem="{x:Bind ViewModel.SelectedScene, Mode=TwoWay}">
+        <ListView.ItemTemplate>
+          <DataTemplate>
+            <StackPanel Padding="4">
+              <TextBlock Text="{Binding Name}" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+              <TextBlock Text="{Binding Description}" Opacity="0.6" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+          </DataTemplate>
+        </ListView.ItemTemplate>
+      </ListView>
+
+      <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+        <Button Command="{x:Bind ViewModel.LoadScenesCommand}" Content="Refresh"/>
+      </StackPanel>
+    </Grid>
+
+    <Border Grid.Column="1" CornerRadius="4" Padding="16"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1">
+      <StackPanel Spacing="12">
+        <TextBlock Text="Scene Details" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+
+        <ComboBox Header="Project"
+                  ItemsSource="{x:Bind ViewModel.AvailableProjects, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.SelectedProjectId, Mode=TwoWay}"
+                  HorizontalAlignment="Stretch"/>
+
+        <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Opacity="0.7"/>
+
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Command="{x:Bind ViewModel.ApplySceneCommand}" Style="{StaticResource AccentButtonStyle}" Content="Apply Scene"/>
+          <Button Command="{x:Bind ViewModel.DeleteSceneCommand}" Content="Delete"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed"/>
   </Grid>
 </UserControl>

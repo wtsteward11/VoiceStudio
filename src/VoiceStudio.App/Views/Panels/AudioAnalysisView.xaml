@@ -4,7 +4,68 @@
   xmlns:controls="using:VoiceStudio.App.Controls"
   xmlns:local="using:VoiceStudio.App.Views.Panels"
   x:DataType="local:AudioAnalysisView">
-  <Grid AutomationProperties.AutomationId="AudioAnalysisView_Root">
-    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed" />
+
+  <Grid AutomationProperties.AutomationId="AudioAnalysisView_Root" Padding="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Text="Audio Analysis" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,0,0,12"/>
+
+    <Grid Grid.Row="1" Margin="0,0,0,12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <ComboBox Grid.Column="0" Header="Audio Source"
+                ItemsSource="{x:Bind ViewModel.AvailableAudioIds, Mode=OneWay}"
+                SelectedItem="{x:Bind ViewModel.SelectedAudioId, Mode=TwoWay}"
+                HorizontalAlignment="Stretch"/>
+
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom" Margin="12,0,12,0">
+        <Button Command="{x:Bind ViewModel.AnalyzeAudioCommand}" Style="{StaticResource AccentButtonStyle}" Content="Analyze"/>
+        <Button Command="{x:Bind ViewModel.RefreshCommand}" Content="Refresh"/>
+      </StackPanel>
+
+      <ComboBox Grid.Column="2" Header="Reference (for comparison)"
+                ItemsSource="{x:Bind ViewModel.AvailableAudioIds, Mode=OneWay}"
+                SelectedItem="{x:Bind ViewModel.ReferenceAudioId, Mode=TwoWay}"
+                HorizontalAlignment="Stretch"/>
+    </Grid>
+
+    <ScrollViewer Grid.Row="2" Margin="0,0,0,12">
+      <StackPanel Spacing="12">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <CheckBox Content="Spectral Analysis" IsChecked="{x:Bind ViewModel.IncludeSpectral, Mode=TwoWay}"/>
+          <CheckBox Content="Temporal Analysis" IsChecked="{x:Bind ViewModel.IncludeTemporal, Mode=TwoWay}"/>
+          <CheckBox Content="Perceptual Analysis" IsChecked="{x:Bind ViewModel.IncludePerceptual, Mode=TwoWay}"/>
+        </StackPanel>
+
+        <Border BorderThickness="1" CornerRadius="4" Padding="12"
+                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Analysis Results" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+            <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Opacity="0.7"/>
+          </StackPanel>
+        </Border>
+
+        <Button Command="{x:Bind ViewModel.CompareAudioCommand}" Content="Compare with Reference" Margin="0,4,0,0"/>
+      </StackPanel>
+    </ScrollViewer>
+
+    <ProgressBar Grid.Row="3" IsIndeterminate="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                 Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}"/>
+
+    <InfoBar Grid.Row="3" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+             Severity="Error" Title="Error"
+             Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"/>
+
+    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed"/>
   </Grid>
 </UserControl>

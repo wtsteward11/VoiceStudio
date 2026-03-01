@@ -4,7 +4,103 @@
   xmlns:controls="using:VoiceStudio.App.Controls"
   xmlns:local="using:VoiceStudio.App.Views.Panels"
   x:DataType="local:TodoPanelView">
-  <Grid AutomationProperties.AutomationId="TodoPanelView_Root">
-    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed" />
+
+  <Grid AutomationProperties.AutomationId="TodoPanelView_Root" Padding="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <Grid Grid.Row="0" Margin="0,0,0,8">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <TextBlock Grid.Column="0" Text="Todo Panel" Style="{StaticResource SubtitleTextBlockStyle}"/>
+      <Button Grid.Column="1" Command="{x:Bind ViewModel.RefreshCommand}" Content="Refresh"/>
+    </Grid>
+
+    <Grid Grid.Row="1" ColumnSpacing="8" Margin="0,0,0,8">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+      <ComboBox Grid.Column="0" Header="Status"
+                ItemsSource="{x:Bind ViewModel.AvailableStatuses, Mode=OneWay}"
+                SelectedItem="{x:Bind ViewModel.FilterStatus, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+      <ComboBox Grid.Column="1" Header="Priority"
+                ItemsSource="{x:Bind ViewModel.AvailablePriorities, Mode=OneWay}"
+                SelectedItem="{x:Bind ViewModel.FilterPriority, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+      <ComboBox Grid.Column="2" Header="Category"
+                ItemsSource="{x:Bind ViewModel.AvailableCategories, Mode=OneWay}"
+                SelectedItem="{x:Bind ViewModel.FilterCategory, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+      <ComboBox Grid.Column="3" Header="Tag"
+                ItemsSource="{x:Bind ViewModel.AvailableTags, Mode=OneWay}"
+                SelectedItem="{x:Bind ViewModel.FilterTag, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+    </Grid>
+
+    <ListView Grid.Row="2"
+              ItemsSource="{x:Bind ViewModel.Todos, Mode=OneWay}"
+              SelectedItem="{x:Bind ViewModel.SelectedTodo, Mode=TwoWay}">
+      <ListView.ItemTemplate>
+        <DataTemplate>
+          <Grid Padding="8,6" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="80"/>
+              <ColumnDefinition Width="80"/>
+              <ColumnDefinition Width="80"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+              <TextBlock Text="{Binding Title}" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+              <TextBlock Text="{Binding Description}" Opacity="0.6" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+            </StackPanel>
+            <TextBlock Grid.Column="1" Text="{Binding Priority}" VerticalAlignment="Center" Opacity="0.7"/>
+            <TextBlock Grid.Column="2" Text="{Binding Status}" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="3" Text="{Binding Category}" VerticalAlignment="Center" Opacity="0.5"/>
+          </Grid>
+        </DataTemplate>
+      </ListView.ItemTemplate>
+    </ListView>
+
+    <Border Grid.Row="3" CornerRadius="4" Padding="12" Margin="0,8,0,0"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1">
+      <StackPanel Spacing="8">
+        <TextBlock Text="New Todo" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+        <TextBox Header="Title" Text="{x:Bind ViewModel.NewTodoTitle, Mode=TwoWay}" PlaceholderText="Task title..."/>
+        <TextBox Header="Description" Text="{x:Bind ViewModel.NewTodoDescription, Mode=TwoWay}"
+                 PlaceholderText="Details..." AcceptsReturn="True" TextWrapping="Wrap" MinHeight="40"/>
+        <Grid ColumnSpacing="8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <ComboBox Grid.Column="0" Header="Priority"
+                    ItemsSource="{x:Bind ViewModel.AvailablePriorities, Mode=OneWay}"
+                    SelectedItem="{x:Bind ViewModel.NewTodoPriority, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+          <ComboBox Grid.Column="1" Header="Category"
+                    ItemsSource="{x:Bind ViewModel.AvailableCategories, Mode=OneWay}"
+                    SelectedItem="{x:Bind ViewModel.NewTodoCategory, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+          <TextBox Grid.Column="2" Header="Tags" Text="{x:Bind ViewModel.NewTodoTags, Mode=TwoWay}"
+                   PlaceholderText="comma,separated"/>
+        </Grid>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Command="{x:Bind ViewModel.CreateTodoCommand}" Style="{StaticResource AccentButtonStyle}" Content="Create"/>
+          <Button Command="{x:Bind ViewModel.DeleteTodoCommand}" Content="Delete Selected"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <ProgressBar Grid.Row="4" IsIndeterminate="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                 Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Margin="0,4,0,0"/>
+
+    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed"/>
   </Grid>
 </UserControl>

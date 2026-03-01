@@ -4,7 +4,99 @@
   xmlns:controls="using:VoiceStudio.App.Controls"
   xmlns:local="using:VoiceStudio.App.Views.Panels"
   x:DataType="local:WorkflowAutomationView">
-  <Grid AutomationProperties.AutomationId="WorkflowAutomationView_Root">
-    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed" />
+
+  <Grid AutomationProperties.AutomationId="WorkflowAutomationView_Root" Padding="16">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="300"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+
+    <Grid Grid.Column="0" Margin="0,0,12,0">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+
+      <TextBlock Grid.Row="0" Text="Workflow Automation" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,0,0,8"/>
+
+      <TextBox Grid.Row="1" Header="Workflow Name" Text="{x:Bind ViewModel.WorkflowName, Mode=TwoWay}"
+               PlaceholderText="My Workflow" Margin="0,0,0,8"/>
+
+      <TextBox Grid.Row="2" Header="Description" Text="{x:Bind ViewModel.WorkflowDescription, Mode=TwoWay}"
+               PlaceholderText="What this workflow does..." AcceptsReturn="True"
+               TextWrapping="Wrap" MinHeight="60" Margin="0,0,0,8"/>
+
+      <ListView Grid.Row="3"
+                ItemsSource="{x:Bind ViewModel.Templates, Mode=OneWay}">
+        <ListView.Header>
+          <TextBlock Text="Templates" Style="{StaticResource BodyStrongTextBlockStyle}" Margin="0,0,0,4"/>
+        </ListView.Header>
+        <ListView.ItemTemplate>
+          <DataTemplate>
+            <StackPanel Padding="4">
+              <TextBlock Text="{Binding Name}" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+              <TextBlock Text="{Binding Description}" Opacity="0.6" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+          </DataTemplate>
+        </ListView.ItemTemplate>
+      </ListView>
+
+      <StackPanel Grid.Row="4" Spacing="8" Margin="0,8,0,0">
+        <Button Command="{x:Bind ViewModel.CreateWorkflowCommand}" Content="New Workflow" HorizontalAlignment="Stretch"/>
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <Button Grid.Column="0" Command="{x:Bind ViewModel.SaveWorkflowCommand}" Content="Save" Margin="0,0,4,0" HorizontalAlignment="Stretch"/>
+          <Button Grid.Column="1" Command="{x:Bind ViewModel.TestWorkflowCommand}" Content="Test" Margin="4,0,4,0" HorizontalAlignment="Stretch"/>
+          <Button Grid.Column="2" Command="{x:Bind ViewModel.RunWorkflowCommand}" Style="{StaticResource AccentButtonStyle}" Content="Run" Margin="4,0,0,0" HorizontalAlignment="Stretch"/>
+        </Grid>
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Column="1">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+
+      <TextBlock Grid.Row="0" Text="Steps" Style="{StaticResource BodyStrongTextBlockStyle}" Margin="0,0,0,8"/>
+
+      <ListView Grid.Row="1"
+                ItemsSource="{x:Bind ViewModel.WorkflowSteps, Mode=OneWay}"
+                SelectedItem="{x:Bind ViewModel.SelectedStep, Mode=TwoWay}">
+        <ListView.ItemTemplate>
+          <DataTemplate>
+            <Grid Padding="8,6" ColumnSpacing="12">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="30"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="0" Text="{Binding Order}" VerticalAlignment="Center" Opacity="0.5"/>
+              <StackPanel Grid.Column="1">
+                <TextBlock Text="{Binding Name}" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                <TextBlock Text="{Binding StepType}" Opacity="0.6"/>
+              </StackPanel>
+              <TextBlock Grid.Column="2" Text="{Binding Status}" VerticalAlignment="Center" Opacity="0.7"/>
+            </Grid>
+          </DataTemplate>
+        </ListView.ItemTemplate>
+      </ListView>
+
+      <StackPanel Grid.Row="2" Margin="0,8,0,0">
+        <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                     Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}"/>
+        <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Opacity="0.7" Margin="0,4,0,0"/>
+      </StackPanel>
+    </Grid>
+
+    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed"/>
   </Grid>
 </UserControl>

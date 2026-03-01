@@ -4,7 +4,72 @@
   xmlns:controls="using:VoiceStudio.App.Controls"
   xmlns:local="using:VoiceStudio.App.Views.Panels"
   x:DataType="local:VoiceStyleTransferView">
-  <Grid AutomationProperties.AutomationId="VoiceStyleTransferView_Root">
-    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed" />
+
+  <Grid AutomationProperties.AutomationId="VoiceStyleTransferView_Root" Padding="16">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="300"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+
+    <ScrollViewer Grid.Column="0" Margin="0,0,12,0">
+      <StackPanel Spacing="12">
+        <TextBlock Text="Voice Style Transfer" Style="{StaticResource SubtitleTextBlockStyle}"/>
+
+        <TextBlock Text="Reference Audio" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+        <TextBox Header="Audio ID" Text="{x:Bind ViewModel.ReferenceAudioId, Mode=TwoWay}"
+                 PlaceholderText="Enter reference audio ID..."/>
+
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Command="{x:Bind ViewModel.ExtractStyleCommand}" Style="{StaticResource AccentButtonStyle}" Content="Extract Style"/>
+          <Button Command="{x:Bind ViewModel.AnalyzeStyleCommand}" Content="Analyze"/>
+        </StackPanel>
+
+        <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsExtractingStyle, Mode=OneWay}"
+                     Visibility="{x:Bind ViewModel.IsExtractingStyle, Mode=OneWay}"/>
+
+        <TextBlock Text="Generation" Style="{StaticResource BodyStrongTextBlockStyle}" Margin="0,8,0,0"/>
+
+        <ComboBox Header="Target Voice Profile"
+                  ItemsSource="{x:Bind ViewModel.AvailableVoiceProfiles, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.TargetVoiceProfileId, Mode=TwoWay}"
+                  HorizontalAlignment="Stretch"/>
+
+        <TextBox Header="Target Text" Text="{x:Bind ViewModel.TargetText, Mode=TwoWay}"
+                 AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80"
+                 PlaceholderText="Text to synthesize with transferred style..."/>
+
+        <Slider Header="Style Intensity" Value="{x:Bind ViewModel.StyleIntensity, Mode=TwoWay}"
+                Minimum="0" Maximum="1" StepFrequency="0.05"/>
+
+        <Button Command="{x:Bind ViewModel.GenerateCommand}" Style="{StaticResource AccentButtonStyle}"
+                Content="Generate with Style" HorizontalAlignment="Stretch"/>
+
+        <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsGenerating, Mode=OneWay}"
+                     Visibility="{x:Bind ViewModel.IsGenerating, Mode=OneWay}"/>
+
+        <Button Command="{x:Bind ViewModel.LoadVoiceProfilesCommand}" Content="Refresh Profiles"/>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Grid Grid.Column="1">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+
+      <Border Grid.Row="0" CornerRadius="4" Padding="16"
+              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+              BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1">
+        <StackPanel Spacing="8" VerticalAlignment="Center" HorizontalAlignment="Center">
+          <TextBlock Text="Style Preview" Style="{StaticResource BodyStrongTextBlockStyle}" HorizontalAlignment="Center"/>
+          <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Opacity="0.6" HorizontalAlignment="Center" TextWrapping="Wrap"/>
+        </StackPanel>
+      </Border>
+
+      <InfoBar Grid.Row="1" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}" Severity="Error"
+               Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" Margin="0,8,0,0"/>
+    </Grid>
+
+    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed"/>
   </Grid>
 </UserControl>

@@ -4,7 +4,85 @@
   xmlns:controls="using:VoiceStudio.App.Controls"
   xmlns:local="using:VoiceStudio.App.Views.Panels"
   x:DataType="local:RecordingView">
-  <Grid AutomationProperties.AutomationId="RecordingView_Root">
-    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed" />
+
+  <Grid AutomationProperties.AutomationId="RecordingView_Root" Padding="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Text="Recording" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,0,0,12"/>
+
+    <Grid Grid.Row="1" Margin="0,0,0,12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+
+      <StackPanel Grid.Column="0" Spacing="8">
+        <ComboBox Header="Input Device"
+                  ItemsSource="{x:Bind ViewModel.AvailableDevices, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.SelectedDevice, Mode=TwoWay}"
+                  HorizontalAlignment="Stretch"/>
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <ComboBox Grid.Column="0" Header="Sample Rate"
+                    ItemsSource="{x:Bind ViewModel.AvailableSampleRates}"
+                    SelectedItem="{x:Bind ViewModel.SampleRate, Mode=TwoWay}" Margin="0,0,4,0"/>
+          <ComboBox Grid.Column="1" Header="Channels"
+                    ItemsSource="{x:Bind ViewModel.AvailableChannels}"
+                    SelectedItem="{x:Bind ViewModel.Channels, Mode=TwoWay}" Margin="4,0,4,0"/>
+          <ComboBox Grid.Column="2" Header="Format"
+                    ItemsSource="{x:Bind ViewModel.AvailableFormats, Mode=OneWay}"
+                    SelectedItem="{x:Bind ViewModel.SelectedFormat, Mode=TwoWay}" Margin="4,0,0,0"/>
+        </Grid>
+        <TextBox Header="Filename" Text="{x:Bind ViewModel.Filename, Mode=TwoWay}"
+                 PlaceholderText="recording_001"/>
+      </StackPanel>
+
+      <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Bottom" Margin="12,0,0,0">
+        <Button Command="{x:Bind ViewModel.LoadDevicesCommand}" Content="Refresh Devices" Width="140"/>
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Row="2" Margin="0,0,0,12">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+      <TextBlock Grid.Row="0" Text="Waveform" Style="{StaticResource BodyStrongTextBlockStyle}" Margin="0,0,0,4"/>
+      <Border Grid.Row="1" BorderThickness="1" CornerRadius="4" MinHeight="120"
+              BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+        <TextBlock Text="{x:Bind ViewModel.RecordingDurationDisplay, Mode=OneWay}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Style="{StaticResource TitleTextBlockStyle}" Opacity="0.6"/>
+      </Border>
+    </Grid>
+
+    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,0,0,12">
+      <Button Command="{x:Bind ViewModel.StartRecordingCommand}"
+              Style="{StaticResource AccentButtonStyle}" Width="120">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <FontIcon Glyph="&#xE7C8;" FontSize="16"/>
+          <TextBlock Text="Record"/>
+        </StackPanel>
+      </Button>
+      <Button Command="{x:Bind ViewModel.StopRecordingCommand}" Width="100" Content="Stop"/>
+      <Button Command="{x:Bind ViewModel.CancelRecordingCommand}" Width="100" Content="Cancel"/>
+    </StackPanel>
+
+    <InfoBar Grid.Row="4" IsOpen="{x:Bind ViewModel.IsRecording, Mode=OneWay}"
+             Severity="Informational" Title="Recording"
+             Message="{x:Bind ViewModel.RecordingDurationDisplay, Mode=OneWay}"/>
+
+    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed"/>
   </Grid>
 </UserControl>

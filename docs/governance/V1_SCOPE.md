@@ -110,7 +110,7 @@ The following are deferred to v1.1 or later:
 - Real-time voice conversion in production (prototype exists)
 - Plugin marketplace (Plugin Gallery panel exists; marketplace backend does not)
 - Automated model fine-tuning pipelines
-- mypy strict compliance (5892 errors — accepted tech debt, VS-0043)
+- mypy strict compliance (5892 errors — accepted tech debt, VS-0043). mypy strict (`-StrictMypy`) is not a v1.0 gate; strict typing is deferred to v1.1.
 - WhisperX diarization in production (engine adapter exists; dependency chain not validated on all platforms)
 
 ---

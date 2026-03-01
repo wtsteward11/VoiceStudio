@@ -4,7 +4,93 @@
   xmlns:controls="using:VoiceStudio.App.Controls"
   xmlns:local="using:VoiceStudio.App.Views.Panels"
   x:DataType="local:ImageGenView">
-  <Grid AutomationProperties.AutomationId="ImageGenView_Root">
-    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed" />
+
+  <Grid AutomationProperties.AutomationId="ImageGenView_Root" Padding="16">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="320"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+
+    <ScrollViewer Grid.Column="0" Margin="0,0,12,0">
+      <StackPanel Spacing="12">
+        <TextBlock Text="Image Generation" Style="{StaticResource SubtitleTextBlockStyle}"/>
+
+        <ComboBox Header="Engine"
+                  ItemsSource="{x:Bind ViewModel.Engines, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.SelectedEngine, Mode=TwoWay}"
+                  HorizontalAlignment="Stretch"/>
+
+        <TextBox Header="Prompt" Text="{x:Bind ViewModel.Prompt, Mode=TwoWay}"
+                 AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80"
+                 PlaceholderText="Describe the image you want to generate..."/>
+
+        <TextBox Header="Negative Prompt" Text="{x:Bind ViewModel.NegativePrompt, Mode=TwoWay}"
+                 AcceptsReturn="True" TextWrapping="Wrap" MinHeight="40"
+                 PlaceholderText="What to avoid..."/>
+
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <NumberBox Grid.Column="0" Header="Width" Value="{x:Bind ViewModel.Width, Mode=TwoWay}"
+                     Minimum="64" Maximum="2048" SpinButtonPlacementMode="Compact" Margin="0,0,4,0"/>
+          <NumberBox Grid.Column="1" Header="Height" Value="{x:Bind ViewModel.Height, Mode=TwoWay}"
+                     Minimum="64" Maximum="2048" SpinButtonPlacementMode="Compact" Margin="4,0,0,0"/>
+        </Grid>
+
+        <NumberBox Header="Steps" Value="{x:Bind ViewModel.Steps, Mode=TwoWay}"
+                   Minimum="1" Maximum="150" SpinButtonPlacementMode="Compact"/>
+
+        <Slider Header="CFG Scale" Value="{x:Bind ViewModel.CfgScale, Mode=TwoWay}"
+                Minimum="1" Maximum="30" StepFrequency="0.5"/>
+
+        <CheckBox Content="Enable Preprocessing" IsChecked="{x:Bind ViewModel.EnablePreprocessing, Mode=TwoWay}"/>
+
+        <Slider Header="Enhancement Strength" Value="{x:Bind ViewModel.EnhancementStrength, Mode=TwoWay}"
+                Minimum="0" Maximum="1" StepFrequency="0.05"/>
+
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <Button Grid.Column="0" Command="{x:Bind ViewModel.GenerateCommand}"
+                  Style="{StaticResource AccentButtonStyle}" Content="Generate"
+                  HorizontalAlignment="Stretch" Margin="0,0,4,0"/>
+          <Button Grid.Column="1" Command="{x:Bind ViewModel.UpscaleCommand}"
+                  Content="Upscale" HorizontalAlignment="Stretch" Margin="4,0,0,0"/>
+        </Grid>
+
+        <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                     Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}"/>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Grid Grid.Column="1">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+
+      <Border Grid.Row="0" CornerRadius="4"
+              BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" BorderThickness="1"
+              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+        <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.5"
+                   Style="{StaticResource BodyTextBlockStyle}"/>
+      </Border>
+
+      <StackPanel Grid.Row="1" Margin="0,8,0,0" Spacing="4">
+        <TextBlock Text="{x:Bind ViewModel.CurrentQualityMetrics, Mode=OneWay}" Opacity="0.7"/>
+      </StackPanel>
+    </Grid>
+
+    <InfoBar Grid.ColumnSpan="2" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+             Severity="Error" Title="Error"
+             Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+             VerticalAlignment="Bottom"/>
+
+    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed"/>
   </Grid>
 </UserControl>

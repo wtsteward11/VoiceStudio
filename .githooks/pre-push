@@ -1,0 +1,25 @@
+#!/bin/sh
+# VoiceStudio pre-push hook
+# Runs dependency gate and XAML artifact checks before allowing push.
+# Install: git config core.hooksPath .githooks
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+echo "[pre-push] Running dependency gate..."
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$REPO_ROOT/tools/build/Verify-ResolvedPackages.ps1"
+if [ $? -ne 0 ]; then
+    echo "[pre-push] BLOCKED: Dependency gate failed. Fix violations before pushing."
+    exit 1
+fi
+
+echo "[pre-push] Running XAML artifact check..."
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$REPO_ROOT/tools/build/Verify-XamlArtifacts.ps1"
+if [ $? -ne 0 ]; then
+    echo "[pre-push] BLOCKED: XAML artifact check failed. Fix before pushing."
+    exit 1
+fi
+
+# Chain to LFS pre-push if git-lfs is available
+if command -v git-lfs >/dev/null 2>&1; then
+    git lfs pre-push "$@"
+fi

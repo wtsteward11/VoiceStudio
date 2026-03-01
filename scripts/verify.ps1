@@ -301,6 +301,15 @@ function Invoke-Stage {
         
         $duration = ((Get-Date) - $stageStart).TotalSeconds
         
+        # Sanity check: if stage failed and log is empty, report harness error
+        if ($exitCode -ne 0 -and (Test-Path $logFile)) {
+            $logSize = (Get-Item $logFile).Length
+            if ($logSize -eq 0) {
+                Write-Host "HARNESS WARNING: Stage failed but log file is empty (0 bytes). Output may not have been captured." -ForegroundColor Yellow
+                "HARNESS WARNING: Log capture produced 0 bytes for a failing stage." | Out-File -FilePath $logFile -Encoding utf8
+            }
+        }
+
         if ($exitCode -eq 0) {
             Write-Stage $Name "PASSED (${duration}s)" "PASS"
             Add-StageResult -Name $Name -Status "PASSED" -ExitCode $exitCode -DurationSeconds $duration -LogFile $logFile
@@ -439,11 +448,10 @@ function Write-Report {
 # ============================================================================
 
 Write-Host ""
-Write-Host "╔══════════════════════════════════════════════════════════════════════╗" -ForegroundColor Magenta
-Write-Host "║            VOICESTUDIO UNIFIED VERIFICATION HARNESS                  ║" -ForegroundColor Magenta
-Write-Host "║                                                                      ║" -ForegroundColor Magenta
-Write-Host "║  RULE: No changes allowed unless this script stays GREEN            ║" -ForegroundColor Yellow
-Write-Host "╚══════════════════════════════════════════════════════════════════════╝" -ForegroundColor Magenta
+Write-Host ("=" * 70) -ForegroundColor Magenta
+Write-Host "  VOICESTUDIO UNIFIED VERIFICATION HARNESS" -ForegroundColor Magenta
+Write-Host "  RULE: No changes allowed unless this script stays GREEN" -ForegroundColor Yellow
+Write-Host ("=" * 70) -ForegroundColor Magenta
 Write-Host ""
 Write-Host "Timestamp:     $Timestamp"
 Write-Host "Configuration: $Configuration"
@@ -748,13 +756,11 @@ if ($OverallPassed) {
     Write-Host "Report: $ReportFile" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Failed stages:" -ForegroundColor Red
-    foreach ($failedStage in $Stages) {
-        if ($failedStage.Status -eq "FAILED") {
-            $fname = $failedStage.Name
-            $fcode = $failedStage.ExitCode
-            $msg = '  - ' + $fname + ' [exit ' + $fcode + ']'
-            Write-Host $msg -ForegroundColor Red
-        }
+    $failedList = @($Stages | Where-Object { $_.Status -eq 'FAILED' })
+    foreach ($fs in $failedList) {
+        $n = $fs.Name
+        $c = $fs.ExitCode
+        Write-Host ('  - ' + $n + ' exit=' + $c) -ForegroundColor Red
     }
     exit 1
 }

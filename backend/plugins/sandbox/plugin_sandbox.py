@@ -18,7 +18,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set
 
-_resource_mod: _types_mod.ModuleType | None
+_resource_mod: Optional[_types_mod.ModuleType]
 try:
     import resource as _resource_mod
 

@@ -241,6 +241,16 @@ jobs:
       - name: Gate C publish check (no launch)
         run: powershell -ExecutionPolicy Bypass -File scripts/gatec-publish-launch.ps1 -Configuration Release -RuntimeIdentifier win-x64 -NoLaunch
 
+      - name: Verify resolved package safety
+        if: success()
+        run: |
+          powershell -ExecutionPolicy Bypass -File tools/build/Verify-ResolvedPackages.ps1
+
+      - name: Verify XAML artifacts
+        if: success()
+        run: |
+          powershell -ExecutionPolicy Bypass -File tools/build/Verify-XamlArtifacts.ps1
+
       - name: Log Build Results to Audit System
         if: always()
         run: |

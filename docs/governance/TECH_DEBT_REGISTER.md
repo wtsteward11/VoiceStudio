@@ -10,7 +10,7 @@
 
 | ID | Title | Priority | Added | Category | Description |
 |----|-------|----------|-------|----------|-------------|
-| **TD-039** | Dynamic Transcription Engine Discovery | Medium | 2026-02-14 | UI/Backend | Transcription engine dropdown currently hardcoded. Should dynamically query backend for available engines based on installed dependencies. WhisperX temporarily removed pending this implementation. See `TranscribeViewModel.cs` TODO comment. |
+| — | (none) | — | — | — | All technical debt closed as of 2026-02-28 |
 
 ---
 
@@ -56,6 +56,7 @@
 | **TD-036** | Workspace automated UI smoke step | 2026-02-12 | Gate C workspace switch + assert in MainWindow | ui_smoke_steps_latest.log |
 | **TD-037** | WhisperX Engine Implementation | 2026-02-12 | WhisperXEngine in app/core/engines/whisperx_engine.py; manifest engines/audio/whisperx; TranscribeViewModel.Engines includes "whisperx"; transcribe route supports diarization | whisperx_engine.py, transcribe.py, TranscribeViewModel.cs |
 | **TD-038** | DAW Export Presets | 2026-02-12 | Pre-configured presets in daw_integration.py (DAW_EXPORT_PRESETS, get_daw_export_presets, get_daw_export_preset_by_id); GET /api/integrations/daw/presets; export accepts preset_id | daw_integration.py, integrations.py, test_daw_integration.py |
+| **TD-039** | Dynamic Transcription Engine Discovery | 2026-02-28 | Implemented in TranscribeViewModel.cs via GAP-CS-003: LoadEnginesAsync() calls GetTranscriptionEnginesAsync(), populates Engines dynamically, falls back to hardcoded list on backend error | TranscribeViewModel.cs lines 229-280 |
 
 ---
 

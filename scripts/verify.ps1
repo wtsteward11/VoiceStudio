@@ -327,100 +327,83 @@ function Write-Report {
     $failedCount = ($Stages | Where-Object { $_.Status -eq "FAILED" }).Count
     $skippedCount = ($Stages | Where-Object { $_.Status -eq "SKIPPED" }).Count
     
-    # Markdown report
-    $report = @"
-# VoiceStudio Verification Report
-
-**Date:** $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-**Configuration:** $Configuration
-**Quick Mode:** $Quick
-**Real UI:** $RealUI
-**Overall Status:** $overallStatus
-**Total Duration:** $([math]::Round($overallDuration, 2)) seconds
-
-## Summary
-
-- **Passed:** $passedCount
-- **Failed:** $failedCount
-- **Skipped:** $skippedCount
-
-## Stage Results
-
-| # | Stage | Status | Exit Code | Duration |
-|---|-------|--------|-----------|----------|
-"@
+    # Markdown report — built with string concatenation to avoid
+    # PowerShell parsing pipe chars in here-strings as pipeline operators.
+    $nl = [Environment]::NewLine
+    $dateStr = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $durStr = [math]::Round($overallDuration, 2)
+    $report = "# VoiceStudio Verification Report" + $nl + $nl
+    $report += "**Date:** $dateStr" + $nl
+    $report += "**Configuration:** $Configuration" + $nl
+    $report += "**Quick Mode:** $Quick" + $nl
+    $report += "**Real UI:** $RealUI" + $nl
+    $report += "**Overall Status:** $overallStatus" + $nl
+    $report += "**Total Duration:** $durStr seconds" + $nl + $nl
+    $report += "## Summary" + $nl + $nl
+    $report += "- **Passed:** $passedCount" + $nl
+    $report += "- **Failed:** $failedCount" + $nl
+    $report += "- **Skipped:** $skippedCount" + $nl + $nl
+    $report += "## Stage Results" + $nl + $nl
+    $tH = "| # | Stage | Status | Exit Code | Duration |"
+    $tD = "|---|-------|--------|-----------|----------|"
+    $report += $tH + $nl + $tD + $nl
 
     $stageNum = 1
     foreach ($stage in $Stages) {
         $icon = switch ($stage.Status) {
-            "PASSED" { "✅" }
-            "FAILED" { "❌" }
-            "SKIPPED" { "⏭️" }
-            default { "❓" }
+            "PASSED" { "PASS" }
+            "FAILED" { "FAIL" }
+            "SKIPPED" { "SKIP" }
+            default { "?" }
         }
-        $report += ("`n" + "| $stageNum | $($stage.Name) | $icon $($stage.Status) | $($stage.ExitCode) | $($stage.DurationSeconds)s |")
+        $row = [string]::Format("| {0} | {1} | {2} {3} | {4} | {5}s |", $stageNum, $stage.Name, $icon, $stage.Status, $stage.ExitCode, $stage.DurationSeconds)
+        $report += $row + $nl
         $stageNum++
     }
 
-    $report += @"
+    $report += $nl + "## Artifacts" + $nl + $nl
+    $report += "- **Report:** $ReportFile" + $nl
+    $report += "- **Logs:** $StageLogsDir" + $nl
+    $report += "- **Screenshots:** $ScreenshotsDir" + $nl
+    $report += "- **Test Results:** $TestResultsDir" + $nl + $nl
+    $report += "## Failed Stages" + $nl + $nl
 
-
-## Artifacts
-
-- **Report:** ``$ReportFile``
-- **Logs:** ``$StageLogsDir``
-- **Screenshots:** ``$ScreenshotsDir``
-- **Test Results:** ``$TestResultsDir``
-
-## Failed Stages
-
-"@
-
-    $failedStages = $Stages | Where-Object { $_.Status -eq "FAILED" }
-    if ($failedStages) {
+    $failedStages = @($Stages | Where-Object { $_.Status -eq "FAILED" })
+    if ($failedStages.Count -gt 0) {
         foreach ($stage in $failedStages) {
-            $report += "`n### $($stage.Name)`n"
-            $report += "`nExit code: $($stage.ExitCode)`n"
-            $report += "Log file: ``$($stage.LogFile)```n"
-            
+            $report += "### $($stage.Name)" + $nl + $nl
+            $report += "Exit code: $($stage.ExitCode)" + $nl
+            $report += "Log file: $($stage.LogFile)" + $nl
+
             if ($stage.LogFile -and (Test-Path $stage.LogFile)) {
                 $lastLines = Get-Content $stage.LogFile -Tail 20 -ErrorAction SilentlyContinue
                 if ($lastLines) {
-                    $report += "`n``````"
-                    $report += "`n$($lastLines -join "`n")"
-                    $report += "`n```````n"
+                    $report += $nl + '```' + $nl
+                    $report += ($lastLines -join $nl) + $nl
+                    $report += '```' + $nl
                 }
             }
         }
     } else {
-        $report += "`nNo failures! 🎉`n"
+        $report += "No failures." + $nl
     }
 
-    $report += @"
-
-## How to Fix Failures
-
-1. Check the log file for the failed stage
-2. Fix the issue in your code
-3. Run ``.\scripts\verify.ps1`` again
-4. Do NOT merge until this script passes
-
-## Re-run Commands
-
-``````powershell
-# Full verification
-.\scripts\verify.ps1
-
-# Quick verification (pre-commit)
-.\scripts\verify.ps1 -Quick
-
-# Skip specific stages
-.\scripts\verify.ps1 -SkipUI -SkipIntegration
-
-# Real UI automation
-.\scripts\verify.ps1 -RealUI
-``````
-"@
+    $report += $nl + "## How to Fix Failures" + $nl + $nl
+    $report += "1. Check the log file for the failed stage" + $nl
+    $report += "2. Fix the issue in your code" + $nl
+    $report += "3. Run .\scripts\verify.ps1 again" + $nl
+    $report += "4. Do NOT merge until this script passes" + $nl + $nl
+    $report += "## Re-run Commands" + $nl + $nl
+    $report += '```powershell' + $nl
+    $report += "# Full verification" + $nl
+    $report += ".\scripts\verify.ps1" + $nl + $nl
+    $report += "# Quick verification (pre-commit)" + $nl
+    $report += ".\scripts\verify.ps1 -Quick" + $nl + $nl
+    $report += "# Skip specific stages" + $nl
+    $report += ".\scripts\verify.ps1 -SkipUI -SkipIntegration" + $nl + $nl
+    $report += "# Real UI automation" + $nl
+    $report += ".\scripts\verify.ps1 -RealUI" + $nl
+    $report += '```' + $nl
 
     $report | Out-File -FilePath $ReportFile -Encoding utf8
     
@@ -475,7 +458,7 @@ Set-Location $RootDir
 # STAGE 1: Clean Build (C#)
 # ============================================================================
 
-$stage1Passed = Invoke-Stage -Name "Clean Build" -Description "Build C# solution (VoiceStudio.sln)" -Skip:$SkipBuild -Action {
+$stage1Passed = Invoke-Stage -Name "Clean Build" -Description "Build C# solution" -Skip:$SkipBuild -Action {
     $binlogPath = Join-Path $ArtifactsDir "build.binlog"
     & dotnet build VoiceStudio.sln -c $Configuration -p:Platform=x64 /bl:$binlogPath
     return $LASTEXITCODE
@@ -515,7 +498,7 @@ if ($stage1Passed -and -not $SkipBuild) {
 # STAGE 2: Python Quality Checks
 # ============================================================================
 
-$stage2Passed = Invoke-Stage -Name "Python Quality" -Description "Lint and type-check Python code (ruff, mypy)" -Skip:$SkipPythonLint -Action {
+$stage2Passed = Invoke-Stage -Name "Python Quality" -Description "Lint and type-check Python code - ruff, mypy" -Skip:$SkipPythonLint -Action {
     Write-Host "Running ruff check --fix (autofix)..."
     & python -m ruff check backend app tests --fix --output-format=concise 2>&1 | Write-Host
     Write-Host "Running ruff check..."
@@ -561,7 +544,7 @@ if (-not $stage2Passed -and -not $SkipPythonLint) {
 # STAGE 3: C# Unit Tests
 # ============================================================================
 
-$stage3Passed = Invoke-Stage -Name "C# Unit Tests" -Description "Run C# unit tests (excluding UI/E2E/Smoke)" -Skip:$SkipCSharpTests -Action {
+$stage3Passed = Invoke-Stage -Name "C# Unit Tests" -Description "Run C# unit tests excluding UI/E2E/Smoke" -Skip:$SkipCSharpTests -Action {
     $trxFile = Join-Path $TestResultsDir "csharp_unit_tests.trx"
     $testProject = Join-Path $RootDir "src\VoiceStudio.App.Tests\VoiceStudio.App.Tests.csproj"
     
@@ -569,7 +552,7 @@ $stage3Passed = Invoke-Stage -Name "C# Unit Tests" -Description "Run C# unit tes
         -c $Configuration `
         -p:Platform=x64 `
         --no-build `
-        --filter "TestCategory!=UI&TestCategory!=E2E&TestCategory!=Smoke" `
+        --filter 'TestCategory!=UI&TestCategory!=E2E&TestCategory!=Smoke' `
         --logger "trx;LogFileName=$trxFile" `
         --results-directory $TestResultsDir 2>&1
     
@@ -601,7 +584,7 @@ if (-not $stage3Passed -and -not $SkipCSharpTests) {
 # STAGE 4: Python Unit Tests
 # ============================================================================
 
-$stage4Passed = Invoke-Stage -Name "Python Unit Tests" -Description "Run Python unit tests (tests/unit)" -Skip:$SkipPythonTests -Action {
+$stage4Passed = Invoke-Stage -Name "Python Unit Tests" -Description "Run Python unit tests from tests/unit" -Skip:$SkipPythonTests -Action {
     $junitFile = Join-Path $TestResultsDir "python_unit_tests.xml"
     
     & python -m pytest tests/unit `
@@ -625,7 +608,7 @@ if (-not $stage4Passed -and -not $SkipPythonTests) {
 # STAGE 5: Contract Tests
 # ============================================================================
 
-$stage5Passed = Invoke-Stage -Name "Contract Tests" -Description "Validate C# <-> Python API contracts" -Skip:$SkipContractTests -Action {
+$stage5Passed = Invoke-Stage -Name "Contract Tests" -Description "Validate CSharp-Python API contracts" -Skip:$SkipContractTests -Action {
     $junitFile = Join-Path $TestResultsDir "contract_tests.xml"
     
     & python -m pytest tests/contract `
@@ -647,7 +630,7 @@ if (-not $stage5Passed -and -not $SkipContractTests) {
 # STAGE 6: Security Tests
 # ============================================================================
 
-$stage6Passed = Invoke-Stage -Name "Security Tests" -Description "Run security tests (injection, auth bypass, sandbox escape)" -Action {
+$stage6Passed = Invoke-Stage -Name "Security Tests" -Description "Run security tests - injection, auth bypass, sandbox escape" -Action {
     $junitFile = Join-Path $TestResultsDir "security_tests.xml"
     & python -m pytest tests/security `
         -v `
@@ -667,7 +650,7 @@ if (-not $stage6Passed) {
 # STAGE 7: Backend Integration Tests
 # ============================================================================
 
-$stage7Passed = Invoke-Stage -Name "Backend Integration" -Description "Run backend integration tests (API endpoints, engine adapters)" -Skip:($SkipIntegration) -Action {
+$stage7Passed = Invoke-Stage -Name "Backend Integration" -Description "Run backend integration tests - API endpoints, engine adapters" -Skip:$SkipIntegration -Action {
     $junitFile = Join-Path $TestResultsDir "integration_tests.xml"
     
     & python -m pytest tests/integration `
@@ -748,25 +731,30 @@ Write-Host "=" * 70 -ForegroundColor Cyan
 
 if ($OverallPassed) {
     Write-Host ""
-    Write-Host "╔══════════════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-    Write-Host "║                    VERIFICATION PASSED ✅                            ║" -ForegroundColor Green
-    Write-Host "╚══════════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
+    Write-Host ("=" * 70) -ForegroundColor Green
+    Write-Host "  VERIFICATION PASSED" -ForegroundColor Green
+    Write-Host ("=" * 70) -ForegroundColor Green
     Write-Host ""
     Write-Host "All stages passed. Safe to merge." -ForegroundColor Green
     Write-Host "Report: $ReportFile" -ForegroundColor Cyan
     exit 0
 } else {
     Write-Host ""
-    Write-Host "╔══════════════════════════════════════════════════════════════════════╗" -ForegroundColor Red
-    Write-Host "║                    VERIFICATION FAILED ❌                            ║" -ForegroundColor Red
-    Write-Host "╚══════════════════════════════════════════════════════════════════════╝" -ForegroundColor Red
+    Write-Host ("=" * 70) -ForegroundColor Red
+    Write-Host "  VERIFICATION FAILED" -ForegroundColor Red
+    Write-Host ("=" * 70) -ForegroundColor Red
     Write-Host ""
     Write-Host "One or more stages failed. DO NOT MERGE." -ForegroundColor Red
     Write-Host "Report: $ReportFile" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Failed stages:" -ForegroundColor Red
-    $Stages | Where-Object { $_.Status -eq "FAILED" } | ForEach-Object {
-        Write-Host "  - $($_.Name): exit code $($_.ExitCode)" -ForegroundColor Red
+    foreach ($failedStage in $Stages) {
+        if ($failedStage.Status -eq "FAILED") {
+            $fname = $failedStage.Name
+            $fcode = $failedStage.ExitCode
+            $msg = '  - ' + $fname + ' [exit ' + $fcode + ']'
+            Write-Host $msg -ForegroundColor Red
+        }
     }
     exit 1
 }

@@ -13,8 +13,8 @@ This document tracks technical, operational, and organizational risks for VoiceS
 |----|------|------------|--------|------------|--------|
 | RISK-001 | Chatterbox torch version incompatibility (requires torch>=2.6, venv has 2.2.2+cu121) | High | Medium | Document limitation; use separate venv when compatibility resolved | Deferred |
 | RISK-002 | XAML compiler instability (VS-0035: exits code 1 with no output) | Medium | High | XAML wrapper with retry logic; ThemeResource migration; monitor Windows App SDK updates | Mitigating |
-| RISK-003 | GPU VRAM contention with concurrent engine runs | Medium | Medium | Implement VRAM scheduler (TD-013); queue jobs when resources constrained | Open |
-| RISK-004 | Python dependency conflicts across engines | High | Medium | Venv families strategy (TD-015); per-engine isolation | Open |
+| RISK-003 | GPU VRAM contention with concurrent engine runs | Medium | Medium | VRAM scheduler implemented (TD-013 CLOSED 2026-02-02, tests 11/11 PASS). Per-engine budgets, eviction policy, priority preemption in place. | Controlled |
+| RISK-004 | Python dependency conflicts across engines | High | Medium | Venv families strategy implemented (TD-015 CLOSED 2026-02-02, tests 14/14 PASS). 3 families, 10 engine manifests, per-family requirements. | Controlled |
 | RISK-005 | Windows App SDK version drift | Low | Medium | Pin SDK version in Directory.Build.props; test upgrades in branch first | Controlled |
 | RISK-006 | Circuit breaker false positives blocking healthy engines | Low | Low | Configurable thresholds; manual reset endpoint; monitoring | Controlled |
 | RISK-014 | Plugin signature verification bypass | Medium | High | Integrated signer.py verification (GAP-PY-007); fallback checks signature file presence | Mitigating |

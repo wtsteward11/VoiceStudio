@@ -23,6 +23,46 @@ See [docs/integration/delta-audit.md](docs/integration/delta-audit.md) for full 
 
 ---
 
+## [1.0.0-rc1] - 2026-02-28
+
+### Release Candidate 1
+
+First release candidate for VoiceStudio v1.0.0. All gates GREEN, all governance registers reconciled, scope frozen.
+
+#### Verified
+- Build: 0 errors (Debug and Release)
+- Gate C: Release publish PASS, EXE launches
+- Verification harness: 5/5 PASS (gate_status, ledger_validate, completion_guard, empty_catch_check, xaml_safety_check)
+- Panel registry: 47 panels (36 fully implemented, 11 shell panels accepted for v1.0)
+- Pin alignment: 0 drift between implementation files and DO_NOT_CHANGE_BUILD_CONFIG.md
+- Tech debt: 0 active items (TD-039 closed, all 39 items resolved)
+- Risk register: 0 Open items (RISK-003/004 moved to Controlled)
+- Dependency scanner: documented AllowedExceptions + WarnPrefixes for Microsoft.Data.*
+- Pre-push hook: Verify-ResolvedPackages + Verify-XamlArtifacts gate before push
+- Remote branches: pruned from 38 stale to 1 (origin/main only)
+
+#### Added
+- `docs/governance/V1_SCOPE.md` -- v1.0 scope freeze (47 panels, 5 Golden Path workflows, explicit not-in-v1.0 list)
+- `docs/reports/audit/PANEL_REGISTRY_AUDIT.md` -- machine-verified panel inventory
+- `docs/testing/GOLDEN_PATH_CHECKLIST.md` -- enhanced with fixtures, pass/fail criteria, time budgets
+- `scripts/golden_path_e2e.ps1` -- automated Golden Path E2E runner
+- `docs/testing/HOSTILE_ENVIRONMENT_TEST.md` -- hostile environment test protocol
+- `docs/testing/INSTALLER_LIFECYCLE_PROTOCOL.md` -- Gate H lifecycle test protocol
+- `docs/developer/QUICKSTART.md` -- fresh clone to running app guide
+- `.githooks/pre-push` -- dependency and XAML artifact gates before push
+
+#### Fixed
+- `scripts/gatec-publish-launch.ps1` -- PRI source search with self-contained build cache fallback
+- `scripts/verify.ps1` -- parse errors in report generation (here-string pipes, parentheses, Unicode)
+- `tools/build/Verify-ResolvedPackages.ps1` -- documented AllowedExceptions + WarnPrefixes
+
+#### Pending (user-action steps for GA)
+- Gate H: installer lifecycle test on clean Windows 10/11 VMs
+- Fresh clone build verification on clean machine
+- Hostile environment test on non-dev machine
+
+---
+
 ## [Unreleased]
 
 ### Added

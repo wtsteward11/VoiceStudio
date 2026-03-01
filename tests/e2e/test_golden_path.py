@@ -430,6 +430,18 @@ class TestGoldenPath:
                 validations.append(
                     ("audio downloadable", audio_accessible, f"size={audio_size} bytes")
                 )
+
+                if audio_accessible and audio_size > 0:
+                    export_dir = os.path.join(tempfile.gettempdir(), "voicestudio_golden_path")
+                    os.makedirs(export_dir, exist_ok=True)
+                    export_path = os.path.join(export_dir, "golden_path_export.wav")
+                    with open(export_path, "wb") as f:
+                        f.write(audio_response.content)
+                    exported = os.path.exists(export_path) and os.path.getsize(export_path) > 1024
+                    validations.append(
+                        ("audio exported to disk", exported, f"path={export_path}, size={os.path.getsize(export_path)}")
+                    )
+                    logger.info(f"  Exported audio to: {export_path}")
             except Exception as e:
                 validations.append(("audio downloadable", False, f"error={e}"))
         else:

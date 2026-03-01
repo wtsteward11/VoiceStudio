@@ -2850,10 +2850,28 @@ namespace VoiceStudio.App
       {
         var version = Package.Current.Id.Version;
         var versionText = $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
+        var aboutPanel = new StackPanel { Spacing = 8 };
+        aboutPanel.Children.Add(new TextBlock { Text = $"Version {versionText}" });
+        aboutPanel.Children.Add(new TextBlock { Text = "Local-first voice production studio", Opacity = 0.7 });
+
+        var licenseLink = new HyperlinkButton
+        {
+          Content = "View Third-Party Licenses",
+          NavigateUri = new System.Uri("https://github.com/wtsteward11/VoiceStudio/blob/main/THIRD_PARTY_LICENSES.md")
+        };
+        aboutPanel.Children.Add(licenseLink);
+
+        aboutPanel.Children.Add(new TextBlock
+        {
+          Text = "License file: THIRD_PARTY_LICENSES.md (repo root)",
+          Opacity = 0.5,
+          FontSize = 11
+        });
+
         var dialog = new ContentDialog
         {
           Title = "VoiceStudio Quantum+",
-          Content = $"Version {versionText}",
+          Content = aboutPanel,
           CloseButtonText = "Close",
           XamlRoot = (Content as FrameworkElement)?.XamlRoot
         };

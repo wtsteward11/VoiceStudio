@@ -23,6 +23,39 @@ See [docs/integration/delta-audit.md](docs/integration/delta-audit.md) for full 
 
 ---
 
+## [1.0.0-rc2] - 2026-02-28
+
+### All 47 Panels Functional
+
+Built real XAML UI for all 11 previously-stub panels. Every panel now has functional controls binding to its ViewModel with backend integration.
+
+#### Panels Built Out
+- RecordingView: device selection, waveform display, record/stop/cancel
+- AudioAnalysisView: spectral/temporal/perceptual analysis toggles, comparison
+- ImageGenView: prompt editor, engine/dimensions/steps, generate/upscale
+- DeepfakeCreatorView: engine selection, media type, consent, jobs list
+- DatasetQAView: dataset selection, QA thresholds, clip results, cull
+- SceneBuilderView: scene list, search, project, create/apply/delete
+- WorkflowAutomationView: step editor, templates, save/test/run
+- APIKeyManagerView: keys list with masking, add/validate/delete
+- TodoPanelView: filters, todos list, create with priority/category/tags
+- VoiceStyleTransferView: extract/analyze style, intensity slider, generate
+- EmbeddingExplorerView: extract, compare, visualize, cluster, export
+
+#### Evidence and Tooling
+- Golden Path E2E: added export-to-disk step with WAV validation
+- Support bundle: scripts/collect-support-bundle.ps1
+- About dialog: third-party license link added
+- Gate C: Release publish PASS (0 errors)
+- Panel audit: 47/47 OK, 0 stubs
+
+#### Verification
+- Build: 0 errors (Debug and Release)
+- Verification harness: 5/5 PASS
+- No build config files modified (DO_NOT_CHANGE compliant)
+
+---
+
 ## [1.0.0-rc1] - 2026-02-28
 
 ### Release Candidate 1

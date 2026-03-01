@@ -53,9 +53,8 @@ $publishCmd = @(
   "-p:WindowsPackageType=None",
   "-p:EnableMsixTooling=false",
   "-p:EnableDefaultPriItems=false",
-  # Gate C/H ship artifact relies on compiled XAML payload (.xbf). Ensure XBF generation is enabled
-  # so publish output cannot retain stale XBFs when XAML changes.
-  "-p:DisableXbfGeneration=false",
+  # DisableXbfGeneration stays true (csproj default): XamlCompiler 1.8.x cannot produce .xbf files.
+  # XAML source files are copied to publish dir below (post-publish step) so ms-appx:// loads them.
   "-p:BaseOutputPath=$baseOutputPath",
   "-p:PublishDir=$publishDir",
   "/bl:$BinlogPath",
@@ -97,6 +96,22 @@ if (-not (Test-Path $exePath)) {
 }
 $exe = Get-Item -LiteralPath $exePath
 
+# Copy XAML source files to publish dir so ms-appx:// resolution finds them at runtime.
+# InitializeComponent() in generated .g.i.cs uses Application.LoadComponent("ms-appx:///..."),
+# which resolves relative to the exe directory for unpackaged apps. XBF disabled (1.8.x bug),
+# so raw XAML source files are the runtime payload.
+$appProjectDir = Join-Path $repoRoot "src\VoiceStudio.App"
+$xamlSources = Get-ChildItem -Path $appProjectDir -Filter "*.xaml" -Recurse -ErrorAction SilentlyContinue
+$xamlCopied = 0
+foreach ($xaml in $xamlSources) {
+  $rel = $xaml.FullName.Substring($appProjectDir.Length).TrimStart('\', '/')
+  $dest = Join-Path $publishDir $rel
+  $destDir = Split-Path $dest -Parent
+  if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir -Force | Out-Null }
+  Copy-Item -LiteralPath $xaml.FullName -Destination $dest -Force
+  $xamlCopied++
+}
+Write-Host "Copied $xamlCopied XAML source files to publish dir for ms-appx:// runtime loading."
 
 # Ensure WinUI resource indexes (.pri) are present.
 # In our unpackaged lane, WinUI may fail early with:
@@ -112,7 +127,7 @@ $requiredWinUiPri = @(
   "VoiceStudio.App.pri"
 )
 
-$priSourceDir = Join-Path $repoRoot ".buildlogs\\x64\\$Configuration\\net8.0-windows10.0.19041.0\\$RuntimeIdentifier\\publish"
+$priSourceDir = Join-Path $repoRoot ".buildlogs\\x64\\$Configuration\\net8.0-windows10.0.19041.0\\$RuntimeIdentifier"
 $appPriSourcePath = Join-Path $repoRoot ".buildlogs\\x64\\$Configuration\\net8.0-windows10.0.19041.0\\$RuntimeIdentifier\\VoiceStudio.App.pri"
 foreach ($priName in $requiredWinUiPri) {
   $dest = Join-Path $publishDir $priName
@@ -151,8 +166,8 @@ foreach ($p in $required) {
 # Check for XAML payload (XBF or XAML files).
 # Note: We always include `VoiceStudio.App.pri` in the unpackaged lane to satisfy ms-appx
 # resource resolution, so `.pri` presence is NOT a reliable indicator of packaged vs unpackaged.
-$xbfFiles = Get-ChildItem -Path $publishDir -Filter "*.xbf" -Recurse -ErrorAction SilentlyContinue
-$xamlFiles = Get-ChildItem -Path $publishDir -Filter "*.xaml" -Recurse -ErrorAction SilentlyContinue
+$xbfFiles = @(Get-ChildItem -Path $publishDir -Filter "*.xbf" -Recurse -ErrorAction SilentlyContinue)
+$xamlFiles = @(Get-ChildItem -Path $publishDir -Filter "*.xaml" -Recurse -ErrorAction SilentlyContinue)
 
 if ($xbfFiles.Count -eq 0 -and $xamlFiles.Count -eq 0) {
   Write-Error "Publish sanity check failed: missing XAML payload (.xbf/.xaml)"

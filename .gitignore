@@ -157,7 +157,19 @@ tools/chatgpt-localfiles/
 
 # Local database (user data)
 data/voicestudio.db
+data/voicestudio_state.db
+data/voicestudio_state.db-shm
+data/voicestudio_state.db-wal
 .cursor\rules\openmemory.mdc
 AGENTS.md
 
 input_noxbf_marker.txt
+
+# Auto-generated build artifact (recreated by build tasks)
+tools/print_xaml.targets
+
+# Personal scratch notes (per-machine)
+.notes/
+
+# Per-machine session state (canonical copy is .cursor/STATE.md, already gitignored via .cursor/)
+STATE.md

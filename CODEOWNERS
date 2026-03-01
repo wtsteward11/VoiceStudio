@@ -1,0 +1,20 @@
+# VoiceStudio CODEOWNERS
+# Protects critical build configuration files from unreviewed changes.
+# Requires Tyler's approval for any PR touching these files.
+#
+# Reference: docs/reports/BUILD_PROTECTION_PROTOCOL_20260228.md
+
+# Build configuration files (XAML compiler, SDK version, package refs)
+Directory.Build.props       @wtsteward11
+Directory.Build.targets     @wtsteward11
+global.json                 @wtsteward11
+VoiceStudio.sln             @wtsteward11
+
+# Project files with package references that affect XAML compilation
+src/VoiceStudio.App/VoiceStudio.App.csproj    @wtsteward11
+src/VoiceStudio.Core/VoiceStudio.Core.csproj  @wtsteward11
+
+# Build hardening scripts
+tools/build/                @wtsteward11
+.githooks/                  @wtsteward11
+buildconfig.lock.json       @wtsteward11

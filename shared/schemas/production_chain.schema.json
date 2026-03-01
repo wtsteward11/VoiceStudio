@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "production_chain.schema.json",
+  "title": "ProductionChain",
+  "description": "Declarative pipeline definition for the orchestration system",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "default": "1.0"
+    },
+    "chain_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PipelineStep"
+      }
+    },
+    "quality_policy": {
+      "$ref": "quality_threshold_policy.schema.json"
+    }
+  },
+  "required": ["name", "steps"],
+  "definitions": {
+    "PipelineStep": {
+      "type": "object",
+      "properties": {
+        "step_id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["synthesis", "enhancement", "quality_evaluation", "post_processing", "mastering", "export"]
+        },
+        "engine": {
+          "type": ["string", "null"]
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "condition": {
+          "type": ["object", "null"]
+        }
+      },
+      "required": ["step_id", "type"]
+    }
+  }
+}

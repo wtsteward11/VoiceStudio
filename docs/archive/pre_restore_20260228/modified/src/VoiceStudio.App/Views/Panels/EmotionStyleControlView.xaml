@@ -1,0 +1,224 @@
+<UserControl x:Class="VoiceStudio.App.Views.Panels.EmotionStyleControlView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:VoiceStudio.App.Controls"
+    xmlns:converters="using:VoiceStudio.App.Converters"
+    xmlns:vm="using:VoiceStudio.App.ViewModels"
+    xmlns:local="using:VoiceStudio.App.Views.Panels"
+    x:DataType="local:EmotionStyleControlView">
+
+  <UserControl.Resources>
+    <converters:BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    <converters:NullToVisibilityConverter x:Key="NullToVis"/>
+  </UserControl.Resources>
+
+  <Grid x:Name="EmotionStyleControlView_Root"
+        AutomationProperties.AutomationId="EmotionStyleControlView_Root"
+        Background="{StaticResource VSQ.Panel.Background}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <!-- Header -->
+    <Grid Grid.Row="0" Padding="16,12"
+          Background="{StaticResource VSQ.Panel.Background.HeaderBrush}">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <TextBlock Grid.Column="0" Text="Emotion and Style Control"
+                 FontSize="{StaticResource VSQ.FontSize.Title}"
+                 Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                 VerticalAlignment="Center"/>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+        <Button Command="{x:Bind ViewModel.RefreshCommand}"
+                AutomationProperties.AutomationId="EmotionStyleControlView_RefreshButton"
+                ToolTipService.ToolTip="Refresh (F5)">
+          <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+        </Button>
+        <Button Click="HelpButton_Click"
+                AutomationProperties.AutomationId="EmotionStyleControlView_HelpButton"
+                ToolTipService.ToolTip="Help">
+          <FontIcon Glyph="&#xE897;" FontSize="14"/>
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- Main Content -->
+    <ScrollViewer Grid.Row="1" Padding="16,8">
+      <StackPanel Spacing="12">
+
+        <!-- Profile & Text Input -->
+        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}"
+                BorderBrush="{StaticResource VSQ.Panel.BorderBrush}"
+                BorderThickness="1" Padding="12">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Synthesis Input" FontSize="{StaticResource VSQ.FontSize.Body}"
+                       FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+            <StackPanel Spacing="4">
+              <TextBlock Text="Voice Profile" FontSize="{StaticResource VSQ.FontSize.Caption}"
+                         Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+              <ComboBox ItemsSource="{x:Bind ViewModel.AvailableProfiles, Mode=OneWay}"
+                        SelectedItem="{x:Bind ViewModel.SelectedProfileId, Mode=TwoWay}"
+                        PlaceholderText="Select profile..."
+                        HorizontalAlignment="Stretch"
+                        AutomationProperties.AutomationId="EmotionStyleControlView_ProfileComboBox"/>
+            </StackPanel>
+            <StackPanel Spacing="4">
+              <TextBlock Text="Text" FontSize="{StaticResource VSQ.FontSize.Caption}"
+                         Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+              <TextBox Text="{x:Bind ViewModel.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                       PlaceholderText="Enter text to synthesize..."
+                       TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60" MaxHeight="120"
+                       AutomationProperties.AutomationId="EmotionStyleControlView_TextInput"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- Emotion Presets -->
+        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}"
+                BorderBrush="{StaticResource VSQ.Panel.BorderBrush}"
+                BorderThickness="1" Padding="12">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Emotion Presets" FontSize="{StaticResource VSQ.FontSize.Body}"
+                       FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+            <ListView ItemsSource="{x:Bind ViewModel.EmotionPresets, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.SelectedEmotionPreset, Mode=TwoWay}"
+                      SelectionMode="Single"
+                      RightTapped="EmotionPreset_RightTapped"
+                      MaxHeight="150"
+                      AutomationProperties.AutomationId="EmotionStyleControlView_EmotionPresetsList">
+              <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:EmotionStylePresetItem">
+                  <StackPanel Padding="8,4" Spacing="2">
+                    <TextBlock Text="{x:Bind Name, Mode=OneWay}"
+                               FontSize="{StaticResource VSQ.FontSize.Body}"
+                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                    <TextBlock FontSize="{StaticResource VSQ.FontSize.Caption}"
+                               Foreground="{StaticResource VSQ.Accent.CyanBrush}">
+                      <Run Text="{x:Bind Emotion, Mode=OneWay}"/>
+                      <Run Text=" (" /><Run Text="{x:Bind Intensity, Mode=OneWay}"/><Run Text="%)"/>
+                    </TextBlock>
+                  </StackPanel>
+                </DataTemplate>
+              </ListView.ItemTemplate>
+            </ListView>
+            <StackPanel Spacing="4">
+              <TextBlock Text="Custom Emotion" FontSize="{StaticResource VSQ.FontSize.Caption}"
+                         Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+              <ComboBox ItemsSource="{x:Bind ViewModel.AvailableEmotions, Mode=OneWay}"
+                        SelectedItem="{x:Bind ViewModel.CustomEmotion, Mode=TwoWay}"
+                        PlaceholderText="Override emotion..."
+                        HorizontalAlignment="Stretch"
+                        AutomationProperties.AutomationId="EmotionStyleControlView_CustomEmotionComboBox"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- Style Presets -->
+        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}"
+                BorderBrush="{StaticResource VSQ.Panel.BorderBrush}"
+                BorderThickness="1" Padding="12">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Style Presets" FontSize="{StaticResource VSQ.FontSize.Body}"
+                       FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+            <ListView ItemsSource="{x:Bind ViewModel.StylePresets, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.SelectedStylePreset, Mode=TwoWay}"
+                      SelectionMode="Single"
+                      RightTapped="StylePreset_RightTapped"
+                      MaxHeight="150"
+                      AutomationProperties.AutomationId="EmotionStyleControlView_StylePresetsList">
+              <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:StylePresetItem">
+                  <StackPanel Padding="8,4" Spacing="2">
+                    <TextBlock Text="{x:Bind Name, Mode=OneWay}"
+                               FontSize="{StaticResource VSQ.FontSize.Body}"
+                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                    <TextBlock Text="{x:Bind Style, Mode=OneWay}"
+                               FontSize="{StaticResource VSQ.FontSize.Caption}"
+                               Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+                  </StackPanel>
+                </DataTemplate>
+              </ListView.ItemTemplate>
+            </ListView>
+            <StackPanel Spacing="4">
+              <TextBlock Text="Custom Style" FontSize="{StaticResource VSQ.FontSize.Caption}"
+                         Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+              <ComboBox ItemsSource="{x:Bind ViewModel.AvailableStyles, Mode=OneWay}"
+                        SelectedItem="{x:Bind ViewModel.CustomStyle, Mode=TwoWay}"
+                        PlaceholderText="Override style..."
+                        HorizontalAlignment="Stretch"
+                        AutomationProperties.AutomationId="EmotionStyleControlView_CustomStyleComboBox"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- Intensity -->
+        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}"
+                BorderBrush="{StaticResource VSQ.Panel.BorderBrush}"
+                BorderThickness="1" Padding="12">
+          <StackPanel Spacing="4">
+            <TextBlock FontSize="{StaticResource VSQ.FontSize.Caption}"
+                       Foreground="{StaticResource VSQ.Text.SecondaryBrush}">
+              <Run Text="Intensity:"/>
+              <Run Text="{x:Bind ViewModel.Intensity, Mode=OneWay}"/>
+            </TextBlock>
+            <Slider Value="{x:Bind ViewModel.Intensity, Mode=TwoWay}"
+                    Minimum="0" Maximum="1" StepFrequency="0.05"
+                    AutomationProperties.AutomationId="EmotionStyleControlView_IntensitySlider"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Apply -->
+        <Button Command="{x:Bind ViewModel.ApplyCommand}"
+                Style="{StaticResource AccentButtonStyle}"
+                HorizontalAlignment="Right"
+                AutomationProperties.AutomationId="EmotionStyleControlView_ApplyButton">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <FontIcon Glyph="&#xE768;" FontSize="14"/>
+            <TextBlock Text="Apply Emotion &amp; Style"/>
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- Status Bar -->
+    <Border Grid.Row="2" Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+            BorderBrush="{StaticResource VSQ.Panel.BorderBrush}"
+            BorderThickness="0,1,0,0" Padding="16,6">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <TextBlock Grid.Column="0" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                   FontSize="{StaticResource VSQ.FontSize.Caption}"
+                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+        <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                   FontSize="{StaticResource VSQ.FontSize.Caption}" Foreground="{StaticResource VSQ.Error.Brush}"
+                   Visibility="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, Converter={StaticResource NullToVis}}"/>
+      </Grid>
+    </Border>
+
+    <!-- Loading Overlay -->
+    <Grid Grid.RowSpan="3" Background="{StaticResource VSQ.Loading.BackgroundBrush}"
+          Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+        <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Width="48" Height="48"
+                      Foreground="{StaticResource VSQ.Loading.ForegroundBrush}"/>
+        <TextBlock Text="Processing..." Foreground="{StaticResource VSQ.Loading.TextBrush}"
+                   FontSize="{StaticResource VSQ.FontSize.Body}"/>
+      </StackPanel>
+    </Grid>
+
+    <controls:HelpOverlay x:Name="HelpOverlay" Grid.RowSpan="3"
+                          IsVisible="False" Visibility="Collapsed"
+                          AutomationProperties.AutomationId="EmotionStyleControlView_HelpOverlay"/>
+  </Grid>
+</UserControl>

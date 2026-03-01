@@ -1,0 +1,141 @@
+<UserControl
+    x:Class="VoiceStudio.App.Controls.PluginCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:VoiceStudio.App.Controls"
+    AutomationProperties.AutomationId="PluginCard">
+
+    <Border x:Name="CardBorder"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="16"
+            PointerPressed="Card_PointerPressed"
+            PointerEntered="Card_PointerEntered"
+            PointerExited="Card_PointerExited">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header: Icon, Name, Verified Badge -->
+            <Grid Grid.Row="0" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="48"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Plugin Icon -->
+                <Border Grid.Column="0"
+                        Width="40"
+                        Height="40"
+                        CornerRadius="8"
+                        Background="{ThemeResource AccentFillColorDefaultBrush}">
+                    <FontIcon Glyph="&#xE74C;"
+                              FontSize="20"
+                              Foreground="White"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"/>
+                </Border>
+
+                <!-- Name and Author -->
+                <StackPanel Grid.Column="1" 
+                            Margin="12,0,0,0"
+                            VerticalAlignment="Center">
+                    <TextBlock x:Name="NameText"
+                               Text="Plugin Name"
+                               FontWeight="SemiBold"
+                               FontSize="14"
+                               TextTrimming="CharacterEllipsis"
+                               AutomationProperties.AutomationId="PluginCard.Name"/>
+                    <TextBlock x:Name="AuthorText"
+                               Text="Author"
+                               FontSize="12"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               AutomationProperties.AutomationId="PluginCard.Author"/>
+                </StackPanel>
+
+                <!-- Verified Badge -->
+                <Border x:Name="VerifiedBadge"
+                        Grid.Column="2"
+                        Visibility="Collapsed"
+                        Background="{StaticResource VSQ.Status.VerifiedBrush}"
+                        CornerRadius="4"
+                        Padding="6,2">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE73E;" FontSize="10" Foreground="White"/>
+                        <TextBlock Text="Verified" FontSize="10" Foreground="White"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Description -->
+            <TextBlock x:Name="DescriptionText"
+                       Grid.Row="1"
+                       Text="Plugin description"
+                       FontSize="13"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       TextWrapping="Wrap"
+                       MaxLines="2"
+                       TextTrimming="CharacterEllipsis"
+                       Margin="0,0,0,12"
+                       AutomationProperties.AutomationId="PluginCard.Description"/>
+
+            <!-- Footer: Rating, Downloads, Action Button -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Stats -->
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <!-- Rating -->
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE735;" 
+                                  FontSize="12" 
+                                  Foreground="{StaticResource VSQ.Accent.GoldBrush}"/>
+                        <TextBlock x:Name="RatingText"
+                                   Text="4.5"
+                                   FontSize="12"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   AutomationProperties.AutomationId="PluginCard.Rating"/>
+                    </StackPanel>
+
+                    <!-- Downloads -->
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE896;" 
+                                  FontSize="12" 
+                                  Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock x:Name="DownloadsText"
+                                   Text="1,000"
+                                   FontSize="12"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   AutomationProperties.AutomationId="PluginCard.Downloads"/>
+                    </StackPanel>
+
+                    <!-- Version -->
+                    <TextBlock x:Name="VersionText"
+                               Text="v1.0.0"
+                               FontSize="12"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               AutomationProperties.AutomationId="PluginCard.Version"/>
+                </StackPanel>
+
+                <!-- GAP-B18: Migrated from Click handler to Command binding -->
+                <Button x:Name="ActionButton"
+                        Grid.Column="1"
+                        Content="Install"
+                        Style="{ThemeResource AccentButtonStyle}"
+                        MinWidth="80"
+                        Command="{x:Bind ActionCommand, Mode=OneWay}"
+                        CommandParameter="{x:Bind Plugin, Mode=OneWay}"
+                        AutomationProperties.AutomationId="PluginCard.ActionButton"/>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

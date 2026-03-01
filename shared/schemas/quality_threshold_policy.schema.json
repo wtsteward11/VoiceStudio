@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "quality_threshold_policy.schema.json",
+  "title": "QualityThresholdPolicy",
+  "description": "Reusable quality gate for orchestration and pipelines",
+  "type": "object",
+  "properties": {
+    "min_mos": {
+      "type": "number",
+      "minimum": 1.0,
+      "maximum": 5.0,
+      "default": 3.5
+    },
+    "min_similarity": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.7
+    },
+    "min_naturalness": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.8
+    },
+    "max_artifact_score": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.05
+    },
+    "min_snr_db": {
+      "type": "number",
+      "minimum": 0.0,
+      "default": 30.0
+    },
+    "auto_enhance_if_below": {
+      "type": "boolean",
+      "default": true
+    },
+    "fail_if_unmet": {
+      "type": "boolean",
+      "default": false
+    }
+  }
+}

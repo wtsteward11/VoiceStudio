@@ -1,0 +1,139 @@
+<UserControl x:Class="VoiceStudio.App.Views.Panels.SceneBuilderView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:VoiceStudio.App.Controls"
+    xmlns:local="using:VoiceStudio.App.Views.Panels"
+    x:DataType="local:SceneBuilderView">
+    <Grid AutomationProperties.AutomationId="SceneBuilderView_Root"
+          Background="{StaticResource VSQ.Panel.Background}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0"
+                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+                Padding="{StaticResource VSQ.Spacing.Medium}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE8B9;" FontSize="20"/>
+                    <TextBlock Text="Scene Builder"
+                               FontWeight="SemiBold"
+                               FontSize="{StaticResource VSQ.FontSize.Title}"
+                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                    <Button Command="{x:Bind ViewModel.RefreshCommand}"
+                            ToolTipService.ToolTip="Refresh"
+                            AutomationProperties.AutomationId="SceneBuilderView_RefreshButton">
+                        <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+                    </Button>
+                    <Button Click="HelpButton_Click" ToolTipService.ToolTip="Help"
+                            AutomationProperties.AutomationId="SceneBuilderView_HelpButton">
+                        <FontIcon Glyph="&#xE897;" FontSize="14"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Padding="16" Spacing="12">
+
+                <!-- Project & Search -->
+                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
+                    <StackPanel Spacing="8">
+                        <ComboBox Header="Project" ItemsSource="{x:Bind ViewModel.AvailableProjects, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedProjectId, Mode=TwoWay}"
+                                  HorizontalAlignment="Stretch"
+                                  AutomationProperties.AutomationId="SceneBuilderView_ProjectComboBox"/>
+                        <TextBox Header="Search" Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 PlaceholderText="Search scenes..."
+                                 AutomationProperties.AutomationId="SceneBuilderView_SearchBox"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Create Scene -->
+                <Button Command="{x:Bind ViewModel.CreateSceneCommand}"
+                        Content="Create New Scene"
+                        HorizontalAlignment="Stretch"
+                        Style="{StaticResource AccentButtonStyle}"
+                        AutomationProperties.AutomationId="SceneBuilderView_CreateButton"/>
+
+                <!-- Scenes List -->
+                <ListView ItemsSource="{x:Bind ViewModel.Scenes, Mode=OneWay}"
+                          SelectedItem="{x:Bind ViewModel.SelectedScene, Mode=TwoWay}"
+                          RightTapped="Scene_RightTapped"
+                          AutomationProperties.AutomationId="SceneBuilderView_SceneList">
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                                    CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12" Margin="0,4">
+                                <StackPanel Spacing="6">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"/>
+                                        <TextBlock Grid.Column="1" FontSize="11" Opacity="0.5">
+                                            <Run Text="{Binding TrackCount}"/>
+                                            <Run Text=" tracks"/>
+                                        </TextBlock>
+                                    </Grid>
+                                    <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                                    <Grid ColumnSpacing="16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="Duration" FontSize="10" Opacity="0.5"/>
+                                            <TextBlock Text="{Binding Duration}" FontSize="12"/>
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="Effects" FontSize="10" Opacity="0.5"/>
+                                            <TextBlock Text="{Binding EffectCount}" FontSize="12"/>
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="Modified" FontSize="10" Opacity="0.5"/>
+                                            <TextBlock Text="{Binding Modified}" FontSize="12"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Padding="8,4"
+                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+                BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Width="16" Height="16"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                           FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                           VerticalAlignment="Center" Margin="8,0,0,0"
+                           AutomationProperties.AutomationId="SceneBuilderView_StatusText"/>
+            </Grid>
+        </Border>
+
+        <controls:HelpOverlay x:Name="HelpOverlay" Grid.RowSpan="3" IsVisible="False" Visibility="Collapsed"/>
+    </Grid>
+</UserControl>

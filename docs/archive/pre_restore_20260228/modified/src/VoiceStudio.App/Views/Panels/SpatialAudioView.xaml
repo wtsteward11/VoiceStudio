@@ -1,0 +1,171 @@
+<UserControl x:Class="VoiceStudio.App.Views.Panels.SpatialAudioView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:VoiceStudio.App.Controls"
+    xmlns:local="using:VoiceStudio.App.Views.Panels"
+    x:DataType="local:SpatialAudioView">
+    <Grid x:Name="SpatialAudioView_Root"
+          AutomationProperties.AutomationId="SpatialAudioView_Root"
+          Background="{StaticResource VSQ.Panel.Background}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0"
+                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+                Padding="{StaticResource VSQ.Spacing.Medium}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xEC4F;" FontSize="20"/>
+                    <TextBlock Text="Spatial Audio"
+                               FontWeight="SemiBold"
+                               FontSize="{StaticResource VSQ.FontSize.Title}"
+                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                    <Button Command="{x:Bind ViewModel.ResetCommand}"
+                            ToolTipService.ToolTip="Reset"
+                            AutomationProperties.AutomationId="SpatialAudioView_ResetButton">
+                        <FontIcon Glyph="&#xE777;" FontSize="14"/>
+                    </Button>
+                    <Button Click="HelpButton_Click" ToolTipService.ToolTip="Help"
+                            AutomationProperties.AutomationId="SpatialAudioView_HelpButton">
+                        <FontIcon Glyph="&#xE897;" FontSize="14"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Padding="16" Spacing="12">
+
+                <!-- Audio Source -->
+                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
+                    <StackPanel Spacing="8">
+                        <TextBox Header="Audio ID" Text="{x:Bind ViewModel.AudioId, Mode=TwoWay}"
+                                 PlaceholderText="Audio file ID..."
+                                 AutomationProperties.AutomationId="SpatialAudioView_AudioId"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Position Controls -->
+                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="3D Position" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <NumberBox Header="X" Value="{x:Bind ViewModel.PositionX, Mode=TwoWay}"
+                                       SpinButtonPlacementMode="Compact"
+                                       AutomationProperties.AutomationId="SpatialAudioView_PosX"/>
+                            <NumberBox Grid.Column="1" Header="Y" Value="{x:Bind ViewModel.PositionY, Mode=TwoWay}"
+                                       SpinButtonPlacementMode="Compact"
+                                       AutomationProperties.AutomationId="SpatialAudioView_PosY"/>
+                            <NumberBox Grid.Column="2" Header="Z" Value="{x:Bind ViewModel.PositionZ, Mode=TwoWay}"
+                                       SpinButtonPlacementMode="Compact"
+                                       AutomationProperties.AutomationId="SpatialAudioView_PosZ"/>
+                        </Grid>
+                        <NumberBox Header="Distance" Value="{x:Bind ViewModel.Distance, Mode=TwoWay}"
+                                   Minimum="0" SpinButtonPlacementMode="Compact"
+                                   AutomationProperties.AutomationId="SpatialAudioView_Distance"/>
+                        <Button Command="{x:Bind ViewModel.SetPositionCommand}"
+                                Content="Set Position" HorizontalAlignment="Stretch"
+                                AutomationProperties.AutomationId="SpatialAudioView_SetPositionButton"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Environment -->
+                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Environment" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                        <Slider Header="Room Size" Value="{x:Bind ViewModel.RoomSize, Mode=TwoWay}"
+                                Minimum="0" Maximum="100" StepFrequency="1"
+                                AutomationProperties.AutomationId="SpatialAudioView_RoomSize"/>
+                        <ComboBox Header="Material" ItemsSource="{x:Bind ViewModel.AvailableMaterials, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedMaterial, Mode=TwoWay}"
+                                  HorizontalAlignment="Stretch"
+                                  AutomationProperties.AutomationId="SpatialAudioView_Material"/>
+                        <Slider Header="Reverb Amount" Value="{x:Bind ViewModel.ReverbAmount, Mode=TwoWay}"
+                                Minimum="0" Maximum="1" StepFrequency="0.01"
+                                AutomationProperties.AutomationId="SpatialAudioView_ReverbAmount"/>
+                        <ToggleSwitch IsOn="{x:Bind ViewModel.EnableDoppler, Mode=TwoWay}"
+                                      Header="Doppler Effect"
+                                      AutomationProperties.AutomationId="SpatialAudioView_DopplerToggle"/>
+                        <ToggleSwitch IsOn="{x:Bind ViewModel.EnableHRTF, Mode=TwoWay}"
+                                      Header="HRTF (Head-Related Transfer Function)"
+                                      AutomationProperties.AutomationId="SpatialAudioView_HrtfToggle"/>
+                        <Button Command="{x:Bind ViewModel.ConfigureEnvironmentCommand}"
+                                Content="Apply Environment" HorizontalAlignment="Stretch"
+                                AutomationProperties.AutomationId="SpatialAudioView_ApplyEnvButton"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Presets -->
+                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Presets" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox ItemsSource="{x:Bind ViewModel.AvailablePresets, Mode=OneWay}"
+                                      SelectedItem="{x:Bind ViewModel.SelectedPreset, Mode=TwoWay}"
+                                      HorizontalAlignment="Stretch"
+                                      AutomationProperties.AutomationId="SpatialAudioView_PresetComboBox"/>
+                            <Button Grid.Column="1" Command="{x:Bind ViewModel.ApplyPresetCommand}"
+                                    Content="Apply" AutomationProperties.AutomationId="SpatialAudioView_ApplyPresetButton"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Process & Preview -->
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Command="{x:Bind ViewModel.ProcessAudioCommand}" Content="Process Audio"
+                            Style="{StaticResource AccentButtonStyle}"
+                            AutomationProperties.AutomationId="SpatialAudioView_ProcessButton"/>
+                    <Button Command="{x:Bind ViewModel.PreviewAudioCommand}" Content="Preview"
+                            AutomationProperties.AutomationId="SpatialAudioView_PreviewButton"/>
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Padding="8,4"
+                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+                BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Width="16" Height="16"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                           FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                           VerticalAlignment="Center" Margin="8,0,0,0"
+                           AutomationProperties.AutomationId="SpatialAudioView_StatusText"/>
+            </Grid>
+        </Border>
+
+        <controls:HelpOverlay x:Name="HelpOverlay" Grid.RowSpan="3" IsVisible="False" Visibility="Collapsed"/>
+    </Grid>
+</UserControl>

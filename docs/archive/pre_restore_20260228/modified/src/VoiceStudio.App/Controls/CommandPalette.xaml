@@ -1,0 +1,65 @@
+<UserControl x:Class="VoiceStudio.App.Controls.CommandPalette"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Microsoft.UI.Xaml.Controls"
+             xmlns:services="using:VoiceStudio.Core.Services">
+    <Border Background="{StaticResource VSQ.Surface.Default}"
+            BorderBrush="{StaticResource VSQ.Panel.BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="0"
+            MinWidth="600"
+            MaxWidth="800"
+            MaxHeight="500"
+            AutomationProperties.AutomationId="CommandPalette_Root">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>   <!-- Search Box -->
+                <RowDefinition Height="*"/>      <!-- Results List -->
+            </Grid.RowDefinitions>
+            <!-- Search Box -->
+            <TextBox x:Name="SearchBox"
+                    Grid.Row="0"
+                    PlaceholderText="Type a command or search..."
+                    Margin="12,12,12,8"
+                    KeyDown="SearchBox_KeyDown"
+                    TextChanged="SearchBox_TextChanged"
+                    AutomationProperties.AutomationId="CommandPalette_SearchBox"/>
+            <!-- Results List -->
+            <ListView x:Name="ResultsList"
+                     Grid.Row="1"
+                     SelectionMode="Single"
+                     Margin="8,0,8,8"
+                     ItemClick="ResultsList_ItemClick"
+                     AutomationProperties.AutomationId="CommandPalette_ResultsList">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="services:CommandItem">
+                        <Grid Padding="12,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="{x:Bind Title}"
+                                          Style="{StaticResource VSQ.Text.Body}"
+                                          FontWeight="SemiBold"/>
+                                <TextBlock Text="{x:Bind Description}"
+                                          Style="{StaticResource VSQ.Text.Body}"
+                                          Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                                          FontSize="10"
+                                          Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <TextBlock Grid.Column="1"
+                                      Text="{x:Bind Shortcut}"
+                                      Style="{StaticResource VSQ.Text.Body}"
+                                      Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                                      FontSize="10"
+                                      VerticalAlignment="Center"
+                                      Margin="12,0,0,0"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
+    </Border>
+</UserControl>

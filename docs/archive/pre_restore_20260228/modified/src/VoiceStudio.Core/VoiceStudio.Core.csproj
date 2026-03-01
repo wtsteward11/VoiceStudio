@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>VoiceStudio.Core</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Allow VoiceStudio.App to access internal members (e.g., PanelEventBase.Sequence setter) -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="VoiceStudio.App" />
+    <InternalsVisibleTo Include="VoiceStudio.App.Tests" />
+  </ItemGroup>
+
+  <!-- No external package references needed - uses built-in .NET 8 features -->
+  <!-- System.Text.Json.Serialization is built into .NET 8 -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <!-- WindowsAppSDK only in App project, not Core - Core is cross-platform library -->
+  </ItemGroup>
+
+</Project>

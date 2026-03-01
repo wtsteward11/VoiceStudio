@@ -1,0 +1,770 @@
+<!--
+  EffectsMixerView.xaml - Audio effects and mixer control panel
+  
+  AI GUIDELINES:
+  - ViewModel is in VoiceStudio.App.Views.Panels namespace (not ViewModels)
+  - Use local:MixerChannel for channel DataTemplates
+  - Use models:EffectChain, models:Effect for effect chain DataTemplates
+  - Volume/Pan sliders use TwoWay binding to update model in real-time
+  - DO NOT change slider ranges (Volume: 0-2, Pan: -1 to 1)
+  - Multi-select is supported via MultiSelectService
+-->
+<UserControl x:Class="VoiceStudio.App.Views.Panels.EffectsMixerView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="using:VoiceStudio.App.Controls"
+    xmlns:converters="using:VoiceStudio.App.Converters"
+    xmlns:local="using:VoiceStudio.App.Views.Panels"
+    xmlns:models="using:VoiceStudio.Core.Models"
+    mc:Ignorable="d"
+    d:DataContext="{d:DesignInstance Type=local:EffectsMixerViewModel, IsDesignTimeCreatable=False}"
+    x:DataType="local:EffectsMixerViewModel">
+
+    <UserControl.Resources>
+        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
+        <converters:NullToBooleanConverter x:Key="NullToBooleanConverter" />
+    </UserControl.Resources>
+
+    <Grid x:Name="EffectsMixerView_Root" 
+          AutomationProperties.AutomationId="EffectsMixerView_Root"
+          Background="{StaticResource VSQ.Panel.Background}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header Row -->
+        <Border Grid.Row="0" 
+                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}" 
+                CornerRadius="{StaticResource VSQ.CornerRadius.PanelHeader}"
+                Padding="{StaticResource VSQ.Spacing.Medium}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Title and Project Selection -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12">
+                    <TextBlock Text="Effects &amp; Mixer" 
+                               FontSize="{StaticResource VSQ.FontSize.Title}" 
+                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                               VerticalAlignment="Center" />
+                    
+                    <!-- Mixer Presets ComboBox -->
+                    <ComboBox x:Name="MixerPresetsComboBox"
+                              AutomationProperties.AutomationId="EffectsMixerView_MixerPresetsComboBox"
+                              ItemsSource="{x:Bind ViewModel.MixerPresets, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedMixerPreset, Mode=TwoWay}"
+                              PlaceholderText="Select Preset"
+                              MinWidth="150"
+                              VerticalAlignment="Center">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="models:MixerPreset">
+                                <TextBlock Text="{x:Bind Name, Mode=OneWay}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Header Actions -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <ToggleButton x:Name="RealTimeToggle"
+                                  AutomationProperties.AutomationId="EffectsMixerView_RealTimeToggle"
+                                  IsChecked="{x:Bind ViewModel.IsRealTimeUpdatesEnabled, Mode=TwoWay}"
+                                  Command="{x:Bind ViewModel.ToggleRealTimeUpdatesCommand}"
+                                  ToolTipService.ToolTip="Toggle Real-Time Meters"
+                                  Padding="8,4">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <FontIcon Glyph="&#xE768;" FontSize="14" />
+                            <TextBlock Text="Live" FontSize="{StaticResource VSQ.FontSize.Body}" />
+                        </StackPanel>
+                    </ToggleButton>
+
+                    <Button x:Name="SaveMixerButton"
+                            AutomationProperties.AutomationId="EffectsMixerView_SaveMixerButton"
+                            Command="{x:Bind ViewModel.SaveMixerStateCommand}"
+                            ToolTipService.ToolTip="Save Mixer State"
+                            Padding="8,4">
+                        <FontIcon Glyph="&#xE74E;" FontSize="14" />
+                    </Button>
+
+                    <Button x:Name="ResetMixerButton"
+                            AutomationProperties.AutomationId="EffectsMixerView_ResetMixerButton"
+                            Command="{x:Bind ViewModel.ResetMixerStateCommand}"
+                            ToolTipService.ToolTip="Reset Mixer"
+                            Padding="8,4">
+                        <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                    </Button>
+
+                    <Button x:Name="HelpButton"
+                            AutomationProperties.AutomationId="EffectsMixerView_HelpButton"
+                            Click="HelpButton_Click"
+                            ToolTipService.ToolTip="Help"
+                            Padding="8,4">
+                        <FontIcon Glyph="&#xE897;" FontSize="14" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content Area -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="300" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="280" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Channel Strips Area -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Channel Strip List -->
+                <ScrollViewer Grid.Row="0" 
+                              HorizontalScrollBarVisibility="Auto" 
+                              VerticalScrollBarVisibility="Disabled"
+                              Padding="{StaticResource VSQ.Spacing.Medium}">
+                    <ItemsControl x:Name="ChannelsItemsControl"
+                                  AutomationProperties.AutomationId="EffectsMixerView_ChannelsItemsControl"
+                                  ItemsSource="{x:Bind ViewModel.Channels, Mode=OneWay}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="8" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="local:MixerChannel">
+                                <Border x:Name="ChannelBorder"
+                                        Tag="{x:Bind Id, Mode=OneWay}"
+                                        Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                                        BorderBrush="{StaticResource VSQ.Panel.BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}"
+                                        Width="80"
+                                        Padding="8"
+                                        PointerPressed="Channel_PointerPressed"
+                                        RightTapped="Channel_RightTapped">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Channel Name -->
+                                        <TextBlock Grid.Row="0" 
+                                                   Text="{x:Bind Name, Mode=OneWay, FallbackValue='Channel', TargetNullValue='Channel'}" 
+                                                   FontSize="{StaticResource VSQ.FontSize.Body}"
+                                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,0,0,8" />
+
+                                        <!-- VU Meter -->
+                                        <Grid Grid.Row="1" Height="120" Margin="0,4">
+                                            <Border Background="{StaticResource VSQ.Background.Darker}"
+                                                    CornerRadius="2"
+                                                    Width="16"
+                                                    HorizontalAlignment="Center">
+                                                <Grid>
+                                                    <!-- Peak Level Bar -->
+                                                    <Border Background="{StaticResource VSQ.Success.Brush}"
+                                                            VerticalAlignment="Bottom"
+                                                            CornerRadius="2"
+                                                            Height="{x:Bind PeakLevel, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=120}" />
+                                                </Grid>
+                                            </Border>
+                                        </Grid>
+
+                                        <!-- Volume Slider (Vertical) -->
+                                        <Slider Grid.Row="2"
+                                                Orientation="Vertical"
+                                                Minimum="0" Maximum="2" StepFrequency="0.01"
+                                                Value="{x:Bind Volume, Mode=TwoWay}"
+                                                Height="80"
+                                                HorizontalAlignment="Center"
+                                                AutomationProperties.AutomationId="EffectsMixerView_VolumeSlider" />
+
+                                        <!-- Volume Display -->
+                                        <TextBlock Grid.Row="3"
+                                                   Text="{x:Bind VolumeDisplay, Mode=OneWay}"
+                                                   FontSize="{StaticResource VSQ.FontSize.Caption}"
+                                                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,4" />
+
+                                        <!-- Pan Slider + Mute/Solo -->
+                                        <StackPanel Grid.Row="4" Spacing="4">
+                                            <!-- Pan Slider -->
+                                            <Slider Minimum="-1" Maximum="1" StepFrequency="0.01"
+                                                    Value="{x:Bind Pan, Mode=TwoWay}"
+                                                    AutomationProperties.AutomationId="EffectsMixerView_PanSlider" />
+                                            
+                                            <!-- Mute/Solo Buttons -->
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4">
+                                                <ToggleButton IsChecked="{x:Bind IsMuted, Mode=TwoWay}"
+                                                              Width="28" Height="24"
+                                                              ToolTipService.ToolTip="Mute"
+                                                              AutomationProperties.AutomationId="EffectsMixerView_MuteButton">
+                                                    <TextBlock Text="M" FontSize="10" FontWeight="Bold" />
+                                                </ToggleButton>
+                                                <ToggleButton IsChecked="{x:Bind IsSoloed, Mode=TwoWay}"
+                                                              Width="28" Height="24"
+                                                              ToolTipService.ToolTip="Solo"
+                                                              AutomationProperties.AutomationId="EffectsMixerView_SoloButton">
+                                                    <TextBlock Text="S" FontSize="10" FontWeight="Bold" />
+                                                </ToggleButton>
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <!-- Selection Indicator -->
+                                        <Border x:Name="ChannelSelectionIndicator"
+                                                Grid.RowSpan="5"
+                                                BorderBrush="{StaticResource VSQ.Accent.CyanBrush}"
+                                                BorderThickness="2"
+                                                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}"
+                                                Visibility="Collapsed" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Multi-Select Actions -->
+                <Border Grid.Row="1"
+                        Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+                        Padding="{StaticResource VSQ.Spacing.Small}"
+                        Visibility="{x:Bind ViewModel.HasMultipleChannelSelection, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        d:Visibility="Visible">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <TextBlock Text="{x:Bind ViewModel.SelectedChannelCount, Mode=OneWay}" 
+                                   Foreground="{StaticResource VSQ.Accent.CyanBrush}"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="channels selected" 
+                                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                                   VerticalAlignment="Center" />
+                        <Button Content="Clear Selection"
+                                Command="{x:Bind ViewModel.ClearChannelSelectionCommand}"
+                                AutomationProperties.AutomationId="EffectsMixerView_ClearSelectionButton"
+                                Padding="8,4" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Splitter -->
+            <Border Grid.Column="1" Width="1" Background="{StaticResource VSQ.Panel.BorderBrush}" Margin="4,8" />
+
+            <!-- Right Panel: Effect Chains + Sends/Returns + Master -->
+            <Grid Grid.Column="2" Padding="{StaticResource VSQ.Spacing.Medium}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="160" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="120" />
+                </Grid.RowDefinitions>
+
+                <!-- Effect Chains Section -->
+                <Grid Grid.Row="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Effect Chains Header -->
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" 
+                                   Text="Effect Chains" 
+                                   FontSize="{StaticResource VSQ.FontSize.Body}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                                   VerticalAlignment="Center" />
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                            <Button AutomationProperties.AutomationId="EffectsMixerView_AddChainButton"
+                                    ToolTipService.ToolTip="Create Effect Chain"
+                                    Padding="4">
+                                <Button.Flyout>
+                                    <Flyout>
+                                        <StackPanel Spacing="8" MinWidth="200">
+                                            <TextBlock Text="New Effect Chain" FontWeight="SemiBold" />
+                                            <TextBox x:Name="NewChainNameTextBox" 
+                                                     PlaceholderText="Chain name"
+                                                     AutomationProperties.AutomationId="EffectsMixerView_NewChainNameTextBox" />
+                                            <Button Content="Create"
+                                                    Command="{x:Bind ViewModel.CreateEffectChainCommand}"
+                                                    CommandParameter="{x:Bind NewChainNameTextBox.Text, Mode=OneWay}"
+                                                    HorizontalAlignment="Right"
+                                                    AutomationProperties.AutomationId="EffectsMixerView_CreateChainButton" />
+                                        </StackPanel>
+                                    </Flyout>
+                                </Button.Flyout>
+                                <FontIcon Glyph="&#xE710;" FontSize="12" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Effect Chains List -->
+                    <ListView Grid.Row="1"
+                              x:Name="EffectChainsListView"
+                              AutomationProperties.AutomationId="EffectsMixerView_EffectChainsListView"
+                              ItemsSource="{x:Bind ViewModel.EffectChains, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedEffectChain, Mode=TwoWay}"
+                              RightTapped="EffectChain_RightTapped"
+                              SelectionMode="Single">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:EffectChain">
+                                <Grid Padding="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" 
+                                               Text="{x:Bind Name, Mode=OneWay, FallbackValue='Chain', TargetNullValue='Chain'}" 
+                                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" 
+                                               Text="{x:Bind Effects.Count, Mode=OneWay, FallbackValue='0', TargetNullValue='0'}" 
+                                               Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                                               FontSize="{StaticResource VSQ.FontSize.Caption}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+
+                <!-- Effects in Selected Chain -->
+                <Border Grid.Row="1" Height="1" Background="{StaticResource VSQ.Panel.BorderBrush}" Margin="0,8" />
+
+                <Grid Grid.Row="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Effects Header -->
+                    <Grid Grid.Row="0" Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" 
+                                   Text="Effects" 
+                                   FontSize="{StaticResource VSQ.FontSize.Body}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                                   VerticalAlignment="Center" />
+
+                        <ComboBox Grid.Column="1"
+                                  x:Name="AddEffectComboBox"
+                                  AutomationProperties.AutomationId="EffectsMixerView_AddEffectComboBox"
+                                  ItemsSource="{x:Bind ViewModel.AvailableEffectTypes}"
+                                  PlaceholderText="+ Add"
+                                  MinWidth="100"
+                                  SelectionChanged="AddEffectComboBox_SelectionChanged" />
+                    </Grid>
+
+                    <!-- Effects List (from selected chain) -->
+                    <ListView Grid.Row="1"
+                              x:Name="EffectsListView"
+                              AutomationProperties.AutomationId="EffectsMixerView_EffectsListView"
+                              ItemsSource="{x:Bind ViewModel.SelectedEffectChain.Effects, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedEffect, Mode=TwoWay}"
+                              CanDragItems="True"
+                              AllowDrop="True"
+                              SelectionMode="Single">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:Effect">
+                                <Border Background="{StaticResource VSQ.Panel.Background.DarkerBrush}"
+                                        CornerRadius="{StaticResource VSQ.CornerRadius.Small}"
+                                        Padding="8,4"
+                                        Margin="0,2"
+                                        CanDrag="True"
+                                        DragStarting="Effect_DragStarting"
+                                        DragOver="Effect_DragOver"
+                                        Drop="Effect_Drop"
+                                        DragLeave="Effect_DragLeave"
+                                        RightTapped="Effect_RightTapped"
+                                        AllowDrop="True">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <CheckBox Grid.Column="0"
+                                                  IsChecked="{x:Bind Enabled, Mode=TwoWay}"
+                                                  VerticalAlignment="Center"
+                                                  MinWidth="0" />
+
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{x:Bind Name, Mode=OneWay, FallbackValue='Effect', TargetNullValue='Effect'}"
+                                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="4,0" />
+
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{x:Bind Order, Mode=OneWay, FallbackValue='0', TargetNullValue='0'}"
+                                                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                                                   FontSize="{StaticResource VSQ.FontSize.Caption}"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+
+                <!-- Sends/Returns/SubGroups Divider -->
+                <Border Grid.Row="3" Height="1" Background="{StaticResource VSQ.Panel.BorderBrush}" Margin="0,8" />
+
+                <!-- Sends Section -->
+                <Expander Grid.Row="4"
+                          IsExpanded="False"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Stretch"
+                          AutomationProperties.AutomationId="EffectsMixerView_SendsExpander">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Sends"
+                                       FontSize="{StaticResource VSQ.FontSize.Body}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                                       VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                <Button AutomationProperties.AutomationId="EffectsMixerView_AddSendButton"
+                                        Command="{x:Bind ViewModel.CreateSendCommand}"
+                                        ToolTipService.ToolTip="Add Send"
+                                        Padding="4">
+                                    <FontIcon Glyph="&#xE710;" FontSize="12" />
+                                </Button>
+                                <Button AutomationProperties.AutomationId="EffectsMixerView_DeleteSendButton"
+                                        Command="{x:Bind ViewModel.DeleteSendCommand}"
+                                        CommandParameter="{x:Bind ViewModel.SelectedSend, Mode=OneWay}"
+                                        ToolTipService.ToolTip="Delete Selected Send"
+                                        Padding="4">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="12" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Expander.Header>
+                    <ListView AutomationProperties.AutomationId="EffectsMixerView_SendsListView"
+                              ItemsSource="{x:Bind ViewModel.Sends, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedSend, Mode=TwoWay}"
+                              SelectionMode="Single"
+                              MaxHeight="120">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:MixerSend">
+                                <Grid Padding="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="{x:Bind Name, Mode=OneWay, FallbackValue='Send', TargetNullValue='Send'}"
+                                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{x:Bind BusNumber, Mode=OneWay}"
+                                               Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                                               FontSize="{StaticResource VSQ.FontSize.Caption}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Expander>
+
+                <!-- Returns Section -->
+                <Expander Grid.Row="5"
+                          IsExpanded="False"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Stretch"
+                          AutomationProperties.AutomationId="EffectsMixerView_ReturnsExpander">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Returns"
+                                       FontSize="{StaticResource VSQ.FontSize.Body}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                                       VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                <Button AutomationProperties.AutomationId="EffectsMixerView_AddReturnButton"
+                                        Command="{x:Bind ViewModel.CreateReturnCommand}"
+                                        ToolTipService.ToolTip="Add Return"
+                                        Padding="4">
+                                    <FontIcon Glyph="&#xE710;" FontSize="12" />
+                                </Button>
+                                <Button AutomationProperties.AutomationId="EffectsMixerView_DeleteReturnButton"
+                                        Command="{x:Bind ViewModel.DeleteReturnCommand}"
+                                        CommandParameter="{x:Bind ViewModel.SelectedReturn, Mode=OneWay}"
+                                        ToolTipService.ToolTip="Delete Selected Return"
+                                        Padding="4">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="12" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Expander.Header>
+                    <ListView AutomationProperties.AutomationId="EffectsMixerView_ReturnsListView"
+                              ItemsSource="{x:Bind ViewModel.Returns, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedReturn, Mode=TwoWay}"
+                              SelectionMode="Single"
+                              MaxHeight="120">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:MixerReturn">
+                                <Grid Padding="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="{x:Bind Name, Mode=OneWay, FallbackValue='Return', TargetNullValue='Return'}"
+                                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{x:Bind BusNumber, Mode=OneWay}"
+                                               Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                                               FontSize="{StaticResource VSQ.FontSize.Caption}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Expander>
+
+                <!-- SubGroups Section -->
+                <Expander Grid.Row="6"
+                          IsExpanded="False"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Stretch"
+                          AutomationProperties.AutomationId="EffectsMixerView_SubGroupsExpander">
+                    <Expander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="SubGroups"
+                                       FontSize="{StaticResource VSQ.FontSize.Body}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                                       VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                <Button AutomationProperties.AutomationId="EffectsMixerView_AddSubGroupButton"
+                                        Command="{x:Bind ViewModel.CreateSubGroupCommand}"
+                                        ToolTipService.ToolTip="Add SubGroup"
+                                        Padding="4">
+                                    <FontIcon Glyph="&#xE710;" FontSize="12" />
+                                </Button>
+                                <Button AutomationProperties.AutomationId="EffectsMixerView_DeleteSubGroupButton"
+                                        Command="{x:Bind ViewModel.DeleteSubGroupCommand}"
+                                        CommandParameter="{x:Bind ViewModel.SelectedSubGroup, Mode=OneWay}"
+                                        ToolTipService.ToolTip="Delete Selected SubGroup"
+                                        Padding="4">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="12" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Expander.Header>
+                    <ListView AutomationProperties.AutomationId="EffectsMixerView_SubGroupsListView"
+                              ItemsSource="{x:Bind ViewModel.SubGroups, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedSubGroup, Mode=TwoWay}"
+                              SelectionMode="Single"
+                              MaxHeight="120">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:MixerSubGroup">
+                                <Grid Padding="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="{x:Bind Name, Mode=OneWay, FallbackValue='SubGroup', TargetNullValue='SubGroup'}"
+                                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{x:Bind BusNumber, Mode=OneWay}"
+                                               Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                                               FontSize="{StaticResource VSQ.FontSize.Caption}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Expander>
+
+                <!-- Master Divider -->
+                <Border Grid.Row="7" Height="1" Background="{StaticResource VSQ.Panel.BorderBrush}" Margin="0,8" />
+
+                <!-- Master Bus Controls -->
+                <Grid Grid.Row="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" 
+                               Text="Master" 
+                               FontSize="{StaticResource VSQ.FontSize.Body}"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                               Margin="0,0,0,8" />
+
+                    <Border Grid.Row="1"
+                            Background="{StaticResource VSQ.Panel.Background.MasterBrush}"
+                            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}"
+                            Padding="12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Spacing="8">
+                                <!-- Master Volume -->
+                                <StackPanel>
+                                    <TextBlock Text="Volume" 
+                                               FontSize="{StaticResource VSQ.FontSize.Caption}"
+                                               Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                                    <Slider Minimum="0" Maximum="2" StepFrequency="0.01"
+                                            Value="{x:Bind ViewModel.Master.Volume, Mode=TwoWay}"
+                                            AutomationProperties.AutomationId="EffectsMixerView_MasterVolumeSlider" />
+                                </StackPanel>
+
+                                <!-- Master Pan -->
+                                <StackPanel>
+                                    <TextBlock Text="Pan" 
+                                               FontSize="{StaticResource VSQ.FontSize.Caption}"
+                                               Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                                    <Slider Minimum="-1" Maximum="1" StepFrequency="0.01"
+                                            Value="{x:Bind ViewModel.Master.Pan, Mode=TwoWay}"
+                                            AutomationProperties.AutomationId="EffectsMixerView_MasterPanSlider" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Master Mute -->
+                            <ToggleButton Grid.Column="1"
+                                          IsChecked="{x:Bind ViewModel.Master.IsMuted, Mode=TwoWay}"
+                                          VerticalAlignment="Center"
+                                          Width="40" Height="40"
+                                          ToolTipService.ToolTip="Mute Master"
+                                          AutomationProperties.AutomationId="EffectsMixerView_MasterMuteButton">
+                                <FontIcon Glyph="&#xE74F;" FontSize="16" />
+                            </ToggleButton>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <!-- Footer Row: Status -->
+        <Border Grid.Row="2"
+                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+                Padding="{StaticResource VSQ.Spacing.Small}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Channel Count -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16">
+                    <TextBlock Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                               FontSize="{StaticResource VSQ.FontSize.Caption}"
+                               VerticalAlignment="Center">
+                        <Run Text="{x:Bind ViewModel.Channels.Count, Mode=OneWay}" />
+                        <Run Text=" channels" />
+                    </TextBlock>
+                    <TextBlock Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                               FontSize="{StaticResource VSQ.FontSize.Caption}"
+                               VerticalAlignment="Center">
+                        <Run Text="{x:Bind ViewModel.EffectChains.Count, Mode=OneWay}" />
+                        <Run Text=" effect chains" />
+                    </TextBlock>
+                </StackPanel>
+
+                <!-- Real-time Indicator -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
+                            Visibility="{x:Bind ViewModel.IsRealTimeUpdatesEnabled, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Ellipse Width="8" Height="8" Fill="{StaticResource VSQ.Success.Brush}" VerticalAlignment="Center" />
+                    <TextBlock Text="LIVE" 
+                               Foreground="{StaticResource VSQ.Success.Brush}"
+                               FontSize="{StaticResource VSQ.FontSize.Caption}"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Grid Grid.RowSpan="3"
+              Background="{StaticResource VSQ.Loading.BackgroundBrush}"
+              Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}"
+              d:Visibility="Collapsed">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                              Foreground="{StaticResource VSQ.Loading.ForegroundBrush}"
+                              Width="40" Height="40" />
+                <TextBlock Text="Loading mixer state..."
+                           Foreground="{StaticResource VSQ.Loading.TextBrush}"
+                           FontSize="{StaticResource VSQ.FontSize.Body}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Error InfoBar -->
+        <InfoBar Grid.Row="0"
+                 IsOpen="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, Converter={StaticResource NullToBooleanConverter}}"
+                 Severity="Error"
+                 Title="Error"
+                 Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, FallbackValue='An error occurred', TargetNullValue='An error occurred'}"
+                 IsClosable="True"
+                 Margin="8"
+                 VerticalAlignment="Top"
+                 d:Visibility="Collapsed" />
+
+        <!-- Help Overlay -->
+        <controls:HelpOverlay x:Name="HelpOverlay" 
+                              Grid.RowSpan="3"
+                              IsVisible="False" 
+                              Visibility="Collapsed"
+                              d:Visibility="Collapsed" />
+    </Grid>
+</UserControl>

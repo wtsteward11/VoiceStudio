@@ -1,0 +1,203 @@
+<UserControl x:Class="VoiceStudio.App.Views.Panels.AutomationView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:VoiceStudio.App.Controls"
+    xmlns:local="using:VoiceStudio.App.Views.Panels"
+    xmlns:vm="using:VoiceStudio.App.ViewModels"
+    x:DataType="local:AutomationView">
+
+  <Grid AutomationProperties.AutomationId="AutomationView_Root" Padding="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <!-- Header -->
+    <Grid Grid.Row="0" Margin="0,0,0,16">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <FontIcon Glyph="&#xE9D9;" FontSize="24" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+        <TextBlock Text="Automation" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"
+                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+        <Button Command="{x:Bind ViewModel.RefreshCommand}"
+                AutomationProperties.AutomationId="AutomationView_RefreshButton"
+                ToolTipService.ToolTip="Refresh curves">
+          <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+        </Button>
+        <Button Click="HelpButton_Click"
+                AutomationProperties.AutomationId="AutomationView_HelpButton"
+                ToolTipService.ToolTip="Help">
+          <FontIcon Glyph="&#xE897;" FontSize="14"/>
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- Parameter Selection -->
+    <Border Grid.Row="1" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16" Margin="0,0,0,8">
+      <StackPanel Spacing="12">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <FontIcon Glyph="&#xE9CE;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+          <TextBlock Text="Parameter Selection" FontSize="13" FontWeight="SemiBold"
+                     Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+        </StackPanel>
+
+        <Grid ColumnSpacing="12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+
+          <!-- Track Selector -->
+          <StackPanel Grid.Column="0" Spacing="4">
+            <TextBlock Text="Track" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+            <ComboBox ItemsSource="{x:Bind ViewModel.AvailableTracks}"
+                      SelectedItem="{x:Bind ViewModel.SelectedTrackId, Mode=TwoWay}"
+                      PlaceholderText="Select track..."
+                      HorizontalAlignment="Stretch"
+                      AutomationProperties.AutomationId="AutomationView_TrackSelector"/>
+          </StackPanel>
+
+          <!-- Parameter Selector -->
+          <StackPanel Grid.Column="1" Spacing="4">
+            <TextBlock Text="Parameter" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+            <ComboBox ItemsSource="{x:Bind ViewModel.AvailableParameters}"
+                      SelectedValuePath="Id"
+                      SelectedValue="{x:Bind ViewModel.SelectedParameterId, Mode=TwoWay}"
+                      DisplayMemberPath="Name"
+                      PlaceholderText="Select parameter..."
+                      HorizontalAlignment="Stretch"
+                      AutomationProperties.AutomationId="AutomationView_ParameterSelector"/>
+          </StackPanel>
+        </Grid>
+
+        <!-- Curve List -->
+        <StackPanel Spacing="4">
+          <TextBlock Text="Curves" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+          <ListView ItemsSource="{x:Bind ViewModel.Curves}"
+                    SelectedItem="{x:Bind ViewModel.SelectedCurve, Mode=TwoWay}"
+                    MaxHeight="120"
+                    RightTapped="Curve_RightTapped"
+                    AutomationProperties.AutomationId="AutomationView_CurveList">
+            <ListView.ItemTemplate>
+              <DataTemplate x:DataType="vm:AutomationCurveItem">
+                <Grid Padding="4,2" ColumnSpacing="8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0" Text="{x:Bind Name}" FontSize="13" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="{x:Bind Interpolation}" FontSize="11"
+                             Foreground="{StaticResource VSQ.Text.SecondaryBrush}" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="2" FontSize="11"
+                             Foreground="{StaticResource VSQ.Text.SecondaryBrush}" VerticalAlignment="Center">
+                    <Run Text="{x:Bind PointCount}"/>
+                    <Run Text="pts"/>
+                  </TextBlock>
+                </Grid>
+              </DataTemplate>
+            </ListView.ItemTemplate>
+          </ListView>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Curve Editor (existing control) -->
+    <Border Grid.Row="2" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="8" Margin="0,0,0,8">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="8,0,0,8">
+          <FontIcon Glyph="&#xE9D9;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+          <TextBlock Text="Curve Editor" FontSize="13" FontWeight="SemiBold"
+                     Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+        </StackPanel>
+        <controls:AutomationCurveEditorControl x:Name="CurveEditor" Grid.Row="1"/>
+      </Grid>
+    </Border>
+
+    <!-- Curve Management Controls -->
+    <Border Grid.Row="3" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16" Margin="0,0,0,8">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Style="{StaticResource VSQ.Button.Primary}"
+                Command="{x:Bind ViewModel.CreateCurveCommand}"
+                AutomationProperties.AutomationId="AutomationView_CreateCurveButton"
+                ToolTipService.ToolTip="Create new curve">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <FontIcon Glyph="&#xE710;" FontSize="14"/>
+            <TextBlock Text="New Curve"/>
+          </StackPanel>
+        </Button>
+        <Button Command="{x:Bind ViewModel.UpdateCurveCommand}"
+                CommandParameter="{x:Bind ViewModel.SelectedCurve, Mode=OneWay}"
+                AutomationProperties.AutomationId="AutomationView_SaveCurveButton"
+                ToolTipService.ToolTip="Save selected curve">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <FontIcon Glyph="&#xE74E;" FontSize="14"/>
+            <TextBlock Text="Save"/>
+          </StackPanel>
+        </Button>
+        <Button Command="{x:Bind ViewModel.DeleteCurveCommand}"
+                CommandParameter="{x:Bind ViewModel.SelectedCurve, Mode=OneWay}"
+                AutomationProperties.AutomationId="AutomationView_DeleteCurveButton"
+                ToolTipService.ToolTip="Delete selected curve">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <FontIcon Glyph="&#xE74D;" FontSize="14"/>
+            <TextBlock Text="Delete"/>
+          </StackPanel>
+        </Button>
+        <Button Command="{x:Bind ViewModel.LoadCurvesCommand}"
+                AutomationProperties.AutomationId="AutomationView_LoadCurvesButton"
+                ToolTipService.ToolTip="Reload curves from project">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <FontIcon Glyph="&#xED25;" FontSize="14"/>
+            <TextBlock Text="Load"/>
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </Border>
+
+    <!-- Status Area -->
+    <Border Grid.Row="4" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12" Margin="0,0,0,8">
+      <StackPanel Spacing="4">
+        <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                     Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                     AutomationProperties.AutomationId="AutomationView_LoadingProgress"/>
+        <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay, FallbackValue='', TargetNullValue=''}"
+                   FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                   AutomationProperties.AutomationId="AutomationView_StatusText"/>
+      </StackPanel>
+    </Border>
+
+    <!-- Error InfoBar -->
+    <InfoBar Grid.Row="5"
+             AutomationProperties.AutomationId="AutomationView_ErrorInfoBar"
+             IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+             Severity="Error" Title="Automation Error"
+             Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, FallbackValue='An error occurred', TargetNullValue='An error occurred'}"
+             IsClosable="True"/>
+
+    <!-- Help Overlay -->
+    <controls:HelpOverlay x:Name="HelpOverlay" Grid.RowSpan="6" IsVisible="False" Visibility="Collapsed"/>
+
+    <!-- Loading Overlay -->
+    <controls:LoadingOverlay Grid.RowSpan="6"
+                             IsLoading="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                             AutomationProperties.AutomationId="AutomationView_LoadingOverlay"/>
+  </Grid>
+</UserControl>

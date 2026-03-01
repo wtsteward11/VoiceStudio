@@ -1,0 +1,198 @@
+<UserControl x:Class="VoiceStudio.App.Views.Panels.AdvancedRealTimeVisualizationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:VoiceStudio.App.Controls"
+             xmlns:local="using:VoiceStudio.App.Views.Panels"
+             x:DataType="local:AdvancedRealTimeVisualizationView">
+  <Grid AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_Root"
+        Background="{StaticResource VSQ.Panel.Background}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+    
+    <Border Grid.Row="0" 
+            Background="{StaticResource VSQ.Panel.Background.HeaderBrush}" 
+            Padding="16,12">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <FontIcon Glyph="&#xE9D9;" FontSize="20"/>
+          <TextBlock Text="Advanced Visualization"
+                     FontWeight="SemiBold"
+                     FontSize="{StaticResource VSQ.FontSize.Title}"
+                     Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+          <Button Command="{x:Bind ViewModel.SavePresetCommand}"
+                  AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_SavePresetButton"
+                  ToolTipService.ToolTip="Save Preset">
+            <FontIcon Glyph="&#xE74E;" FontSize="14"/>
+          </Button>
+          <Button Command="{x:Bind ViewModel.ResetViewCommand}"
+                  AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_ResetButton"
+                  ToolTipService.ToolTip="Reset View">
+            <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+    
+    <Grid Grid.Row="1" Padding="16" ColumnSpacing="12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="260"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <ScrollViewer Grid.Column="0">
+        <StackPanel Spacing="12">
+          <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                  CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Visualization Type" FontSize="13" FontWeight="SemiBold"
+                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+              <ComboBox SelectedItem="{x:Bind ViewModel.VisualizationType, Mode=TwoWay}"
+                        HorizontalAlignment="Stretch"
+                        AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_VizType">
+                <ComboBoxItem Content="Waveform"/>
+                <ComboBoxItem Content="Spectrogram"/>
+                <ComboBoxItem Content="3D Spectrogram"/>
+                <ComboBoxItem Content="Frequency Waterfall"/>
+                <ComboBoxItem Content="Particle Visualizer"/>
+              </ComboBox>
+              <ComboBox SelectedItem="{x:Bind ViewModel.ColorScheme, Mode=TwoWay}"
+                        Header="Color Scheme" HorizontalAlignment="Stretch"
+                        AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_ColorScheme">
+                <ComboBoxItem Content="Cyan"/>
+                <ComboBoxItem Content="Fire"/>
+                <ComboBoxItem Content="Rainbow"/>
+                <ComboBoxItem Content="Ocean"/>
+                <ComboBoxItem Content="Neon"/>
+              </ComboBox>
+            </StackPanel>
+          </Border>
+
+          <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                  CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Settings" FontSize="13" FontWeight="SemiBold"
+                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+              <ToggleSwitch IsOn="{x:Bind ViewModel.RealTimeUpdates, Mode=TwoWay}"
+                            Header="Real-Time Updates"
+                            AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_RealTimeToggle"/>
+              <StackPanel Spacing="4">
+                <TextBlock FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}">
+                  <Run Text="Update Rate: "/>
+                  <Run Text="{x:Bind ViewModel.UpdateRate, Mode=OneWay}"/>
+                  <Run Text=" fps"/>
+                </TextBlock>
+                <Slider Minimum="1" Maximum="120" StepFrequency="1"
+                        Value="{x:Bind ViewModel.UpdateRate, Mode=TwoWay}"
+                        AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_UpdateRate"/>
+              </StackPanel>
+              <CheckBox Content="Show Grid" IsChecked="{x:Bind ViewModel.ShowGrid, Mode=TwoWay}"
+                        AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_ShowGrid"/>
+              <CheckBox Content="Show Labels" IsChecked="{x:Bind ViewModel.ShowLabels, Mode=TwoWay}"
+                        AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_ShowLabels"/>
+              <CheckBox Content="Show FPS" IsChecked="{x:Bind ViewModel.ShowFPS, Mode=TwoWay}"
+                        AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_ShowFPS"/>
+              <CheckBox Content="Sync with Playback" IsChecked="{x:Bind ViewModel.SyncWithPlayback, Mode=TwoWay}"
+                        AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_SyncPlayback"/>
+            </StackPanel>
+          </Border>
+
+          <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                  CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12"
+                  Visibility="{x:Bind ViewModel.Is3DVisualization, Mode=OneWay}">
+            <StackPanel Spacing="8">
+              <TextBlock Text="3D Settings" FontSize="13" FontWeight="SemiBold"
+                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+              <StackPanel Spacing="4">
+                <TextBlock Text="Rotation Speed" FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <Slider Minimum="0" Maximum="100" Value="{x:Bind ViewModel.RotationSpeed, Mode=TwoWay}"
+                        AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_RotationSpeed"/>
+              </StackPanel>
+              <StackPanel Spacing="4">
+                <TextBlock Text="Perspective" FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <Slider Minimum="0" Maximum="100" Value="{x:Bind ViewModel.Perspective, Mode=TwoWay}"
+                        AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_Perspective"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                  CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12"
+                  Visibility="{x:Bind ViewModel.IsParticleVisualizer, Mode=OneWay}">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Particle Settings" FontSize="13" FontWeight="SemiBold"
+                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+              <NumberBox Value="{x:Bind ViewModel.ParticleCount, Mode=TwoWay}"
+                         Header="Particle Count" Minimum="100" Maximum="10000"
+                         SpinButtonPlacementMode="Compact"
+                         AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_ParticleCount"/>
+              <StackPanel Spacing="4">
+                <TextBlock Text="Sensitivity" FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <Slider Minimum="0" Maximum="100" Value="{x:Bind ViewModel.ParticleSensitivity, Mode=TwoWay}"
+                        AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_Sensitivity"/>
+              </StackPanel>
+              <ComboBox SelectedItem="{x:Bind ViewModel.ParticleStyle, Mode=TwoWay}"
+                        Header="Particle Style" HorizontalAlignment="Stretch"
+                        AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_ParticleStyle">
+                <ComboBoxItem Content="Bubbles"/>
+                <ComboBoxItem Content="Trails"/>
+                <ComboBoxItem Content="Stars"/>
+                <ComboBoxItem Content="Sparks"/>
+              </ComboBox>
+            </StackPanel>
+          </Border>
+
+          <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                  CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Presets" FontSize="13" FontWeight="SemiBold"
+                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+              <ListView ItemsSource="{x:Bind ViewModel.VisualizationPresets, Mode=OneWay}"
+                        SelectedItem="{x:Bind ViewModel.SelectedPreset, Mode=TwoWay}"
+                        MaxHeight="150"
+                        AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_PresetList">
+                <ListView.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding Name}" Padding="4"/>
+                  </DataTemplate>
+                </ListView.ItemTemplate>
+              </ListView>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+
+      <Border Grid.Column="1" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+              CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+          <TextBlock Grid.Row="0" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                     FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" Margin="0,0,0,8"/>
+          <Border Grid.Row="1" Background="{StaticResource VSQ.Panel.Background}" CornerRadius="4"
+                  MinHeight="300"
+                  AutomationProperties.AutomationId="AdvancedRealTimeVisualizationView_Canvas">
+            <TextBlock Text="Visualization canvas" HorizontalAlignment="Center"
+                       VerticalAlignment="Center" FontSize="12" Opacity="0.5"/>
+          </Border>
+          <TextBlock Grid.Row="2" FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" Margin="0,8,0,0">
+            <Run Text="Position: "/>
+            <Run Text="{x:Bind ViewModel.AudioPosition, Mode=OneWay}"/>
+          </TextBlock>
+        </Grid>
+      </Border>
+    </Grid>
+    
+    <controls:HelpOverlay x:Name="HelpOverlay" Grid.RowSpan="2" IsVisible="False" Visibility="Collapsed"/>
+  </Grid>
+</UserControl>

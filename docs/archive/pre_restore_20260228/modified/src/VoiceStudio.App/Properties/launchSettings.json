@@ -1,0 +1,45 @@
+{
+  "profiles": {
+    "VoiceStudio.App": {
+      "commandName": "MsixPackage",
+      "nativeDebugging": false
+    },
+    "Default (Full App)": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "VOICESTUDIO_BACKEND_URL": "http://localhost:8000",
+        "VOICESTUDIO_LOG_LEVEL": "INFO",
+        "VOICESTUDIO_ENABLE_ANALYTICS": "false",
+        "VOICESTUDIO_ENABLE_PERFORMANCE_PROFILING": "false"
+      }
+    },
+    "Lightweight (Skip Heavy Panels)": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "VOICESTUDIO_BACKEND_URL": "http://localhost:8000",
+        "VOICESTUDIO_LOG_LEVEL": "INFO",
+        "VOICESTUDIO_SKIP_HEAVY_PANELS": "true",
+        "VOICESTUDIO_ENABLE_ANALYTICS": "false",
+        "VOICESTUDIO_ENABLE_PERFORMANCE_PROFILING": "false"
+      }
+    },
+    "Stress Test Mode": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "VOICESTUDIO_BACKEND_URL": "http://localhost:8000",
+        "VOICESTUDIO_LOG_LEVEL": "DEBUG",
+        "VOICESTUDIO_STRESS_TEST": "true",
+        "VOICESTUDIO_ENABLE_ANALYTICS": "true",
+        "VOICESTUDIO_ENABLE_PERFORMANCE_PROFILING": "true"
+      }
+    },
+    "Backend API Only": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "VOICESTUDIO_BACKEND_URL": "http://localhost:8000",
+        "VOICESTUDIO_LOG_LEVEL": "DEBUG",
+        "VOICESTUDIO_SKIP_FRONTEND": "true"
+      }
+    }
+  }
+}

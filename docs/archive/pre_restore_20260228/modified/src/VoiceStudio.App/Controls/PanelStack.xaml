@@ -1,0 +1,31 @@
+<UserControl x:Class="VoiceStudio.App.Controls.PanelStack"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Microsoft.UI.Xaml.Controls"
+    xmlns:local="using:VoiceStudio.App.Controls"
+    x:DataType="local:PanelStack">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Tab Bar -->
+            <RowDefinition Height="*"/>
+            <!-- Content -->
+        </Grid.RowDefinitions>
+        <!-- Tab Bar -->
+        <Border Grid.Row="0" Background="{StaticResource VSQ.PanelHost.HeaderBackgroundBrush}" BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="0,0,0,1" Visibility="{x:Bind HasMultiplePanels, Mode=OneWay}">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" HorizontalScrollMode="Enabled">
+                <StackPanel x:Name="TabBar" Orientation="Horizontal" Margin="4,0">
+                    <!-- Tabs will be added here via code-behind -->
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+        <!-- Content Area -->
+        <ContentPresenter Grid.Row="1" x:Name="ContentPresenter">
+            <ContentPresenter.ContentTransitions>
+                <TransitionCollection>
+                    <ContentThemeTransition />
+                </TransitionCollection>
+            </ContentPresenter.ContentTransitions>
+        </ContentPresenter>
+    </Grid>
+</UserControl>

@@ -1,0 +1,226 @@
+<UserControl x:Class="VoiceStudio.App.Views.Panels.BatchProcessingView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:VoiceStudio.App.Controls"
+    xmlns:local="using:VoiceStudio.App.Views.Panels"
+    x:DataType="local:BatchProcessingView">
+
+  <Grid AutomationProperties.AutomationId="BatchProcessingView_Root" Padding="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <!-- Header -->
+    <Grid Grid.Row="0" Margin="0,0,0,16">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <FontIcon Glyph="&#xE9F5;" FontSize="24" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+        <TextBlock Text="Batch Processing" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"
+                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+        <Button Command="{x:Bind ViewModel.RefreshCommand}"
+                AutomationProperties.AutomationId="BatchProcessingView_RefreshButton"
+                ToolTipService.ToolTip="Refresh (F5)">
+          <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+        </Button>
+        <Button Click="HelpButton_Click"
+                AutomationProperties.AutomationId="BatchProcessingView_HelpButton"
+                ToolTipService.ToolTip="Help">
+          <FontIcon Glyph="&#xE897;" FontSize="14"/>
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- Configuration Section -->
+    <Border Grid.Row="1" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16" Margin="0,0,0,8">
+      <StackPanel Spacing="12">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <FontIcon Glyph="&#xE713;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+          <TextBlock Text="Job Configuration" FontSize="13" FontWeight="SemiBold"
+                     Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+        </StackPanel>
+
+        <Grid ColumnSpacing="12" RowSpacing="8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+
+          <!-- Job Name -->
+          <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
+            <TextBlock Text="Job Name" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+            <TextBox Text="{x:Bind ViewModel.JobName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     PlaceholderText="Enter job name..."
+                     AutomationProperties.AutomationId="BatchProcessingView_JobNameTextBox"/>
+          </StackPanel>
+
+          <!-- Engine Selector -->
+          <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4">
+            <TextBlock Text="Engine" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+            <ComboBox ItemsSource="{x:Bind ViewModel.Engines}"
+                      SelectedItem="{x:Bind ViewModel.SelectedEngineId, Mode=TwoWay}"
+                      PlaceholderText="Select engine..."
+                      HorizontalAlignment="Stretch"
+                      AutomationProperties.AutomationId="BatchProcessingView_EngineSelector"/>
+          </StackPanel>
+
+          <!-- Project ID -->
+          <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4">
+            <TextBlock Text="Project ID" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+            <TextBox Text="{x:Bind ViewModel.SelectedProjectId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     PlaceholderText="Project ID..."
+                     AutomationProperties.AutomationId="BatchProcessingView_ProjectIdTextBox"/>
+          </StackPanel>
+
+          <!-- Voice Profile ID -->
+          <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4">
+            <TextBlock Text="Voice Profile ID" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+            <TextBox Text="{x:Bind ViewModel.SelectedVoiceProfileId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     PlaceholderText="Voice profile ID..."
+                     AutomationProperties.AutomationId="BatchProcessingView_VoiceProfileIdTextBox"/>
+          </StackPanel>
+
+          <!-- Quality Settings -->
+          <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="16">
+            <CheckBox Content="Enhance Quality" IsChecked="{x:Bind ViewModel.EnhanceQuality, Mode=TwoWay}"
+                      AutomationProperties.AutomationId="BatchProcessingView_EnhanceQualityCheckBox"/>
+            <CheckBox Content="Auto-Refresh" IsChecked="{x:Bind ViewModel.AutoRefresh, Mode=TwoWay}"
+                      AutomationProperties.AutomationId="BatchProcessingView_AutoRefreshCheckBox"/>
+          </StackPanel>
+        </Grid>
+
+        <!-- Batch Text Input -->
+        <StackPanel Spacing="4">
+          <TextBlock Text="Batch Text" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+          <TextBox Text="{x:Bind ViewModel.BatchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                   PlaceholderText="Enter text for batch synthesis..."
+                   AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" MaxHeight="120"
+                   AutomationProperties.AutomationId="BatchProcessingView_BatchTextBox"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Action Buttons -->
+    <Border Grid.Row="2" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16" Margin="0,0,0,8">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+          <Button Style="{StaticResource VSQ.Button.Primary}"
+                  Command="{x:Bind ViewModel.CreateJobCommand}"
+                  AutomationProperties.AutomationId="BatchProcessingView_CreateJobButton"
+                  ToolTipService.ToolTip="Create new batch job (Ctrl+N)">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <FontIcon Glyph="&#xE710;" FontSize="14"/>
+              <TextBlock Text="Create Job"/>
+            </StackPanel>
+          </Button>
+          <Button Command="{x:Bind ViewModel.SelectAllJobsCommand}"
+                  AutomationProperties.AutomationId="BatchProcessingView_SelectAllButton"
+                  ToolTipService.ToolTip="Select all jobs (Ctrl+A)">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <FontIcon Glyph="&#xE8B3;" FontSize="14"/>
+              <TextBlock Text="Select All"/>
+            </StackPanel>
+          </Button>
+          <Button Command="{x:Bind ViewModel.ClearJobSelectionCommand}"
+                  AutomationProperties.AutomationId="BatchProcessingView_ClearSelectionButton"
+                  ToolTipService.ToolTip="Clear selection (Escape)">
+            <FontIcon Glyph="&#xE711;" FontSize="14"/>
+          </Button>
+        </StackPanel>
+
+        <!-- Filter -->
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="Filter:" FontSize="12" VerticalAlignment="Center"
+                     Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+          <ComboBox SelectionChanged="StatusFilter_SelectionChanged"
+                    AutomationProperties.AutomationId="BatchProcessingView_StatusFilter"
+                    MinWidth="120">
+            <ComboBoxItem Content="All" Tag="" IsSelected="True"/>
+            <ComboBoxItem Content="Pending" Tag="Pending"/>
+            <ComboBoxItem Content="Running" Tag="Running"/>
+            <ComboBoxItem Content="Completed" Tag="Completed"/>
+            <ComboBoxItem Content="Failed" Tag="Failed"/>
+            <ComboBoxItem Content="Cancelled" Tag="Cancelled"/>
+          </ComboBox>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Batch Queue Timeline (existing control) -->
+    <Border Grid.Row="3" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="8" Margin="0,0,0,8">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="8,0,0,8">
+          <FontIcon Glyph="&#xE916;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+          <TextBlock Text="Queue Timeline" FontSize="13" FontWeight="SemiBold"
+                     Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+          <TextBlock Text="{x:Bind ViewModel.SelectedJobCount, Mode=OneWay}"
+                     FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                     VerticalAlignment="Center"/>
+          <TextBlock Text="selected" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                     VerticalAlignment="Center"/>
+        </StackPanel>
+        <controls:BatchQueueTimelineControl x:Name="BatchQueueTimeline" Grid.Row="1"/>
+      </Grid>
+    </Border>
+
+    <!-- Status / Progress Area -->
+    <Border Grid.Row="4" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16" Margin="0,0,0,8">
+      <StackPanel Spacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <FontIcon Glyph="&#xE9CE;" FontSize="12" Foreground="{StaticResource VSQ.Accent.GreenBrush}"/>
+          <TextBlock Text="Queue Status" FontSize="13" FontWeight="SemiBold"
+                     Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+        </StackPanel>
+        <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                     Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                     AutomationProperties.AutomationId="BatchProcessingView_LoadingProgress"/>
+        <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay, FallbackValue='', TargetNullValue=''}"
+                   FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                   AutomationProperties.AutomationId="BatchProcessingView_StatusText"/>
+      </StackPanel>
+    </Border>
+
+    <!-- Error InfoBar -->
+    <InfoBar Grid.Row="5"
+             AutomationProperties.AutomationId="BatchProcessingView_ErrorInfoBar"
+             IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+             Severity="Error" Title="Batch Processing Error"
+             Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, FallbackValue='An error occurred', TargetNullValue='An error occurred'}"
+             IsClosable="True"/>
+
+    <!-- Help Overlay -->
+    <controls:HelpOverlay x:Name="HelpOverlay" Grid.RowSpan="6" Visibility="Collapsed"/>
+
+    <!-- Loading Overlay -->
+    <controls:LoadingOverlay Grid.RowSpan="6"
+                             IsLoading="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                             AutomationProperties.AutomationId="BatchProcessingView_LoadingOverlay"/>
+  </Grid>
+</UserControl>

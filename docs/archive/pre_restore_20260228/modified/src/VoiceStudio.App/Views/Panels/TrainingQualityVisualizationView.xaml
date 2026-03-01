@@ -1,0 +1,259 @@
+<UserControl x:Class="VoiceStudio.App.Views.Panels.TrainingQualityVisualizationView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:VoiceStudio.App.Controls"
+    xmlns:local="using:VoiceStudio.App.Views.Panels"
+    xmlns:models="using:VoiceStudio.Core.Models"
+    x:DataType="local:TrainingQualityVisualizationView">
+
+  <Grid Padding="16" AutomationProperties.AutomationId="TrainingQualityVisualizationView_Root">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <!-- Header -->
+    <Grid Grid.Row="0" Margin="0,0,0,12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <FontIcon Glyph="&#xE9D9;" FontSize="24" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+        <TextBlock Text="Training Quality" FontSize="20" FontWeight="SemiBold"
+                   VerticalAlignment="Center" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+        <Button Command="{x:Bind ViewModel.RefreshCommand}" ToolTipService.ToolTip="Refresh"
+                AutomationProperties.AutomationId="TrainingQualityVisualizationView_RefreshBtn">
+          <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+        </Button>
+        <Button Click="HelpButton_Click" ToolTipService.ToolTip="Help"
+                AutomationProperties.AutomationId="TrainingQualityVisualizationView_HelpBtn">
+          <FontIcon Glyph="&#xE897;" FontSize="14"/>
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- Content -->
+    <ScrollViewer Grid.Row="1">
+      <StackPanel Spacing="12">
+
+        <!-- Training Job Selector -->
+        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16">
+          <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <FontIcon Glyph="&#xE8B7;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+              <TextBlock Text="Training Job" FontSize="13" FontWeight="SemiBold"
+                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+            </StackPanel>
+            <ComboBox ItemsSource="{x:Bind ViewModel.AvailableTrainingJobs, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.SelectedTrainingJobId, Mode=TwoWay}"
+                      PlaceholderText="Select a training job..." HorizontalAlignment="Stretch"
+                      AutomationProperties.AutomationId="TrainingQualityVisualizationView_JobSelector"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Average Metrics -->
+        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16"
+                Visibility="{x:Bind ViewModel.HasData, Mode=OneWay}">
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <FontIcon Glyph="&#xE9D9;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+              <TextBlock Text="Average Metrics" FontSize="13" FontWeight="SemiBold"
+                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+            </StackPanel>
+            <Grid ColumnSpacing="16" RowSpacing="8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0" Spacing="4"
+                          AutomationProperties.AutomationId="TrainingQualityVisualizationView_AvgQuality">
+                <TextBlock Text="Quality" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <TextBlock Text="{x:Bind ViewModel.AverageQualityScore, Mode=OneWay, FallbackValue='--'}"
+                           FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+              </StackPanel>
+              <StackPanel Grid.Column="1" Spacing="4"
+                          AutomationProperties.AutomationId="TrainingQualityVisualizationView_AvgMOS">
+                <TextBlock Text="MOS" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <TextBlock Text="{x:Bind ViewModel.AverageMosScore, Mode=OneWay, FallbackValue='--'}"
+                           FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+              </StackPanel>
+              <StackPanel Grid.Column="2" Spacing="4"
+                          AutomationProperties.AutomationId="TrainingQualityVisualizationView_AvgSimilarity">
+                <TextBlock Text="Similarity" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <TextBlock Text="{x:Bind ViewModel.AverageSimilarity, Mode=OneWay, FallbackValue='--'}"
+                           FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+              </StackPanel>
+              <StackPanel Grid.Column="3" Spacing="4"
+                          AutomationProperties.AutomationId="TrainingQualityVisualizationView_AvgNaturalness">
+                <TextBlock Text="Naturalness" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <TextBlock Text="{x:Bind ViewModel.AverageNaturalness, Mode=OneWay, FallbackValue='--'}"
+                           FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- Best / Worst Metrics -->
+        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16"
+                Visibility="{x:Bind ViewModel.HasData, Mode=OneWay}">
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <FontIcon Glyph="&#xE734;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+              <TextBlock Text="Best / Worst Epochs" FontSize="13" FontWeight="SemiBold"
+                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+            </StackPanel>
+            <Grid ColumnSpacing="24">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+
+              <!-- Best -->
+              <Border Grid.Column="0" Padding="12" CornerRadius="8"
+                      BorderBrush="{StaticResource VSQ.Accent.CyanBrush}" BorderThickness="1">
+                <Grid ColumnSpacing="12" RowSpacing="4">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                  </Grid.RowDefinitions>
+                  <TextBlock Grid.ColumnSpan="2" Text="Best" FontSize="13" FontWeight="SemiBold"
+                             Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+                  <TextBlock Grid.Row="1" Grid.Column="0" Text="Epoch:" FontSize="12"
+                             Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                  <TextBlock Grid.Row="1" Grid.Column="1"
+                             Text="{x:Bind ViewModel.BestMetrics.Epoch, Mode=OneWay, FallbackValue='--'}"
+                             FontSize="12" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                  <TextBlock Grid.Row="2" Grid.Column="0" Text="Quality:" FontSize="12"
+                             Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                  <TextBlock Grid.Row="2" Grid.Column="1"
+                             Text="{x:Bind ViewModel.BestMetrics.QualityScore, Mode=OneWay, FallbackValue='--'}"
+                             FontSize="12" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                  <TextBlock Grid.Row="3" Grid.Column="0" Text="MOS:" FontSize="12"
+                             Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                  <TextBlock Grid.Row="3" Grid.Column="1"
+                             Text="{x:Bind ViewModel.BestMetrics.MosScore, Mode=OneWay, FallbackValue='--'}"
+                             FontSize="12" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                </Grid>
+              </Border>
+
+              <!-- Worst -->
+              <Border Grid.Column="1" Padding="12" CornerRadius="8"
+                      BorderBrush="{StaticResource VSQ.Text.SecondaryBrush}" BorderThickness="1">
+                <Grid ColumnSpacing="12" RowSpacing="4">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                  </Grid.RowDefinitions>
+                  <TextBlock Grid.ColumnSpan="2" Text="Worst" FontSize="13" FontWeight="SemiBold"
+                             Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                  <TextBlock Grid.Row="1" Grid.Column="0" Text="Epoch:" FontSize="12"
+                             Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                  <TextBlock Grid.Row="1" Grid.Column="1"
+                             Text="{x:Bind ViewModel.WorstMetrics.Epoch, Mode=OneWay, FallbackValue='--'}"
+                             FontSize="12" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                  <TextBlock Grid.Row="2" Grid.Column="0" Text="Quality:" FontSize="12"
+                             Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                  <TextBlock Grid.Row="2" Grid.Column="1"
+                             Text="{x:Bind ViewModel.WorstMetrics.QualityScore, Mode=OneWay, FallbackValue='--'}"
+                             FontSize="12" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                  <TextBlock Grid.Row="3" Grid.Column="0" Text="MOS:" FontSize="12"
+                             Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                  <TextBlock Grid.Row="3" Grid.Column="1"
+                             Text="{x:Bind ViewModel.WorstMetrics.MosScore, Mode=OneWay, FallbackValue='--'}"
+                             FontSize="12" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                </Grid>
+              </Border>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- Quality History -->
+        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16"
+                Visibility="{x:Bind ViewModel.HasData, Mode=OneWay}">
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <FontIcon Glyph="&#xE8D6;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+              <TextBlock Text="Quality History" FontSize="13" FontWeight="SemiBold"
+                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+            </StackPanel>
+            <ListView ItemsSource="{x:Bind ViewModel.QualityHistory, Mode=OneWay}" MaxHeight="300"
+                      AutomationProperties.AutomationId="TrainingQualityVisualizationView_HistoryList"
+                      SelectionMode="None">
+              <ListView.ItemTemplate>
+                <DataTemplate x:DataType="models:TrainingQualityMetrics">
+                  <Grid Padding="8,6" ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center">
+                      <Run Text="E"/><Run Text="{x:Bind Epoch}"/>
+                    </TextBlock>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                      <TextBlock Text="Loss:" FontSize="11" Opacity="0.6"/>
+                      <TextBlock Text="{x:Bind TrainingLoss, TargetNullValue='--'}" FontSize="11"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                      <TextBlock Text="Q:" FontSize="11" Opacity="0.6"/>
+                      <TextBlock Text="{x:Bind QualityScore, TargetNullValue='--'}" FontSize="11"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                      <TextBlock Text="MOS:" FontSize="11" Opacity="0.6"/>
+                      <TextBlock Text="{x:Bind MosScore, TargetNullValue='--'}" FontSize="11"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                      <TextBlock Text="Sim:" FontSize="11" Opacity="0.6"/>
+                      <TextBlock Text="{x:Bind Similarity, TargetNullValue='--'}" FontSize="11"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                      <TextBlock Text="Nat:" FontSize="11" Opacity="0.6"/>
+                      <TextBlock Text="{x:Bind Naturalness, TargetNullValue='--'}" FontSize="11"/>
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ListView.ItemTemplate>
+            </ListView>
+          </StackPanel>
+        </Border>
+
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- Error InfoBar -->
+    <InfoBar Grid.Row="2" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}" Severity="Error"
+             Title="Training Quality Error"
+             Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, FallbackValue='An error occurred', TargetNullValue='An error occurred'}"
+             IsClosable="True" AutomationProperties.AutomationId="TrainingQualityVisualizationView_ErrorInfoBar"/>
+
+    <!-- Overlays -->
+    <controls:HelpOverlay x:Name="HelpOverlay" Grid.RowSpan="3" IsVisible="False" Visibility="Collapsed"/>
+    <controls:LoadingOverlay Grid.RowSpan="3" IsLoading="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                             AutomationProperties.AutomationId="TrainingQualityVisualizationView_LoadingOverlay"/>
+  </Grid>
+</UserControl>

@@ -1,0 +1,181 @@
+<Window x:Class="VoiceStudio.App.MainWindow"
+  Title="VoiceStudio Quantum+"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:controls="using:VoiceStudio.App.Controls"
+  xmlns:views="using:VoiceStudio.App.Views">
+  <Grid Background="{StaticResource VSQ.Window.Background}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="48" />
+      <!-- Toolbar -->
+      <RowDefinition Height="*" />
+      <!-- Workspace -->
+      <RowDefinition Height="26" />
+      <!-- Status bar -->
+    </Grid.RowDefinitions>
+    <!-- Top command toolbar -->
+    <controls:CustomizableToolbar Grid.Row="0" Margin="8,0,8,4" x:Name="CommandToolbar" />
+    <!-- Main workspace -->
+    <Grid Grid.Row="1" Margin="8,0,8,4">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="4*" />
+        <RowDefinition Height="*" />
+      </Grid.RowDefinitions>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="64" />
+        <ColumnDefinition Width="20*" />
+        <ColumnDefinition Width="55*" />
+        <ColumnDefinition Width="25*" />
+      </Grid.ColumnDefinitions>
+      <!-- Nav rail -->
+      <Border Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+        Background="{StaticResource VSQ.NavRail.BackgroundBrush}"
+        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}"
+        Padding="{StaticResource VSQ.Spacing.Small}">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,8"
+          Spacing="4">
+          <ToggleButton x:Name="NavStudio" ToolTipService.ToolTip="Studio" Width="44"
+            Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
+            AutomationProperties.AutomationId="NavStudio"
+            Click="NavStudio_Click"
+            PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
+            <FontIcon Glyph="&#xE80F;" FontSize="18" FontFamily="Segoe Fluent Icons" />
+          </ToggleButton>
+          <ToggleButton x:Name="NavProfiles" ToolTipService.ToolTip="Profiles" Width="44"
+            Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
+            AutomationProperties.AutomationId="NavProfiles"
+            Click="NavProfiles_Click"
+            PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
+            <FontIcon Glyph="&#xE77B;" FontSize="18" FontFamily="Segoe Fluent Icons" />
+          </ToggleButton>
+          <ToggleButton x:Name="NavLibrary" ToolTipService.ToolTip="Library" Width="44"
+            Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
+            AutomationProperties.AutomationId="NavLibrary"
+            Click="NavLibrary_Click"
+            PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
+            <FontIcon Glyph="&#xE8F1;" FontSize="18" FontFamily="Segoe Fluent Icons" />
+          </ToggleButton>
+          <ToggleButton x:Name="NavEffects" ToolTipService.ToolTip="Effects" Width="44"
+            Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
+            AutomationProperties.AutomationId="NavEffects"
+            Click="NavEffects_Click"
+            PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
+            <FontIcon Glyph="&#xE9D9;" FontSize="18" FontFamily="Segoe Fluent Icons" />
+          </ToggleButton>
+          <ToggleButton x:Name="NavTrain" ToolTipService.ToolTip="Train" Width="44"
+            Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
+            AutomationProperties.AutomationId="NavTrain"
+            Click="NavTrain_Click"
+            PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
+            <FontIcon Glyph="&#xE7BE;" FontSize="18" FontFamily="Segoe Fluent Icons" />
+          </ToggleButton>
+          <ToggleButton x:Name="NavAnalyze" ToolTipService.ToolTip="Analyze" Width="44"
+            Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
+            AutomationProperties.AutomationId="NavAnalyze"
+            Click="NavAnalyze_Click"
+            PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
+            <FontIcon Glyph="&#xE9D9;" FontSize="18" FontFamily="Segoe Fluent Icons" />
+          </ToggleButton>
+          <!-- Separator between creative tools and utility tools -->
+          <Rectangle Width="32" Height="1" Fill="{StaticResource VSQ.Panel.BorderBrush}" Margin="0,4,0,4" />
+          <ToggleButton x:Name="NavSettings" ToolTipService.ToolTip="Settings" Width="44"
+            Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
+            AutomationProperties.AutomationId="NavSettings"
+            Click="NavSettings_Click"
+            PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
+            <FontIcon Glyph="&#xE713;" FontSize="18" FontFamily="Segoe Fluent Icons" />
+          </ToggleButton>
+          <ToggleButton x:Name="NavLogs" ToolTipService.ToolTip="Diagnostics" Width="44"
+            Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
+            AutomationProperties.AutomationId="NavLogs"
+            Click="NavLogs_Click"
+            PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
+            <FontIcon Glyph="&#xE7BA;" FontSize="18" FontFamily="Segoe Fluent Icons" />
+          </ToggleButton>
+        </StackPanel>
+      </Border>
+      <!-- Left / Center / Right PanelHosts -->
+      <controls:PanelHost Grid.Row="0" Grid.Column="1" Margin="4,0,4,4" x:Name="LeftPanelHost" />
+      <controls:PanelHost Grid.Row="0" Grid.Column="2" Margin="0,0,4,4" x:Name="CenterPanelHost" />
+      <controls:PanelHost Grid.Row="0" Grid.Column="3" Margin="0,0,0,4" x:Name="RightPanelHost" />
+      <!-- Bottom PanelHost -->
+      <controls:PanelHost Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" x:Name="BottomPanelHost" />
+    </Grid>
+    <!-- Status bar -->
+    <Border Grid.Row="2" Height="26" Background="{StaticResource VSQ.StatusBar.BackgroundBrush}"
+      BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="1,1,1,0">
+      <Grid Margin="8,0,8,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="2*" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+          Spacing="{StaticResource VSQ.Spacing.Value.Medium}"
+          Margin="0,0,12,0">
+          <Border x:Name="ProcessingIndicator" Width="8" Height="8"
+            CornerRadius="{StaticResource VSQ.CornerRadius.Small}"
+            Background="{StaticResource VSQ.StatusIndicator.IdleBrush}"
+            AutomationProperties.AutomationId="StatusBar_ProcessingIndicator"
+            ToolTipService.ToolTip="Processing: Idle">
+          </Border>
+          <Border x:Name="NetworkIndicator" Width="8" Height="8"
+            CornerRadius="{StaticResource VSQ.CornerRadius.Small}"
+            Background="{StaticResource VSQ.StatusIndicator.SuccessBrush}"
+            ToolTipService.ToolTip="Network: Connected">
+          </Border>
+          <Border x:Name="EngineIndicator" Width="8" Height="8"
+            CornerRadius="{StaticResource VSQ.CornerRadius.Small}"
+            Background="{StaticResource VSQ.StatusIndicator.SuccessBrush}"
+            ToolTipService.ToolTip="Engine: Ready">
+          </Border>
+        </StackPanel>
+        <TextBlock Grid.Column="1" x:Name="StatusText" Text="Ready" VerticalAlignment="Center"
+          AutomationProperties.AutomationId="StatusBar_StatusText" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
+          HorizontalAlignment="Center">
+          <TextBlock Text="Job:" Margin="0,0,4,0" />
+          <TextBlock x:Name="JobStatusText" Text="Idle"
+            AutomationProperties.AutomationId="StatusBar_JobStatusText" />
+          <ProgressBar x:Name="JobProgressBar" Width="200" Height="6" Margin="12,0,0,0" Value="0"
+            AutomationProperties.AutomationId="StatusBar_JobProgressBar" />
+        </StackPanel>
+        <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Right"
+          VerticalAlignment="Center" Spacing="4">
+          <TextBlock x:Name="CpuText" Text="CPU 0%" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+          <TextBlock x:Name="GpuText" Text="GPU 0%" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+          <TextBlock x:Name="RamText" Text="RAM 0%" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+          <Rectangle Width="1" Height="12" Fill="{StaticResource VSQ.Panel.BorderBrush}" Margin="4,0" />
+          <TextBlock x:Name="SampleRateText" Text="48 kHz" FontSize="10" Foreground="{StaticResource VSQ.Accent.CyanBrush}" />
+          <TextBlock x:Name="LatencyText" Text="--ms" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+          <Rectangle Width="1" Height="12" Fill="{StaticResource VSQ.Panel.BorderBrush}" Margin="4,0" />
+          <Button x:Name="CollaboratorsToggleButton" ToolTipService.ToolTip="Show Collaborators (Coming Soon)"
+            Click="CollaboratorsToggleButton_Click" Padding="2" Background="Transparent" BorderThickness="0"
+            Visibility="Collapsed">
+            <FontIcon Glyph="&#xE716;" FontSize="12" FontFamily="Segoe Fluent Icons" />
+          </Button>
+          <Rectangle Width="1" Height="12" Fill="{StaticResource VSQ.Panel.BorderBrush}" Margin="4,0" />
+          <TextBlock x:Name="ClockText" Text="00:00" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+        </StackPanel>
+      </Grid>
+    </Border>
+    <!-- Toast Notification Container (IDEA 11) -->
+    <StackPanel x:Name="ToastContainer" Grid.Row="1" HorizontalAlignment="Right"
+      VerticalAlignment="Bottom" Margin="0,0,16,80" Spacing="0" MaxWidth="400" />
+    <!-- Global Search Overlay (IDEA 5) -->
+    <Grid x:Name="GlobalSearchOverlay" Grid.Row="1"
+      Background="{StaticResource VSQ.Overlay.BackgroundBrush}" Visibility="Collapsed"
+      Tapped="GlobalSearchOverlay_Tapped">
+      <views:GlobalSearchView x:Name="GlobalSearchView" HorizontalAlignment="Center"
+        VerticalAlignment="Top" Margin="0,100,0,0" />
+    </Grid>
+    <!-- Collaboration Indicators (IDEA 25) -->
+    <Border x:Name="CollaborationPanel" Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0"
+      Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+      BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="1" CornerRadius="8"
+      Padding="8" Width="280" MaxHeight="400" Visibility="Collapsed">
+      <controls:CollaborationIndicator x:Name="CollaborationIndicator" CloseRequested="CollaborationIndicator_CloseRequested" />
+    </Border>
+  </Grid>
+</Window>

@@ -1,0 +1,158 @@
+<UserControl x:Class="VoiceStudio.App.Views.Panels.ABTestingView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:VoiceStudio.App.Controls"
+    xmlns:local="using:VoiceStudio.App.Views.Panels"
+    x:DataType="local:ABTestingView">
+    <Grid AutomationProperties.AutomationId="ABTestingView_Root"
+          Background="{StaticResource VSQ.Panel.Background}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0"
+                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+                Padding="{StaticResource VSQ.Spacing.Medium}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE8EF;" FontSize="20"/>
+                    <TextBlock Text="A/B Testing"
+                               FontWeight="SemiBold"
+                               FontSize="{StaticResource VSQ.FontSize.Title}"
+                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                </StackPanel>
+                <Button Grid.Column="1" Click="HelpButton_Click" ToolTipService.ToolTip="Help"
+                        AutomationProperties.AutomationId="ABTestingView_HelpButton">
+                    <FontIcon Glyph="&#xE897;" FontSize="14"/>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Padding="16" Spacing="12">
+
+                <!-- Test Setup -->
+                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Test Setup" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                        <ComboBox Header="Voice Profile" ItemsSource="{x:Bind ViewModel.Profiles, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedProfile, Mode=TwoWay}"
+                                  DisplayMemberPath="Name" HorizontalAlignment="Stretch"
+                                  AutomationProperties.AutomationId="ABTestingView_ProfileComboBox"/>
+                        <TextBox Header="Test Text" Text="{x:Bind ViewModel.TestText, Mode=TwoWay}"
+                                 PlaceholderText="Enter text for synthesis comparison..."
+                                 AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"
+                                 AutomationProperties.AutomationId="ABTestingView_TestText"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Version A & B Side by Side -->
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Version A -->
+                    <Border Grid.Column="0" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Version A" FontWeight="SemiBold" FontSize="13"
+                                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                            <TextBox Header="Engine" Text="{x:Bind ViewModel.EngineA, Mode=TwoWay}"
+                                     PlaceholderText="Engine ID..."
+                                     AutomationProperties.AutomationId="ABTestingView_EngineA"/>
+                            <TextBox Header="Emotion" Text="{x:Bind ViewModel.EmotionA, Mode=TwoWay}"
+                                     PlaceholderText="Optional emotion..."
+                                     AutomationProperties.AutomationId="ABTestingView_EmotionA"/>
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.EnhanceQualityA, Mode=TwoWay}"
+                                          Header="Enhance Quality"
+                                          AutomationProperties.AutomationId="ABTestingView_EnhanceA"/>
+                            <Button Command="{x:Bind ViewModel.PlaySampleACommand}" Content="Play A"
+                                    HorizontalAlignment="Stretch"
+                                    AutomationProperties.AutomationId="ABTestingView_PlayAButton"/>
+                            <TextBlock Text="{x:Bind ViewModel.SampleAMetricsDisplay, Mode=OneWay}"
+                                       FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Version B -->
+                    <Border Grid.Column="1" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Version B" FontWeight="SemiBold" FontSize="13"
+                                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                            <TextBox Header="Engine" Text="{x:Bind ViewModel.EngineB, Mode=TwoWay}"
+                                     PlaceholderText="Engine ID..."
+                                     AutomationProperties.AutomationId="ABTestingView_EngineB"/>
+                            <TextBox Header="Emotion" Text="{x:Bind ViewModel.EmotionB, Mode=TwoWay}"
+                                     PlaceholderText="Optional emotion..."
+                                     AutomationProperties.AutomationId="ABTestingView_EmotionB"/>
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.EnhanceQualityB, Mode=TwoWay}"
+                                          Header="Enhance Quality"
+                                          AutomationProperties.AutomationId="ABTestingView_EnhanceB"/>
+                            <Button Command="{x:Bind ViewModel.PlaySampleBCommand}" Content="Play B"
+                                    HorizontalAlignment="Stretch"
+                                    AutomationProperties.AutomationId="ABTestingView_PlayBButton"/>
+                            <TextBlock Text="{x:Bind ViewModel.SampleBMetricsDisplay, Mode=OneWay}"
+                                       FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Run Test -->
+                <Button Command="{x:Bind ViewModel.RunTestCommand}"
+                        Content="Run A/B Test"
+                        HorizontalAlignment="Stretch"
+                        Style="{StaticResource AccentButtonStyle}"
+                        AutomationProperties.AutomationId="ABTestingView_RunTestButton"/>
+
+                <!-- Comparison Results -->
+                <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                        CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12"
+                        Visibility="{x:Bind ViewModel.ResultsVisibility, Mode=OneWay}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Comparison Results" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                        <TextBlock Text="{x:Bind ViewModel.ComparisonSummary, Mode=OneWay}"
+                                   FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                                   AutomationProperties.AutomationId="ABTestingView_ComparisonSummary"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Padding="8,4"
+                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+                BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Width="16" Height="16"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                           FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                           VerticalAlignment="Center" Margin="8,0,0,0"
+                           AutomationProperties.AutomationId="ABTestingView_StatusText"/>
+            </Grid>
+        </Border>
+
+        <controls:HelpOverlay x:Name="HelpOverlay" Grid.RowSpan="3" IsVisible="False" Visibility="Collapsed"/>
+    </Grid>
+</UserControl>

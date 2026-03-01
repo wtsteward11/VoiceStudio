@@ -27,7 +27,17 @@
 param(
     [string]$ProjectDir = "",
     [string[]]$BannedPrefixes = @("Microsoft.Extensions."),
+    # Packages to warn about (not fail) if they resolve at or above $MaxMajorVersion.
+    # Defense-in-depth: catches high-version packages outside BannedPrefixes that
+    # could gain dangerous transitives on future SDK updates.
+    [string[]]$WarnPrefixes = @("Microsoft.Data."),
     [int]$MaxMajorVersion = 9,
+    # Golden-config exceptions: these packages are pinned in VoiceStudio.App.csproj
+    # and documented in docs/reports/DO_NOT_CHANGE_BUILD_CONFIG.md.
+    # They target netstandard2.0/net8.0 and do NOT inject net9.0-only assemblies
+    # into the XAML compiler's net472 reference path.
+    # Verified: build 0 errors, 0 warnings, XAML compiler exit 0 (2026-02-28).
+    # DO NOT add entries here without updating DO_NOT_CHANGE_BUILD_CONFIG.md.
     [string[]]$AllowedExceptions = @(
         "Microsoft.Extensions.DependencyInjection/10.0.2",
         "Microsoft.Extensions.DependencyInjection.Abstractions/10.0.2",
@@ -100,6 +110,30 @@ if ($violations.Count -gt 0) {
     Write-Host "FIX: Downgrade these packages to 8.x or earlier in the .csproj files." -ForegroundColor Yellow
     Write-Host "REF: docs/reports/BUILD_ROOT_CAUSE_ANALYSIS_20260228.md" -ForegroundColor Yellow
     exit 1
+}
+
+$warnings = @()
+foreach ($target in $assets.targets.PSObject.Properties) {
+    foreach ($pkg in $target.Value.PSObject.Properties) {
+        $pkgName = $pkg.Name.Split("/")[0]
+        $pkgVersion = $pkg.Name.Split("/")[1]
+        foreach ($wp in $WarnPrefixes) {
+            if ($pkgName.StartsWith($wp)) {
+                $major = 0
+                if ($pkgVersion -match "^(\d+)\.") { $major = [int]$Matches[1] }
+                if ($major -ge $MaxMajorVersion) {
+                    $warnings += "$pkgName/$pkgVersion"
+                }
+            }
+        }
+    }
+}
+if ($warnings.Count -gt 0) {
+    $unique = $warnings | Sort-Object -Unique
+    Write-Host ""
+    Write-Host "[WARN] High-version monitored packages detected (not blocking):" -ForegroundColor Yellow
+    foreach ($w in $unique) { Write-Host "  - $w" -ForegroundColor Yellow }
+    Write-Host "  Check for dangerous transitives if SDK or these packages are updated." -ForegroundColor Yellow
 }
 
 Write-Host "[PASS] No banned .NET ${MaxMajorVersion}.0+ Microsoft.Extensions packages found." -ForegroundColor Green

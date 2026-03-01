@@ -1,0 +1,232 @@
+<UserControl x:Class="VoiceStudio.App.Views.Panels.DatasetQAView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:VoiceStudio.App.Controls"
+    xmlns:local="using:VoiceStudio.App.Views.Panels"
+    xmlns:vm="using:VoiceStudio.App.ViewModels"
+    x:DataType="local:DatasetQAView">
+
+  <Grid Padding="16" AutomationProperties.AutomationId="DatasetQAView_Root">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <!-- Header -->
+    <Grid Grid.Row="0" Margin="0,0,0,12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <FontIcon Glyph="&#xE9D5;" FontSize="24" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+        <TextBlock Text="Dataset QA" FontSize="20" FontWeight="SemiBold"
+                   VerticalAlignment="Center" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+        <Button Command="{x:Bind ViewModel.RefreshCommand}" ToolTipService.ToolTip="Refresh"
+                AutomationProperties.AutomationId="DatasetQAView_RefreshBtn">
+          <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+        </Button>
+        <Button Click="HelpButton_Click" ToolTipService.ToolTip="Help"
+                AutomationProperties.AutomationId="DatasetQAView_HelpBtn">
+          <FontIcon Glyph="&#xE897;" FontSize="14"/>
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- Content -->
+    <ScrollViewer Grid.Row="1">
+      <StackPanel Spacing="12">
+
+        <!-- Dataset Selection + Run -->
+        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16">
+          <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <FontIcon Glyph="&#xE8B7;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+              <TextBlock Text="Dataset" FontSize="13" FontWeight="SemiBold"
+                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+            </StackPanel>
+            <Grid ColumnSpacing="8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <ComboBox Grid.Column="0"
+                        ItemsSource="{x:Bind ViewModel.AvailableDatasets, Mode=OneWay}"
+                        SelectedItem="{x:Bind ViewModel.SelectedDatasetId, Mode=TwoWay}"
+                        PlaceholderText="Select a dataset..." HorizontalAlignment="Stretch"
+                        AutomationProperties.AutomationId="DatasetQAView_DatasetSelector"/>
+              <Button Grid.Column="1" Command="{x:Bind ViewModel.RunQACommand}"
+                      Style="{StaticResource VSQ.Button.Primary}"
+                      AutomationProperties.AutomationId="DatasetQAView_RunQABtn">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <FontIcon Glyph="&#xE768;" FontSize="14"/>
+                  <TextBlock Text="Run QA"/>
+                </StackPanel>
+              </Button>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- Quality Thresholds -->
+        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16">
+          <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <FontIcon Glyph="&#xE9D5;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+              <TextBlock Text="Quality Thresholds" FontSize="13" FontWeight="SemiBold"
+                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+              <Grid>
+                <TextBlock Text="Min Quality" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <TextBlock Text="{x:Bind ViewModel.MinQualityThreshold, Mode=OneWay}" FontSize="12"
+                           Foreground="{StaticResource VSQ.Text.PrimaryBrush}" HorizontalAlignment="Right"/>
+              </Grid>
+              <Slider Value="{x:Bind ViewModel.MinQualityThreshold, Mode=TwoWay}"
+                      Minimum="0" Maximum="1" StepFrequency="0.01"
+                      AutomationProperties.AutomationId="DatasetQAView_QualitySlider"/>
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+              <Grid>
+                <TextBlock Text="Min SNR (dB)" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <TextBlock Text="{x:Bind ViewModel.MinSnrThreshold, Mode=OneWay}" FontSize="12"
+                           Foreground="{StaticResource VSQ.Text.PrimaryBrush}" HorizontalAlignment="Right"/>
+              </Grid>
+              <Slider Value="{x:Bind ViewModel.MinSnrThreshold, Mode=TwoWay}"
+                      Minimum="0" Maximum="60" StepFrequency="1"
+                      AutomationProperties.AutomationId="DatasetQAView_SnrSlider"/>
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+              <Grid>
+                <TextBlock Text="Max LUFS" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <TextBlock Text="{x:Bind ViewModel.MaxLufsThreshold, Mode=OneWay}" FontSize="12"
+                           Foreground="{StaticResource VSQ.Text.PrimaryBrush}" HorizontalAlignment="Right"/>
+              </Grid>
+              <Slider Value="{x:Bind ViewModel.MaxLufsThreshold, Mode=TwoWay}"
+                      Minimum="-60" Maximum="0" StepFrequency="1"
+                      AutomationProperties.AutomationId="DatasetQAView_LufsSlider"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- QA Report Summary -->
+        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16"
+                Visibility="{x:Bind ViewModel.HasReport, Mode=OneWay}">
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <FontIcon Glyph="&#xE9D9;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+              <TextBlock Text="Report Summary" FontSize="13" FontWeight="SemiBold"
+                         Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+            </StackPanel>
+            <Grid ColumnSpacing="16" RowSpacing="8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0" Spacing="4">
+                <TextBlock Text="Pass Rate" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <TextBlock Text="{x:Bind ViewModel.QaReport.PassRateDisplay, Mode=OneWay, FallbackValue='--'}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                           AutomationProperties.AutomationId="DatasetQAView_PassRate"/>
+              </StackPanel>
+              <StackPanel Grid.Column="1" Spacing="4">
+                <TextBlock Text="Avg Quality" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <TextBlock Text="{x:Bind ViewModel.QaReport.AverageQualityDisplay, Mode=OneWay, FallbackValue='--'}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                           AutomationProperties.AutomationId="DatasetQAView_AvgQuality"/>
+              </StackPanel>
+              <StackPanel Grid.Column="2" Spacing="4">
+                <TextBlock Text="Avg SNR" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <TextBlock Text="{x:Bind ViewModel.QaReport.AverageSnrDisplay, Mode=OneWay, FallbackValue='--'}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                           AutomationProperties.AutomationId="DatasetQAView_AvgSnr"/>
+              </StackPanel>
+              <StackPanel Grid.Column="3" Spacing="4">
+                <TextBlock Text="Avg LUFS" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                <TextBlock Text="{x:Bind ViewModel.QaReport.AverageLufsDisplay, Mode=OneWay, FallbackValue='--'}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
+                           AutomationProperties.AutomationId="DatasetQAView_AvgLufs"/>
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- Clip Results -->
+        <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="16"
+                Visibility="{x:Bind ViewModel.HasReport, Mode=OneWay}">
+          <StackPanel Spacing="8">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon Glyph="&#xE8D6;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}"/>
+                <TextBlock Text="Clip Results" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+              </StackPanel>
+              <Button Grid.Column="1" Command="{x:Bind ViewModel.CullLowQualityCommand}"
+                      ToolTipService.ToolTip="Remove failing clips from dataset"
+                      AutomationProperties.AutomationId="DatasetQAView_CullBtn">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <FontIcon Glyph="&#xE74D;" FontSize="14"/>
+                  <TextBlock Text="Cull Low Quality"/>
+                </StackPanel>
+              </Button>
+            </Grid>
+            <ListView ItemsSource="{x:Bind ViewModel.ClipResults, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.SelectedClipResult, Mode=TwoWay}"
+                      MaxHeight="300" AutomationProperties.AutomationId="DatasetQAView_ClipResultsList">
+              <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:DatasetQAClipResult">
+                  <Grid Padding="8,6" ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{x:Bind ClipId}" FontSize="13" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{x:Bind QualityDisplay}" FontSize="12"
+                               VerticalAlignment="Center" Opacity="0.7"/>
+                    <TextBlock Grid.Column="2" Text="{x:Bind SnrDisplay}" FontSize="12"
+                               VerticalAlignment="Center" Opacity="0.7"/>
+                    <TextBlock Grid.Column="3" Text="{x:Bind LufsDisplay}" FontSize="12"
+                               VerticalAlignment="Center" Opacity="0.7"/>
+                    <TextBlock Grid.Column="4" Text="{x:Bind StatusDisplay}" FontSize="12"
+                               FontWeight="SemiBold" VerticalAlignment="Center"/>
+                  </Grid>
+                </DataTemplate>
+              </ListView.ItemTemplate>
+            </ListView>
+          </StackPanel>
+        </Border>
+
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- Error InfoBar -->
+    <InfoBar Grid.Row="2" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}" Severity="Error"
+             Title="Dataset QA Error"
+             Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, FallbackValue='An error occurred', TargetNullValue='An error occurred'}"
+             IsClosable="True" AutomationProperties.AutomationId="DatasetQAView_ErrorInfoBar"/>
+
+    <!-- Overlays -->
+    <controls:HelpOverlay x:Name="HelpOverlay" Grid.RowSpan="3" IsVisible="False" Visibility="Collapsed"/>
+    <controls:LoadingOverlay Grid.RowSpan="3" IsLoading="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                             AutomationProperties.AutomationId="DatasetQAView_LoadingOverlay"/>
+  </Grid>
+</UserControl>

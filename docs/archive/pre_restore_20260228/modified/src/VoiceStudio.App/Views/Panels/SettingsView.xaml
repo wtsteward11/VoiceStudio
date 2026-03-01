@@ -1,0 +1,679 @@
+<!--
+  SettingsView.xaml - Application settings panel
+  
+  AI GUIDELINES:
+  - Use {x:Bind ViewModel.Property, Mode=OneWay/TwoWay} for all bindings
+  - Always specify Mode explicitly (OneWay for display, TwoWay for input controls)
+  - DataTemplates must include x:DataType for compile-time checking
+  - Use StaticResource for theme resources (VSQ.* prefix)
+  - DO NOT use {Binding} without ElementName - prefer {x:Bind}
+  - Commands should use IRelayCommand/IAsyncRelayCommand patterns
+-->
+<UserControl x:Class="VoiceStudio.App.Views.Panels.SettingsView"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:controls="using:VoiceStudio.App.Controls"
+  xmlns:vm="using:VoiceStudio.App.ViewModels"
+  xmlns:converters="using:VoiceStudio.App.Converters"
+  xmlns:models="using:VoiceStudio.Core.Models"
+  mc:Ignorable="d"
+  d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel, IsDesignTimeCreatable=False}"
+  x:DataType="vm:SettingsViewModel">
+  <UserControl.Resources>
+    <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
+    <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
+    <converters:StringFormatConverter x:Key="StringFormatConverter" />
+    <Style x:Key="CategoryButtonStyle" TargetType="Button">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Padding" Value="{StaticResource VSQ.Spacing.Medium}" />
+      <Setter Property="Margin" Value="0,0,0,8" />
+      <Setter Property="Background" Value="{StaticResource VSQ.Panel.Background.HeaderBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource VSQ.Text.PrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource VSQ.Panel.BorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource VSQ.CornerRadius.Button}" />
+    </Style>
+    <Style x:Key="CategoryButtonActiveStyle" TargetType="Button"
+      BasedOn="{StaticResource CategoryButtonStyle}">
+      <Setter Property="Background" Value="{StaticResource VSQ.Accent.CyanBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource VSQ.Text.OnAccentBrush}" />
+    </Style>
+    <Style x:Key="SettingGroupStyle" TargetType="Border">
+      <Setter Property="Background" Value="{StaticResource VSQ.Panel.Background.DarkBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource VSQ.Panel.BorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource VSQ.CornerRadius.Panel}" />
+      <Setter Property="Padding" Value="{StaticResource VSQ.Spacing.Medium}" />
+      <Setter Property="Margin" Value="0,0,0,16" />
+    </Style>
+  </UserControl.Resources>
+  <Grid AutomationProperties.AutomationId="SettingsView_Root">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <!-- Header with Save/Reset buttons -->
+    <Border Grid.Row="0"
+      Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+      BorderBrush="{StaticResource VSQ.Panel.BorderBrush}"
+      BorderThickness="0,0,0,1"
+      Padding="{StaticResource VSQ.Spacing.Medium}">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Grid.Column="0"
+          Text="Settings"
+          Style="{StaticResource VSQ.Text.Title}"
+          VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal"
+          Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+          <Button Content="Save"
+            Command="{x:Bind ViewModel.SaveSettingsCommand, Mode=OneWay}"
+            IsEnabled="{x:Bind ViewModel.HasUnsavedChanges, Mode=OneWay}"
+            Margin="0,0,8,0"
+            AutomationProperties.AutomationId="SettingsView_SaveButton" />
+          <Button Content="Reset"
+            Command="{x:Bind ViewModel.ResetSettingsCommand, Mode=OneWay}"
+            AutomationProperties.AutomationId="SettingsView_ResetButton" />
+          <Button Content="?"
+            Click="HelpButton_Click"
+            Style="{StaticResource VSQ.Button.Icon}"
+            Margin="4,0,0,0" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Main content: Categories (left) + Settings panels (right) -->
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="200" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <!-- Category navigation (left sidebar) -->
+      <ScrollViewer Grid.Column="0"
+        Background="{StaticResource VSQ.Background.Darker}"
+        BorderBrush="{StaticResource VSQ.Panel.BorderBrush}"
+        BorderThickness="0,0,1,0">
+        <StackPanel Padding="{StaticResource VSQ.Spacing.Medium}">
+          <Button x:Name="GeneralCategory"
+            Content="General"
+            Tag="General"
+            Click="CategoryButton_Click"
+            RightTapped="CategoryButton_RightTapped"
+            Style="{StaticResource CategoryButtonStyle}"
+            AutomationProperties.AutomationId="SettingsView_GeneralCategoryButton" />
+          <Button x:Name="EngineCategory"
+            Content="Engine"
+            Tag="Engine"
+            Click="CategoryButton_Click"
+            RightTapped="CategoryButton_RightTapped"
+            Style="{StaticResource CategoryButtonStyle}"
+            AutomationProperties.AutomationId="SettingsView_EngineCategoryButton" />
+          <Button x:Name="AudioCategory"
+            Content="Audio"
+            Tag="Audio"
+            Click="CategoryButton_Click"
+            RightTapped="CategoryButton_RightTapped"
+            Style="{StaticResource CategoryButtonStyle}" />
+          <Button x:Name="TimelineCategory"
+            Content="Timeline"
+            Tag="Timeline"
+            Click="CategoryButton_Click"
+            RightTapped="CategoryButton_RightTapped"
+            Style="{StaticResource CategoryButtonStyle}" />
+          <Button x:Name="BackendCategory"
+            Content="Backend"
+            Tag="Backend"
+            Click="CategoryButton_Click"
+            RightTapped="CategoryButton_RightTapped"
+            Style="{StaticResource CategoryButtonStyle}" />
+          <Button x:Name="PerformanceCategory"
+            Content="Performance"
+            Tag="Performance"
+            Click="CategoryButton_Click"
+            RightTapped="CategoryButton_RightTapped"
+            Style="{StaticResource CategoryButtonStyle}" />
+          <Button x:Name="PluginsCategory"
+            Content="Plugins"
+            Tag="Plugins"
+            Click="CategoryButton_Click"
+            RightTapped="CategoryButton_RightTapped"
+            Style="{StaticResource CategoryButtonStyle}" />
+          <Button x:Name="McpCategory"
+            Content="MCP"
+            Tag="MCP"
+            Click="CategoryButton_Click"
+            RightTapped="CategoryButton_RightTapped"
+            Style="{StaticResource CategoryButtonStyle}" />
+          <Button x:Name="PrivacyCategory"
+            Content="Privacy"
+            Tag="Privacy"
+            Click="CategoryButton_Click"
+            RightTapped="CategoryButton_RightTapped"
+            Style="{StaticResource CategoryButtonStyle}"
+            AutomationProperties.AutomationId="SettingsView_PrivacyCategoryButton" />
+          <Button x:Name="SystemCategory"
+            Content="System"
+            Tag="System"
+            Click="CategoryButton_Click"
+            RightTapped="CategoryButton_RightTapped"
+            Style="{StaticResource CategoryButtonStyle}" />
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- Settings panels (right content area) -->
+      <ScrollViewer Grid.Column="1" Padding="{StaticResource VSQ.Spacing.Medium}">
+        <StackPanel>
+          <!-- General Settings Panel -->
+          <Border x:Name="GeneralPanel" Style="{StaticResource SettingGroupStyle}">
+            <StackPanel Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+              <TextBlock Text="General Settings" Style="{StaticResource VSQ.Text.Heading}"
+                Margin="0,0,0,8" />
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Theme:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{x:Bind ViewModel.AvailableThemes, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.Theme, Mode=TwoWay}"
+                  Width="200"
+                  AutomationProperties.AutomationId="SettingsView_ThemeComboBox" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Language:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{x:Bind ViewModel.AvailableLanguages, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.Language, Mode=TwoWay}"
+                  Width="200"
+                  AutomationProperties.AutomationId="SettingsView_LanguageComboBox" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Auto-save:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <ToggleSwitch IsOn="{x:Bind ViewModel.AutoSave, Mode=TwoWay}"
+                  AutomationProperties.AutomationId="SettingsView_AutoSaveToggle" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Auto-save interval (s):" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <NumberBox Value="{x:Bind ViewModel.AutoSaveInterval, Mode=TwoWay}"
+                  Minimum="30" Maximum="3600"
+                  Width="200" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- Engine Settings Panel -->
+          <Border x:Name="EnginePanel" Style="{StaticResource SettingGroupStyle}"
+            Visibility="Collapsed">
+            <StackPanel Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+              <TextBlock Text="Engine Settings" Style="{StaticResource VSQ.Text.Heading}"
+                Margin="0,0,0,8" />
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Default Audio Engine:" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{x:Bind ViewModel.AvailableAudioEngines, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.DefaultAudioEngine, Mode=TwoWay}"
+                  Width="200" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Default Image Engine:" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{x:Bind ViewModel.AvailableImageEngines, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.DefaultImageEngine, Mode=TwoWay}"
+                  Width="200" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Default Video Engine:" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{x:Bind ViewModel.AvailableVideoEngines, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.DefaultVideoEngine, Mode=TwoWay}"
+                  Width="200" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Quality Level (1-10):" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <Slider Value="{x:Bind ViewModel.QualityLevel, Mode=TwoWay}"
+                  Minimum="1" Maximum="10"
+                  TickFrequency="1" SnapsTo="Ticks"
+                  Width="200" />
+                <TextBlock Text="{x:Bind ViewModel.QualityLevel, Mode=OneWay}"
+                  Style="{StaticResource VSQ.Text.Caption}"
+                  VerticalAlignment="Center"
+                  Margin="8,0,0,0" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- Audio Settings Panel -->
+          <Border x:Name="AudioPanel" Style="{StaticResource SettingGroupStyle}"
+            Visibility="Collapsed">
+            <StackPanel Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+              <TextBlock Text="Audio Settings" Style="{StaticResource VSQ.Text.Heading}"
+                Margin="0,0,0,8" />
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Output Device:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <ComboBox Text="{x:Bind ViewModel.AudioOutputDevice, Mode=TwoWay}"
+                  Width="200"
+                  PlaceholderText="Select output device" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Input Device:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <ComboBox Text="{x:Bind ViewModel.AudioInputDevice, Mode=TwoWay}"
+                  Width="200"
+                  PlaceholderText="Select input device" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Sample Rate (Hz):" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <ComboBox SelectedItem="{x:Bind ViewModel.SampleRate, Mode=TwoWay}"
+                  Width="200">
+                  <x:Int32>44100</x:Int32>
+                  <x:Int32>48000</x:Int32>
+                  <x:Int32>96000</x:Int32>
+                </ComboBox>
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Buffer Size:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <ComboBox SelectedItem="{x:Bind ViewModel.BufferSize, Mode=TwoWay}"
+                  Width="200">
+                  <x:Int32>512</x:Int32>
+                  <x:Int32>1024</x:Int32>
+                  <x:Int32>2048</x:Int32>
+                  <x:Int32>4096</x:Int32>
+                </ComboBox>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- Timeline Settings Panel -->
+          <Border x:Name="TimelinePanel" Style="{StaticResource SettingGroupStyle}"
+            Visibility="Collapsed">
+            <StackPanel Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+              <TextBlock Text="Timeline Settings" Style="{StaticResource VSQ.Text.Heading}"
+                Margin="0,0,0,8" />
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Time Format:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{x:Bind ViewModel.AvailableTimeFormats, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.TimeFormat, Mode=TwoWay}"
+                  Width="200" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Snap Enabled:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <ToggleSwitch IsOn="{x:Bind ViewModel.SnapEnabled, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Snap Interval (s):" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <NumberBox Value="{x:Bind ViewModel.SnapInterval, Mode=TwoWay}"
+                  Minimum="0.01" Maximum="10.0"
+                  SmallChange="0.1"
+                  Width="200" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Grid Enabled:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <ToggleSwitch IsOn="{x:Bind ViewModel.GridEnabled, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Grid Interval (s):" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <NumberBox Value="{x:Bind ViewModel.GridInterval, Mode=TwoWay}"
+                  Minimum="0.1" Maximum="60.0"
+                  SmallChange="1.0"
+                  Width="200" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- Backend Settings Panel -->
+          <Border x:Name="BackendPanel" Style="{StaticResource SettingGroupStyle}"
+            Visibility="Collapsed">
+            <StackPanel Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+              <TextBlock Text="Backend Settings" Style="{StaticResource VSQ.Text.Heading}"
+                Margin="0,0,0,8" />
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="API URL:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <TextBox Text="{x:Bind ViewModel.ApiUrl, Mode=TwoWay}"
+                  Width="300"
+                  PlaceholderText="http://localhost:8000" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Timeout (s):" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <NumberBox Value="{x:Bind ViewModel.ApiTimeout, Mode=TwoWay}"
+                  Minimum="5" Maximum="300"
+                  Width="200" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Retry Count:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <NumberBox Value="{x:Bind ViewModel.ApiRetryCount, Mode=TwoWay}"
+                  Minimum="0" Maximum="10"
+                  Width="200" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- Performance Settings Panel -->
+          <Border x:Name="PerformancePanel" Style="{StaticResource SettingGroupStyle}"
+            Visibility="Collapsed">
+            <StackPanel Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+              <TextBlock Text="Performance Settings" Style="{StaticResource VSQ.Text.Heading}"
+                Margin="0,0,0,8" />
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Caching Enabled:" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <ToggleSwitch IsOn="{x:Bind ViewModel.CachingEnabled, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Cache Size (MB):" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <NumberBox Value="{x:Bind ViewModel.CacheSize, Mode=TwoWay}"
+                  Minimum="64" Maximum="4096"
+                  SmallChange="128"
+                  Width="200" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Max Threads:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <NumberBox Value="{x:Bind ViewModel.MaxThreads, Mode=TwoWay}"
+                  Minimum="1" Maximum="32"
+                  Width="200" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Memory Limit (MB):" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <NumberBox Value="{x:Bind ViewModel.MemoryLimit, Mode=TwoWay}"
+                  Minimum="512" Maximum="32768"
+                  SmallChange="512"
+                  Width="200" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- Plugins Settings Panel -->
+          <Border x:Name="PluginsPanel" Style="{StaticResource SettingGroupStyle}"
+            Visibility="Collapsed">
+            <StackPanel Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                  Text="Plugin Settings"
+                  Style="{StaticResource VSQ.Text.Heading}"
+                  Margin="0,0,0,8" />
+                <Button Grid.Column="1"
+                  Content="Refresh"
+                  Command="{x:Bind ViewModel.RefreshPluginsCommand, Mode=OneWay}" />
+              </Grid>
+
+              <ProgressRing IsActive="{x:Bind ViewModel.IsLoadingPlugins, Mode=OneWay}"
+                Visibility="{x:Bind ViewModel.IsLoadingPlugins, Mode=OneWay}"
+                Height="40" Width="40"
+                HorizontalAlignment="Center" />
+
+              <ListView ItemsSource="{x:Bind ViewModel.Plugins, Mode=OneWay}"
+                SelectedItem="{x:Bind ViewModel.SelectedPlugin, Mode=TwoWay}"
+                Visibility="{x:Bind ViewModel.IsLoadingPlugins, Mode=OneWay, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                <ListView.ItemTemplate>
+                  <DataTemplate x:DataType="models:PluginInfo">
+                    <Grid Padding="{StaticResource VSQ.Spacing.Small}">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <StackPanel Grid.Column="0">
+                        <TextBlock Text="{x:Bind Name, Mode=OneWay}" Style="{StaticResource VSQ.Text.Body}"
+                          FontWeight="SemiBold" />
+                        <TextBlock Text="{x:Bind Description, Mode=OneWay}"
+                          Style="{StaticResource VSQ.Text.Caption}"
+                          Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                        <TextBlock
+                          Text="{x:Bind Version, Mode=OneWay}"
+                          Style="{StaticResource VSQ.Text.Caption}"
+                          Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal"
+                        Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                        <TextBlock
+                          Text="{x:Bind IsInitialized, Mode=OneWay}"
+                          Style="{StaticResource VSQ.Text.Caption}"
+                          VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Grid>
+                  </DataTemplate>
+                </ListView.ItemTemplate>
+              </ListView>
+            </StackPanel>
+          </Border>
+
+          <!-- MCP Settings Panel -->
+          <Border x:Name="McpPanel" Style="{StaticResource SettingGroupStyle}"
+            Visibility="Collapsed">
+            <StackPanel Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+              <TextBlock Text="MCP Settings" Style="{StaticResource VSQ.Text.Heading}"
+                Margin="0,0,0,8" />
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="MCP Enabled:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <ToggleSwitch IsOn="{x:Bind ViewModel.McpEnabled, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Server URL:" Width="150" Style="{StaticResource VSQ.Text.Body}"
+                  VerticalAlignment="Center" />
+                <TextBox Text="{x:Bind ViewModel.McpServerUrl, Mode=TwoWay}"
+                  Width="300"
+                  PlaceholderText="http://localhost:8080" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- Privacy Settings Panel -->
+          <Border x:Name="PrivacyPanel" Style="{StaticResource SettingGroupStyle}"
+            Visibility="Collapsed">
+            <StackPanel Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+              <TextBlock Text="Privacy Settings" Style="{StaticResource VSQ.Text.Heading}"
+                Margin="0,0,0,8" />
+
+              <TextBlock Text="VoiceStudio respects your privacy. All data stays local by default."
+                Style="{StaticResource VSQ.Text.Body}"
+                Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                TextWrapping="Wrap"
+                Margin="0,0,0,16" />
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Usage Analytics:" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <ToggleSwitch IsOn="{x:Bind ViewModel.TelemetryEnabled, Mode=TwoWay}"
+                  AutomationProperties.AutomationId="SettingsView_TelemetryToggle" />
+              </StackPanel>
+
+              <TextBlock Text="Help improve VoiceStudio by sharing anonymous usage data. No personal information, audio files, or project content is ever collected."
+                Style="{StaticResource VSQ.Text.Caption}"
+                Foreground="{StaticResource VSQ.Text.TertiaryBrush}"
+                TextWrapping="Wrap"
+                Margin="150,0,0,16" />
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Error Reporting:" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <ToggleSwitch IsOn="{x:Bind ViewModel.CrashReportingEnabled, Mode=TwoWay}" />
+              </StackPanel>
+
+              <TextBlock Text="Automatically send crash reports to help diagnose issues. Reports contain only technical error information."
+                Style="{StaticResource VSQ.Text.Caption}"
+                Foreground="{StaticResource VSQ.Text.TertiaryBrush}"
+                TextWrapping="Wrap"
+                Margin="150,0,0,16" />
+
+              <HyperlinkButton Content="View Privacy Policy"
+                NavigateUri="https://voicestudio.dev/privacy"
+                Margin="0,8,0,0" />
+            </StackPanel>
+          </Border>
+
+          <!-- System Settings Panel -->
+          <Border x:Name="SystemPanel" Style="{StaticResource SettingGroupStyle}"
+            Visibility="Collapsed">
+            <StackPanel Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                  Text="System &amp; Dependencies"
+                  Style="{StaticResource VSQ.Text.Heading}"
+                  Margin="0,0,0,8" />
+                <Button Grid.Column="1"
+                  Content="Refresh"
+                  Command="{x:Bind ViewModel.RefreshDependencyStatusCommand, Mode=OneWay}" />
+              </Grid>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Large}">
+                <TextBlock
+                  Text="{x:Bind ViewModel.InstalledDependencies, Mode=OneWay}"
+                  Style="{StaticResource VSQ.Text.Body}" />
+                <TextBlock
+                  Text="{x:Bind ViewModel.MissingDependencies, Mode=OneWay}"
+                  Style="{StaticResource VSQ.Text.Body}" />
+                <TextBlock
+                  Text="{x:Bind ViewModel.TotalDependencies, Mode=OneWay}"
+                  Style="{StaticResource VSQ.Text.Body}" />
+              </StackPanel>
+
+              <ListView ItemsSource="{x:Bind ViewModel.DependencyStatusList, Mode=OneWay}">
+                <ListView.ItemTemplate>
+                  <DataTemplate x:DataType="vm:DependencyStatusItem">
+                    <Grid Padding="{StaticResource VSQ.Spacing.Small}">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <StackPanel Grid.Column="0">
+                        <TextBlock Text="{x:Bind Name, Mode=OneWay}" Style="{StaticResource VSQ.Text.Body}"
+                          FontWeight="SemiBold" />
+                        <TextBlock Text="{x:Bind Description, Mode=OneWay}"
+                          Style="{StaticResource VSQ.Text.Caption}"
+                          Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                        <TextBlock
+                          Text="{x:Bind Category, Mode=OneWay}"
+                          Style="{StaticResource VSQ.Text.Caption}"
+                          Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                      </StackPanel>
+                      <Border Grid.Column="1"
+                        Background="{x:Bind StatusBrush, Mode=OneWay}"
+                        CornerRadius="4"
+                        Padding="8,4"
+                        VerticalAlignment="Center">
+                        <TextBlock Text="{x:Bind Status, Mode=OneWay}" Style="{StaticResource VSQ.Text.Caption}" />
+                      </Border>
+                    </Grid>
+                  </DataTemplate>
+                </ListView.ItemTemplate>
+              </ListView>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+
+    <!-- Status bar -->
+    <Border Grid.Row="2"
+      Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+      BorderBrush="{StaticResource VSQ.Panel.BorderBrush}"
+      BorderThickness="0,1,0,0"
+      Padding="{StaticResource VSQ.Spacing.Medium}">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Grid.Column="0"
+          Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+          Style="{StaticResource VSQ.Text.Caption}"
+          Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+        <TextBlock Grid.Column="1"
+          Text="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+          Style="{StaticResource VSQ.Text.Caption}"
+          Foreground="Red"
+          Visibility="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}}" />
+      </Grid>
+    </Border>
+
+    <!-- Help Overlay -->
+    <controls:HelpOverlay x:Name="HelpOverlay"
+      IsVisible="False"
+      Visibility="Collapsed" />
+  </Grid>
+</UserControl>

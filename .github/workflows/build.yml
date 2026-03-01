@@ -16,6 +16,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Verify no repo path patterns
+        run: powershell -ExecutionPolicy Bypass -File tools/build/Verify-NoRepoPaths.ps1
+
       - name: Verify build config integrity
         run: |
           powershell -ExecutionPolicy Bypass -File tools/build/Verify-BuildConfigLock.ps1
@@ -418,6 +421,11 @@ jobs:
           if [ -f requirements_engines.txt ]; then pip install -r requirements_engines.txt; fi
           if [ -f requirements_missing_libraries.txt ]; then pip install -r requirements_missing_libraries.txt; fi
 
+      - name: CI guardrails (route boundaries + repo payloads)
+        run: |
+          python scripts/ci/check_route_boundaries.py
+          python scripts/ci/check_repo_payloads.py
+
       - name: Verify Python installation
         run: |
           python --version
@@ -427,6 +435,9 @@ jobs:
         run: |
           python -m py_compile backend/api/main.py
           find backend -name "*.py" -exec python -m py_compile {} \;
+
+      - name: Check trust & safety policy wiring
+        run: python scripts/ci/check_policy_wiring.py
 
       - name: Validate OpenAPI contract
         run: |

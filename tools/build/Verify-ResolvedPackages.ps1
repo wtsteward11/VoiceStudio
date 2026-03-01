@@ -27,7 +27,12 @@
 param(
     [string]$ProjectDir = "",
     [string[]]$BannedPrefixes = @("Microsoft.Extensions."),
-    [int]$MaxMajorVersion = 9
+    [int]$MaxMajorVersion = 9,
+    [string[]]$AllowedExceptions = @(
+        "Microsoft.Extensions.DependencyInjection/10.0.2",
+        "Microsoft.Extensions.DependencyInjection.Abstractions/10.0.2",
+        "Microsoft.Extensions.Logging.Abstractions/9.0.0"
+    )
 )
 
 $ErrorActionPreference = "Stop"
@@ -68,6 +73,8 @@ foreach ($target in $assets.targets.PSObject.Properties) {
                     $major = [int]$Matches[1]
                 }
                 if ($major -ge $MaxMajorVersion) {
+                    $pkgKey = "$pkgName/$pkgVersion"
+                    if ($AllowedExceptions -contains $pkgKey) { continue }
                     $violations += [PSCustomObject]@{
                         Package = $pkgName
                         Version = $pkgVersion

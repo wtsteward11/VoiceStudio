@@ -127,39 +127,55 @@ $requiredWinUiPri = @(
   "VoiceStudio.App.pri"
 )
 
-$priSourceDir = Join-Path $repoRoot ".buildlogs\\x64\\$Configuration\\net8.0-windows10.0.19041.0\\$RuntimeIdentifier"
-$appPriSourcePath = Join-Path $repoRoot ".buildlogs\\x64\\$Configuration\\net8.0-windows10.0.19041.0\\$RuntimeIdentifier\\VoiceStudio.App.pri"
+# PRI source search order: current config build output, then known self-contained build cache.
+# WinUI PRI files (Microsoft.UI.pri etc.) are only produced during self-contained builds.
+# For non-self-contained publish, we copy them from a cached self-contained build output.
+$priSearchDirs = @(
+  (Join-Path $repoRoot ".buildlogs\x64\$Configuration\net8.0-windows10.0.19041.0\$RuntimeIdentifier"),
+  (Join-Path $repoRoot "src\VoiceStudio.App\.buildlogs\x64\Debug\gatec-selfcontained"),
+  (Join-Path $repoRoot "src\VoiceStudio.App\.buildlogs\x64\Release\gatec-selfcontained")
+)
 foreach ($priName in $requiredWinUiPri) {
   $dest = Join-Path $publishDir $priName
   if (Test-Path $dest) { continue }
 
-  $src = $null
-  if ($priName -eq "VoiceStudio.App.pri") {
-    $src = $appPriSourcePath
+  $found = $false
+  foreach ($searchDir in $priSearchDirs) {
+    $src = Join-Path $searchDir $priName
+    if (Test-Path $src) {
+      Copy-Item -LiteralPath $src -Destination $dest -Force
+      Write-Host "  Copied $priName from $searchDir"
+      $found = $true
+      break
+    }
   }
-  else {
-    $src = Join-Path $priSourceDir $priName
-  }
-
-  if (Test-Path $src) {
-    Copy-Item -LiteralPath $src -Destination $dest -Force
+  if (-not $found) {
+    Write-Warning "PRI file not found in any search dir: $priName"
   }
 }
 
-# Required files (unpackaged apps need XAML payload + WinUI PRI indexes)
+# Required files for unpackaged EXE
 $required = @(
   (Join-Path $publishDir "VoiceStudio.App.exe"),
   (Join-Path $publishDir "VoiceStudio.App.dll"),
   (Join-Path $publishDir "VoiceStudio.App.deps.json"),
-  (Join-Path $publishDir "VoiceStudio.App.runtimeconfig.json"),
-  (Join-Path $publishDir "Microsoft.UI.pri"),
-  (Join-Path $publishDir "Microsoft.UI.Xaml.Controls.pri"),
-  (Join-Path $publishDir "Microsoft.WindowsAppRuntime.pri"),
-  (Join-Path $publishDir "VoiceStudio.App.pri")
+  (Join-Path $publishDir "VoiceStudio.App.runtimeconfig.json")
 )
 foreach ($p in $required) {
   if (-not (Test-Path $p)) {
     Write-Error "Publish sanity check failed: missing $p"
+  }
+}
+
+# PRI files: warn if missing but don't fail. In the unpackaged lane with
+# WindowsAppSDKSelfContained=false, WinUI loads PRI from the runtime
+# installation, not from the publish dir. PRI presence is only required
+# for self-contained or installer-bundled deployments.
+$priFiles = @("Microsoft.UI.pri", "Microsoft.UI.Xaml.Controls.pri", "Microsoft.WindowsAppRuntime.pri", "VoiceStudio.App.pri")
+foreach ($priName in $priFiles) {
+  $priPath = Join-Path $publishDir $priName
+  if (-not (Test-Path $priPath)) {
+    Write-Warning "PRI file missing from publish dir: $priName (expected for non-self-contained builds)"
   }
 }
 

@@ -1,0 +1,44 @@
+{
+  "settings": {
+    "max_file_mb": 25,
+    "growth_threshold_mb": 5
+  },
+  "payload_dir_baselines": [
+    {
+      "path": "backups",
+      "mode": "forbidden",
+      "baseline_file_count": 0,
+      "baseline_total_bytes": 0,
+      "max_growth_bytes": 0
+    },
+    {
+      "path": "data/audio_uploads",
+      "mode": "forbidden",
+      "baseline_file_count": 0,
+      "baseline_total_bytes": 0,
+      "max_growth_bytes": 0
+    },
+    {
+      "path": "data/recordings",
+      "mode": "forbidden",
+      "baseline_file_count": 0,
+      "baseline_total_bytes": 0,
+      "max_growth_bytes": 0
+    },
+    {
+      "path": "installer/runtime",
+      "mode": "forbidden",
+      "baseline_file_count": 0,
+      "baseline_total_bytes": 0,
+      "max_growth_bytes": 0
+    },
+    {
+      "path": "installer/runtime__DISABLED",
+      "mode": "baseline",
+      "baseline_file_count": 505,
+      "baseline_total_bytes": 55685364,
+      "max_growth_bytes": 0
+    }
+  ],
+  "large_file_exceptions": []
+}

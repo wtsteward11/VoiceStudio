@@ -179,7 +179,7 @@ def test_validate_proof_bad_timestamp(tmp_path: Path) -> None:
 
 
 def test_validate_proof_git_commit_mismatch(tmp_path: Path) -> None:
-    """git_commit mismatch fails when not in allowlist (mock git)."""
+    """git_commit mismatch fails (mock git; no allowlist bypass)."""
     proof_dir = tmp_path / "docs" / "reports" / "verification"
     proof_dir.mkdir(parents=True)
     proof_file = proof_dir / "PROOF_PROVENANCE_2026-03-02.json"
@@ -238,31 +238,137 @@ def test_validate_proof_historical_skips_git_match(tmp_path: Path) -> None:
     assert len(errs) == 0
 
 
-def test_validate_proof_allowlist_skips_git_match(tmp_path: Path) -> None:
-    """Path in historical_proof_allowlist skips git_commit match."""
+def test_validate_proof_gate_c_ui_smoke_exit_code_nonzero_fails(tmp_path: Path) -> None:
+    """PROOF_GATE_C with ui_smoke.exit_code != 0 fails nested validation."""
     proof_dir = tmp_path / "docs" / "reports" / "verification"
     proof_dir.mkdir(parents=True)
-    proof_file = proof_dir / "PROOF_PROVENANCE_2026-03-02.json"
+    proof_file = proof_dir / "PROOF_GATE_C_2026-03-02.json"
     proof_file.write_text(
         json.dumps({
-            "command": "pytest tests/unit/test_foo.py -q",
+            "command": ".\\scripts\\gatec-publish-launch.ps1 -UiSmoke",
             "exit_code": 0,
             "timestamp": "2026-03-02T12:00:00Z",
             "git_commit": "a" * 40,
             "git_branch": "main",
-            "stdout": "",
-            "stderr": "",
+            "ui_smoke": {"exit_code": 1, "nav_steps_completed": 0, "binding_failure_count": 0},
+            "gatec_log": "log content",
         }),
         encoding="utf-8",
     )
     schema = {
         "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch"],
-        "type_specific": {"PROOF_PROVENANCE": {"required": ["stdout", "stderr"]}},
-        "historical_proof_allowlist": ["docs/reports/verification/PROOF_PROVENANCE_2026-03-02.json"],
+        "type_specific": {"PROOF_GATE_C": {"required": ["ui_smoke", "gatec_log"]}},
+        "nested_semantics": {"PROOF_GATE_C": {"ui_smoke.exit_code": 0}},
     }
     with patch.object(check_module, "ROOT", tmp_path):
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = type("R", (), {"returncode": 0, "stdout": "b" * 40})()
-            errs = check_module.validate_proof(proof_file, schema, no_git_match=False)
-    assert not any("does not match HEAD" in e for e in errs)
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
+    assert any("ui_smoke.exit_code" in e for e in errs)
+    assert any("must be 0" in e for e in errs)
+
+
+def test_validate_proof_gate_c_ui_smoke_exit_code_zero_passes(tmp_path: Path) -> None:
+    """PROOF_GATE_C with ui_smoke.exit_code == 0 passes nested check."""
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True)
+    proof_file = proof_dir / "PROOF_GATE_C_2026-03-02.json"
+    proof_file.write_text(
+        json.dumps({
+            "command": ".\\scripts\\gatec-publish-launch.ps1 -UiSmoke",
+            "exit_code": 0,
+            "timestamp": "2026-03-02T12:00:00Z",
+            "git_commit": "a" * 40,
+            "git_branch": "main",
+            "ui_smoke": {"exit_code": 0, "nav_steps_completed": 0, "binding_failure_count": 0},
+            "gatec_log": "log content",
+        }),
+        encoding="utf-8",
+    )
+    schema = {
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch"],
+        "type_specific": {"PROOF_GATE_C": {"required": ["ui_smoke", "gatec_log"]}},
+        "nested_semantics": {"PROOF_GATE_C": {"ui_smoke.exit_code": 0}},
+    }
+    with patch.object(check_module, "ROOT", tmp_path):
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
     assert len(errs) == 0
+
+
+def test_validate_proof_installer_missing_step_fails(tmp_path: Path) -> None:
+    """PROOF_INSTALLER missing a required step fails nested validation."""
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True)
+    proof_file = proof_dir / "PROOF_INSTALLER_2026-03-02.json"
+    proof_file.write_text(
+        json.dumps({
+            "command": ".\\installer\\test-installer-lifecycle.ps1",
+            "exit_code": 0,
+            "timestamp": "2026-03-02T12:00:00Z",
+            "git_commit": "a" * 40,
+            "git_branch": "main",
+            "results": {
+                "InstallV1": "PASS",
+                "LaunchV1": "PASS",
+            },
+            "all_passed": True,
+        }),
+        encoding="utf-8",
+    )
+    schema = {
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch"],
+        "type_specific": {"PROOF_INSTALLER": {"required": ["results", "all_passed"]}},
+        "nested_semantics": {
+            "PROOF_INSTALLER": {
+                "results_required_keys": [
+                    "InstallV1", "LaunchV1", "UpgradeV1ToV2", "LaunchV2",
+                    "RollbackV2ToV1", "LaunchV1AfterRollback", "UninstallV1",
+                ],
+                "results_all_pass_when_all_passed_true": True,
+            },
+        },
+    }
+    with patch.object(check_module, "ROOT", tmp_path):
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
+    assert any("results missing required keys" in e for e in errs)
+
+
+def test_validate_proof_installer_step_fail_when_all_passed_fails(tmp_path: Path) -> None:
+    """PROOF_INSTALLER with all_passed true but one step FAIL fails nested validation."""
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True)
+    proof_file = proof_dir / "PROOF_INSTALLER_2026-03-02.json"
+    proof_file.write_text(
+        json.dumps({
+            "command": ".\\installer\\test-installer-lifecycle.ps1",
+            "exit_code": 0,
+            "timestamp": "2026-03-02T12:00:00Z",
+            "git_commit": "a" * 40,
+            "git_branch": "main",
+            "results": {
+                "InstallV1": "PASS",
+                "LaunchV1": "PASS",
+                "UpgradeV1ToV2": "PASS",
+                "LaunchV2": "PASS",
+                "RollbackV2ToV1": "PASS",
+                "LaunchV1AfterRollback": "PASS",
+                "UninstallV1": "FAIL",
+            },
+            "all_passed": True,
+        }),
+        encoding="utf-8",
+    )
+    schema = {
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch"],
+        "type_specific": {"PROOF_INSTALLER": {"required": ["results", "all_passed"]}},
+        "nested_semantics": {
+            "PROOF_INSTALLER": {
+                "results_required_keys": [
+                    "InstallV1", "LaunchV1", "UpgradeV1ToV2", "LaunchV2",
+                    "RollbackV2ToV1", "LaunchV1AfterRollback", "UninstallV1",
+                ],
+                "results_all_pass_when_all_passed_true": True,
+            },
+        },
+    }
+    with patch.object(check_module, "ROOT", tmp_path):
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
+    assert any("all_passed=true but results not all PASS" in e for e in errs)

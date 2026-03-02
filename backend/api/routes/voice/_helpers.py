@@ -32,6 +32,10 @@ from ...exceptions import InvalidEngineException
 from ...middleware.correlation_id import get_correlation_id, get_span_id, get_trace_id
 from ...models_additional import QualityMetrics, VoiceCloneResponse
 from backend.services.audio_download_service import download_audio_to_temp
+from backend.services.audio_artifacts.use_cases import (
+    create_audio_artifact_from_file,
+    create_audio_artifact_from_wav_array,
+)
 
 from . import _shared
 from ._shared import (
@@ -251,38 +255,6 @@ def _cleanup_old_audio_files():
 
     if to_remove:
         logger.info(f"Cleaned up {len(to_remove)} old audio files from storage")
-
-
-def _register_audio_file(
-    audio_id: str,
-    file_path: str,
-    *,
-    project_id: str | None = None,
-    source: str | None = None,
-):
-    """
-    Register an audio file in storage. Single source of truth: _audio_registry.
-
-    Args:
-        audio_id: Unique audio identifier
-        file_path: Path to audio file
-    """
-    cached_path, _ = _audio_registry.register_file(
-        audio_id, file_path, project_id=project_id, source=source
-    )
-    try:
-        # If we cached a copy, remove the original temp output to avoid orphaning files.
-        if os.path.abspath(cached_path) != os.path.abspath(file_path):
-            tmp_root = os.path.abspath(tempfile.gettempdir())
-            src_dir = os.path.abspath(os.path.dirname(file_path))
-            if src_dir.startswith(tmp_root) and os.path.exists(file_path):
-                os.remove(file_path)
-    except OSError as cleanup_err:
-        logger.debug(f"Failed to clean up temp file {file_path}: {cleanup_err}")
-
-    # Periodically clean up old files
-    if len(_audio_registry.to_dict()) > AUDIO_STORAGE_MAX_SIZE:
-        _cleanup_old_audio_files()
 
 
 def _save_audio_to_project(project_id: str, audio_id: str, source_path: str) -> str:
@@ -586,10 +558,10 @@ async def _perform_synthesis_with_retry(
     # Try fallback to utility TTS if all main engine attempts failed
     if result is None and synthesis_error is not None:
         result = await _try_utility_tts_fallback(
-            text_to_synthesize, language, output_path, synthesis_error
+            text_to_synthesize, language, synthesis_error
         )
-        if result is not None or os.path.exists(output_path):
-            return result, None  # Fallback succeeded
+        if result is not None:
+            return result, None  # Fallback succeeded (result is dict)
 
     return result, synthesis_error
 
@@ -597,68 +569,78 @@ async def _perform_synthesis_with_retry(
 async def _try_utility_tts_fallback(
     text: str,
     language: str,
-    output_path: str,
     original_error: Exception,
-) -> Any | None:
+) -> dict[str, Any] | None:
     """
     Try gTTS and pyttsx3 as fallback TTS when main engine fails.
 
-    Args:
-        text: Text to synthesize
-        language: Language code
-        output_path: Output file path
-        original_error: The error from the main engine
+    Returns artifact info via create_audio_artifact_from_wav_array (no sf.write in routes).
 
     Returns:
-        None (file saved to output_path) on success, or None with no file on failure
+        {"audio_id": ..., "cached_path": ..., "duration": ...} on success, None on failure
     """
     try:
         from backend.tts.tts_utils import synthesize_with_utility
 
-        logger.warning(f"Main engine failed, trying utility TTS fallback: {original_error}")
+        logger.warning("Main engine failed, trying utility TTS fallback: %s", original_error)
 
-        # Try gTTS as fallback
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
+            fallback_mp3 = tmp_mp3.name
         try:
-            fallback_output = tempfile.mktemp(suffix=".mp3")
             synthesize_with_utility(
                 text,
                 utility="gtts",
                 language=language or "en",
-                output_path=fallback_output,
+                output_path=fallback_mp3,
             )
-            # Convert MP3 to WAV if needed
             try:
                 import soundfile as sf
 
-                audio, sr = sf.read(fallback_output)
-                sf.write(output_path, audio, sr)
-                logger.info("Fallback to gTTS successful")
-                return None  # File saved
-            except ImportError:
-                import shutil
-
-                shutil.copy(fallback_output, output_path)
-                logger.info("Fallback to gTTS successful (MP3 format)")
-                return None
-        except Exception as gtts_error:
-            logger.warning(f"gTTS fallback failed: {gtts_error}")
-
-            # Try pyttsx3 as last resort
-            try:
-                fallback_output = tempfile.mktemp(suffix=".wav")
-                synthesize_with_utility(
-                    text,
-                    utility="pyttsx3",
-                    output_path=fallback_output,
+                audio, sr = sf.read(fallback_mp3)
+                duration = len(audio) / float(sr) if sr else 0.0
+                aid, cached_path, _ = create_audio_artifact_from_wav_array(
+                    audio, sr, created_by="gtts_fallback"
                 )
-                import shutil
+                logger.info("Fallback to gTTS successful")
+                return {"audio_id": aid, "cached_path": cached_path, "duration": duration}
+            except ImportError:
+                aid, cached_path, _ = create_audio_artifact_from_file(
+                    fallback_mp3, created_by="gtts_fallback", delete_source=False
+                )
+                duration = 0.0
+                logger.info("Fallback to gTTS successful (MP3 format)")
+                return {"audio_id": aid, "cached_path": cached_path, "duration": duration}
+        except Exception as gtts_error:
+            logger.warning("gTTS fallback failed: %s", gtts_error)
+        finally:
+            try:
+                os.unlink(fallback_mp3)
+            except OSError:
+                pass
 
-                shutil.copy(fallback_output, output_path)
-                logger.info("Fallback to pyttsx3 successful")
-                return None  # File saved
-            except Exception as pyttsx3_error:
-                logger.warning(f"pyttsx3 fallback also failed: {pyttsx3_error}")
-                return None
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav:
+            fallback_wav = tmp_wav.name
+        try:
+            synthesize_with_utility(
+                text,
+                utility="pyttsx3",
+                output_path=fallback_wav,
+            )
+            aid, cached_path, _ = create_audio_artifact_from_file(
+                fallback_wav, created_by="pyttsx3_fallback", delete_source=True
+            )
+            duration = 0.0
+            logger.info("Fallback to pyttsx3 successful")
+            return {"audio_id": aid, "cached_path": cached_path, "duration": duration}
+        except Exception as pyttsx3_error:
+            logger.warning("pyttsx3 fallback also failed: %s", pyttsx3_error)
+            return None
+        finally:
+            try:
+                if os.path.exists(fallback_wav):
+                    os.unlink(fallback_wav)
+            except OSError:
+                pass
     except ImportError:
         logger.debug("TTS utilities not available for fallback")
         return None

@@ -88,6 +88,64 @@ def get_required_keys(schema: dict, proof_type: str) -> list[str]:
     return list(common) + list(extra)
 
 
+def validate_nested_semantics(
+    path: Path,
+    data: dict,
+    proof_type: str,
+    schema: dict,
+) -> list[str]:
+    """
+    Validate nested semantics per proof type. Return list of error messages (empty if valid).
+    """
+    errors: list[str] = []
+    nested = schema.get("nested_semantics", {}).get(proof_type)
+    if not nested:
+        return []
+
+    if proof_type == "PROOF_GATE_C":
+        expected_exit = nested.get("ui_smoke.exit_code")
+        if expected_exit is not None:
+            ui_smoke = data.get("ui_smoke")
+            if not isinstance(ui_smoke, dict):
+                errors.append(
+                    f"{path.relative_to(ROOT)}: ui_smoke must be object for nested validation"
+                )
+            else:
+                ec = ui_smoke.get("exit_code")
+                if ec != expected_exit:
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: ui_smoke.exit_code must be {expected_exit}, got {ec}"
+                    )
+
+    elif proof_type == "PROOF_INSTALLER":
+        required_keys = nested.get("results_required_keys", [])
+        if required_keys:
+            results = data.get("results")
+            if not isinstance(results, dict):
+                errors.append(
+                    f"{path.relative_to(ROOT)}: results must be object for nested validation"
+                )
+            else:
+                missing = [k for k in required_keys if k not in results]
+                if missing:
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: results missing required keys: {missing}"
+                    )
+                elif nested.get("results_all_pass_when_all_passed_true") and data.get(
+                    "all_passed"
+                ):
+                    failed = [
+                        k for k, v in results.items()
+                        if v != "PASS"
+                    ]
+                    if failed:
+                        errors.append(
+                            f"{path.relative_to(ROOT)}: all_passed=true but results not all PASS: {failed}"
+                        )
+
+    return errors
+
+
 def validate_types(data: dict, key: str, expected: str) -> str | None:
     """Return error message if type mismatch, else None."""
     val = data.get(key)
@@ -148,6 +206,10 @@ def validate_proof(
         if key in data and (err := validate_types(data, key, expected)):
             errors.append(f"{path.relative_to(ROOT)}: {err}")
 
+    # Nested semantics (M10)
+    nested_errs = validate_nested_semantics(path, data, proof_type, schema)
+    errors.extend(nested_errs)
+
     if errors:
         return errors
 
@@ -180,12 +242,9 @@ def validate_proof(
             )
             head = result.stdout.strip() if result.returncode == 0 else ""
             if head and gc and gc.lower() != head.lower():
-                allowlist = schema.get("historical_proof_allowlist", [])
-                rel = str(path.relative_to(ROOT)).replace("\\", "/")
-                if rel not in allowlist:
-                    errors.append(
-                        f"{path.relative_to(ROOT)}: git_commit {gc[:8]}... does not match HEAD {head[:8]}..."
-                    )
+                errors.append(
+                    f"{path.relative_to(ROOT)}: git_commit {gc[:8]}... does not match HEAD {head[:8]}..."
+                )
         except (subprocess.TimeoutExpired, FileNotFoundError):
             pass  # Skip if git unavailable
 

@@ -6,6 +6,7 @@ Follows local-first principle with environment variable overrides.
 
 Environment Variables:
     VOICESTUDIO_MODELS_PATH: Base models directory
+    VOICESTUDIO_PAYLOADS_ROOT: External payload root (M8; large binaries)
     VOICESTUDIO_FFMPEG_PATH: FFmpeg executable path
     VOICESTUDIO_CACHE_PATH: Cache directory
     VOICESTUDIO_LOGS_PATH: Logs directory
@@ -32,6 +33,60 @@ from pathlib import Path
 
 class PathResolutionError(RuntimeError):
     """Raised when path resolution fails."""
+
+
+def get_payloads_root() -> Path:
+    """
+    Return the external payload root (M8 Repo Payload Detox).
+
+    Heavyweight binaries (test assets, models, installer output) live here.
+    Resolution order:
+    1. VOICESTUDIO_PAYLOADS_ROOT environment variable
+    2. Windows: %LOCALAPPDATA%\\VoiceStudioPayloads
+    3. Other: ~/.voicestudio/payloads
+
+    Returns:
+        Path to payload root (not created; caller creates as needed)
+    """
+    env_path = os.getenv("VOICESTUDIO_PAYLOADS_ROOT")
+    if env_path:
+        return Path(env_path)
+    if os.name == "nt":
+        localappdata = os.getenv("LOCALAPPDATA", os.path.expanduser("~"))
+        return Path(localappdata) / "VoiceStudioPayloads"
+    return Path(os.path.expanduser("~/.voicestudio/payloads"))
+
+
+def resolve_payload_path(repo_relative_path: Path | str, repo_root: Path) -> Path:
+    """
+    Resolve a repo-relative path to the actual file, following pointer files if present.
+
+    When a file has been migrated (M8), the original is replaced by a
+    .payload_pointer.json file. This function returns the payload path when
+    a pointer exists, otherwise the in-repo path.
+
+    Args:
+        repo_relative_path: Path relative to repo root (e.g. tests/assets/canonical/standard/allan_watts.wav)
+        repo_root: Project root directory
+
+    Returns:
+        Path to the actual file (in-repo or in payload root)
+    """
+    path = Path(repo_relative_path) if isinstance(repo_relative_path, str) else repo_relative_path
+    in_repo = repo_root / path
+    if in_repo.exists() and in_repo.is_file():
+        return in_repo
+    pointer_path = repo_root / (str(path).replace("\\", "/") + ".payload_pointer.json")
+    if pointer_path.exists() and pointer_path.is_file():
+        try:
+            import json
+            data = json.loads(pointer_path.read_text(encoding="utf-8"))
+            payload_path = data.get("payload_path")
+            if payload_path:
+                return Path(payload_path)
+        except (json.JSONDecodeError, OSError, KeyError):
+            pass
+    return in_repo
 
 
 def get_models_path() -> Path:
@@ -141,6 +196,7 @@ def get_path(path_type: str) -> Path:
         - "output": Default output directory (GAP-PY-002)
         - "bin": Executables/binaries directory (GAP-PY-002)
         - "plugins": Plugins directory (GAP-PY-002)
+        - "payloads": External payload root (M8; VOICESTUDIO_PAYLOADS_ROOT)
 
     Args:
         path_type: Type of path to resolve
@@ -208,6 +264,42 @@ def get_path(path_type: str) -> Path:
             path = Path(appdata) / "VoiceStudio" / "data"
         else:
             path = Path(os.path.expanduser("~/.voicestudio/data"))
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    elif path_type_lower == "audio_uploads":
+        env_path = os.getenv("VOICESTUDIO_AUDIO_UPLOADS_PATH")
+        if env_path:
+            path = Path(env_path)
+        elif os.name == "nt":
+            localappdata = os.getenv("LOCALAPPDATA", os.path.expanduser("~"))
+            path = Path(localappdata) / "VoiceStudio" / "audio_uploads"
+        else:
+            path = Path(os.path.expanduser("~/.voicestudio/audio_uploads"))
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    elif path_type_lower == "backups":
+        env_path = os.getenv("VOICESTUDIO_BACKUPS_PATH")
+        if env_path:
+            path = Path(env_path)
+        elif os.name == "nt":
+            localappdata = os.getenv("LOCALAPPDATA", os.path.expanduser("~"))
+            path = Path(localappdata) / "VoiceStudio" / "backups"
+        else:
+            path = Path(os.path.expanduser("~/.voicestudio/backups"))
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    elif path_type_lower == "recordings":
+        env_path = os.getenv("VOICESTUDIO_RECORDINGS_PATH")
+        if env_path:
+            path = Path(env_path)
+        elif os.name == "nt":
+            localappdata = os.getenv("LOCALAPPDATA", os.path.expanduser("~"))
+            path = Path(localappdata) / "VoiceStudio" / "recordings"
+        else:
+            path = Path(os.path.expanduser("~/.voicestudio/recordings"))
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -281,6 +373,9 @@ def get_path(path_type: str) -> Path:
             path = Path(os.path.expanduser("~/.voicestudio/plugins"))
         path.mkdir(parents=True, exist_ok=True)
         return path
+
+    elif path_type_lower == "payloads":
+        return get_payloads_root()
 
     else:
         raise ValueError(f"Unknown path type: {path_type}")

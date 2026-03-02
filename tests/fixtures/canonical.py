@@ -10,15 +10,24 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from backend.config.path_config import resolve_payload_path
+
 # Base paths
 TESTS_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = TESTS_DIR.parent
 CANONICAL_AUDIO_DIR = TESTS_DIR / "assets" / "canonical"
 MANIFEST_PATH = CANONICAL_AUDIO_DIR / "manifest.json"
 
-# Standard paths
-CANONICAL_WAV = CANONICAL_AUDIO_DIR / "standard" / "allan_watts.wav"
-CANONICAL_WAV_SEGMENT = CANONICAL_AUDIO_DIR / "standard" / "allan_watts_15s.wav"
-CANONICAL_ORIGINAL = CANONICAL_AUDIO_DIR / "originals" / "allan_watts.m4a"
+# Standard paths (resolved via pointer files when migrated to payload root, M8)
+CANONICAL_WAV = resolve_payload_path(
+    Path("tests/assets/canonical/standard/allan_watts.wav"), PROJECT_ROOT
+)
+CANONICAL_WAV_SEGMENT = resolve_payload_path(
+    Path("tests/assets/canonical/standard/allan_watts_15s.wav"), PROJECT_ROOT
+)
+CANONICAL_ORIGINAL = resolve_payload_path(
+    Path("tests/assets/canonical/originals/allan_watts.m4a"), PROJECT_ROOT
+)
 
 
 class CanonicalAudioError(Exception):

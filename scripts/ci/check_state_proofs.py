@@ -121,7 +121,7 @@ def validate_proof(
         return []  # Non-JSON proofs: existence only, no schema
 
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError as e:
         return [f"{path.relative_to(ROOT)}: JSON parse error: {e}"]
 

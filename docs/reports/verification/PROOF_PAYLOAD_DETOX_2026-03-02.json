@@ -1,16 +1,16 @@
 {
   "milestone": "M8 Repo Payload Detox",
+  "step": "payload_detox",
   "date": "2026-03-02",
+  "timestamp": "2026-03-02T09:40:35Z",
+  "command": "python scripts/ci/check_repo_payloads.py",
+  "exit_code": 0,
+  "git_commit": "5940e5ce522a27184c3e82683b88d20e830b3c1b",
+  "git_branch": "main",
+  "check_repo_payloads": "PASS (git-tracked large files: 0; large_file_exceptions: empty)",
   "policy_file_summary": {
     "large_file_exceptions_count": 0,
     "payload_dir_baselines": 5
   },
-  "moved_payloads": [
-    "installer/Output/VoiceStudio-Setup-v1.0.0.exe",
-    "tests/assets/canonical/originals/allan_watts.m4a",
-    "tests/assets/canonical/standard/allan_watts.wav"
-  ],
-  "manifest_path": "docs/reports/verification/PAYLOAD_MIGRATION_MANIFEST_2026-03-02_0036.json",
-  "check_repo_payloads": "PASS (git-tracked large files: 0; large_file_exceptions: empty)",
   "note": "check_repo_payloads passes when run in clean environment. Local installer/runtime (gitignored) may cause FORBIDDEN DIR; CI clone has no installer/runtime."
 }

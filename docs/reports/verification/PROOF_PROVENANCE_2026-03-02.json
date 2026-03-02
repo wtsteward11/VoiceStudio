@@ -1,0 +1,13 @@
+{
+  "step": "provenance_policy",
+  "date": "2026-03-02",
+  "timestamp": "2026-03-02T09:43:08Z",
+  "exit_code": 0,
+  "tests_passed": "passed",
+  "command": "pytest tests/unit/test_audio_artifact_provenance.py tests/unit/test_audio_artifact_use_cases.py -q --tb=short",
+  "stdout": "\u001b[1m============================= test session starts =============================\u001b[0m\nplatform win32 -- Python 3.9.13, pytest-8.4.2, pluggy-1.6.0\nrootdir: E:\\VoiceStudio\nconfigfile: pytest.ini\nplugins: typeguard-4.4.4, allure-pytest-2.15.3, anyio-4.12.1, asyncio-1.2.0, cov-7.0.0, html-4.2.0, metadata-3.1.1, mock-3.15.1, timeout-2.4.0, xdist-3.8.0\nasyncio: mode=auto, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollected 10 items\n\ntests\\unit\\test_audio_artifact_provenance.py \u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m                       [ 50%]\u001b[0m\ntests\\unit\\test_audio_artifact_use_cases.py \u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m                        [100%]\u001b[0m\n\n============================ slowest 10 durations =============================\n0.02s call     tests/unit/test_audio_artifact_provenance.py::test_best_effort_provenance_failure_artifact_still_created\n0.02s call     tests/unit/test_audio_artifact_provenance.py::test_strict_provenance_failure_rolls_back\n0.01s setup    tests/unit/test_audio_artifact_use_cases.py::test_create_audio_artifact_from_file_with_audio_id\n0.01s call     tests/unit/test_audio_artifact_use_cases.py::test_create_audio_artifact_from_wav_array_calls_store\n0.01s setup    tests/unit/test_audio_artifact_provenance.py::test_provenance_adapter_calls_canonical\n\n(5 durations < 0.005s hidden.  Use -vv to show these durations.)\n\u001b[32m============================= \u001b[32m\u001b[1m10 passed\u001b[0m\u001b[32m in 1.92s\u001b[0m\u001b[32m ==============================\u001b[0m\n",
+  "stderr": "",
+  "git_commit": "5940e5ce522a27184c3e82683b88d20e830b3c1b",
+  "git_branch": "main",
+  "test_count": 10
+}

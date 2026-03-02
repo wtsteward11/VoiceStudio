@@ -1,0 +1,15 @@
+﻿{
+    "git_branch":  "main",
+    "ui_smoke":  {
+                     "nav_steps_completed":  0,
+                     "binding_failure_count":  0,
+                     "exit_code":  0
+                 },
+    "step":  "gate_c_publish_ui_smoke",
+    "command":  ".\\scripts\\gatec-publish-launch.ps1 -Configuration Release -RuntimeIdentifier win-x64 -UiSmoke -UiSmokeTimeoutSeconds 120",
+    "gatec_log":  "Timestamp: 2026-03-01T23:56:56.0400384-06:00\r\nBinlog: E:\\VoiceStudio\\.buildlogs\\gatec-publish-20260301-235626-34584.binlog\r\nPublishDir: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\r\nExe: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\\VoiceStudio.App.exe\r\nResult: ui_smoke\r\nUiSmokeResult: exited\r\nUiSmokeExitCode: 0\r\nUiSmokeLog: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\\gatec-ui-smoke.log\r\nUiSmokeSummary: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\\ui_smoke_summary.json\r\nExitCode: 0\r\n",
+    "date":  "2026-03-02",
+    "exit_code":  0,
+    "git_commit":  "5940e5ce522a27184c3e82683b88d20e830b3c1b",
+    "timestamp":  "2026-03-02T03:42:09Z"
+}

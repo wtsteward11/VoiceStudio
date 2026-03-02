@@ -1,0 +1,21 @@
+﻿{
+    "git_branch":  "main",
+    "log_file":  "E:\\VoiceStudio\\.buildlogs\\installer-lifecycle\\voicestudio_lifecycle_20260302-000832.log",
+    "all_passed":  true,
+    "step":  "installer_lifecycle",
+    "command":  ".\\installer\\test-installer-lifecycle.ps1 -LogDir \".buildlogs/installer-lifecycle\"",
+    "log_dir":  ".buildlogs/installer-lifecycle",
+    "results":  {
+                    "UpgradeV1ToV2":  "PASS",
+                    "LaunchV2":  "PASS",
+                    "LaunchV1":  "PASS",
+                    "RollbackV2ToV1":  "PASS",
+                    "UninstallV1":  "PASS",
+                    "InstallV1":  "PASS",
+                    "LaunchV1AfterRollback":  "PASS"
+                },
+    "date":  "2026-03-02",
+    "exit_code":  0,
+    "git_commit":  "5940e5ce522a27184c3e82683b88d20e830b3c1b",
+    "timestamp":  "2026-03-02T03:40:52Z"
+}

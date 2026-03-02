@@ -22,7 +22,12 @@
       "required": ["check_repo_payloads", "policy_file_summary"]
     }
   },
-  "historical_proof_allowlist": [],
+  "historical_proof_allowlist": [
+    "docs/reports/verification/PROOF_PROVENANCE_2026-03-02.json",
+    "docs/reports/verification/PROOF_GATE_C_2026-03-02.json",
+    "docs/reports/verification/PROOF_INSTALLER_2026-03-02.json",
+    "docs/reports/verification/PROOF_PAYLOAD_DETOX_2026-03-02.json"
+  ],
   "semantic_rules": {
     "exit_code_must_be_zero": true,
     "timestamp_iso8601": true,

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Machine-readable proof schema for STATE.md verification. All proof JSONs must conform.",
+  "common_required": [
+    "command",
+    "exit_code",
+    "timestamp",
+    "git_commit",
+    "git_branch"
+  ],
+  "type_specific": {
+    "PROOF_PROVENANCE": {
+      "required": ["stdout", "stderr"]
+    },
+    "PROOF_GATE_C": {
+      "required": ["ui_smoke", "gatec_log"]
+    },
+    "PROOF_INSTALLER": {
+      "required": ["results", "all_passed"]
+    },
+    "PROOF_PAYLOAD_DETOX": {
+      "required": ["check_repo_payloads", "policy_file_summary"]
+    }
+  },
+  "historical_proof_allowlist": [],
+  "semantic_rules": {
+    "exit_code_must_be_zero": true,
+    "timestamp_iso8601": true,
+    "git_commit_40_hex": true,
+    "git_commit_matches_head_unless_historical": true
+  }
+}

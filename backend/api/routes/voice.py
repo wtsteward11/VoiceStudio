@@ -1,4 +1,4 @@
-﻿"""
+"""
 Voice Cloning and Synthesis Routes
 
 High-quality voice cloning endpoints with support for multiple engines.
@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import hashlib
 import json
 import logging
 import os
@@ -28,7 +27,6 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
 
 import numpy as np
 
@@ -40,7 +38,6 @@ try:
     HAS_HTTPX = True
 except ImportError:  # ALLOWED: bare except - optional httpx
     pass
-from backend.ml.models.engine_service import IEngineService, get_engine_service
 from fastapi import (
     APIRouter,
     Depends,
@@ -65,6 +62,7 @@ from backend.core.security.file_validation import (
     validate_audio_file,
     validate_media_for_audio_extraction,
 )
+from backend.ml.models.engine_service import IEngineService, get_engine_service
 from backend.ml.models.model_preflight import (
     PreflightError,
     ensure_piper,
@@ -72,6 +70,7 @@ from backend.ml.models.model_preflight import (
     ensure_xtts,
 )
 from backend.platform.config.unified_config import get_config
+from backend.services.audio_artifacts import AudioRegistry
 
 from ..deps import (
     EngineConfigServiceDep,
@@ -84,6 +83,7 @@ from ..exceptions import (
     ProfileNotFoundException,
 )
 from ..middleware.auth_middleware import require_auth_if_enabled
+from ..security.voice_policy import enforce_voice_policy as _enforce_voice_policy
 
 # WebSocket protocol for standardized messaging (GAP-CRIT-002)
 from ..ws.protocol import (
@@ -170,68 +170,15 @@ except Exception as e:
     HAS_QUALITY_OPTIMIZATION = False
     logger.warning("Quality optimization not available: %s", e)
 
-# URL download cache directory
-_URL_CACHE_DIR = Path(tempfile.gettempdir()) / "voicestudio_url_cache"
-_URL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-
-
-async def _download_url_to_file(url: str, timeout: float = 30.0) -> str | None:
-    """
-    Download a file from URL and cache it locally.
-
-    Args:
-        url: The URL to download from
-        timeout: Download timeout in seconds
-
-    Returns:
-        Path to the downloaded file, or None if download failed
-    """
-    if not HAS_HTTPX:
-        logger.warning("httpx not available for URL downloads")
-        return None
-
-    try:
-        # Generate cache key from URL
-        url_hash = hashlib.md5(url.encode()).hexdigest()[:16]
-        parsed = urlparse(url)
-        ext = Path(parsed.path).suffix or ".wav"
-        cache_path = _URL_CACHE_DIR / f"{url_hash}{ext}"
-
-        # Check if already cached
-        if cache_path.exists():
-            logger.debug(f"Using cached file for {url}: {cache_path}")
-            return str(cache_path)
-
-        # Download the file
-        import httpx  # safe: HAS_HTTPX guard above ensures availability
-
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(url, follow_redirects=True)
-            response.raise_for_status()
-
-            # Verify content type is audio
-            content_type = response.headers.get("content-type", "")
-            if not any(
-                t in content_type.lower() for t in ["audio", "octet-stream", "wav", "mp3", "flac"]
-            ):
-                logger.warning(f"Unexpected content type for audio URL: {content_type}")
-
-            # Write to cache
-            with open(cache_path, "wb") as f:
-                f.write(response.content)
-
-            logger.info(f"Downloaded {len(response.content)} bytes from {url} to {cache_path}")
-            return str(cache_path)
-
-    except Exception as e:
-        logger.error(f"Failed to download URL {url}: {e}")
-        return None
-
+from backend.services.audio_download_service import download_audio_to_temp
 
 router = APIRouter(
     prefix="/api/voice",
     tags=["voice"],
-    dependencies=[Depends(require_auth_if_enabled)],
+    dependencies=[
+        Depends(require_auth_if_enabled),
+        Depends(_enforce_voice_policy),
+    ],
 )
 
 # Backward-compatible engine aliases used by the UI and some clients.
@@ -243,6 +190,16 @@ _ENGINE_ID_ALIASES: dict[str, str] = {
 def _normalize_engine_id(engine_id: str) -> str:
     engine_norm = (engine_id or "").strip().lower()
     return _ENGINE_ID_ALIASES.get(engine_norm, engine_norm)
+
+
+def _check_consent_required(profile_id: str) -> bool:
+    """
+    Returns True if consent is required for this profile.
+    Local profiles (alphanumeric + underscore + hyphen, 1–100 chars) are treated as user-owned.
+    Everything else requires consent.
+    """
+    import re
+    return not bool(re.match(r"^[a-zA-Z0-9_\-]{1,100}$", str(profile_id)))
 
 
 def _normalize_candidate_metrics(candidate_metrics: Any) -> list[dict[str, Any]]:
@@ -380,10 +337,8 @@ def _coerce_optional_float(value: Any) -> float | None:
         return None
 
 
-# Audio artifact registry (durable across restart) + in-memory view for compatibility.
+# Audio artifact registry: single source of truth for audio_id -> path.
 _audio_registry = get_audio_registry()
-_audio_storage: dict[str, str] = _audio_registry.to_dict()  # audio_id -> file_path
-_audio_storage_timestamps: dict[str, float] = {}  # audio_id -> creation_time (best-effort)
 _state_lock = asyncio.Lock()
 
 # Cleanup configuration (mapping only; cached files are content-addressed and not deleted here)
@@ -401,32 +356,28 @@ def _cleanup_old_audio_files():
     """
     current_time = time.time()
     to_remove = []
+    entries = _audio_registry.get_entries_sorted_by_age()
+    count = len(entries)
 
     # Find files that are too old
-    for audio_id, timestamp in _audio_storage_timestamps.items():
-        age = current_time - timestamp
+    for audio_id, created_at in entries:
+        age = current_time - created_at
         if age > AUDIO_STORAGE_MAX_AGE_SECONDS:
             to_remove.append(audio_id)
 
     # If storage is too large, remove oldest files
-    if len(_audio_storage) > AUDIO_STORAGE_MAX_SIZE:
-        # Sort by timestamp (oldest first)
-        sorted_items = sorted(_audio_storage_timestamps.items(), key=lambda x: x[1])
-        # Remove oldest files until we're under the limit
-        excess = len(_audio_storage) - AUDIO_STORAGE_MAX_SIZE
-        for audio_id, _ in sorted_items[:excess]:
+    if count > AUDIO_STORAGE_MAX_SIZE:
+        excess = count - AUDIO_STORAGE_MAX_SIZE
+        for audio_id, _ in entries[:excess]:
             if audio_id not in to_remove:
                 to_remove.append(audio_id)
 
-    # Remove mappings and clean up (do NOT delete cached files; they may be shared)
+    # Remove mappings (do NOT delete cached files; they may be shared)
     for audio_id in to_remove:
-        if audio_id in _audio_storage:
-            del _audio_storage[audio_id]
-            try:
-                _audio_registry.remove(audio_id)
-            except Exception as e:
-                logger.debug(f"Failed to remove audio_id from registry: {e}")
-        _audio_storage_timestamps.pop(audio_id, None)
+        try:
+            _audio_registry.remove(audio_id)
+        except Exception as e:
+            logger.debug(f"Failed to remove audio_id from registry: {e}")
 
     if to_remove:
         logger.info(f"Cleaned up {len(to_remove)} old audio files from storage")
@@ -440,37 +391,27 @@ def _register_audio_file(
     source: str | None = None,
 ):
     """
-    Register an audio file in storage with timestamp.
+    Register an audio file in storage. Single source of truth: _audio_registry.
 
     Args:
         audio_id: Unique audio identifier
         file_path: Path to audio file
     """
+    cached_path, _ = _audio_registry.register_file(
+        audio_id, file_path, project_id=project_id, source=source
+    )
     try:
-        cached_path, _ = _audio_registry.register_file(
-            audio_id, file_path, project_id=project_id, source=source
-        )
-        _audio_storage[audio_id] = cached_path
-        try:
-            # If we cached a copy, remove the original temp output to avoid orphaning files.
-            if os.path.abspath(cached_path) != os.path.abspath(file_path):
-                import tempfile
-
-                tmp_root = os.path.abspath(tempfile.gettempdir())
-                src_dir = os.path.abspath(os.path.dirname(file_path))
-                if src_dir.startswith(tmp_root) and os.path.exists(file_path):
-                    os.remove(file_path)
-        except OSError as cleanup_err:
-            logger.debug(f"Failed to clean up temp file {file_path}: {cleanup_err}")
-    except Exception as e:
-        # Fallback: keep original path in memory (still better than failing)
-        logger.warning(f"Failed to persist audio artifact {audio_id}: {e}")
-        _audio_storage[audio_id] = file_path
-
-    _audio_storage_timestamps[audio_id] = time.time()
+        # If we cached a copy, remove the original temp output to avoid orphaning files.
+        if os.path.abspath(cached_path) != os.path.abspath(file_path):
+            tmp_root = os.path.abspath(tempfile.gettempdir())
+            src_dir = os.path.abspath(os.path.dirname(file_path))
+            if src_dir.startswith(tmp_root) and os.path.exists(file_path):
+                os.remove(file_path)
+    except OSError as cleanup_err:
+        logger.debug(f"Failed to clean up temp file {file_path}: {cleanup_err}")
 
     # Periodically clean up old files
-    if len(_audio_storage) > AUDIO_STORAGE_MAX_SIZE:
+    if len(_audio_registry.to_dict()) > AUDIO_STORAGE_MAX_SIZE:
         _cleanup_old_audio_files()
 
 
@@ -486,56 +427,31 @@ def _save_audio_to_project(project_id: str, audio_id: str, source_path: str) -> 
     return str(dest_path)
 
 
-# Engine router for voice synthesis (initialized lazily)
-ENGINE_AVAILABLE = False
-engine_router = None
+# Engine router for voice synthesis (from shared module, no route-to-route)
+from backend.api.routes._engine_shared import (
+    ENGINE_AVAILABLE,
+    engine_router,
+    _ensure_engine_router,
+)
+
 quality_metrics = None
-_voice_engine_service = None
-
-
-def _ensure_engine_router():
-    """Lazy initialization of engine router - called at request time, not import time."""
-    global engine_router, ENGINE_AVAILABLE, _voice_engine_service
-
-    if engine_router is not None:
-        return  # Already initialized
-
-    try:
-        if _voice_engine_service is None:
-            _voice_engine_service = get_engine_service()
-
-        # Get the actual engine router from the service
-        engine_router = _voice_engine_service.get_engine_router()
-
-        if engine_router is not None:
-            # Try to load engines if not already loaded
-            engines = engine_router.list_engines()
-            if not engines:
-                engine_router.load_all_engines("engines")
-                engines = engine_router.list_engines()
-
-            ENGINE_AVAILABLE = len(engines) > 0
-            if ENGINE_AVAILABLE:
-                logger.info(f"Voice engine router initialized with {len(engines)} engines")
-        else:
-            ENGINE_AVAILABLE = False
-            logger.warning("Engine router not available from service")
-    except Exception as e:
-        logger.warning(f"Failed to initialize engine router: {e}")
-        ENGINE_AVAILABLE = False
 
 
 def _get_quality_metrics():
     """Get quality metrics functions via EngineService."""
-    if _voice_engine_service is None:
+    try:
+        svc = get_engine_service()
+        if svc is None:
+            return {}
+        return {
+            "calculate_all": svc.calculate_all_metrics,
+            "mos": svc.calculate_mos_score,
+            "similarity": svc.calculate_similarity,
+            "naturalness": svc.calculate_naturalness,
+            "snr": svc.calculate_snr,
+        }
+    except Exception:
         return {}
-    return {
-        "calculate_all": _voice_engine_service.calculate_all_metrics,
-        "mos": _voice_engine_service.calculate_mos_score,
-        "similarity": _voice_engine_service.calculate_similarity,
-        "naturalness": _voice_engine_service.calculate_naturalness,
-        "snr": _voice_engine_service.calculate_snr,
-    }
 
 
 # ============================================================================
@@ -593,7 +509,8 @@ async def _resolve_profile_audio(
     if not profile_audio_path and profile.reference_audio_url:
         if profile.reference_audio_url.startswith("http"):
             logger.info("Downloading reference audio from URL: %s", profile.reference_audio_url)
-            downloaded_path = await _download_url_to_file(profile.reference_audio_url)
+            path = await download_audio_to_temp(profile.reference_audio_url)
+            downloaded_path = str(path) if path else None
             if downloaded_path and os.path.exists(downloaded_path):
                 profile_audio_path = downloaded_path
             else:
@@ -816,12 +733,7 @@ async def _try_utility_tts_fallback(
         None (file saved to output_path) on success, or None with no file on failure
     """
     try:
-        import sys
-        from pathlib import Path
-
-        project_root = Path(__file__).parent.parent.parent.parent
-        sys.path.insert(0, str(project_root / "app"))
-        from app.core.tts.tts_utilities import synthesize_with_utility
+        from backend.tts.tts_utils import synthesize_with_utility
 
         logger.warning(f"Main engine failed, trying utility TTS fallback: {original_error}")
 
@@ -961,21 +873,57 @@ def _extract_quality_metrics(
     return duration, quality_score, detailed_metrics
 
 
-@router.post("/synthesize", response_model=VoiceSynthesizeResponse)
-async def synthesize(
+async def synthesize_core(
     req: VoiceSynthesizeRequest,
     request: Request,
     config_service: EngineConfigServiceDep | None = None,
 ) -> VoiceSynthesizeResponse:
     """
-    Synthesize audio from text using a voice profile.
-
-    Engines are dynamically discovered from engine manifests.
-    Any engine with an engine.manifest.json file in engines/ will be available.
-    No hardcoded engine limits - add as many engines as needed.
+    Internal synthesis service function. Call this from other modules instead of
+    the route handler. The route handler is a thin wrapper over this.
     """
     # Lazy-initialize engine router at request time (not import time)
     _ensure_engine_router()
+
+    # Task 4: Demo mode gate
+    _policy = getattr(request.state, "voice_policy", None)
+    if _policy and _policy.demo_mode:
+        raise HTTPException(
+            status_code=403,
+            detail="Voice synthesis is disabled in demo mode.",
+        )
+
+    # Task 4: Consent — required whenever profile is not local/owned
+    _consent_id = getattr(req, "consent_id", None)
+    if _check_consent_required(req.profile_id):
+        if not _consent_id or not _consent_id.strip():
+            raise HTTPException(
+                status_code=403,
+                detail="consent_id is required for third-party voice profiles.",
+            )
+        try:
+            from backend.services.security_service import (
+                ConsentStatus,
+                get_security_service,
+            )
+
+            _svc = get_security_service()
+            _record = _svc.consent.get_consent_by_id(_consent_id.strip())
+            if not _record:
+                raise HTTPException(status_code=403, detail="Consent record not found.")
+            if _record.status != ConsentStatus.GRANTED:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Consent not granted (status={_record.status.value}).",
+                )
+            if not _record.is_valid:
+                raise HTTPException(
+                    status_code=403, detail="Consent expired or revoked."
+                )
+        except HTTPException:
+            raise
+        except Exception as _ce:
+            logger.warning("Consent check error: %s", _ce)
 
     # Get request ID from middleware
     request_id = getattr(request.state, "request_id", None)
@@ -1090,8 +1038,9 @@ async def synthesize(
                         )
 
                     # Get profile audio path from profile storage
-                    from .profiles import _profiles
+                    from backend.services.profile_search_service import get_profiles_proxy
 
+                    _profiles = get_profiles_proxy()
                     if req.profile_id not in _profiles:
                         raise ProfileNotFoundException(profile_id=req.profile_id)
 
@@ -1111,12 +1060,7 @@ async def synthesize(
                     # Preprocess text using NLP if available
                     text_to_synthesize = req.text
                     try:
-                        import sys
-                        from pathlib import Path
-
-                        project_root = Path(__file__).parent.parent.parent.parent
-                        sys.path.insert(0, str(project_root / "app"))
-                        from app.core.nlp.text_processing import get_text_preprocessor
+                        from backend.nlp.text_processing import get_text_preprocessor
 
                         preprocessor = get_text_preprocessor()
                         preprocessed = preprocessor.preprocess_for_tts(
@@ -1151,7 +1095,7 @@ async def synthesize(
                         and req.quality_mode
                     ):
                         try:
-                            from app.core.engines.quality_presets import (
+                            from backend.engines.quality_facade import (
                                 get_synthesis_params_from_preset,
                             )
 
@@ -1250,12 +1194,7 @@ async def synthesize(
                                 # Try fallback to utility TTS if main engine fails
                                 if attempt == max_retries:
                                     try:
-                                        import sys
-                                        from pathlib import Path
-
-                                        project_root = Path(__file__).parent.parent.parent.parent
-                                        sys.path.insert(0, str(project_root / "app"))
-                                        from app.core.tts.tts_utilities import (
+                                        from backend.tts.tts_utils import (
                                             synthesize_with_utility,
                                         )
 
@@ -1340,12 +1279,7 @@ async def synthesize(
                     # Try fallback to utility TTS if all main engine attempts failed
                     if result is None and synthesis_error is not None:
                         try:
-                            import sys
-                            from pathlib import Path
-
-                            project_root = Path(__file__).parent.parent.parent.parent
-                            sys.path.insert(0, str(project_root / "app"))
-                            from app.core.tts.tts_utilities import (
+                            from backend.tts.tts_utils import (
                                 synthesize_with_utility,
                             )
 
@@ -1465,7 +1399,12 @@ async def synthesize(
                     # Store audio file path for retrieval (cache/dedup first)
                     if os.path.exists(output_path):
                         cached_path = _dedupe_and_get_path(output_path)
-                        _register_audio_file(audio_id, cached_path)
+                        AudioRegistry.register(
+                            audio_id,
+                            cached_path,
+                            model_used=engine_id,
+                            duration_seconds=duration,
+                        )
                         # If the cached path differs, remove the temp file to save space
                         if cached_path != output_path and os.path.exists(output_path):
                             try:
@@ -1521,6 +1460,16 @@ async def synthesize(
             raise HTTPException(status_code=500, detail=f"Synthesis failed: {e!s}")
 
 
+@router.post("/synthesize", response_model=VoiceSynthesizeResponse)
+async def synthesize(
+    req: VoiceSynthesizeRequest,
+    request: Request,
+    config_service: EngineConfigServiceDep | None = None,
+) -> VoiceSynthesizeResponse:
+    """Synthesize audio from text using a voice profile. Thin wrapper over synthesize_core."""
+    return await synthesize_core(req, request, config_service)
+
+
 @router.post("/synthesize/multipass", response_model=MultiPassSynthesisResponse)
 async def synthesize_multipass(
     req: MultiPassSynthesisRequest,
@@ -1564,8 +1513,9 @@ async def synthesize_multipass(
             )
 
         # Get profile audio path
-        from .profiles import _profiles
+        from backend.services.profile_search_service import get_profiles_proxy
 
+        _profiles = get_profiles_proxy()
         if req.profile_id not in _profiles:
             raise HTTPException(status_code=404, detail=f"Profile not found: {req.profile_id}")
 
@@ -1575,8 +1525,9 @@ async def synthesize_multipass(
         if profile.reference_audio_url:
             if profile.reference_audio_url.startswith("http"):
                 # Download from URL
-                logger.info(f"Downloading reference audio from URL: {profile.reference_audio_url}")
-                downloaded_path = await _download_url_to_file(profile.reference_audio_url)
+                logger.info("Downloading reference audio from URL: %s", profile.reference_audio_url)
+                path = await download_audio_to_temp(profile.reference_audio_url)
+                downloaded_path = str(path) if path else None
                 if downloaded_path and os.path.exists(downloaded_path):
                     profile_audio_path = downloaded_path
                     logger.info(f"Using downloaded reference audio: {profile_audio_path}")
@@ -1633,10 +1584,11 @@ async def synthesize_multipass(
                 language=req.language,
                 emotion=req.emotion,
                 enhance_quality=True,  # Always enhance for multi-pass
+                consent_id=getattr(req, "consent_id", None),
             )
 
             # Perform synthesis
-            synth_response = await synthesize(synth_req)
+            synth_response = await synthesize_core(synth_req, request, config_service=None)
 
             if not synth_response.quality_metrics:
                 # Calculate basic quality if metrics not available
@@ -1685,9 +1637,9 @@ async def synthesize_multipass(
         best_pass_result = passes[best_pass - 1]
 
         # Get audio duration from best pass
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
-        best_audio_path = _get_audio_path(best_pass_result.audio_id)
+        best_audio_path = resolve_audio_path(best_pass_result.audio_id)
         duration = 2.5  # Default
         if best_audio_path and os.path.exists(best_audio_path):
             try:
@@ -1699,6 +1651,18 @@ async def synthesize_multipass(
                     duration = frames / float(sample_rate)
             except (wave.Error, OSError) as wav_err:
                 logger.debug(f"Could not read duration from {best_audio_path}: {wav_err}")
+
+        # Provenance + usage stats (centralized in record_artifact_provenance_and_usage)
+        if best_audio_path:
+            from backend.services.artifact_provenance import (
+                record_artifact_provenance_and_usage,
+            )
+
+            record_artifact_provenance_and_usage(
+                best_audio_path,
+                model_used=engine_id,
+                duration_seconds=duration if duration and duration > 0 else None,
+            )
 
         return MultiPassSynthesisResponse(
             audio_id=best_pass_result.audio_id,
@@ -2007,9 +1971,9 @@ async def remove_artifacts(
 
     try:
         # Get audio file path
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
-        audio_path = _get_audio_path(req.audio_id)
+        audio_path = resolve_audio_path(req.audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(status_code=404, detail=f"Audio file not found: {req.audio_id}")
 
@@ -2047,13 +2011,7 @@ async def remove_artifacts(
 
         # Import artifact detection functions (ADR-008 compliant)
         try:
-            import sys
-
-            app_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "app")
-            if os.path.exists(app_path) and app_path not in sys.path:
-                sys.path.insert(0, app_path)
-
-            from core.audio.audio_utils import remove_artifacts as remove_artifacts_func
+            from backend.audio.audio_utils import remove_artifacts as remove_artifacts_func
 
             # Use injected engine_service or fallback to singleton
             _engine_svc = engine_service or get_engine_service()
@@ -2203,7 +2161,13 @@ async def remove_artifacts(
                 repaired_audio = np.clip(repaired_audio, -1.0, 1.0)
 
                 sf.write(repaired_path, repaired_audio, sample_rate)
-                _register_audio_file(repaired_audio_id, repaired_path)
+                _duration = len(repaired_audio) / float(sample_rate) if sample_rate else 0
+                AudioRegistry.register(
+                    repaired_audio_id,
+                    repaired_path,
+                    model_used="artifact_removal",
+                    duration_seconds=_duration if _duration > 0 else None,
+                )
                 repaired_audio_url = f"/api/voice/audio/{repaired_audio_id}"
 
                 # Calculate quality improvement
@@ -2250,9 +2214,9 @@ async def analyze_voice_characteristics_endpoint(
 
     try:
         # Get audio file path
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
-        audio_path = _get_audio_path(req.audio_id)
+        audio_path = resolve_audio_path(req.audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(status_code=404, detail=f"Audio file not found: {req.audio_id}")
 
@@ -2278,13 +2242,7 @@ async def analyze_voice_characteristics_endpoint(
 
         # Import voice characteristic analysis
         try:
-            import sys
-
-            app_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "app")
-            if os.path.exists(app_path) and app_path not in sys.path:
-                sys.path.insert(0, app_path)
-
-            from core.audio.audio_utils import (
+            from backend.audio.audio_utils import (
                 analyze_voice_characteristics,
                 match_voice_profile,
             )
@@ -2318,7 +2276,7 @@ async def analyze_voice_characteristics_endpoint(
             recommendations = []
 
             if req.reference_audio_id:
-                ref_path = _get_audio_path(req.reference_audio_id)
+                ref_path = resolve_audio_path(req.reference_audio_id)
                 if ref_path and os.path.exists(ref_path):
                     ref_audio, ref_sr = sf.read(ref_path)
                     if len(ref_audio.shape) > 1:
@@ -2399,9 +2357,9 @@ async def prosody_control(req: ProsodyControlRequest) -> ProsodyControlResponse:
 
     try:
         # Get audio file path
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
-        audio_path = _get_audio_path(req.audio_id)
+        audio_path = resolve_audio_path(req.audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(status_code=404, detail=f"Audio file not found: {req.audio_id}")
 
@@ -2473,7 +2431,13 @@ async def prosody_control(req: ProsodyControlRequest) -> ProsodyControlResponse:
             processed_audio = np.clip(processed_audio, -1.0, 1.0)
 
             sf.write(processed_path, processed_audio, sample_rate)
-            _register_audio_file(processed_audio_id, processed_path)
+            _duration = len(processed_audio) / float(sample_rate) if sample_rate else 0
+            AudioRegistry.register(
+                processed_audio_id,
+                processed_path,
+                model_used="prosody_control",
+                duration_seconds=_duration if _duration > 0 else None,
+            )
 
             quality_improvement = min(1.0, quality_improvement)
 
@@ -2517,9 +2481,9 @@ async def post_process_pipeline(
 
         # Process audio
         if req.audio_id:
-            from .audio import _get_audio_path
+            from backend.services.audio_path_resolver import resolve_audio_path
 
-            audio_path = _get_audio_path(req.audio_id)
+            audio_path = resolve_audio_path(req.audio_id)
             if not audio_path or not os.path.exists(audio_path):
                 raise HTTPException(status_code=404, detail=f"Audio file not found: {req.audio_id}")
 
@@ -2552,13 +2516,7 @@ async def post_process_pipeline(
 
             # Import enhancement functions
             try:
-                import sys
-
-                app_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "app")
-                if os.path.exists(app_path) and app_path not in sys.path:
-                    sys.path.insert(0, app_path)
-
-                from core.audio.audio_utils import (
+                from backend.audio.audio_utils import (
                     enhance_voice_quality,
                     remove_artifacts,
                 )
@@ -2623,7 +2581,13 @@ async def post_process_pipeline(
                     processed_audio = np.clip(processed_audio, -1.0, 1.0)
 
                     sf.write(processed_path, processed_audio, sample_rate)
-                    _register_audio_file(processed_audio_id, processed_path)
+                    _duration = len(processed_audio) / float(sample_rate) if sample_rate else 0
+                    AudioRegistry.register(
+                        processed_audio_id,
+                        processed_path,
+                        model_used="post_process",
+                        duration_seconds=_duration if _duration > 0 else None,
+                    )
                     processed_audio_url = f"/api/voice/audio/{processed_audio_id}"
 
                 return PostProcessingPipelineResponse(
@@ -2652,23 +2616,15 @@ async def post_process_pipeline(
         elif req.image_id:
             try:
                 # Get image from image storage
-                from .image_gen import _image_storage
+                from backend.services.media_storage_service import get_image_storage
 
-                image_path = _image_storage.get(req.image_id)
+                image_path = get_image_storage().get(req.image_id)
                 if not image_path or not os.path.exists(image_path):
                     raise HTTPException(
                         status_code=404, detail=f"Image file not found: {req.image_id}"
                     )
 
-                import sys
-                from pathlib import Path
-
                 from PIL import Image
-
-                # Add app directory to path if needed
-                app_dir = Path(__file__).parent.parent.parent.parent / "app"
-                if str(app_dir) not in sys.path:
-                    sys.path.insert(0, str(app_dir))
 
                 # Load image
                 input_image = Image.open(image_path)
@@ -2754,7 +2710,7 @@ async def post_process_pipeline(
                         os.makedirs(output_dir, exist_ok=True)
                         processed_path = os.path.join(output_dir, f"{processed_image_id}.png")
                         processed_image.save(processed_path)
-                        _image_storage[processed_image_id] = processed_path
+                        get_image_storage()[processed_image_id] = processed_path
                         processed_image_url = f"/api/image/{processed_image_id}"
 
                     return PostProcessingPipelineResponse(
@@ -2788,21 +2744,13 @@ async def post_process_pipeline(
         elif req.video_id:
             try:
                 # Get video from video storage
-                from .video_gen import _video_storage
+                from backend.services.media_storage_service import get_video_storage
 
-                video_path = _video_storage.get(req.video_id)
+                video_path = get_video_storage().get(req.video_id)
                 if not video_path or not os.path.exists(video_path):
                     raise HTTPException(
                         status_code=404, detail=f"Video file not found: {req.video_id}"
                     )
-
-                import sys
-                from pathlib import Path
-
-                # Add app directory to path if needed
-                app_dir = Path(__file__).parent.parent.parent.parent / "app"
-                if str(app_dir) not in sys.path:
-                    sys.path.insert(0, str(app_dir))
 
                 # Determine enhancement stages
                 stages = req.enhancement_stages or [
@@ -2954,7 +2902,7 @@ async def post_process_pipeline(
                         import shutil
 
                         shutil.copy(processed_video_path, final_path)
-                        _video_storage[processed_video_id] = final_path
+                        get_video_storage()[processed_video_id] = final_path
                         processed_video_url = f"/api/video/{processed_video_id}"
 
                     return PostProcessingPipelineResponse(
@@ -3001,6 +2949,7 @@ async def post_process_pipeline(
 
 @router.post("/clone", response_model=VoiceCloneResponse)
 async def clone(
+    request: Request,
     reference_audio: list[UploadFile] = File(...),
     text: str | None = Form(None),
     engine: str = Form("xtts"),
@@ -3036,6 +2985,13 @@ async def clone(
         raise HTTPException(
             status_code=400,
             detail="Consent is required for voice cloning. Set consent_acknowledged=true.",
+        )
+    # Demo mode gate
+    _policy = getattr(request.state, "voice_policy", None)
+    if _policy and _policy.demo_mode:
+        raise HTTPException(
+            status_code=403,
+            detail="Voice cloning is disabled in demo mode.",
         )
     consent_metadata = {
         "consent_type": consent_type or "voice_clone",
@@ -3413,11 +3369,13 @@ async def clone(
                             duration_seconds = _get_wav_duration_seconds(
                                 cached_path
                             ) or _get_wav_duration_seconds(output_path)
-                            _register_audio_file(
+                            AudioRegistry.register(
                                 audio_id,
                                 cached_path,
                                 project_id=project_id,
                                 source="clone",
+                                model_used=engine_id,
+                                duration_seconds=duration_seconds,
                             )
                             logger.info(
                                 f"Clone audio registered: audio_id={audio_id}, cached_path={cached_path}"
@@ -3534,15 +3492,12 @@ async def get_audio(audio_id: str):
 
     Returns the audio file as a WAV stream for playback.
     """
-    if audio_id not in _audio_storage:
+    file_path = AudioRegistry.get_path(audio_id)
+    if not file_path:
         raise HTTPException(status_code=404, detail=f"Audio not found: {audio_id}")
 
-    file_path = _audio_storage[audio_id]
-
     if not os.path.exists(file_path):
-        # Clean up invalid entry
-        _audio_storage.pop(audio_id, None)
-        _audio_storage_timestamps.pop(audio_id, None)
+        AudioRegistry.remove(audio_id)
         raise HTTPException(status_code=404, detail="Audio file not found on disk")
 
     return FileResponse(
@@ -3555,6 +3510,7 @@ async def get_audio(audio_id: str):
 
 @router.post("/synthesize/style")
 async def synthesize_with_style(
+    request: Request,
     text: str,
     profile_id: str,
     engine: str = "openvoice",
@@ -3568,12 +3524,52 @@ async def synthesize_with_style(
     energy: float | None = None,
     enhance_quality: bool = True,
     calculate_quality: bool = True,
+    consent_id: str | None = None,
 ):
     """
     Synthesize with granular style control (OpenVoice).
 
     Supports emotion, accent, rhythm, pauses, and intonation control.
     """
+    # Demo mode gate
+    _policy = getattr(request.state, "voice_policy", None)
+    if _policy and _policy.demo_mode:
+        raise HTTPException(
+            status_code=403,
+            detail="Voice synthesis is disabled in demo mode.",
+        )
+
+    # Consent required for non-local profiles
+    if _check_consent_required(profile_id):
+        if not consent_id or not consent_id.strip():
+            raise HTTPException(
+                status_code=403,
+                detail="consent_id is required for third-party voice profiles.",
+            )
+        try:
+            from backend.services.security_service import (
+                ConsentStatus,
+                get_security_service,
+            )
+
+            _svc = get_security_service()
+            _record = _svc.consent.get_consent_by_id(consent_id.strip())
+            if not _record:
+                raise HTTPException(status_code=403, detail="Consent record not found.")
+            if _record.status != ConsentStatus.GRANTED:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Consent not granted (status={_record.status.value}).",
+                )
+            if not _record.is_valid:
+                raise HTTPException(
+                    status_code=403, detail="Consent expired or revoked."
+                )
+        except HTTPException:
+            raise
+        except Exception as _ce:
+            logger.warning("Consent check error: %s", _ce)
+
     if not ENGINE_AVAILABLE or not engine_router:
         raise HTTPException(status_code=503, detail="Engine router not available")
 
@@ -3637,17 +3633,36 @@ async def synthesize_with_style(
 
         # Generate audio ID and store
         audio_id = str(uuid.uuid4())
-        _register_audio_file(audio_id, output_path)
+
+        # Calculate duration for provenance/usage
+        import wave
+
+        duration = 2.5
+        try:
+            with wave.open(output_path, "rb") as wav_file:
+                frames = wav_file.getnframes()
+                sample_rate = wav_file.getframerate()
+                duration = frames / float(sample_rate)
+        except (wave.Error, OSError) as wav_err:
+            logger.debug(f"Could not read duration from {output_path}: {wav_err}")
+
+        AudioRegistry.register(
+            audio_id,
+            output_path,
+            model_used=engine,
+            duration_seconds=duration if duration and duration > 0 else None,
+        )
 
         # Calculate quality if requested
-        quality_metrics = None
-        if calculate_quality and quality_metrics:
+        quality_metrics_result = None
+        quality_provider = _get_quality_metrics()
+        if calculate_quality and quality_provider.get("calculate_all"):
             try:
                 import soundfile as sf
 
                 audio_array, sr = sf.read(output_path)
-                metrics = quality_metrics["calculate_all"](audio_array, sr)
-                quality_metrics = QualityMetrics(
+                metrics = quality_provider["calculate_all"](audio_array, sr)
+                quality_metrics_result = QualityMetrics(
                     mos_score=metrics.get("mos_score"),
                     similarity=metrics.get("similarity"),
                     naturalness=metrics.get("naturalness"),
@@ -3656,24 +3671,12 @@ async def synthesize_with_style(
             except Exception as e:
                 logger.warning(f"Quality calculation failed: {e}")
 
-        # Calculate duration
-        import wave
-
-        try:
-            with wave.open(output_path, "rb") as wav_file:
-                frames = wav_file.getnframes()
-                sample_rate = wav_file.getframerate()
-                duration = frames / float(sample_rate)
-        except (wave.Error, OSError) as wav_err:
-            logger.debug(f"Could not read duration from {output_path}: {wav_err}")
-            duration = 2.5
-
         return VoiceSynthesizeResponse(
             audio_id=audio_id,
             audio_url=f"/api/voice/audio/{audio_id}",
             duration=duration,
             quality_score=0.85,
-            quality_metrics=quality_metrics,
+            quality_metrics=quality_metrics_result,
         )
 
     except HTTPException:
@@ -3684,7 +3687,7 @@ async def synthesize_with_style(
 
 
 @router.post("/ab-test", response_model=ABTestResponse)
-async def ab_test(request: ABTestRequest) -> ABTestResponse:
+async def ab_test(req: ABTestRequest, http_request: Request) -> ABTestResponse:
     """
     A/B test two synthesis configurations side-by-side.
 
@@ -3697,18 +3700,19 @@ async def ab_test(request: ABTestRequest) -> ABTestResponse:
         raise HTTPException(status_code=503, detail="Engine router not available")
 
     try:
-        # Get profile
-        from ..routes.profiles import _profiles
+        # Get profile (via service, no route import)
+        from backend.services.profile_search_service import get_profiles_proxy
 
-        if request.profile_id not in _profiles:
-            raise HTTPException(status_code=404, detail=f"Profile {request.profile_id} not found")
+        _profiles = get_profiles_proxy()
+        if req.profile_id not in _profiles:
+            raise HTTPException(status_code=404, detail=f"Profile {req.profile_id} not found")
 
-        profile = _profiles[request.profile_id]
+        profile = _profiles[req.profile_id]
         reference_audio_path = profile.get("reference_audio_url")
         if not reference_audio_path or not os.path.exists(reference_audio_path):
             raise HTTPException(
                 status_code=404,
-                detail=f"Profile {request.profile_id} has no valid reference audio",
+                detail=f"Profile {req.profile_id} has no valid reference audio",
             )
 
         # Helper function to synthesize one sample
@@ -3719,15 +3723,15 @@ async def ab_test(request: ABTestRequest) -> ABTestResponse:
             # Create synthesis request
             synth_req = VoiceSynthesizeRequest(
                 engine=engine_name,
-                profile_id=request.profile_id,
-                text=request.text,
-                language=request.language,
+                profile_id=req.profile_id,
+                text=req.text,
+                language=req.language,
                 emotion=emotion,
                 enhance_quality=enhance_quality,
             )
 
             # Synthesize using existing endpoint logic
-            result = await synthesize(synth_req)
+            result = await synthesize_core(synth_req, http_request, config_service=None)
 
             return ABTestResult(
                 sample_label=label,
@@ -3742,11 +3746,11 @@ async def ab_test(request: ABTestRequest) -> ABTestResponse:
 
         # Synthesize both samples
         sample_a = await synthesize_sample(
-            request.engine_a, request.emotion_a, request.enhance_quality_a, "A"
+            req.engine_a, req.emotion_a, req.enhance_quality_a, "A"
         )
 
         sample_b = await synthesize_sample(
-            request.engine_b, request.emotion_b, request.enhance_quality_b, "B"
+            req.engine_b, req.emotion_b, req.enhance_quality_b, "B"
         )
 
         # Build comparison metrics
@@ -3804,6 +3808,7 @@ async def ab_test(request: ABTestRequest) -> ABTestResponse:
 
 @router.post("/synthesize/cross-lingual")
 async def synthesize_cross_lingual(
+    request: Request,
     text: str,
     profile_id: str,
     source_language: str = "en",
@@ -3811,12 +3816,52 @@ async def synthesize_cross_lingual(
     engine: str = "openvoice",
     enhance_quality: bool = True,
     calculate_quality: bool = True,
+    consent_id: str | None = None,
 ):
     """
     Zero-shot cross-lingual voice cloning (OpenVoice).
 
     Clones voice from source language to target language.
     """
+    # Demo mode gate
+    _policy = getattr(request.state, "voice_policy", None)
+    if _policy and _policy.demo_mode:
+        raise HTTPException(
+            status_code=403,
+            detail="Voice synthesis is disabled in demo mode.",
+        )
+
+    # Consent required for non-local profiles
+    if _check_consent_required(profile_id):
+        if not consent_id or not consent_id.strip():
+            raise HTTPException(
+                status_code=403,
+                detail="consent_id is required for third-party voice profiles.",
+            )
+        try:
+            from backend.services.security_service import (
+                ConsentStatus,
+                get_security_service,
+            )
+
+            _svc = get_security_service()
+            _record = _svc.consent.get_consent_by_id(consent_id.strip())
+            if not _record:
+                raise HTTPException(status_code=403, detail="Consent record not found.")
+            if _record.status != ConsentStatus.GRANTED:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Consent not granted (status={_record.status.value}).",
+                )
+            if not _record.is_valid:
+                raise HTTPException(
+                    status_code=403, detail="Consent expired or revoked."
+                )
+        except HTTPException:
+            raise
+        except Exception as _ce:
+            logger.warning("Consent check error: %s", _ce)
+
     if not ENGINE_AVAILABLE or not engine_router:
         raise HTTPException(status_code=503, detail="Engine router not available")
 
@@ -3857,16 +3902,35 @@ async def synthesize_cross_lingual(
 
         # Generate audio ID and store
         audio_id = str(uuid.uuid4())
-        _register_audio_file(audio_id, output_path)
+
+        # Calculate duration for provenance/usage
+        import wave
+
+        duration = 2.5
+        try:
+            with wave.open(output_path, "rb") as wav_file:
+                frames = wav_file.getnframes()
+                sample_rate = wav_file.getframerate()
+                duration = frames / float(sample_rate)
+        except (wave.Error, OSError) as wav_err:
+            logger.debug(f"Could not read duration from {output_path}: {wav_err}")
+
+        AudioRegistry.register(
+            audio_id,
+            output_path,
+            model_used=engine,
+            duration_seconds=duration if duration and duration > 0 else None,
+        )
 
         # Calculate quality if requested
         quality_metrics_obj = None
-        if calculate_quality and quality_metrics:
+        quality_provider = _get_quality_metrics()
+        if calculate_quality and quality_provider.get("calculate_all"):
             try:
                 import soundfile as sf
 
                 audio_array, sr = sf.read(output_path)
-                metrics = quality_metrics["calculate_all"](audio_array, sr)
+                metrics = quality_provider["calculate_all"](audio_array, sr)
                 quality_metrics_obj = QualityMetrics(
                     mos_score=metrics.get("mos_score"),
                     similarity=metrics.get("similarity"),
@@ -3875,18 +3939,6 @@ async def synthesize_cross_lingual(
                 )
             except Exception as e:
                 logger.warning(f"Quality calculation failed: {e}")
-
-        # Calculate duration
-        import wave
-
-        try:
-            with wave.open(output_path, "rb") as wav_file:
-                frames = wav_file.getnframes()
-                sample_rate = wav_file.getframerate()
-                duration = frames / float(sample_rate)
-        except (wave.Error, OSError) as wav_err:
-            logger.debug(f"Could not read duration from {output_path}: {wav_err}")
-            duration = 2.5
 
         return VoiceSynthesizeResponse(
             audio_id=audio_id,

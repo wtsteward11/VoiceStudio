@@ -25,14 +25,14 @@
 
 | Key | Type | Description |
 |-----|------|--------------|
-| `ui_smoke` | object | Must contain `exit_code` (int); may include `nav_steps_completed`, `binding_failure_count` |
+| `ui_smoke` | object | Must contain `exit_code` (int) equal to 0; may include `nav_steps_completed`, `binding_failure_count` |
 | `gatec_log` | string | Gate C publish log content or path to log |
 
 ### PROOF_INSTALLER_*.json
 
 | Key | Type | Description |
 |-----|------|--------------|
-| `results` | object | Step names to PASS/FAIL (e.g. InstallV1, LaunchV1, UpgradeV1ToV2, etc.) |
+| `results` | object | Must contain all lifecycle steps (InstallV1, LaunchV1, UpgradeV1ToV2, LaunchV2, RollbackV2ToV1, LaunchV1AfterRollback, UninstallV1); each value must be "PASS" when all_passed is true |
 | `all_passed` | bool | Must be true for valid proof |
 
 ### PROOF_PAYLOAD_DETOX_*.json
@@ -47,11 +47,16 @@
 - **exit_code**: Must equal 0
 - **timestamp**: Must parse as ISO8601
 - **git_commit**: Must be exactly 40 hex characters
-- **git_commit match**: In CI, must match `git rev-parse HEAD` unless `historical_proof: true` and path is in allowlist
+- **git_commit match**: In CI, must match `git rev-parse HEAD` unless `historical_proof: true` in the proof JSON
+
+## Nested Semantics (M10)
+
+- **PROOF_GATE_C**: `ui_smoke.exit_code` must equal 0
+- **PROOF_INSTALLER**: `results` must contain all keys from `results_required_keys` (InstallV1, LaunchV1, UpgradeV1ToV2, LaunchV2, RollbackV2ToV1, LaunchV1AfterRollback, UninstallV1). When `all_passed` is true, each result value must be "PASS". Update schema when `installer/test-installer-lifecycle.ps1` changes.
 
 ## Historical Proof Exception
 
-If a proof JSON contains `"historical_proof": true`, the git_commit match is skipped. Use only for proofs produced before schema enforcement. New proofs must NOT use this flag.
+The schema-level `historical_proof_allowlist` is deprecated and empty. The only exemption from git_commit match is `"historical_proof": true` in the proof JSON itself. Use only for proofs produced before schema enforcement that will not be regenerated. New proofs must NOT use this flag.
 
 ## Machine-Readable Schema
 

@@ -22,12 +22,24 @@
       "required": ["check_repo_payloads", "policy_file_summary"]
     }
   },
-  "historical_proof_allowlist": [
-    "docs/reports/verification/PROOF_PROVENANCE_2026-03-02.json",
-    "docs/reports/verification/PROOF_GATE_C_2026-03-02.json",
-    "docs/reports/verification/PROOF_INSTALLER_2026-03-02.json",
-    "docs/reports/verification/PROOF_PAYLOAD_DETOX_2026-03-02.json"
-  ],
+  "historical_proof_allowlist": [],
+  "nested_semantics": {
+    "PROOF_GATE_C": {
+      "ui_smoke.exit_code": 0
+    },
+    "PROOF_INSTALLER": {
+      "results_required_keys": [
+        "InstallV1",
+        "LaunchV1",
+        "UpgradeV1ToV2",
+        "LaunchV2",
+        "RollbackV2ToV1",
+        "LaunchV1AfterRollback",
+        "UninstallV1"
+      ],
+      "results_all_pass_when_all_passed_true": true
+    }
+  },
   "semantic_rules": {
     "exit_code_must_be_zero": true,
     "timestamp_iso8601": true,

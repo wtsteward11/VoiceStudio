@@ -61,33 +61,31 @@ except ImportError:  # ALLOWED: bare except - optional dependency
 EngineServiceDep = Annotated[Any, Depends(get_engine_service_dep)]
 
 
-# AudioArtifactRegistry dependency
+# AudioRegistryDB dependency (M9: canonical via audio_registry_service)
 def get_audio_registry_dep() -> Any:
-    """Get the AudioArtifactRegistry singleton."""
-    from backend.audio.processing.audio_artifact_registry import get_audio_registry
+    """Get the canonical AudioRegistryDB singleton."""
+    from backend.services.audio_registry_service import get_registry
 
-    return get_audio_registry()
+    return get_registry()
 
 
 _AudioArtifactRegistry: type = object
 try:
-    from backend.audio.processing.audio_artifact_registry import (
-        AudioArtifactRegistry,
-    )
+    from backend.services.audio_artifacts.registry_db import AudioRegistryDB
 
-    _AudioArtifactRegistry = AudioArtifactRegistry
+    _AudioArtifactRegistry = AudioRegistryDB
 except ImportError:  # ALLOWED: bare except - optional dependency
     pass
 
 AudioRegistryDep = Annotated[Any, Depends(get_audio_registry_dep)]
 
 
-# ContentAddressedAudioCache dependency
+# ContentAddressedAudioCache dependency (M9: via service only)
 def get_audio_cache_dep() -> Any:
-    """Get the ContentAddressedAudioCache singleton."""
-    from backend.audio.processing.content_addressed_audio_cache import get_audio_cache
+    """Get the content-addressed cache via audio_registry_service."""
+    from backend.services.audio_registry_service import get_cache
 
-    return get_audio_cache()
+    return get_cache()
 
 
 _ContentAddressedAudioCache: type = object

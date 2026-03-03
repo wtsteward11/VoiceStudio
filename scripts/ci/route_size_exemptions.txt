@@ -1,0 +1,3 @@
+# Route files exempt from line limit (one per line, path relative to backend/api/routes)
+# quality.py passes after Phase 3 thinning (1395 lines)
+# voice.py removed: Phase A complete, god-route deleted, voice/ package is canonical

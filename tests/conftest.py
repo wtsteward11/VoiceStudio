@@ -8,6 +8,23 @@ Task 9.1: Pytest configuration and fixtures.
 import sys
 from pathlib import Path
 
+# Guard against thinc/numpy seed overflow with pytest-randomly (C-T2).
+# thinc registers a reseed callback that passes the seed to numpy.random.seed()
+# without clamping, causing ValueError when seed + CRC32 offset exceeds 2**32.
+try:
+    import numpy as np
+
+    _original_np_random_seed = np.random.seed
+
+    def _safe_np_random_seed(seed=None):
+        if seed is not None and isinstance(seed, int) and seed >= 2**32:
+            seed = seed % (2**32 - 1)
+        _original_np_random_seed(seed)
+
+    np.random.seed = _safe_np_random_seed
+except ImportError:
+    pass
+
 PROJECT_ROOT = Path(__file__).parent.parent
 _project_root_str = str(PROJECT_ROOT)
 # Force insert at position 0 to ensure it takes precedence
@@ -272,6 +289,36 @@ def test_env(clean_env):
     os.environ["VOICESTUDIO_TEST"] = "1"
     os.environ["VOICESTUDIO_LOG_LEVEL"] = "DEBUG"
     return os.environ
+
+
+# ============================================================================
+# State Isolation Fixtures (C-T2)
+# ============================================================================
+
+
+@pytest.fixture(autouse=True)
+def clear_route_job_stores():
+    """Clear module-level in-memory job stores after each test."""
+    yield
+    try:
+        import backend.api.routes.ensemble as ensemble_mod
+
+        ensemble_mod._ensemble_jobs.clear()
+        ensemble_mod._multi_engine_ensemble_jobs.clear()
+    except (ImportError, AttributeError):
+        pass
+    try:
+        import backend.api.routes.multi_voice_generator as mvg_mod
+
+        mvg_mod._multi_voice_jobs.clear()
+    except (ImportError, AttributeError):
+        pass
+    try:
+        import backend.api.routes.voice_cloning_wizard as wizard_mod
+
+        wizard_mod._wizard_jobs.clear()
+    except (ImportError, AttributeError):
+        pass
 
 
 # ============================================================================

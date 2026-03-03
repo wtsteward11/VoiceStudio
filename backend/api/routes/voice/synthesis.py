@@ -10,11 +10,13 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
+
+from backend.api.dependencies import require_synthesis_clearance
 from fastapi.responses import FileResponse
 
-from backend.services.audio_artifacts import AudioRegistry
+from backend.services.audio_artifacts.use_cases import create_audio_artifact_from_file
 
-from ..models_additional import (
+from ...models_additional import (
     MultiPassSynthesisRequest,
     MultiPassSynthesisResponse,
     QualityMetrics,
@@ -22,8 +24,6 @@ from ..models_additional import (
     VoiceSynthesizeResponse,
 )
 from . import _shared
-from backend.services.audio_artifacts.use_cases import create_audio_artifact_from_file
-
 from ._helpers import (
     _download_url_to_file,
     _ensure_engine_router,
@@ -58,6 +58,7 @@ logger = logging.getLogger(__name__)
 async def synthesize(
     req: VoiceSynthesizeRequest,
     request: Request,
+    _policy: None = Depends(require_synthesis_clearance),
     config_service: EngineConfigServiceDep | None = None,
 ) -> VoiceSynthesizeResponse:
     """
@@ -191,15 +192,9 @@ async def synthesize(
 
                     profile = _profiles[req.profile_id]
 
-                    # Resolve reference audio path using helper (Phase 1B extraction)
-                    profile_dir = os.path.join(
-                        os.path.expanduser("~"),
-                        ".voicestudio",
-                        "profiles",
-                        req.profile_id,
-                    )
+                    # Resolve reference audio path using canonical profiles dir
                     profile_audio_path = await _resolve_profile_audio(
-                        req.profile_id, profile, profile_dir
+                        req.profile_id, profile
                     )
 
                     # Preprocess text using NLP if available
@@ -513,6 +508,7 @@ async def synthesize(
 async def synthesize_multipass(
     req: MultiPassSynthesisRequest,
     request: Request,
+    _policy: None = Depends(require_synthesis_clearance),
 ) -> MultiPassSynthesisResponse:
     """
     Multi-pass synthesis with quality refinement (IDEA 61).
@@ -520,7 +516,7 @@ async def synthesize_multipass(
     Generates multiple synthesis passes, compares quality metrics,
     and selects the best segments for maximum quality output.
     """
-    from ..models_additional import (
+    from ...models_additional import (
         MultiPassSynthesisResponse,
         PassResult,
         QualityMetrics,
@@ -573,16 +569,11 @@ async def synthesize_multipass(
                 profile_audio_path = profile.reference_audio_url
 
         if not profile_audio_path:
-            profile_dir = os.path.join(
-                os.path.expanduser("~"), ".voicestudio", "profiles", req.profile_id
-            )
-            for path in [
-                os.path.join(profile_dir, "reference.wav"),
-                os.path.join(profile_dir, "reference_audio.wav"),
-            ]:
-                if os.path.exists(path):
-                    profile_audio_path = path
-                    break
+            from backend.services.profile_service import resolve_reference_audio_path
+
+            resolved = resolve_reference_audio_path(req.profile_id)
+            if resolved.exists():
+                profile_audio_path = str(resolved)
 
         if not profile_audio_path or not os.path.exists(profile_audio_path):
             raise HTTPException(
@@ -718,12 +709,13 @@ async def synthesize_with_style(
     emotion: str | None = None,
     accent: str | None = None,
     rhythm: float | None = None,
-    pauses: str | None = None,  # JSON string of pause positions and durations
+    pauses: str | None = None,
     pitch_shift: float | None = None,
     pitch_variance: float | None = None,
     energy: float | None = None,
     enhance_quality: bool = True,
     calculate_quality: bool = True,
+    _policy: None = Depends(require_synthesis_clearance),
 ):
     """
     Synthesize with granular style control (OpenVoice).
@@ -775,9 +767,12 @@ async def synthesize_with_style(
             intonation["energy"] = energy
 
         # Get profile audio path
-        profile_audio_path = f"profiles/{profile_id}/reference.wav"
-        if not os.path.exists(profile_audio_path):
+        from backend.services.profile_service import resolve_reference_audio_path
+
+        profile_audio_path = resolve_reference_audio_path(profile_id)
+        if not profile_audio_path.exists():
             raise HTTPException(status_code=404, detail=f"Profile audio not found: {profile_id}")
+        profile_audio_path = str(profile_audio_path)
 
         # Synthesize with style
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
@@ -795,12 +790,12 @@ async def synthesize_with_style(
             pause_positions=pause_positions,
         )
 
-        # Generate audio ID and store
-        audio_id = str(uuid.uuid4())
-        AudioRegistry.register(
-            audio_id,
+        # Store via artifact spine (registry + provenance)
+        audio_id, _, _ = create_audio_artifact_from_file(
             output_path,
-            model_used="style",
+            created_by="style",
+            project_id=None,
+            source="style_transfer",
         )
 
         # Calculate quality if requested
@@ -857,6 +852,7 @@ async def synthesize_cross_lingual(
     engine: str = "openvoice",
     enhance_quality: bool = True,
     calculate_quality: bool = True,
+    _policy: None = Depends(require_synthesis_clearance),
 ):
     """
     Zero-shot cross-lingual voice cloning (OpenVoice).
@@ -887,9 +883,12 @@ async def synthesize_cross_lingual(
             )
 
         # Get profile audio path
-        profile_audio_path = f"profiles/{profile_id}/reference.wav"
-        if not os.path.exists(profile_audio_path):
+        from backend.services.profile_service import resolve_reference_audio_path
+
+        profile_audio_path = resolve_reference_audio_path(profile_id)
+        if not profile_audio_path.exists():
             raise HTTPException(status_code=404, detail=f"Profile audio not found: {profile_id}")
+        profile_audio_path = str(profile_audio_path)
 
         # Synthesize cross-lingual (artifact spine: NamedTemporaryFile + create_audio_artifact_from_file)
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:

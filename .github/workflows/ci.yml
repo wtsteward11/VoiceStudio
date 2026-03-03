@@ -31,10 +31,23 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
       
+      - name: CI guardrails (route boundaries + route size + service boundaries + service size + repo payloads)
+        run: |
+          python scripts/ci/check_route_boundaries.py
+          python scripts/ci/check_route_size.py
+          python scripts/ci/check_service_boundaries.py
+          python scripts/ci/check_service_size.py
+          python scripts/ci/check_repo_payloads.py
+      
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev,extras]"
+
+      - name: Artifact spine compliance
+        run: |
+          python scripts/ci/check_artifact_spine_compliance.py
+          python -m pytest tests/guardrails/test_route_table_and_spine.py -q
       
       - name: Run linting
         run: |
@@ -48,7 +61,9 @@ jobs:
       
       - name: Run tests
         run: |
-          python -m pytest tests/ -v --cov=backend --cov=app --cov-report=xml
+          python -m pytest tests/ -v --cov=backend --cov=app --cov-report=xml --randomly-seed=12345
+          python -m pytest tests/ -q --randomly-seed=99999
+          python -m pytest tests/ -q --randomly-seed=55555
       
       - name: Upload coverage
         uses: codecov/codecov-action@v4

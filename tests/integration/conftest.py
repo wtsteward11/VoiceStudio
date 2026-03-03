@@ -307,6 +307,25 @@ def setup_test_environment():
 
 
 # =============================================================================
+# State Isolation Fixtures (C-T2)
+# =============================================================================
+
+
+@pytest.fixture(autouse=True)
+def reset_performance_middleware_metrics():
+    """Clear per-request metrics from performance monitoring middleware."""
+    yield
+    try:
+        from backend.api.middleware_setup import get_performance_middleware
+
+        mw = get_performance_middleware()
+        if mw is not None:
+            mw.reset()
+    except Exception:
+        pass
+
+
+# =============================================================================
 # Sample Data Fixtures
 # =============================================================================
 

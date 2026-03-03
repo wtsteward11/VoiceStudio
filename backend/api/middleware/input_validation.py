@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from typing import Any
 from urllib.parse import unquote
 
@@ -44,6 +45,13 @@ SQL_INJECTION_PATTERNS = [
 
 MAX_STRING_LENGTH = 10000  # Maximum string length for input fields
 MAX_PATH_LENGTH = 260  # Windows MAX_PATH limit
+
+_FORBIDDEN_UNICODE_CATEGORIES = frozenset({"Cf", "Cc", "Cs", "Zl", "Zp"})
+
+
+def _path_contains_unicode_control(path: str) -> bool:
+    """Return True if *path* contains any Unicode control/format/surrogate codepoint."""
+    return any(unicodedata.category(ch) in _FORBIDDEN_UNICODE_CATEGORIES for ch in path)
 
 
 class InputValidationMiddleware(BaseHTTPMiddleware):
@@ -205,6 +213,19 @@ class InputValidationMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         """Process request with input validation."""
+        path = request.url.path
+        if _path_contains_unicode_control(path):
+            from fastapi.responses import JSONResponse
+
+            logger.warning(
+                "Rejected request with Unicode control chars in path: %r",
+                path.encode("unicode_escape").decode("ascii"),
+            )
+            return JSONResponse(
+                status_code=400,
+                content={"error": "INVALID_PATH", "message": "Path contains invalid characters."},
+            )
+
         # Skip validation for certain paths
         if not self.enabled or request.url.path in self.skip_paths:
             return await call_next(request)

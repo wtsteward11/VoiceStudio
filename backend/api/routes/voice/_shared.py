@@ -53,8 +53,6 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 
-from backend.audio.processing.audio_artifact_registry import get_audio_registry
-from backend.audio.processing.content_addressed_audio_cache import get_audio_cache
 from backend.core.circuit_breaker import get_engine_breaker
 from backend.core.security.file_validation import (
     FileCategory,
@@ -71,22 +69,22 @@ from backend.ml.models.model_preflight import (
 )
 from backend.platform.config.unified_config import get_config
 
-from ..deps import EngineConfigServiceDep, EngineServiceDep
-from ..exceptions import (
+from ...deps import EngineConfigServiceDep, EngineServiceDep
+from ...exceptions import (
     EngineProcessingException,
     EngineUnavailableException,
     InvalidEngineException,
     ProfileNotFoundException,
 )
-from ..middleware.auth_middleware import require_auth_if_enabled
-from ..security.voice_policy import enforce_voice_policy as _enforce_voice_policy
+from ...middleware.auth_middleware import require_auth_if_enabled
+from ...security.voice_policy import enforce_voice_policy_http as _enforce_voice_policy
 
 # WebSocket protocol for standardized messaging (GAP-CRIT-002)
-from ..ws.protocol import ErrorCode, MessageType, create_complete, create_error, create_message
+from ...ws.protocol import ErrorCode, MessageType, create_complete, create_error, create_message
 
 HAS_PITCH_TRACKER = False
 try:
-    from ..audio_processing import PitchTracker
+    from ...audio_processing import PitchTracker
 
     HAS_PITCH_TRACKER = True
 except Exception as _pitch_import_err:
@@ -97,9 +95,9 @@ except Exception as _pitch_import_err:
 # Import correlation ID support for enhanced logging (Phase 3A, GAP-I08)
 import contextlib
 
-from ..dependencies import RequestContext, get_request_context
-from ..middleware.correlation_id import get_correlation_id, get_span_id, get_trace_id
-from ..models_additional import (
+from ...dependencies import RequestContext, get_request_context
+from ...middleware.correlation_id import get_correlation_id, get_span_id, get_trace_id
+from ...models_additional import (
     ABTestRequest,
     ABTestResponse,
     ABTestResult,
@@ -121,9 +119,9 @@ from ..models_additional import (
     VoiceSynthesizeRequest,
     VoiceSynthesizeResponse,
 )
-from ..optimization import cache_response
-from ..utils.instrumentation import EventType, instrument_flow
-from ..utils.quality_batch import calculate_batch_quality_score
+from ...optimization import cache_response
+from ...utils.instrumentation import EventType, instrument_flow
+from ...utils.quality_batch import calculate_batch_quality_score
 
 logger = logging.getLogger(__name__)
 
@@ -152,11 +150,9 @@ _ENGINE_ID_ALIASES: dict[str, str] = {
     "xtts": "xtts_v2",
 }
 
-# Audio artifact registry: single source of truth for audio_id -> path.
-_audio_registry = get_audio_registry()
 _state_lock = asyncio.Lock()
 
-# Cleanup configuration (mapping only; cached files are content-addressed and not deleted here)
+# Cleanup configuration (mapping only; registry rows removed, files not deleted)
 AUDIO_STORAGE_MAX_AGE_SECONDS = 7 * 24 * 3600  # 7 days
 AUDIO_STORAGE_MAX_SIZE = 2000  # Maximum number of registered audio IDs to keep
 

@@ -17,7 +17,6 @@ from typing import Any
 import numpy as np
 from fastapi import HTTPException, WebSocket
 
-from backend.audio.processing.content_addressed_audio_cache import get_audio_cache
 from backend.core.circuit_breaker import get_engine_breaker
 from backend.ml.models.engine_service import get_engine_service
 from backend.ml.models.model_preflight import (
@@ -27,23 +26,21 @@ from backend.ml.models.model_preflight import (
     ensure_xtts,
 )
 from backend.platform.config.unified_config import get_config
-
-from ...exceptions import InvalidEngineException
-from ...middleware.correlation_id import get_correlation_id, get_span_id, get_trace_id
-from ...models_additional import QualityMetrics, VoiceCloneResponse
-from backend.services.audio_download_service import download_audio_to_temp
 from backend.services.audio_artifacts.use_cases import (
     create_audio_artifact_from_file,
     create_audio_artifact_from_wav_array,
 )
+from backend.services.audio_download_service import download_audio_to_temp
 
+from ...exceptions import InvalidEngineException
+from ...middleware.correlation_id import get_correlation_id, get_span_id, get_trace_id
+from ...models_additional import QualityMetrics, VoiceCloneResponse
 from . import _shared
 from ._shared import (
     _ENGINE_ID_ALIASES,
     AUDIO_STORAGE_MAX_AGE_SECONDS,
     AUDIO_STORAGE_MAX_SIZE,
     HAS_HTTPX,
-    _audio_registry,
     logger,
 )
 
@@ -162,17 +159,18 @@ def _ensure_vc_assets(engine_id: str):
 
 def _dedupe_and_get_path(output_path: str) -> str:
     """
-    Place synthesized audio into the content-addressed cache and return cached path.
+    Place synthesized audio into content-addressed cache; return cached path.
 
     Falls back to the original path on any failure.
     """
     try:
-        cache = get_audio_cache()
-        cached_path = cache.ensure_cached(Path(output_path))
+        from backend.services.audio_registry_service import ensure_cached
+
+        cached_path = ensure_cached(Path(output_path))
         if cached_path and os.path.exists(cached_path):
             return str(cached_path)
     except Exception as e:
-        logger.warning(f"Audio cache deduplication failed for {output_path}: {e}")
+        logger.warning("Audio cache deduplication failed for %s: %s", output_path, e)
     return output_path
 
 
@@ -220,41 +218,16 @@ def _coerce_optional_float(value: Any) -> float | None:
         return None
 
 
-def _cleanup_old_audio_files():
+def _cleanup_old_audio_files() -> None:
     """
-    Clean up old audio files from storage to prevent memory accumulation.
+    Purge old registry entries (mapping only; does not delete files).
 
-    Removes:
-    - Files older than AUDIO_STORAGE_MAX_AGE_SECONDS
-    - Files beyond AUDIO_STORAGE_MAX_SIZE (oldest first)
+    Removes entries older than AUDIO_STORAGE_MAX_AGE_SECONDS or beyond
+    AUDIO_STORAGE_MAX_SIZE (oldest first).
     """
-    current_time = time.time()
-    to_remove = []
-    entries = _audio_registry.get_entries_sorted_by_age()
-    count = len(entries)
+    from backend.services.audio_registry_service import purge_old_entries
 
-    # Find files that are too old
-    for audio_id, created_at in entries:
-        age = current_time - created_at
-        if age > AUDIO_STORAGE_MAX_AGE_SECONDS:
-            to_remove.append(audio_id)
-
-    # If storage is too large, remove oldest files
-    if count > AUDIO_STORAGE_MAX_SIZE:
-        excess = count - AUDIO_STORAGE_MAX_SIZE
-        for audio_id, _ in entries[:excess]:
-            if audio_id not in to_remove:
-                to_remove.append(audio_id)
-
-    # Remove mappings (do NOT delete cached files; they may be shared)
-    for audio_id in to_remove:
-        try:
-            _audio_registry.remove(audio_id)
-        except Exception as e:
-            logger.debug(f"Failed to remove audio_id from registry: {e}")
-
-    if to_remove:
-        logger.info(f"Cleaned up {len(to_remove)} old audio files from storage")
+    purge_old_entries(AUDIO_STORAGE_MAX_AGE_SECONDS, AUDIO_STORAGE_MAX_SIZE)
 
 
 def _save_audio_to_project(project_id: str, audio_id: str, source_path: str) -> str:
@@ -315,20 +288,19 @@ def _get_quality_metrics():
 async def _resolve_profile_audio(
     profile_id: str,
     profile: Any,
-    profile_dir: str,
+    profile_dir: str | None = None,
 ) -> str:
     """
     Resolve the reference audio path for a voice profile.
 
     Priority order:
-    1. Authoritative path: ~/.voicestudio/profiles/{id}/reference_audio.wav
-    2. Alternate names in profile dir (reference.wav, audio.wav)
-    3. profile.reference_audio_url (file path or HTTP URL)
+    1. Canonical path: get_path("profiles")/{id}/reference_audio.wav (or fallbacks)
+    2. profile.reference_audio_url (file path or HTTP URL)
 
     Args:
         profile_id: The profile identifier
         profile: The profile object with reference_audio_url attribute
-        profile_dir: Directory containing profile files
+        profile_dir: Optional directory; if None, uses PathService.get_profiles_dir() / profile_id
 
     Returns:
         Path to the reference audio file
@@ -336,9 +308,14 @@ async def _resolve_profile_audio(
     Raises:
         HTTPException: If no valid reference audio is found
     """
+    from backend.services.path_service import PathService
+
+    if profile_dir is None:
+        profile_dir = str(PathService.get_profiles_dir() / profile_id)
+
     profile_audio_path = None
 
-    # Try authoritative path first
+    # Try canonical path first (reference_audio.wav, reference.wav, audio.wav)
     authoritative_path = os.path.join(profile_dir, "reference_audio.wav")
     if os.path.exists(authoritative_path):
         profile_audio_path = authoritative_path

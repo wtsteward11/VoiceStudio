@@ -86,3 +86,29 @@ Start-Process ".buildlogs\x64\Debug\net8.0-windows10.0.19041.0\VoiceStudio.App.e
 dotnet build VoiceStudio.sln -c Release -p:Platform=x64
 .\scripts\gatec-publish-launch.ps1 -Configuration Release -RuntimeIdentifier win-x64 -NoLaunch
 ```
+
+## Real Mode Golden Path (SSOT Proof)
+
+Runs the **real** golden path E2E test (with actual engines) and generates a PROOF_GOLDEN_PATH_REAL_*.json SSOT proof.
+
+**Prerequisites:**
+- Backend running on `http://localhost:8000`
+- `whisper_cpp` GGUF model installed
+- `piper` or `xtts` model installed
+- Check: `python scripts/golden_path_preconditions.py --check-backend http://localhost:8000 --json`
+
+**Command:**
+```powershell
+.\scripts\dev\run_golden_path_real.ps1
+```
+
+**Expected output:**
+- `PROOF_GOLDEN_PATH_REAL_YYYY-MM-DD.json` in `docs/reports/verification/`
+
+**To commit the proof:**
+```powershell
+git add docs/reports/verification/PROOF_GOLDEN_PATH_REAL_*.json
+git commit -m "ci(proof): add real-mode golden path proof"
+```
+
+**Note:** Real mode is a developer-machine gate. GitHub Actions runners do not have models. A self-hosted runner with preinstalled models is required for CI real-mode enforcement.

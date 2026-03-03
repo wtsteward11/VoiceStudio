@@ -34,11 +34,11 @@ class Layer(Enum):
 
 
 # Layer definitions by path pattern
+# backend/application/ removed: Phase B (ADR-046) deleted mediator/CQRS layer
 LAYER_PATTERNS: dict[str, Layer] = {
     "backend/api/routes/": Layer.API,
     "backend/api/middleware/": Layer.API,
     "backend/api/": Layer.API,
-    "backend/application/": Layer.APPLICATION,
     "backend/services/": Layer.SERVICES,
     "backend/domain/": Layer.DOMAIN,
     "backend/infrastructure/": Layer.INFRASTRUCTURE,
@@ -48,9 +48,9 @@ LAYER_PATTERNS: dict[str, Layer] = {
 }
 
 # Allowed dependencies (key can import from values)
+# Layer.APPLICATION removed: Phase B (ADR-046) deleted mediator layer
 ALLOWED_DEPENDENCIES: dict[Layer, set[Layer]] = {
-    Layer.API: {Layer.APPLICATION, Layer.SERVICES, Layer.DOMAIN, Layer.EXTERNAL},
-    Layer.APPLICATION: {Layer.SERVICES, Layer.DOMAIN, Layer.EXTERNAL},
+    Layer.API: {Layer.SERVICES, Layer.DOMAIN, Layer.EXTERNAL},
     Layer.SERVICES: {Layer.DOMAIN, Layer.INFRASTRUCTURE, Layer.EXTERNAL},
     Layer.INFRASTRUCTURE: {Layer.DOMAIN, Layer.EXTERNAL},
     Layer.DOMAIN: {Layer.EXTERNAL},  # Domain should only import stdlib/external
@@ -114,8 +114,7 @@ def get_import_layer(module: str) -> Layer:
         return Layer.API
     if module.startswith("backend.api"):
         return Layer.API
-    if module.startswith("backend.application"):
-        return Layer.APPLICATION
+    # backend.application removed: Phase B (ADR-046)
     if module.startswith("backend.services"):
         return Layer.SERVICES
     if module.startswith("backend.domain"):

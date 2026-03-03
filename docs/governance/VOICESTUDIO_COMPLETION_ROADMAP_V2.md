@@ -92,10 +92,9 @@ Six phases. Every milestone has a CI gate, a specific command, or a hard fork de
 - [x] **A2**: Migrate all remaining endpoints to voice/ with service delegation — already done
 - [x] **A3**: Delete voice.py (139 KB), create voice/__init__.py, enable I-1 (3/3 pass)
 
-### Phase B: Mediator Hard Decision Gate
+### Phase B: Mediator Hard Decision Gate — COMPLETE (2026-03-03)
 
-- **B-WIRE** or **B-DELETE** — no half-wiring
-- Evidence points toward DELETE (dispatcher unused for 2+ months)
+- [x] **B-DELETE**: Removed `backend/application/` (11 files, ~20 KB). ADR-046. Routes call services directly.
 
 ### Phase C: Stability — COMPLETE (2026-03-03)
 
@@ -132,8 +131,8 @@ Six phases. Every milestone has a CI gate, a specific command, or a hard fork de
 | 4 | Phase A | A1 — Gap Matrix | HIGH | Must know what to migrate | DONE |
 | 5 | Phase A | A2 — Migrate Endpoints | HIGH | Complete the split | DONE |
 | 6 | Phase A | A3 — Delete voice.py + I-1 | HIGH | Removes dual-routing ambiguity | DONE |
-| 7 | Phase B | B-WIRE or B-DELETE | DECISION | After route decomp | NEXT |
-| 8 | Phase D | D1 — Safety Choke Point + I-2 | HIGH | Must be done before Golden Path |
+| 7 | Phase B | B-DELETE (mediator removed) | DECISION | After route decomp | DONE |
+| 8 | Phase D | D1 — Safety Choke Point + I-2 | HIGH | Must be done before Golden Path | NEXT |
 | 9 | Phase D | D2 — OpenAPI + I-4 | MEDIUM | API contract |
 | 10 | Phase E | E1-E3 — Real Engine Run + Proof | RELEASE GATE | Requires all previous phases |
 | 11 | Phase E | E4 — Golden Path CI | MEDIUM | Automated regression guard |

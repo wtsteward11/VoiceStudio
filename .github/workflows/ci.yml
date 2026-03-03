@@ -138,6 +138,52 @@ jobs:
           python -m pytest tests/integration/ -v -m integration
 
   # ============================================================================
+  # Phase E: Golden Path (stub mode)
+  # ============================================================================
+  golden-path:
+    name: Golden Path (Phase E)
+    runs-on: ubuntu-latest
+    needs: [python-tests]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,extras]"
+      
+      - name: Run golden path integration test (stub mode)
+        env:
+          VOICESTUDIO_TEST_MODE: stub
+        run: |
+          python -m pytest tests/integration/test_golden_path_e2e.py -v --tb=short
+
+      - name: Generate SSOT proof artifact
+        env:
+          VOICESTUDIO_TEST_MODE: stub
+        run: |
+          python scripts/ci/write_golden_path_proof.py --engine-mode stub --no-run-test
+
+      - name: Validate SSOT proof (schema + fingerprint + git match)
+        run: |
+          python scripts/ci/check_state_proofs.py --validate-file "docs/reports/verification/PROOF_GOLDEN_PATH_STUB_*.json"
+
+      - name: Upload proof artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: golden-path-proof
+          path: docs/reports/verification/PROOF_GOLDEN_PATH_*.json
+          retention-days: 90
+
+  # ============================================================================
   # Security Scan
   # ============================================================================
   security-scan:
@@ -497,7 +543,7 @@ jobs:
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [python-tests, dotnet-build, integration-tests, security-scan, code-quality]
+    needs: [python-tests, dotnet-build, integration-tests, golden-path, security-scan, code-quality]
     if: always()
     
     steps:
@@ -506,6 +552,7 @@ jobs:
           echo "Python Tests: ${{ needs.python-tests.result }}"
           echo ".NET Build: ${{ needs.dotnet-build.result }}"
           echo "Integration Tests: ${{ needs.integration-tests.result }}"
+          echo "Golden Path: ${{ needs.golden-path.result }}"
           echo "Security Scan: ${{ needs.security-scan.result }}"
           echo "Code Quality: ${{ needs.code-quality.result }}"
           

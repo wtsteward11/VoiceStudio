@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import re
 import subprocess
@@ -24,6 +25,9 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from scripts.ci.proof_fingerprint import compute_fingerprint
 STATE_PATH = ROOT / ".cursor" / "STATE.md"
 SCHEMA_PATH = ROOT / ".ci" / "proof_schema.json"
 
@@ -68,13 +72,39 @@ def load_schema() -> dict:
     return json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
 
+def _load_allowlisted_paths(schema: dict) -> list[str]:
+    """Load allowlisted proof paths from historical_proofs_allowlist.json."""
+    allowlist_path = ROOT / schema.get(
+        "historical_proofs_allowlist_path", ".ci/historical_proofs_allowlist.json"
+    )
+    if not allowlist_path.exists():
+        return []
+    try:
+        allowlist = json.loads(allowlist_path.read_text(encoding="utf-8"))
+        if isinstance(allowlist, list):
+            return [e.get("path", "") for e in allowlist if isinstance(e, dict)]
+    except (json.JSONDecodeError, OSError):
+        pass
+    return []
+
+
 def get_proof_type(basename: str) -> str | None:
     """Return schema key for proof type (e.g. PROOF_GATE_C) or None if unknown."""
     if not basename.startswith("PROOF_") or not basename.endswith(PROOF_JSON_SUFFIX):
         return None
     stem = basename[: -len(PROOF_JSON_SUFFIX)]
-    # Match longest prefix: PROOF_PROVENANCE, PROOF_GATE_C, PROOF_INSTALLER, PROOF_PAYLOAD_DETOX
-    for prefix in ("PROOF_PAYLOAD_DETOX", "PROOF_PROVENANCE", "PROOF_GATE_C", "PROOF_INSTALLER"):
+    # Match longest prefix first: PROOF_PHASE_3, PROOF_PHASE_2_1, then PROOF_PHASE (legacy-only last)
+    for prefix in (
+        "PROOF_PAYLOAD_DETOX",
+        "PROOF_PROVENANCE",
+        "PROOF_GATE_C",
+        "PROOF_INSTALLER",
+        "PROOF_GOLDEN_PATH",
+        "PROOF_UI_COMMAND_SURFACE",
+        "PROOF_PHASE_3",
+        "PROOF_PHASE_2_1",
+        "PROOF_PHASE",
+    ):
         if stem == prefix or stem.startswith(prefix + "_"):
             return prefix
     return None
@@ -82,8 +112,10 @@ def get_proof_type(basename: str) -> str | None:
 
 def get_required_keys(schema: dict, proof_type: str) -> list[str]:
     """Return all required keys for proof type."""
-    common = schema.get("common_required", [])
     type_spec = schema.get("type_specific", {}).get(proof_type, {})
+    if type_spec.get("override_common"):
+        return list(type_spec.get("required", []))
+    common = schema.get("common_required", [])
     extra = type_spec.get("required", [])
     return list(common) + list(extra)
 
@@ -143,6 +175,48 @@ def validate_nested_semantics(
                             f"{path.relative_to(ROOT)}: all_passed=true but results not all PASS: {failed}"
                         )
 
+    elif proof_type == "PROOF_GOLDEN_PATH":
+        engine_mode = data.get("engine_mode")
+        if engine_mode not in ("stub", "real"):
+            errors.append(
+                f"{path.relative_to(ROOT)}: engine_mode must be 'stub' or 'real', got {engine_mode!r}"
+            )
+        if data.get("all_steps_passed") is not True:
+            errors.append(
+                f"{path.relative_to(ROOT)}: all_steps_passed must be true"
+            )
+        ofh = data.get("output_file_hash", "")
+        if not re.match(r"^[a-f0-9]{64}$", str(ofh)):
+            errors.append(
+                f"{path.relative_to(ROOT)}: output_file_hash must be 64-char hex, got {str(ofh)[:20]}"
+            )
+        mh = data.get("model_hashes")
+        if not isinstance(mh, dict):
+            errors.append(
+                f"{path.relative_to(ROOT)}: model_hashes must be a dict"
+            )
+        if engine_mode == "real":
+            d = data.get("output_duration_seconds", 0)
+            if not isinstance(d, (int, float)) or d <= 0:
+                errors.append(
+                    f"{path.relative_to(ROOT)}: output_duration_seconds must be > 0 for real mode"
+                )
+            e = data.get("output_energy_rms", 0)
+            if not isinstance(e, (int, float)) or e <= 0.001:
+                errors.append(
+                    f"{path.relative_to(ROOT)}: output_energy_rms must be > 0.001 for real mode"
+                )
+
+    elif proof_type == "PROOF_UI_COMMAND_SURFACE":
+        if data.get("all_commands_registered") is not True:
+            errors.append(
+                f"{path.relative_to(ROOT)}: all_commands_registered must be true"
+            )
+        if data.get("all_panels_registered") is not True:
+            errors.append(
+                f"{path.relative_to(ROOT)}: all_panels_registered must be true"
+            )
+
     return errors
 
 
@@ -194,6 +268,19 @@ def validate_proof(
         errors.append(f"{path.relative_to(ROOT)}: missing required keys: {missing}")
         errors.append(f"  expected schema: {required}")
 
+    # PROOF_PHASE legacy-only: fail unless historical_proof + allowlisted
+    if proof_type == "PROOF_PHASE" and not missing:
+        rel_path = str(path.relative_to(ROOT)).replace("\\", "/")
+        allowlisted_paths = _load_allowlisted_paths(schema)
+        if not (data.get("historical_proof") is True and rel_path in allowlisted_paths):
+            errors.append(
+                f"{path.relative_to(ROOT)}: PROOF_PHASE (weak) is no longer accepted; "
+                "use PROOF_PHASE_2_1 or PROOF_PHASE_3. For legacy proofs only: "
+                "set historical_proof=true and add path to .ci/historical_proofs_allowlist.json"
+            )
+            return errors
+        return []
+
     # Type checks for common keys
     type_checks = [
         ("command", "str"),
@@ -201,6 +288,7 @@ def validate_proof(
         ("timestamp", "str"),
         ("git_commit", "str"),
         ("git_branch", "str"),
+        ("evidence_fingerprint", "str"),
     ]
     for key, expected in type_checks:
         if key in data and (err := validate_types(data, key, expected)):
@@ -230,6 +318,29 @@ def validate_proof(
     if gc and not (isinstance(gc, str) and len(gc) == 40 and all(c in "0123456789abcdef" for c in gc.lower())):
         errors.append(f"{path.relative_to(ROOT)}: git_commit must be 40 hex chars, got {gc!r}")
 
+    # M11: Refresh rules — refreshed proofs require historical_proof and allowlist
+    if data.get("refreshed") is True:
+        if data.get("historical_proof") is not True:
+            errors.append(
+                f"{path.relative_to(ROOT)}: refreshed=true requires historical_proof=true"
+            )
+        else:
+            rel_path = str(path.relative_to(ROOT)).replace("\\", "/")
+            allowlisted_paths = _load_allowlisted_paths(schema)
+            if rel_path not in allowlisted_paths:
+                errors.append(
+                    f"{path.relative_to(ROOT)}: refreshed proof not in .ci/historical_proofs_allowlist.json"
+                )
+
+    # M11: Evidence fingerprint validation
+    stored_fp = data.get("evidence_fingerprint")
+    expected_fp = compute_fingerprint(data, proof_type)
+    if stored_fp != expected_fp:
+        got = f"{stored_fp[:16]}..." if stored_fp else "missing"
+        errors.append(
+            f"{path.relative_to(ROOT)}: evidence_fingerprint mismatch (expected {expected_fp[:16]}..., got {got})"
+        )
+
     # Semantic: git_commit matches HEAD (unless historical_proof or --no-git-match)
     if not no_git_match and not data.get("historical_proof"):
         try:
@@ -258,30 +369,52 @@ def main() -> int:
         action="store_true",
         help="Skip git_commit vs HEAD check (for local dev after regeneration)",
     )
+    parser.add_argument(
+        "--validate-file",
+        type=str,
+        default=None,
+        help="Validate a specific proof file or glob (bypass STATE.md extraction)",
+    )
     args = parser.parse_args()
-
-    if not STATE_PATH.exists():
-        print(f"STATE.md not found: {STATE_PATH}", file=sys.stderr)
-        return 1
-
-    content = STATE_PATH.read_text(encoding="utf-8")
-    all_paths = extract_proof_paths(content)
-    paths = filter_canonical_proof_paths(all_paths)
-
-    if not paths:
-        print(
-            "No canonical Proof paths (docs/reports/verification/PROOF_*.json) found in STATE.md.",
-            file=sys.stderr,
-        )
-        return 1
 
     schema = load_schema()
     all_errors: list[str] = []
 
-    for p in paths:
-        full = ROOT / p
-        errs = validate_proof(full, schema, no_git_match=args.no_git_match)
-        all_errors.extend(errs)
+    if args.validate_file:
+        # Standalone validation: resolve glob, validate each file (no STATE.md)
+        resolved = sorted(glob.glob(str(ROOT / args.validate_file)))
+        if not resolved:
+            print(
+                f"No files matched: {args.validate_file}",
+                file=sys.stderr,
+            )
+            return 1
+        for p in resolved:
+            full = Path(p)
+            if full.is_file() and full.suffix.lower() == ".json":
+                errs = validate_proof(full, schema, no_git_match=args.no_git_match)
+                all_errors.extend(errs)
+    else:
+        # STATE.md mode
+        if not STATE_PATH.exists():
+            print(f"STATE.md not found: {STATE_PATH}", file=sys.stderr)
+            return 1
+
+        content = STATE_PATH.read_text(encoding="utf-8")
+        all_paths = extract_proof_paths(content)
+        paths = filter_canonical_proof_paths(all_paths)
+
+        if not paths:
+            print(
+                "No canonical Proof paths (docs/reports/verification/PROOF_*.json) found in STATE.md.",
+                file=sys.stderr,
+            )
+            return 1
+
+        for p in paths:
+            full = ROOT / p
+            errs = validate_proof(full, schema, no_git_match=args.no_git_match)
+            all_errors.extend(errs)
 
     if all_errors:
         print("PROOF VALIDATION FAILED:", file=sys.stderr)

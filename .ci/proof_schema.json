@@ -6,9 +6,37 @@
     "exit_code",
     "timestamp",
     "git_commit",
-    "git_branch"
+    "git_branch",
+    "evidence_fingerprint"
   ],
+  "evidence_fields": {
+    "PROOF_PROVENANCE": ["stdout", "stderr", "command", "exit_code"],
+    "PROOF_GATE_C": ["command", "exit_code", "gatec_log", "ui_smoke"],
+    "PROOF_INSTALLER": ["command", "exit_code", "all_passed", "results"],
+    "PROOF_PAYLOAD_DETOX": ["command", "exit_code", "moved_payloads", "check_repo_payloads", "policy_file_summary"],
+    "PROOF_PHASE_3": ["phase", "date", "checks", "command", "exit_code"],
+    "PROOF_PHASE_2_1": ["phase", "date", "checks", "command", "exit_code"],
+    "PROOF_PHASE": ["phase", "date", "checks"],
+    "PROOF_GOLDEN_PATH": [
+      "command", "exit_code", "engine_mode", "model_hashes",
+      "output_file_hash", "output_duration_seconds",
+      "output_energy_rms", "all_steps_passed", "git_commit"
+    ],
+    "PROOF_UI_COMMAND_SURFACE": [
+      "command", "exit_code", "commands_checked", "panels_checked",
+      "all_commands_registered", "all_panels_registered"
+    ]
+  },
+  "historical_proofs_allowlist_path": ".ci/historical_proofs_allowlist.json",
   "type_specific": {
+    "PROOF_PHASE_3": {
+      "override_common": false,
+      "required": ["phase", "date", "checks"]
+    },
+    "PROOF_PHASE_2_1": {
+      "override_common": false,
+      "required": ["phase", "date", "checks"]
+    },
     "PROOF_PROVENANCE": {
       "required": ["stdout", "stderr"]
     },
@@ -20,6 +48,24 @@
     },
     "PROOF_PAYLOAD_DETOX": {
       "required": ["check_repo_payloads", "policy_file_summary"]
+    },
+    "PROOF_GOLDEN_PATH": {
+      "required": [
+        "engine_mode", "model_hashes", "output_file_hash",
+        "output_duration_seconds", "output_energy_rms", "all_steps_passed"
+      ]
+    },
+    "PROOF_UI_COMMAND_SURFACE": {
+      "required": [
+        "commands_checked", "panels_checked",
+        "all_commands_registered", "all_panels_registered",
+        "command_details", "panel_details"
+      ]
+    },
+    "PROOF_PHASE": {
+      "override_common": true,
+      "required": ["phase", "date", "checks"],
+      "legacy_only": true
     }
   },
   "historical_proof_allowlist": [],
@@ -38,6 +84,19 @@
         "UninstallV1"
       ],
       "results_all_pass_when_all_passed_true": true
+    },
+    "PROOF_GOLDEN_PATH": {
+      "engine_mode_enum": ["stub", "real"],
+      "real_mode_constraints": {
+        "output_duration_seconds_positive": true,
+        "output_energy_rms_above": 0.001
+      },
+      "output_file_hash_sha256_hex": true,
+      "all_steps_passed_must_be_true": true
+    },
+    "PROOF_UI_COMMAND_SURFACE": {
+      "all_commands_registered_must_be_true": true,
+      "all_panels_registered_must_be_true": true
     }
   },
   "semantic_rules": {

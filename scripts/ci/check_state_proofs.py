@@ -29,6 +29,14 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scripts.ci.proof_fingerprint import compute_fingerprint
+
+
+def _rel(path: Path) -> str:
+    """Return path relative to ROOT, or the path name if outside ROOT."""
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
 STATE_PATH = ROOT / ".cursor" / "STATE.md"
 SCHEMA_PATH = ROOT / ".ci" / "proof_schema.json"
 
@@ -146,7 +154,7 @@ def validate_nested_semantics(
         ui_smoke = data.get("ui_smoke")
         if not isinstance(ui_smoke, dict):
             errors.append(
-                f"{path.relative_to(ROOT)}: ui_smoke must be object for nested validation"
+                f"{_rel(path)}: ui_smoke must be object for nested validation"
             )
         else:
             expected_exit = nested.get("ui_smoke.exit_code")
@@ -154,89 +162,89 @@ def validate_nested_semantics(
                 ec = ui_smoke.get("exit_code")
                 if ec != expected_exit:
                     errors.append(
-                        f"{path.relative_to(ROOT)}: ui_smoke.exit_code must be {expected_exit}, got {ec}"
+                        f"{_rel(path)}: ui_smoke.exit_code must be {expected_exit}, got {ec}"
                     )
             min_nav = nested.get("ui_smoke.nav_steps_completed_min")
             if min_nav is not None:
                 nav = ui_smoke.get("nav_steps_completed")
                 if nav is None:
                     errors.append(
-                        f"{path.relative_to(ROOT)}: ui_smoke.nav_steps_completed is required"
+                        f"{_rel(path)}: ui_smoke.nav_steps_completed is required"
                     )
                 elif not isinstance(nav, int) or nav < min_nav:
                     errors.append(
-                        f"{path.relative_to(ROOT)}: ui_smoke.nav_steps_completed must be >= {min_nav}, got {nav}"
+                        f"{_rel(path)}: ui_smoke.nav_steps_completed must be >= {min_nav}, got {nav}"
                     )
             bfc = nested.get("ui_smoke.binding_failure_count")
             if bfc is not None:
                 actual = ui_smoke.get("binding_failure_count")
                 if actual is None:
                     errors.append(
-                        f"{path.relative_to(ROOT)}: ui_smoke.binding_failure_count is required"
+                        f"{_rel(path)}: ui_smoke.binding_failure_count is required"
                     )
                 elif actual != bfc:
                     errors.append(
-                        f"{path.relative_to(ROOT)}: ui_smoke.binding_failure_count must be {bfc}, got {actual}"
+                        f"{_rel(path)}: ui_smoke.binding_failure_count must be {bfc}, got {actual}"
                     )
             if nested.get("ui_smoke.summary_path_required"):
                 sp = ui_smoke.get("summary_path")
                 if not sp or not isinstance(sp, str):
                     errors.append(
-                        f"{path.relative_to(ROOT)}: ui_smoke.summary_path is required"
+                        f"{_rel(path)}: ui_smoke.summary_path is required"
                     )
                 elif not data.get("historical_proof"):
                     summary_full = (ROOT / sp.replace("\\", "/")).resolve()
                     root_resolved = ROOT.resolve()
                     if not str(summary_full).startswith(str(root_resolved)):
                         errors.append(
-                            f"{path.relative_to(ROOT)}: ui_smoke.summary_path must be under repo root"
+                            f"{_rel(path)}: ui_smoke.summary_path must be under repo root"
                         )
                     elif not summary_full.exists():
                         errors.append(
-                            f"{path.relative_to(ROOT)}: ui_smoke.summary_path does not exist: {sp}"
+                            f"{_rel(path)}: ui_smoke.summary_path does not exist: {sp}"
                         )
                     elif nested.get("ui_smoke.summary_sha256_hex"):
                         sh = ui_smoke.get("summary_sha256")
                         if not sh or not re.match(r"^[a-f0-9]{64}$", str(sh)):
                             errors.append(
-                                f"{path.relative_to(ROOT)}: ui_smoke.summary_sha256 must be 64-hex SHA-256"
+                                f"{_rel(path)}: ui_smoke.summary_sha256 must be 64-hex SHA-256"
                             )
                         else:
                             with open(summary_full, "rb") as f:
                                 actual_hash = hashlib.sha256(f.read()).hexdigest()
                             if sh.lower() != actual_hash.lower():
                                 errors.append(
-                                    f"{path.relative_to(ROOT)}: ui_smoke.summary_sha256 does not match file"
+                                    f"{_rel(path)}: ui_smoke.summary_sha256 does not match file"
                                 )
             if nested.get("ui_smoke.log_path_required"):
                 lp = ui_smoke.get("log_path")
                 if not lp or not isinstance(lp, str):
                     errors.append(
-                        f"{path.relative_to(ROOT)}: ui_smoke.log_path is required"
+                        f"{_rel(path)}: ui_smoke.log_path is required"
                     )
                 elif not data.get("historical_proof"):
                     log_full = (ROOT / lp.replace("\\", "/")).resolve()
                     root_resolved = ROOT.resolve()
                     if not str(log_full).startswith(str(root_resolved)):
                         errors.append(
-                            f"{path.relative_to(ROOT)}: ui_smoke.log_path must be under repo root"
+                            f"{_rel(path)}: ui_smoke.log_path must be under repo root"
                         )
                     elif not log_full.exists():
                         errors.append(
-                            f"{path.relative_to(ROOT)}: ui_smoke.log_path does not exist: {lp}"
+                            f"{_rel(path)}: ui_smoke.log_path does not exist: {lp}"
                         )
                     elif nested.get("ui_smoke.log_sha256_hex"):
                         lh = ui_smoke.get("log_sha256")
                         if not lh or not re.match(r"^[a-f0-9]{64}$", str(lh)):
                             errors.append(
-                                f"{path.relative_to(ROOT)}: ui_smoke.log_sha256 must be 64-hex SHA-256"
+                                f"{_rel(path)}: ui_smoke.log_sha256 must be 64-hex SHA-256"
                             )
                         else:
                             with open(log_full, "rb") as f:
                                 actual_hash = hashlib.sha256(f.read()).hexdigest()
                             if lh.lower() != actual_hash.lower():
                                 errors.append(
-                                    f"{path.relative_to(ROOT)}: ui_smoke.log_sha256 does not match file"
+                                    f"{_rel(path)}: ui_smoke.log_sha256 does not match file"
                                 )
 
     elif proof_type == "PROOF_INSTALLER":
@@ -245,13 +253,13 @@ def validate_nested_semantics(
             results = data.get("results")
             if not isinstance(results, dict):
                 errors.append(
-                    f"{path.relative_to(ROOT)}: results must be object for nested validation"
+                    f"{_rel(path)}: results must be object for nested validation"
                 )
             else:
                 missing = [k for k in required_keys if k not in results]
                 if missing:
                     errors.append(
-                        f"{path.relative_to(ROOT)}: results missing required keys: {missing}"
+                        f"{_rel(path)}: results missing required keys: {missing}"
                     )
                 elif nested.get("results_all_pass_when_all_passed_true") and data.get(
                     "all_passed"
@@ -262,49 +270,49 @@ def validate_nested_semantics(
                     ]
                     if failed:
                         errors.append(
-                            f"{path.relative_to(ROOT)}: all_passed=true but results not all PASS: {failed}"
+                            f"{_rel(path)}: all_passed=true but results not all PASS: {failed}"
                         )
 
     elif proof_type == "PROOF_GOLDEN_PATH":
         engine_mode = data.get("engine_mode")
         if engine_mode not in ("stub", "real"):
             errors.append(
-                f"{path.relative_to(ROOT)}: engine_mode must be 'stub' or 'real', got {engine_mode!r}"
+                f"{_rel(path)}: engine_mode must be 'stub' or 'real', got {engine_mode!r}"
             )
         if data.get("all_steps_passed") is not True:
             errors.append(
-                f"{path.relative_to(ROOT)}: all_steps_passed must be true"
+                f"{_rel(path)}: all_steps_passed must be true"
             )
         ofh = data.get("output_file_hash", "")
         if not re.match(r"^[a-f0-9]{64}$", str(ofh)):
             errors.append(
-                f"{path.relative_to(ROOT)}: output_file_hash must be 64-char hex, got {str(ofh)[:20]}"
+                f"{_rel(path)}: output_file_hash must be 64-char hex, got {str(ofh)[:20]}"
             )
         mh = data.get("model_hashes")
         if not isinstance(mh, dict):
             errors.append(
-                f"{path.relative_to(ROOT)}: model_hashes must be a dict"
+                f"{_rel(path)}: model_hashes must be a dict"
             )
         if engine_mode == "real":
             d = data.get("output_duration_seconds", 0)
             if not isinstance(d, (int, float)) or d <= 0:
                 errors.append(
-                    f"{path.relative_to(ROOT)}: output_duration_seconds must be > 0 for real mode"
+                    f"{_rel(path)}: output_duration_seconds must be > 0 for real mode"
                 )
             e = data.get("output_energy_rms", 0)
             if not isinstance(e, (int, float)) or e <= 0.001:
                 errors.append(
-                    f"{path.relative_to(ROOT)}: output_energy_rms must be > 0.001 for real mode"
+                    f"{_rel(path)}: output_energy_rms must be > 0.001 for real mode"
                 )
 
     elif proof_type == "PROOF_UI_COMMAND_SURFACE":
         if data.get("all_commands_registered") is not True:
             errors.append(
-                f"{path.relative_to(ROOT)}: all_commands_registered must be true"
+                f"{_rel(path)}: all_commands_registered must be true"
             )
         if data.get("all_panels_registered") is not True:
             errors.append(
-                f"{path.relative_to(ROOT)}: all_panels_registered must be true"
+                f"{_rel(path)}: all_panels_registered must be true"
             )
 
     elif proof_type == "PROOF_CRASH_RECOVERY":
@@ -312,11 +320,11 @@ def validate_nested_semantics(
         tt = data.get("tests_total", 0)
         if not isinstance(tp, int) or not isinstance(tt, int):
             errors.append(
-                f"{path.relative_to(ROOT)}: tests_passed/tests_total must be int"
+                f"{_rel(path)}: tests_passed/tests_total must be int"
             )
         elif tp != tt:
             errors.append(
-                f"{path.relative_to(ROOT)}: tests_passed ({tp}) != tests_total ({tt})"
+                f"{_rel(path)}: tests_passed ({tp}) != tests_total ({tt})"
             )
         for flag in (
             "circuit_breaker_tested",
@@ -325,7 +333,7 @@ def validate_nested_semantics(
         ):
             if data.get(flag) is not True:
                 errors.append(
-                    f"{path.relative_to(ROOT)}: {flag} must be true"
+                    f"{_rel(path)}: {flag} must be true"
                 )
 
     elif proof_type == "PROOF_SUPPORT_BUNDLE":
@@ -336,64 +344,64 @@ def validate_nested_semantics(
         ):
             if data.get(flag) is not True:
                 errors.append(
-                    f"{path.relative_to(ROOT)}: {flag} must be true"
+                    f"{_rel(path)}: {flag} must be true"
                 )
 
     elif proof_type == "PROOF_PERF_BUDGET":
         if data.get("budgets_defined") is not True:
             errors.append(
-                f"{path.relative_to(ROOT)}: budgets_defined must be true"
+                f"{_rel(path)}: budgets_defined must be true"
             )
         if data.get("regression_detector_exists") is not True:
             errors.append(
-                f"{path.relative_to(ROOT)}: regression_detector_exists must be true"
+                f"{_rel(path)}: regression_detector_exists must be true"
             )
 
     elif proof_type == "PROOF_SUPPORT_BUNDLE_RUNTIME":
         if data.get("ui_wiring_verified") is not True:
             errors.append(
-                f"{path.relative_to(ROOT)}: ui_wiring_verified must be true"
+                f"{_rel(path)}: ui_wiring_verified must be true"
             )
         rf = data.get("required_files")
         if not isinstance(rf, list) or not rf:
             errors.append(
-                f"{path.relative_to(ROOT)}: required_files must be a non-empty list"
+                f"{_rel(path)}: required_files must be a non-empty list"
             )
         else:
             for i, entry in enumerate(rf):
                 if not isinstance(entry, dict):
                     errors.append(
-                        f"{path.relative_to(ROOT)}: required_files[{i}] must be object"
+                        f"{_rel(path)}: required_files[{i}] must be object"
                     )
                     continue
                 if entry.get("exists") is not True:
                     errors.append(
-                        f"{path.relative_to(ROOT)}: required_files[{i}] "
+                        f"{_rel(path)}: required_files[{i}] "
                         f"({entry.get('name', '?')}) exists must be true"
                     )
                 b = entry.get("bytes", 0)
                 if not isinstance(b, int) or b <= 0:
                     errors.append(
-                        f"{path.relative_to(ROOT)}: required_files[{i}] "
+                        f"{_rel(path)}: required_files[{i}] "
                         f"({entry.get('name', '?')}) bytes must be > 0"
                     )
                 h = entry.get("sha256", "")
                 if not re.match(r"^[a-f0-9]{64}$", str(h)):
                     errors.append(
-                        f"{path.relative_to(ROOT)}: required_files[{i}] "
+                        f"{_rel(path)}: required_files[{i}] "
                         f"({entry.get('name', '?')}) sha256 must be 64-hex"
                     )
 
     elif proof_type == "PROOF_PERF_BUDGET_RUNTIME":
         if data.get("within_budget") is not True:
             errors.append(
-                f"{path.relative_to(ROOT)}: within_budget must be true"
+                f"{_rel(path)}: within_budget must be true"
             )
         measured = data.get("measured")
         budgets = data.get("budgets")
         if not isinstance(measured, dict) or not isinstance(budgets, dict):
             errors.append(
-                f"{path.relative_to(ROOT)}: measured and budgets must be objects"
+                f"{_rel(path)}: measured and budgets must be objects"
             )
         else:
             for key in ("StartupMs", "ApiResponseMs"):
@@ -401,30 +409,30 @@ def validate_nested_semantics(
                 bv = budgets.get(key)
                 if not isinstance(mv, (int, float)) or mv <= 0:
                     errors.append(
-                        f"{path.relative_to(ROOT)}: measured.{key} must be > 0"
+                        f"{_rel(path)}: measured.{key} must be > 0"
                     )
                 if isinstance(mv, (int, float)) and isinstance(bv, (int, float)):
                     if mv > bv:
                         errors.append(
-                            f"{path.relative_to(ROOT)}: measured.{key} ({mv}) "
+                            f"{_rel(path)}: measured.{key} ({mv}) "
                             f"exceeds budget ({bv})"
                         )
 
     elif proof_type in ("PROOF_GOLDEN_PATH_STUB", "PROOF_GOLDEN_PATH_REAL"):
         if data.get("passed") is not True:
             errors.append(
-                f"{path.relative_to(ROOT)}: passed must be true"
+                f"{_rel(path)}: passed must be true"
             )
         em = data.get("engine_mode")
         expected_mode = "stub" if proof_type.endswith("_STUB") else "real"
         if em != expected_mode:
             errors.append(
-                f"{path.relative_to(ROOT)}: engine_mode must be '{expected_mode}', got {em!r}"
+                f"{_rel(path)}: engine_mode must be '{expected_mode}', got {em!r}"
             )
         om = data.get("output_metrics")
         if not isinstance(om, dict):
             errors.append(
-                f"{path.relative_to(ROOT)}: output_metrics must be an object"
+                f"{_rel(path)}: output_metrics must be an object"
             )
         else:
             dur = om.get("duration_seconds", 0)
@@ -432,58 +440,58 @@ def validate_nested_semantics(
             sha = om.get("output_sha256", "")
             if not isinstance(dur, (int, float)) or dur <= 0:
                 errors.append(
-                    f"{path.relative_to(ROOT)}: output_metrics.duration_seconds must be > 0"
+                    f"{_rel(path)}: output_metrics.duration_seconds must be > 0"
                 )
             if not isinstance(rms, (int, float)) or rms <= 0.001:
                 errors.append(
-                    f"{path.relative_to(ROOT)}: output_metrics.rms_energy must be > 0.001"
+                    f"{_rel(path)}: output_metrics.rms_energy must be > 0.001"
                 )
             if not re.match(r"^[a-f0-9]{64}$", str(sha)):
                 errors.append(
-                    f"{path.relative_to(ROOT)}: output_metrics.output_sha256 must be 64-hex"
+                    f"{_rel(path)}: output_metrics.output_sha256 must be 64-hex"
                 )
         if proof_type == "PROOF_GOLDEN_PATH_REAL":
             models = data.get("models")
             if not isinstance(models, dict) or not models:
                 errors.append(
-                    f"{path.relative_to(ROOT)}: models must be a non-empty dict for real mode"
+                    f"{_rel(path)}: models must be a non-empty dict for real mode"
                 )
             elif models:
                 for mk, mv in models.items():
                     if not re.match(r"^[a-f0-9]{64}$", str(mv)):
                         errors.append(
-                            f"{path.relative_to(ROOT)}: models.{mk} must be 64-hex sha256"
+                            f"{_rel(path)}: models.{mk} must be 64-hex sha256"
                         )
 
         if nested.get("test_ran_must_be_true"):
             if data.get("test_ran") is not True:
                 errors.append(
-                    f"{path.relative_to(ROOT)}: test_ran must be true"
+                    f"{_rel(path)}: test_ran must be true"
                 )
 
         if nested.get("artifact_path_required"):
             art_path_str = data.get("artifact_path", "")
             if not art_path_str or not isinstance(art_path_str, str):
                 errors.append(
-                    f"{path.relative_to(ROOT)}: artifact_path is required"
+                    f"{_rel(path)}: artifact_path is required"
                 )
             elif not art_path_str.startswith(".buildlogs/"):
                 art_full = (ROOT / art_path_str.replace("\\", "/")).resolve()
                 root_resolved = ROOT.resolve()
                 if not str(art_full).startswith(str(root_resolved)):
                     errors.append(
-                        f"{path.relative_to(ROOT)}: artifact_path must be under repo root"
+                        f"{_rel(path)}: artifact_path must be under repo root"
                     )
                 elif not art_full.exists():
                     errors.append(
-                        f"{path.relative_to(ROOT)}: artifact_path does not exist: {art_path_str}"
+                        f"{_rel(path)}: artifact_path does not exist: {art_path_str}"
                     )
 
         if nested.get("artifact_sha256_required"):
             art_sha = data.get("artifact_sha256", "")
             if not re.match(r"^[a-f0-9]{64}$", str(art_sha)):
                 errors.append(
-                    f"{path.relative_to(ROOT)}: artifact_sha256 must be 64-hex SHA-256"
+                    f"{_rel(path)}: artifact_sha256 must be 64-hex SHA-256"
                 )
             else:
                 art_path_str = data.get("artifact_path", "")
@@ -494,7 +502,7 @@ def validate_nested_semantics(
                             actual_hash = hashlib.sha256(f.read()).hexdigest()
                         if art_sha.lower() != actual_hash.lower():
                             errors.append(
-                                f"{path.relative_to(ROOT)}: artifact_sha256 does not match file at artifact_path"
+                                f"{_rel(path)}: artifact_sha256 does not match file at artifact_path"
                             )
 
     return errors
@@ -527,7 +535,7 @@ def validate_proof(
     errors: list[str] = []
 
     if not path.exists():
-        return [f"file missing: {path.relative_to(ROOT)}"]
+        return [f"file missing: {_rel(path)}"]
 
     if not path.suffix.lower() == ".json":
         return []  # Non-JSON proofs: existence only, no schema
@@ -535,26 +543,26 @@ def validate_proof(
     try:
         data = json.loads(path.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError as e:
-        return [f"{path.relative_to(ROOT)}: JSON parse error: {e}"]
+        return [f"{_rel(path)}: JSON parse error: {e}"]
 
     basename = path.name
     proof_type = get_proof_type(basename)
     if not proof_type:
-        return [f"{path.relative_to(ROOT)}: unknown proof type (basename={basename})"]
+        return [f"{_rel(path)}: unknown proof type (basename={basename})"]
 
     required = get_required_keys(schema, proof_type)
     missing = [k for k in required if k not in data or data[k] is None]
     if missing:
-        errors.append(f"{path.relative_to(ROOT)}: missing required keys: {missing}")
+        errors.append(f"{_rel(path)}: missing required keys: {missing}")
         errors.append(f"  expected schema: {required}")
 
     # PROOF_PHASE legacy-only: fail unless historical_proof + allowlisted
     if proof_type == "PROOF_PHASE" and not missing:
-        rel_path = str(path.relative_to(ROOT)).replace("\\", "/")
+        rel_path = str(_rel(path)).replace("\\", "/")
         allowlisted_paths = _load_allowlisted_paths(schema)
         if not (data.get("historical_proof") is True and rel_path in allowlisted_paths):
             errors.append(
-                f"{path.relative_to(ROOT)}: PROOF_PHASE (weak) is no longer accepted; "
+                f"{_rel(path)}: PROOF_PHASE (weak) is no longer accepted; "
                 "use PROOF_PHASE_2_1 or PROOF_PHASE_3. For legacy proofs only: "
                 "set historical_proof=true and add path to .ci/historical_proofs_allowlist.json"
             )
@@ -572,7 +580,7 @@ def validate_proof(
     ]
     for key, expected in type_checks:
         if key in data and (err := validate_types(data, key, expected)):
-            errors.append(f"{path.relative_to(ROOT)}: {err}")
+            errors.append(f"{_rel(path)}: {err}")
 
     # Nested semantics (M10)
     nested_errs = validate_nested_semantics(path, data, proof_type, schema)
@@ -583,7 +591,7 @@ def validate_proof(
 
     # Semantic: exit_code == 0
     if data.get("exit_code") != 0:
-        errors.append(f"{path.relative_to(ROOT)}: exit_code must be 0, got {data.get('exit_code')}")
+        errors.append(f"{_rel(path)}: exit_code must be 0, got {data.get('exit_code')}")
 
     # Semantic: timestamp parses as ISO8601
     ts = data.get("timestamp")
@@ -591,25 +599,25 @@ def validate_proof(
         try:
             datetime.fromisoformat(ts.replace("Z", "+00:00"))
         except (ValueError, TypeError):
-            errors.append(f"{path.relative_to(ROOT)}: timestamp not valid ISO8601: {ts!r}")
+            errors.append(f"{_rel(path)}: timestamp not valid ISO8601: {ts!r}")
 
     # Semantic: git_commit 40 hex
     gc = data.get("git_commit")
     if gc and not (isinstance(gc, str) and len(gc) == 40 and all(c in "0123456789abcdef" for c in gc.lower())):
-        errors.append(f"{path.relative_to(ROOT)}: git_commit must be 40 hex chars, got {gc!r}")
+        errors.append(f"{_rel(path)}: git_commit must be 40 hex chars, got {gc!r}")
 
     # M11: Refresh rules — refreshed proofs require historical_proof and allowlist
     if data.get("refreshed") is True:
         if data.get("historical_proof") is not True:
             errors.append(
-                f"{path.relative_to(ROOT)}: refreshed=true requires historical_proof=true"
+                f"{_rel(path)}: refreshed=true requires historical_proof=true"
             )
         else:
-            rel_path = str(path.relative_to(ROOT)).replace("\\", "/")
+            rel_path = str(_rel(path)).replace("\\", "/")
             allowlisted_paths = _load_allowlisted_paths(schema)
             if rel_path not in allowlisted_paths:
                 errors.append(
-                    f"{path.relative_to(ROOT)}: refreshed proof not in .ci/historical_proofs_allowlist.json"
+                    f"{_rel(path)}: refreshed proof not in .ci/historical_proofs_allowlist.json"
                 )
 
     # M11: Evidence fingerprint validation
@@ -618,7 +626,7 @@ def validate_proof(
     if stored_fp != expected_fp:
         got = f"{stored_fp[:16]}..." if stored_fp else "missing"
         errors.append(
-            f"{path.relative_to(ROOT)}: evidence_fingerprint mismatch (expected {expected_fp[:16]}..., got {got})"
+            f"{_rel(path)}: evidence_fingerprint mismatch (expected {expected_fp[:16]}..., got {got})"
         )
 
     # Semantic: git_commit matches HEAD (unless historical_proof or --no-git-match)
@@ -634,7 +642,7 @@ def validate_proof(
             head = result.stdout.strip() if result.returncode == 0 else ""
             if head and gc and gc.lower() != head.lower():
                 errors.append(
-                    f"{path.relative_to(ROOT)}: git_commit {gc[:8]}... does not match HEAD {head[:8]}..."
+                    f"{_rel(path)}: git_commit {gc[:8]}... does not match HEAD {head[:8]}..."
                 )
         except (subprocess.TimeoutExpired, FileNotFoundError):
             pass  # Skip if git unavailable

@@ -55,7 +55,9 @@
     ],
     "PROOF_GOLDEN_PATH_REAL": [
       "command", "exit_code", "engine_mode", "checks",
-      "output_metrics", "models", "passed"
+      "output_metrics", "models", "passed",
+      "test_ran", "pytest_stdout_sha256", "pytest_stderr_sha256",
+      "artifact_path", "artifact_sha256"
     ]
   },
   "historical_proofs_allowlist_path": ".ci/historical_proofs_allowlist.json",
@@ -132,7 +134,8 @@
     "PROOF_GOLDEN_PATH_REAL": {
       "required": [
         "engine_mode", "checks", "output_metrics",
-        "models", "passed"
+        "models", "passed",
+        "test_ran", "artifact_path", "artifact_sha256"
       ]
     },
     "PROOF_PHASE": {
@@ -209,7 +212,10 @@
       "passed_must_be_true": true,
       "engine_mode_must_be_real": true,
       "models_must_have_hashes": true,
-      "output_metrics_positive": true
+      "output_metrics_positive": true,
+      "test_ran_must_be_true": true,
+      "artifact_sha256_required": true,
+      "artifact_path_required": true
     }
   },
   "semantic_rules": {

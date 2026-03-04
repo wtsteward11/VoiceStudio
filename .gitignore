@@ -100,6 +100,10 @@ openmemory.md
 # Audio uploads (user data)
 data/audio_uploads/
 
+# Backups and recordings (Cursor brick prevention)
+backups/
+data/recordings/
+
 # PDF documents (generated, not source)
 docs/**/*.pdf
 

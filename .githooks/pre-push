@@ -19,6 +19,41 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+echo "[pre-push] Running Python route boundary check..."
+python "$REPO_ROOT/scripts/ci/check_route_boundaries.py"
+if [ $? -ne 0 ]; then
+    echo "[pre-push] BLOCKED: Route boundary violations. Fix before pushing."
+    exit 1
+fi
+
+echo "[pre-push] Running Python route size check..."
+python "$REPO_ROOT/scripts/ci/check_route_size.py"
+if [ $? -ne 0 ]; then
+    echo "[pre-push] BLOCKED: Route size violations (god-route prevention). Fix before pushing."
+    exit 1
+fi
+
+echo "[pre-push] Running Python service boundary check..."
+python "$REPO_ROOT/scripts/ci/check_service_boundaries.py"
+if [ $? -ne 0 ]; then
+    echo "[pre-push] BLOCKED: Service boundary violations. Fix before pushing."
+    exit 1
+fi
+
+echo "[pre-push] Running Python service size check..."
+python "$REPO_ROOT/scripts/ci/check_service_size.py"
+if [ $? -ne 0 ]; then
+    echo "[pre-push] BLOCKED: Service size violations (monolith prevention). Fix before pushing."
+    exit 1
+fi
+
+echo "[pre-push] Running repo payload check..."
+python "$REPO_ROOT/scripts/ci/check_repo_payloads.py"
+if [ $? -ne 0 ]; then
+    echo "[pre-push] BLOCKED: Repo payload violations. Fix before pushing."
+    exit 1
+fi
+
 # Chain to LFS pre-push if git-lfs is available
 if command -v git-lfs >/dev/null 2>&1; then
     git lfs pre-push "$@"

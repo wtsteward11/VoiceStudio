@@ -9,7 +9,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.core.audio import (
+from backend.audio.audit import (
+    AudioModuleAuditor,
     EnhancedPreprocessor,
     MasteringRack,
     ParametricEQ,
@@ -17,7 +18,6 @@ from app.core.audio import (
     StyleTransfer,
     VoiceMixer,
 )
-from app.core.audio.audio_module_audit import AudioModuleAuditor
 
 logger = logging.getLogger(__name__)
 

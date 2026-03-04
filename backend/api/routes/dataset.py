@@ -32,7 +32,7 @@ from backend.ml.models.engine_service import get_engine_service
 try:
     import numpy as np
 
-    from app.core.audio import audio_utils
+    from backend.audio import audio_utils
 
     HAS_AUDIO_PROCESSING = True
 except ImportError:
@@ -74,11 +74,10 @@ async def score(req: DatasetScoreRequest) -> list[ScoreResult]:
                 clip_path = clip
                 if not os.path.exists(clip_path):
                     # Try to get from audio storage
-                    from .voice import _audio_storage
+                    from backend.services.audio_artifacts import AudioRegistry
 
-                    if clip in _audio_storage:
-                        clip_path = _audio_storage[clip]
-                    else:
+                    clip_path = AudioRegistry.get_path(clip)
+                    if not clip_path:
                         logger.warning(f"Clip not found: {clip}")
                         results.append(ScoreResult(clip=clip, snr=0.0, lufs=-70.0, quality=0.0))
                         continue
@@ -324,11 +323,10 @@ def _validate_dataset(clips: list[str]) -> DatasetValidationResult:
         if not os.path.exists(clip_path):
             # Try to get from audio storage
             try:
-                from .voice import _audio_storage
+                from backend.services.audio_artifacts import AudioRegistry
 
-                if clip in _audio_storage:
-                    clip_path = _audio_storage[clip]
-                else:
+                clip_path = AudioRegistry.get_path(clip)
+                if not clip_path:
                     errors.append(f"Clip not found: {clip}")
                     continue
             except Exception:
@@ -507,11 +505,10 @@ async def analyze_dataset(req: DatasetScoreRequest) -> DatasetAnalysisResult:
             try:
                 clip_path = clip
                 if not os.path.exists(clip_path):
-                    from .voice import _audio_storage
+                    from backend.services.audio_artifacts import AudioRegistry
 
-                    if clip in _audio_storage:
-                        clip_path = _audio_storage[clip]
-                    else:
+                    clip_path = AudioRegistry.get_path(clip) or clip
+                    if not clip_path or not os.path.exists(clip_path):
                         continue
 
                 if os.path.exists(clip_path):
@@ -591,11 +588,10 @@ async def export_dataset(req: DatasetExportRequest):
                 for clip in req.clips:
                     clip_path = clip
                     if not os.path.exists(clip_path):
-                        from .voice import _audio_storage
+                        from backend.services.audio_artifacts import AudioRegistry
 
-                        if clip in _audio_storage:
-                            clip_path = _audio_storage[clip]
-                        else:
+                        clip_path = AudioRegistry.get_path(clip)
+                        if not clip_path:
                             logger.warning(f"Clip not found for export: {clip}")
                             continue
 
@@ -633,6 +629,11 @@ async def export_dataset(req: DatasetExportRequest):
                     zipf.writestr("metadata.json", metadata_json)
 
             logger.info(f"Exported dataset {req.dataset_id} to {output_path}")
+            try:
+                from backend.services.usage_stats import record_export_completed
+                record_export_completed()
+            except Exception:
+                pass
             return FileResponse(
                 output_path,
                 media_type="application/zip",
@@ -654,10 +655,10 @@ async def export_dataset(req: DatasetExportRequest):
 
                 clip_path = clip
                 if not os.path.exists(clip_path):
-                    from .voice import _audio_storage
+                    from backend.services.audio_artifacts import AudioRegistry
 
-                    if clip in _audio_storage:
-                        clip_path = _audio_storage[clip]
+                    clip_path = AudioRegistry.get_path(clip)
+                    if clip_path:
                         clip_info2["file_path"] = clip_path
                     else:
                         clip_info2["file_path"] = None
@@ -685,6 +686,11 @@ async def export_dataset(req: DatasetExportRequest):
                 json.dump(metadata, f, indent=2)
 
             logger.info(f"Exported dataset {req.dataset_id} to {output_path}")
+            try:
+                from backend.services.usage_stats import record_export_completed
+                record_export_completed()
+            except Exception:
+                pass
             return FileResponse(
                 output_path,
                 media_type="application/json",

@@ -7,8 +7,8 @@ and advanced processing options.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -98,21 +98,19 @@ async def generate_advanced_spectrogram(request: AdvancedSpectrogramRequest):
         import matplotlib
         import numpy as np
 
-        from app.core.audio.audio_utils import load_audio
-
-        from .voice import _audio_storage
+        from backend.audio.audio_utils import load_audio
+        from backend.services.audio_artifacts import AudioRegistry
 
         matplotlib.use("Agg")  # Non-interactive backend
         import matplotlib.pyplot as plt
 
         # Load audio file
-        if request.audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(request.audio_id)
+        if not audio_path:
             raise HTTPException(
                 status_code=404,
                 detail=f"Audio file '{request.audio_id}' not found",
             )
-
-        audio_path = _audio_storage[request.audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404,
@@ -209,7 +207,8 @@ async def generate_advanced_spectrogram(request: AdvancedSpectrogramRequest):
 
         # Save to temporary file
         view_id = f"view-{uuid.uuid4().hex[:8]}"
-        output_path = tempfile.mktemp(suffix=".png")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+            output_path = tmp.name
         plt.savefig(output_path, dpi=150, bbox_inches="tight")
         plt.close()
 
@@ -292,9 +291,8 @@ async def compare_spectrograms(request: SpectrogramCompareRequest):
         import librosa
         import numpy as np
 
-        from app.core.audio.audio_utils import load_audio
-
-        from .voice import _audio_storage
+        from backend.audio.audio_utils import load_audio
+        from backend.services.audio_artifacts import AudioRegistry
 
         if len(request.audio_ids) < 2:
             raise HTTPException(
@@ -307,13 +305,12 @@ async def compare_spectrograms(request: SpectrogramCompareRequest):
         sample_rates = []
 
         for audio_id in request.audio_ids:
-            if audio_id not in _audio_storage:
+            audio_path = AudioRegistry.get_path(audio_id)
+            if not audio_path:
                 raise HTTPException(
                     status_code=404,
                     detail=f"Audio file '{audio_id}' not found",
                 )
-
-            audio_path = _audio_storage[audio_id]
             if not os.path.exists(audio_path):
                 raise HTTPException(
                     status_code=404,
@@ -497,18 +494,16 @@ async def export_spectrogram(
             import librosa
             import numpy as np
 
-            from app.core.audio.audio_utils import load_audio
-
-            from .voice import _audio_storage
+            from backend.audio.audio_utils import load_audio
+            from backend.services.audio_artifacts import AudioRegistry
 
             audio_id = view["audio_id"]
-            if audio_id not in _audio_storage:
+            audio_path = AudioRegistry.get_path(audio_id)
+            if not audio_path:
                 raise HTTPException(
                     status_code=404,
                     detail=f"Audio file '{audio_id}' not found",
                 )
-
-            audio_path = _audio_storage[audio_id]
             if not os.path.exists(audio_path):
                 raise HTTPException(
                     status_code=404,

@@ -53,12 +53,11 @@ async def render(req: GranularRenderRequest) -> dict:
         window_type = params.get("window_type", "hann")  # Window type
 
         # Get audio file path
-        from .voice import _audio_storage, _register_audio_file
+        from backend.services.audio_artifacts import AudioRegistry
 
-        if audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(audio_id)
+        if not audio_path:
             raise HTTPException(status_code=404, detail=f"Audio file '{audio_id}' not found")
-
-        audio_path = _audio_storage[audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
@@ -159,13 +158,15 @@ async def render(req: GranularRenderRequest) -> dict:
         if max_val > 0.95:
             output_audio = output_audio * (0.95 / max_val)
 
-        # Save rendered audio
-        output_path = tempfile.mktemp(suffix=".wav")
-        sf.write(output_path, output_audio, sample_rate)
+        # Save rendered audio via artifact spine
+        from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
-        # Register new audio file
-        rendered_audio_id = f"granular_{uuid.uuid4().hex[:8]}"
-        _register_audio_file(rendered_audio_id, output_path)
+        rendered_audio_id, _, _ = create_audio_artifact_from_wav_array(
+            output_audio,
+            sample_rate,
+            created_by="granular",
+            audio_id=f"granular_{uuid.uuid4().hex[:8]}",
+        )
 
         logger.info(
             f"Granular synthesis completed: {audio_id} -> {rendered_audio_id} "

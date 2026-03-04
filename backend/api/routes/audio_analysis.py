@@ -164,9 +164,9 @@ async def get_audio_analysis(
                     del _analysis_timestamps[audio_id]
 
         # Get audio file path
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
-        audio_path = _get_audio_path(audio_id)
+        audio_path = resolve_audio_path(audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(status_code=404, detail=f"Audio file not found: {audio_id}")
 
@@ -458,9 +458,9 @@ async def analyze_audio(audio_id: str):
     import uuid
 
     # Validate audio exists
-    from .audio import _get_audio_path
+    from backend.services.audio_path_resolver import resolve_audio_path
 
-    audio_path = _get_audio_path(audio_id)
+    audio_path = resolve_audio_path(audio_id)
     if not audio_path or not os.path.exists(audio_path):
         raise HTTPException(status_code=404, detail=f"Audio file not found: {audio_id}")
 
@@ -581,9 +581,9 @@ async def get_pitch_analysis(
     method: str = Query("crepe", description="Pitch tracking method: crepe or pyin"),
 ):
     """Get pitch analysis for an audio file."""
-    from .audio import _get_audio_path
+    from backend.services.audio_path_resolver import resolve_audio_path
 
-    audio_path = _get_audio_path(audio_id)
+    audio_path = resolve_audio_path(audio_id)
     if not audio_path or not os.path.exists(audio_path):
         raise HTTPException(status_code=404, detail=f"Audio file not found: {audio_id}")
 
@@ -640,9 +640,9 @@ async def get_pitch_analysis(
 @cache_response(ttl=600)
 async def get_audio_metadata(audio_id: str):
     """Get metadata for an audio file."""
-    from .audio import _get_audio_path
+    from backend.services.audio_path_resolver import resolve_audio_path
 
-    audio_path = _get_audio_path(audio_id)
+    audio_path = resolve_audio_path(audio_id)
     if not audio_path or not os.path.exists(audio_path):
         raise HTTPException(status_code=404, detail=f"Audio file not found: {audio_id}")
 
@@ -670,9 +670,9 @@ async def get_wavelet_analysis(
     wavelet: str = Query("db4", description="Wavelet name (e.g., db4, haar)"),
 ):
     """Get wavelet analysis for an audio file."""
-    from .audio import _get_audio_path
+    from backend.services.audio_path_resolver import resolve_audio_path
 
-    audio_path = _get_audio_path(audio_id)
+    audio_path = resolve_audio_path(audio_id)
     if not audio_path or not os.path.exists(audio_path):
         raise HTTPException(status_code=404, detail=f"Audio file not found: {audio_id}")
 

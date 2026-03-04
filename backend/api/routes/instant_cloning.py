@@ -13,7 +13,9 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from backend.api.dependencies import require_synthesis_clearance
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -116,12 +118,10 @@ def calculate_embedding_quality(
     return max(0.1, min(1.0, quality_score))
 
 
-# Audio upload directory - must match audio.py
-UPLOAD_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-    "data",
-    "audio_uploads",
-)
+# Audio upload directory - must match audio.py (outside repo)
+from backend.config.path_config import get_path
+
+UPLOAD_DIR = str(get_path("audio_uploads"))
 
 
 def resolve_audio_id_to_path(audio_id: str) -> str:
@@ -332,7 +332,10 @@ async def extract_embedding(request: EmbeddingExtractionRequest):
 
 
 @router.post("/preview", response_model=InstantPreviewResponse)
-async def instant_preview(request: InstantPreviewRequest):
+async def instant_preview(
+    request: InstantPreviewRequest,
+    _policy: None = Depends(require_synthesis_clearance),
+):
     """
     Generate instant preview synthesis.
 

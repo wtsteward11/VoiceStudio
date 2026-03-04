@@ -6,8 +6,8 @@ Endpoints for managing scripts and transcripts for voice synthesis.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query

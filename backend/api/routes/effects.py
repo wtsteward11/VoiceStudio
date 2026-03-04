@@ -29,8 +29,8 @@ _create_post_fx_processor: _AnyType = None
 HAS_POST_FX = False
 
 try:
-    from app.core.audio.post_fx import PostFXProcessor as _PFX
-    from app.core.audio.post_fx import create_post_fx_processor as _create_pfx
+    from backend.audio.post_fx import PostFXProcessor as _PFX
+    from backend.audio.post_fx import create_post_fx_processor as _create_pfx
 
     _PostFXProcessor = _PFX
     _create_post_fx_processor = _create_pfx
@@ -414,14 +414,13 @@ def process_audio_with_chain(
             raise HTTPException(status_code=400, detail="Effect chain has no enabled effects")
 
         # Load audio file
-        from .voice import _audio_storage, _register_audio_file
+        from backend.services.audio_artifacts import AudioRegistry
 
-        if request.audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(request.audio_id)
+        if not audio_path:
             raise HTTPException(
                 status_code=404, detail=f"Audio file '{request.audio_id}' not found"
             )
-
-        audio_path = _audio_storage[request.audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
@@ -429,7 +428,7 @@ def process_audio_with_chain(
 
         # Load audio
         try:
-            from app.core.audio.audio_utils import load_audio, save_audio
+            from backend.audio.audio_utils import load_audio
 
             audio, sample_rate = load_audio(audio_path)
         except ImportError:
@@ -485,15 +484,16 @@ def process_audio_with_chain(
                     logger.warning(f"Failed to apply effect {effect.name}: {e}")
                     # Continue with next effect
 
-        # Save processed audio
-        output_path = tempfile.mktemp(suffix=".wav")
-
+        # Save and register via artifact spine
         try:
-            save_audio(processed_audio, sample_rate, output_path)
+            from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
-            # Register output audio
-            output_audio_id = f"effect_{uuid.uuid4().hex[:8]}"
-            _register_audio_file(output_audio_id, output_path)
+            output_audio_id, _, _ = create_audio_artifact_from_wav_array(
+                processed_audio,
+                sample_rate,
+                created_by="effects",
+                audio_id=f"effect_{uuid.uuid4().hex[:8]}",
+            )
 
             logger.info(
                 f"Processed audio {request.audio_id} with chain {chain_id} "
@@ -1033,18 +1033,18 @@ async def process_project_effect_chain(
 
         # Attempt to load and process audio
         try:
-            from .voice import _audio_storage, _register_audio_file
+            from backend.services.audio_artifacts import AudioRegistry
 
-            if audio_id not in _audio_storage:
+            audio_path = AudioRegistry.get_path(audio_id)
+            if not audio_path:
                 raise HTTPException(status_code=404, detail=f"Audio file '{audio_id}' not found")
-
-            audio_path = _audio_storage[audio_id]
             if not os.path.exists(audio_path):
                 raise HTTPException(
                     status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
                 )
 
-            from app.core.audio.audio_utils import load_audio, save_audio
+            from backend.audio.audio_utils import load_audio
+            from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
             audio, sample_rate = load_audio(audio_path)
 
@@ -1068,14 +1068,13 @@ async def process_project_effect_chain(
                 elif effect.type == "filter":
                     processed_audio = _apply_filter(processed_audio, sample_rate, params)
 
-            # Save processed audio
-            output_dir = tempfile.mkdtemp(prefix="effects_")
-            out_name = output_filename or f"processed_{audio_id}.wav"
-            output_path = os.path.join(output_dir, out_name)
-            save_audio(processed_audio, sample_rate, output_path)
-
-            output_audio_id = f"effect_{uuid.uuid4().hex[:8]}"
-            _register_audio_file(output_audio_id, output_path)
+            # Save and register via artifact spine
+            output_audio_id, _, _ = create_audio_artifact_from_wav_array(
+                processed_audio,
+                sample_rate,
+                created_by="effects",
+                audio_id=f"effect_{uuid.uuid4().hex[:8]}",
+            )
             processing_time = time.time() - start_time
 
             logger.info(

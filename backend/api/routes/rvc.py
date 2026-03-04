@@ -158,14 +158,14 @@ async def convert_voice(
             )
 
         # Get source audio path using helper function
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
-        source_audio_path = _get_audio_path(source_audio_id)
+        source_audio_path = resolve_audio_path(source_audio_id)
         if not source_audio_path or not os.path.exists(source_audio_path):
             # Try alternative storage
-            from .voice import _audio_storage as voice_audio_storage
+            from backend.services.audio_artifacts import AudioRegistry
 
-            source_audio_path = voice_audio_storage.get(source_audio_id)
+            source_audio_path = AudioRegistry.get_path(source_audio_id)
             if not source_audio_path or not os.path.exists(source_audio_path):
                 raise HTTPException(
                     status_code=404, detail=f"Source audio not found: {source_audio_id}"
@@ -183,7 +183,8 @@ async def convert_voice(
                 raise HTTPException(status_code=424, detail=detail)
 
         # Perform conversion with circuit breaker protection
-        output_path = tempfile.mktemp(suffix=".wav")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            output_path = tmp.name
         breaker = get_engine_breaker(engine_key)
 
         try:
@@ -214,22 +215,16 @@ async def convert_voice(
         if audio is None and not os.path.exists(output_path):
             raise HTTPException(status_code=500, detail="Voice conversion failed")
 
-        # Generate audio ID and store (persisted via voice registry)
-        audio_id = str(uuid.uuid4())
-        from .voice import _register_audio_file
+        # Store and register via artifact spine (engine wrote to output_path)
+        from backend.services.audio_artifacts import create_audio_artifact_from_file
 
-        _register_audio_file(audio_id, output_path)
-
-        # Calculate duration
-        import wave
-
-        try:
-            with wave.open(output_path, "rb") as wav_file:
-                frames = wav_file.getnframes()
-                sample_rate = wav_file.getframerate()
-                duration = frames / float(sample_rate)
-        except (wave.Error, OSError) as wav_err:
-            logger.debug(f"Could not read duration from {output_path}: {wav_err}")
+        audio_id, cached_path, metadata = create_audio_artifact_from_file(
+            output_path,
+            created_by="rvc",
+            delete_source=True,
+        )
+        duration = metadata.get("duration") if metadata else None
+        if duration is None:
             duration = 2.5
 
         # Build response
@@ -465,9 +460,10 @@ async def upload_model(model_file: UploadFile = File(...), model_name: str | Non
         # Save model file
         filename = model_file.filename or "model.pth"
         model_path = os.path.join(model_dir, filename)
-        with open(model_path, "wb") as f:
-            content = await model_file.read()
-            f.write(content)
+        content = await model_file.read()
+        from pathlib import Path
+
+        Path(model_path).write_bytes(content)
 
         return {
             "success": True,
@@ -487,15 +483,14 @@ async def get_audio(audio_id: str):
 
     Returns the audio file as a WAV stream for playback.
     """
-    from .voice import _audio_storage
+    from backend.services.audio_artifacts import AudioRegistry
 
-    if audio_id not in _audio_storage:
+    file_path = AudioRegistry.get_path(audio_id)
+    if not file_path:
         raise HTTPException(status_code=404, detail=f"Audio not found: {audio_id}")
 
-    file_path = _audio_storage[audio_id]
-
     if not os.path.exists(file_path):
-        del _audio_storage[audio_id]
+        AudioRegistry.remove(audio_id)
         raise HTTPException(status_code=404, detail="Audio file not found on disk")
 
     return FileResponse(

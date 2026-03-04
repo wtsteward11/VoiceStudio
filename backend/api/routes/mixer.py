@@ -34,7 +34,7 @@ except ImportError:
 router = APIRouter(prefix="/api/mixer", tags=["mixer"])
 
 # In-memory storage (replace with database in production)
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _mixer_states: PersistentStore = PersistentStore("mixer_states")
 _mixer_presets: PersistentStore = PersistentStore("mixer_presets")

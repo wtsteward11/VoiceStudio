@@ -14,7 +14,9 @@ import logging
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from backend.api.dependencies import require_synthesis_clearance
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -111,7 +113,10 @@ class MultiVoiceCompareResponse(BaseModel):
 
 
 @router.post("/generate", response_model=MultiVoiceGenerateResponse, status_code=201)
-async def generate_multi_voice(request: MultiVoiceGenerateRequest):
+async def generate_multi_voice(
+    request: MultiVoiceGenerateRequest,
+    _policy: None = Depends(require_synthesis_clearance),
+):
     """Start multi-voice generation job."""
     try:
         if len(request.items) > 20:

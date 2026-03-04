@@ -6,9 +6,9 @@ High-quality video generation endpoints with support for multiple engines.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
-import asyncio
 import os
 import tempfile
 import uuid
@@ -25,6 +25,7 @@ from backend.core.security.file_validation import (
     validate_video_file,
 )
 from backend.ml.models.engine_service import get_engine_service
+from backend.services.media_storage_service import get_video_storage
 
 from ..models_additional import (
     TemporalAnalysis,
@@ -40,9 +41,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/video", tags=["video", "generation"])
 
-# In-memory storage for generated videos
-# (replace with database/storage in production)
-_video_storage: dict[str, str] = {}  # video_id -> file_path
 _state_lock = asyncio.Lock()
 
 # Engine router for video generation
@@ -163,7 +161,7 @@ async def generate_video(req: VideoGenerateRequest) -> VideoGenerateResponse:
                         raise HTTPException(status_code=500, detail="Video file was not created")
 
                 # Store video path
-                _video_storage[video_id] = output_path
+                get_video_storage()[video_id] = output_path
 
                 # Get video metadata
                 try:
@@ -253,9 +251,9 @@ async def upscale_video(
                 input_video_path = tmp_file.name
         elif req.video_id:
             # Load from stored video
-            if req.video_id not in _video_storage:
+            if req.video_id not in get_video_storage():
                 raise HTTPException(status_code=404, detail=f"Video '{req.video_id}' not found")
-            input_video_path = _video_storage[req.video_id]
+            input_video_path = get_video_storage()[req.video_id]
         else:
             raise HTTPException(
                 status_code=400, detail="Either video_file or video_id must be provided"
@@ -295,7 +293,7 @@ async def upscale_video(
             raise HTTPException(status_code=500, detail="Video upscaling failed")
 
         # Store upscaled video
-        _video_storage[video_id] = output_path
+        get_video_storage()[video_id] = output_path
 
         # Get video metadata
         try:
@@ -343,10 +341,10 @@ async def enhance_temporal_consistency(
     and reduces flickering/jitter in video deepfakes.
     """
     try:
-        if req.video_id not in _video_storage:
+        if req.video_id not in get_video_storage():
             raise HTTPException(status_code=404, detail=f"Video '{req.video_id}' not found")
 
-        video_path = _video_storage[req.video_id]
+        video_path = get_video_storage()[req.video_id]
 
         # Analyze temporal consistency
         try:
@@ -454,7 +452,7 @@ async def enhance_temporal_consistency(
                 out.release()
 
                 # Store processed video
-                _video_storage[processed_video_id] = output_path
+                get_video_storage()[processed_video_id] = output_path
                 processed_video_url = f"/api/video/{processed_video_id}"
 
                 # Re-analyze processed video
@@ -535,10 +533,10 @@ async def list_engines() -> dict:
 @router.get("/{video_id}")
 async def get_video(video_id: str):
     """Retrieve generated video by ID."""
-    if video_id not in _video_storage:
+    if video_id not in get_video_storage():
         raise HTTPException(status_code=404, detail="Video not found")
 
-    video_path = _video_storage[video_id]
+    video_path = get_video_storage()[video_id]
     if not os.path.exists(video_path):
         raise HTTPException(status_code=404, detail="Video file not found")
 
@@ -632,7 +630,7 @@ async def convert_voice(
             raise HTTPException(status_code=500, detail="Voice conversion failed")
 
         # Store audio path in video storage
-        _video_storage[audio_id] = converted_path
+        get_video_storage()[audio_id] = converted_path
 
         return {
             "audio_id": audio_id,

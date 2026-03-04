@@ -11,7 +11,10 @@ import asyncio
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from backend.api.dependencies import require_synthesis_clearance
+from backend.api.models import ApiOk
 from pydantic import BaseModel
 
 from ..optimization import cache_response
@@ -125,6 +128,8 @@ class MultiEngineEnsembleStatus(BaseModel):
 @router.post("", response_model=EnsembleSynthesisResponse)
 async def create_ensemble_synthesis(
     request: EnsembleSynthesisRequest,
+    http_request: Request,
+    _policy: None = Depends(require_synthesis_clearance),
 ):
     """Create a new ensemble synthesis job."""
     import uuid
@@ -160,7 +165,7 @@ async def create_ensemble_synthesis(
         # Queue job for asynchronous processing
         import asyncio
 
-        asyncio.create_task(_process_ensemble_job(job_id, request))
+        asyncio.create_task(_process_ensemble_job(job_id, request, http_request))
 
         logger.info(f"Ensemble synthesis job created: {job_id}")
 
@@ -229,7 +234,7 @@ async def list_ensemble_jobs(
     ]
 
 
-@router.delete("/{job_id}")
+@router.delete("/{job_id}", response_model=ApiOk)
 async def delete_ensemble_job(job_id: str):
     """Delete an ensemble synthesis job."""
     if job_id not in _ensemble_jobs:
@@ -237,10 +242,12 @@ async def delete_ensemble_job(job_id: str):
 
     del _ensemble_jobs[job_id]
     logger.info(f"Deleted ensemble job: {job_id}")
-    return {"success": True}
+    return ApiOk(ok=True)
 
 
-async def _process_ensemble_job(job_id: str, request: EnsembleSynthesisRequest):
+async def _process_ensemble_job(
+    job_id: str, request: EnsembleSynthesisRequest, http_request: Request
+):
     """
     Process ensemble synthesis job asynchronously.
 
@@ -259,7 +266,6 @@ async def _process_ensemble_job(job_id: str, request: EnsembleSynthesisRequest):
         # Try to use voice synthesis service
         try:
             from ..models_additional import VoiceSynthesizeRequest
-            from .voice import synthesize
 
             total_voices = len(request.voices)
             completed = 0
@@ -276,7 +282,7 @@ async def _process_ensemble_job(job_id: str, request: EnsembleSynthesisRequest):
                         language=voice.language or "en",
                         emotion=voice.emotion,
                     )
-                    tasks.append(_synthesize_voice(synth_req, job_id))
+                    tasks.append(_synthesize_voice(synth_req, job_id, http_request))
 
                 # Wait for all voices to complete
                 results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -304,7 +310,7 @@ async def _process_ensemble_job(job_id: str, request: EnsembleSynthesisRequest):
                     )
 
                     try:
-                        audio_id = await _synthesize_voice(synth_req, job_id)
+                        audio_id = await _synthesize_voice(synth_req, job_id, http_request)
                         if audio_id:
                             job["audio_ids"].append(audio_id)
                             completed += 1
@@ -350,17 +356,19 @@ async def _process_ensemble_job(job_id: str, request: EnsembleSynthesisRequest):
             job["updated"] = datetime.utcnow().isoformat()
 
 
-async def _synthesize_voice(synth_req, job_id: str) -> str | None:
+async def _synthesize_voice(
+    synth_req, job_id: str, http_request: Request
+) -> str | None:
     """
     Synthesize a single voice for ensemble.
 
     Returns audio_id if successful, None otherwise.
     """
     try:
-        from .voice import synthesize
+        from backend.voice.services.synthesis_service import SynthesisService
 
         # Call voice synthesis endpoint
-        result = await synthesize(synth_req)
+        result = await SynthesisService.synthesize(synth_req, http_request, config_service=None)
         return result.audio_id if result else None
 
     except Exception as e:
@@ -372,6 +380,8 @@ async def _synthesize_voice(synth_req, job_id: str) -> str | None:
 @router.post("/multi-engine", response_model=MultiEngineEnsembleResponse)
 async def create_multi_engine_ensemble(
     request: MultiEngineEnsembleRequest,
+    http_request: Request,
+    _policy: None = Depends(require_synthesis_clearance),
 ):
     """
     Create a multi-engine ensemble synthesis job (IDEA 55).
@@ -430,7 +440,7 @@ async def create_multi_engine_ensemble(
         _multi_engine_ensemble_jobs[job_id] = job
 
         # Queue job for asynchronous processing
-        asyncio.create_task(_process_multi_engine_ensemble_job(job_id, request))
+        asyncio.create_task(_process_multi_engine_ensemble_job(job_id, request, http_request))
 
         logger.info(f"Multi-engine ensemble job created: {job_id}")
 
@@ -468,7 +478,9 @@ async def get_multi_engine_ensemble_status(job_id: str):
     )
 
 
-async def _process_multi_engine_ensemble_job(job_id: str, request: MultiEngineEnsembleRequest):
+async def _process_multi_engine_ensemble_job(
+    job_id: str, request: MultiEngineEnsembleRequest, http_request: Request
+):
     """
     Process multi-engine ensemble synthesis job asynchronously (IDEA 55).
 
@@ -490,7 +502,7 @@ async def _process_multi_engine_ensemble_job(job_id: str, request: MultiEngineEn
 
         synthesis_tasks = []
         for engine in request.engines:
-            task = _synthesize_with_engine(engine, request, job_id)
+            task = _synthesize_with_engine(engine, request, job_id, http_request)
             synthesis_tasks.append((engine, task))
 
         # Wait for all engines to complete (with timeout)
@@ -563,14 +575,10 @@ async def _process_multi_engine_ensemble_job(job_id: str, request: MultiEngineEn
         elif request.selection_mode == "hybrid":
             # Hybrid mode: Select best segments from different engines
             try:
-                import tempfile
-
                 import numpy as np
-                import soundfile as sf
 
-                from app.core.audio import audio_utils
-
-                from .voice import _audio_storage, _register_audio_file
+                from backend.audio import audio_utils
+                from backend.services.audio_artifacts import AudioRegistry
 
                 # Load all engine outputs
                 engine_audios = {}
@@ -579,8 +587,8 @@ async def _process_multi_engine_ensemble_job(job_id: str, request: MultiEngineEn
 
                 for engine in successful_engines:
                     audio_id = job["engine_outputs"][engine]
-                    if audio_id in _audio_storage:
-                        audio_path = _audio_storage[audio_id]
+                    audio_path = AudioRegistry.get_path(audio_id)
+                    if audio_path:
                         try:
                             audio, sr = audio_utils.load_audio(audio_path)
                             if len(audio.shape) > 1:
@@ -629,17 +637,17 @@ async def _process_multi_engine_ensemble_job(job_id: str, request: MultiEngineEn
                 # Combine segments
                 if segments:
                     combined_audio = np.concatenate(segments)
-                    # Save combined audio
-                    output_path = tempfile.mktemp(suffix=".wav")
-                    sf.write(
-                        output_path,
-                        combined_audio,
-                        sample_rates[next(iter(sample_rates.keys()))],
+                    target_sr = sample_rates[next(iter(sample_rates.keys()))]
+                    from backend.services.audio_artifacts import (
+                        create_audio_artifact_from_wav_array,
                     )
 
-                    # Register audio
-                    ensemble_audio_id = f"ensemble_{job_id}"
-                    _register_audio_file(ensemble_audio_id, output_path)
+                    ensemble_audio_id, _, _ = create_audio_artifact_from_wav_array(
+                        combined_audio,
+                        target_sr,
+                        created_by="ensemble_hybrid",
+                        audio_id=f"ensemble_{job_id}",
+                    )
 
                     job["ensemble_audio_id"] = ensemble_audio_id
                     job["ensemble_quality"] = {"quality_score": best_quality_segment}
@@ -659,14 +667,10 @@ async def _process_multi_engine_ensemble_job(job_id: str, request: MultiEngineEn
         elif request.selection_mode == "fusion":
             # Fusion mode: Weighted combination of all engines
             try:
-                import tempfile
-
                 import numpy as np
-                import soundfile as sf
 
-                from app.core.audio import audio_utils
-
-                from .voice import _audio_storage, _register_audio_file
+                from backend.audio import audio_utils
+                from backend.services.audio_artifacts import AudioRegistry
 
                 # Load all engine outputs
                 engine_audios = {}
@@ -675,8 +679,8 @@ async def _process_multi_engine_ensemble_job(job_id: str, request: MultiEngineEn
 
                 for engine in successful_engines:
                     audio_id = job["engine_outputs"][engine]
-                    if audio_id in _audio_storage:
-                        audio_path = _audio_storage[audio_id]
+                    audio_path = AudioRegistry.get_path(audio_id)
+                    if audio_path:
                         try:
                             audio, sr = audio_utils.load_audio(audio_path)
                             if len(audio.shape) > 1:
@@ -732,13 +736,15 @@ async def _process_multi_engine_ensemble_job(job_id: str, request: MultiEngineEn
                 if max_amp > 0.95:
                     fused_audio = fused_audio * (0.95 / max_amp)
 
-                # Save fused audio
-                output_path = tempfile.mktemp(suffix=".wav")
-                sf.write(output_path, fused_audio, target_sr)
+                # Save and register fused audio via artifact spine
+                from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
-                # Register audio
-                ensemble_audio_id = f"ensemble_{job_id}"
-                _register_audio_file(ensemble_audio_id, output_path)
+                ensemble_audio_id, _, _ = create_audio_artifact_from_wav_array(
+                    fused_audio,
+                    target_sr,
+                    created_by="ensemble_fusion",
+                    audio_id=f"ensemble_{job_id}",
+                )
 
                 # Calculate average quality
                 avg_quality = sum(
@@ -780,7 +786,10 @@ async def _process_multi_engine_ensemble_job(job_id: str, request: MultiEngineEn
 
 
 async def _synthesize_with_engine(
-    engine: str, request: MultiEngineEnsembleRequest, job_id: str
+    engine: str,
+    request: MultiEngineEnsembleRequest,
+    job_id: str,
+    http_request: Request,
 ) -> dict:
     """
     Synthesize with a specific engine for multi-engine ensemble.
@@ -788,8 +797,9 @@ async def _synthesize_with_engine(
     Returns dict with audio_id, quality metrics, or error.
     """
     try:
+        from backend.voice.services.synthesis_service import SynthesisService
+
         from ..models_additional import VoiceSynthesizeRequest
-        from .voice import synthesize
 
         synth_req = VoiceSynthesizeRequest(
             profile_id=request.profile_id,
@@ -801,7 +811,7 @@ async def _synthesize_with_engine(
         )
 
         # Call voice synthesis
-        result = await synthesize(synth_req)
+        result = await SynthesisService.synthesize(synth_req, http_request, config_service=None)
 
         if result and result.audio_id:
             return {

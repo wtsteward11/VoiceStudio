@@ -7,8 +7,8 @@ Supports CRUD operations, template categories, and template application.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/templates", tags=["templates"])
 
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _templates: PersistentStore = PersistentStore("templates")
 _state_lock = asyncio.Lock()

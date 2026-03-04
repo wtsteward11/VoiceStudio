@@ -6,8 +6,8 @@ Endpoints for controlling emotion and style in voice synthesis.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/emotion-style", tags=["emotion-style"])
 
 # In-memory emotion/style presets (replace with database in production)
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _emotion_presets: PersistentStore = PersistentStore("emotion_presets")
 _style_presets: PersistentStore = PersistentStore("style_presets")

@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from ..models_additional import AssistantRunRequest
 
@@ -56,7 +56,7 @@ _action_registry: dict[str, dict] = {
 
 
 @router.post("/run")
-async def run(req: AssistantRunRequest) -> dict:
+async def run(req: AssistantRunRequest, http_request: Request) -> dict:
     """
     Execute an AI assistant action.
 
@@ -105,8 +105,9 @@ async def run(req: AssistantRunRequest) -> dict:
         try:
             if action_id == "synthesize":
                 # Execute voice synthesis
+                from backend.voice.services.synthesis_service import SynthesisService
+
                 from ..models_additional import VoiceSynthesizeRequest
-                from .voice import synthesize
 
                 synth_req = VoiceSynthesizeRequest(
                     engine=params.get("engine", "xtts"),
@@ -116,15 +117,18 @@ async def run(req: AssistantRunRequest) -> dict:
                     emotion=params.get("emotion"),
                 )
 
-                synth_result = await synthesize(synth_req)
+                synth_result = await SynthesisService.synthesize(synth_req, http_request, config_service=None)
                 result = {
                     "audio_id": synth_result.audio_id,
                     "audio_url": synth_result.audio_url,
                 }
 
             elif action_id == "transcribe":
-                # Execute transcription
-                from .transcribe import TranscriptionRequest, transcribe_audio
+                # Execute transcription via service (no route-to-route import)
+                from backend.services.transcription_service import (
+                    TranscriptionRequest,
+                    transcribe_audio,
+                )
 
                 transcribe_req = TranscriptionRequest(
                     audio_id=params["audio_id"],
@@ -156,8 +160,11 @@ async def run(req: AssistantRunRequest) -> dict:
                 }
 
             elif action_id == "analyze_quality":
-                # Execute quality analysis
-                from .quality import QualityAnalysisRequest, analyze_quality
+                # Execute quality analysis via service (no route-to-route import)
+                from backend.services.quality_service import (
+                    QualityAnalysisRequest,
+                    analyze_quality,
+                )
 
                 quality_req = QualityAnalysisRequest()
 

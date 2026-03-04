@@ -12,7 +12,6 @@ import json
 import logging
 import os
 import shutil
-import sys
 import tempfile
 import zipfile
 from pathlib import Path
@@ -26,13 +25,11 @@ from backend.core.security.file_validation import (
     FileValidationError,
     validate_archive_file,
 )
+from backend.services.model_facade import ModelStorage
 
 from ..auth import require_auth_if_enabled
 from ..models import ApiOk
 from ..optimization import cache_response
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../.."))
-from app.core.models.storage import ModelStorage
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +40,9 @@ _model_storage = ModelStorage()
 HAS_MODEL_CACHE = False
 _model_cache: Any = None
 try:
-    _cache_mod = _il.import_module("app.core.models.cache")
-    _model_cache = _cache_mod.get_model_cache(max_models=10, max_memory_mb=4096.0)
+    from backend.services.model_facade import get_model_cache
+
+    _model_cache = get_model_cache(max_models=10, max_memory_mb=4096.0)
     HAS_MODEL_CACHE = True
 except (ImportError, AttributeError):
     pass
@@ -536,8 +534,7 @@ async def import_model(
 
             try:
                 # Write validated file
-                with open(temp_file, "wb") as f:
-                    f.write(content)
+                Path(temp_file).write_bytes(content)
 
                 # Extract ZIP
                 extract_dir = Path(temp_dir) / "extracted"

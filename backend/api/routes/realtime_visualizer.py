@@ -10,8 +10,8 @@ WebSocket Protocol (GAP-INT-002):
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -173,12 +173,6 @@ async def visualizer_stream(websocket: WebSocket, session_id: str):
 
         # Check if audio processing libraries are available
         try:
-            import sys
-
-            app_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "app")
-            if os.path.exists(app_path) and app_path not in sys.path:
-                sys.path.insert(0, app_path)
-
             import librosa
             import numpy as np
         except ImportError:

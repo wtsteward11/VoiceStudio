@@ -6,8 +6,8 @@ Endpoints for fine-grained emotion control in voice synthesis.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import os
 import uuid
 from datetime import datetime
@@ -118,6 +118,13 @@ class EmotionApplyExtendedRequest(BaseModel):
     timeline_curve: list[float] | None = None  # Automation curve
 
 
+class EmotionApplyExtendedResponse(BaseModel):
+    """Response after applying emotion (new file, new audio_id)."""
+
+    audio_id: str
+    audio_url: str
+
+
 @router.get("/list", response_model=list[str])
 @cache_response(ttl=600)  # Cache for 10 minutes (emotion list is static)
 async def list_emotions():
@@ -142,12 +149,11 @@ async def analyze(req: dict) -> dict:
             raise HTTPException(status_code=400, detail="audio_id is required and must be a string")
 
         # Load the audio file using audio_id
-        from .voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
-        if audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(audio_id)
+        if not audio_path:
             raise HTTPException(status_code=404, detail=f"Audio file '{audio_id}' not found")
-
-        audio_path = _audio_storage[audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
@@ -157,7 +163,7 @@ async def analyze(req: dict) -> dict:
         try:
             import numpy as np
 
-            from app.core.audio import audio_utils
+            from backend.audio import audio_utils
 
             # Load audio
             audio, sample_rate = audio_utils.load_audio(audio_path)
@@ -373,8 +379,8 @@ async def apply(req: EmotionApplyRequest) -> ApiOk:
     return ApiOk()
 
 
-@router.post("/apply-extended")
-async def apply_extended(req: EmotionApplyExtendedRequest) -> ApiOk:
+@router.post("/apply-extended", response_model=EmotionApplyExtendedResponse)
+async def apply_extended(req: EmotionApplyExtendedRequest) -> EmotionApplyExtendedResponse:
     """
     Apply emotion with blending and timeline automation.
 
@@ -416,13 +422,12 @@ async def apply_extended(req: EmotionApplyExtendedRequest) -> ApiOk:
     try:
         import numpy as np
 
-        from .voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
         # Get audio file path
-        if req.audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(req.audio_id)
+        if not audio_path:
             raise HTTPException(status_code=404, detail=f"Audio file '{req.audio_id}' not found")
-
-        audio_path = _audio_storage[req.audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
@@ -437,7 +442,10 @@ async def apply_extended(req: EmotionApplyExtendedRequest) -> ApiOk:
                 audio = np.mean(audio, axis=1)  # Convert to mono
         except ImportError:
             logger.warning("soundfile not available, emotion application skipped")
-            return ApiOk()
+            raise HTTPException(
+                status_code=503,
+                detail="soundfile required for emotion application",
+            )
 
         # Apply emotion-based prosody modifications
         # Emotion affects pitch, tempo, and formant characteristics
@@ -503,20 +511,34 @@ async def apply_extended(req: EmotionApplyExtendedRequest) -> ApiOk:
                 stft_shifted = librosa.phase_vocoder(stft, rate=1.0 + formant_shift)
                 audio = librosa.istft(stft_shifted)
 
-            # Save processed audio back
-            sf.write(audio_path, audio, sample_rate)
-            logger.info(f"Applied emotion modifications to audio '{req.audio_id}'")
+            # Write to artifact spine (do not overwrite original)
+            from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
+
+            output_audio_id, _, _ = create_audio_artifact_from_wav_array(
+                audio,
+                sample_rate,
+                created_by="emotion",
+                audio_id=f"emotion_{uuid.uuid4().hex[:8]}",
+            )
+            logger.info(
+                f"Applied emotion modifications to audio '{req.audio_id}' -> {output_audio_id}"
+            )
+            return EmotionApplyExtendedResponse(
+                audio_id=output_audio_id,
+                audio_url=f"/api/voice/audio/{output_audio_id}",
+            )
         except ImportError:
             logger.warning("librosa not available, emotion prosody modifications skipped")
+            raise HTTPException(
+                status_code=503,
+                detail="librosa required for emotion prosody modifications",
+            )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to apply emotion to audio: {e}", exc_info=True)
-        # Return error response instead of silently failing
         raise HTTPException(status_code=500, detail=f"Failed to apply emotion to audio: {e!s}")
-
-    return ApiOk()
 
 
 @router.post("/preset/save", response_model=EmotionPresetResponse, status_code=201)
@@ -763,3 +785,8 @@ async def preview_emotion(request: EmotionPreviewRequest):
         "duration": 0.0,
         "message": "Preview generated",
     }
+
+
+from backend.services.emotion_service import register_emotion_analyze_handler
+
+register_emotion_analyze_handler(analyze)

@@ -6,10 +6,9 @@ Endpoints for applying noise reduction to audio files.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import os
-import tempfile
 import uuid
 
 import numpy as np
@@ -51,12 +50,11 @@ async def apply(req: NrApplyRequest) -> dict:
             raise HTTPException(status_code=400, detail="noise_print_id is required")
 
         # Get audio file path
-        from .voice import _audio_storage, _register_audio_file
+        from backend.services.audio_artifacts import AudioRegistry
 
-        if audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(audio_id)
+        if not audio_path:
             raise HTTPException(status_code=404, detail=f"Audio file '{audio_id}' not found")
-
-        audio_path = _audio_storage[audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
@@ -130,13 +128,15 @@ async def apply(req: NrApplyRequest) -> dict:
         if max_val > 0.95:
             processed_audio = processed_audio * (0.95 / max_val)
 
-        # Save processed audio
-        output_path = tempfile.mktemp(suffix=".wav")
-        sf.write(output_path, processed_audio, sample_rate)
+        # Save and register via artifact spine
+        from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
-        # Register new audio file
-        output_audio_id = f"nr_{uuid.uuid4().hex[:8]}"
-        _register_audio_file(output_audio_id, output_path)
+        output_audio_id, _, _ = create_audio_artifact_from_wav_array(
+            processed_audio,
+            sample_rate,
+            created_by="nr",
+            audio_id=f"nr_{uuid.uuid4().hex[:8]}",
+        )
 
         logger.info(
             f"Noise reduction applied: {audio_id} -> {output_audio_id} "
@@ -177,12 +177,11 @@ async def create_noise_print(audio_id: str, name: str | None = None) -> dict:
             raise HTTPException(status_code=400, detail="audio_id is required")
 
         # Get audio file path
-        from .voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
-        if audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(audio_id)
+        if not audio_path:
             raise HTTPException(status_code=404, detail=f"Audio file '{audio_id}' not found")
-
-        audio_path = _audio_storage[audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"

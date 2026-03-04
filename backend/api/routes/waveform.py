@@ -23,8 +23,8 @@ See also: docs/api/ROUTE_MAPPING.md for complete route documentation.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import os
 
 from fastapi import APIRouter, HTTPException
@@ -115,24 +115,18 @@ async def get_waveform_data(
 
     try:
         # Get audio file path
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
-        audio_path = _get_audio_path(audio_id)
+        audio_path = resolve_audio_path(audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404,
                 detail=f"Audio file not found for audio_id: {audio_id}",
             )
 
-        # Load audio file
+        # Load audio file (app on path via main.py bootstrap)
         try:
-            import sys
-
-            app_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "app")
-            if os.path.exists(app_path) and app_path not in sys.path:
-                sys.path.insert(0, app_path)
-
-            from core.audio.audio_utils import load_audio
+            from backend.audio.audio_utils import load_audio
 
             audio, sample_rate = load_audio(audio_path)
         except ImportError as e:
@@ -228,9 +222,9 @@ async def analyze_waveform(audio_id: str):
 
     try:
         # Get audio file path
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
-        audio_path = _get_audio_path(audio_id)
+        audio_path = resolve_audio_path(audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404,
@@ -239,13 +233,7 @@ async def analyze_waveform(audio_id: str):
 
         # Load audio file
         try:
-            import sys
-
-            app_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "app")
-            if os.path.exists(app_path) and app_path not in sys.path:
-                sys.path.insert(0, app_path)
-
-            from core.audio.audio_utils import load_audio
+            from backend.audio.audio_utils import load_audio
 
             audio, _sample_rate = load_audio(audio_path)
         except ImportError as e:
@@ -314,10 +302,10 @@ async def compare_waveforms(audio_id_1: str, audio_id_2: str):
 
     try:
         # Get audio file paths
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
-        audio_path_1 = _get_audio_path(audio_id_1)
-        audio_path_2 = _get_audio_path(audio_id_2)
+        audio_path_1 = resolve_audio_path(audio_id_1)
+        audio_path_2 = resolve_audio_path(audio_id_2)
 
         if not audio_path_1 or not os.path.exists(audio_path_1):
             raise HTTPException(
@@ -332,13 +320,7 @@ async def compare_waveforms(audio_id_1: str, audio_id_2: str):
 
         # Load both audio files
         try:
-            import sys
-
-            app_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "app")
-            if os.path.exists(app_path) and app_path not in sys.path:
-                sys.path.insert(0, app_path)
-
-            from core.audio.audio_utils import load_audio
+            from backend.audio.audio_utils import load_audio
 
             audio_1, sr_1 = load_audio(audio_path_1)
             audio_2, sr_2 = load_audio(audio_path_2)

@@ -6,8 +6,8 @@ Endpoints for spatial audio positioning and 3D audio effects.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import os
 from typing import Any
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/spatial-audio", tags=["spatial-audio"])
 
 # In-memory spatial audio configurations (replace with database in production)
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _spatial_configs: PersistentStore = PersistentStore("spatial_configs")
 _state_lock = asyncio.Lock()
@@ -211,13 +211,12 @@ async def apply_spatial_audio(request: SpatialApplyRequest):
 
         import numpy as np
 
-        from .voice import _audio_storage, _register_audio_file
+        from backend.services.audio_artifacts import AudioRegistry
 
         # Get audio file path
-        if config.audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(config.audio_id)
+        if not audio_path:
             raise HTTPException(status_code=404, detail=f"Audio file '{config.audio_id}' not found")
-
-        audio_path = _audio_storage[config.audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
@@ -309,15 +308,39 @@ async def apply_spatial_audio(request: SpatialApplyRequest):
                 except Exception as e:
                     logger.warning(f"Doppler effect failed: {e}")
 
-        # Save processed audio
-        import tempfile
+        # Save and register via artifact spine
+        from backend.services.audio_artifacts import (
+            create_audio_artifact_from_file,
+            create_audio_artifact_from_wav_array,
+        )
 
-        output_path = tempfile.mktemp(suffix=f".{request.output_format}")
-        sf.write(output_path, processed_audio, sample_rate)
+        output_format = (request.output_format or "wav").lower()
+        if output_format == "wav":
+            output_audio_id, _, _ = create_audio_artifact_from_wav_array(
+                processed_audio,
+                sample_rate,
+                created_by="spatial_audio",
+                audio_id=f"spatial_{uuid.uuid4().hex[:8]}",
+            )
+        else:
+            import tempfile
 
-        # Register new audio file
-        output_audio_id = f"spatial_{uuid.uuid4().hex[:8]}"
-        _register_audio_file(output_audio_id, output_path)
+            from backend.services.audio_artifacts.use_cases import wav_array_to_bytes
+
+            wav_bytes = wav_array_to_bytes(
+                processed_audio, sample_rate, format=output_format.upper()
+            )
+            with tempfile.NamedTemporaryFile(
+                delete=False, suffix=f".{output_format}"
+            ) as tmp:
+                tmp.write(wav_bytes)
+                output_path = tmp.name
+            output_audio_id, _, _ = create_audio_artifact_from_file(
+                output_path,
+                created_by="spatial_audio",
+                audio_id=f"spatial_{uuid.uuid4().hex[:8]}",
+                delete_source=True,
+            )
 
         # Calculate quality metrics (ADR-008 compliant)
         quality_metrics: dict[str, Any] = {}
@@ -407,13 +430,12 @@ async def preview_spatial_audio(
 
         import numpy as np
 
-        from .voice import _audio_storage, _register_audio_file
+        from backend.services.audio_artifacts import AudioRegistry
 
         # Get audio file path
-        if audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(audio_id)
+        if not audio_path:
             raise HTTPException(status_code=404, detail=f"Audio file '{audio_id}' not found")
-
-        audio_path = _audio_storage[audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
@@ -448,13 +470,15 @@ async def preview_spatial_audio(
                 [processed_audio * left_gain, processed_audio * right_gain]
             ).T
 
-        # Save preview audio
-        output_path = tempfile.mktemp(suffix=".wav")
-        sf.write(output_path, processed_audio, sample_rate)
+        # Save and register via artifact spine
+        from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
-        # Register preview audio
-        preview_audio_id = f"spatial_preview_{uuid.uuid4().hex[:8]}"
-        _register_audio_file(preview_audio_id, output_path)
+        preview_audio_id, _, _ = create_audio_artifact_from_wav_array(
+            processed_audio,
+            sample_rate,
+            created_by="spatial_audio_preview",
+            audio_id=f"spatial_preview_{uuid.uuid4().hex[:8]}",
+        )
 
         return {
             "audio_id": preview_audio_id,
@@ -629,15 +653,14 @@ async def generate_binaural_audio(request: SpatialBinauralRequest):
 
         import numpy as np
 
-        from .voice import _audio_storage, _register_audio_file
+        from backend.services.audio_artifacts import AudioRegistry
 
         # Get audio file path
-        if request.audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(request.audio_id)
+        if not audio_path:
             raise HTTPException(
                 status_code=404, detail=f"Audio file '{request.audio_id}' not found"
             )
-
-        audio_path = _audio_storage[request.audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
@@ -701,13 +724,15 @@ async def generate_binaural_audio(request: SpatialBinauralRequest):
             right_gain = max(0.0, min(1.0, (1.0 + request.x) / 2.0))
             binaural_audio = np.array([processed_audio * left_gain, processed_audio * right_gain]).T
 
-        # Save binaural audio
-        output_path = tempfile.mktemp(suffix=".wav")
-        sf.write(output_path, binaural_audio, sample_rate)
+        # Save and register via artifact spine
+        from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
-        # Register binaural audio
-        binaural_audio_id = f"binaural_{uuid.uuid4().hex[:8]}"
-        _register_audio_file(binaural_audio_id, output_path)
+        binaural_audio_id, _, _ = create_audio_artifact_from_wav_array(
+            binaural_audio,
+            sample_rate,
+            created_by="spatial_audio_binaural",
+            audio_id=f"binaural_{uuid.uuid4().hex[:8]}",
+        )
 
         # Calculate quality metrics for binaural audio
         quality_metrics: dict[str, Any] = {}

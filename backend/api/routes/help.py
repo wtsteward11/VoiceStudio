@@ -7,9 +7,9 @@ Supports help topics, keyboard shortcuts, and search.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import asyncio
 import os
 
 from fastapi import APIRouter, HTTPException, Query

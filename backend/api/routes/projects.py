@@ -230,15 +230,14 @@ def save_audio_to_project(project_id: str, req: SaveAudioRequest) -> ProjectAudi
     filename = req.filename
 
     # Import audio storage from voice routes
-    from .voice import _audio_storage
+    from backend.services.audio_artifacts import AudioRegistry
 
-    if audio_id not in _audio_storage:
+    source_path = AudioRegistry.get_path(audio_id)
+    if not source_path:
         raise HTTPException(
             status_code=404,
             detail=f"Audio file with ID '{audio_id}' not found. The audio may have expired or been removed.",
         )
-
-    source_path = _audio_storage[audio_id]
     if not os.path.exists(source_path):
         raise HTTPException(
             status_code=404,

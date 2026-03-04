@@ -6,9 +6,9 @@ Endpoints for browsing and discovering voice profiles, samples, and models.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import asyncio
 import os
 
 from fastapi import APIRouter, HTTPException
@@ -79,11 +79,15 @@ def _sync_catalog_from_profiles():
     global _voice_catalog
     updated = False
 
-    # Import profiles from profiles route
+    # Import profiles from profile service (no route-to-route import)
     try:
-        from .profiles import _profile_timestamps
-        from .profiles import _profiles as profile_storage
+        from backend.services.profile_search_service import (
+            get_profile_timestamps_store,
+            get_profiles_proxy,
+        )
 
+        _profile_timestamps = get_profile_timestamps_store()
+        profile_storage = get_profiles_proxy()
         for profile_id, profile in profile_storage.items():
             # Handle both Pydantic model and dict
             if hasattr(profile, "name"):

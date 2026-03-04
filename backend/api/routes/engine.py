@@ -6,12 +6,13 @@ Endpoints for engine performance telemetry and monitoring.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import time
 
-from backend.ml.models.engine_service import IEngineService, get_engine_service
 from fastapi import APIRouter, Depends, HTTPException, Query
+
+from backend.ml.models.engine_service import IEngineService, get_engine_service
 
 from ..models_additional import Telemetry
 from ..optimization import cache_response

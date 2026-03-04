@@ -195,8 +195,11 @@ async def export_to_daw(request: DAWExportRequest) -> DAWExportResponse:
                 bit_depth = preset["settings"].get("bit_depth", bit_depth)
 
         # Process export (in full implementation, would resample/convert per sample_rate/bit_depth)
-        output_path = Path("exports") / f"daw_{audio_path.stem}.wav"
-        output_path.parent.mkdir(exist_ok=True)
+        from backend.config.path_config import get_path
+
+        output_base = get_path("output")
+        output_path = output_base / f"daw_{audio_path.stem}.wav"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         import shutil
 
@@ -239,7 +242,9 @@ async def export_for_video(request: VideoExportRequest) -> VideoExportResponse:
         if not audio_path.exists():
             raise HTTPException(status_code=404, detail="Audio file not found")
 
-        output_dir = Path("exports/video")
+        from backend.config.path_config import get_path
+
+        output_dir = get_path("output") / "video"
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Copy audio

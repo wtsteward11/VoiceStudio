@@ -6,8 +6,8 @@ Provides endpoints for engine-specific quality enhancement pipelines.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import os
 import uuid
 from typing import Any
@@ -120,9 +120,9 @@ async def apply_pipeline(
     """
     try:
         # Get audio file from storage
-        from ..routes.voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
-        audio_path = _audio_storage.get(audio_id)
+        audio_path = AudioRegistry.get_path(audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(status_code=404, detail=f"Audio not found: {audio_id}")
 
@@ -138,7 +138,7 @@ async def apply_pipeline(
         # Get reference audio if provided
         reference_audio_path = None
         if reference_audio_id:
-            reference_audio_path = _audio_storage.get(reference_audio_id)
+            reference_audio_path = AudioRegistry.get_path(reference_audio_id)
             if not reference_audio_path or not os.path.exists(reference_audio_path):
                 logger.warning(f"Reference audio not found: {reference_audio_id}")
 
@@ -161,19 +161,15 @@ async def apply_pipeline(
             reference_audio=reference_audio_path,
         )
 
-        # Save enhanced audio
-        enhanced_audio_id = f"{audio_id}_enhanced_{uuid.uuid4().hex[:8]}"
+        # Save and register via artifact spine
+        from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
-        # Save to temporary location
-        import tempfile
-
-        enhanced_path = tempfile.mktemp(suffix=".wav")
-        sf.write(enhanced_path, enhanced_audio, sample_rate)
-
-        # Register in audio storage
-        from ..routes.voice import _register_audio_file
-
-        _register_audio_file(enhanced_audio_id, enhanced_path)
+        enhanced_audio_id, _, _ = create_audio_artifact_from_wav_array(
+            enhanced_audio,
+            sample_rate,
+            created_by="quality_pipelines",
+            audio_id=f"{audio_id}_enhanced_{uuid.uuid4().hex[:8]}",
+        )
 
         return {"audio_id": enhanced_audio_id, "quality_metrics": quality_metrics}
     except HTTPException:
@@ -191,9 +187,9 @@ async def preview_pipeline(engine_id: str, request: PipelinePreviewRequest):
     """
     try:
         # Get audio file
-        from ..routes.voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
-        audio_path = _audio_storage.get(request.audio_id)
+        audio_path = AudioRegistry.get_path(request.audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(status_code=404, detail=f"Audio not found: {request.audio_id}")
 
@@ -224,18 +220,15 @@ async def preview_pipeline(engine_id: str, request: PipelinePreviewRequest):
             reference_audio=None,
         )
 
-        # Save enhanced audio
-        enhanced_audio_id = f"{request.audio_id}_preview_{uuid.uuid4().hex[:8]}"
+        # Save and register via artifact spine
+        from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
-        import tempfile
-
-        enhanced_path = tempfile.mktemp(suffix=".wav")
-        sf.write(enhanced_path, enhanced_audio, sample_rate)
-
-        # Register in audio storage
-        from ..routes.voice import _register_audio_file
-
-        _register_audio_file(enhanced_audio_id, enhanced_path)
+        enhanced_audio_id, _, _ = create_audio_artifact_from_wav_array(
+            enhanced_audio,
+            sample_rate,
+            created_by="quality_pipelines_preview",
+            audio_id=f"{request.audio_id}_preview_{uuid.uuid4().hex[:8]}",
+        )
 
         # Create comparison
         comparison_data: PipelineComparisonResponse | None = None
@@ -291,9 +284,9 @@ async def compare_pipeline(
     """
     try:
         # Get audio file
-        from ..routes.voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
-        audio_path = _audio_storage.get(audio_id)
+        audio_path = AudioRegistry.get_path(audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(status_code=404, detail=f"Audio not found: {audio_id}")
 
@@ -310,7 +303,7 @@ async def compare_pipeline(
         # Get reference audio if provided
         reference_audio_path = None
         if reference_audio_id:
-            reference_audio_path = _audio_storage.get(reference_audio_id)
+            reference_audio_path = AudioRegistry.get_path(reference_audio_id)
 
         # Get pipeline configuration
         config = None

@@ -12,6 +12,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 
+from backend.orchestrator.presets import get_presets_service
+from backend.orchestrator.scheduler import get_job_scheduler
 from backend.orchestrator.schemas import (
     GpuStatusResponse,
     OrchestrationRequest,
@@ -20,8 +22,6 @@ from backend.orchestrator.schemas import (
     StrategyPreset,
 )
 from backend.orchestrator.service import get_orchestration_service
-from backend.orchestrator.presets import get_presets_service
-from backend.orchestrator.scheduler import get_job_scheduler
 
 from ..middleware.auth_middleware import require_auth_if_enabled
 

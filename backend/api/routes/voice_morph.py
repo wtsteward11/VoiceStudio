@@ -6,12 +6,12 @@ Endpoints for voice morphing and blending between multiple voices.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 from pathlib import Path
 
 import numpy as np
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from backend.ml.models.engine_service import get_engine_service
@@ -182,7 +182,7 @@ class MorphApplyResponse(BaseModel):
 
 
 @router.post("/apply", response_model=MorphApplyResponse)
-async def apply_morph(request: MorphApplyRequest):
+async def apply_morph(request: MorphApplyRequest, http_request: Request):
     """
     Apply voice morphing configuration.
 
@@ -201,12 +201,13 @@ async def apply_morph(request: MorphApplyRequest):
     try:
         import numpy as np
 
+        from backend.services.audio_artifacts import AudioRegistry
+
         # Import audio utilities
-        from .audio import _get_audio_path
-        from .voice import _register_audio_file
+        from backend.services.audio_path_resolver import resolve_audio_path
 
         # Step 1: Load source audio
-        source_audio_path = _get_audio_path(config.source_audio_id)
+        source_audio_path = resolve_audio_path(config.source_audio_id)
         if not source_audio_path or not os.path.exists(source_audio_path):
             raise HTTPException(
                 status_code=404,
@@ -214,24 +215,13 @@ async def apply_morph(request: MorphApplyRequest):
             )
 
         try:
-            from app.core.audio.audio_utils import load_audio, save_audio
+            from backend.audio.audio_utils import load_audio
         except ImportError:
             import librosa
-            import soundfile as sf
 
             def load_audio(file_path: str | Path) -> tuple[np.ndarray, int]:
                 audio, sr = librosa.load(str(file_path), sr=None)
                 return np.asarray(audio), int(sr)
-
-            def save_audio(
-                audio: np.ndarray,
-                sample_rate: int,
-                file_path: str | Path,
-                format: str = "wav",
-                subtype: str = "PCM_16",
-            ) -> Path:
-                sf.write(str(file_path), audio, sample_rate)
-                return Path(file_path)
 
         source_audio, sample_rate = load_audio(source_audio_path)
 
@@ -246,8 +236,9 @@ async def apply_morph(request: MorphApplyRequest):
         for target_voice in config.target_voices:
             try:
                 # Try to synthesize with target voice profile
+                from backend.voice.services.synthesis_service import SynthesisService
+
                 from ..models_additional import VoiceSynthesizeRequest
-                from .voice import synthesize
 
                 # Get approximate duration of source audio for synthesis
                 len(source_audio) / sample_rate
@@ -260,9 +251,9 @@ async def apply_morph(request: MorphApplyRequest):
                     engine="piper",  # Use fast engine for morphing
                 )
 
-                result = await synthesize(synth_req)
+                result = await SynthesisService.synthesize(synth_req, http_request, config_service=None)
                 if result and result.audio_id:
-                    target_path = _get_audio_path(result.audio_id)
+                    target_path = resolve_audio_path(result.audio_id)
                     if target_path and os.path.exists(target_path):
                         target_audio, target_sr = load_audio(target_path)
 
@@ -347,11 +338,19 @@ async def apply_morph(request: MorphApplyRequest):
             except Exception as e:
                 logger.warning(f"Failed to preserve prosody: {e}")
 
-        # Step 5: Save morphed audio
+        # Step 5: Save morphed audio via spine
+        from backend.services.audio_artifacts.use_cases import create_audio_artifact_from_wav_array
+
         morphed_audio_id = f"morphed_{uuid.uuid4().hex[:8]}"
-        output_path = os.path.join(tempfile.gettempdir(), f"{morphed_audio_id}.wav")
-        save_audio(morphed_audio, sample_rate, output_path)
-        _register_audio_file(morphed_audio_id, output_path)
+        try:
+            _, output_path, _ = create_audio_artifact_from_wav_array(
+                morphed_audio,
+                sample_rate,
+                created_by="voice_morph",
+                audio_id=morphed_audio_id,
+            )
+        except Exception as e:
+            logger.warning("Provenance/usage record failed: %s", e)
 
         duration = len(morphed_audio) / sample_rate
 
@@ -460,7 +459,7 @@ class VoicePreviewResponse(BaseModel):
 
 
 @router.post("/voice/blend", response_model=VoiceBlendResponse)
-async def blend_voices(request: VoiceBlendRequest):
+async def blend_voices(request: VoiceBlendRequest, http_request: Request):
     """
     Blend two voices (simplified endpoint for panel).
 
@@ -493,8 +492,10 @@ async def blend_voices(request: VoiceBlendRequest):
         # If text provided, synthesize preview audio with blended voice
         if request.text:
             try:
+                from backend.services.audio_artifacts import AudioRegistry
+                from backend.voice.services.synthesis_service import SynthesisService
+
                 from ..models_additional import VoiceSynthesizeRequest
-                from .voice import _register_audio_file, synthesize
 
                 # Synthesize with voice A
                 synth_a = VoiceSynthesizeRequest(
@@ -502,7 +503,7 @@ async def blend_voices(request: VoiceBlendRequest):
                     text=request.text,
                     engine="xtts_v2",
                 )
-                result_a = await synthesize(synth_a)
+                result_a = await SynthesisService.synthesize(synth_a, http_request, config_service=None)
 
                 # Synthesize with voice B
                 synth_b = VoiceSynthesizeRequest(
@@ -510,19 +511,18 @@ async def blend_voices(request: VoiceBlendRequest):
                     text=request.text,
                     engine="xtts_v2",
                 )
-                result_b = await synthesize(synth_b)
+                result_b = await SynthesisService.synthesize(synth_b, http_request, config_service=None)
 
                 if result_a and result_a.audio_id and result_b and result_b.audio_id:
                     # Load both audio files
-                    from app.core.audio.audio_utils import (
+                    from backend.audio.audio_utils import (
                         load_audio,
                         save_audio,
                     )
+                    from backend.services.audio_path_resolver import resolve_audio_path
 
-                    from .audio import _get_audio_path
-
-                    audio_path_a = _get_audio_path(result_a.audio_id)
-                    audio_path_b = _get_audio_path(result_b.audio_id)
+                    audio_path_a = resolve_audio_path(result_a.audio_id)
+                    audio_path_b = resolve_audio_path(result_b.audio_id)
 
                     if audio_path_a and audio_path_b:
                         audio_a, sr_a = load_audio(audio_path_a)
@@ -575,7 +575,15 @@ async def blend_voices(request: VoiceBlendRequest):
                         preview_audio_id = f"blend_preview_{uuid.uuid4().hex[:8]}"
                         output_path = os.path.join(tempfile.gettempdir(), f"{preview_audio_id}.wav")
                         save_audio(blended_audio, sr_a, output_path)
-                        _register_audio_file(preview_audio_id, output_path)
+                        try:
+                            AudioRegistry.register(
+                                preview_audio_id,
+                                output_path,
+                                model_used="voice_morph_blend",
+                                duration_seconds=len(blended_audio) / sr_a,
+                            )
+                        except Exception as e:
+                            logger.warning("Provenance/usage record failed: %s", e)
 
                         logger.info(
                             f"Blended voices: {request.voice_a_id} "
@@ -589,8 +597,10 @@ async def blend_voices(request: VoiceBlendRequest):
         # If save_profile requested, create blended profile
         if request.save_profile:
             try:
-                from .profiles import VoiceProfile, _profiles
+                from backend.api.models_additional import VoiceProfile
+                from backend.services.profile_search_service import get_profiles_proxy
 
+                _profiles = get_profiles_proxy()
                 blended_profile_id = f"blend_{uuid.uuid4().hex[:8]}"
                 profile_name = f"Blend: {request.voice_a_id} + {request.voice_b_id}"
 
@@ -678,8 +688,9 @@ async def get_voice_embedding(request: VoiceEmbeddingRequest):
 
         # Try to get profile and extract embedding from reference audio
         try:
-            from .profiles import _profiles
+            from backend.services.profile_search_service import get_profiles_proxy
 
+            _profiles = get_profiles_proxy()
             profile = _profiles.get(request.voice_profile_id)
             if not profile:
                 raise HTTPException(
@@ -694,27 +705,16 @@ async def get_voice_embedding(request: VoiceEmbeddingRequest):
                     reference_audio_path = profile.reference_audio_url
 
             if not reference_audio_path:
-                # Try standard profile directory
-                profile_dir = os.path.join(
-                    os.path.expanduser("~"),
-                    ".voicestudio",
-                    "profiles",
-                    request.voice_profile_id,
-                )
-                potential_paths = [
-                    os.path.join(profile_dir, "reference.wav"),
-                    os.path.join(profile_dir, "reference_audio.wav"),
-                    os.path.join(profile_dir, "audio.wav"),
-                ]
-                for path in potential_paths:
-                    if os.path.exists(path):
-                        reference_audio_path = path
-                        break
+                from backend.services.profile_service import resolve_reference_audio_path
+
+                resolved = resolve_reference_audio_path(request.voice_profile_id)
+                if resolved.exists():
+                    reference_audio_path = str(resolved)
 
             if reference_audio_path and os.path.exists(reference_audio_path):
                 # Extract voice characteristics as embedding
                 try:
-                    from app.core.audio.audio_utils import (
+                    from backend.audio.audio_utils import (
                         analyze_voice_characteristics,
                         load_audio,
                     )
@@ -906,7 +906,7 @@ async def get_voice_embedding(request: VoiceEmbeddingRequest):
 
 
 @router.post("/voice/preview", response_model=VoicePreviewResponse)
-async def preview_voice(request: VoicePreviewRequest):
+async def preview_voice(request: VoicePreviewRequest, http_request: Request):
     """
     Preview blended/morphed voice (simplified endpoint for panel).
 
@@ -926,10 +926,11 @@ async def preview_voice(request: VoicePreviewRequest):
         preview_audio_id = None
 
         try:
-            from app.core.audio.audio_utils import load_audio
+            from backend.audio.audio_utils import load_audio
+            from backend.services.audio_artifacts import AudioRegistry
+            from backend.voice.services.synthesis_service import SynthesisService
 
             from ..models_additional import VoiceSynthesizeRequest
-            from .voice import _register_audio_file, synthesize
 
             # If voice_profile_id provided, use that directly
             if request.voice_profile_id:
@@ -938,7 +939,7 @@ async def preview_voice(request: VoicePreviewRequest):
                     text=request.text,
                     engine="xtts_v2",
                 )
-                result = await synthesize(synth_req)
+                result = await SynthesisService.synthesize(synth_req, http_request, config_service=None)
                 if result and result.audio_id:
                     preview_audio_id = result.audio_id
 
@@ -952,25 +953,24 @@ async def preview_voice(request: VoicePreviewRequest):
                     text=request.text,
                     engine="xtts_v2",
                 )
-                result_a = await synthesize(synth_a)
+                result_a = await SynthesisService.synthesize(synth_a, http_request, config_service=None)
 
                 synth_b = VoiceSynthesizeRequest(
                     profile_id=request.voice_b_id,
                     text=request.text,
                     engine="xtts_v2",
                 )
-                result_b = await synthesize(synth_b)
+                result_b = await SynthesisService.synthesize(synth_b, http_request, config_service=None)
 
                 if result_a and result_a.audio_id and result_b and result_b.audio_id:
                     # Blend the audio (same logic as blend_voices)
                     import numpy as np
 
-                    from app.core.audio.audio_utils import save_audio
+                    from backend.audio.audio_utils import save_audio
+                    from backend.services.audio_path_resolver import resolve_audio_path
 
-                    from .audio import _get_audio_path
-
-                    audio_path_a = _get_audio_path(result_a.audio_id)
-                    audio_path_b = _get_audio_path(result_b.audio_id)
+                    audio_path_a = resolve_audio_path(result_a.audio_id)
+                    audio_path_b = resolve_audio_path(result_b.audio_id)
 
                     if audio_path_a and audio_path_b:
                         audio_a, sr_a = load_audio(audio_path_a)
@@ -1022,7 +1022,15 @@ async def preview_voice(request: VoicePreviewRequest):
                         preview_audio_id = f"preview_{uuid.uuid4().hex[:8]}"
                         output_path = os.path.join(tempfile.gettempdir(), f"{preview_audio_id}.wav")
                         save_audio(blended_audio, sr_a, output_path)
-                        _register_audio_file(preview_audio_id, output_path)
+                        try:
+                            AudioRegistry.register(
+                                preview_audio_id,
+                                output_path,
+                                model_used="voice_morph_preview",
+                                duration_seconds=len(blended_audio) / sr_a,
+                            )
+                        except Exception as e:
+                            logger.warning("Provenance/usage record failed: %s", e)
 
                         logger.info(
                             f"Created preview with blended voices: "
@@ -1044,7 +1052,7 @@ async def preview_voice(request: VoicePreviewRequest):
                 )
 
             # Get duration
-            audio_path = _get_audio_path(preview_audio_id)
+            audio_path = resolve_audio_path(preview_audio_id)
             if audio_path:
                 audio, sr = load_audio(audio_path)
                 duration = len(audio) / sr

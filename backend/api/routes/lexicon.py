@@ -6,8 +6,8 @@ Endpoints for managing pronunciation lexicons and custom word pronunciations.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/lexicon", tags=["lexicon"])
 
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _lexicons: PersistentStore = PersistentStore("lexicons")
 _lexicon_entries: PersistentStore = PersistentStore("lexicon_entries")
@@ -631,15 +631,14 @@ async def estimate_phonemes(request: PhonemeEstimateRequest):
             try:
                 import os
 
-                from .voice import _audio_storage
+                from backend.services.audio_artifacts import AudioRegistry
 
-                if request.audio_id not in _audio_storage:
+                audio_path = AudioRegistry.get_path(request.audio_id)
+                if not audio_path:
                     raise HTTPException(
                         status_code=404,
                         detail=f"Audio file '{request.audio_id}' not found",
                     )
-
-                audio_path = _audio_storage[request.audio_id]
                 if not os.path.exists(audio_path):
                     raise HTTPException(
                         status_code=404,
@@ -813,3 +812,8 @@ def _estimate_phonemes_simple(word: str) -> str:
         return f"/{word}/"
 
     return f"/{'.'.join(phonemes)}/"
+
+
+from backend.services.lexicon_service import register_estimate_phonemes_handler
+
+register_estimate_phonemes_handler(estimate_phonemes)

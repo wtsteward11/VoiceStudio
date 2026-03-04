@@ -7,8 +7,8 @@ Supports full backups, selective backups, and restore operations.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import os
 import shutil
 import zipfile
@@ -50,9 +50,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/backup", tags=["backup"])
 
-# Backup storage directory
-BACKUP_DIR = Path("backups")
-BACKUP_DIR.mkdir(exist_ok=True)
+# Backup storage directory (outside repo to avoid Cursor brick)
+from backend.config.path_config import get_path
+
+BACKUP_DIR = get_path("backups")
 
 
 class BackupInfo(BaseModel):
@@ -90,7 +91,7 @@ class RestoreRequest(BaseModel):
     restore_models: bool = False
 
 
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _backups: PersistentStore = PersistentStore("backups")
 _state_lock = asyncio.Lock()
@@ -241,14 +242,14 @@ async def create_backup(
     now = datetime.utcnow().isoformat()
 
     try:
-        # Create temporary directory for backup contents
-        temp_dir = Path(f"temp_backup_{backup_id}")
-        temp_dir.mkdir(exist_ok=True)
+        # Create temporary directory for backup contents (outside repo)
+        temp_dir = get_path("temp") / f"temp_backup_{backup_id}"
+        temp_dir.mkdir(parents=True, exist_ok=True)
 
         try:
             # Backup profiles
             if request.includes_profiles:
-                profiles_dir = Path("data/profiles")
+                profiles_dir = get_path("data") / "profiles"
                 if profiles_dir.exists():
                     shutil.copytree(
                         profiles_dir,
@@ -258,7 +259,7 @@ async def create_backup(
 
             # Backup projects
             if request.includes_projects:
-                projects_dir = Path("data/projects")
+                projects_dir = get_path("data") / "projects"
                 if projects_dir.exists():
                     shutil.copytree(
                         projects_dir,
@@ -268,13 +269,13 @@ async def create_backup(
 
             # Backup settings
             if request.includes_settings:
-                settings_file = Path("data/settings.json")
+                settings_file = get_path("data") / "settings.json"
                 if settings_file.exists():
                     shutil.copy2(settings_file, temp_dir / "settings.json")
 
             # Backup models (optional, can be large)
             if request.includes_models:
-                models_dir = Path("models")
+                models_dir = get_path("models")
                 if models_dir.exists():
                     # Check size before copying
                     total_size = sum(f.stat().st_size for f in models_dir.rglob("*") if f.is_file())
@@ -432,9 +433,9 @@ async def restore_backup(
         raise HTTPException(status_code=404, detail="Backup file not found")
 
     try:
-        # Create temporary directory for extraction
-        temp_dir = Path(f"temp_restore_{backup_id}")
-        temp_dir.mkdir(exist_ok=True)
+        # Create temporary directory for extraction (outside repo)
+        temp_dir = get_path("temp") / f"temp_restore_{backup_id}"
+        temp_dir.mkdir(parents=True, exist_ok=True)
 
         try:
             # Extract ZIP archive with validation
@@ -465,7 +466,7 @@ async def restore_backup(
             if request.restore_profiles and metadata.get("includes_profiles"):
                 profiles_backup = temp_dir / "profiles"
                 if profiles_backup.exists():
-                    profiles_dir = Path("data/profiles")
+                    profiles_dir = get_path("data") / "profiles"
                     profiles_dir.mkdir(parents=True, exist_ok=True)
                     shutil.copytree(profiles_backup, profiles_dir, dirs_exist_ok=True)
 
@@ -473,7 +474,7 @@ async def restore_backup(
             if request.restore_projects and metadata.get("includes_projects"):
                 projects_backup = temp_dir / "projects"
                 if projects_backup.exists():
-                    projects_dir = Path("data/projects")
+                    projects_dir = get_path("data") / "projects"
                     projects_dir.mkdir(parents=True, exist_ok=True)
                     shutil.copytree(projects_backup, projects_dir, dirs_exist_ok=True)
 
@@ -481,7 +482,7 @@ async def restore_backup(
             if request.restore_settings and metadata.get("includes_settings"):
                 settings_backup = temp_dir / "settings.json"
                 if settings_backup.exists():
-                    settings_file = Path("data/settings.json")
+                    settings_file = get_path("data") / "settings.json"
                     settings_file.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(settings_backup, settings_file)
 
@@ -489,7 +490,7 @@ async def restore_backup(
             if request.restore_models and metadata.get("includes_models"):
                 models_backup = temp_dir / "models"
                 if models_backup.exists():
-                    models_dir = Path("models")
+                    models_dir = get_path("models")
                     models_dir.mkdir(parents=True, exist_ok=True)
                     shutil.copytree(models_backup, models_dir, dirs_exist_ok=True)
 
@@ -561,12 +562,11 @@ async def upload_backup(
             )
 
         # Save validated file
-        with open(backup_path, "wb") as f:
-            f.write(content)
+        backup_path.write_bytes(content)
 
         # Extract and read metadata
-        temp_dir = Path(f"temp_upload_{backup_id}")
-        temp_dir.mkdir(exist_ok=True)
+        temp_dir = get_path("temp") / f"temp_upload_{backup_id}"
+        temp_dir.mkdir(parents=True, exist_ok=True)
 
         try:
             # Validate ZIP file before extraction

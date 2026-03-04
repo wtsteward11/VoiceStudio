@@ -6,14 +6,15 @@ Endpoints for application analytics and usage statistics.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from ..ml_optimization import ModelExplainer
+from backend.services.ml_optimization import ModelExplainer
+
 from ..optimization import cache_response
 
 logger = logging.getLogger(__name__)
@@ -124,11 +125,11 @@ async def get_analytics_summary(
 
         # Get projects data
         try:
-            from .projects import _store as _projects_store
+            from backend.services.project_service import get_project_store
 
             projects = [
-                {"created": p.get("created", end.isoformat())}
-                for p in _projects_store().list_projects()
+                {"created": p.created_at if hasattr(p, "created_at") else p.get("created", end.isoformat())}
+                for p in get_project_store().list_projects()
             ]
             projects_in_period = [
                 p
@@ -142,9 +143,9 @@ async def get_analytics_summary(
 
         # Get voice synthesis data (from audio storage)
         try:
-            from .voice import _audio_storage
+            from backend.services.audio_artifacts import AudioRegistry
 
-            total_synthesis = len(_audio_storage)
+            total_synthesis = AudioRegistry.count()
         except Exception:
             total_synthesis = 0
 
@@ -153,8 +154,9 @@ async def get_analytics_summary(
 
         # Calculate quality scores (from quality history if available)
         try:
-            from .quality import _quality_history
+            from backend.services.quality_history_service import get_quality_history
 
+            _quality_history = get_quality_history()
             all_entries = []
             for _profile_id, entries in _quality_history.items():
                 all_entries.extend(entries)
@@ -260,10 +262,10 @@ async def get_category_metrics(
             if category == "Synthesis":
                 # Count synthesis jobs in this interval
                 try:
-                    from .voice import _audio_storage
+                    from backend.services.audio_artifacts import AudioRegistry
 
                     # Estimate based on total count distributed over time
-                    total = len(_audio_storage)
+                    total = AudioRegistry.count()
                     value = total / 30.0  # Distribute over 30 days
                 except Exception:
                     value = 0.0
@@ -271,11 +273,11 @@ async def get_category_metrics(
             elif category == "Projects":
                 # Count projects created in this interval
                 try:
-                    from .projects import _store as _projects_store2
+                    from backend.services.project_service import get_project_store
 
                     all_projects = [
-                        {"created": p.get("created", end.isoformat())}
-                        for p in _projects_store2().list_projects()
+                        {"created": p.created_at if hasattr(p, "created_at") else p.get("created", end.isoformat())}
+                        for p in get_project_store().list_projects()
                     ]
                     interval_projects = [
                         p
@@ -292,9 +294,9 @@ async def get_category_metrics(
             elif category == "Audio Processing":
                 # Count audio processing jobs
                 try:
-                    from .voice import _audio_storage
+                    from backend.services.audio_artifacts import AudioRegistry
 
-                    total = len(_audio_storage)
+                    total = AudioRegistry.count()
                     value = total / 30.0
                 except Exception:
                     value = 0.0
@@ -302,8 +304,9 @@ async def get_category_metrics(
             elif category == "Quality":
                 # Average quality score for this interval
                 try:
-                    from .quality import _quality_history
+                    from backend.services.quality_history_service import get_quality_history
 
+                    _quality_history = get_quality_history()
                     all_entries = []
                     for _profile_id, entries in _quality_history.items():
                         all_entries.extend(entries)
@@ -403,18 +406,16 @@ async def explain_quality_prediction(audio_id: str, method: str = "shap"):
             try:
                 import os
 
-                from app.core.audio.audio_utils import load_audio
-
-                from .voice import _audio_storage
+                from backend.audio.audio_utils import load_audio
+                from backend.services.audio_artifacts import AudioRegistry
 
                 # Load audio file
-                if audio_id not in _audio_storage:
+                audio_path = AudioRegistry.get_path(audio_id)
+                if not audio_path:
                     raise HTTPException(
                         status_code=404,
                         detail=f"Audio file '{audio_id}' not found",
                     )
-
-                audio_path = _audio_storage[audio_id]
                 if not os.path.exists(audio_path):
                     raise HTTPException(
                         status_code=404,
@@ -423,8 +424,9 @@ async def explain_quality_prediction(audio_id: str, method: str = "shap"):
 
                 # Get quality metrics for this audio
                 try:
-                    from .quality import _quality_history
+                    from backend.services.quality_history_service import get_quality_history
 
+                    _quality_history = get_quality_history()
                     # Find quality entry for this audio
                     # Check audio_url or metadata for audio_id match
                     quality_entry = None
@@ -512,18 +514,16 @@ async def explain_quality_prediction(audio_id: str, method: str = "shap"):
             try:
                 import os
 
-                from app.core.audio.audio_utils import load_audio
-
-                from .voice import _audio_storage
+                from backend.audio.audio_utils import load_audio
+                from backend.services.audio_artifacts import AudioRegistry
 
                 # Load audio file
-                if audio_id not in _audio_storage:
+                audio_path = AudioRegistry.get_path(audio_id)
+                if not audio_path:
                     raise HTTPException(
                         status_code=404,
                         detail=f"Audio file '{audio_id}' not found",
                     )
-
-                audio_path = _audio_storage[audio_id]
                 if not os.path.exists(audio_path):
                     raise HTTPException(
                         status_code=404,
@@ -532,8 +532,9 @@ async def explain_quality_prediction(audio_id: str, method: str = "shap"):
 
                 # Get quality metrics for this audio
                 try:
-                    from .quality import _quality_history
+                    from backend.services.quality_history_service import get_quality_history
 
+                    _quality_history = get_quality_history()
                     # Find quality entry for this audio
                     # Check audio_url or metadata for audio_id match
                     quality_entry = None
@@ -657,8 +658,9 @@ async def visualize_quality_metrics(
 
         # Get quality data
         try:
-            from .quality import _quality_history
+            from backend.services.quality_history_service import get_quality_history
 
+            _quality_history = get_quality_history()
             all_entries = []
             for _profile_id, entries in _quality_history.items():
                 for entry in entries:
@@ -818,7 +820,8 @@ async def visualize_quality_metrics(
                 plt.grid(True, alpha=0.3)
 
             # Save to temporary file
-            output_path = tempfile.mktemp(suffix=".png")
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                output_path = tmp.name
             plt.savefig(output_path, dpi=150, bbox_inches="tight")
             plt.close()
 

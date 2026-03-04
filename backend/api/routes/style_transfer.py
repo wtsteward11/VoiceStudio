@@ -11,7 +11,7 @@ import logging
 from typing import Any
 
 import numpy as np
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from backend.ml.models.engine_service import get_engine_service
@@ -77,7 +77,7 @@ class StylePreset(BaseModel):
 
 
 @router.post("/transfer", response_model=StyleTransferJob)
-async def create_style_transfer(request: StyleTransferRequest):
+async def create_style_transfer(request: StyleTransferRequest, http_request: Request):
     """Create a new voice style transfer job."""
     import uuid
     from datetime import datetime
@@ -101,7 +101,7 @@ async def create_style_transfer(request: StyleTransferRequest):
         # Start style transfer processing in background
         import asyncio
 
-        asyncio.create_task(_process_style_transfer(job_id, request))
+        asyncio.create_task(_process_style_transfer(job_id, request, http_request))
 
         logger.info(f"Created style transfer job: {job_id}")
 
@@ -261,14 +261,13 @@ async def extract_style(request: StyleExtractRequest):
     try:
         import os
 
-        from .voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
-        if request.audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(request.audio_id)
+        if not audio_path:
             raise HTTPException(
                 status_code=404, detail=f"Audio file '{request.audio_id}' not found"
             )
-
-        audio_path = _audio_storage[request.audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
@@ -278,7 +277,7 @@ async def extract_style(request: StyleExtractRequest):
         try:
             import numpy as np
 
-            from app.core.audio.audio_utils import (
+            from backend.audio.audio_utils import (
                 analyze_voice_characteristics,
                 load_audio,
             )
@@ -300,7 +299,7 @@ async def extract_style(request: StyleExtractRequest):
             emotion_tag = None
             if request.analyze_emotion:
                 try:
-                    from .emotion import analyze
+                    from backend.services.emotion_service import analyze
 
                     emotion_req = {"audio_id": request.audio_id}
                     emotion_result = await analyze(emotion_req)
@@ -374,14 +373,13 @@ async def analyze_style(request: StyleAnalyzeRequest):
 
         import numpy as np
 
-        from .voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
-        if request.audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(request.audio_id)
+        if not audio_path:
             raise HTTPException(
                 status_code=404, detail=f"Audio file '{request.audio_id}' not found"
             )
-
-        audio_path = _audio_storage[request.audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
@@ -391,7 +389,7 @@ async def analyze_style(request: StyleAnalyzeRequest):
         try:
             import librosa
 
-            from app.core.audio.audio_utils import load_audio
+            from backend.audio.audio_utils import load_audio
 
             audio, sample_rate = load_audio(audio_path)
             if len(audio.shape) > 1:
@@ -501,11 +499,12 @@ async def analyze_style(request: StyleAnalyzeRequest):
 
 
 @router.post("/synthesize/style", response_model=StyleSynthesizeResponse)
-async def synthesize_with_style(request: StyleSynthesizeRequest):
+async def synthesize_with_style(request: StyleSynthesizeRequest, http_request: Request):
     """Synthesize with style transfer."""
     try:
+        from backend.voice.services.synthesis_service import SynthesisService
+
         from ..models_additional import VoiceSynthesizeRequest
-        from .voice import synthesize
 
         # Synthesize with voice profile
         synth_request = VoiceSynthesizeRequest(
@@ -519,7 +518,7 @@ async def synthesize_with_style(request: StyleSynthesizeRequest):
         if request.reference_audio_id:
             pass
 
-        synth_response = await synthesize(synth_request)
+        synth_response = await SynthesisService.synthesize(synth_request, http_request, config_service=None)
 
         return StyleSynthesizeResponse(
             audio_id=synth_response.audio_id,
@@ -535,14 +534,16 @@ async def synthesize_with_style(request: StyleSynthesizeRequest):
         ) from e
 
 
-async def _process_style_transfer(job_id: str, request: StyleTransferRequest):
+async def _process_style_transfer(
+    job_id: str, request: StyleTransferRequest, http_request: Request
+):
     """Process style transfer job asynchronously."""
     import os
     import tempfile
     import uuid
     from datetime import datetime
 
-    from .voice import _audio_storage, _register_audio_file
+    from backend.services.audio_artifacts import AudioRegistry
 
     try:
         job = _style_transfer_jobs.get(job_id)
@@ -555,10 +556,9 @@ async def _process_style_transfer(job_id: str, request: StyleTransferRequest):
         _style_transfer_jobs[job_id] = job
 
         # Load source audio
-        if request.source_audio_id not in _audio_storage:
+        source_audio_path = AudioRegistry.get_path(request.source_audio_id)
+        if not source_audio_path:
             raise ValueError(f"Source audio '{request.source_audio_id}' not found")
-
-        source_audio_path = _audio_storage[request.source_audio_id]
         if not os.path.exists(source_audio_path):
             raise ValueError(f"Source audio file at '{source_audio_path}' does not exist")
 
@@ -567,7 +567,7 @@ async def _process_style_transfer(job_id: str, request: StyleTransferRequest):
 
         # Load audio
         try:
-            from app.core.audio.audio_utils import load_audio, save_audio
+            from backend.audio.audio_utils import load_audio
 
             _source_audio, _sample_rate = load_audio(source_audio_path)
         except ImportError:
@@ -578,8 +578,9 @@ async def _process_style_transfer(job_id: str, request: StyleTransferRequest):
             engine_service = get_engine_service()
 
             # Check if target_style_id is a voice profile
-            from .profiles import _profiles
+            from backend.services.profile_search_service import get_profiles_proxy
 
+            _profiles = get_profiles_proxy()
             target_profile = None
             if request.target_style_id in _profiles:
                 target_profile = _profiles[request.target_style_id]
@@ -588,13 +589,16 @@ async def _process_style_transfer(job_id: str, request: StyleTransferRequest):
                 # Use RVC for voice conversion
                 rvc_engine = engine_service.get_rvc_engine()
                 if rvc_engine and rvc_engine.is_available():
-                    target_audio_path = _audio_storage.get(target_profile["reference_audio_id"])
+                    target_audio_path = AudioRegistry.get_path(target_profile["reference_audio_id"])
                     if target_audio_path and os.path.exists(target_audio_path):
                         job["progress"] = 0.5
                         _style_transfer_jobs[job_id] = job
 
                         # Convert voice using RVC
-                        output_path = tempfile.mktemp(suffix=".wav")
+                        with tempfile.NamedTemporaryFile(
+                            delete=False, suffix=".wav"
+                        ) as tmp:
+                            output_path = tmp.name
                         converted_audio = rvc_engine.convert_voice(
                             source_audio_path=source_audio_path,
                             target_voice_path=target_audio_path,
@@ -604,9 +608,17 @@ async def _process_style_transfer(job_id: str, request: StyleTransferRequest):
                         )
 
                         if converted_audio is not None:
-                            # Register output audio
-                            output_audio_id = f"style_{uuid.uuid4().hex[:8]}"
-                            _register_audio_file(output_audio_id, output_path)
+                            # Register output audio via artifact spine
+                            from backend.services.audio_artifacts import (
+                                create_audio_artifact_from_file,
+                            )
+
+                            output_audio_id, _, _ = create_audio_artifact_from_file(
+                                output_path,
+                                created_by="style_transfer",
+                                audio_id=f"style_{uuid.uuid4().hex[:8]}",
+                                delete_source=True,
+                            )
 
                             job["status"] = "completed"
                             job["progress"] = 1.0
@@ -623,8 +635,9 @@ async def _process_style_transfer(job_id: str, request: StyleTransferRequest):
 
         # Fallback: Use voice synthesis with target profile
         try:
+            from backend.voice.services.synthesis_service import SynthesisService
+
             from ..models_additional import VoiceSynthesizeRequest
-            from .voice import synthesize
 
             # Transcribe source audio to get text (ADR-008 compliant)
             try:
@@ -649,7 +662,7 @@ async def _process_style_transfer(job_id: str, request: StyleTransferRequest):
                 language="en",
             )
 
-            synth_response = await synthesize(synth_request)
+            synth_response = await SynthesisService.synthesize(synth_request, http_request, config_service=None)
 
             job["status"] = "completed"
             job["progress"] = 1.0

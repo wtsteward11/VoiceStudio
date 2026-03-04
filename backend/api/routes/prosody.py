@@ -7,12 +7,12 @@ Enhanced with pyrubberband for high-quality pitch/rate modification and Phonemiz
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import uuid
 
 import numpy as np
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from ..optimization import cache_response
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Try importing audio processing utilities
 try:
-    from app.core.audio.audio_utils import pitch_shift_audio, time_stretch_audio
+    from backend.audio.audio_utils import pitch_shift_audio, time_stretch_audio
 
     HAS_AUDIO_UTILS = True
 except ImportError:
@@ -222,7 +222,7 @@ async def analyze_phonemes(text: str, language: str = "en"):
 
     # Fallback: Use lexicon route for phoneme estimation
     try:
-        from .lexicon import PhonemeEstimateRequest, estimate_phonemes
+        from backend.services.lexicon_service import PhonemeEstimateRequest, estimate_phonemes
 
         # Split text into words and estimate phonemes for each
         words = text.split()
@@ -248,7 +248,7 @@ async def analyze_phonemes(text: str, language: str = "en"):
 
 
 @router.post("/apply")
-async def apply_prosody(request: ProsodyApplyRequest):
+async def apply_prosody(request: ProsodyApplyRequest, http_request: Request):
     """
     Apply prosody configuration to text synthesis.
 
@@ -262,8 +262,9 @@ async def apply_prosody(request: ProsodyApplyRequest):
 
     # Apply prosody by calling voice synthesis with prosody parameters
     try:
+        from backend.voice.services.synthesis_service import SynthesisService
+
         from ..models_additional import VoiceSynthesizeRequest
-        from .voice import synthesize
 
         # Map prosody config to synthesis parameters
         speed = config.rate  # Rate maps to speed
@@ -277,24 +278,21 @@ async def apply_prosody(request: ProsodyApplyRequest):
             emotion=emotion,
         )
 
-        synth_response = await synthesize(synth_request)
+        synth_response = await SynthesisService.synthesize(synth_request, http_request, config_service=None)
 
         # Apply pitch and volume modifications in post-processing
         import os
-        import tempfile
 
-        from app.core.audio.audio_utils import load_audio, save_audio
-
-        from .voice import _audio_storage, _register_audio_file
+        from backend.audio.audio_utils import load_audio
+        from backend.services.audio_artifacts import AudioRegistry
 
         # Load synthesized audio
-        if synth_response.audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(synth_response.audio_id)
+        if not audio_path:
             raise HTTPException(
                 status_code=404,
                 detail=(f"Synthesized audio " f"'{synth_response.audio_id}' not found"),
             )
-
-        audio_path = _audio_storage[synth_response.audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404,
@@ -363,13 +361,15 @@ async def apply_prosody(request: ProsodyApplyRequest):
                 audio = audio / max_val
             logger.info(f"Applied volume adjustment: {config.volume:.2f}")
 
-        # Save modified audio
-        output_path = tempfile.mktemp(suffix=".wav")
-        save_audio(audio, sample_rate, output_path)
+        # Save and register modified audio via artifact spine
+        from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
-        # Register modified audio
-        modified_audio_id = f"prosody_{uuid.uuid4().hex[:8]}"
-        _register_audio_file(modified_audio_id, output_path)
+        modified_audio_id, _, _ = create_audio_artifact_from_wav_array(
+            audio,
+            sample_rate,
+            created_by="prosody",
+            audio_id=f"prosody_{uuid.uuid4().hex[:8]}",
+        )
 
         # Calculate duration
         duration = len(audio) / sample_rate

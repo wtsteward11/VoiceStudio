@@ -42,15 +42,9 @@ async def inspect(req: ModelInspectRequest) -> dict:
         # Try to get model information from engine router
         try:
             import os
-            import sys
 
-            # Add app directory to path if needed
-            app_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "app")
-            if os.path.exists(app_path) and app_path not in sys.path:
-                sys.path.insert(0, app_path)
-
-            # Try to get model cache to inspect models
-            from core.models.cache import get_model_cache
+            # Try to get model cache to inspect models (app on path via main.py bootstrap)
+            from backend.services.model_facade import get_model_cache
 
             model_cache = get_model_cache()
             cache_stats = model_cache.get_stats()
@@ -372,7 +366,7 @@ async def list_layers(
     try:
         # Try to get model information
         try:
-            from core.models.cache import get_model_cache
+            from backend.services.model_facade import get_model_cache
 
             model_cache = get_model_cache()
             cache_stats = model_cache.get_stats()

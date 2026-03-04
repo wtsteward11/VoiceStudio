@@ -54,12 +54,11 @@ async def inpaint(req: SpectralInpaintRequest) -> SpectralInpaintResponse:
             raise HTTPException(status_code=400, detail="audio_id is required")
 
         # Get audio file path
-        from .voice import _audio_storage, _register_audio_file
+        from backend.services.audio_artifacts import AudioRegistry
 
-        if audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(audio_id)
+        if not audio_path:
             raise HTTPException(status_code=404, detail=f"Audio file '{audio_id}' not found")
-
-        audio_path = _audio_storage[audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
@@ -222,13 +221,15 @@ async def inpaint(req: SpectralInpaintRequest) -> SpectralInpaintResponse:
         if max_val > 0.95:
             inpainted_audio = inpainted_audio * (0.95 / max_val)
 
-        # Save inpainted audio
-        output_path = tempfile.mktemp(suffix=".wav")
-        sf.write(output_path, inpainted_audio, sample_rate)
+        # Save inpainted audio via artifact spine
+        from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
-        # Register new audio file
-        inpainted_audio_id = f"inpainted_{uuid.uuid4().hex[:8]}"
-        _register_audio_file(inpainted_audio_id, output_path)
+        inpainted_audio_id, _, _ = create_audio_artifact_from_wav_array(
+            inpainted_audio,
+            sample_rate,
+            created_by="spectral",
+            audio_id=f"inpainted_{uuid.uuid4().hex[:8]}",
+        )
 
         logger.info(
             f"Spectral inpainting completed: {audio_id} -> {inpainted_audio_id} "

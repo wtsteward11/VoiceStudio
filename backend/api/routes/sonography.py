@@ -6,8 +6,8 @@ Endpoints for sonography (waterfall/3D spectrogram) visualization.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import os
 
 from fastapi import APIRouter, HTTPException
@@ -75,24 +75,18 @@ async def generate_sonography(request: SonographyGenerateRequest):
 
     try:
         # Get audio file path
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
-        audio_path = _get_audio_path(request.audio_id)
+        audio_path = resolve_audio_path(request.audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404,
                 detail=f"Audio file not found for audio_id: {request.audio_id}",
             )
 
-        # Load audio file
+        # Load audio file (app on path via main.py bootstrap)
         try:
-            import sys
-
-            app_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "app")
-            if os.path.exists(app_path) and app_path not in sys.path:
-                sys.path.insert(0, app_path)
-
-            from core.audio.audio_utils import load_audio
+            from backend.audio.audio_utils import load_audio
 
             audio, sample_rate = load_audio(audio_path)
         except ImportError as e:

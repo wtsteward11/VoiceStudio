@@ -11,10 +11,10 @@ import contextlib
 import logging
 from typing import Any
 
-from backend.ml.models.engine_service import IEngineService, get_engine_service
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from backend.ml.models.engine_service import IEngineService, get_engine_service
 from backend.ml.models.model_preflight import run_preflight
 
 from ..optimization import cache_response
@@ -57,6 +57,10 @@ class EngineInfo(BaseModel):
     description: str | None = Field(default=None, description="Engine description")
     available: bool = Field(default=True, description="Whether engine is available")
     status: str | None = Field(default=None, description="Current status")
+    support_tier: str | None = Field(
+        default=None,
+        description="Support tier: tier1_supported (wedge), tier2_best_effort, experimental",
+    )
 
 
 class EngineListResponse(BaseModel):
@@ -183,6 +187,16 @@ async def list_engines(
     """List all available engines (detailed endpoint)."""
     try:
         engines_raw = engine_service.list_engines()
+        # If empty, router may not have loaded manifests yet - trigger load (lazy init)
+        if not engines_raw:
+            try:
+                from app.core.engines.router import router as engine_router
+
+                if hasattr(engine_router, "load_all_engines"):
+                    engine_router.load_all_engines("engines")
+                    engines_raw = engine_service.list_engines()
+            except Exception as load_ex:
+                logger.debug("Engine manifest load (lazy init): %s", load_ex)
         # Convert raw engine data to EngineInfo models for contract compliance
         engines = [
             (
@@ -194,6 +208,7 @@ async def list_engines(
                     description=e.get("description"),
                     available=e.get("available", True),
                     status=e.get("status"),
+                    support_tier=e.get("support_tier") if isinstance(e, dict) else None,
                 )
                 if isinstance(e, dict)
                 else EngineInfo(id=str(e), name=str(e))

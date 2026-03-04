@@ -32,8 +32,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/plugins", tags=["plugins"])
 
-# Plugin directory path
-PLUGINS_DIRECTORY = Path("plugins")
+# Plugin directory path (use path_config to avoid repo writes)
+from backend.config.path_config import get_path
+
+PLUGINS_DIRECTORY = get_path("plugins")
 
 
 class PluginManifest(BaseModel):

@@ -24,8 +24,8 @@ See also: docs/api/ROUTE_MAPPING.md for complete route documentation.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import os
 from typing import Any
 
@@ -214,9 +214,9 @@ async def get_spectrogram_data(
 
     try:
         # Get audio file path
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
-        audio_path = _get_audio_path(audio_id)
+        audio_path = resolve_audio_path(audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(status_code=404, detail=f"Audio file not found: {audio_id}")
 
@@ -394,7 +394,7 @@ async def compare_spectrograms(
             )
 
         # Load audio files and compute spectrograms
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
         try:
             import librosa
@@ -408,7 +408,7 @@ async def compare_spectrograms(
 
         spectrograms = []
         for audio_id in audio_id_list:
-            audio_path = _get_audio_path(audio_id)
+            audio_path = resolve_audio_path(audio_id)
             if not audio_path or not os.path.exists(audio_path):
                 logger.warning(f"Audio file not found: {audio_id}")
                 continue
@@ -505,7 +505,7 @@ async def export_spectrogram(
 
         from fastapi.responses import FileResponse
 
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
         try:
             import librosa
@@ -517,7 +517,7 @@ async def export_spectrogram(
                 detail="librosa/soundfile not available. Install with: pip install librosa soundfile",
             )
 
-        audio_path = _get_audio_path(audio_id)
+        audio_path = resolve_audio_path(audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(status_code=404, detail=f"Audio file not found: {audio_id}")
 
@@ -560,7 +560,8 @@ async def export_spectrogram(
             plt.colorbar(im, ax=ax, label="Magnitude (dB)")
 
             # Save to temporary file
-            output_path = tempfile.mktemp(suffix=f".{format}")
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{format}") as tmp:
+                output_path = tmp.name
             plt.savefig(output_path, format=format, bbox_inches="tight", dpi=100)
             plt.close(fig)
 

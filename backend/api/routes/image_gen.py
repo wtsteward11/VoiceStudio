@@ -6,9 +6,9 @@ High-quality image generation endpoints with support for multiple engines.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
-import asyncio
 import os
 import tempfile
 import uuid
@@ -27,6 +27,7 @@ from backend.core.security.file_validation import (
     validate_image_file,
 )
 from backend.ml.models.engine_service import get_engine_service
+from backend.services.media_storage_service import get_image_storage
 
 from ..models_additional import (
     FaceEnhancementRequest,
@@ -42,9 +43,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/image", tags=["image", "generation"])
 
-# In-memory storage for generated images
-# (replace with database/storage in production)
-_image_storage: dict[str, str] = {}  # image_id -> file_path
 _state_lock = asyncio.Lock()
 
 
@@ -321,7 +319,7 @@ async def generate_image(req: ImageGenerateRequest) -> ImageGenerateResponse:
                     image.save(output_path)
 
                 # Store image path
-                _image_storage[image_id] = output_path
+                get_image_storage()[image_id] = output_path
 
                 # Convert image to base64 for response
                 buffer = BytesIO()
@@ -394,9 +392,9 @@ async def upscale_image(
             input_image = Image.open(BytesIO(image_data))
         elif req.image_id:
             # Load from stored image
-            if req.image_id not in _image_storage:
+            if req.image_id not in get_image_storage():
                 raise HTTPException(status_code=404, detail=f"Image '{req.image_id}' not found")
-            input_image = Image.open(_image_storage[req.image_id])
+            input_image = Image.open(get_image_storage()[req.image_id])
         else:
             raise HTTPException(
                 status_code=400, detail="Either image_file or image_id must be provided"
@@ -434,7 +432,7 @@ async def upscale_image(
             raise HTTPException(status_code=500, detail="Image upscaling failed")
 
         # Store upscaled image
-        _image_storage[image_id] = output_path
+        get_image_storage()[image_id] = output_path
 
         # Convert to base64
         buffer = BytesIO()
@@ -473,10 +471,10 @@ async def enhance_face(req: FaceEnhancementRequest) -> FaceEnhancementResponse:
 
         # For images, analyze and enhance
         if req.image_id:
-            if req.image_id not in _image_storage:
+            if req.image_id not in get_image_storage():
                 raise HTTPException(status_code=404, detail=f"Image '{req.image_id}' not found")
 
-            image_path = _image_storage[req.image_id]
+            image_path = get_image_storage()[req.image_id]
             input_image = Image.open(image_path)
 
             # Analyze image quality metrics
@@ -534,7 +532,7 @@ async def enhance_face(req: FaceEnhancementRequest) -> FaceEnhancementResponse:
 
                             enhanced_image = engine.upscale(input_image, output_path=output_path)
                             if enhanced_image:
-                                _image_storage[enhanced_image_id] = output_path
+                                get_image_storage()[enhanced_image_id] = output_path
                                 enhanced_image_url = f"/api/image/{enhanced_image_id}"
 
                                 # Re-analyze enhanced image
@@ -635,10 +633,11 @@ async def enhance_face(req: FaceEnhancementRequest) -> FaceEnhancementResponse:
 @router.get("/{image_id}")
 async def get_image(image_id: str):
     """Retrieve generated image by ID."""
-    if image_id not in _image_storage:
+    storage = get_image_storage()
+    if image_id not in storage:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    image_path = _image_storage[image_id]
+    image_path = storage[image_id]
     if not os.path.exists(image_path):
         raise HTTPException(status_code=404, detail="Image file not found")
 
@@ -659,3 +658,8 @@ async def list_engines() -> dict:
     except Exception as e:
         logger.error(f"Error listing engines: {e}")
         return {"engines": [], "available": False, "error": str(e)}
+
+
+from backend.services.image_gen_service import register_generate_image_handler
+
+register_generate_image_handler(generate_image)

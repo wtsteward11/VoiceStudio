@@ -15,11 +15,13 @@ import logging
 import os
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Callable
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
+from backend.config.path_config import get_path
 from backend.data.repositories.library_repository import (
     LibraryAssetEntity,
     LibraryFolderEntity,
@@ -183,14 +185,15 @@ async def create_folder(name: str, parent_id: str | None = None, path: str | Non
     folder_id = str(uuid.uuid4())
 
     if not path:
+        library_base = get_path("data") / "library"
         if parent_id:
             parent = await folder_repo.get_by_id(parent_id)
             if parent:
-                path = os.path.join(parent.path, name)
+                path = str(Path(parent.path) / name)
             else:
-                path = os.path.join("data", "library", name)
+                path = str(library_base / name)
         else:
-            path = os.path.join("data", "library", name)
+            path = str(library_base / name)
 
     # Ensure directory exists
     os.makedirs(path, exist_ok=True)
@@ -387,12 +390,8 @@ async def upload_asset(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid audio file: {e!s}") from e
 
-    # Save file to audio uploads directory
-    upload_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-        "data",
-        "audio_uploads",
-    )
+    # Save file to audio uploads directory (outside repo)
+    upload_dir = str(get_path("audio_uploads"))
     os.makedirs(upload_dir, exist_ok=True)
 
     file_id = str(uuid.uuid4())
@@ -401,8 +400,9 @@ async def upload_asset(
     dest_path = os.path.join(upload_dir, safe_filename)
 
     try:
-        with open(dest_path, "wb") as out:
-            out.write(content)
+        from pathlib import Path
+
+        Path(dest_path).write_bytes(content)
     except Exception as e:
         if os.path.exists(dest_path):
             os.remove(dest_path)

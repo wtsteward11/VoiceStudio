@@ -6,8 +6,8 @@ Endpoints for managing multi-language voice synthesis and translation.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -259,6 +259,11 @@ async def translate_text(request: TranslationRequest):
                 "or install translation packages."
             ),
         )
+
+
+from backend.services.translation_service import register_translate_handler
+
+register_translate_handler(translate_text)
 
 
 @router.get("/supported")

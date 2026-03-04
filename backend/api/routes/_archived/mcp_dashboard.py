@@ -6,8 +6,8 @@ Endpoints for MCP (Model Context Protocol) server dashboard and management.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel

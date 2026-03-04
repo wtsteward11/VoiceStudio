@@ -19,8 +19,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/advanced-settings", tags=["advanced-settings"])
 
-# Settings file path
-SETTINGS_FILE = Path("data/advanced_settings.json")
+# Settings file path (use path_config to avoid repo writes)
+from backend.config.path_config import get_path
+
+SETTINGS_FILE = get_path("data") / "advanced_settings.json"
 
 # Cache for settings
 _settings_cache: dict | None = None

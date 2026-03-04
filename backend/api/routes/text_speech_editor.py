@@ -7,9 +7,9 @@ Game-changing feature that dramatically speeds up voiceover revisions.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
-import asyncio
 import uuid
 from datetime import datetime
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/edit", tags=["text-speech-editor"])
 
 # In-memory storage for edit sessions (replace with database in production)
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _edit_sessions: PersistentStore = PersistentStore("text_speech_edit_sessions")
 _state_lock = asyncio.Lock()
@@ -181,16 +181,15 @@ async def align_transcript(request: AlignRequest):
     try:
         import os
 
-        from .voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
         # Load audio file
-        if request.audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(request.audio_id)
+        if not audio_path:
             raise HTTPException(
                 status_code=404,
                 detail=f"Audio file '{request.audio_id}' not found",
             )
-
-        audio_path = _audio_storage[request.audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404,
@@ -277,7 +276,7 @@ async def align_transcript(request: AlignRequest):
             logger.warning(f"Whisper alignment failed: {e}")
 
         # Final fallback: Simple time-based estimation
-        from app.core.audio.audio_utils import load_audio
+        from backend.audio.audio_utils import load_audio
 
         audio, sample_rate = load_audio(audio_path)
         duration = len(audio) / sample_rate
@@ -336,9 +335,8 @@ async def merge_segments(request: MergeRequest):
 
         import numpy as np
 
-        from app.core.audio.audio_utils import load_audio, save_audio
-
-        from .voice import _audio_storage, _register_audio_file
+        from backend.audio.audio_utils import load_audio, save_audio
+        from backend.services.audio_artifacts import AudioRegistry
 
         # Load all audio segments
         merged_audio = None
@@ -357,10 +355,9 @@ async def merge_segments(request: MergeRequest):
 
         for _seg_type, seg in all_segments:
             audio_id = seg.get("audio_id")
-            if not audio_id or audio_id not in _audio_storage:
+            audio_path = AudioRegistry.get_path(audio_id) if audio_id else None
+            if not audio_path:
                 continue
-
-            audio_path = _audio_storage[audio_id]
             if not os.path.exists(audio_path):
                 continue
 
@@ -373,7 +370,7 @@ async def merge_segments(request: MergeRequest):
             else:
                 # Resample if needed
                 if seg_sr != sample_rate:
-                    from app.core.audio.audio_utils import resample_audio
+                    from backend.audio.audio_utils import resample_audio
 
                     segment_audio = resample_audio(segment_audio, seg_sr, sample_rate)
 
@@ -413,12 +410,21 @@ async def merge_segments(request: MergeRequest):
             raise HTTPException(status_code=400, detail="No valid audio segments to merge")
 
         # Save merged audio
-        output_path = tempfile.mktemp(suffix=".wav")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+            output_path = f.name
         save_audio(merged_audio, sample_rate, output_path)
 
         # Register merged audio
         merged_audio_id = f"merged-{uuid.uuid4().hex[:8]}"
-        _register_audio_file(merged_audio_id, output_path)
+        try:
+            AudioRegistry.register(
+                merged_audio_id,
+                output_path,
+                model_used="text_speech_editor_merge",
+                duration_seconds=total_duration,
+            )
+        except Exception as e:
+            logger.warning("Provenance/usage record failed: %s", e)
 
         return MergeResponse(
             merged_audio_id=merged_audio_id,
@@ -493,10 +499,17 @@ async def insert_text(request: InsertTextRequest):
         import os
         import tempfile
 
-        from app.core.audio.audio_utils import load_audio
+        from backend.api.routes._engine_shared import (
+            ENGINE_AVAILABLE,
+            _ensure_engine_router,
+            engine_router,
+        )
+        from backend.audio.audio_utils import load_audio
+        from backend.services.audio_artifacts import AudioRegistry
+        from backend.services.profile_search_service import get_profiles_proxy
 
-        from .profiles import _profiles
-        from .voice import ENGINE_AVAILABLE, _register_audio_file, engine_router
+        _ensure_engine_router()
+        _profiles = get_profiles_proxy()
 
         # Validate profile exists
         if request.profile_id not in _profiles:
@@ -518,26 +531,17 @@ async def insert_text(request: InsertTextRequest):
         profile = _profiles[request.profile_id]
         profile_audio_path = None
 
-        if profile.reference_audio_url:
-            if not profile.reference_audio_url.startswith("http"):
-                profile_audio_path = profile.reference_audio_url
+        if profile.get("reference_audio_url"):
+            ref_url = profile.get("reference_audio_url")
+            if ref_url and not ref_url.startswith("http"):
+                profile_audio_path = ref_url
 
         if not profile_audio_path:
-            profile_dir = os.path.join(
-                os.path.expanduser("~"),
-                ".voicestudio",
-                "profiles",
-                request.profile_id,
-            )
-            potential_paths = [
-                os.path.join(profile_dir, "reference.wav"),
-                os.path.join(profile_dir, "reference_audio.wav"),
-                os.path.join(profile_dir, "audio.wav"),
-            ]
-            for path in potential_paths:
-                if os.path.exists(path):
-                    profile_audio_path = path
-                    break
+            from backend.services.profile_service import resolve_reference_audio_path
+
+            resolved = resolve_reference_audio_path(request.profile_id)
+            if resolved.exists():
+                profile_audio_path = str(resolved)
 
         if not profile_audio_path or not os.path.exists(profile_audio_path):
             raise HTTPException(
@@ -546,12 +550,13 @@ async def insert_text(request: InsertTextRequest):
             )
 
         # Synthesize text
-        output_path = tempfile.mktemp(suffix=".wav")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+            output_path = f.name
         try:
             result = engine.synthesize(
                 text=request.text,
                 speaker_wav=profile_audio_path,
-                language=profile.language or "en",
+                language=profile.get("language") or "en",
                 output_path=output_path,
             )
 
@@ -564,7 +569,15 @@ async def insert_text(request: InsertTextRequest):
 
             # Register audio file
             inserted_audio_id = f"inserted-{uuid.uuid4().hex[:8]}"
-            _register_audio_file(inserted_audio_id, output_path)
+            try:
+                AudioRegistry.register(
+                    inserted_audio_id,
+                    output_path,
+                    model_used="text_speech_editor_insert",
+                    duration_seconds=duration,
+                )
+            except Exception as e:
+                logger.warning("Provenance/usage record failed: %s", e)
             inserted_audio_url = f"/api/voice/audio/{inserted_audio_id}"
 
             # Create word alignments (estimate based on duration)
@@ -639,11 +652,17 @@ async def replace_word(request: ReplaceWordRequest):
         import os
         import tempfile
 
-        from app.core.audio.audio_utils import load_audio
+        from backend.api.routes._engine_shared import (
+            ENGINE_AVAILABLE,
+            _ensure_engine_router,
+            engine_router,
+        )
+        from backend.audio.audio_utils import load_audio
+        from backend.services.audio_artifacts import AudioRegistry
+        from backend.services.profile_search_service import get_profiles_proxy
 
-        from .profiles import _profiles
-        from .voice import ENGINE_AVAILABLE, _register_audio_file, engine_router
-
+        _ensure_engine_router()
+        _profiles = get_profiles_proxy()
         session = _edit_sessions[request.session_id]
 
         if request.segment_index < 0 or request.segment_index >= len(session.segments):
@@ -674,26 +693,17 @@ async def replace_word(request: ReplaceWordRequest):
         profile = _profiles[request.profile_id]
         profile_audio_path = None
 
-        if profile.reference_audio_url:
-            if not profile.reference_audio_url.startswith("http"):
-                profile_audio_path = profile.reference_audio_url
+        if profile.get("reference_audio_url"):
+            ref_url = profile.get("reference_audio_url")
+            if ref_url and not ref_url.startswith("http"):
+                profile_audio_path = ref_url
 
         if not profile_audio_path:
-            profile_dir = os.path.join(
-                os.path.expanduser("~"),
-                ".voicestudio",
-                "profiles",
-                request.profile_id,
-            )
-            potential_paths = [
-                os.path.join(profile_dir, "reference.wav"),
-                os.path.join(profile_dir, "reference_audio.wav"),
-                os.path.join(profile_dir, "audio.wav"),
-            ]
-            for path in potential_paths:
-                if os.path.exists(path):
-                    profile_audio_path = path
-                    break
+            from backend.services.profile_service import resolve_reference_audio_path
+
+            resolved = resolve_reference_audio_path(request.profile_id)
+            if resolved.exists():
+                profile_audio_path = str(resolved)
 
         if not profile_audio_path or not os.path.exists(profile_audio_path):
             raise HTTPException(
@@ -702,12 +712,13 @@ async def replace_word(request: ReplaceWordRequest):
             )
 
         # Synthesize replacement word
-        output_path = tempfile.mktemp(suffix=".wav")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+            output_path = f.name
         try:
             result = engine.synthesize(
                 text=request.new_text,
                 speaker_wav=profile_audio_path,
-                language=profile.language or "en",
+                language=profile.get("language") or "en",
                 output_path=output_path,
             )
 
@@ -720,7 +731,15 @@ async def replace_word(request: ReplaceWordRequest):
 
             # Register audio file
             replaced_audio_id = f"replaced-{uuid.uuid4().hex[:8]}"
-            _register_audio_file(replaced_audio_id, output_path)
+            try:
+                AudioRegistry.register(
+                    replaced_audio_id,
+                    output_path,
+                    model_used="text_speech_editor_replace",
+                    duration_seconds=duration,
+                )
+            except Exception as e:
+                logger.warning("Provenance/usage record failed: %s", e)
             replaced_audio_url = f"/api/voice/audio/{replaced_audio_id}"
 
             # Update segment
@@ -791,20 +810,18 @@ async def apply_edits(request: ApplyEditsRequest):
 
         import numpy as np
 
-        from app.core.audio.audio_utils import load_audio, save_audio
-
-        from .voice import _audio_storage, _register_audio_file
+        from backend.audio.audio_utils import load_audio, save_audio
+        from backend.services.audio_artifacts import AudioRegistry
 
         session = _edit_sessions[request.session_id]
 
         # Load original audio
-        if session.audio_id not in _audio_storage:
+        original_audio_path = AudioRegistry.get_path(session.audio_id)
+        if not original_audio_path:
             raise HTTPException(
                 status_code=404,
                 detail=f"Original audio '{session.audio_id}' not found",
             )
-
-        original_audio_path = _audio_storage[session.audio_id]
         if not os.path.exists(original_audio_path):
             raise HTTPException(
                 status_code=404,
@@ -880,12 +897,21 @@ async def apply_edits(request: ApplyEditsRequest):
             raise HTTPException(status_code=400, detail="No audio segments to merge")
 
         # Save final audio
-        output_path = tempfile.mktemp(suffix=".wav")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+            output_path = f.name
         save_audio(final_audio, final_sample_rate, output_path)
 
         # Register final audio
         final_audio_id = f"edited-{uuid.uuid4().hex[:8]}"
-        _register_audio_file(final_audio_id, output_path)
+        try:
+            AudioRegistry.register(
+                final_audio_id,
+                output_path,
+                model_used="text_speech_editor_finalize",
+                duration_seconds=len(final_audio) / final_sample_rate,
+            )
+        except Exception as e:
+            logger.warning("Provenance/usage record failed: %s", e)
         final_audio_url = f"/api/voice/audio/{final_audio_id}"
 
         # Calculate total duration

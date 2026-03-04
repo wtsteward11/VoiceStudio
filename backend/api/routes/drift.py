@@ -9,13 +9,14 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
 from backend.ml.models.model_drift_detector import (
     DriftMetric,
     DriftStatus,
     get_model_drift_detector,
 )
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 

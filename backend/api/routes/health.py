@@ -14,11 +14,6 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.core.resilience.health_check import (
-    HealthCheckResult,
-    HealthStatus,
-    get_health_checker,
-)
 from backend.config.path_config import get_models_path
 from backend.core.circuit_breaker import (
     get_engine_breaker_metrics,
@@ -27,6 +22,11 @@ from backend.core.circuit_breaker import (
     reset_engine_breaker,
 )
 from backend.ml.models.engine_service import get_engine_service
+from backend.services.health_facade import (
+    HealthCheckResult,
+    HealthStatus,
+    get_health_checker,
+)
 from backend.settings import config
 
 from ..optimization import cache_response
@@ -44,7 +44,7 @@ def _check_database() -> bool:
     """Check database connectivity."""
     try:
         # Try to import and check database
-        from app.core.security.database import WatermarkDatabase
+        from backend.services.health_facade import WatermarkDatabase
 
         _ = WatermarkDatabase()
         # Simple check - try to query
@@ -523,7 +523,7 @@ def _get_resource_usage() -> dict[str, Any]:
 
     # GPU information
     try:
-        from app.core.runtime.resource_manager import ResourceManager
+        from backend.services.health_facade import ResourceManager
 
         resource_manager = ResourceManager()
         gpu_monitor = getattr(resource_manager, "gpu_monitor", None)
@@ -536,7 +536,7 @@ def _get_resource_usage() -> dict[str, Any]:
 
     # Task scheduler statistics
     try:
-        from app.core.tasks.scheduler import get_scheduler
+        from backend.services.health_facade import get_scheduler
 
         scheduler = get_scheduler()
         resources["tasks"] = scheduler.get_stats()
@@ -559,7 +559,7 @@ def _get_resource_usage() -> dict[str, Any]:
 
     # Database connection pool statistics
     try:
-        from app.core.database.query_optimizer import DatabaseQueryOptimizer
+        from backend.services.health_facade import DatabaseQueryOptimizer
 
         # Use default database path
         db_path = ":memory:"  # Default SQLite in-memory
@@ -602,7 +602,7 @@ def _get_resource_usage() -> dict[str, Any]:
 
     # Temp file manager statistics
     try:
-        from app.core.utils.temp_file_manager import get_temp_file_manager
+        from backend.services.health_facade import get_temp_file_manager
 
         temp_manager = get_temp_file_manager()
         stats = temp_manager.get_stats()
@@ -773,24 +773,27 @@ def preflight_check() -> dict[str, Any]:
             os.makedirs(path, exist_ok=True)
             # Write test
             test_file = os.path.join(path, ".write_test.tmp")
-            with open(test_file, "w", encoding="utf-8") as f:
-                f.write("ok")
+            from pathlib import Path
+
+            Path(test_file).write_text("ok", encoding="utf-8")
             os.remove(test_file)
             return {"ok": True, "path": path}
         except Exception as e:
             return {"ok": False, "path": path, "error": str(e)}
 
-    # Resolve core roots
-    from backend.audio.processing.audio_artifact_registry import get_audio_registry
-    from backend.audio.processing.content_addressed_audio_cache import get_audio_cache
+    # Resolve core roots (M9: use audio_registry_service, not legacy)
     from backend.infrastructure.adapters.job_state_store import get_job_state_store
     from backend.ml.models.engine_config_service import get_engine_config_service
     from backend.project.management.project_store_service import get_project_store_service
+    from backend.services.audio_registry_service import (
+        get_cache_dir,
+        get_registry_db_path,
+    )
 
     projects_root = str(get_project_store_service().projects_dir)
-    cache_root = str(get_audio_cache().cache_dir)
+    cache_root = get_cache_dir()
     model_root = str(get_models_path())
-    audio_registry_path = str(get_audio_registry().registry_path)
+    audio_registry_path = str(get_registry_db_path())
     jobs_root = str(get_job_state_store("voice_cloning_wizard").jobs_root)
 
     # Ensure dirs exist / writable

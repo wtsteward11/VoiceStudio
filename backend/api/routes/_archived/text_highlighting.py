@@ -6,8 +6,8 @@ Endpoints for text highlighting and synchronization with audio.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel

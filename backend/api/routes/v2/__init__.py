@@ -2,7 +2,6 @@
 #
 # This package contains API v2 endpoints.
 # V2 endpoints may have enhanced functionality compared to v1.
-
-from .health import router as health_router
-
-__all__ = ["health_router"]
+#
+# Route registry imports directly from v2.health to avoid route-to-route import.
+__all__: list[str] = []

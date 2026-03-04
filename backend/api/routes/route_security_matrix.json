@@ -30,7 +30,15 @@
     "/api/macros",
     "/api/workflows",
     "/api/effects",
-    "/api/transcribe"
+    "/api/transcribe",
+    "/api/rvc",
+    "/api/nr",
+    "/api/repair",
+    "/api/spatial-audio",
+    "/api/quality",
+    "/api/style-transfer",
+    "/api/ensemble",
+    "/api/pipeline"
   ],
   "admin": []
 }

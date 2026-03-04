@@ -6,7 +6,6 @@ Endpoints for repairing audio issues like clipping, distortion, and artifacts.
 
 import logging
 import os
-import tempfile
 import uuid
 from typing import Any
 
@@ -53,12 +52,11 @@ async def clipping(req: RepairClippingRequest) -> RepairClippingResponse:
             raise HTTPException(status_code=400, detail="audio_id is required")
 
         # Get audio file path
-        from .voice import _audio_storage, _register_audio_file
+        from backend.services.audio_artifacts import AudioRegistry
 
-        if audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(audio_id)
+        if not audio_path:
             raise HTTPException(status_code=404, detail=f"Audio file '{audio_id}' not found")
-
-        audio_path = _audio_storage[audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
@@ -203,13 +201,15 @@ async def clipping(req: RepairClippingRequest) -> RepairClippingResponse:
         if max_val > 0.95:
             repaired_audio = repaired_audio * (0.95 / max_val)
 
-        # Save repaired audio
-        output_path = tempfile.mktemp(suffix=".wav")
-        sf.write(output_path, repaired_audio, sample_rate)
+        # Save and register via artifact spine
+        from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
-        # Register new audio file
-        repaired_audio_id = f"repaired_{uuid.uuid4().hex[:8]}"
-        _register_audio_file(repaired_audio_id, output_path)
+        repaired_audio_id, _, _ = create_audio_artifact_from_wav_array(
+            repaired_audio,
+            sample_rate,
+            created_by="repair_clipping",
+            audio_id=f"repaired_{uuid.uuid4().hex[:8]}",
+        )
 
         logger.info(
             f"Audio clipping repair completed: {audio_id} -> {repaired_audio_id} "

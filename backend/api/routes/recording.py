@@ -9,8 +9,8 @@ and writes them to WAV files.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import os
 import threading
 import time
@@ -20,6 +20,8 @@ from datetime import datetime
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
+
+from backend.config.path_config import get_path
 
 from ..optimization import cache_response
 
@@ -90,7 +92,7 @@ async def start_recording(request: RecordingStartRequest):
     recording_id = str(uuid.uuid4())
 
     # Create recording directory if it doesn't exist
-    recording_dir = os.path.join("data", "recordings")
+    recording_dir = str(get_path("recordings"))
     os.makedirs(recording_dir, exist_ok=True)
 
     # Generate filename
@@ -265,11 +267,11 @@ async def stop_recording(recording_id: str):
         # Store audio_id in recording
         recording["audio_id"] = audio_id
 
-        # Register in audio storage (import from voice routes)
+        # Register in audio storage
         try:
-            from .voice import _audio_storage
+            from backend.services.audio_artifacts import AudioRegistry
 
-            _audio_storage[audio_id] = file_path
+            AudioRegistry.register(audio_id, file_path)
         except Exception as e:
             logger.warning(f"Could not register audio in storage: {e}")
 

@@ -8,8 +8,8 @@ Security: All endpoints require authentication when auth is enabled.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,9 +24,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/api-keys", tags=["api-keys"])
 
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.api_key_store_service import get_api_keys_store
 
-_api_keys: PersistentStore = PersistentStore("api_keys")
+_api_keys = get_api_keys_store()
 _state_lock = asyncio.Lock()
 
 
@@ -221,8 +221,9 @@ def _encrypt_key(key_value: str) -> str:
             else:
                 encryption_key_bytes = Fernet.generate_key()
                 os.makedirs(os.path.dirname(key_file), exist_ok=True)
-                with open(key_file, "wb") as f:
-                    f.write(encryption_key_bytes)
+                from pathlib import Path
+
+                Path(key_file).write_bytes(encryption_key_bytes)
                 logger.warning("Generated new encryption key. Store securely in production!")
         else:
             encryption_key_bytes = encryption_key_str.encode()

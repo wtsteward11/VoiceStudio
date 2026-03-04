@@ -6,24 +6,19 @@ Endpoints for SSML (Speech Synthesis Markup Language) editing and processing.
 
 from __future__ import annotations
 
-import logging
 import asyncio
-import sys
+import logging
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from ..optimization import cache_response
 
-# Add app to path for NLP imports
-project_root = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(project_root / "app"))
-
-# Try importing NLP text processor
+# Try importing NLP text processor via backend facade
 try:
-    from app.core.nlp.text_processing import get_text_preprocessor
+    from backend.nlp.text_processing import get_text_preprocessor
 
     HAS_NLP = True
 except ImportError:
@@ -34,7 +29,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ssml", tags=["ssml"])
 
 # In-memory SSML documents storage (replace with database in production)
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _ssml_documents: PersistentStore = PersistentStore("ssml_documents")
 _state_lock = asyncio.Lock()
@@ -339,7 +334,7 @@ async def validate_ssml(request: SSMLCreateRequest):
 
 
 @router.post("/preview", response_model=SSMLPreviewResponse)
-async def preview_ssml(request: SSMLPreviewRequest):
+async def preview_ssml(request: SSMLPreviewRequest, http_request: Request):
     """Preview SSML by synthesizing it."""
     import xml.etree.ElementTree as ET
 
@@ -437,8 +432,9 @@ async def preview_ssml(request: SSMLPreviewRequest):
         engine = request.engine or "xtts"
 
         # Use voice synthesis endpoint to synthesize the extracted text
+        from backend.voice.services.synthesis_service import SynthesisService
+
         from ..models_additional import VoiceSynthesizeRequest
-        from .voice import synthesize
 
         # Create synthesis request
         synth_request = VoiceSynthesizeRequest(
@@ -449,7 +445,7 @@ async def preview_ssml(request: SSMLPreviewRequest):
         )
 
         # Synthesize using voice endpoint
-        synth_response = await synthesize(synth_request)
+        synth_response = await SynthesisService.synthesize(synth_request, http_request, config_service=None)
 
         # Return audio ID and duration from synthesis response
         return SSMLPreviewResponse(

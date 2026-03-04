@@ -73,9 +73,9 @@ async def detect_voice_activity(
     threshold: float = Query(0.5, ge=0.0, le=1.0, description="Detection threshold"),
 ):
     """Detect voice activity in an audio file."""
-    from .audio import _get_audio_path
+    from backend.services.audio_path_resolver import resolve_audio_path
 
-    audio_path = _get_audio_path(audio_id)
+    audio_path = resolve_audio_path(audio_id)
     if not audio_path or not os.path.exists(audio_path):
         raise HTTPException(status_code=404, detail=f"Audio file not found: {audio_id}")
 
@@ -148,9 +148,9 @@ async def phonemize_text(request: PhonemizationRequest):
 @router.post("/recognize", response_model=SpeechRecognitionResponse)
 async def recognize_speech(request: SpeechRecognitionRequest):
     """Recognize speech in an audio file."""
-    from .audio import _get_audio_path
+    from backend.services.audio_path_resolver import resolve_audio_path
 
-    audio_path = _get_audio_path(request.audio_id)
+    audio_path = resolve_audio_path(request.audio_id)
     if not audio_path or not os.path.exists(audio_path):
         raise HTTPException(
             status_code=404,

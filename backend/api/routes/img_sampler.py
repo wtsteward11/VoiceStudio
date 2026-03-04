@@ -7,9 +7,9 @@ for diffusion models (DDIM, Euler, etc.).
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
-import asyncio
 import os
 
 from fastapi import APIRouter, HTTPException
@@ -77,9 +77,10 @@ async def render(req: ImgSamplerRequest) -> dict:
 
         # Try to use image generation engine
         try:
-            # Import image generation route
+            from backend.services.image_gen_service import generate_image
+            from backend.services.media_storage_service import get_image_storage
+
             from ..models_additional import ImageGenerateRequest
-            from .image_gen import generate_image
 
             # Create image generation request
             gen_req = ImageGenerateRequest(
@@ -97,7 +98,7 @@ async def render(req: ImgSamplerRequest) -> dict:
 
             # Get image path from result
             image_id = gen_result.image_id
-            image_path = gen_result.image_url
+            image_path = get_image_storage().get(image_id)
 
             if not image_path:
                 raise HTTPException(

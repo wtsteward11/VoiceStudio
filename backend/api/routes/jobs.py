@@ -174,20 +174,6 @@ async def get_jobs(
     return [_entity_to_progress(e) for e in entities]
 
 
-@router.get("/{job_id}", response_model=JobProgress)
-@cache_response(ttl=5)  # Cache for 5 seconds (job status changes frequently)
-async def get_job(
-    job_id: str,
-    repo: JobRepository = Depends(get_repo),
-):
-    """Get a specific job."""
-    entity = await repo.get_by_id(job_id)
-    if not entity:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    return _entity_to_progress(entity)
-
-
 @router.get("/summary", response_model=JobSummary)
 @cache_response(ttl=10)  # Cache for 10 seconds (summary updates frequently)
 async def get_job_summary(
@@ -254,6 +240,20 @@ async def get_job_queue_status(
 async def get_job_queue_status_alias():
     """Alias for /status to match frontend JobGateway expectations."""
     return await get_job_queue_status()
+
+
+@router.get("/{job_id}", response_model=JobProgress)
+@cache_response(ttl=5)  # Cache for 5 seconds (job status changes frequently)
+async def get_job(
+    job_id: str,
+    repo: JobRepository = Depends(get_repo),
+):
+    """Get a specific job."""
+    entity = await repo.get_by_id(job_id)
+    if not entity:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return _entity_to_progress(entity)
 
 
 @router.post("/{job_id}/retry")

@@ -55,15 +55,14 @@ async def align(req: AdrAlignRequest) -> AdrAlignResponse:
             raise HTTPException(status_code=400, detail="audio_id is required")
 
         # Get audio file path
-        from .voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
-        if audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(audio_id)
+        if not audio_path:
             raise HTTPException(
                 status_code=404,
                 detail=f"Audio file '{audio_id}' not found",
             )
-
-        audio_path = _audio_storage[audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404,

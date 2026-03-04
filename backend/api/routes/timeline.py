@@ -362,6 +362,8 @@ async def _write_audio_output(
         format: Output format (wav, mp3, flac, etc.)
     """
     import os
+    import tempfile
+    from pathlib import Path
 
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
@@ -374,19 +376,26 @@ async def _write_audio_output(
         audio = audio / max(max_val, 1.0)
 
     try:
-        import soundfile as sf
+        from backend.services.audio_artifacts.use_cases import wav_array_to_bytes
 
-        # soundfile supports wav, flac, ogg natively
+        # soundfile supports wav, flac, ogg natively; avoid sf.write to path
         sf_format = format.upper()
         if sf_format == "MP3":
-            # soundfile doesn't support mp3, write wav then convert
-            wav_path = output_path.rsplit(".", 1)[0] + ".wav"
-            sf.write(wav_path, audio, sample_rate)
-            await _convert_to_format(wav_path, output_path, format)
-            if wav_path != output_path and os.path.exists(wav_path):
-                os.remove(wav_path)
+            # soundfile doesn't support mp3, write wav to temp then convert
+            wav_bytes = wav_array_to_bytes(audio, sample_rate)
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                tmp.write(wav_bytes)
+                wav_path = tmp.name
+            try:
+                await _convert_to_format(wav_path, output_path, format)
+            finally:
+                if os.path.exists(wav_path):
+                    os.remove(wav_path)
         else:
-            sf.write(output_path, audio, sample_rate)
+            wav_bytes = wav_array_to_bytes(
+                audio, sample_rate, format=sf_format
+            )
+            Path(output_path).write_bytes(wav_bytes)
 
     except ImportError:
         # Fallback to scipy for wav
@@ -696,6 +705,44 @@ async def set_loop(request: LoopRequest):
     return {"success": True}
 
 
+def _resolve_export_path(output_path: str, format: str) -> str:
+    """Resolve export path, refusing repo-relative or unsafe paths (Cursor brick prevention)."""
+    from pathlib import Path
+
+    from backend.config.path_config import get_path
+
+    path = Path(output_path)
+    # Refuse relative paths (e.g. ".", "output.wav")
+    if not path.is_absolute():
+        safe_dir = get_path("artifacts")
+        safe_dir.mkdir(parents=True, exist_ok=True)
+        import uuid
+        fallback = safe_dir / f"timeline_export_{uuid.uuid4().hex[:8]}.{format}"
+        logger.warning(
+            "Refusing relative export path '%s'; using safe path: %s",
+            output_path,
+            fallback,
+        )
+        return str(fallback)
+    # Refuse paths under repo root
+    try:
+        repo_root = Path(__file__).resolve().parents[3]
+        if path.resolve().is_relative_to(repo_root):
+            safe_dir = get_path("artifacts")
+            safe_dir.mkdir(parents=True, exist_ok=True)
+            import uuid
+            fallback = safe_dir / f"timeline_export_{uuid.uuid4().hex[:8]}.{format}"
+            logger.warning(
+                "Refusing export path inside repo '%s'; using safe path: %s",
+                output_path,
+                fallback,
+            )
+            return str(fallback)
+    except (ValueError, OSError):
+        pass
+    return output_path
+
+
 @router.post(
     "/export", response_model=ExportResponse, dependencies=[Depends(require_auth_if_enabled)]
 )
@@ -708,7 +755,8 @@ async def export_timeline(request: ExportRequest):
     timeline = _get_or_create_timeline()
     sample_rate = request.sample_rate or timeline.sample_rate
 
-    logger.info(f"Export requested: {request.output_path} as {request.format}")
+    output_path = _resolve_export_path(request.output_path, request.format)
+    logger.info(f"Export requested: {output_path} as {request.format}")
 
     # Render the timeline audio
     rendered_audio = await _render_timeline_audio(timeline, sample_rate)
@@ -722,15 +770,15 @@ async def export_timeline(request: ExportRequest):
 
     # Write output file
     try:
-        await _write_audio_output(rendered_audio, request.output_path, sample_rate, request.format)
-        logger.info(f"Exported timeline to {request.output_path}")
+        await _write_audio_output(rendered_audio, output_path, sample_rate, request.format)
+        logger.info(f"Exported timeline to {output_path}")
     except Exception as e:
         logger.error(f"Failed to export timeline: {e}")
         raise HTTPException(status_code=500, detail=f"Export failed: {e}")
 
     return ExportResponse(
         success=True,
-        output_path=request.output_path,
+        output_path=output_path,
         duration=len(rendered_audio) / sample_rate if len(rendered_audio) > 0 else 0.0,
     )
 

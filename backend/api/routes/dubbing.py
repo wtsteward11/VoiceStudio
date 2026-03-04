@@ -40,23 +40,18 @@ async def translate(req: DubTranslateRequest) -> DubTranslateResponse:
         if not audio_id or not target_lang:
             raise HTTPException(status_code=400, detail="audio_id and lang are required")
 
-        # Get audio transcription
-        from .transcribe import _transcriptions
+        # Get audio transcription via service (no route-to-route import)
+        from backend.services.transcription_service import (
+            TranscriptionRequest,
+            get_transcription_for_audio,
+            transcribe_audio,
+        )
 
-        transcription = None
-
-        # Check if transcription exists for this audio
-        for _trans_id, trans_data in _transcriptions.items():
-            if trans_data.get("audio_id") == audio_id:
-                transcription = trans_data
-                break
+        transcription = await get_transcription_for_audio(audio_id)
 
         # If no transcription exists, create one
         if not transcription:
             try:
-                # Use transcription service
-                from .transcribe import TranscriptionRequest, transcribe_audio
-
                 transcribe_req = TranscriptionRequest(
                     audio_id=audio_id, engine="whisper", language="auto"
                 )
@@ -78,8 +73,11 @@ async def translate(req: DubTranslateRequest) -> DubTranslateResponse:
                 detail="No transcription found for audio. Cannot translate empty text.",
             )
 
-        # Translate the transcription
-        from .multilingual import TranslationRequest, translate_text
+        # Translate the transcription via service (no route-to-route import)
+        from backend.services.translation_service import (
+            TranslationRequest,
+            translate_text,
+        )
 
         translation_req = TranslationRequest(
             text=source_text,
@@ -128,15 +126,14 @@ async def sync(req: DubSyncRequest) -> DubSyncResponse:
             )
 
         # Load audio file
-        from .voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
-        if audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(audio_id)
+        if not audio_path:
             raise HTTPException(
                 status_code=404,
                 detail=f"Audio file '{audio_id}' not found",
             )
-
-        audio_path = _audio_storage[audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404,
@@ -144,7 +141,7 @@ async def sync(req: DubSyncRequest) -> DubSyncResponse:
             )
 
         # Load audio to get duration
-        from app.core.audio.audio_utils import load_audio
+        from backend.audio.audio_utils import load_audio
 
         audio, sample_rate = load_audio(audio_path)
         audio_duration = len(audio) / sample_rate
@@ -152,93 +149,79 @@ async def sync(req: DubSyncRequest) -> DubSyncResponse:
         # Try to use Aeneas engine for audio-text alignment
         alignment_result = None
         try:
-            import sys
-            from pathlib import Path
+            # Get Aeneas engine via EngineService (ADR-008 compliant)
+            engine_service = get_engine_service()
+            engine = engine_service.get_aeneas_engine()
+            if not engine:
+                raise ImportError("Aeneas engine not available")
 
-            # Add app directory to path if needed
-            app_path = Path(__file__).parent.parent.parent.parent / "app"
-            if str(app_path) not in sys.path:
-                sys.path.insert(0, str(app_path))
+            # Perform alignment
+            # Segment translated text into sentences
+            sentences = re.split(r"[.!?]+", translated_text)
+            sentences = [s.strip() for s in sentences if s.strip()]
 
-            try:
-                # Get Aeneas engine via EngineService (ADR-008 compliant)
-                engine_service = get_engine_service()
-                engine = engine_service.get_aeneas_engine()
-                if not engine:
-                    raise ImportError("Aeneas engine not available")
+            # Use original timing if available, otherwise estimate
+            if original_timing and isinstance(original_timing, list):
+                timing_segments: list[dict[str, Any]] = []
+                sum(seg.get("end", 0) - seg.get("start", 0) for seg in original_timing)
 
-                # Perform alignment
-                # Segment translated text into sentences
-                sentences = re.split(r"[.!?]+", translated_text)
-                sentences = [s.strip() for s in sentences if s.strip()]
-
-                # Use original timing if available, otherwise estimate
-                if original_timing and isinstance(original_timing, list):
-                    timing_segments: list[dict[str, Any]] = []
-                    sum(seg.get("end", 0) - seg.get("start", 0) for seg in original_timing)
-
-                    # Distribute translated text proportionally
-                    char_count = len(translated_text)
-                    if char_count > 0:
-                        for i, sentence in enumerate(sentences):
-                            if i < len(original_timing):
-                                # Use original timing if available
-                                seg = original_timing[i]
-                                start = seg.get("start", 0)
-                                end = seg.get("end", audio_duration)
-                            else:
-                                # Estimate timing based on sentence length
-                                sentence_ratio = len(sentence) / char_count
-                                start = timing_segments[-1]["end"] if timing_segments else 0
-                                end = min(
-                                    start + (sentence_ratio * audio_duration),
-                                    audio_duration,
-                                )
-
-                            timing_segments.append(
-                                {
-                                    "text": sentence,
-                                    "start": round(start, 3),
-                                    "end": round(end, 3),
-                                }
-                            )
-                else:
-                    # Estimate timing based on text length
-                    timing_segments = []
-                    char_count = len(translated_text)
-                    if char_count > 0:
-                        current_time = 0.0
-                        for sentence in sentences:
+                # Distribute translated text proportionally
+                char_count = len(translated_text)
+                if char_count > 0:
+                    for i, sentence in enumerate(sentences):
+                        if i < len(original_timing):
+                            # Use original timing if available
+                            seg = original_timing[i]
+                            start = seg.get("start", 0)
+                            end = seg.get("end", audio_duration)
+                        else:
+                            # Estimate timing based on sentence length
                             sentence_ratio = len(sentence) / char_count
-                            duration = sentence_ratio * audio_duration
-                            timing_segments.append(
-                                {
-                                    "text": sentence,
-                                    "start": round(current_time, 3),
-                                    "end": round(min(current_time + duration, audio_duration), 3),
-                                }
+                            start = timing_segments[-1]["end"] if timing_segments else 0
+                            end = min(
+                                start + (sentence_ratio * audio_duration),
+                                audio_duration,
                             )
-                            current_time += duration
 
-                alignment_result = {
-                    "segments": timing_segments,
-                    "total_duration": audio_duration,
-                    "language": target_language,
-                }
+                        timing_segments.append(
+                            {
+                                "text": sentence,
+                                "start": round(start, 3),
+                                "end": round(end, 3),
+                            }
+                        )
+            else:
+                # Estimate timing based on text length
+                timing_segments = []
+                char_count = len(translated_text)
+                if char_count > 0:
+                    current_time = 0.0
+                    for sentence in sentences:
+                        sentence_ratio = len(sentence) / char_count
+                        duration = sentence_ratio * audio_duration
+                        timing_segments.append(
+                            {
+                                "text": sentence,
+                                "start": round(current_time, 3),
+                                "end": round(min(current_time + duration, audio_duration), 3),
+                            }
+                        )
+                        current_time += duration
 
-                logger.info(
-                    f"Synchronized dubbing for audio {audio_id}: "
-                    f"{len(timing_segments)} segments, "
-                    f"{audio_duration:.2f}s duration"
-                )
+            alignment_result = {
+                "segments": timing_segments,
+                "total_duration": audio_duration,
+                "language": target_language,
+            }
 
-            except ImportError:
-                # Aeneas not available, use fallback method
-                logger.warning("Aeneas engine not available, using fallback alignment")
-                raise ImportError("Aeneas not available")
+            logger.info(
+                f"Synchronized dubbing for audio {audio_id}: "
+                f"{len(timing_segments)} segments, "
+                f"{audio_duration:.2f}s duration"
+            )
 
         except ImportError:
-            # Fallback: Simple proportional timing based on text length
+            # Aeneas not available, use fallback: Simple proportional timing
             logger.info("Using fallback timing alignment method")
 
             # Segment translated text

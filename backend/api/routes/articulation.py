@@ -70,9 +70,9 @@ async def analyze(req: ArticulationAnalyzeRequest) -> ArticulationAnalyzeRespons
             )
 
         # Get audio file path from audio storage
-        from .audio import _get_audio_path
+        from backend.services.audio_path_resolver import resolve_audio_path
 
-        audio_path = _get_audio_path(audio_id)
+        audio_path = resolve_audio_path(audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(status_code=404, detail=f"Audio file not found: {audio_id}")
 

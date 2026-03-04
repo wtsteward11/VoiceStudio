@@ -11,8 +11,8 @@ Unified endpoint for managing all types of presets:
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import uuid
 from datetime import datetime
 from typing import Any
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/presets", tags=["presets"])
 
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _presets: PersistentStore = PersistentStore("presets")
 _MAX_PRESETS = 1000

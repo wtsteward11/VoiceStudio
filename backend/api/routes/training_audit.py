@@ -9,13 +9,13 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.core.training import (
+from backend.training.facade import (
     AutoTrainer,
     ParameterOptimizer,
+    TrainingModuleAuditor,
     TrainingProgressMonitor,
     UnifiedTrainer,
 )
-from app.core.training.training_module_audit import TrainingModuleAuditor
 
 logger = logging.getLogger(__name__)
 

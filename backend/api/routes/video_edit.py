@@ -20,8 +20,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/video/edit", tags=["video", "editing"])
 
-# Output directory for edited videos
-OUTPUT_DIR = Path("data/videos/edited")
+# Output directory for edited videos (use path_config to avoid repo writes)
+from backend.config.path_config import get_path
+
+OUTPUT_DIR = get_path("data") / "videos" / "edited"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 

@@ -13,10 +13,11 @@ import numpy as np
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ..ml_optimization import (
+from backend.services.ml_optimization import (
     HyperparameterOptimizer,
     ModelExplainer,
 )
+
 from ..optimization import cache_response
 
 logger = logging.getLogger(__name__)

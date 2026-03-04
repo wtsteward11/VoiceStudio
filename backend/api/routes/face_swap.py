@@ -173,10 +173,8 @@ async def create_face_swap(
         except FileValidationError as e:
             raise HTTPException(status_code=400, detail=f"Invalid target media: {e.message}") from e
 
-        with open(source_face_path, "wb") as f:
-            f.write(source_face_content)
-        with open(target_media_path, "wb") as f:
-            f.write(target_media_content)
+        source_face_path.write_bytes(source_face_content)
+        target_media_path.write_bytes(target_media_content)
 
         source_ext = Path(source_face.filename or "").suffix.lower()
         target_ext = Path(target_media.filename or "").suffix.lower()

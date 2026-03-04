@@ -6,9 +6,8 @@ Endpoints for exploring and visualizing speaker embeddings.
 
 from __future__ import annotations
 
-import logging
 import asyncio
-import os
+import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -142,24 +141,16 @@ async def extract_embedding(request: EmbeddingExtractRequest):
         )
 
     try:
-        # Resolve audio file path from audio_id
-        # In a real implementation, this would look up the audio file in a database/storage
-        audio_storage_path = os.environ.get("VOICESTUDIO_AUDIO_STORAGE", "data/audio")
-        audio_path = Path(audio_storage_path) / f"{request.audio_id}.wav"
+        # Resolve audio file path via registry (spine single source of truth)
+        from backend.services.audio_artifacts import AudioRegistry
 
-        # Try alternative extensions if .wav not found
-        if not audio_path.exists():
-            for ext in [".mp3", ".flac", ".ogg", ""]:
-                alt_path = Path(audio_storage_path) / f"{request.audio_id}{ext}"
-                if alt_path.exists():
-                    audio_path = alt_path
-                    break
-
-        if not audio_path.exists():
+        audio_path_str = AudioRegistry.get_path(request.audio_id)
+        if not audio_path_str or not Path(audio_path_str).exists():
             raise HTTPException(
                 status_code=404,
                 detail=f"Audio file not found for audio_id: {request.audio_id}",
             )
+        audio_path = Path(audio_path_str)
 
         # Extract embedding based on available library
         embedding_vector: list[float] = []
@@ -179,9 +170,11 @@ async def extract_embedding(request: EmbeddingExtractRequest):
 
         elif HAS_SPEECHBRAIN and (request.method == "default" or request.method == "speechbrain"):
             # Use SpeechBrain for embedding extraction
+            from backend.services.path_service import PathService
+
             classifier = EncoderClassifier.from_hparams(
                 source="speechbrain/spkrec-ecapa-voxceleb",
-                savedir="models/speechbrain_speaker",
+                savedir=str(PathService.get_models_dir() / "speechbrain_speaker"),
             )
 
             # Load audio

@@ -29,6 +29,8 @@ import numpy as np
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
+from backend.config.path_config import get_path
+
 from ..optimization import cache_response
 
 logger = logging.getLogger(__name__)
@@ -141,66 +143,10 @@ class RadarChartData(BaseModel):
 
 
 def _get_audio_path(audio_id: str) -> str | None:
-    """Get audio file path from audio_id.
+    """Get audio file path from audio_id. Thin wrapper over resolve_audio_path."""
+    from backend.services.audio_path_resolver import resolve_audio_path
 
-    Checks:
-    1. Voice route temporary storage (_audio_storage)
-    2. Audio upload directories (from /api/audio/upload)
-    3. Project audio directories (by filename match)
-    4. Direct filename match in project audio directories
-    """
-    # Check voice route storage
-    from .voice import _audio_storage
-
-    if audio_id in _audio_storage:
-        path = _audio_storage[audio_id]
-        if os.path.exists(path):
-            return path
-
-    # Check audio upload directories (GAP-1 fix: connect upload to export/analysis)
-    # audio_id from upload is a UUID; files are stored as {uuid}.wav
-    upload_wav_dir = UPLOAD_WAV_DIR
-    upload_originals_dir = UPLOAD_ORIGINALS_DIR
-
-    # Try direct match in upload WAV directory (canonical format)
-    wav_path = os.path.join(upload_wav_dir, f"{audio_id}.wav")
-    if os.path.exists(wav_path):
-        return wav_path
-
-    # Try with .wav extension already in audio_id
-    if audio_id.endswith(".wav"):
-        wav_path = os.path.join(upload_wav_dir, audio_id)
-        if os.path.exists(wav_path):
-            return wav_path
-
-    # Try originals directory (for non-WAV formats)
-    for ext in [".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac"]:
-        original_path = os.path.join(upload_originals_dir, f"{audio_id}{ext}")
-        if os.path.exists(original_path):
-            return original_path
-
-    # Check project audio storage
-    # audio_id might be a filename (for project audio files)
-    projects_dir = os.path.join(os.path.expanduser("~"), ".voicestudio", "projects")
-
-    # First, try exact filename match
-    for project_dir in Path(projects_dir).glob("*/audio/*"):
-        if project_dir.is_file() and project_dir.name == audio_id:
-            return str(project_dir)
-
-    # Then try partial match (audio_id might be embedded in filename)
-    for project_dir in Path(projects_dir).glob("*/audio/*"):
-        if project_dir.is_file() and audio_id in project_dir.name:
-            return str(project_dir)
-
-    # Also check if audio_id is just a filename without path
-    if os.path.sep not in audio_id and os.path.altsep not in audio_id:
-        # It's just a filename, search all project audio directories
-        for project_dir in Path(projects_dir).glob("*/audio/*"):
-            if project_dir.is_file() and project_dir.name == audio_id:
-                return str(project_dir)
-
-    return None
+    return resolve_audio_path(audio_id)
 
 
 def _downsample_waveform(
@@ -884,15 +830,40 @@ def get_phase_data(
 
 # --- Audio Upload ---
 
-# Base upload directory
-_UPLOAD_BASE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-    "data",
-    "audio_uploads",
-)
+# Base upload directory (outside repo to avoid Cursor brick risk)
+_UPLOAD_BASE = str(get_path("audio_uploads"))
 UPLOAD_DIR = _UPLOAD_BASE  # Legacy compatibility
 UPLOAD_ORIGINALS_DIR = os.path.join(_UPLOAD_BASE, "originals")
 UPLOAD_WAV_DIR = os.path.join(_UPLOAD_BASE, "wav")
+
+
+def _migrate_audio_uploads_from_repo() -> None:
+    """One-time migration: move existing data/audio_uploads to new location."""
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    old_base = os.path.join(project_root, "data", "audio_uploads")
+    new_base = _UPLOAD_BASE
+    if os.path.normpath(old_base) == os.path.normpath(new_base):
+        return
+    if not os.path.isdir(old_base):
+        return
+    try:
+        items = list(Path(old_base).rglob("*"))
+        files = [p for p in items if p.is_file()]
+        if not files:
+            return
+        logger.info("Migrating %d files from data/audio_uploads to %s", len(files), new_base)
+        for src in files:
+            rel = src.relative_to(old_base)
+            dst = Path(new_base) / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            if not dst.exists() or dst.stat().st_size != src.stat().st_size:
+                shutil.copy2(src, dst)
+        logger.info("Migration complete. Old files remain in %s (remove manually if desired).", old_base)
+    except Exception as e:
+        logger.warning("Audio upload migration skipped: %s", e)
+
+
+_migrate_audio_uploads_from_repo()
 
 
 class AudioUploadResponse(BaseModel):
@@ -987,8 +958,9 @@ async def upload_audio(file: UploadFile = File(...)):
 
     try:
         # Save original file
-        with open(original_path, "wb") as out:
-            out.write(content)
+        from pathlib import Path
+
+        Path(original_path).write_bytes(content)
 
         # Check if conversion is needed
         is_wav = original_ext.lower() in (".wav", ".wave")

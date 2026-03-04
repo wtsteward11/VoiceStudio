@@ -6,8 +6,8 @@ Endpoints for real-time voice conversion and streaming.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import os
 
 import numpy as np
@@ -206,8 +206,9 @@ async def converter_stream(websocket: WebSocket, session_id: str):
             logger.warning(f"Could not get RVC engine: {e}")
 
         # Get target profile audio path
-        from .profiles import _profiles
+        from backend.services.profile_search_service import get_profiles_proxy
 
+        _profiles = get_profiles_proxy()
         target_profile_audio_path = None
 
         if target_profile_id in _profiles:
@@ -217,18 +218,11 @@ async def converter_stream(websocket: WebSocket, session_id: str):
                     target_profile_audio_path = target_profile.reference_audio_url
 
         if not target_profile_audio_path:
-            # Try standard profile directory
-            profile_dir = os.path.join(
-                os.path.expanduser("~"), ".voicestudio", "profiles", target_profile_id
-            )
-            potential_paths = [
-                os.path.join(profile_dir, "reference.wav"),
-                os.path.join(profile_dir, "reference_audio.wav"),
-            ]
-            for path in potential_paths:
-                if os.path.exists(path):
-                    target_profile_audio_path = path
-                    break
+            from backend.services.profile_service import resolve_reference_audio_path
+
+            resolved = resolve_reference_audio_path(target_profile_id)
+            if resolved.exists():
+                target_profile_audio_path = str(resolved)
 
         # Process audio chunks
         while True:
@@ -253,7 +247,13 @@ async def converter_stream(websocket: WebSocket, session_id: str):
                     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_input:
                         import soundfile as sf
 
-                        sf.write(tmp_input.name, audio_chunk, 40000)  # RVC typically uses 40kHz
+                        from backend.services.audio_artifacts.use_cases import (
+                            wav_array_to_bytes,
+                        )
+
+                        wav_bytes = wav_array_to_bytes(audio_chunk, 40000)
+                        tmp_input.write(wav_bytes)
+                        tmp_input.flush()
 
                         # Convert using RVC
                         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_output:

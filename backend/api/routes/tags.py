@@ -7,8 +7,8 @@ Supports CRUD operations, tag usage tracking, and categorization.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/tags", tags=["tags"])
 
 # In-memory tags storage (replace with database in production)
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _tags: PersistentStore = PersistentStore("tags")
 _state_lock = asyncio.Lock()
@@ -436,8 +436,9 @@ async def get_tag_usage(tag_id: str):
     resources: list[dict] = []
 
     # Query profiles that use this tag
-    from .profiles import _profiles
+    from backend.services.profile_search_service import get_profiles_proxy
 
+    _profiles = get_profiles_proxy()
     for profile_id, profile in _profiles.items():
         if tag_id in profile.tags or tag_name in profile.tags:
             resources.append(

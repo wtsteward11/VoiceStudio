@@ -381,9 +381,8 @@ async def _process_upscaling_job(job_id: str, file: UploadFile, request: Upscali
         input_file_path = temp_dir / (
             file.filename or f"input.{'png' if request.media_type == 'image' else 'mp4'}"
         )
-        with open(input_file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
+        content = await file.read()
+        input_file_path.write_bytes(content)
 
         # Get original dimensions
         original_width = None

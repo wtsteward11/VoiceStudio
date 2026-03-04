@@ -6,8 +6,8 @@ CRUD operations for macros and automation curves.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import os
 import uuid
 from datetime import datetime, timedelta
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api/macros", tags=["macros"])
 
 # Try to import scheduler
 try:
-    from app.core.tasks.scheduler import TaskPriority, get_scheduler
+    from backend.tasks.facade import TaskPriority, get_scheduler
 
     HAS_SCHEDULER = True
 except ImportError:
@@ -134,7 +134,7 @@ class AutomationCurveUpdateRequest(BaseModel):
     interpolation: str | None = None
 
 
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _macros: PersistentStore = PersistentStore("macros")
 _automation_curves: PersistentStore = PersistentStore("macro_automation_curves")
@@ -949,8 +949,7 @@ async def schedule_macro(macro_id: str, request: MacroScheduleRequest):
                 # Create execution function
                 def execute_macro_task():
                     try:
-                        # Import here to avoid circular dependency
-                        from .macros import execute_macro
+                        from backend.services.macro_execution_service import execute_macro
 
                         result = execute_macro(macro_id)
                         schedule_info["execution_count"] += 1
@@ -1378,3 +1377,8 @@ def delete_track_automation(curve_id: str) -> dict[str, bool]:
     except Exception as e:
         logger.error(f"Error deleting automation curve {curve_id}: {e!s}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to delete automation curve: {e!s}")
+
+
+from backend.services.macro_execution_service import register_execute_macro_handler
+
+register_execute_macro_handler(execute_macro)

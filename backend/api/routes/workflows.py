@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from backend.core.security.expression_evaluator import evaluate_condition
@@ -164,13 +164,10 @@ def _validate_audio_id(audio_id: str) -> bool:
         True if audio ID is valid, False otherwise
     """
     try:
-        from .voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
-        if audio_id not in _audio_storage:
-            return False
-
-        audio_path = _audio_storage[audio_id]
-        return os.path.exists(audio_path)
+        audio_path = AudioRegistry.get_path(audio_id)
+        return audio_path is not None and os.path.exists(audio_path)
     except Exception as e:
         # GAP-PY-001: Audio validation failed, treating as invalid
         logger.debug(f"Audio ID validation failed for '{audio_id}': {e}")
@@ -413,7 +410,11 @@ async def delete_workflow(workflow_id: str):
 
 
 @router.post("/{workflow_id}/execute", response_model=WorkflowExecutionResult)
-async def execute_workflow(workflow_id: str, request: WorkflowExecutionRequest | None = None):
+async def execute_workflow(
+    workflow_id: str,
+    http_request: Request,
+    request: WorkflowExecutionRequest | None = None,
+):
     """Execute a workflow."""
     try:
         if workflow_id not in _workflows:
@@ -431,7 +432,7 @@ async def execute_workflow(workflow_id: str, request: WorkflowExecutionRequest |
         sorted_steps = sorted(workflow.steps, key=lambda s: s.order)
 
         # Prepare execution context
-        context: dict[str, Any] = {}
+        context: dict[str, Any] = {"_http_request": http_request}
 
         # Add workflow variables to context
         for var in workflow.variables:
@@ -548,8 +549,16 @@ async def _execute_synthesize_step(step: WorkflowStep, context: dict[str, Any]) 
 
     # Call actual synthesis by importing and using the synthesis function
     try:
+        from backend.voice.services.synthesis_service import SynthesisService
+
         from ..models_additional import VoiceSynthesizeRequest
-        from .voice import synthesize
+
+        http_request = context.get("_http_request")
+        if not isinstance(http_request, Request):
+            raise ValueError(
+                "Workflow synthesis requires HTTP request context. "
+                "Ensure execute_workflow is called from an HTTP request."
+            )
 
         # Create synthesis request
         synth_request = VoiceSynthesizeRequest(
@@ -562,7 +571,7 @@ async def _execute_synthesize_step(step: WorkflowStep, context: dict[str, Any]) 
         )
 
         # Perform synthesis
-        synth_response = await synthesize(synth_request)
+        synth_response = await SynthesisService.synthesize(synth_request, http_request, config_service=None)
 
         return {
             "type": "synthesize",
@@ -613,11 +622,11 @@ async def _execute_effect_step(step: WorkflowStep, context: dict[str, Any]) -> d
 
         import numpy as np
 
-        from .voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
         # Try to import audio_utils
         try:
-            from app.core.audio import audio_utils
+            from backend.audio import audio_utils
 
             HAS_AUDIO_UTILS = True
         except ImportError:
@@ -632,10 +641,9 @@ async def _execute_effect_step(step: WorkflowStep, context: dict[str, Any]) -> d
                 raise ValueError("Audio processing libraries not available")
 
         # Get audio file path
-        if audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(audio_id)
+        if not audio_path:
             raise ValueError(f"Audio file '{audio_id}' not found in storage")
-
-        audio_path = _audio_storage[audio_id]
         if not os.path.exists(audio_path):
             raise ValueError(f"Audio file at '{audio_path}' does not exist")
 
@@ -676,22 +684,15 @@ async def _execute_effect_step(step: WorkflowStep, context: dict[str, Any]) -> d
                 logger.warning(f"Unknown effect type '{effect_type}', skipping effect")
                 processed_audio = audio
 
-        # Save processed audio
-        import tempfile
+        # Save processed audio via artifact spine
+        from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
-        output_path = tempfile.mktemp(suffix=".wav")
-        if HAS_AUDIO_UTILS:
-            audio_utils.save_audio(processed_audio, sample_rate, output_path)
-        elif HAS_SOUNDFILE:
-            sf.write(output_path, processed_audio, sample_rate)
-        else:
-            raise ValueError("Cannot save audio - no audio libraries available")
-
-        # Register new audio file
-        output_audio_id = f"workflow_{uuid.uuid4().hex[:8]}"
-        from .voice import _register_audio_file
-
-        _register_audio_file(output_audio_id, output_path)
+        output_audio_id, _, _ = create_audio_artifact_from_wav_array(
+            processed_audio,
+            sample_rate,
+            created_by="workflows_effect",
+            audio_id=f"workflow_{uuid.uuid4().hex[:8]}",
+        )
 
         return {
             "type": "effect",
@@ -740,13 +741,12 @@ async def _execute_export_step(step: WorkflowStep, context: dict[str, Any]) -> d
     try:
         import shutil
 
-        from .voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
         # Get audio file path
-        if audio_id not in _audio_storage:
+        source_path = AudioRegistry.get_path(audio_id)
+        if not source_path:
             raise ValueError(f"Audio file '{audio_id}' not found in storage")
-
-        source_path = _audio_storage[audio_id]
         if not os.path.exists(source_path):
             raise ValueError(f"Audio file at '{source_path}' does not exist")
 

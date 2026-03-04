@@ -8,8 +8,8 @@ Ollama provider with fallback to cloud providers.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import uuid
 from datetime import datetime
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 
 # In-memory conversation history (future: persist via JsonFileStore)
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _conversations: PersistentStore = PersistentStore("assistant_conversations")
 _state_lock = asyncio.Lock()
@@ -191,7 +191,7 @@ async def chat_with_assistant(request: ChatRequest):
         try:
             from backend.ml.models.llm_function_calling import get_function_registry
 
-            from app.core.engines.llm_interface import LLMConfig, Message, MessageRole
+            from backend.engines.llm_facade import LLMConfig, Message, MessageRole
 
             # Build message history
             llm_messages = []
@@ -315,7 +315,7 @@ async def suggest_tasks(
         )
 
     try:
-        from app.core.engines.llm_interface import LLMConfig, Message, MessageRole
+        from backend.engines.llm_facade import LLMConfig, Message, MessageRole
 
         prompt = (
             f"Based on a voice production project (ID: {project_id}), "

@@ -92,11 +92,12 @@ async def search_images(request: ImageSearchRequest):
         # Implement real image search
         results = []
 
-        # Try to get API keys from APIKeyManager storage
+        # Try to get API keys from API key store service
         api_keys: dict[str, str] = {}
         try:
-            from .api_key_manager import _api_keys as api_key_storage
+            from backend.services.api_key_store_service import get_api_keys_store
 
+            api_key_storage = get_api_keys_store()
             # Try to get keys for different sources
             for source_name in ["unsplash", "pexels", "pixabay"]:
                 # Search for key by service name

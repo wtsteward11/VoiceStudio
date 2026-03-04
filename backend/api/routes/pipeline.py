@@ -10,9 +10,9 @@ WebSocket Protocol (GAP-INT-002):
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import asyncio
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -83,7 +83,7 @@ async def process_pipeline(request: PipelineRequest):
     Supports batch mode (complete response) and returns
     the LLM response with optional TTS audio.
     """
-    from app.core.pipeline.orchestrator import PipelineConfig, PipelineMode, PipelineOrchestrator
+    from backend.pipeline.facade import PipelineConfig, PipelineMode, PipelineOrchestrator
 
     session_id = f"sess-{uuid.uuid4().hex[:8]}"
 
@@ -109,22 +109,43 @@ async def process_pipeline(request: PipelineRequest):
     try:
         result = await orchestrator.process_text(request.text)
 
-        # Store audio if generated
+        # Store audio if generated (real storage + provenance per trust audit)
         audio_id = None
-        if result.get("audio"):
+        audio_bytes = result.get("audio")
+        if audio_bytes and isinstance(audio_bytes, bytes) and request.synthesize:
             try:
-                from backend.audio.processing.audio_artifact_registry import get_audio_registry
+                import tempfile
 
-                get_audio_registry()
-                audio_id = f"pipe-{uuid.uuid4().hex[:8]}"
-                # Audio storage handled by registry
+                from backend.services.audio_artifacts import create_audio_artifact_from_file
+
+                with tempfile.NamedTemporaryFile(
+                    suffix=".wav", delete=False
+                ) as tmp:
+                    tmp.write(audio_bytes)
+                    output_path = tmp.name
+                try:
+                    audio_id, _, _ = create_audio_artifact_from_file(
+                        output_path,
+                        created_by="pipeline",
+                        audio_id=f"pipe-{uuid.uuid4().hex[:8]}",
+                        delete_source=True,
+                    )
+                finally:
+                    import os
+
+                    if os.path.exists(output_path):
+                        try:
+                            os.unlink(output_path)
+                        except OSError:
+                            pass
             except Exception as exc:
-                logger.warning(f"Audio storage failed: {exc}")
+                logger.warning("Pipeline audio storage failed: %s", exc)
+                audio_id = None
 
         return PipelineResponse(
             session_id=session_id,
             response_text=result.get("response", ""),
-            audio_available=result.get("audio") is not None,
+            audio_available=audio_id is not None,
             audio_id=audio_id,
             metrics=result.get("metrics"),
         )
@@ -157,7 +178,7 @@ async def pipeline_stream(websocket: WebSocket):
     session_id = f"ws-{uuid.uuid4().hex[:8]}"
     logger.info(f"Pipeline WebSocket connected: {session_id}")
 
-    from app.core.pipeline.orchestrator import PipelineConfig, PipelineOrchestrator
+    from backend.pipeline.facade import PipelineConfig, PipelineOrchestrator
 
     orchestrator = PipelineOrchestrator(PipelineConfig())
     await orchestrator.initialize()

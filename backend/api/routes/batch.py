@@ -15,7 +15,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from backend.api.dependencies import require_synthesis_clearance
 from pydantic import BaseModel
 
 from backend.infrastructure.adapters.job_state_store import get_job_state_store
@@ -35,7 +37,7 @@ _batch_store = get_job_state_store("batch_jobs")
 _enhanced_job_queue = None
 _resource_manager = None
 
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _batch_jobs: PersistentStore = PersistentStore("batch_jobs")
 _job_queue: list[str] = []  # Queue of job IDs
@@ -85,8 +87,10 @@ def _get_enhanced_job_queue():
     global _enhanced_job_queue, _resource_manager
     if _enhanced_job_queue is None:
         try:
-            from app.core.runtime.job_queue_enhanced import create_enhanced_job_queue
-            from app.core.runtime.resource_manager import get_resource_manager
+            from backend.services.runtime_facade import (
+                create_enhanced_job_queue,
+                get_resource_manager,
+            )
 
             _resource_manager = get_resource_manager()
             _enhanced_job_queue = create_enhanced_job_queue(
@@ -192,6 +196,17 @@ class BatchJob(BaseModel):
     quality_status: str | None = None  # "pass", "fail", "warning"
 
 
+class BatchQueueStatus(BaseModel):
+    """Batch queue status response."""
+
+    queue_length: int
+    pending: int
+    running: int
+    completed: int
+    failed: int
+    total: int
+
+
 class BatchJobRequest(BaseModel):
     """Request to create a batch job."""
 
@@ -212,7 +227,10 @@ _load_persisted_batch_jobs()
 
 
 @router.post("/jobs", response_model=BatchJob)
-async def create_batch_job(job_request: BatchJobRequest):
+async def create_batch_job(
+    job_request: BatchJobRequest,
+    _policy: None = Depends(require_synthesis_clearance),
+):
     """Create a new batch processing job."""
     try:
         if not job_request.name or not job_request.name.strip():
@@ -336,7 +354,10 @@ async def delete_batch_job(job_id: str):
 
 
 @router.post("/jobs/{job_id}/start", response_model=BatchJob)
-async def start_batch_job(job_id: str):
+async def start_batch_job(
+    job_id: str,
+    _policy: None = Depends(require_synthesis_clearance),
+):
     """Start processing a batch job."""
     try:
         if not job_id or not job_id.strip():
@@ -428,7 +449,7 @@ async def cancel_batch_job(job_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to cancel batch job: {e!s}")
 
 
-@router.get("/queue/status")
+@router.get("/queue/status", response_model=BatchQueueStatus)
 @cache_response(ttl=5)  # Cache for 5 seconds (queue status changes frequently)
 async def get_queue_status():
     """Get the status of the batch processing queue."""
@@ -444,16 +465,16 @@ async def get_queue_status():
         )
         failed = len([j for j in _batch_jobs.values() if j.get("status") == JobStatus.FAILED.value])
 
-        status = {
-            "queue_length": len(_job_queue),
-            "pending": pending,
-            "running": running,
-            "completed": completed,
-            "failed": failed,
-            "total": len(_batch_jobs),
-        }
+        status = BatchQueueStatus(
+            queue_length=len(_job_queue),
+            pending=pending,
+            running=running,
+            completed=completed,
+            failed=failed,
+            total=len(_batch_jobs),
+        )
 
-        logger.debug(f"Retrieved batch queue status: {status}")
+        logger.debug(f"Retrieved batch queue status: {status.model_dump()}")
         return status
     except Exception as e:
         logger.error(f"Error getting batch queue status: {e!s}", exc_info=True)
@@ -587,18 +608,22 @@ async def _process_batch_job(job_id: str):
             )
 
         # Get profile audio path
-        profile_audio_path = f"profiles/{job.voice_profile_id}/reference.wav"
+        from backend.services.profile_service import resolve_reference_audio_path
 
-        # Check if profile audio exists
-        if not os.path.exists(profile_audio_path):
-            # Try to get from profiles API or storage
+        resolved = resolve_reference_audio_path(job.voice_profile_id)
+        profile_audio_path = str(resolved) if resolved.exists() else None
+
+        # Fallback: try profile store audio_path if canonical path not found
+        if not profile_audio_path or not os.path.exists(profile_audio_path):
             try:
                 from backend.project.management.profile_store import get_profile_store
 
                 _profile_store = get_profile_store()
                 profile_data = _profile_store.get(job.voice_profile_id)
                 if profile_data and isinstance(profile_data, dict):
-                    profile_audio_path = profile_data.get("audio_path", profile_audio_path)
+                    store_path = profile_data.get("audio_path")
+                    if store_path and os.path.exists(store_path):
+                        profile_audio_path = store_path
             except Exception as e:
                 logger.debug(f"Could not get profile audio path from profile store: {e}")
 
@@ -663,9 +688,11 @@ async def _process_batch_job(job_id: str):
             else:
                 # Use temporary file or project directory
                 if job.project_id:
-                    project_audio_dir = f"projects/{job.project_id}/audio"
+                    from backend.services.path_service import PathService
+
+                    project_audio_dir = PathService.get_projects_dir() / job.project_id / "audio"
                     try:
-                        os.makedirs(project_audio_dir, exist_ok=True)
+                        project_audio_dir.mkdir(parents=True, exist_ok=True)
                     except (PermissionError, OSError) as e:
                         error_msg = (
                             f"Failed to create project audio directory '{project_audio_dir}': {e!s}"
@@ -686,10 +713,13 @@ async def _process_batch_job(job_id: str):
                             )
                         return
                     output_filename = f"batch_{job_id}.wav"
-                    output_path = os.path.join(project_audio_dir, output_filename)
+                    output_path = str(project_audio_dir / output_filename)
                 else:
                     try:
-                        output_path = tempfile.mktemp(suffix=".wav")
+                        with tempfile.NamedTemporaryFile(
+                            delete=False, suffix=".wav"
+                        ) as tmp:
+                            output_path = tmp.name
                     except OSError as e:
                         error_msg = f"Failed to create temporary file: {e!s}"
                         logger.error(f"Batch job {job_id} failed: {error_msg}")
@@ -874,12 +904,17 @@ async def _process_batch_job(job_id: str):
             # Generate audio ID for result
             audio_id = f"batch_{job_id}_{uuid.uuid4().hex[:8]}"
 
-            # Register audio file if it exists
+            # Register audio file via artifact spine if it exists
             if os.path.exists(output_path):
                 try:
-                    from .voice import _register_audio_file
+                    from backend.services.audio_artifacts import create_audio_artifact_from_file
 
-                    _register_audio_file(audio_id, output_path)
+                    audio_id, _, _ = create_audio_artifact_from_file(
+                        output_path,
+                        created_by="batch",
+                        audio_id=audio_id,
+                        delete_source=False,
+                    )
                 except Exception as e:
                     logger.warning(f"Could not register audio file: {e}")
 
@@ -1073,7 +1108,11 @@ async def get_batch_quality_statistics(
 
 
 @router.post("/jobs/{job_id}/retry-with-quality", response_model=BatchJob)
-async def retry_batch_job_with_quality(job_id: str, request: BatchRetryWithQualityRequest):
+async def retry_batch_job_with_quality(
+    job_id: str,
+    request: BatchRetryWithQualityRequest,
+    _policy: None = Depends(require_synthesis_clearance),
+):
     """
     Retry a failed batch job with quality settings (IDEA 57).
     Creates a new job based on the failed one with updated quality settings.

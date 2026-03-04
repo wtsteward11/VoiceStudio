@@ -7,8 +7,8 @@ Uses ProfileStore for persistent, disk-backed storage.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -19,8 +19,10 @@ from ..exceptions import ProfileNotFoundException
 from ..middleware.auth_middleware import require_auth_if_enabled
 from ..models import ApiOk
 from ..models_additional import (
+    ProfileCreateRequest,
     ReferenceAudioPreprocessRequest,
     ReferenceAudioPreprocessResponse,
+    VoiceProfile,
 )
 from ..optimization import cache_response, get_pagination_params
 
@@ -114,7 +116,7 @@ class _ProfilesProxy:
 
 # Export for backward compatibility
 _profiles = _ProfilesProxy()
-from backend.api.routes._persistent_store import PersistentStore
+from backend.services.persistent_store import PersistentStore
 
 _profile_timestamps: PersistentStore = PersistentStore("profile_timestamps")
 _state_lock = asyncio.Lock()
@@ -124,29 +126,6 @@ router = APIRouter(
     tags=["profiles"],
     dependencies=[Depends(require_auth_if_enabled)],
 )
-
-
-class VoiceProfile(BaseModel):
-    """Voice profile model with avatar support."""
-
-    id: str
-    name: str
-    language: str = "en"
-    emotion: str | None = None
-    quality_score: float = 0.0
-    tags: list[str] = []
-    reference_audio_url: str | None = None
-    avatar_url: str | None = None  # URL or path to profile avatar image
-
-
-class ProfileCreateRequest(BaseModel):
-    """Request model for creating a new voice profile."""
-
-    name: str
-    language: str = "en"
-    emotion: str | None = None
-    tags: list[str] = []
-    avatar_url: str | None = None
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -312,6 +291,7 @@ def get_profile(
 
 @router.post("", response_model=VoiceProfile)
 def create_profile(
+    request: Request,
     req: ProfileCreateRequest,
     profile_store: ProfileStoreDep,
 ) -> VoiceProfile:
@@ -336,6 +316,7 @@ def create_profile(
 
         profile_id = str(uuid.uuid4())
 
+        owner_user_id = request.headers.get("X-User-ID", "").strip() or "local"
         profile_data = {
             "id": profile_id,
             "name": req.name.strip(),
@@ -345,6 +326,7 @@ def create_profile(
             "quality_score": 0.0,
             "avatar_url": req.avatar_url,
             "created_at": time.time(),
+            "owner_user_id": owner_user_id,
         }
 
         # Save to persistent store
@@ -518,16 +500,11 @@ async def preprocess_reference_audio(
             if profile.reference_audio_url and not profile.reference_audio_url.startswith("http"):
                 reference_audio_path = profile.reference_audio_url
             else:
-                profile_dir = os.path.join(
-                    os.path.expanduser("~"), ".voicestudio", "profiles", profile_id
-                )
-                for path in [
-                    os.path.join(profile_dir, "reference.wav"),
-                    os.path.join(profile_dir, "reference_audio.wav"),
-                ]:
-                    if os.path.exists(path):
-                        reference_audio_path = path
-                        break
+                from backend.services.profile_service import resolve_reference_audio_path
+
+                resolved = resolve_reference_audio_path(profile_id)
+                if resolved.exists():
+                    reference_audio_path = str(resolved)
 
         if not reference_audio_path or not os.path.exists(reference_audio_path):
             from ..exceptions import FileNotFoundException
@@ -647,14 +624,8 @@ async def preprocess_reference_audio(
 
         if req.auto_enhance:
             try:
-                # Import audio enhancement functions
-                import sys
-
-                app_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "app")
-                if os.path.exists(app_path) and app_path not in sys.path:
-                    sys.path.insert(0, app_path)
-
-                from core.audio.audio_utils import enhance_voice_quality
+                # Import audio enhancement (app on path via main.py bootstrap)
+                from backend.audio.audio_utils import enhance_voice_quality
 
                 # Enhance audio
                 processed_audio = enhance_voice_quality(
@@ -731,21 +702,19 @@ async def preprocess_reference_audio(
         processed_analysis = None
 
         if req.auto_enhance and improvements_applied:
-            processed_audio_id = f"processed_{profile_id}_{uuid.uuid4().hex[:8]}"
-            processed_path = tempfile.mktemp(suffix=".wav")
+            from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
             # Ensure audio is in correct format
             if processed_audio.dtype != np.float32:
                 processed_audio = processed_audio.astype(np.float32)
             processed_audio = np.clip(processed_audio, -1.0, 1.0)
 
-            # Save processed audio
-            sf.write(processed_path, processed_audio, sample_rate)
-
-            # Register audio file
-            from .voice import _register_audio_file
-
-            _register_audio_file(processed_audio_id, processed_path)
+            processed_audio_id, _, _ = create_audio_artifact_from_wav_array(
+                processed_audio,
+                sample_rate,
+                created_by="profiles_preprocess",
+                audio_id=f"processed_{profile_id}_{uuid.uuid4().hex[:8]}",
+            )
 
             processed_audio_url = f"/api/voice/audio/{processed_audio_id}"
 

@@ -6,8 +6,8 @@ Endpoints for managing timeline markers for navigation and organization.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/markers", tags=["markers"])
 
-# In-memory markers storage (replace with database in production)
-from backend.api.routes._persistent_store import PersistentStore
+# Use centralized marker store (no route-to-route imports)
+from backend.services.marker_store import get_marker_store
 
-_markers: PersistentStore = PersistentStore("markers")
+_markers = get_marker_store()
 _state_lock = asyncio.Lock()
 _MAX_MARKERS = 10000  # Maximum number of markers to keep
 

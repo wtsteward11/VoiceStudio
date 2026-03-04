@@ -13,33 +13,25 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from backend.services.audio_artifacts import AudioRegistry
+
 from ..optimization import cache_response
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
-# In-memory storage references (replace with database in production)
-_markers: Any = None
-_profiles: Any = None
-_projects: Any = None
-_scripts: Any = None
-_tracks: Any = None
-_audio_storage: Any = None
-STORAGE_AVAILABLE = False
-try:
-    from ..routes.markers import _markers as _m
-    from ..routes.profiles import _profiles as _p
-    from ..routes.script_editor import _scripts as _sc
-    from ..routes.voice import _audio_storage as _as
+# Use backend services (no route-to-route imports)
+from backend.services.marker_store import get_marker_store
+from backend.services.profile_search_service import get_profiles_for_search
+from backend.services.project_search_service import get_projects_for_search
+from backend.services.script_store import get_scripts_for_search
 
-    _markers = _m
-    _profiles = _p
-    _scripts = _sc
-    _audio_storage = _as
-    STORAGE_AVAILABLE = True
-except (ImportError, AttributeError):
-    logger.warning("Storage modules not available for search")
+_markers = get_marker_store()
+_profiles = get_profiles_for_search()
+_projects = get_projects_for_search()
+_scripts = get_scripts_for_search()
+STORAGE_AVAILABLE = True
 
 
 class SearchResultItem(BaseModel):
@@ -162,7 +154,7 @@ def _search_audio_files(query: str, limit: int = 10) -> list[SearchResultItem]:
     query_lower = query.lower()
 
     # Search in audio storage
-    for audio_id, audio_path in _audio_storage.items():
+    for audio_id, audio_path in AudioRegistry.items():
         # Extract filename from path
         import os
 
@@ -185,37 +177,35 @@ def _search_audio_files(query: str, limit: int = 10) -> list[SearchResultItem]:
 
 
 def _search_markers(query: str, limit: int = 10) -> list[SearchResultItem]:
-    """Search timeline markers."""
+    """Search timeline markers (flat store: marker_id -> marker)."""
     if not STORAGE_AVAILABLE:
         return []
 
     results = []
     query_lower = query.lower()
 
-    # Search across all projects
-    for project_id, project_markers in _markers.items():
-        for marker_id, marker in project_markers.items():
-            name = marker.get("name", "")
-            description = marker.get("description", "")
+    for marker_id, marker in _markers.items():
+        name = marker.get("name", "")
+        description = marker.get("description", "")
 
-            if query_lower in name.lower() or query_lower in description.lower():
-                preview_parts = []
-                if query_lower in name.lower():
-                    preview_parts.append(f"Name: {name}")
-                if description and query_lower in description.lower():
-                    preview_parts.append(description[:100])
+        if query_lower in name.lower() or query_lower in description.lower():
+            preview_parts = []
+            if query_lower in name.lower():
+                preview_parts.append(f"Name: {name}")
+            if description and query_lower in description.lower():
+                preview_parts.append(description[:100])
 
-                results.append(
-                    SearchResultItem(
-                        id=marker_id,
-                        type="marker",
-                        title=name,
-                        description=description,
-                        panel_id="timeline",
-                        preview=" | ".join(preview_parts) if preview_parts else None,
-                        metadata={"project_id": project_id, "time": marker.get("time")},
-                    )
+            results.append(
+                SearchResultItem(
+                    id=marker_id,
+                    type="marker",
+                    title=name,
+                    description=description,
+                    panel_id="timeline",
+                    preview=" | ".join(preview_parts) if preview_parts else None,
+                    metadata={"project_id": marker.get("project_id"), "time": marker.get("time")},
                 )
+            )
 
     return results[:limit]
 

@@ -11,7 +11,10 @@ import logging
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from backend.api.dependencies import require_synthesis_clearance
+from backend.api.models import ApiOk
 from pydantic import BaseModel
 
 from backend.infrastructure.adapters.job_state_store import get_job_state_store
@@ -133,6 +136,13 @@ class WizardStatusResponse(BaseModel):
     error_message: str | None = None
 
 
+class WizardProcessResponse(BaseModel):
+    """Response from starting wizard processing."""
+
+    message: str
+    job_id: str
+
+
 class WizardFinalizeRequest(BaseModel):
     """Request to finalize wizard and create profile."""
 
@@ -157,17 +167,15 @@ async def validate_audio(request: AudioValidationRequest):
 
         import numpy as np
 
-        from app.core.audio import audio_utils
-
-        from .voice import _audio_storage
+        from backend.audio import audio_utils
+        from backend.services.audio_artifacts import AudioRegistry
 
         # Get audio file path
-        if request.audio_id not in _audio_storage:
+        audio_path = AudioRegistry.get_path(request.audio_id)
+        if not audio_path:
             raise HTTPException(
                 status_code=404, detail=f"Audio file '{request.audio_id}' not found"
             )
-
-        audio_path = _audio_storage[request.audio_id]
         if not os.path.exists(audio_path):
             raise HTTPException(
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
@@ -357,7 +365,10 @@ async def validate_audio(request: AudioValidationRequest):
 
 
 @router.post("/start", response_model=WizardStartResponse, status_code=201)
-async def start_wizard(request: WizardStartRequest):
+async def start_wizard(
+    request: WizardStartRequest,
+    _policy: None = Depends(require_synthesis_clearance),
+):
     """Start a new voice cloning wizard job. Requires consent_acknowledged."""
     if not request.consent_acknowledged:
         raise HTTPException(
@@ -435,8 +446,12 @@ async def get_wizard_status(job_id: str):
         ) from e
 
 
-@router.post("/{job_id}/process")
-async def process_wizard(job_id: str):
+@router.post("/{job_id}/process", response_model=WizardProcessResponse)
+async def process_wizard(
+    job_id: str,
+    http_request: Request,
+    _policy: None = Depends(require_synthesis_clearance),
+):
     """Process voice cloning (move from step 2 to step 3)."""
     try:
         if job_id not in _wizard_jobs:
@@ -462,15 +477,14 @@ async def process_wizard(job_id: str):
         import asyncio
         import os
 
-        from .voice import _audio_storage
+        from backend.services.audio_artifacts import AudioRegistry
 
         async def process_voice_cloning():
             try:
                 # Get reference audio path
-                if job.reference_audio_id not in _audio_storage:
+                audio_path = AudioRegistry.get_path(job.reference_audio_id)
+                if not audio_path:
                     raise ValueError(f"Reference audio '{job.reference_audio_id}' not found")
-
-                audio_path = _audio_storage[job.reference_audio_id]
                 if not os.path.exists(audio_path):
                     raise ValueError(f"Audio file at '{audio_path}' does not exist")
 
@@ -479,27 +493,23 @@ async def process_wizard(job_id: str):
                 job.updated_at = datetime.utcnow().isoformat()
                 _wizard_jobs[job_id] = job
 
-                # Create voice profile using profiles API
-                from ..models_additional import ProfileCreateRequest
-                from .profiles import create_profile
+                # Create voice profile via service (no route-to-route import)
+                from backend.services.profile_service import create_profile_from_request
 
-                profile_request = ProfileCreateRequest(
+                profile_data = create_profile_from_request(
                     name=job.profile_name or f"Wizard Profile {job_id}",
+                    language="en",
                     description=job.profile_description or "Created via Voice Cloning Wizard",
-                    reference_audio_id=job.reference_audio_id,
-                    engine=job.engine,
-                    quality_mode=job.quality_mode,
                 )
-
-                profile_response = await create_profile(profile_request)
-                job.profile_id = profile_response.profile_id
+                job.profile_id = profile_data["id"]
                 job.progress = 0.6
                 job.updated_at = datetime.utcnow().isoformat()
                 _wizard_jobs[job_id] = job
 
                 # Generate test synthesis
+                from backend.voice.services.synthesis_service import SynthesisService
+
                 from ..models_additional import VoiceSynthesizeRequest
-                from .voice import synthesize
 
                 test_text = "Hello, this is a test of the voice cloning system."
                 synth_request = VoiceSynthesizeRequest(
@@ -509,24 +519,18 @@ async def process_wizard(job_id: str):
                     language="en",
                 )
 
-                synth_response = await synthesize(synth_request)
+                synth_response = await SynthesisService.synthesize(synth_request, http_request, config_service=None)
                 job.test_synthesis_audio_id = synth_response.audio_id
                 job.test_synthesis_audio_url = synth_response.audio_url
                 job.progress = 0.8
                 job.updated_at = datetime.utcnow().isoformat()
                 _wizard_jobs[job_id] = job
 
-                # Calculate quality metrics
+                # Calculate quality metrics (via service, no route import)
                 try:
-                    from ..models_additional import AudioAnalysisRequest
-                    from .voice import analyze_audio
+                    from backend.services.audio_analysis_service import analyze_audio_metrics
 
-                    analysis_request = AudioAnalysisRequest(
-                        audio_id=job.test_synthesis_audio_id,
-                        metrics=["mos", "similarity", "naturalness", "snr"],
-                    )
-                    analysis_response = await analyze_audio(analysis_request)
-                    job.quality_metrics = analysis_response.metrics
+                    job.quality_metrics = await analyze_audio_metrics(job.test_synthesis_audio_id)
                 except Exception as e:
                     logger.warning(f"Failed to calculate quality metrics: {e}")
                     job.quality_metrics = {
@@ -566,7 +570,7 @@ async def process_wizard(job_id: str):
         # Start processing in background
         asyncio.create_task(process_voice_cloning())
 
-        return {"message": "Processing started", "job_id": job_id}
+        return WizardProcessResponse(message="Processing started", job_id=job_id)
     except HTTPException:
         raise
     except Exception as e:
@@ -626,7 +630,7 @@ async def finalize_wizard(job_id: str, request: WizardFinalizeRequest):
         ) from e
 
 
-@router.delete("/{job_id}")
+@router.delete("/{job_id}", response_model=ApiOk)
 async def delete_wizard_job(job_id: str):
     """Delete a wizard job."""
     try:
@@ -636,7 +640,7 @@ async def delete_wizard_job(job_id: str):
         del _wizard_jobs[job_id]
         logger.info(f"Deleted wizard job: {job_id}")
 
-        return {"message": f"Wizard job '{job_id}' deleted successfully"}
+        return ApiOk(ok=True, message=f"Wizard job '{job_id}' deleted successfully")
     except HTTPException:
         raise
     except Exception as e:

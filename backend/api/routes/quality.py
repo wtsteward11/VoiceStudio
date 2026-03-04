@@ -5,12 +5,12 @@ Quality optimization, presets, and comparison endpoints
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import tempfile
 import uuid
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Optional
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
@@ -27,39 +27,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/quality", tags=["quality"])
 
-# Quality optimization via EngineService (ADR-008 compliant)
-HAS_QUALITY_OPTIMIZATION = False
-HAS_QUALITY_PRESETS = False
-HAS_QUALITY_COMPARISON = False
-_quality_engine_service: Any = None
-
-try:
-    _quality_engine_service = get_engine_service()
-    presets = _quality_engine_service.get_quality_presets()
-    HAS_QUALITY_PRESETS = len(presets) > 0
-    HAS_QUALITY_OPTIMIZATION = True
-    HAS_QUALITY_COMPARISON = True
-    logger.info(f"Quality EngineService initialized with {len(presets)} presets")
-except Exception as e:
-    logger.warning(f"Quality optimization modules not available: {e}")
-
-try:
-    from app.core.engines.quality_comparison import QualityComparison as QualityComparison
-    from app.core.engines.quality_optimizer import QualityOptimizer as QualityOptimizer
-    from app.core.engines.quality_optimizer import (
-        optimize_synthesis_for_quality as optimize_synthesis_for_quality,
-    )
-    from app.core.engines.quality_presets import get_preset_description as get_preset_description
-    from app.core.engines.quality_presets import (
-        get_preset_target_metrics as get_preset_target_metrics,
-    )
-    from app.core.engines.quality_presets import get_quality_preset as get_quality_preset
-    from app.core.engines.quality_presets import (
-        get_synthesis_params_from_preset as get_synthesis_params_from_preset,
-    )
-    from app.core.engines.quality_presets import list_quality_presets as list_quality_presets
-except ImportError:  # ALLOWED: bare except - optional quality presets
-    pass
+# Quality logic lives in backend.services.quality_service (no route imports)
 
 
 # Request/Response Models
@@ -201,59 +169,16 @@ class QualityTrendsResponse(BaseModel):
     worst_entry: QualityHistoryEntry | None = None
 
 
-# In-memory storage for quality history (replace with database in production)
-_quality_history: dict[str, list[QualityHistoryEntry]] = {}  # profile_id -> list of entries
-_state_lock = asyncio.Lock()
-_MAX_HISTORY_ENTRIES_PER_PROFILE = 1000  # Maximum entries per profile
-_MAX_TOTAL_ENTRIES = 10000  # Maximum total entries across all profiles
-
-
-def _cleanup_old_history():
-    """
-    Clean up old quality history entries to prevent memory accumulation.
-
-    Removes oldest entries when limits are exceeded.
-    """
-    global _quality_history
-
-    # First, clean up per-profile limits
-    for profile_id, entries in list(_quality_history.items()):
-        if len(entries) > _MAX_HISTORY_ENTRIES_PER_PROFILE:
-            # Sort by timestamp (oldest first) and remove excess
-            entries.sort(key=lambda e: e.timestamp)
-            excess = len(entries) - _MAX_HISTORY_ENTRIES_PER_PROFILE
-            _quality_history[profile_id] = entries[excess:]
-            logger.debug(
-                f"Cleaned up {excess} old quality history entries for profile {profile_id}"
-            )
-
-    # Then, clean up total limit across all profiles
-    total_entries = sum(len(entries) for entries in _quality_history.values())
-    if total_entries > _MAX_TOTAL_ENTRIES:
-        # Collect all entries with profile_id for sorting
-        all_entries = []
-        for profile_id, entries in _quality_history.items():
-            for entry in entries:
-                all_entries.append((profile_id, entry))
-
-        # Sort by timestamp (oldest first)
-        all_entries.sort(key=lambda x: x[1].timestamp)
-
-        # Remove oldest entries until under limit
-        excess = total_entries - _MAX_TOTAL_ENTRIES
-        removed = 0
-        for profile_id, entry in all_entries[:excess]:
-            if profile_id in _quality_history:
-                try:
-                    _quality_history[profile_id].remove(entry)
-                    removed += 1
-                except ValueError:
-                    pass  # Entry already removed
-
-        # Clean up empty profiles
-        _quality_history = {pid: entries for pid, entries in _quality_history.items() if entries}
-
-        logger.debug(f"Cleaned up {removed} old quality history entries globally")
+# Quality history: service owns storage and cleanup
+from backend.services.quality_history_service import (
+    get_entries as get_quality_history_entries,
+)
+from backend.services.quality_history_service import (
+    get_quality_history,
+)
+from backend.services.quality_history_service import (
+    store_entry as store_quality_history_entry,
+)
 
 
 @router.get("/presets", response_model=dict[str, QualityPresetResponse])
@@ -265,28 +190,21 @@ async def list_presets():
     Returns:
         Dictionary of preset names to preset configurations
     """
-    if not HAS_QUALITY_PRESETS:
-        raise HTTPException(status_code=503, detail="Quality presets not available")
-
     try:
-        presets = list_quality_presets()
-        result = {}
+        from backend.services.quality_service import list_presets_with_details
 
-        for name, config in presets.items():
-            # Get synthesis parameters for default engine
-            params = get_synthesis_params_from_preset(name)
-            result[name] = QualityPresetResponse(
-                name=name,
-                description=config.get("description", ""),
-                target_metrics=config.get("target_metrics", {}),
-                parameters=params,
-            )
-
-        return result
-
+        presets = list_presets_with_details()
+        return {
+            name: QualityPresetResponse(**info)
+            for name, info in presets.items()
+        }
+    except RuntimeError as e:
+        if "not available" in str(e).lower():
+            raise HTTPException(status_code=503, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Failed to list presets: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/presets/{preset_name}", response_model=QualityPresetResponse)
@@ -301,28 +219,20 @@ async def get_preset(preset_name: str):
     Returns:
         Preset configuration
     """
-    if not HAS_QUALITY_PRESETS:
-        raise HTTPException(status_code=503, detail="Quality presets not available")
-
     try:
-        preset = get_quality_preset(preset_name)
-        if not preset:
-            raise HTTPException(status_code=404, detail=f"Preset '{preset_name}' not found")
+        from backend.services.quality_service import get_preset_info
 
-        params = get_synthesis_params_from_preset(preset_name)
-
-        return QualityPresetResponse(
-            name=preset_name,
-            description=get_preset_description(preset_name),
-            target_metrics=get_preset_target_metrics(preset_name),
-            parameters=params,
-        )
-
-    except HTTPException:
-        raise
+        info = get_preset_info(preset_name)
+        return QualityPresetResponse(**info)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except RuntimeError as e:
+        if "not available" in str(e).lower():
+            raise HTTPException(status_code=503, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Failed to get preset: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/analyze", response_model=QualityAnalysisResponse)
@@ -336,33 +246,35 @@ async def analyze_quality(req: QualityAnalysisRequest):
     Returns:
         Analysis results with recommendations
     """
-    if not HAS_QUALITY_OPTIMIZATION:
-        raise HTTPException(status_code=503, detail="Quality optimization not available")
-
     try:
-        metrics = {
-            "mos_score": req.mos_score,
-            "similarity": req.similarity,
-            "naturalness": req.naturalness,
-            "snr_db": req.snr_db,
-        }
-
-        # Remove None values
-        metrics = {k: v for k, v in metrics.items() if v is not None}
-
-        optimizer = QualityOptimizer(target_tier=req.target_tier)
-        analysis = optimizer.analyze_quality(metrics)
-
-        return QualityAnalysisResponse(
-            meets_target=analysis["meets_target"],
-            quality_score=analysis["quality_score"],
-            deficiencies=analysis["deficiencies"],
-            recommendations=analysis["recommendations"],
+        from backend.services.quality_service import (
+            QualityAnalysisRequest as ServiceRequest,
+        )
+        from backend.services.quality_service import (
+            analyze_quality as svc_analyze,
         )
 
+        service_req = ServiceRequest(
+            mos_score=req.mos_score,
+            similarity=req.similarity,
+            naturalness=req.naturalness,
+            snr_db=req.snr_db,
+            target_tier=req.target_tier,
+        )
+        result = await svc_analyze(service_req)
+        return QualityAnalysisResponse(
+            meets_target=result.meets_target,
+            quality_score=result.quality_score,
+            deficiencies=result.deficiencies,
+            recommendations=result.recommendations,
+        )
+    except RuntimeError as e:
+        if "not available" in str(e).lower():
+            raise HTTPException(status_code=503, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Quality analysis failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/optimize", response_model=QualityOptimizationResponse)
@@ -376,24 +288,25 @@ async def optimize_quality(req: QualityOptimizationRequest):
     Returns:
         Optimized parameters and analysis
     """
-    if not HAS_QUALITY_OPTIMIZATION:
-        raise HTTPException(status_code=503, detail="Quality optimization not available")
-
     try:
-        optimized_params, analysis = optimize_synthesis_for_quality(
+        from backend.services.quality_service import optimize_quality as svc_optimize
+
+        optimized_params, analysis = svc_optimize(
             metrics=req.metrics,
             current_params=req.current_params,
             target_tier=req.target_tier,
         )
-
         return QualityOptimizationResponse(
             optimized_params=optimized_params,
             analysis=analysis,
         )
-
+    except RuntimeError as e:
+        if "not available" in str(e).lower():
+            raise HTTPException(status_code=503, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Quality optimization failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/compare", response_model=QualityComparisonResponse)
@@ -411,13 +324,9 @@ async def compare_quality(
     Returns:
         Comparison results with rankings and statistics
     """
-    if not HAS_QUALITY_COMPARISON:
-        raise HTTPException(status_code=503, detail="Quality comparison not available")
-
     try:
-        comparison = QualityComparison()
+        from backend.services.quality_service import compare_quality_samples
 
-        # Save and validate reference audio if provided
         ref_path = None
         if reference_audio:
             ref_content = await reference_audio.read()
@@ -432,9 +341,8 @@ async def compare_quality(
                 ref_file.write(ref_content)
                 ref_path = ref_file.name
 
-        # Process each audio file
+        samples = []
         for audio_file in audio_files:
-            # Read and validate audio file
             content = await audio_file.read()
             try:
                 validate_audio_file(content, filename=audio_file.filename)
@@ -443,26 +351,16 @@ async def compare_quality(
                     status_code=400,
                     detail=f"Invalid audio file '{audio_file.filename}': {e.message}",
                 ) from e
-            # Save to temporary file
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
                 tmp_file.write(content)
                 tmp_path = tmp_file.name
-
-            # Add to comparison
             metadata = {
                 "filename": audio_file.filename,
                 "content_type": audio_file.content_type,
             }
-            comparison.add_sample(
-                name=audio_file.filename or f"sample_{len(comparison.comparisons)}",
-                audio=tmp_path,
-                reference_audio=ref_path,
-                metadata=metadata,
-            )
+            samples.append((audio_file.filename or f"sample_{len(samples)}", tmp_path, ref_path, metadata))
 
-        # Compare
-        results = comparison.compare()
-
+        results = compare_quality_samples(samples)
         return QualityComparisonResponse(
             total_samples=results["total_samples"],
             rankings=results["rankings"],
@@ -470,10 +368,13 @@ async def compare_quality(
             best_samples=results["best_samples"],
             comparison_table=results["comparison_table"],
         )
-
+    except RuntimeError as e:
+        if "not available" in str(e).lower():
+            raise HTTPException(status_code=503, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Quality comparison failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/engine-recommendation")
@@ -496,34 +397,34 @@ async def get_engine_recommendation(
     Returns:
         Recommended engine name and reasoning
     """
-    if not HAS_QUALITY_OPTIMIZATION:
-        raise HTTPException(status_code=503, detail="Quality optimization not available")
-
     try:
-        optimizer = QualityOptimizer(target_tier=target_tier)
+        from backend.services.quality_service import suggest_engine
 
-        # Build target metrics
         target_metrics = {}
-        if min_mos_score:
+        if min_mos_score is not None:
             target_metrics["mos_score"] = min_mos_score
-        if min_similarity:
+        if min_similarity is not None:
             target_metrics["similarity"] = min_similarity
-        if min_naturalness:
+        if min_naturalness is not None:
             target_metrics["naturalness"] = min_naturalness
 
-        # Get recommendation
-        recommended_engine = optimizer.suggest_engine(target_metrics if target_metrics else None)
-
+        recommended_engine = suggest_engine(
+            target_tier=target_tier,
+            target_metrics=target_metrics if target_metrics else None,
+        )
         return {
             "recommended_engine": recommended_engine,
             "target_tier": target_tier,
-            "target_metrics": target_metrics or optimizer.target_metrics,
+            "target_metrics": target_metrics,
             "reasoning": f"Engine '{recommended_engine}' best matches quality requirements for tier '{target_tier}'",
         }
-
+    except RuntimeError as e:
+        if "not available" in str(e).lower():
+            raise HTTPException(status_code=503, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Engine recommendation failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/benchmark", response_model=BenchmarkResponse)
@@ -540,153 +441,34 @@ async def run_benchmark(request: BenchmarkRequest):
         Benchmark results for all engines
     """
     try:
-        # Get engine service (ADR-008 compliant)
-        import os
+        from backend.services.quality_benchmark_service import (
+            BenchmarkReferenceNotFoundError,
+            resolve_benchmark_reference,
+        )
+        from backend.services.quality_benchmark_service import (
+            run_benchmark as run_benchmark_svc,
+        )
 
-        engine_service = get_engine_service()
-
-        # Get reference audio path
-        reference_audio_path = None
-        if request.reference_audio_id:
-            # Get audio file path from storage
-            from ..routes.voice import _audio_storage
-
-            if request.reference_audio_id in _audio_storage:
-                reference_audio_path = _audio_storage[request.reference_audio_id]
-            else:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Reference audio {request.reference_audio_id} not found",
-                )
-        elif request.profile_id:
-            # Get profile reference audio
-            from ..routes.profiles import _profiles
-
-            if request.profile_id in _profiles:
-                profile = _profiles[request.profile_id]
-                if profile.get("reference_audio_url"):
-                    # Extract file path from URL or storage
-                    reference_audio_path = profile["reference_audio_url"]
-                else:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"Profile {request.profile_id} has no reference audio",
-                    )
-            else:
-                raise HTTPException(
-                    status_code=404, detail=f"Profile {request.profile_id} not found"
-                )
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="Either profile_id or reference_audio_id must be provided",
+        try:
+            reference_audio_path = resolve_benchmark_reference(
+                request.profile_id, request.reference_audio_id
             )
+        except BenchmarkReferenceNotFoundError as e:
+            raise HTTPException(status_code=e.status_code, detail=e.message) from e
 
-        if not os.path.exists(reference_audio_path):
-            raise HTTPException(
-                status_code=404,
-                detail=f"Reference audio file not found: {reference_audio_path}",
-            )
-
-        # Determine which engines to benchmark
-        engines_to_test = request.engines or ["xtts", "chatterbox", "tortoise"]
-
-        results = []
-        successful_count = 0
-
-        # Benchmark each engine
-        for engine_name in engines_to_test:
-            engine_result = BenchmarkResult(engine=engine_name, success=False)
-
-            try:
-                # Get engine instance via EngineService (ADR-008 compliant)
-                engine_instance = engine_service.get_engine(engine_name.lower())
-                if engine_instance is None:
-                    engine_result.error = f"Engine not available: {engine_name}"
-                    results.append(engine_result)
-                    continue
-
-                # Initialize engine
-                import time
-
-                init_start = time.time()
-                if not engine_instance.is_initialized():
-                    engine_instance.initialize()
-                init_time = time.time() - init_start
-
-                # Synthesize
-                synth_start = time.time()
-                if engine_name.lower() == "xtts":
-                    audio, metrics = engine_instance.synthesize(
-                        text=request.test_text,
-                        speaker_wav=reference_audio_path,
-                        language=request.language,
-                        enhance_quality=request.enhance_quality,
-                        calculate_quality=True,
-                    )
-                elif engine_name.lower() == "chatterbox":
-                    audio, metrics = engine_instance.synthesize(
-                        text=request.test_text,
-                        reference_audio=reference_audio_path,
-                        language=request.language,
-                        enhance_quality=request.enhance_quality,
-                        calculate_quality=True,
-                    )
-                elif engine_name.lower() == "tortoise":
-                    audio, metrics = engine_instance.synthesize(
-                        text=request.test_text,
-                        speaker_wav=reference_audio_path,
-                        enhance_quality=request.enhance_quality,
-                        calculate_quality=True,
-                    )
-
-                synth_time = time.time() - synth_start
-
-                # Calculate metrics if not provided
-                if not metrics or not isinstance(metrics, dict):
-                    import soundfile as sf
-
-                    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-                        sf.write(tmp.name, audio, 22050)
-                        tmp_path = tmp.name
-
-                    try:
-                        # Calculate metrics via EngineService
-                        all_metrics = engine_service.calculate_all_metrics(
-                            audio=tmp_path,
-                            reference=reference_audio_path,
-                        )
-                        metrics = all_metrics
-                    finally:
-                        if os.path.exists(tmp_path):
-                            os.unlink(tmp_path)
-
-                # Build result
-                engine_result.success = True
-                engine_result.quality_metrics = metrics if metrics else {}
-                engine_result.performance = {
-                    "initialization_time": init_time,
-                    "synthesis_time": synth_time,
-                    "total_time": init_time + synth_time,
-                }
-                successful_count += 1
-
-            except Exception as e:
-                logger.error(f"Benchmark failed for {engine_name}: {e}")
-                engine_result.error = str(e)
-
-            results.append(engine_result)
-
-        # Generate benchmark ID for tracking
-        import uuid
-
-        benchmark_id = str(uuid.uuid4())
+        data = run_benchmark_svc(
+            reference_audio_path=reference_audio_path,
+            test_text=request.test_text,
+            language=request.language,
+            engines=request.engines,
+            enhance_quality=request.enhance_quality,
+        )
 
         return BenchmarkResponse(
-            results=results,
-            total_engines=len(engines_to_test),
-            successful_engines=successful_count,
-            benchmark_id=benchmark_id,
+            results=[BenchmarkResult(**r) for r in data["results"]],
+            total_engines=data["total_engines"],
+            successful_engines=data["successful_engines"],
+            benchmark_id=data["benchmark_id"],
         )
 
     except HTTPException:
@@ -712,202 +494,11 @@ async def get_quality_dashboard(project_id: str | None = None, days: int = 30) -
         Dashboard data with overview, trends, distribution, and alerts
     """
     try:
-        from datetime import datetime, timedelta
+        from backend.services.quality_dashboard_service import get_dashboard_data
+        from backend.services.quality_history_service import get_all_entries_flat
 
-        # Get all quality history entries
-        all_entries = []
-        for _profile_id, entries in _quality_history.items():
-            all_entries.extend(entries)
-
-        # Filter by date range
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
-        recent_entries = [
-            e
-            for e in all_entries
-            if datetime.fromisoformat(e.timestamp.replace("Z", "+00:00")) >= cutoff_date
-        ]
-
-        # Filter by project if specified (B.1 enhancement - project_id now a first-class field)
-        if project_id:
-            filtered_entries = []
-            for entry in recent_entries:
-                # Check direct project_id field first (new entries)
-                if hasattr(entry, "project_id") and entry.project_id == project_id:
-                    filtered_entries.append(entry)
-                # Fallback: check metadata for backward compatibility (legacy entries)
-                elif hasattr(entry, "metadata") and isinstance(entry.metadata, dict):
-                    if entry.metadata.get("project_id") == project_id:
-                        filtered_entries.append(entry)
-            # Only use filtered entries if we found matches, otherwise return empty
-            # (this is stricter than before - if project_id is specified, we respect it)
-            recent_entries = filtered_entries
-
-        if not recent_entries:
-            return {
-                "overview": {
-                    "total_samples": 0,
-                    "average_mos": 0.0,
-                    "average_similarity": 0.0,
-                    "average_naturalness": 0.0,
-                },
-                "trends": {
-                    "mos_trend": [],
-                    "similarity_trend": [],
-                    "naturalness_trend": [],
-                },
-                "distribution": {
-                    "mos_distribution": {},
-                    "quality_tiers": {"excellent": 0, "good": 0, "fair": 0, "poor": 0},
-                },
-                "alerts": [],
-                "insights": [],
-            }
-
-        # Calculate overview metrics
-        mos_scores = [
-            e.metrics.get("mos_score", 0) for e in recent_entries if e.metrics.get("mos_score")
-        ]
-        similarity_scores = [
-            e.metrics.get("similarity", 0) for e in recent_entries if e.metrics.get("similarity")
-        ]
-        naturalness_scores = [
-            e.metrics.get("naturalness", 0) for e in recent_entries if e.metrics.get("naturalness")
-        ]
-
-        avg_mos = sum(mos_scores) / len(mos_scores) if mos_scores else 0.0
-        avg_similarity = (
-            sum(similarity_scores) / len(similarity_scores) if similarity_scores else 0.0
-        )
-        avg_naturalness = (
-            sum(naturalness_scores) / len(naturalness_scores) if naturalness_scores else 0.0
-        )
-
-        # Calculate trends (daily averages)
-        daily_data: dict[Any, dict[str, list[Any]]] = {}
-        for entry in recent_entries:
-            entry_date = datetime.fromisoformat(entry.timestamp.replace("Z", "+00:00")).date()
-            if entry_date not in daily_data:
-                daily_data[entry_date] = {
-                    "mos": [],
-                    "similarity": [],
-                    "naturalness": [],
-                }
-
-            if entry.metrics.get("mos_score"):
-                daily_data[entry_date]["mos"].append(entry.metrics["mos_score"])
-            if entry.metrics.get("similarity"):
-                daily_data[entry_date]["similarity"].append(entry.metrics["similarity"])
-            if entry.metrics.get("naturalness"):
-                daily_data[entry_date]["naturalness"].append(entry.metrics["naturalness"])
-
-        # Build trend data
-        sorted_dates = sorted(daily_data.keys())
-        mos_trend = [
-            {
-                "date": str(d),
-                "value": (
-                    sum(daily_data[d]["mos"]) / len(daily_data[d]["mos"])
-                    if daily_data[d]["mos"]
-                    else 0.0
-                ),
-            }
-            for d in sorted_dates
-        ]
-        similarity_trend = [
-            {
-                "date": str(d),
-                "value": (
-                    sum(daily_data[d]["similarity"]) / len(daily_data[d]["similarity"])
-                    if daily_data[d]["similarity"]
-                    else 0.0
-                ),
-            }
-            for d in sorted_dates
-        ]
-        naturalness_trend = [
-            {
-                "date": str(d),
-                "value": (
-                    sum(daily_data[d]["naturalness"]) / len(daily_data[d]["naturalness"])
-                    if daily_data[d]["naturalness"]
-                    else 0.0
-                ),
-            }
-            for d in sorted_dates
-        ]
-
-        # Calculate distribution
-        mos_distribution: dict[int, int] = {}
-        for score in mos_scores:
-            bucket = int(score)
-            mos_distribution[bucket] = mos_distribution.get(bucket, 0) + 1
-
-        # Quality tiers
-        excellent = sum(1 for s in mos_scores if s >= 4.5)
-        good = sum(1 for s in mos_scores if 3.5 <= s < 4.5)
-        fair = sum(1 for s in mos_scores if 2.5 <= s < 3.5)
-        poor = sum(1 for s in mos_scores if s < 2.5)
-
-        # Generate alerts
-        alerts = []
-        if avg_mos < 3.0:
-            alerts.append(
-                {
-                    "type": "warning",
-                    "message": f"Average MOS score ({avg_mos:.2f}) is below acceptable threshold (3.0)",
-                    "severity": "high",
-                }
-            )
-        if avg_similarity < 0.7:
-            alerts.append(
-                {
-                    "type": "warning",
-                    "message": f"Average similarity ({avg_similarity:.2f}) is below target (0.7)",
-                    "severity": "medium",
-                }
-            )
-
-        # Generate insights
-        insights = []
-        if len(recent_entries) > 10:
-            insights.append(
-                {
-                    "type": "statistic",
-                    "message": f"Analyzed {len(recent_entries)} quality samples over the last {days} days",
-                }
-            )
-        if avg_mos >= 4.0:
-            insights.append(
-                {
-                    "type": "positive",
-                    "message": "Quality metrics are above target thresholds",
-                }
-            )
-
-        return {
-            "overview": {
-                "total_samples": len(recent_entries),
-                "average_mos": round(avg_mos, 2),
-                "average_similarity": round(avg_similarity, 2),
-                "average_naturalness": round(avg_naturalness, 2),
-            },
-            "trends": {
-                "mos_trend": mos_trend,
-                "similarity_trend": similarity_trend,
-                "naturalness_trend": naturalness_trend,
-            },
-            "distribution": {
-                "mos_distribution": mos_distribution,
-                "quality_tiers": {
-                    "excellent": excellent,
-                    "good": good,
-                    "fair": fair,
-                    "poor": poor,
-                },
-            },
-            "alerts": alerts,
-            "insights": insights,
-        }
+        all_entries = get_all_entries_flat()
+        return get_dashboard_data(all_entries, project_id=project_id, days=days)
     except Exception as e:
         logger.error(f"Failed to generate quality dashboard: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to generate dashboard: {e!s}")
@@ -935,7 +526,7 @@ async def store_quality_history(request: QualityHistoryRequest):
             id=str(uuid.uuid4()),
             profile_id=request.profile_id,
             project_id=request.project_id,
-            timestamp=datetime.utcnow().isoformat() + "Z",
+            timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             engine=request.engine,
             metrics=request.metrics,
             quality_score=request.quality_score,
@@ -945,15 +536,8 @@ async def store_quality_history(request: QualityHistoryRequest):
             metadata=request.metadata,
         )
 
-        # Store entry
-        if request.profile_id not in _quality_history:
-            _quality_history[request.profile_id] = []
-
-        _quality_history[request.profile_id].append(entry)
-
-        # Cleanup old entries periodically
-        if len(_quality_history[request.profile_id]) % 100 == 0:
-            _cleanup_old_history()
+        # Store entry (service handles cleanup)
+        store_quality_history_entry(request.profile_id, entry)
 
         logger.debug(f"Stored quality history entry {entry.id} for profile {request.profile_id}")
 
@@ -989,7 +573,7 @@ async def get_quality_history(
         Quality history entries for the profile
     """
     try:
-        entries = _quality_history.get(profile_id, [])
+        entries = get_quality_history_entries(profile_id)
 
         # Apply project_id filter if provided (B.1 enhancement)
         if project_id:
@@ -1037,109 +621,15 @@ async def get_quality_trends(profile_id: str, time_range: str = "30d"):
     Get quality trends for a voice profile.
 
     Implements IDEA 30: Voice Profile Quality History.
-    Calculates trends, statistics, and identifies best/worst samples.
-
-    Args:
-        profile_id: Voice profile ID
-        time_range: Time range for trends (7d, 30d, 90d, 1y, all)
-
-    Returns:
-        Quality trends and statistics for the profile
+    Delegates to quality_trends_service for trends, statistics, best/worst.
     """
     try:
-        entries = _quality_history.get(profile_id, [])
-
-        if not entries:
-            return QualityTrendsResponse(
-                profile_id=profile_id,
-                time_range=time_range,
-                trends={},
-                statistics={},
-                best_entry=None,
-                worst_entry=None,
-            )
-
-        # Calculate days from time range
-        days = {"7d": 7, "30d": 30, "90d": 90, "1y": 365, "all": 999999}.get(time_range, 30)
-
-        # Filter entries by time range
-        from datetime import datetime, timedelta
-
-        cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat() + "Z"
-        filtered_entries = [e for e in entries if e.timestamp >= cutoff_date or time_range == "all"]
-
-        if not filtered_entries:
-            return QualityTrendsResponse(
-                profile_id=profile_id,
-                time_range=time_range,
-                trends={},
-                statistics={},
-                best_entry=None,
-                worst_entry=None,
-            )
-
-        # Build trends for each metric
-        metrics_to_track = ["mos_score", "similarity", "naturalness", "quality_score"]
-        trends: dict[str, list[dict[str, Any]]] = {}
-        statistics: dict[str, dict[str, float]] = {}
-
-        for metric in metrics_to_track:
-            metric_values: list[dict[str, Any]] = []
-            for entry in filtered_entries:
-                # Get metric value from entry
-                value = None
-                if metric == "quality_score":
-                    value = entry.quality_score
-                elif metric in entry.metrics:
-                    val = entry.metrics[metric]
-                    if isinstance(val, (int, float)):
-                        value = float(val)
-
-                if value is not None:
-                    metric_values.append({"timestamp": entry.timestamp, "value": value})
-
-            # Sort by timestamp
-            metric_values.sort(key=lambda x: str(x["timestamp"]))
-
-            trends[metric] = metric_values
-
-            # Calculate statistics
-            if metric_values:
-                values: list[float] = [float(v["value"]) for v in metric_values]
-                avg = sum(values) / len(values)
-                min_val = min(values)
-                max_val = max(values)
-
-                # Calculate trend (slope of linear regression)
-                trend = 0.0
-                if len(values) > 1:
-                    x_mean = (len(values) - 1) / 2.0
-                    y_mean = avg
-                    numerator = sum((i - x_mean) * (values[i] - y_mean) for i in range(len(values)))
-                    denominator = sum((i - x_mean) ** 2 for i in range(len(values)))
-                    if denominator != 0:
-                        trend = numerator / denominator
-
-                statistics[metric] = {
-                    "avg": avg,
-                    "min": min_val,
-                    "max": max_val,
-                    "trend": trend,
-                }
-
-        # Find best and worst entries (by quality_score)
-        best_entry = max(filtered_entries, key=lambda e: e.quality_score, default=None)
-        worst_entry = min(filtered_entries, key=lambda e: e.quality_score, default=None)
-
-        return QualityTrendsResponse(
-            profile_id=profile_id,
-            time_range=time_range,
-            trends=trends,
-            statistics=statistics,
-            best_entry=best_entry,
-            worst_entry=worst_entry,
+        from backend.services.quality_trends_service import (
+            get_quality_trends as compute_quality_trends,
         )
 
+        result = compute_quality_trends(profile_id, time_range)
+        return QualityTrendsResponse(**result)
     except Exception as e:
         logger.error(f"Failed to get quality trends: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get quality trends: {e!s}")
@@ -1204,7 +694,7 @@ async def analyze_text_endpoint(request: TextAnalysisRequest):
         Text analysis results
     """
     try:
-        from api.utils.text_analysis import analyze_text
+        from backend.services.quality_text_service import analyze_text
 
         result = analyze_text(request.text, request.language or "en")
 
@@ -1230,8 +720,7 @@ async def recommend_quality_endpoint(request: QualityRecommendationRequest):
         Quality recommendations with reasoning
     """
     try:
-        from api.utils.quality_recommendations import recommend_quality_settings
-        from api.utils.text_analysis import analyze_text
+        from backend.services.quality_text_service import analyze_text, recommend_quality_settings
 
         # Analyze text
         text_analysis = analyze_text(request.text, request.language or "en")
@@ -1323,12 +812,10 @@ async def check_quality_degradation(
         QualityDegradationResponse with alerts if any detected
     """
     try:
-        from api.utils.quality_degradation import (
-            detect_quality_degradation,
-        )
+        from backend.services.quality_degradation_service import detect_quality_degradation
 
         # Get quality history
-        entries = _quality_history.get(profile_id, [])
+        entries = get_quality_history_entries(profile_id)
         if not entries:
             return QualityDegradationResponse(
                 profile_id=profile_id,
@@ -1372,7 +859,7 @@ async def check_quality_degradation(
         raise HTTPException(status_code=500, detail=f"Failed to check quality degradation: {e!s}")
 
 
-@router.get("/baseline/{profile_id}", response_model=QualityBaselineResponse | None)
+@router.get("/baseline/{profile_id}", response_model=Optional[QualityBaselineResponse])
 async def get_quality_baseline(profile_id: str, time_period_days: int = 30):
     """
     Get quality baseline for a voice profile (IDEA 56).
@@ -1387,10 +874,10 @@ async def get_quality_baseline(profile_id: str, time_period_days: int = 30):
         QualityBaselineResponse with baseline data
     """
     try:
-        from api.utils.quality_degradation import calculate_quality_baseline
+        from backend.services.quality_degradation_service import calculate_quality_baseline
 
         # Get quality history
-        entries = _quality_history.get(profile_id, [])
+        entries = get_quality_history_entries(profile_id)
         if not entries:
             return None
 
@@ -1491,7 +978,7 @@ async def set_quality_standard(request: QualityStandardRequest):
         Success message
     """
     try:
-        from api.utils.quality_consistency import get_quality_consistency_monitor
+        from backend.services.quality_consistency_service import get_quality_consistency_monitor
 
         monitor = get_quality_consistency_monitor()
         success = monitor.set_quality_standard(request.project_id, request.standard_name)
@@ -1528,7 +1015,7 @@ async def record_quality_metrics(
         Success message
     """
     try:
-        from api.utils.quality_consistency import get_quality_consistency_monitor
+        from backend.services.quality_consistency_service import get_quality_consistency_monitor
 
         if metrics is None:
             raise HTTPException(status_code=400, detail="Metrics are required")
@@ -1564,7 +1051,7 @@ async def check_project_consistency(project_id: str, time_period_days: int = 30)
         QualityConsistencyReport
     """
     try:
-        from api.utils.quality_consistency import get_quality_consistency_monitor
+        from backend.services.quality_consistency_service import get_quality_consistency_monitor
 
         monitor = get_quality_consistency_monitor()
         report = monitor.check_quality_consistency(project_id, time_period_days)
@@ -1588,7 +1075,7 @@ async def check_all_projects_consistency(time_period_days: int = 30):
         AllProjectsConsistencyResponse
     """
     try:
-        from api.utils.quality_consistency import get_quality_consistency_monitor
+        from backend.services.quality_consistency_service import get_quality_consistency_monitor
 
         monitor = get_quality_consistency_monitor()
         report = monitor.check_all_projects_consistency(time_period_days)
@@ -1630,7 +1117,7 @@ async def get_project_quality_trends(project_id: str, time_period_days: int = 30
         ProjectQualityTrendsResponse
     """
     try:
-        from api.utils.quality_consistency import get_quality_consistency_monitor
+        from backend.services.quality_consistency_service import get_quality_consistency_monitor
 
         monitor = get_quality_consistency_monitor()
         trends = monitor.get_quality_trends(project_id, time_period_days)
@@ -1728,7 +1215,7 @@ async def get_quality_heatmap(request: QualityHeatmapRequest):
         QualityHeatmapResponse
     """
     try:
-        from api.utils.quality_visualization import calculate_quality_heatmap
+        from backend.services.quality_visualization_service import calculate_quality_heatmap
 
         heatmap = calculate_quality_heatmap(
             quality_data=request.quality_data,
@@ -1756,7 +1243,7 @@ async def get_quality_correlations(quality_data: list[dict[str, Any]]):
         QualityCorrelationResponse
     """
     try:
-        from api.utils.quality_visualization import calculate_quality_correlations
+        from backend.services.quality_visualization_service import calculate_quality_correlations
 
         correlations = calculate_quality_correlations(quality_data)
 
@@ -1788,7 +1275,7 @@ async def detect_quality_anomalies_endpoint(
         QualityAnomalyResponse
     """
     try:
-        from api.utils.quality_visualization import detect_quality_anomalies
+        from backend.services.quality_visualization_service import detect_quality_anomalies
 
         anomalies = detect_quality_anomalies(
             quality_data=quality_data, metric=metric, threshold_std=threshold_std
@@ -1819,12 +1306,12 @@ async def predict_quality_endpoint(request: QualityPredictionRequest):
         QualityPredictionResponse
     """
     try:
-        from api.utils.quality_visualization import predict_quality
+        from backend.services.quality_visualization_service import predict_quality
 
         # Use provided quality data or get from consistency monitor
         quality_data = request.quality_data
         if not quality_data:
-            from api.utils.quality_consistency import get_quality_consistency_monitor
+            from backend.services.quality_consistency_service import get_quality_consistency_monitor
 
             monitor = get_quality_consistency_monitor()
             # Get quality history from monitor
@@ -1862,7 +1349,7 @@ async def get_quality_insights(quality_data: list[dict[str, Any]], time_period_d
         QualityInsightsResponse
     """
     try:
-        from api.utils.quality_visualization import generate_quality_insights
+        from backend.services.quality_visualization_service import generate_quality_insights
 
         insights_data = generate_quality_insights(quality_data, time_period_days)
 
@@ -1901,7 +1388,7 @@ async def export_quality_heatmap(
         import csv
         import io
 
-        from api.utils.quality_visualization import calculate_quality_heatmap
+        from backend.services.quality_visualization_service import calculate_quality_heatmap
 
         heatmap = calculate_quality_heatmap(
             quality_data=request.quality_data,
@@ -1967,7 +1454,7 @@ async def export_quality_correlations(
         import csv
         import io
 
-        from api.utils.quality_visualization import calculate_quality_correlations
+        from backend.services.quality_visualization_service import calculate_quality_correlations
 
         correlations = calculate_quality_correlations(quality_data)
 
@@ -2031,7 +1518,7 @@ async def export_quality_anomalies(
         import csv
         import io
 
-        from api.utils.quality_visualization import detect_quality_anomalies
+        from backend.services.quality_visualization_service import detect_quality_anomalies
 
         anomalies = detect_quality_anomalies(
             quality_data=quality_data, metric=metric, threshold_std=threshold_std
@@ -2116,7 +1603,7 @@ async def export_quality_insights(
         import csv
         import io
 
-        from api.utils.quality_visualization import generate_quality_insights
+        from backend.services.quality_visualization_service import generate_quality_insights
 
         insights_data = generate_quality_insights(quality_data, time_period_days)
 

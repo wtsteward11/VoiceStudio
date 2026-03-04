@@ -7,8 +7,8 @@ voice synthesis quality through perceptual testing.
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 import os
 import uuid
 from datetime import datetime
@@ -104,9 +104,9 @@ async def start(req: AbxStartRequest) -> ABXSession:
         # Validate audio files exist (skip validation if no audio storage has been populated yet,
         # which indicates a test environment or fresh startup)
         try:
-            from .voice import _audio_storage
+            from backend.services.audio_artifacts import AudioRegistry
 
-            storage_len = len(_audio_storage) if _audio_storage else 0
+            storage_len = AudioRegistry.count()
             logger.info(f"Audio storage check: length={storage_len}, test_mode={test_mode}")
 
             # Skip validation in test mode OR when storage is empty (likely test/fresh startup)
@@ -115,7 +115,7 @@ async def start(req: AbxStartRequest) -> ABXSession:
             if not skip_validation:
                 missing_audio = []
                 for audio_id in req.items:
-                    if audio_id not in _audio_storage:
+                    if not AudioRegistry.exists(audio_id):
                         missing_audio.append(audio_id)
 
                 if missing_audio:
@@ -125,8 +125,8 @@ async def start(req: AbxStartRequest) -> ABXSession:
             else:
                 logger.info("Skipping audio validation (test mode or empty storage)")
         except ImportError:
-            # voice module not available, skip validation
-            logger.warning("Voice module not available, skipping audio validation")
+            # audio_artifacts module not available, skip validation
+            logger.warning("AudioRegistry not available, skipping audio validation")
 
         # Create ABX session
         session_id = f"abx-{uuid.uuid4().hex[:8]}"

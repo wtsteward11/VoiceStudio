@@ -1,4 +1,4 @@
-﻿"""
+"""
 Engine Service - Abstraction layer for engine operations.
 
 This service provides a clean architecture boundary between API routes and the engine layer.
@@ -191,13 +191,34 @@ class EngineService(IEngineService):
     # -------------------------------------------------------------------------
 
     def list_engines(self) -> List[Dict[str, Any]]:
-        """List all available engines with their metadata."""
+        """List engines with metadata: id, name, type, support_tier."""
         self._ensure_engines_loaded()
         if self._engine_router is None:
             return []
-        
+
         try:
-            return self._engine_router.list_engines()
+            engine_ids = self._engine_router.list_engines()
+            get_manifest = getattr(self._engine_router, "get_manifest", None)
+            if not get_manifest or not engine_ids:
+                return [{"id": eid, "name": eid} for eid in engine_ids]
+
+            result = []
+            for engine_id in engine_ids:
+                manifest = get_manifest(engine_id)
+                if manifest:
+                    result.append({
+                        "id": manifest.get("engine_id", engine_id),
+                        "name": manifest.get("name", engine_id),
+                        "type": manifest.get("subtype") or manifest.get("type", "tts"),
+                        "version": manifest.get("version"),
+                        "description": manifest.get("description"),
+                        "available": True,
+                        "status": None,
+                        "support_tier": manifest.get("support_tier"),
+                    })
+                else:
+                    result.append({"id": engine_id, "name": engine_id})
+            return result
         except Exception:
             return []
 

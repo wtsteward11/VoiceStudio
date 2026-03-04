@@ -377,6 +377,15 @@ def get_path(path_type: str) -> Path:
     elif path_type_lower == "payloads":
         return get_payloads_root()
 
+    elif path_type_lower == "profiles":
+        env_path = os.getenv("VOICESTUDIO_PROFILES_PATH")
+        if env_path:
+            path = Path(env_path)
+        else:
+            path = get_path("data") / "profiles"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
     else:
         raise ValueError(f"Unknown path type: {path_type}")
 

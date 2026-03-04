@@ -13,6 +13,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from backend.config.path_config import get_path
 from backend.infrastructure.adapters.base import Adapter
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ class FileSystemAdapter(Adapter):
         """
         super().__init__("FileSystem")
 
-        self._base_path = base_path or Path("data")
+        self._base_path = base_path or get_path("data")
         self._base_path.mkdir(parents=True, exist_ok=True)
 
     async def connect(self) -> bool:

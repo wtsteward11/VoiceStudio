@@ -346,9 +346,13 @@ class InMemoryJobRepository:
         self._is_fallback = True
         logger.info("Using InMemoryJobRepository fallback (database unavailable)")
 
+    def _active_jobs(self) -> list[JobEntity]:
+        """Jobs not soft-deleted."""
+        return [j for j in self._jobs.values() if j.deleted_at is None]
+
     async def find_all(self, options: QueryOptions | None = None) -> list[JobEntity]:
-        """Get all jobs."""
-        jobs = list(self._jobs.values())
+        """Get all jobs (excluding soft-deleted)."""
+        jobs = self._active_jobs()
         if options:
             if options.order_by:
                 reverse = options.order_desc if options.order_desc else False
@@ -357,13 +361,17 @@ class InMemoryJobRepository:
                 jobs = jobs[: options.limit]
         return jobs
 
+    async def get_all(self, options: QueryOptions | None = None) -> list[JobEntity]:
+        """Get all jobs (alias for find_all for route compatibility)."""
+        return await self.find_all(options)
+
     async def find(
         self, filters: dict[str, Any], options: QueryOptions | None = None
     ) -> list[JobEntity]:
-        """Find jobs matching filters."""
+        """Find jobs matching filters (excluding soft-deleted)."""
         jobs = [
             job
-            for job in self._jobs.values()
+            for job in self._active_jobs()
             if all(getattr(job, k, None) == v for k, v in filters.items())
         ]
         if options and options.limit:
@@ -371,8 +379,9 @@ class InMemoryJobRepository:
         return jobs
 
     async def get_by_id(self, job_id: str) -> JobEntity | None:
-        """Get job by ID."""
-        return self._jobs.get(job_id)
+        """Get job by ID (returns None if soft-deleted)."""
+        job = self._jobs.get(job_id)
+        return job if job and job.deleted_at is None else None
 
     async def create(self, entity: JobEntity) -> JobEntity:
         """Create a new job."""
@@ -390,12 +399,16 @@ class InMemoryJobRepository:
         job.updated_at = datetime.now()
         return job
 
-    async def delete(self, job_id: str) -> bool:
-        """Delete a job."""
-        if job_id in self._jobs:
-            del self._jobs[job_id]
+    async def delete(self, job_id: str, soft: bool = True) -> bool:
+        """Delete a job (soft or hard)."""
+        if job_id not in self._jobs:
+            return False
+        if soft:
+            job = self._jobs[job_id]
+            job.deleted_at = datetime.now()
             return True
-        return False
+        del self._jobs[job_id]
+        return True
 
     async def get_by_status(
         self, status: JobStatus, options: QueryOptions | None = None

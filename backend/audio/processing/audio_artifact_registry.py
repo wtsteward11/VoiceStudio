@@ -149,6 +149,14 @@ class AudioArtifactRegistry:
                 del self._records[audio_id]
                 self._persist()
 
+    def get_entries_sorted_by_age(self) -> list[tuple[str, float]]:
+        """Return [(audio_id, created_at_epoch), ...] sorted by oldest first for LRU cleanup."""
+        with self._lock:
+            return sorted(
+                [(k, v.created_at_epoch) for k, v in self._records.items()],
+                key=lambda x: x[1],
+            )
+
     def register_file(
         self,
         audio_id: str,

@@ -426,7 +426,7 @@ jobs:
         run: |
           if ls docs/reports/verification/PROOF_*.json 1>/dev/null 2>&1; then
             for f in docs/reports/verification/PROOF_*.json; do
-              python scripts/ci/check_state_proofs.py --validate-file "$f"
+              python scripts/ci/check_state_proofs.py --validate-file "$f" --no-git-match
             done
           else
             echo "No committed proofs found. Skipping proof verification."

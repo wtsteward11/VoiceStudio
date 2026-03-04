@@ -333,8 +333,8 @@ begin
   begin
     Log('Upgrade detected from version: ' + GetPreviousVersion);
     
-    // Warn about downgrade
-    if IsDowngrade then
+    // Warn about downgrade (skip in silent mode - Gate H lifecycle requires non-interactive rollback)
+    if IsDowngrade and not WizardSilent() then
     begin
       if MsgBox('WARNING: You are about to install an older version ({#MyAppVersion}).'#13#10#13#10 +
                 'Currently installed: ' + GetPreviousVersion + #13#10#13#10 +

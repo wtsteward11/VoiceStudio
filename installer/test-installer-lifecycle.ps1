@@ -13,6 +13,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Resolve LogDir to absolute path so uninstaller/installer logs always land in the right place
+if (-not [System.IO.Path]::IsPathRooted($LogDir)) {
+    $LogDir = Join-Path (Get-Location) $LogDir
+}
+$LogDir = (New-Item -ItemType Directory -Path $LogDir -Force).FullName
+
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Installer Lifecycle Test" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
@@ -108,8 +114,18 @@ function Invoke-SilentInstall {
     }
 }
 
+function Stop-VoiceStudioProcesses {
+    Write-Log "Stopping any running VoiceStudio processes..." "Yellow"
+    Get-Process -Name "VoiceStudio.App" -ErrorAction SilentlyContinue | ForEach-Object {
+        try { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue } catch {}
+    }
+    Start-Sleep -Seconds 1
+}
+
 function Invoke-SilentUninstall {
     param([string]$InstallPath, [string]$Version)
+    
+    Stop-VoiceStudioProcesses
     
     Write-Log "Uninstalling version $Version (silent)..." "Yellow"
     

@@ -8,7 +8,9 @@ param(
     # Optional override for locating the Inno Setup compiler (ISCC.exe) when not installed in the default path.
     [string]$InnoSetupPath = "",
     # If set, always re-run the Gate C publish step even when a valid publish output already exists.
-    [switch]$ForcePublish
+    [switch]$ForcePublish,
+    # Optional path to runtime bundle (from prepare-runtime.ps1). Defaults to sandbox or installer/runtime.
+    [string]$RuntimePath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -198,19 +200,33 @@ else {
 }
 
 # Check for bundled runtime (optional - prepared by prepare-runtime.ps1)
-$RuntimePython = Join-Path $InstallerDir "runtime\python\python.exe"
-$RuntimeFFmpeg = Join-Path $InstallerDir "runtime\ffmpeg\ffmpeg.exe"
+# prepare-runtime.ps1 outputs to $OutputRoot/installer_runtime where OutputRoot defaults to
+# $env:VOICESTUDIO_BUILD_SANDBOX or %LOCALAPPDATA%\VoiceStudioBuild. build-installer prefers
+# that sandbox path, then falls back to legacy installer/runtime.
+if (-not $RuntimePath -or $RuntimePath.Trim() -eq "") {
+    $sandbox = if ($env:VOICESTUDIO_BUILD_SANDBOX) { $env:VOICESTUDIO_BUILD_SANDBOX } else { Join-Path $env:LOCALAPPDATA "VoiceStudioBuild" }
+    $RuntimePath = Join-Path $sandbox "installer_runtime"
+}
+$RuntimePython = Join-Path $RuntimePath "python\python.exe"
+$RuntimeFFmpeg = Join-Path $RuntimePath "ffmpeg\ffmpeg.exe"
+# Fallback to legacy installer/runtime if sandbox not present
+if (-not (Test-Path $RuntimePython)) {
+    $RuntimePython = Join-Path $InstallerDir "runtime\python\python.exe"
+}
+if (-not (Test-Path $RuntimeFFmpeg)) {
+    $RuntimeFFmpeg = Join-Path $InstallerDir "runtime\ffmpeg\ffmpeg.exe"
+}
 if (Test-Path $RuntimePython) {
     Write-Host "Bundled Python runtime found - will be included in installer." -ForegroundColor Green
 }
 else {
-    Write-Host "No bundled Python runtime. Run prepare-runtime.ps1 to bundle Python." -ForegroundColor Yellow
+    Write-Host "No bundled Python runtime. Run prepare-runtime.ps1 to bundle Python. Use -RuntimePath to point to sandbox output." -ForegroundColor Yellow
 }
 if (Test-Path $RuntimeFFmpeg) {
     Write-Host "Bundled FFmpeg found - will be included in installer." -ForegroundColor Green
 }
 else {
-    Write-Host "No bundled FFmpeg. Run prepare-runtime.ps1 to bundle FFmpeg." -ForegroundColor Yellow
+    Write-Host "No bundled FFmpeg. Run prepare-runtime.ps1 to bundle FFmpeg. Use -RuntimePath to point to sandbox output." -ForegroundColor Yellow
 }
 
 # Build Installer

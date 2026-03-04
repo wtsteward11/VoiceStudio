@@ -12,13 +12,29 @@ param(
     [switch]$SkipFFmpeg,
     [switch]$IncludeModels,
     [string]$PythonVersion = "3.11.9",
-    [string]$FFmpegVersion = "7.0"
+    [string]$FFmpegVersion = "7.0",
+    [string]$OutputRoot = $env:VOICESTUDIO_BUILD_SANDBOX,
+    [switch]$ForceInRepo
 )
 
 $ErrorActionPreference = "Stop"
 $InstallerDir = $PSScriptRoot
-$RuntimeDir = Join-Path $InstallerDir "runtime"
-$RootDir = Split-Path -Parent $InstallerDir
+$RepoRoot = Split-Path -Parent $InstallerDir
+
+if (-not $OutputRoot -or $OutputRoot.Trim() -eq "") {
+    $OutputRoot = Join-Path $env:LOCALAPPDATA "VoiceStudioBuild"
+}
+
+$repoFull = [System.IO.Path]::GetFullPath($RepoRoot)
+$outFull = [System.IO.Path]::GetFullPath($OutputRoot)
+
+if ($outFull.StartsWith($repoFull, [System.StringComparison]::OrdinalIgnoreCase) -and (-not $ForceInRepo)) {
+    throw "Refusing to write runtime bundle inside repo: $outFull. Use -OutputRoot outside repo, or pass -ForceInRepo (NOT RECOMMENDED)."
+}
+
+$RuntimeDir = Join-Path $OutputRoot "installer_runtime"
+$RootDir = $RepoRoot
+New-Item -ItemType Directory -Path $RuntimeDir -Force | Out-Null
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "VoiceStudio Runtime Bundle Preparation"  -ForegroundColor Cyan
@@ -144,9 +160,9 @@ if ($IncludeModels) {
     Write-Host ""
     Write-Host "Model pack preparation is manual." -ForegroundColor Yellow
     Write-Host "Place model files in:" -ForegroundColor Gray
-    Write-Host "  installer/runtime/models/piper/     - Piper voice models (.onnx + .json)" -ForegroundColor Gray
-    Write-Host "  installer/runtime/models/whisper/    - Whisper models (tiny.bin, base.bin)" -ForegroundColor Gray
-    Write-Host "  installer/runtime/models/espeak/     - eSpeak-NG data" -ForegroundColor Gray
+    Write-Host "  $RuntimeDir/models/piper/     - Piper voice models (.onnx + .json)" -ForegroundColor Gray
+    Write-Host "  $RuntimeDir/models/whisper/    - Whisper models (tiny.bin, base.bin)" -ForegroundColor Gray
+    Write-Host "  $RuntimeDir/models/espeak/     - eSpeak-NG data" -ForegroundColor Gray
 }
 
 # ── Summary ──────────────────────────────────────────────────────────────
@@ -156,5 +172,5 @@ Write-Host "Runtime preparation complete!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Next: Run build-installer.ps1 to create the installer." -ForegroundColor White
-Write-Host "The installer will automatically include any runtime" -ForegroundColor White
-Write-Host "bundles found in installer/runtime/." -ForegroundColor White
+Write-Host "Runtime bundles are in: $RuntimeDir" -ForegroundColor White
+Write-Host "Pass -RuntimePath to build-installer.ps1 to include them, or copy to installer staging as needed." -ForegroundColor White

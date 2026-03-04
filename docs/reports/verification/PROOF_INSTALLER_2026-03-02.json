@@ -14,9 +14,13 @@
     "InstallV1": "PASS",
     "LaunchV1AfterRollback": "PASS"
   },
-  "date": "2026-03-02",
+  "date": "2026-03-04",
   "exit_code": 0,
-  "git_commit": "f0bf8e208e6a2ed3e609dfa1085c5f5118af0d70",
-  "timestamp": "2026-03-02T10:05:18Z",
-  "evidence_fingerprint": "6349b6b1cdd3ab075412c142cf624a08e61c56ce798836a1c4e389a4728a6d05"
+  "git_commit": "25374423abccecd91f976451dde6bc153f68d54a",
+  "timestamp": "2026-03-04T09:30:14Z",
+  "evidence_fingerprint": "6349b6b1cdd3ab075412c142cf624a08e61c56ce798836a1c4e389a4728a6d05",
+  "refreshed": true,
+  "refreshed_reason": "Phase F: align to HEAD after proof allowlist commit",
+  "refreshed_at": "2026-03-04T09:30:14Z",
+  "historical_proof": true
 }

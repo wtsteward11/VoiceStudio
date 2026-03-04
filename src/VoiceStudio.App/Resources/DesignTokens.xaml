@@ -32,10 +32,12 @@
   <SolidColorBrush x:Key="VSQ.Accent.GreenBrush" Color="#FF40FF80" />
   <SolidColorBrush x:Key="VSQ.Accent.OrangeBrush" Color="#FFFFB540" />
   <SolidColorBrush x:Key="VSQ.Accent.PrimaryBrush" Color="#FF00B7C2" />
+  <SolidColorBrush x:Key="VSQ.Accent.Brush" Color="#FF00B7C2" />
   <!-- Additional accent colors for quality indicators and status displays -->
   <SolidColorBrush x:Key="VSQ.Accent.RedBrush" Color="#FFFF4060" />
   <SolidColorBrush x:Key="VSQ.Accent.YellowBrush" Color="#FFFFCC40" />
   <SolidColorBrush x:Key="VSQ.Accent.PurpleBrush" Color="#FF8B5CF6" />
+  <SolidColorBrush x:Key="VSQ.Accent.MagentaBrush" Color="#FFE040FB" />
   <SolidColorBrush x:Key="VSQ.Panel.BorderBrush" Color="#26FFFFFF" />
   <!-- Border and surface defaults for various UI components -->
   <SolidColorBrush x:Key="VSQ.Border.DefaultBrush" Color="#26FFFFFF" />

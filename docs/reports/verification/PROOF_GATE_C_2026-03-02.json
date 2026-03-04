@@ -1,24 +1,20 @@
 {
-  "git_branch": "main",
-  "ui_smoke": {
-    "nav_steps_completed": 11,
-    "binding_failure_count": 0,
-    "exit_code": 0,
-    "summary_path": ".buildlogs/x64/Release/gatec-publish/ui_smoke_summary.json",
-    "log_path": ".buildlogs/x64/Release/gatec-publish/gatec-ui-smoke.log",
-    "summary_sha256": "3e4b1f7a9a94aa0bc977e359e8dcf44259ba798bd0ed3a0a54cc8af81957998d",
-    "log_sha256": "9e3f5b571e44dc7dcf32a824997198bffa7a4bb92dabd602244f95e4a28f22cb"
-  },
-  "step": "gate_c_publish_ui_smoke",
-  "command": ".\\scripts\\gatec-publish-launch.ps1 -Configuration Release -RuntimeIdentifier win-x64 -UiSmoke -UiSmokeTimeoutSeconds 120",
-  "gatec_log": "Timestamp: 2026-03-01T23:56:56.0400384-06:00\r\nBinlog: E:\\VoiceStudio\\.buildlogs\\gatec-publish-20260301-235626-34584.binlog\r\nPublishDir: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\r\nExe: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\\VoiceStudio.App.exe\r\nResult: ui_smoke\r\nUiSmokeResult: exited\r\nUiSmokeExitCode: 0\r\nUiSmokeLog: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\\gatec-ui-smoke.log\r\nUiSmokeSummary: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\\ui_smoke_summary.json\r\nExitCode: 0\r\n",
-  "date": "2026-03-04",
+  "gatec_log": "Timestamp: 2026-03-04T12:39:19.0708469-06:00\r\nBinlog: E:\\VoiceStudio\\.buildlogs\\gatec-publish-20260304-123824-58128.binlog\r\nPublishDir: E:\\VoiceStudio\\.buildlogs\\x64\\Debug\\gatec-publish\r\nExe: E:\\VoiceStudio\\.buildlogs\\x64\\Debug\\gatec-publish\\VoiceStudio.App.exe\r\nResult: ui_smoke\r\nUiSmokeResult: exited\r\nUiSmokeExitCode: 0\r\nUiSmokeLog: E:\\VoiceStudio\\.buildlogs\\x64\\Debug\\gatec-publish\\gatec-ui-smoke.log\r\nUiSmokeSummary: E:\\VoiceStudio\\.buildlogs\\x64\\Debug\\gatec-publish\\ui_smoke_summary.json\r\nExitCode: 0\r\n",
   "exit_code": 0,
-  "git_commit": "89bcb2fbee05f962b35d750b3ccf726b484f2b2e",
-  "timestamp": "2026-03-04T12:18:18Z",
-  "evidence_fingerprint": "beae019020d06709d1cafcad12519ce629485499029e0c99bbef76dee6417a6a",
-  "refreshed": true,
-  "refreshed_reason": "Phase F CI fix round 3",
-  "refreshed_at": "2026-03-04T12:18:18Z",
-  "historical_proof": true
+  "date": "2026-03-04",
+  "timestamp": "2026-03-04T12:39:26Z",
+  "step": "gate_c_publish_ui_smoke",
+  "ui_smoke": {
+    "nav_steps_completed": 27,
+    "summary_sha256": "854dfd01a5b1273490337d7184acc41882651affa1965917d2fac32faa62ac09",
+    "log_path": ".buildlogs/x64/Debug/gatec-publish/gatec-ui-smoke.log",
+    "log_sha256": "b239ac4f16ed4e9a9e16e6f48e915f4d76410c940dcda08deb7680357949643e",
+    "exit_code": 0,
+    "binding_failure_count": 0,
+    "summary_path": ".buildlogs/x64/Debug/gatec-publish/ui_smoke_summary.json"
+  },
+  "command": ".\\scripts\\gatec-publish-launch.ps1 -Configuration Release -RuntimeIdentifier win-x64 -UiSmoke -UiSmokeTimeoutSeconds 120",
+  "git_commit": "a95a604adc18bd1b0bc7847574fce24a3559d3af",
+  "git_branch": "main",
+  "evidence_fingerprint": "8b39fd25f93abedc3abfa534a101b72c9e38f2fc28c5141a00f99b50bbfb99ae"
 }

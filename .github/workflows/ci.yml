@@ -183,7 +183,7 @@ jobs:
         env:
           VOICESTUDIO_TEST_MODE: stub
         run: |
-          python scripts/ci/write_golden_path_stub_proof.py --no-run-test
+          python scripts/ci/write_golden_path_stub_proof.py
 
       - name: Validate SSOT stub proof (schema + fingerprint + git match)
         run: |

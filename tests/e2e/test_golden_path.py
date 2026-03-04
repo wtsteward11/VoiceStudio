@@ -436,19 +436,13 @@ class TestGoldenPath:
                     proof_output_dir = os.environ.get(
                         "VOICESTUDIO_GOLDEN_PATH_OUTPUT_DIR"
                     )
-                    if proof_output_dir:
-                        if not os.path.isdir(proof_output_dir):
-                            pytest.fail(
-                                f"VOICESTUDIO_GOLDEN_PATH_OUTPUT_DIR "
-                                f"set but not a directory: "
-                                f"{proof_output_dir}"
-                            )
-                        export_dir = proof_output_dir
-                    else:
-                        export_dir = os.path.join(
-                            tempfile.gettempdir(),
-                            "voicestudio_golden_path",
+                    if not proof_output_dir or not os.path.isdir(proof_output_dir):
+                        pytest.fail(
+                            "VOICESTUDIO_GOLDEN_PATH_OUTPUT_DIR must be set to an "
+                            "existing directory for proof generation. "
+                            "Use write_golden_path_real_proof.py for real mode."
                         )
+                    export_dir = proof_output_dir
                     os.makedirs(export_dir, exist_ok=True)
                     wav_filename = "golden_path_export.wav"
                     export_path = os.path.join(
@@ -470,19 +464,15 @@ class TestGoldenPath:
                     )
                     logger.info(f"  Exported audio to: {export_path}")
 
-                    if proof_output_dir:
-                        manifest = {
-                            "output_wav": wav_filename,
-                        }
-                        manifest_path = os.path.join(
-                            export_dir, "output_manifest.json"
-                        )
-                        with open(manifest_path, "w",
-                                  encoding="utf-8") as mf:
-                            json.dump(manifest, mf, indent=2)
-                        logger.info(
-                            f"  Manifest: {manifest_path}"
-                        )
+                    manifest = {
+                        "output_wav": wav_filename,
+                    }
+                    manifest_path = os.path.join(
+                        export_dir, "output_manifest.json"
+                    )
+                    with open(manifest_path, "w", encoding="utf-8") as mf:
+                        json.dump(manifest, mf, indent=2)
+                    logger.info(f"  Manifest: {manifest_path}")
             except Exception as e:
                 validations.append(("audio downloadable", False, f"error={e}"))
         else:

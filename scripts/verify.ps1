@@ -292,30 +292,16 @@ function Invoke-Stage {
     $stageStart = Get-Date
     
     try {
-        # Execute the action and capture output
-        # The scriptblock may return an exit code as its last output item
-        $output = & $Action 2>&1
-        $rawExitCode = $LASTEXITCODE
-        
-        # If the last item in output is a numeric exit code from the scriptblock's return statement,
-        # use that instead of $LASTEXITCODE (which may be stale from an earlier external command)
-        $exitCode = $rawExitCode
-        if ($output -is [array] -and $output.Count -gt 0) {
-            $lastItem = $output[-1]
-            if ($lastItem -is [int] -or ($lastItem -is [string] -and $lastItem -match '^\d+$')) {
-                $exitCode = [int]$lastItem
-                # Remove the exit code from output (it's metadata, not display content)
-                if ($output.Count -gt 1) {
-                    $output = $output[0..($output.Count - 2)]
-                } else {
-                    $output = @()
-                }
-            }
-        } elseif ($output -is [int] -or ($output -is [string] -and $output -match '^\d+$')) {
-            # Single item output that is just the exit code
-            $exitCode = [int]$output
-            $output = @()
+        # Prevent stderr from native exes causing PowerShell terminating errors
+        $prevErrorPref = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $output = & $Action 2>&1
+        } finally {
+            $ErrorActionPreference = $prevErrorPref
         }
+        # Use exit code exclusively from last external command (not from parsing output)
+        $exitCode = $LASTEXITCODE
         if ($null -eq $exitCode) { $exitCode = 0 }
         
         # Save output to log file
@@ -333,8 +319,9 @@ function Invoke-Stage {
             $logSize = (Get-Item $logFile).Length
             if ($logSize -eq 0) {
                 $integrityMsg = "HARNESS INTEGRITY FAILURE: Stage '$Name' exited $exitCode but log is 0 bytes. Output was not captured. Fix the harness before trusting results."
+                $fallbackLine = "Fallback diagnostic: exitCode=$exitCode stage='$Name'"
                 Write-Host $integrityMsg -ForegroundColor Red
-                $integrityMsg | Out-File -FilePath $logFile -Encoding utf8
+                ($integrityMsg, $fallbackLine) | Out-File -FilePath $logFile -Encoding utf8
                 Add-StageResult -Name $Name -Status "FAILED" -ExitCode 99 -DurationSeconds $duration -LogFile $logFile
                 $script:OverallPassed = $false
                 return $false
@@ -566,7 +553,8 @@ $stage2Passed = Invoke-Stage -Name "Python Quality" -Description "Lint and type-
     
     if ($ruffExit -ne 0) {
         Write-Host "Ruff check failed with exit code $ruffExit"
-        return $ruffExit
+        cmd /c "exit $ruffExit"
+        return
     }
     
     Write-Host ""
@@ -580,15 +568,38 @@ $stage2Passed = Invoke-Stage -Name "Python Quality" -Description "Lint and type-
     if ($mypyExit -eq 1) {
         if ($StrictMypy) {
             Write-Host "Mypy found type errors (strict mode enabled)" -ForegroundColor Red
-            return 1
+            cmd /c "exit 1"
+            return
         } else {
             Write-Host "Mypy found type errors (warnings only, use -StrictMypy to fail)" -ForegroundColor Yellow
         }
     } elseif ($mypyExit -gt 1) {
-        return $mypyExit
+        cmd /c "exit $mypyExit"
+        return
     }
     
-    return 0
+    # Mypy strict-scope budget report (see tests/ci/test_mypy_strict_scope.py)
+    $baselinePath = Join-Path $RootDir ".ci\mypy_strict_baseline.json"
+    if (Test-Path $baselinePath) {
+        $baseline = Get-Content $baselinePath -Raw | ConvertFrom-Json
+        $budget = $baseline.baseline_errors
+        $scopePaths = $baseline.scope | ForEach-Object { Join-Path $RootDir $_ }
+        $strictResult = & python -m mypy --strict --follow-imports=skip --config-file pyproject.toml $scopePaths 2>&1
+        $strictExit = $LASTEXITCODE
+        $errorCount = 0
+        $m = [regex]::Match($strictResult, "Found (\d+) error")
+        if ($m.Success) { $errorCount = [int]$m.Groups[1].Value }
+        else { $errorCount = ([regex]::Matches($strictResult, ": error:")).Count }
+        $delta = $errorCount - $budget
+        Write-Host "Mypy strict scope: $errorCount errors (budget: $budget, delta: $delta)" -ForegroundColor $(if ($delta -gt 0) { "Red" } else { "Gray" })
+        if ($StrictMypy -and $errorCount -gt $budget) {
+            Write-Host "Mypy strict scope exceeds budget (use -StrictMypy to fail)" -ForegroundColor Red
+            cmd /c "exit 1"
+            return
+        }
+    }
+    
+    cmd /c "exit 0"
 }
 
 if (-not $stage2Passed -and -not $SkipPythonLint) {
@@ -615,8 +626,9 @@ $stage3Passed = Invoke-Stage -Name "C# Unit Tests" -Description "Run C# unit tes
         --results-directory $TestResultsDir 2>&1
     
     $exitCode = $LASTEXITCODE
-    $testOutput | Write-Host
-    
+    # Emit to pipeline (not Write-Host) so Invoke-Stage captures output for log file
+    $testOutput
+
     # WinUI test host may crash during shutdown even when all tests pass.
     # Check if all tests passed by examining output for "Failed: 0" pattern.
     $summaryLine = $testOutput | Where-Object { $_ -match "Failed:\s+\d+.*Passed:\s+\d+" } | Select-Object -Last 1
@@ -625,10 +637,10 @@ $stage3Passed = Invoke-Stage -Name "C# Unit Tests" -Description "Run C# unit tes
         if ($exitCode -ne 0) {
             Write-Host "Note: Test host crashed after tests completed (known WinUI issue), but all tests passed." -ForegroundColor Yellow
         }
-        return 0
+        cmd /c "exit 0"
+        return
     }
-    
-    return $exitCode
+    cmd /c "exit $exitCode"
 }
 
 if (-not $stage3Passed -and -not $SkipCSharpTests) {

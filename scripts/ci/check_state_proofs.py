@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import hashlib
 import json
 import re
 import subprocess
@@ -99,8 +100,15 @@ def get_proof_type(basename: str) -> str | None:
         "PROOF_PROVENANCE",
         "PROOF_GATE_C",
         "PROOF_INSTALLER",
+        "PROOF_GOLDEN_PATH_STUB",
+        "PROOF_GOLDEN_PATH_REAL",
         "PROOF_GOLDEN_PATH",
         "PROOF_UI_COMMAND_SURFACE",
+        "PROOF_CRASH_RECOVERY",
+        "PROOF_SUPPORT_BUNDLE_RUNTIME",
+        "PROOF_SUPPORT_BUNDLE",
+        "PROOF_PERF_BUDGET_RUNTIME",
+        "PROOF_PERF_BUDGET",
         "PROOF_PHASE_3",
         "PROOF_PHASE_2_1",
         "PROOF_PHASE",
@@ -135,19 +143,101 @@ def validate_nested_semantics(
         return []
 
     if proof_type == "PROOF_GATE_C":
-        expected_exit = nested.get("ui_smoke.exit_code")
-        if expected_exit is not None:
-            ui_smoke = data.get("ui_smoke")
-            if not isinstance(ui_smoke, dict):
-                errors.append(
-                    f"{path.relative_to(ROOT)}: ui_smoke must be object for nested validation"
-                )
-            else:
+        ui_smoke = data.get("ui_smoke")
+        if not isinstance(ui_smoke, dict):
+            errors.append(
+                f"{path.relative_to(ROOT)}: ui_smoke must be object for nested validation"
+            )
+        else:
+            expected_exit = nested.get("ui_smoke.exit_code")
+            if expected_exit is not None:
                 ec = ui_smoke.get("exit_code")
                 if ec != expected_exit:
                     errors.append(
                         f"{path.relative_to(ROOT)}: ui_smoke.exit_code must be {expected_exit}, got {ec}"
                     )
+            min_nav = nested.get("ui_smoke.nav_steps_completed_min")
+            if min_nav is not None:
+                nav = ui_smoke.get("nav_steps_completed")
+                if nav is None:
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: ui_smoke.nav_steps_completed is required"
+                    )
+                elif not isinstance(nav, int) or nav < min_nav:
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: ui_smoke.nav_steps_completed must be >= {min_nav}, got {nav}"
+                    )
+            bfc = nested.get("ui_smoke.binding_failure_count")
+            if bfc is not None:
+                actual = ui_smoke.get("binding_failure_count")
+                if actual is None:
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: ui_smoke.binding_failure_count is required"
+                    )
+                elif actual != bfc:
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: ui_smoke.binding_failure_count must be {bfc}, got {actual}"
+                    )
+            if nested.get("ui_smoke.summary_path_required"):
+                sp = ui_smoke.get("summary_path")
+                if not sp or not isinstance(sp, str):
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: ui_smoke.summary_path is required"
+                    )
+                else:
+                    summary_full = (ROOT / sp.replace("\\", "/")).resolve()
+                    root_resolved = ROOT.resolve()
+                    if not str(summary_full).startswith(str(root_resolved)):
+                        errors.append(
+                            f"{path.relative_to(ROOT)}: ui_smoke.summary_path must be under repo root"
+                        )
+                    elif not summary_full.exists():
+                        errors.append(
+                            f"{path.relative_to(ROOT)}: ui_smoke.summary_path does not exist: {sp}"
+                        )
+                    elif nested.get("ui_smoke.summary_sha256_hex"):
+                        sh = ui_smoke.get("summary_sha256")
+                        if not sh or not re.match(r"^[a-f0-9]{64}$", str(sh)):
+                            errors.append(
+                                f"{path.relative_to(ROOT)}: ui_smoke.summary_sha256 must be 64-hex SHA-256"
+                            )
+                        else:
+                            with open(summary_full, "rb") as f:
+                                actual_hash = hashlib.sha256(f.read()).hexdigest()
+                            if sh.lower() != actual_hash.lower():
+                                errors.append(
+                                    f"{path.relative_to(ROOT)}: ui_smoke.summary_sha256 does not match file"
+                                )
+            if nested.get("ui_smoke.log_path_required"):
+                lp = ui_smoke.get("log_path")
+                if not lp or not isinstance(lp, str):
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: ui_smoke.log_path is required"
+                    )
+                else:
+                    log_full = (ROOT / lp.replace("\\", "/")).resolve()
+                    root_resolved = ROOT.resolve()
+                    if not str(log_full).startswith(str(root_resolved)):
+                        errors.append(
+                            f"{path.relative_to(ROOT)}: ui_smoke.log_path must be under repo root"
+                        )
+                    elif not log_full.exists():
+                        errors.append(
+                            f"{path.relative_to(ROOT)}: ui_smoke.log_path does not exist: {lp}"
+                        )
+                    elif nested.get("ui_smoke.log_sha256_hex"):
+                        lh = ui_smoke.get("log_sha256")
+                        if not lh or not re.match(r"^[a-f0-9]{64}$", str(lh)):
+                            errors.append(
+                                f"{path.relative_to(ROOT)}: ui_smoke.log_sha256 must be 64-hex SHA-256"
+                            )
+                        else:
+                            with open(log_full, "rb") as f:
+                                actual_hash = hashlib.sha256(f.read()).hexdigest()
+                            if lh.lower() != actual_hash.lower():
+                                errors.append(
+                                    f"{path.relative_to(ROOT)}: ui_smoke.log_sha256 does not match file"
+                                )
 
     elif proof_type == "PROOF_INSTALLER":
         required_keys = nested.get("results_required_keys", [])
@@ -216,6 +306,196 @@ def validate_nested_semantics(
             errors.append(
                 f"{path.relative_to(ROOT)}: all_panels_registered must be true"
             )
+
+    elif proof_type == "PROOF_CRASH_RECOVERY":
+        tp = data.get("tests_passed", 0)
+        tt = data.get("tests_total", 0)
+        if not isinstance(tp, int) or not isinstance(tt, int):
+            errors.append(
+                f"{path.relative_to(ROOT)}: tests_passed/tests_total must be int"
+            )
+        elif tp != tt:
+            errors.append(
+                f"{path.relative_to(ROOT)}: tests_passed ({tp}) != tests_total ({tt})"
+            )
+        for flag in (
+            "circuit_breaker_tested",
+            "state_preservation_tested",
+            "restart_policies_tested",
+        ):
+            if data.get(flag) is not True:
+                errors.append(
+                    f"{path.relative_to(ROOT)}: {flag} must be true"
+                )
+
+    elif proof_type == "PROOF_SUPPORT_BUNDLE":
+        for flag in (
+            "script_exists",
+            "ui_handler_exists",
+            "required_items_present",
+        ):
+            if data.get(flag) is not True:
+                errors.append(
+                    f"{path.relative_to(ROOT)}: {flag} must be true"
+                )
+
+    elif proof_type == "PROOF_PERF_BUDGET":
+        if data.get("budgets_defined") is not True:
+            errors.append(
+                f"{path.relative_to(ROOT)}: budgets_defined must be true"
+            )
+        if data.get("regression_detector_exists") is not True:
+            errors.append(
+                f"{path.relative_to(ROOT)}: regression_detector_exists must be true"
+            )
+
+    elif proof_type == "PROOF_SUPPORT_BUNDLE_RUNTIME":
+        if data.get("ui_wiring_verified") is not True:
+            errors.append(
+                f"{path.relative_to(ROOT)}: ui_wiring_verified must be true"
+            )
+        rf = data.get("required_files")
+        if not isinstance(rf, list) or not rf:
+            errors.append(
+                f"{path.relative_to(ROOT)}: required_files must be a non-empty list"
+            )
+        else:
+            for i, entry in enumerate(rf):
+                if not isinstance(entry, dict):
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: required_files[{i}] must be object"
+                    )
+                    continue
+                if entry.get("exists") is not True:
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: required_files[{i}] "
+                        f"({entry.get('name', '?')}) exists must be true"
+                    )
+                b = entry.get("bytes", 0)
+                if not isinstance(b, int) or b <= 0:
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: required_files[{i}] "
+                        f"({entry.get('name', '?')}) bytes must be > 0"
+                    )
+                h = entry.get("sha256", "")
+                if not re.match(r"^[a-f0-9]{64}$", str(h)):
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: required_files[{i}] "
+                        f"({entry.get('name', '?')}) sha256 must be 64-hex"
+                    )
+
+    elif proof_type == "PROOF_PERF_BUDGET_RUNTIME":
+        if data.get("within_budget") is not True:
+            errors.append(
+                f"{path.relative_to(ROOT)}: within_budget must be true"
+            )
+        measured = data.get("measured")
+        budgets = data.get("budgets")
+        if not isinstance(measured, dict) or not isinstance(budgets, dict):
+            errors.append(
+                f"{path.relative_to(ROOT)}: measured and budgets must be objects"
+            )
+        else:
+            for key in ("StartupMs", "ApiResponseMs"):
+                mv = measured.get(key)
+                bv = budgets.get(key)
+                if not isinstance(mv, (int, float)) or mv <= 0:
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: measured.{key} must be > 0"
+                    )
+                if isinstance(mv, (int, float)) and isinstance(bv, (int, float)):
+                    if mv > bv:
+                        errors.append(
+                            f"{path.relative_to(ROOT)}: measured.{key} ({mv}) "
+                            f"exceeds budget ({bv})"
+                        )
+
+    elif proof_type in ("PROOF_GOLDEN_PATH_STUB", "PROOF_GOLDEN_PATH_REAL"):
+        if data.get("passed") is not True:
+            errors.append(
+                f"{path.relative_to(ROOT)}: passed must be true"
+            )
+        em = data.get("engine_mode")
+        expected_mode = "stub" if proof_type.endswith("_STUB") else "real"
+        if em != expected_mode:
+            errors.append(
+                f"{path.relative_to(ROOT)}: engine_mode must be '{expected_mode}', got {em!r}"
+            )
+        om = data.get("output_metrics")
+        if not isinstance(om, dict):
+            errors.append(
+                f"{path.relative_to(ROOT)}: output_metrics must be an object"
+            )
+        else:
+            dur = om.get("duration_seconds", 0)
+            rms = om.get("rms_energy", 0)
+            sha = om.get("output_sha256", "")
+            if not isinstance(dur, (int, float)) or dur <= 0:
+                errors.append(
+                    f"{path.relative_to(ROOT)}: output_metrics.duration_seconds must be > 0"
+                )
+            if not isinstance(rms, (int, float)) or rms <= 0.001:
+                errors.append(
+                    f"{path.relative_to(ROOT)}: output_metrics.rms_energy must be > 0.001"
+                )
+            if not re.match(r"^[a-f0-9]{64}$", str(sha)):
+                errors.append(
+                    f"{path.relative_to(ROOT)}: output_metrics.output_sha256 must be 64-hex"
+                )
+        if proof_type == "PROOF_GOLDEN_PATH_REAL":
+            models = data.get("models")
+            if not isinstance(models, dict) or not models:
+                errors.append(
+                    f"{path.relative_to(ROOT)}: models must be a non-empty dict for real mode"
+                )
+            elif models:
+                for mk, mv in models.items():
+                    if not re.match(r"^[a-f0-9]{64}$", str(mv)):
+                        errors.append(
+                            f"{path.relative_to(ROOT)}: models.{mk} must be 64-hex sha256"
+                        )
+
+        if nested.get("test_ran_must_be_true"):
+            if data.get("test_ran") is not True:
+                errors.append(
+                    f"{path.relative_to(ROOT)}: test_ran must be true"
+                )
+
+        if nested.get("artifact_path_required"):
+            art_path_str = data.get("artifact_path", "")
+            if not art_path_str or not isinstance(art_path_str, str):
+                errors.append(
+                    f"{path.relative_to(ROOT)}: artifact_path is required"
+                )
+            else:
+                art_full = (ROOT / art_path_str.replace("\\", "/")).resolve()
+                root_resolved = ROOT.resolve()
+                if not str(art_full).startswith(str(root_resolved)):
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: artifact_path must be under repo root"
+                    )
+                elif not art_full.exists():
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: artifact_path does not exist: {art_path_str}"
+                    )
+
+        if nested.get("artifact_sha256_required"):
+            art_sha = data.get("artifact_sha256", "")
+            if not re.match(r"^[a-f0-9]{64}$", str(art_sha)):
+                errors.append(
+                    f"{path.relative_to(ROOT)}: artifact_sha256 must be 64-hex SHA-256"
+                )
+            else:
+                art_path_str = data.get("artifact_path", "")
+                if art_path_str and isinstance(art_path_str, str):
+                    art_full = (ROOT / art_path_str.replace("\\", "/")).resolve()
+                    if art_full.exists():
+                        with open(art_full, "rb") as f:
+                            actual_hash = hashlib.sha256(f.read()).hexdigest()
+                        if art_sha.lower() != actual_hash.lower():
+                            errors.append(
+                                f"{path.relative_to(ROOT)}: artifact_sha256 does not match file at artifact_path"
+                            )
 
     return errors
 

@@ -25,6 +25,37 @@
     "PROOF_UI_COMMAND_SURFACE": [
       "command", "exit_code", "commands_checked", "panels_checked",
       "all_commands_registered", "all_panels_registered"
+    ],
+    "PROOF_CRASH_RECOVERY": [
+      "command", "exit_code", "tests_passed", "tests_total",
+      "circuit_breaker_tested", "state_preservation_tested",
+      "restart_policies_tested"
+    ],
+    "PROOF_SUPPORT_BUNDLE": [
+      "command", "exit_code", "script_exists", "ui_handler_exists",
+      "required_items_present", "items_checked"
+    ],
+    "PROOF_PERF_BUDGET": [
+      "command", "exit_code", "budgets_defined", "budgets_values",
+      "regression_detector_exists", "ci_mode_available"
+    ],
+    "PROOF_SUPPORT_BUNDLE_RUNTIME": [
+      "command", "exit_code", "required_files",
+      "ui_wiring_verified", "bundle_path"
+    ],
+    "PROOF_PERF_BUDGET_RUNTIME": [
+      "command", "exit_code", "measured", "budgets",
+      "within_budget", "environment"
+    ],
+    "PROOF_GOLDEN_PATH_STUB": [
+      "command", "exit_code", "engine_mode", "checks",
+      "output_metrics", "models", "passed",
+      "test_ran", "pytest_stdout_sha256", "pytest_stderr_sha256",
+      "artifact_path", "artifact_sha256"
+    ],
+    "PROOF_GOLDEN_PATH_REAL": [
+      "command", "exit_code", "engine_mode", "checks",
+      "output_metrics", "models", "passed"
     ]
   },
   "historical_proofs_allowlist_path": ".ci/historical_proofs_allowlist.json",
@@ -62,6 +93,48 @@
         "command_details", "panel_details"
       ]
     },
+    "PROOF_CRASH_RECOVERY": {
+      "required": [
+        "tests_passed", "tests_total",
+        "circuit_breaker_tested", "state_preservation_tested",
+        "restart_policies_tested"
+      ]
+    },
+    "PROOF_SUPPORT_BUNDLE": {
+      "required": [
+        "script_exists", "ui_handler_exists",
+        "required_items_present", "items_checked"
+      ]
+    },
+    "PROOF_PERF_BUDGET": {
+      "required": [
+        "budgets_defined", "budgets_values",
+        "regression_detector_exists", "ci_mode_available"
+      ]
+    },
+    "PROOF_SUPPORT_BUNDLE_RUNTIME": {
+      "required": [
+        "required_files", "ui_wiring_verified", "bundle_path"
+      ]
+    },
+    "PROOF_PERF_BUDGET_RUNTIME": {
+      "required": [
+        "measured", "budgets", "within_budget", "environment"
+      ]
+    },
+    "PROOF_GOLDEN_PATH_STUB": {
+      "required": [
+        "engine_mode", "checks", "output_metrics",
+        "models", "passed",
+        "test_ran", "artifact_path", "artifact_sha256"
+      ]
+    },
+    "PROOF_GOLDEN_PATH_REAL": {
+      "required": [
+        "engine_mode", "checks", "output_metrics",
+        "models", "passed"
+      ]
+    },
     "PROOF_PHASE": {
       "override_common": true,
       "required": ["phase", "date", "checks"],
@@ -71,7 +144,13 @@
   "historical_proof_allowlist": [],
   "nested_semantics": {
     "PROOF_GATE_C": {
-      "ui_smoke.exit_code": 0
+      "ui_smoke.exit_code": 0,
+      "ui_smoke.nav_steps_completed_min": 8,
+      "ui_smoke.binding_failure_count": 0,
+      "ui_smoke.summary_sha256_hex": true,
+      "ui_smoke.log_sha256_hex": true,
+      "ui_smoke.summary_path_required": true,
+      "ui_smoke.log_path_required": true
     },
     "PROOF_INSTALLER": {
       "results_required_keys": [
@@ -97,6 +176,40 @@
     "PROOF_UI_COMMAND_SURFACE": {
       "all_commands_registered_must_be_true": true,
       "all_panels_registered_must_be_true": true
+    },
+    "PROOF_CRASH_RECOVERY": {
+      "tests_passed_equals_tests_total": true
+    },
+    "PROOF_SUPPORT_BUNDLE": {
+      "script_exists_must_be_true": true,
+      "ui_handler_exists_must_be_true": true,
+      "required_items_present_must_be_true": true
+    },
+    "PROOF_PERF_BUDGET": {
+      "budgets_defined_must_be_true": true,
+      "regression_detector_exists_must_be_true": true
+    },
+    "PROOF_SUPPORT_BUNDLE_RUNTIME": {
+      "ui_wiring_verified_must_be_true": true,
+      "all_required_files_exist": true
+    },
+    "PROOF_PERF_BUDGET_RUNTIME": {
+      "within_budget_must_be_true": true,
+      "measured_values_positive": true
+    },
+    "PROOF_GOLDEN_PATH_STUB": {
+      "passed_must_be_true": true,
+      "engine_mode_must_be_stub": true,
+      "output_metrics_positive": true,
+      "test_ran_must_be_true": true,
+      "artifact_sha256_required": true,
+      "artifact_path_required": true
+    },
+    "PROOF_GOLDEN_PATH_REAL": {
+      "passed_must_be_true": true,
+      "engine_mode_must_be_real": true,
+      "models_must_have_hashes": true,
+      "output_metrics_positive": true
     }
   },
   "semantic_rules": {

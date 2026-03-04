@@ -171,7 +171,7 @@ namespace VoiceStudio.App.ViewModels
           {
             TrimStart = value;
           }
-          if (value > VideoDuration)
+          if (VideoDuration > 0 && value > VideoDuration)
           {
             TrimEnd = VideoDuration;
           }

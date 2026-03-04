@@ -27,7 +27,10 @@
     "**/runtime/external/**": true,
     "**/.venv/**": true,
     "**/temp/**": true,
-    "**/models/**": true
+    "**/models/**": true,
+    "**/data/audio_uploads/**": true,
+    "**/backups/**": true,
+    "**/data/recordings/**": true
   },
   // Python settings
   "python.defaultInterpreterPath": "${workspaceFolder}\\backend\\.venv\\Scripts\\python.exe",
@@ -79,7 +82,10 @@
     "**/venv": true,
     "**/runtime/external": true,
     "**/temp": true,
-    "**/models": true
+    "**/models": true,
+    "**/data/audio_uploads": true,
+    "**/backups": true,
+    "**/data/recordings": true
   },
   // Logging settings (addresses rpcFileLoggerFolder warning)
   "log.output.level": "info",

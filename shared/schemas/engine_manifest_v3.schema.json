@@ -40,6 +40,11 @@
       "type": "string",
       "description": "Notes about implementation status or requirements"
     },
+    "support_tier": {
+      "type": "string",
+      "enum": ["tier1_supported", "tier2_best_effort", "experimental"],
+      "description": "User-facing support tier: tier1_supported (content-creator wedge), tier2_best_effort, experimental"
+    },
     "venv_family": {
       "type": "string",
       "description": "Virtual environment family for dependency isolation (e.g., venv_core_tts, venv_video)"

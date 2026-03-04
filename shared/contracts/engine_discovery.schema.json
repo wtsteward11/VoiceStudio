@@ -1,0 +1,149 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "engine_discovery.schema.json",
+  "title": "EngineDiscovery",
+  "description": "Request and response shapes for the MCP Engine Discovery server tools",
+  "definitions": {
+    "EngineSummary": {
+      "type": "object",
+      "description": "Summary of an engine returned by list_engines",
+      "properties": {
+        "engine_id": {
+          "type": "string",
+          "description": "Unique engine identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the engine"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["tts", "stt", "vc", "s2s", "image", "video", "llm", "unknown"],
+          "description": "Resolved engine type"
+        },
+        "supported_languages": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "ISO language codes supported by this engine"
+        },
+        "quality_metrics": {
+          "type": "object",
+          "description": "Quality feature estimates (mos_estimate, similarity, etc.)",
+          "additionalProperties": true
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Engine capability tags"
+        },
+        "implementation_status": {
+          "type": "string",
+          "enum": ["full", "basic", "placeholder", "unknown"],
+          "description": "Current implementation completeness"
+        }
+      },
+      "required": ["engine_id", "name", "type"]
+    },
+    "ListEnginesResponse": {
+      "type": "object",
+      "properties": {
+        "engines": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/EngineSummary" }
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["engines", "count"]
+    },
+    "GetEngineDetailsRequest": {
+      "type": "object",
+      "properties": {
+        "engine_id": {
+          "type": "string",
+          "description": "Engine identifier to look up"
+        }
+      },
+      "required": ["engine_id"]
+    },
+    "GetEngineDetailsResponse": {
+      "type": "object",
+      "description": "Full engine manifest data plus resolved metadata",
+      "properties": {
+        "engine_id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "subtype": { "type": "string" },
+        "version": { "type": "string" },
+        "description": { "type": "string" },
+        "resolved_type": { "type": "string" },
+        "streaming_capable": { "type": "boolean" },
+        "supported_languages": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "quality_features": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "device_requirements": {
+          "type": "object",
+          "properties": {
+            "gpu": { "type": "string" },
+            "vram_min_gb": { "type": "number" },
+            "ram_min_gb": { "type": "number" }
+          }
+        },
+        "contract": { "type": "object" },
+        "config_schema": { "type": "object" },
+        "implementation_status": { "type": "string" }
+      },
+      "required": ["engine_id", "name"]
+    },
+    "GetEngineDetailsErrorResponse": {
+      "type": "object",
+      "properties": {
+        "error": { "type": "string" },
+        "available_engines": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["error"]
+    },
+    "StreamingEngineSummary": {
+      "type": "object",
+      "properties": {
+        "engine_id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "streaming_capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Matched streaming capability tags"
+        }
+      },
+      "required": ["engine_id", "name", "type", "streaming_capabilities"]
+    },
+    "GetStreamingEnginesResponse": {
+      "type": "object",
+      "properties": {
+        "engines": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/StreamingEngineSummary" }
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["engines", "count"]
+    }
+  }
+}

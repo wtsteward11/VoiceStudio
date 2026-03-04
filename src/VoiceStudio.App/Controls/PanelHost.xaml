@@ -54,7 +54,7 @@
                 <!-- Context-Sensitive Action Bar (IDEA 2) -->
                 <StackPanel x:Name="ActionBar" Grid.Column="2" Orientation="Horizontal"
                     VerticalAlignment="Center" Spacing="4" Margin="8,0,8,0" Visibility="Collapsed" />
-                <!-- Panel Actions (Pop out, Collapse) -->
+                <!-- Panel Actions (Pop out, Collapse, Options) -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center"
                     Spacing="4">
                     <Button x:Name="PopOutButton" Content="▢" Width="24" Height="24"
@@ -65,6 +65,20 @@
                         ToolTipService.ToolTip="Collapse panel"
                         AutomationProperties.Name="Collapse panel" Click="CollapseButton_Click"
                         Style="{StaticResource VSQ.Button.FocusStyle}" />
+                    <Button x:Name="OptionsButton" Width="24" Height="24"
+                        ToolTipService.ToolTip="Panel options"
+                        AutomationProperties.Name="Panel options"
+                        AutomationProperties.AutomationId="PanelHost_OptionsButton"
+                        Style="{StaticResource VSQ.Button.FocusStyle}">
+                        <Button.Flyout>
+                            <MenuFlyout x:Name="OptionsFlyout" Opening="OptionsFlyout_Opening">
+                                <MenuFlyoutItem x:Name="RefreshMenuItem" Text="Refresh" Click="OptionsRefresh_Click" />
+                                <MenuFlyoutSeparator x:Name="OptionsSeparator" />
+                                <MenuFlyoutItem x:Name="PopOutMenuItem" Text="Pop out" Click="OptionsPopOut_Click" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                        <FontIcon Glyph="&#xE712;" FontSize="12" />
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>

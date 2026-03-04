@@ -8,7 +8,9 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using UIColors = Microsoft.UI.Colors;
@@ -400,6 +402,46 @@ namespace VoiceStudio.App.Views.Panels
             FeatureFlagsTabGrid.Visibility = Visibility.Visible;
             break;
         }
+      }
+    }
+
+    private async void ExportSupportBundle_Click(object sender, RoutedEventArgs e)
+    {
+      try
+      {
+        var baseDir = AppContext.BaseDirectory;
+        var scriptPath = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "scripts", "collect-support-bundle.ps1"));
+        if (!File.Exists(scriptPath))
+          scriptPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? baseDir, "..", "..", "scripts", "collect-support-bundle.ps1"));
+        if (!File.Exists(scriptPath))
+          scriptPath = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "..", "scripts", "collect-support-bundle.ps1"));
+
+        if (!File.Exists(scriptPath))
+        {
+          _toastService?.ShowToast(ToastType.Error, "Export Failed", "Support bundle script not found. Run from repo root.");
+          return;
+        }
+
+        var outputDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VoiceStudio_Support");
+        Directory.CreateDirectory(outputDir);
+
+        var psi = new ProcessStartInfo("powershell.exe",
+          $"-ExecutionPolicy Bypass -File \"{scriptPath}\" -OutputDir \"{outputDir}\"")
+        {
+          UseShellExecute = false,
+          CreateNoWindow = true,
+        };
+        var proc = Process.Start(psi);
+        if (proc != null)
+          await proc.WaitForExitAsync();
+
+        Process.Start(new ProcessStartInfo("explorer.exe", outputDir) { UseShellExecute = true });
+        _toastService?.ShowToast(ToastType.Success, "Support Bundle", "Diagnostics collected. Folder opened.");
+      }
+      catch (Exception ex)
+      {
+        Debug.WriteLine($"[DiagnosticsView] ExportSupportBundle failed: {ex.Message}");
+        _toastService?.ShowToast(ToastType.Error, "Export Failed", ex.Message);
       }
     }
 

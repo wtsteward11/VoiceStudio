@@ -354,6 +354,45 @@ namespace VoiceStudio.App.Controls
       IsCollapsed = !IsCollapsed;
     }
 
+    private void OptionsFlyout_Opening(object sender, object e)
+    {
+      if (OptionsFlyout.Items.Count < 2)
+        return;
+
+      var viewModel = Content != null ? GetViewModelFromContent(Content) : null;
+      var showRefresh = viewModel is IPanelLifecycle;
+
+      if (OptionsFlyout.Items[0] is MenuFlyoutItem refreshItem)
+        refreshItem.Visibility = showRefresh ? Visibility.Visible : Visibility.Collapsed;
+      if (OptionsFlyout.Items[1] is MenuFlyoutSeparator separator)
+        separator.Visibility = showRefresh ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void OptionsRefresh_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+      if (Content == null)
+        return;
+
+      var viewModel = GetViewModelFromContent(Content);
+      if (viewModel is not IPanelLifecycle lifecycle)
+        return;
+
+      try
+      {
+        await lifecycle.RefreshAsync(CancellationToken.None);
+      }
+      catch (Exception ex)
+      {
+        System.Diagnostics.Debug.WriteLine($"[PanelHost] Error refreshing panel: {ex.Message}");
+      }
+    }
+
+    private void OptionsPopOut_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+      // Stub: future floating window support
+      System.Diagnostics.Debug.WriteLine("[PanelHost] Pop out requested (stub)");
+    }
+
     /// <summary>
     /// Saves the current panel state before switching panels.
     /// Backend-Frontend Integration Plan - Phase 2: Enhanced state persistence.

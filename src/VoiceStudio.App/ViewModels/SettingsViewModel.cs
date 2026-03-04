@@ -739,16 +739,42 @@ namespace VoiceStudio.App.ViewModels
                     new DependencyStatusItem { Name = "NumPy", Description = "Required for numerical operations", Category = "Core", IsInstalled = false }
                 };
 
-        // Check dependency status via backend
+        // Check dependency status via backend (retry when backend is still starting)
         try
         {
-          System.Diagnostics.Debug.WriteLine("[DEP-CHECK] Starting dependency check...");
-          var response = await _backendClient.SendRequestAsync<object, Dictionary<string, object>>(
-              "/api/settings/check/dependencies",
-              null,
-              System.Net.Http.HttpMethod.Get,
-              cancellationToken
-          );
+          const int maxRetries = 8;
+          const int retryDelayMs = 2500;
+          Dictionary<string, object>? response = null;
+
+          for (int attempt = 1; attempt <= maxRetries; attempt++)
+          {
+            try
+            {
+              System.Diagnostics.Debug.WriteLine($"[DEP-CHECK] Attempt {attempt}/{maxRetries}...");
+              response = await _backendClient.SendRequestAsync<object, Dictionary<string, object>>(
+                  "/api/settings/check/dependencies",
+                  null,
+                  System.Net.Http.HttpMethod.Get,
+                  cancellationToken
+              );
+              break;
+            }
+            catch (Exception ex)
+            {
+              var isRetryable = ex is System.Net.Http.HttpRequestException
+                  || ex is System.Net.Sockets.SocketException
+                  || ex is System.Threading.Tasks.TaskCanceledException;
+              if (attempt < maxRetries && isRetryable)
+              {
+                System.Diagnostics.Debug.WriteLine($"[DEP-CHECK] Backend not ready (attempt {attempt}), retrying in {retryDelayMs}ms...");
+                await Task.Delay(retryDelayMs, cancellationToken);
+              }
+              else
+              {
+                throw;
+              }
+            }
+          }
 
           System.Diagnostics.Debug.WriteLine($"[DEP-CHECK] Response received: {response != null}");
           if (response != null)

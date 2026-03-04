@@ -175,6 +175,13 @@ public sealed class BackendProcessManager : IDisposable
                 Debug.WriteLine("[BackendProcessManager] Portable mode active - data stored relative to app root");
             }
 
+            // Item 26: Safe Demo Mode - pass through so backend can disable cloning/export
+            var demoMode = Environment.GetEnvironmentVariable("VOICESTUDIO_DEMO_MODE");
+            if (!string.IsNullOrEmpty(demoMode))
+            {
+                psi.Environment["VOICESTUDIO_DEMO_MODE"] = demoMode;
+            }
+
             Debug.WriteLine($"[BackendProcessManager] Starting backend: {psi.FileName} {psi.Arguments}");
             Debug.WriteLine($"[BackendProcessManager] Working directory: {repoRoot}");
 

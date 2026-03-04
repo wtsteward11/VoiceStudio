@@ -3788,7 +3788,7 @@ namespace VoiceStudio.App.Services
         var result = await response.Content.ReadFromJsonAsync<EnginesListResponse>(_jsonOptions, cancellationToken)
                   ?? throw new BackendDeserializationException("Failed to deserialize engines list");
 
-        return result.Engines ?? new List<string>();
+        return result.EngineIds;
       });
     }
 

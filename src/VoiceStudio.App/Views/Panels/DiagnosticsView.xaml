@@ -26,7 +26,13 @@
                                FontWeight="SemiBold"
                                Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
                 </StackPanel>
-                <Button Grid.Column="1" Content="?" Click="HelpButton_Click" ToolTipService.ToolTip="Help"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Content="?" Click="HelpButton_Click" ToolTipService.ToolTip="Help"/>
+                    <Button Content="Export Support Bundle"
+                            Click="ExportSupportBundle_Click"
+                            Margin="8,0,0,0"
+                            ToolTipService.ToolTip="Collect logs and diagnostics into a zip file"/>
+                </StackPanel>
             </Grid>
         </Border>
 

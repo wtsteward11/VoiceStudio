@@ -44,9 +44,10 @@ namespace VoiceStudio.App.Services
             HttpMethod.Get,
             cancellationToken);
 
-        if (response?.Engines != null)
+        var engineIds = response?.EngineIds ?? new List<string>();
+        if (engineIds.Count > 0)
         {
-          foreach (var engineId in response.Engines)
+          foreach (var engineId in engineIds)
           {
             if (!_engines.ContainsKey(engineId))
             {

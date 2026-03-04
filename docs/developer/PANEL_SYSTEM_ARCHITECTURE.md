@@ -76,7 +76,7 @@ The `PanelHost` is a `UserControl` that provides a consistent container for all 
 **Location:** `src/VoiceStudio.App/Controls/PanelHost.xaml`
 
 **Features:**
-- **Header Bar**: Displays panel icon, title, quality badge, context-sensitive action bar, and panel controls (pop out, collapse)
+- **Header Bar**: Displays panel icon, title, quality badge, context-sensitive action bar, and panel controls (pop out, collapse, panel options MenuFlyout)
 - **Content Area**: Hosts the actual panel view
 - **Resize Handles**: Right and bottom handles for resizing panels
 - **Loading Overlay**: Shows loading state with customizable message

@@ -50,7 +50,7 @@ Run the script to update after adding or modifying tools.
 | `audit_cursor_mcp` | Audit Cursor MCP configuration (C:\Users\<you>\.cursor\mcp.j... | `tools/audit_cursor_mcp.py` |
 | `audit_dependencies` | Dependency Audit Script | `scripts/audit_dependencies.py` |
 | `audit_dependencies` | No description available | `scripts/audit_dependencies.ps1` |
-| `audit_route_boundaries` | Route Boundary Audit Script. | `scripts/audit_route_boundaries.py` |
+| `check_route_boundaries` | CI route boundary enforcement (replaces audit_route_boundaries). | `scripts/ci/check_route_boundaries.py` |
 | `audit_store` | Audit Store | `tools/overseer/agent/audit_store.py` |
 | `audit_todo_patterns` | VoiceStudio TODO/Stub Pattern Auditor | `scripts/audit_todo_patterns.py` |
 | `audit_uncommitted_dependencies` | Audit Uncommitted Dependencies | `scripts/audit_uncommitted_dependencies.py` |

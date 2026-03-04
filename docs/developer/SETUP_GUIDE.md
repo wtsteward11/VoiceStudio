@@ -81,6 +81,10 @@ Start-Process ".buildlogs\x64\Debug\net8.0-windows10.0.19041.0\VoiceStudio.App.e
 
 Verify: `curl http://localhost:8001/health`
 
+## 10. Project and Data Paths (Cursor Brick Prevention)
+
+Projects use `VOICESTUDIO_PROJECTS_DIR` (default `~/.voicestudio/projects`). **Do not set this to a path under the repo root.** Storing projects, backups, recordings, or training outputs inside the repository can cause Cursor indexing and git to choke on large binary files—a "Cursor brick" risk. All runtime data (backups, recordings, persistent store, timeline exports, training models) is stored in external directories via `path_config` (`%LOCALAPPDATA%\VoiceStudio\*` or `~/.voicestudio/*`).
+
 ## Available Setup Scripts
 
 | Script | Purpose |

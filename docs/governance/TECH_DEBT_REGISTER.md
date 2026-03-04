@@ -57,6 +57,8 @@
 | **TD-037** | WhisperX Engine Implementation | 2026-02-12 | WhisperXEngine in app/core/engines/whisperx_engine.py; manifest engines/audio/whisperx; TranscribeViewModel.Engines includes "whisperx"; transcribe route supports diarization | whisperx_engine.py, transcribe.py, TranscribeViewModel.cs |
 | **TD-038** | DAW Export Presets | 2026-02-12 | Pre-configured presets in daw_integration.py (DAW_EXPORT_PRESETS, get_daw_export_presets, get_daw_export_preset_by_id); GET /api/integrations/daw/presets; export accepts preset_id | daw_integration.py, integrations.py, test_daw_integration.py |
 | **TD-039** | Dynamic Transcription Engine Discovery | 2026-02-28 | Implemented in TranscribeViewModel.cs via GAP-CS-003: LoadEnginesAsync() calls GetTranscriptionEnginesAsync(), populates Engines dynamically, falls back to hardcoded list on backend error | TranscribeViewModel.cs lines 229-280 |
+| **TD-040** | Starlette Double call_next AssertionError | 2026-03-03 | Fixed double call_next in performance_profiling_middleware and request_size_limit_middleware except blocks; replaced with raise. Added Unicode control character path rejection in InputValidationMiddleware (C-T1) | tests/unit/test_middleware_regression.py (8 pass) |
+| **TD-041** | Test Isolation (Order-Dependent Tests) | 2026-03-03 | Installed pytest-randomly; added --randomly-seed=last to pytest.ini; autouse fixtures clear module-level job stores (conftest.py) and performance middleware metrics (integration/conftest.py); CI runs two seeds (C-T2) | ci.yml dual-seed runs |
 
 ---
 
@@ -210,3 +212,5 @@
 | 2026-02-12 | Closed TD-034 (7 UI controls implemented), TD-035 (DAW import), TD-036 (workspace smoke); added resolution rows to Closed table |
 | 2026-02-12 | Closed TD-037 (WhisperX engine): whisperx_engine.py, manifest engines/audio/whisperx, TranscribeViewModel.Engines + "whisperx", transcribe route diarization; Active table now empty |
 | 2026-02-12 | TD-038 DAW Export Presets: implemented DAW_EXPORT_PRESETS, get_daw_export_presets, get_daw_export_preset_by_id; GET /daw/presets; export preset_id; tests in test_daw_integration.py; closed same day |
+| 2026-03-03 | TD-040 Starlette Double call_next AssertionError (C-T1): fixed double call_next, added Unicode control char guard |
+| 2026-03-03 | TD-041 Test Isolation (C-T2): pytest-randomly installed, autouse fixtures for state cleanup, CI dual-seed runs |

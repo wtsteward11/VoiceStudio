@@ -1,0 +1,750 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "VoiceStudio Quantum+ Backend API",
+    "description": "\n    VoiceStudio Quantum+ provides a comprehensive REST API for voice cloning, audio processing, and project management.\n\n    ## Features\n\n    - **Voice Cloning:** Multiple engines (XTTS v2, Chatterbox TTS, Tortoise TTS, OpenVoice, RVC, and more)\n    - **Audio Processing:** 17+ audio effects and processing tools\n    - **Project Management:** Projects, tracks, clips, and timeline management\n    - **Quality Metrics:** MOS score, similarity, naturalness, SNR, artifact detection\n    - **Training:** Custom voice model training with data optimization\n    - **Batch Processing:** Queue-based batch synthesis\n    - **Transcription:** Whisper-based speech-to-text\n    - **Real-time Updates:** WebSocket support for real-time updates\n\n    ## Error Handling\n\n    All errors follow a standardized format with error codes, recovery suggestions, and context.\n    See the error handling documentation for details.\n\n    ## Rate Limiting\n\n    API endpoints are rate-limited to ensure fair usage and system stability.\n    Rate limit information is provided in response headers.\n    See the rate limiting documentation for details.\n    ",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "Root endpoint with version information.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/version": {
+      "get": {
+        "tags": [
+          "versioning"
+        ],
+        "summary": "Api Version Info",
+        "description": "Get API version information including negotiated version and compatibility.\n\nReturns:\n    - current_version: The current API version\n    - min_supported_version: Minimum supported API version\n    - negotiated_version: The version negotiated for this request\n    - supported_versions: List of all supported versions\n    - version_info: Application version details",
+        "operationId": "api_version_info_api_version_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "description": "Basic health check endpoint.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "API health check",
+        "description": "\n                Comprehensive API health check with performance metrics.\n\n                **Response:**\n                Returns API status, version, uptime, and system health indicators.\n\n                **Usage Example (C#):**\n                ```csharp\n                var health = await _backendClient.GetApiHealthAsync(cancellationToken);\n                ```\n                ",
+        "operationId": "api_health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "examples": {
+                  "default": {
+                    "summary": "Example response",
+                    "value": {
+                      "status": "ok",
+                      "version": "1.0.0",
+                      "uptime_seconds": 86400,
+                      "system_health": "healthy",
+                      "database_connected": true,
+                      "engines_available": 15
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/metrics": {
+      "get": {
+        "summary": "Api Metrics",
+        "description": "Minimum observability metrics for API, engines, and errors.",
+        "operationId": "api_metrics_api_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/metrics/history": {
+      "get": {
+        "summary": "Api Metrics History",
+        "description": "Phase 8 WS4: Get metrics history for trend charts.\n\nQuery param: window (e.g. 24h, 48h, 168h for 1 week). Default 24h.",
+        "operationId": "api_metrics_history_api_metrics_history_get",
+        "parameters": [
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "24h",
+              "title": "Window"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cache/stats": {
+      "get": {
+        "summary": "Cache Stats",
+        "description": "Get response cache statistics.",
+        "operationId": "cache_stats_api_cache_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cache/clear": {
+      "post": {
+        "summary": "Clear Cache",
+        "description": "Clear all response cache entries.",
+        "operationId": "clear_cache_api_cache_clear_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profiler/stats": {
+      "get": {
+        "summary": "Profiler Stats",
+        "description": "Get performance profiler statistics.",
+        "operationId": "profiler_stats_api_profiler_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profiler/detailed": {
+      "get": {
+        "summary": "Profiler Detailed",
+        "description": "Get detailed performance profiler statistics.",
+        "operationId": "profiler_detailed_api_profiler_detailed_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profiler/reset": {
+      "post": {
+        "summary": "Profiler Reset",
+        "description": "Reset performance profiler data.",
+        "operationId": "profiler_reset_api_profiler_reset_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/metrics": {
+      "get": {
+        "summary": "Engine Metrics",
+        "description": "Get engine performance metrics.",
+        "operationId": "engine_metrics_api_engines_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/metrics/{engine_name}": {
+      "get": {
+        "summary": "Engine Metrics Detail",
+        "description": "Get performance metrics for a specific engine.",
+        "operationId": "engine_metrics_detail_api_engines_metrics__engine_name__get",
+        "parameters": [
+          {
+            "name": "engine_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Engine Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engines/metrics/reset": {
+      "post": {
+        "summary": "Engine Metrics Reset",
+        "description": "Reset engine performance metrics.",
+        "operationId": "engine_metrics_reset_api_engines_metrics_reset_post",
+        "parameters": [
+          {
+            "name": "engine_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Engine Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/endpoints/metrics": {
+      "get": {
+        "summary": "Endpoint Metrics",
+        "description": "Get API endpoint performance metrics.",
+        "operationId": "endpoint_metrics_api_endpoints_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/endpoints/metrics/{endpoint_key}": {
+      "get": {
+        "summary": "Endpoint Metrics Detail",
+        "description": "Get performance metrics for a specific endpoint.",
+        "operationId": "endpoint_metrics_detail_api_endpoints_metrics__endpoint_key__get",
+        "parameters": [
+          {
+            "name": "endpoint_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Endpoint Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/endpoints/metrics/reset": {
+      "post": {
+        "summary": "Endpoint Metrics Reset",
+        "description": "Reset API endpoint performance metrics.",
+        "operationId": "endpoint_metrics_reset_api_endpoints_metrics_reset_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cache/invalidate": {
+      "post": {
+        "summary": "Invalidate Cache",
+        "description": "Invalidate cache entries by pattern, tags, or path prefix.\n\nArgs:\n    pattern: Pattern to match in cache key\n    tags: Comma-separated list of tags to invalidate\n    path_prefix: Path prefix to invalidate (e.g., \"/api/profiles\")",
+        "operationId": "invalidate_cache_api_cache_invalidate_post",
+        "parameters": [
+          {
+            "name": "pattern",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pattern"
+            }
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tags"
+            }
+          },
+          {
+            "name": "path_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Path Prefix"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/validation/stats": {
+      "get": {
+        "summary": "Validation Stats",
+        "description": "Get validation statistics.",
+        "operationId": "validation_stats_api_validation_stats_get",
+        "parameters": [
+          {
+            "name": "model_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/validation/cache/clear": {
+      "post": {
+        "summary": "Validation Cache Clear",
+        "description": "Clear validation cache.",
+        "operationId": "validation_cache_clear_api_validation_cache_clear_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduler/stats": {
+      "get": {
+        "summary": "Scheduler Stats",
+        "description": "Get background task scheduler statistics.",
+        "operationId": "scheduler_stats_api_scheduler_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduler/tasks": {
+      "get": {
+        "summary": "Scheduler Tasks",
+        "description": "List scheduled tasks.",
+        "operationId": "scheduler_tasks_api_scheduler_tasks_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduler/tasks/{task_id}": {
+      "get": {
+        "summary": "Scheduler Task Detail",
+        "description": "Get details for a specific task.",
+        "operationId": "scheduler_task_detail_api_scheduler_tasks__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduler/tasks/{task_id}/cancel": {
+      "post": {
+        "summary": "Scheduler Task Cancel",
+        "description": "Cancel a scheduled task.",
+        "operationId": "scheduler_task_cancel_api_scheduler_tasks__task_id__cancel_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

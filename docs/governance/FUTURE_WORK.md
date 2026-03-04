@@ -42,6 +42,8 @@ This document tracks items that are intentionally deferred to future development
 | ~~TD-015~~ | ~~Venv Families (8 families)~~ | **COMPLETE** - See `docs/design/VENV_FAMILIES_ANALYSIS.md` | ~~Phase 11+~~ |
 | ~~TD-016~~ | ~~Engine Manifest Schema v2~~ | **RESOLVED** - verify_engine_tasks_targeted.py 4/4 PASS (2026-02-10) | ~~Phase 11+~~ |
 | ~~TD-017~~ | ~~BaseEngine to EngineProtocol Migration~~ | **RESOLVED** - BaseEngine is alias for EngineProtocol (2026-02-11) | ~~v1.1+~~ |
+| TD-018 | sys.path.insert for app/ imports | Routes (voice, training, synthesis, etc.) use sys.path.insert to import app.core.*. Fix: use EngineService/backend facade or make app a proper package. | v1.1+ |
+| TD-019 | Training split-brain (PersistentStore + TrainingJobRepository) | Training uses both; pick one system of record. | v1.1+ |
 
 #### TD-017: BaseEngine to EngineProtocol Migration — **COMPLETE**
 

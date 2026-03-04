@@ -59,6 +59,20 @@ python scripts/ci/check_artifact_spine_compliance.py
 python -m pytest tests/guardrails/test_route_table_and_spine.py -q
 ```
 
+## Route Enumeration Tests (M6)
+
+`tests/contract/test_route_enumeration.py` enumerates routes whose response model contains `audio_id` and verifies:
+
+1. **Enumeration** — At least one route returns `audio_id` (e.g. `/api/voice/synthesize`).
+2. **Compliance** — Route source files pass artifact spine compliance.
+3. **Resolution** — `AudioRegistry.get_path(audio_id)` resolves for registered artifacts.
+
+### How to Run Locally
+
+```powershell
+python -m pytest tests/contract/test_route_enumeration.py -q
+```
+
 ## How to Run Locally (Route Boundaries + Repo Payloads)
 
 ```powershell
@@ -99,6 +113,13 @@ The legacy `--update-allowlist` mode auto-added every payload and large file, tu
 python scripts/ci/check_repo_payloads.py --update-baselines
 python scripts/ci/check_repo_payloads.py --refresh-large-file-sizes
 ```
+
+### installer/runtime
+
+- `installer/runtime` is gitignored.
+- CI never sets `VOICESTUDIO_ALLOW_REPO_RUNTIME`; the dir must be empty in CI.
+- Local dev: run `prepare-runtime.ps1` only if needed; set `VOICESTUDIO_ALLOW_REPO_RUNTIME=1` before `check_repo_payloads.py` if the dir is populated.
+- Do not commit `installer/runtime` contents.
 
 ### installer/runtime__DISABLED
 

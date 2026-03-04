@@ -37,6 +37,8 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Change Control Rules** | `docs/governance/CHANGE_CONTROL_RULES.md` | 2026-02-09 | Non-negotiable verification gate, stabilization protocol, Cursor agent operating protocol, blast radius limits |
 | **Verification Harness Rule** | `.cursor/rules/workflows/verification-harness.mdc` | 2026-02-09 | Agent rule for verify.ps1 usage; "no green = no merge" enforcement |
 | **Plugin System Guidelines** | `docs/governance/PLUGIN_SYSTEM_GUIDELINES.md` | 2026-02-16 | Canonical plugin governance: architecture, security, performance, DX, testing, UI, compatibility, risk, observability (10 sections). Companion to ADR-036. |
+| **Provenance Policy** | `docs/governance/PROVENANCE_POLICY.md` | 2026-03-01 | Best-effort provenance and usage recording for audio outputs; do not claim full traceability |
+| **Completion Roadmap v2.0** | `docs/governance/VOICESTUDIO_COMPLETION_ROADMAP_V2.md` | 2026-03-03 | CI-enforced hardened roadmap for v1.1.0; 7 gaps, 6 phases (0/A/B/C/D/E/F), 5 permanent CI invariants |
 
 ## Architecture
 
@@ -253,7 +255,8 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Reorg Log | `docs/governance/PROJECT_REORG_LOG.md` | 2026-01-25 | Reorganization history |
 | Compatibility Matrix (Design) | `docs/design/COMPATIBILITY_MATRIX.md` | 2026-01-30 | Human-readable compatibility matrix; see also `config/compatibility_matrix.yml` |
 | Production Build | `docs/governance/VoiceStudio_Production_Build_Plan.md` | 2026-01-25 | Production build plan |
-| **Deterministic Sentinel Implementation Plan** | `docs/design/DETERMINISTIC_SENTINEL_IMPLEMENTATION_PLAN.md` | 2026-02-13 | **NEW** — 6-phase implementation plan for sentinel workflow, API hardening, UI automation, security/stability, architecture foundations, scalability |
+| **Deterministic Sentinel Implementation Plan** | `docs/design/DETERMINISTIC_SENTINEL_IMPLEMENTATION_PLAN.md` | 2026-02-13 | 6-phase implementation plan for sentinel workflow, API hardening, UI automation, security/stability, architecture foundations, scalability |
+| **Phase F Anti-Theater Hardening Plan** | `docs/design/PHASE_F_ANTI_THEATER_HARDENING_PLAN.md` | 2026-03-04 | Sprint plan: Gate C nav_steps, stub/real proof non-fakeability, STATE canonical, god-object budgets, schema/fingerprint alignment |
 
 ## Security
 

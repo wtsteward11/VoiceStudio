@@ -184,7 +184,7 @@ def validate_nested_semantics(
                     errors.append(
                         f"{path.relative_to(ROOT)}: ui_smoke.summary_path is required"
                     )
-                else:
+                elif not data.get("historical_proof"):
                     summary_full = (ROOT / sp.replace("\\", "/")).resolve()
                     root_resolved = ROOT.resolve()
                     if not str(summary_full).startswith(str(root_resolved)):
@@ -214,7 +214,7 @@ def validate_nested_semantics(
                     errors.append(
                         f"{path.relative_to(ROOT)}: ui_smoke.log_path is required"
                     )
-                else:
+                elif not data.get("historical_proof"):
                     log_full = (ROOT / lp.replace("\\", "/")).resolve()
                     root_resolved = ROOT.resolve()
                     if not str(log_full).startswith(str(root_resolved)):

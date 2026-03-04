@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-03-04
+
+### Service Layer Extraction and CI Hardening
+
+Major architecture refactor: extracted business logic from 72 route files into dedicated service modules. Established CI-enforced invariant gates and proof artifact pipeline.
+
+#### Architecture
+- Extracted 55 new service modules from route handlers (thin route pattern)
+- Added engine, pipeline, training, NLP, TTS, voice facade modules
+- Removed dead mediator/CQRS layer (ADR-046)
+- Deleted voice.py god-route (138 KB, 3,326 lines)
+- Updated all 68 engine manifests to v3 schema
+
+#### CI/Proof System
+- 5 permanent CI invariants: router uniqueness, trust/safety choke point, proof artifact completeness, OpenAPI validity, crash traceback completeness
+- Proof artifact pipeline with evidence fingerprinting (M11 tamper-evidence)
+- Historical proof allowlist for refreshed proofs
+- Golden path stub proof generation and validation in CI
+- 3-seed test determinism (pytest-randomly)
+- File size budgets, route size budgets, service boundary checks
+
+#### Quality
+- 54 CI gate tests, all passing across 3 random seeds
+- Consent enforcement API (trust/safety)
+- Content-creator workflow E2E test
+- Crash recovery scenario tests
+- Route artifact invariant tests
+
+#### Release Readiness
+- v1.1.0 release criteria document (6 hard gates)
+- Beta program structure
+- Installer size audit
+- Support bundle runtime proof infrastructure
+- Performance budget runtime proof infrastructure
+
+---
+
 ## [1.0.3] - 2026-02-24
 
 ### Reintegration Release

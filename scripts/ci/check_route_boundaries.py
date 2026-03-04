@@ -98,7 +98,7 @@ EXEMPTION_SUBSTRINGS = (
 )
 
 
-EXCLUDED_FILES = frozenset({"engine_audit.py", "engines.py"})
+EXCLUDED_FILES = frozenset({"engine_audit.py", "engines.py", "__init__.py"})
 
 
 def get_route_files() -> list[Path]:

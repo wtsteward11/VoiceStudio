@@ -18,6 +18,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from backend.config.path_config import get_path
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,10 +78,10 @@ class RetentionConfig:
         }
     )
 
-    # Directory mappings
+    # Directory mappings (audio_uploads outside repo per trust audit)
     category_paths: dict[DataCategory, str] = field(
         default_factory=lambda: {
-            DataCategory.AUDIO_UPLOADS: "data/audio_uploads",
+            DataCategory.AUDIO_UPLOADS: str(get_path("audio_uploads")),
             DataCategory.VOICE_CLONES: "data/voice_clones",
             DataCategory.SYNTHESIS_OUTPUT: "data/output",
             DataCategory.PROJECT_FILES: "data/projects",

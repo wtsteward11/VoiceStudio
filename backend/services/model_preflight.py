@@ -146,8 +146,14 @@ def ensure_xtts(auto_download: bool = True) -> dict[str, object]:
                 repo_id=model_name,
                 local_dir=str(base_dir),
                 local_dir_use_symlinks=False,
+                resume_download=True,
             )
             downloaded = True
+            try:
+                from backend.services.usage_stats import record_model_downloaded
+                record_model_downloaded()
+            except Exception as e:
+                logger.debug("Usage stats record_model_downloaded skip: %s", e)
         else:
             # Coqui model IDs are downloaded/managed by the Coqui TTS library on first use.
             # We still create the directories so downstream components have a stable place
@@ -206,12 +212,19 @@ def ensure_piper(auto_download: bool = True) -> dict[str, object]:
                 "huggingface_hub required for Piper auto-download. Install: pip install huggingface_hub",
                 status_code=503,
             )
-        return hf_hub_download(
+        out = hf_hub_download(
             repo_id="rhasspy/piper-voices",
             filename=file_rel,
             local_dir=str(base_dir),
             local_dir_use_symlinks=False,
+            resume_download=True,
         )
+        try:
+            from backend.services.usage_stats import record_model_downloaded
+            record_model_downloaded()
+        except Exception as e:
+            logger.debug("Usage stats record_model_downloaded skip: %s", e)
+        return out
 
     downloaded = False
     if not model_path.exists():
@@ -277,8 +290,14 @@ def ensure_whisper_cpp(auto_download: bool = True) -> dict[str, object]:
             filename="whisper-medium.en.gguf",
             local_dir=str(model_path.parent),
             local_dir_use_symlinks=False,
+            resume_download=True,
         )
         downloaded = True
+        try:
+            from backend.services.usage_stats import record_model_downloaded
+            record_model_downloaded()
+        except Exception as e:
+            logger.debug("Usage stats record_model_downloaded skip: %s", e)
 
     return {
         "ok": True,
@@ -412,3 +431,57 @@ def run_preflight(auto_download: bool = True) -> dict[str, object]:
             }
 
     return {"results": results}
+
+
+def _sha256_file(path: Path) -> str:
+    """Compute SHA256 hex digest of a file."""
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def model_integrity_check(models_root: str | Path) -> dict[str, object]:
+    """
+    Verify downloaded models match expected hashes (Item 33).
+
+    Looks for .sha256 sidecar files next to assets (e.g. model.onnx.sha256
+    containing one line: hexdigest). If present, verifies the asset file.
+    Returns dict with keys: ok, checked, passed, failed, message.
+    """
+    root = Path(models_root)
+    if not root.is_dir():
+        return {
+            "ok": True,
+            "checked": 0,
+            "passed": 0,
+            "failed": 0,
+            "message": "Models root not found; nothing to verify",
+        }
+    checked = 0
+    passed = 0
+    failed: list[dict] = []
+    for sha_path in root.rglob("*.sha256"):
+        asset_path = sha_path.with_suffix("")
+        if not asset_path.is_file():
+            continue
+        checked += 1
+        expected = sha_path.read_text().strip().split()[0]
+        actual = _sha256_file(asset_path)
+        if actual.lower() == expected.lower():
+            passed += 1
+        else:
+            failed.append(
+                {"path": str(asset_path), "expected": expected, "actual": actual}
+            )
+    ok = len(failed) == 0
+    return {
+        "ok": ok,
+        "checked": checked,
+        "passed": passed,
+        "failed": failed,
+        "message": f"Checked {checked} files, {passed} passed, {len(failed)} failed"
+        if checked else "No .sha256 sidecars found",
+    }

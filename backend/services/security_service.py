@@ -206,7 +206,7 @@ class ConsentStatus(Enum):
 
 @dataclass
 class ConsentRecord:
-    """Consent record."""
+    """Consent record (subject identity, proof of consent, allowed uses, expiry/revocation)."""
 
     consent_id: str
     voice_id: str
@@ -218,6 +218,7 @@ class ConsentRecord:
     expires_at: datetime | None
     scope: dict[str, Any]
     signature: str | None
+    reference_audio_hash: str | None = None  # Proof of consent: hash of reference audio
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -231,6 +232,7 @@ class ConsentRecord:
             "expires_at": self.expires_at.isoformat() if self.expires_at else None,
             "scope": self.scope,
             "signature": self.signature,
+            "reference_audio_hash": self.reference_audio_hash,
         }
 
     @property
@@ -247,6 +249,10 @@ class ConsentManager:
         self._consents: dict[str, ConsentRecord] = {}
         self._voice_consents: dict[str, list[str]] = {}  # voice_id -> consent_ids
 
+    def get_consent_by_id(self, consent_id: str) -> ConsentRecord | None:
+        """Get a consent record by ID."""
+        return self._consents.get(consent_id)
+
     async def request_consent(
         self,
         voice_id: str,
@@ -255,6 +261,7 @@ class ConsentManager:
         consent_type: ConsentType,
         scope: dict[str, Any] | None = None,
         expires_days: int | None = None,
+        reference_audio_hash: str | None = None,
     ) -> ConsentRecord:
         """Create a consent request."""
         consent_id = f"consent_{uuid.uuid4().hex[:8]}"
@@ -274,6 +281,7 @@ class ConsentManager:
             expires_at=expires_at,
             scope=scope or {},
             signature=None,
+            reference_audio_hash=reference_audio_hash,
         )
 
         self._consents[consent_id] = record
@@ -597,6 +605,39 @@ class SecurityService:
     @property
     def watermarking(self) -> WatermarkingService:
         return self._watermarking
+
+
+def write_provenance_sidecar(
+    output_base_path: str,
+    model_used: str,
+    source_reference_hash: str | None = None,
+    version: str | None = None,
+) -> None:
+    """
+    Write provenance metadata as JSON sidecar (Item 24).
+
+    Creates a .json file alongside the output file with generation timestamp,
+    model used, source reference hash, and VoiceStudio version.
+    """
+    import json
+    from pathlib import Path
+
+    base = Path(output_base_path)
+    # If path has extension, sidecar is same name with .json; else append .json
+    if base.suffix:
+        sidecar_path = base.with_suffix(base.suffix + ".provenance.json")
+    else:
+        sidecar_path = base.with_name(base.name + ".provenance.json")
+    payload = {
+        "generation_timestamp": datetime.now().isoformat(),
+        "model_used": model_used,
+        "source_reference_hash": source_reference_hash,
+        "voicestudio_version": version or "1.1.0",
+    }
+    try:
+        sidecar_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except OSError as e:
+        logger.warning("Failed to write provenance sidecar %s: %s", sidecar_path, e)
 
 
 # Singleton

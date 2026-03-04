@@ -1,0 +1,25 @@
+{
+  "preset_id": "content_creator_quick_export",
+  "name": "Content Creator Quick Export",
+  "category": "content_creator",
+  "description": "Noise reduction → leveling → de-essing → loudness normalization → export (podcast -16 LUFS, broadcast-ready)",
+  "default_chain": {
+    "schema_version": "1.0",
+    "name": "Content Creator Quick Export Pipeline",
+    "steps": [
+      {"step_id": "s1", "type": "enhancement", "parameters": {"preset": "preset_podcast", "noise_reduction": 0.7, "normalization": true}},
+      {"step_id": "s2", "type": "quality_evaluation"},
+      {"step_id": "s3", "type": "mastering", "parameters": {"loudness": "EBU_R128", "target_lufs": -16}},
+      {"step_id": "s4", "type": "export", "parameters": {"format": "wav", "fallback_format": "mp3"}}
+    ]
+  },
+  "default_quality_policy": {
+    "min_mos": 3.8,
+    "min_similarity": 0.8,
+    "min_naturalness": 0.85,
+    "max_artifact_score": 0.05,
+    "min_snr_db": 30,
+    "auto_enhance_if_below": true,
+    "fail_if_unmet": false
+  }
+}

@@ -29,7 +29,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-
 # Phase 6A: Wasm execution imports
 WasmRunner: type | None = None
 WasmPluginConfig: type | None = None

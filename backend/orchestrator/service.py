@@ -416,8 +416,9 @@ class OrchestrationService:
         self, audio_path: str, reference_path: str | None = None
     ) -> OrchestrationQualityMetrics:
         try:
-            from app.core.engines.quality_metrics import calculate_all_metrics
             import numpy as np
+
+            from app.core.engines.quality_metrics import calculate_all_metrics
 
             audio = np.zeros(16000, dtype=np.float32)
             try:

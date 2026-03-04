@@ -27,7 +27,7 @@ class ProfileStore:
     loading all profile data.
 
     Storage layout:
-        ~/.voicestudio/profiles/
+        get_path("profiles") /  # VOICESTUDIO_PROFILES_PATH or data/profiles
         ├── index.json          # Fast lookup index
         ├── {profile_id}/
         │   ├── profile.json    # Profile metadata
@@ -39,10 +39,12 @@ class ProfileStore:
         base_dir: str | None = None,
         max_profiles: int = 5000,
     ):
+        from backend.config.path_config import get_path
+
         self._base_dir = Path(
             base_dir
             or os.getenv("VOICESTUDIO_PROFILES_PATH", "")
-            or Path.home() / ".voicestudio" / "profiles"
+            or str(get_path("profiles"))
         )
         self._base_dir.mkdir(parents=True, exist_ok=True)
         self._max_profiles = max_profiles

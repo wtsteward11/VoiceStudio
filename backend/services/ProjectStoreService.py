@@ -25,7 +25,7 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, ValidationError
 
-from backend.services.ContentAddressedAudioCache import get_audio_cache
+from backend.services.audio_registry_service import ensure_cached
 
 logger = logging.getLogger(__name__)
 
@@ -122,8 +122,7 @@ class ProjectStoreService:
         dest_path = audio_dir / normalized
 
         try:
-            audio_cache = get_audio_cache()
-            cached_path, _ = audio_cache.get_or_store(source)
+            cached_path = ensure_cached(source)
         except Exception as cache_error:
             logger.warning(
                 "Content-addressed cache failed, using direct copy: %s",

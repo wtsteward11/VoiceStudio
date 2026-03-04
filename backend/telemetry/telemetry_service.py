@@ -189,6 +189,12 @@ class TelemetryService:
                 "duration": duration_seconds,
             },
         )
+        if success and duration_seconds > 0:
+            try:
+                from backend.services.usage_stats import record_synthesis_minutes
+                record_synthesis_minutes(duration_seconds / 60.0)
+            except Exception as e:
+                logger.debug("Usage stats record_synthesis_minutes skip: %s", e)
 
     def track_performance(self, operation: str, duration_ms: float, success: bool = True) -> None:
         """Track performance metrics."""

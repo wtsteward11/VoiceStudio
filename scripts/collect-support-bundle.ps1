@@ -62,6 +62,22 @@ if (Test-Path $bootJson) {
     $collected++
 }
 
+# Engine manifest snapshot (Item 30)
+$enginesRoot = Join-Path $repoRoot "engines"
+if (Test-Path $enginesRoot) {
+    $manifestList = Get-ChildItem $enginesRoot -Recurse -Filter "engine.manifest.json" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+    $manifestList | Out-File (Join-Path $bundleDir "engine_manifests_list.txt") -Encoding utf8
+    Write-Host "  Engine manifests: $($manifestList.Count) listed"
+    $collected++
+}
+
+# Build version (Item 30)
+$versionFile = Join-Path $repoRoot "src\VoiceStudio.App\Package.appxmanifest.xml"
+if (-not (Test-Path $versionFile)) { $versionFile = Join-Path $repoRoot "Directory.Build.props" }
+if (Test-Path $versionFile) {
+    Get-Content $versionFile -Raw | Out-File (Join-Path $bundleDir "build_version_source.txt") -Encoding utf8 -ErrorAction SilentlyContinue
+}
+
 $info = @{
     timestamp = $timestamp
     hostname = $env:COMPUTERNAME

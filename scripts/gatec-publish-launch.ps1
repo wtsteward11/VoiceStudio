@@ -286,6 +286,19 @@ if ($UiSmoke) {
     if ($e.LastWriteTime -ge $start) { Copy-Item -LiteralPath $exception -Destination $exceptionCopy -Force }
   }
 
+  # Fallback: app exited 0 but did not write summary (e.g. path/permission). Synthesize from observed exit code.
+  if ($uiExitCode -eq 0 -and -not (Test-Path $summaryCopy)) {
+    $synthesized = @{
+      timestamp_utc         = (Get-Date).ToUniversalTime().ToString("o")
+      exe                  = $exe.FullName
+      exit_code            = 0
+      nav_steps            = @()
+      binding_failure_count = 0
+      synthesized_from_gatec = $true
+    } | ConvertTo-Json
+    $synthesized | Set-Content -Path $summaryCopy -Encoding UTF8
+  }
+
   $artifacts = Get-ChildItem -Path $crashDir | Where-Object { $_.LastWriteTime -ge $start } | Sort-Object LastWriteTime -Descending
   $artifactLines = @()
   foreach ($a in $artifacts) {

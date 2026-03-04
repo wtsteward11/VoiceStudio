@@ -6,9 +6,11 @@ Exports the FastAPI OpenAPI schema to docs/api/openapi.json
 Usage:
     python scripts/export_openapi_schema.py
     python scripts/export_openapi_schema.py --output path/to/openapi.json
+    python scripts/export_openapi_schema.py --update-hash  # Also update drift test hash
 """
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -25,6 +27,11 @@ def main():
         type=str,
         default=None,
         help="Output file path (default: docs/api/openapi.json)"
+    )
+    parser.add_argument(
+        "--update-hash",
+        action="store_true",
+        help="Also update tests/contract/.openapi_schema_hash for drift test"
     )
     args = parser.parse_args()
 
@@ -52,6 +59,17 @@ def main():
             f"   Schema version: {openapi_schema.get('info', {}).get('version', 'unknown')}"
         )
         print(f"   Total paths: {len(openapi_schema.get('paths', {}))}")
+
+        if args.update_hash:
+            hash_file = PROJECT_ROOT / "tests" / "contract" / ".openapi_schema_hash"
+            normalized = {
+                "paths": openapi_schema.get("paths", {}),
+                "components": openapi_schema.get("components", {}),
+            }
+            h = hashlib.sha256(json.dumps(normalized, sort_keys=True).encode()).hexdigest()
+            hash_file.parent.mkdir(parents=True, exist_ok=True)
+            hash_file.write_text(h)
+            print(f"   Hash updated: {hash_file}")
 
         return 0
 

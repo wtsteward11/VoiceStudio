@@ -6,7 +6,9 @@
   "entry_point": "app.core.engines.bark_engine:BarkEngine",
   "description": "Suno Bark - Expressive multi-modal TTS with sound effects",
   "dependencies": {
-    "python": ["bark"],
+    "python": [
+      "bark"
+    ],
     "system": []
   },
   "capabilities": {
@@ -16,9 +18,22 @@
     "emotions": true,
     "sound_effects": true
   },
-  "supported_languages": ["en", "es", "fr", "de", "it", "pt", "pl", "ru", "zh", "ja", "ko"],
+  "supported_languages": [
+    "en",
+    "es",
+    "fr",
+    "de",
+    "it",
+    "pt",
+    "pl",
+    "ru",
+    "zh",
+    "ja",
+    "ko"
+  ],
   "model_paths": {},
   "config": {
     "sample_rate": 24000
-  }
+  },
+  "support_tier": "experimental"
 }

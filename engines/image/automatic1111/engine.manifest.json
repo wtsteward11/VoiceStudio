@@ -102,5 +102,6 @@
     }
   },
   "implementation_status": "external",
-  "implementation_notes": "Delegates to external tool. Requires automatic1111 to be installed and running."
+  "implementation_notes": "Delegates to external tool. Requires automatic1111 to be installed and running.",
+  "support_tier": "experimental"
 }

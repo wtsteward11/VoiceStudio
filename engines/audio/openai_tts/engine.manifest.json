@@ -164,5 +164,6 @@
     ]
   },
   "implementation_status": "full",
-  "implementation_notes": "Fully implemented audio engine."
+  "implementation_notes": "Fully implemented audio engine.",
+  "support_tier": "tier2_best_effort"
 }

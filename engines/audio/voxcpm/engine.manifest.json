@@ -78,5 +78,6 @@
     }
   },
   "implementation_status": "placeholder",
-  "implementation_notes": "Returns default/silence when dependencies unavailable. Requires package installation."
+  "implementation_notes": "Returns default/silence when dependencies unavailable. Requires package installation.",
+  "support_tier": "experimental"
 }

@@ -6,7 +6,9 @@
   "entry_point": "app.core.engines.xtts_engine:XTTSEngine",
   "description": "Coqui XTTS v2 - Multi-language voice cloning TTS",
   "dependencies": {
-    "python": ["TTS>=0.21.0"],
+    "python": [
+      "TTS>=0.21.0"
+    ],
     "system": []
   },
   "capabilities": {
@@ -15,10 +17,28 @@
     "streaming": true,
     "emotions": false
   },
-  "supported_languages": ["en", "es", "fr", "de", "it", "pt", "pl", "tr", "ru", "nl", "cs", "ar", "zh-cn", "ja", "hu", "ko"],
+  "supported_languages": [
+    "en",
+    "es",
+    "fr",
+    "de",
+    "it",
+    "pt",
+    "pl",
+    "tr",
+    "ru",
+    "nl",
+    "cs",
+    "ar",
+    "zh-cn",
+    "ja",
+    "hu",
+    "ko"
+  ],
   "model_paths": {},
   "config": {
     "sample_rate": 24000,
     "default_speed": 1.0
-  }
+  },
+  "support_tier": "tier1_supported"
 }

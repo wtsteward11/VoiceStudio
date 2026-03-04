@@ -6,7 +6,9 @@
   "entry_point": "app.core.engines.whisper_engine:WhisperEngine",
   "description": "OpenAI Whisper - Speech-to-text transcription",
   "dependencies": {
-    "python": ["openai-whisper"],
+    "python": [
+      "openai-whisper"
+    ],
     "system": []
   },
   "capabilities": {
@@ -14,9 +16,21 @@
     "translation": true,
     "multi_language": true
   },
-  "supported_languages": ["en", "es", "fr", "de", "it", "pt", "ja", "zh", "ko", "ru"],
+  "supported_languages": [
+    "en",
+    "es",
+    "fr",
+    "de",
+    "it",
+    "pt",
+    "ja",
+    "zh",
+    "ko",
+    "ru"
+  ],
   "model_paths": {},
   "config": {
     "default_model": "base"
-  }
+  },
+  "support_tier": "tier1_supported"
 }

@@ -6,7 +6,9 @@
   "entry_point": "app.core.engines.openvoice_engine:OpenVoiceEngine",
   "description": "OpenVoice - Instant voice cloning with style control",
   "dependencies": {
-    "python": ["openvoice"],
+    "python": [
+      "openvoice"
+    ],
     "system": []
   },
   "capabilities": {
@@ -16,9 +18,17 @@
     "emotions": true,
     "style_transfer": true
   },
-  "supported_languages": ["en", "es", "fr", "zh", "ja", "ko"],
+  "supported_languages": [
+    "en",
+    "es",
+    "fr",
+    "zh",
+    "ja",
+    "ko"
+  ],
   "model_paths": {},
   "config": {
     "sample_rate": 24000
-  }
+  },
+  "support_tier": "experimental"
 }

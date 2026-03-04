@@ -62,5 +62,6 @@
   },
   "notes": "Per local-first policy, prefer Ollama. This adapter is for cases where cloud quality is explicitly needed.",
   "implementation_status": "full",
-  "implementation_notes": "Fully implemented llm engine."
+  "implementation_notes": "Fully implemented llm engine.",
+  "support_tier": "tier2_best_effort"
 }

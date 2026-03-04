@@ -15,9 +15,12 @@
     "streaming": true,
     "emotions": true
   },
-  "supported_languages": ["en"],
+  "supported_languages": [
+    "en"
+  ],
   "model_paths": {},
   "config": {
     "sample_rate": 24000
-  }
+  },
+  "support_tier": "experimental"
 }

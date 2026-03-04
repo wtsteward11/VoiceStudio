@@ -5,6 +5,7 @@
   "subtype": "tts",
   "version": "1.0",
   "implementation_status": "full",
+  "support_tier": "tier1_supported",
   "implementation_notes": "Fully implemented with multi-language TTS. Lightweight, CPU-friendly.",
   "venv_family": "venv_core_tts",
   "description": "Silero TTS - Fast, high-quality multilingual TTS models with many languages",

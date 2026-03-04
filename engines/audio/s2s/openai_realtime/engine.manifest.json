@@ -58,5 +58,6 @@
   },
   "notes": "Cloud-only. Requires OPENAI_API_KEY. Per local-first policy, prefer local alternatives.",
   "implementation_status": "basic",
-  "implementation_notes": "Basic implementation. Some advanced features may be missing."
+  "implementation_notes": "Basic implementation. Some advanced features may be missing.",
+  "support_tier": "tier2_best_effort"
 }

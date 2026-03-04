@@ -5,11 +5,11 @@ from __future__ import annotations
 import pytest
 
 from backend.orchestrator.schemas import (
+    OrchestrationQualityMetrics,
     OrchestrationRequest,
     OrchestrationStatus,
     OrchestrationStrategy,
     QualityThresholdPolicy,
-    OrchestrationQualityMetrics,
 )
 from backend.orchestrator.service import OrchestrationService
 

@@ -84,9 +84,10 @@ class TestAuthRouteHandlers:
 class TestAuthRouteFunctionality:
     """Test auth route functionality with mocks."""
 
+    @pytest.mark.asyncio
     @patch("backend.api.routes.auth.get_jwt_manager")
     @patch("backend.api.routes.auth.get_api_key_manager")
-    def test_login_with_api_key(self, mock_get_api_key_manager, mock_get_jwt_manager):
+    async def test_login_with_api_key(self, mock_get_api_key_manager, mock_get_jwt_manager):
         """Test login with API key."""
         # Mock JWT manager
         mock_jwt = MagicMock()
@@ -109,7 +110,7 @@ class TestAuthRouteFunctionality:
         request = auth.LoginRequest(username="testuser", api_key="test_key")
 
         # Test login
-        result = auth.login(request)
+        result = await auth.login(request)
 
         # Verify
         assert result.access_token == "access_token"
@@ -117,9 +118,10 @@ class TestAuthRouteFunctionality:
         assert result.token_type == "bearer"
         mock_api_key_mgr.authenticate_api_key.assert_called_once_with("test_key")
 
+    @pytest.mark.asyncio
     @patch("backend.api.routes.auth.get_jwt_manager")
     @patch("backend.api.routes.auth.get_api_key_manager")
-    def test_login_with_password(self, mock_get_api_key_manager, mock_get_jwt_manager):
+    async def test_login_with_password(self, mock_get_api_key_manager, mock_get_jwt_manager):
         """Test login with password."""
         # Mock JWT manager
         mock_jwt = MagicMock()
@@ -142,16 +144,17 @@ class TestAuthRouteFunctionality:
         request = auth.LoginRequest(username="testuser", password="testpass")
 
         # Test login
-        result = auth.login(request)
+        result = await auth.login(request)
 
         # Verify
         assert result.access_token == "access_token"
         assert result.refresh_token == "refresh_token"
         mock_api_key_mgr.authenticate_password.assert_called_once_with("testuser", "testpass")
 
+    @pytest.mark.asyncio
     @patch("backend.api.routes.auth.get_jwt_manager")
     @patch("backend.api.routes.auth.get_api_key_manager")
-    def test_login_creates_guest_user(self, mock_get_api_key_manager, mock_get_jwt_manager):
+    async def test_login_creates_guest_user(self, mock_get_api_key_manager, mock_get_jwt_manager):
         """Test login creates guest user when no password provided."""
         # Mock JWT manager
         mock_jwt = MagicMock()
@@ -175,14 +178,15 @@ class TestAuthRouteFunctionality:
         request = auth.LoginRequest(username="testuser")
 
         # Test login
-        result = auth.login(request)
+        result = await auth.login(request)
 
         # Verify
         assert result.access_token == "access_token"
         mock_api_key_mgr.create_user.assert_called_once()
 
+    @pytest.mark.asyncio
     @patch("backend.api.routes.auth.get_jwt_manager")
-    def test_refresh_token(self, mock_get_jwt_manager):
+    async def test_refresh_token(self, mock_get_jwt_manager):
         """Test refresh token."""
         # Mock JWT manager
         mock_jwt = MagicMock()
@@ -196,15 +200,16 @@ class TestAuthRouteFunctionality:
         mock_credentials.credentials = "refresh_token"
 
         # Test refresh
-        result = auth.refresh_token(mock_credentials)
+        result = await auth.refresh_token(mock_credentials)
 
         # Verify
         assert result.access_token == "new_access_token"
         assert result.refresh_token == "new_refresh_token"
         mock_jwt.refresh_access_token.assert_called_once_with("refresh_token")
 
+    @pytest.mark.asyncio
     @patch("backend.api.routes.auth.require_authentication")
-    def test_get_current_user_info(self, mock_require_authentication):
+    async def test_get_current_user_info(self, mock_require_authentication):
         """Test get current user info."""
         # Mock user
         mock_user = MagicMock()
@@ -220,7 +225,7 @@ class TestAuthRouteFunctionality:
         mock_require_authentication.return_value = mock_user
 
         # Test get current user info
-        result = auth.get_current_user_info(mock_user)
+        result = await auth.get_current_user_info(mock_user)
 
         # Verify
         assert result.user_id == "user123"
@@ -233,19 +238,21 @@ class TestAuthRouteFunctionality:
 class TestAuthRouteErrorHandling:
     """Test auth route error handling."""
 
+    @pytest.mark.asyncio
     @patch("backend.api.routes.auth.get_jwt_manager")
-    def test_login_no_jwt_manager(self, mock_get_jwt_manager):
+    async def test_login_no_jwt_manager(self, mock_get_jwt_manager):
         """Test login fails when JWT manager not available."""
         mock_get_jwt_manager.return_value = None
 
         request = auth.LoginRequest(username="testuser", api_key="test_key")
 
         with pytest.raises(Exception):  # Should raise HTTPException
-            auth.login(request)
+            await auth.login(request)
 
+    @pytest.mark.asyncio
     @patch("backend.api.routes.auth.get_jwt_manager")
     @patch("backend.api.routes.auth.get_api_key_manager")
-    def test_login_invalid_api_key(self, mock_get_api_key_manager, mock_get_jwt_manager):
+    async def test_login_invalid_api_key(self, mock_get_api_key_manager, mock_get_jwt_manager):
         """Test login fails with invalid API key."""
         # Mock JWT manager
         mock_jwt = MagicMock()
@@ -259,10 +266,11 @@ class TestAuthRouteErrorHandling:
         request = auth.LoginRequest(username="testuser", api_key="invalid_key")
 
         with pytest.raises(Exception):  # Should raise HTTPException
-            auth.login(request)
+            await auth.login(request)
 
+    @pytest.mark.asyncio
     @patch("backend.api.routes.auth.get_jwt_manager")
-    def test_refresh_token_no_jwt_manager(self, mock_get_jwt_manager):
+    async def test_refresh_token_no_jwt_manager(self, mock_get_jwt_manager):
         """Test refresh token fails when JWT manager not available."""
         mock_get_jwt_manager.return_value = None
 
@@ -270,10 +278,11 @@ class TestAuthRouteErrorHandling:
         mock_credentials.credentials = "refresh_token"
 
         with pytest.raises(Exception):  # Should raise HTTPException
-            auth.refresh_token(mock_credentials)
+            await auth.refresh_token(mock_credentials)
 
+    @pytest.mark.asyncio
     @patch("backend.api.routes.auth.get_jwt_manager")
-    def test_refresh_token_invalid_token(self, mock_get_jwt_manager):
+    async def test_refresh_token_invalid_token(self, mock_get_jwt_manager):
         """Test refresh token fails with invalid token."""
         # Mock JWT manager
         mock_jwt = MagicMock()
@@ -284,4 +293,4 @@ class TestAuthRouteErrorHandling:
         mock_credentials.credentials = "invalid_token"
 
         with pytest.raises(Exception):  # Should raise HTTPException
-            auth.refresh_token(mock_credentials)
+            await auth.refresh_token(mock_credentials)

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from backend.orchestrator.scheduler import JobScheduler, ScheduledJobStatus
 from backend.orchestrator.gpu_tracker import GpuTracker
+from backend.orchestrator.scheduler import JobScheduler, ScheduledJobStatus
 from backend.orchestrator.schemas import (
     OrchestrationPriority,
     OrchestrationRequest,

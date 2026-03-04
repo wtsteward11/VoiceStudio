@@ -19,8 +19,8 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 try:
-    from backend.api.models import ApiOk
     from backend.api.auth import UserRole
+    from backend.api.models import ApiOk
 except ImportError:
     pytest.skip("Could not import backend models", allow_module_level=True)
 

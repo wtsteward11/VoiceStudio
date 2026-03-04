@@ -12,8 +12,8 @@ project_root = Path(__file__).parent.parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from backend.api.versioning import VERSION_HEADER, APIVersion
     from backend.api.routes.version import router
+    from backend.api.versioning import VERSION_HEADER, APIVersion
 except ImportError:
     pytest.skip("Could not import version route module", allow_module_level=True)
 

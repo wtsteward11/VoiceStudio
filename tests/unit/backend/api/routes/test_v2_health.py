@@ -12,8 +12,8 @@ project_root = Path(__file__).parent.parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from backend.api.versioning import VERSION_HEADER, APIVersion
     from backend.api.routes.v2 import health_router
+    from backend.api.versioning import VERSION_HEADER, APIVersion
 except ImportError:
     pytest.skip("Could not import v2 health route module", allow_module_level=True)
 

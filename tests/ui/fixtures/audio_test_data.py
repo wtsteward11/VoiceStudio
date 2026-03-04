@@ -16,7 +16,6 @@ Audio resolution is delegated to tests/fixtures/canonical.py which provides:
 from __future__ import annotations
 
 import hashlib
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -24,16 +23,8 @@ from pathlib import Path
 # Test Audio File Configuration (delegated to canonical.py)
 # =============================================================================
 
-# Project root directory (relative to this file: tests/ui/fixtures/audio_test_data.py)
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
-
-# Add tests/ to path for canonical module import
-_TESTS_DIR = _PROJECT_ROOT / "tests"
-if str(_TESTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_TESTS_DIR))
-
-# Delegate to unified canonical resolution
-from fixtures.canonical import resolve_test_audio
+# Delegate to unified canonical resolution (tests.fixtures avoids conflict with tests.ui.fixtures)
+from tests.fixtures.canonical import resolve_test_audio
 
 # Primary test audio file - resolved via canonical.py
 TEST_AUDIO_FILE = resolve_test_audio(prefer_segment=True, allow_synthetic=True)

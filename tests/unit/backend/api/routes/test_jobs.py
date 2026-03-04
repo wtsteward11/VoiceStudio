@@ -1,8 +1,13 @@
 """
 Unit Tests for Jobs API Route
 Tests job management endpoints comprehensively.
+
+Uses InMemoryJobRepository with dependency override for isolation.
 """
 
+from __future__ import annotations
+
+import asyncio
 import sys
 import uuid
 from datetime import datetime
@@ -15,11 +20,22 @@ from fastapi.testclient import TestClient
 project_root = Path(__file__).parent.parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-# Import the route module
 try:
     from backend.api.routes import jobs
+    from backend.data.repositories.job_repository import (
+        InMemoryJobRepository,
+        JobEntity,
+    )
+    from backend.data.repositories.job_repository import (
+        JobStatus as RepoJobStatus,
+    )
 except ImportError:
     pytest.skip("Could not import jobs route module", allow_module_level=True)
+
+
+def _run(coro):
+    """Run async coroutine in sync test context."""
+    return asyncio.run(coro)
 
 
 class TestJobsRouteImports:
@@ -27,7 +43,7 @@ class TestJobsRouteImports:
 
     def test_jobs_module_imports(self):
         """Test jobs module can be imported."""
-        assert jobs is not None, "Failed to import jobs module"
+        assert jobs is not None, "Failed to import jobs route module"
         assert hasattr(jobs, "router"), "jobs module missing router"
 
     def test_router_exists(self):
@@ -46,23 +62,39 @@ class TestJobsRouteImports:
 class TestJobsEndpoints:
     """Test job management endpoints."""
 
-    def setup_method(self):
-        """Save module state before each test."""
-        self._saved_jobs = dict(getattr(jobs, "_jobs", {}))
+    def _make_app(self, repo: InMemoryJobRepository) -> FastAPI:
+        """Create FastAPI app with repo override."""
+        app = FastAPI()
+        app.include_router(jobs.router)
+        app.dependency_overrides[jobs.get_repo] = lambda: repo
+        return app
 
-    def teardown_method(self):
-        """Restore module state after each test."""
-        if hasattr(jobs, "_jobs"):
-            jobs._jobs.clear()
-            jobs._jobs.update(self._saved_jobs)
+    def _create_job(
+        self,
+        repo: InMemoryJobRepository,
+        job_id: str,
+        name: str,
+        job_type: str = "batch",
+        status: str = "running",
+        progress: float = 0.5,
+    ) -> None:
+        """Create a job in the repository."""
+        entity = JobEntity(
+            id=job_id,
+            job_type=job_type,
+            name=name,
+            status=status,
+            progress=progress,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        _run(repo.create(entity))
 
     def test_get_jobs_empty(self):
         """Test listing jobs when empty."""
-        app = FastAPI()
-        app.include_router(jobs.router)
+        repo = InMemoryJobRepository()
+        app = self._make_app(repo)
         client = TestClient(app)
-
-        jobs._jobs.clear()
 
         response = client.get("/api/jobs")
         assert response.status_code == 200
@@ -72,23 +104,11 @@ class TestJobsEndpoints:
 
     def test_get_jobs_with_data(self):
         """Test listing jobs with data."""
-        app = FastAPI()
-        app.include_router(jobs.router)
-        client = TestClient(app)
-
-        jobs._jobs.clear()
-
-        # Create a job
+        repo = InMemoryJobRepository()
         job_id = f"job-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        jobs._jobs[job_id] = {
-            "id": job_id,
-            "name": "Test Job",
-            "type": "batch",
-            "status": "running",
-            "progress": 0.5,
-            "created": now,
-        }
+        self._create_job(repo, job_id, "Test Job", status="running")
+        app = self._make_app(repo)
+        client = TestClient(app)
 
         response = client.get("/api/jobs")
         assert response.status_code == 200
@@ -98,34 +118,13 @@ class TestJobsEndpoints:
 
     def test_get_jobs_filtered_by_type(self):
         """Test listing jobs filtered by type."""
-        app = FastAPI()
-        app.include_router(jobs.router)
-        client = TestClient(app)
-
-        jobs._jobs.clear()
-
-        # Create jobs of different types
+        repo = InMemoryJobRepository()
         job_id1 = f"job-{uuid.uuid4().hex[:8]}"
         job_id2 = f"job-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-
-        jobs._jobs[job_id1] = {
-            "id": job_id1,
-            "name": "Batch Job",
-            "type": "batch",
-            "status": "running",
-            "progress": 0.5,
-            "created": now,
-        }
-
-        jobs._jobs[job_id2] = {
-            "id": job_id2,
-            "name": "Training Job",
-            "type": "training",
-            "status": "running",
-            "progress": 0.3,
-            "created": now,
-        }
+        self._create_job(repo, job_id1, "Batch Job", job_type="batch")
+        self._create_job(repo, job_id2, "Training Job", job_type="training")
+        app = self._make_app(repo)
+        client = TestClient(app)
 
         response = client.get("/api/jobs?job_type=batch")
         assert response.status_code == 200
@@ -135,34 +134,13 @@ class TestJobsEndpoints:
 
     def test_get_jobs_filtered_by_status(self):
         """Test listing jobs filtered by status."""
-        app = FastAPI()
-        app.include_router(jobs.router)
-        client = TestClient(app)
-
-        jobs._jobs.clear()
-
-        # Create jobs with different statuses
+        repo = InMemoryJobRepository()
         job_id1 = f"job-{uuid.uuid4().hex[:8]}"
         job_id2 = f"job-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-
-        jobs._jobs[job_id1] = {
-            "id": job_id1,
-            "name": "Running Job",
-            "type": "batch",
-            "status": "running",
-            "progress": 0.5,
-            "created": now,
-        }
-
-        jobs._jobs[job_id2] = {
-            "id": job_id2,
-            "name": "Completed Job",
-            "type": "batch",
-            "status": "completed",
-            "progress": 1.0,
-            "created": now,
-        }
+        self._create_job(repo, job_id1, "Running Job", status="running")
+        self._create_job(repo, job_id2, "Completed Job", status="completed")
+        app = self._make_app(repo)
+        client = TestClient(app)
 
         response = client.get("/api/jobs?status=running")
         assert response.status_code == 200
@@ -172,24 +150,11 @@ class TestJobsEndpoints:
 
     def test_get_jobs_with_limit(self):
         """Test listing jobs with limit."""
-        app = FastAPI()
-        app.include_router(jobs.router)
-        client = TestClient(app)
-
-        jobs._jobs.clear()
-
-        # Create multiple jobs
-        now = datetime.utcnow().isoformat()
+        repo = InMemoryJobRepository()
         for i in range(5):
-            job_id = f"job-{uuid.uuid4().hex[:8]}"
-            jobs._jobs[job_id] = {
-                "id": job_id,
-                "name": f"Job {i}",
-                "type": "batch",
-                "status": "running",
-                "progress": 0.5,
-                "created": now,
-            }
+            self._create_job(repo, f"job-{uuid.uuid4().hex[:8]}", f"Job {i}")
+        app = self._make_app(repo)
+        client = TestClient(app)
 
         response = client.get("/api/jobs?limit=2")
         assert response.status_code == 200
@@ -198,22 +163,11 @@ class TestJobsEndpoints:
 
     def test_get_job_success(self):
         """Test getting a specific job."""
-        app = FastAPI()
-        app.include_router(jobs.router)
-        client = TestClient(app)
-
-        jobs._jobs.clear()
-
+        repo = InMemoryJobRepository()
         job_id = f"job-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        jobs._jobs[job_id] = {
-            "id": job_id,
-            "name": "Test Job",
-            "type": "batch",
-            "status": "running",
-            "progress": 0.5,
-            "created": now,
-        }
+        self._create_job(repo, job_id, "Test Job")
+        app = self._make_app(repo)
+        client = TestClient(app)
 
         response = client.get(f"/api/jobs/{job_id}")
         assert response.status_code == 200
@@ -223,55 +177,24 @@ class TestJobsEndpoints:
 
     def test_get_job_not_found(self):
         """Test getting non-existent job."""
-        app = FastAPI()
-        app.include_router(jobs.router)
+        repo = InMemoryJobRepository()
+        app = self._make_app(repo)
         client = TestClient(app)
-
-        jobs._jobs.clear()
 
         response = client.get("/api/jobs/nonexistent")
         assert response.status_code == 404
 
     def test_get_job_summary_success(self):
         """Test successful job summary retrieval."""
-        app = FastAPI()
-        app.include_router(jobs.router)
-        client = TestClient(app)
-
-        jobs._jobs.clear()
-
-        # Create jobs with different statuses
-        now = datetime.utcnow().isoformat()
+        repo = InMemoryJobRepository()
         job_id1 = f"job-{uuid.uuid4().hex[:8]}"
         job_id2 = f"job-{uuid.uuid4().hex[:8]}"
         job_id3 = f"job-{uuid.uuid4().hex[:8]}"
-
-        jobs._jobs[job_id1] = {
-            "id": job_id1,
-            "name": "Running Job",
-            "type": "batch",
-            "status": "running",
-            "progress": 0.5,
-            "created": now,
-        }
-
-        jobs._jobs[job_id2] = {
-            "id": job_id2,
-            "name": "Completed Job",
-            "type": "batch",
-            "status": "completed",
-            "progress": 1.0,
-            "created": now,
-        }
-
-        jobs._jobs[job_id3] = {
-            "id": job_id3,
-            "name": "Failed Job",
-            "type": "training",
-            "status": "failed",
-            "progress": 0.0,
-            "created": now,
-        }
+        self._create_job(repo, job_id1, "Running Job", status="running")
+        self._create_job(repo, job_id2, "Completed Job", status="completed")
+        self._create_job(repo, job_id3, "Failed Job", status="failed")
+        app = self._make_app(repo)
+        client = TestClient(app)
 
         response = client.get("/api/jobs/summary")
         assert response.status_code == 200
@@ -283,190 +206,112 @@ class TestJobsEndpoints:
 
     def test_cancel_job_success(self):
         """Test successful job cancellation."""
-        app = FastAPI()
-        app.include_router(jobs.router)
-        client = TestClient(app)
-
-        jobs._jobs.clear()
-
+        repo = InMemoryJobRepository()
         job_id = f"job-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        jobs._jobs[job_id] = {
-            "id": job_id,
-            "name": "Test Job",
-            "type": "batch",
-            "status": "running",
-            "progress": 0.5,
-            "created": now,
-        }
+        self._create_job(repo, job_id, "Test Job", status="running")
+        app = self._make_app(repo)
+        client = TestClient(app)
 
         response = client.post(f"/api/jobs/{job_id}/cancel")
         assert response.status_code == 200
 
-        # Verify job is cancelled
         get_response = client.get(f"/api/jobs/{job_id}")
         assert get_response.status_code == 200
         assert get_response.json()["status"] == "cancelled"
 
     def test_cancel_job_not_found(self):
         """Test cancelling non-existent job."""
-        app = FastAPI()
-        app.include_router(jobs.router)
+        repo = InMemoryJobRepository()
+        app = self._make_app(repo)
         client = TestClient(app)
-
-        jobs._jobs.clear()
 
         response = client.post("/api/jobs/nonexistent/cancel")
         assert response.status_code == 404
 
     def test_pause_job_success(self):
         """Test successful job pause."""
-        app = FastAPI()
-        app.include_router(jobs.router)
-        client = TestClient(app)
-
-        jobs._jobs.clear()
-
+        repo = InMemoryJobRepository()
         job_id = f"job-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        jobs._jobs[job_id] = {
-            "id": job_id,
-            "name": "Test Job",
-            "type": "batch",
-            "status": "running",
-            "progress": 0.5,
-            "created": now,
-        }
+        self._create_job(repo, job_id, "Test Job", status="running")
+        app = self._make_app(repo)
+        client = TestClient(app)
 
         response = client.post(f"/api/jobs/{job_id}/pause")
         assert response.status_code == 200
 
-        # Verify job is paused
         get_response = client.get(f"/api/jobs/{job_id}")
         assert get_response.status_code == 200
         assert get_response.json()["status"] == "paused"
 
     def test_pause_job_not_found(self):
         """Test pausing non-existent job."""
-        app = FastAPI()
-        app.include_router(jobs.router)
+        repo = InMemoryJobRepository()
+        app = self._make_app(repo)
         client = TestClient(app)
-
-        jobs._jobs.clear()
 
         response = client.post("/api/jobs/nonexistent/pause")
         assert response.status_code == 404
 
     def test_resume_job_success(self):
         """Test successful job resume."""
-        app = FastAPI()
-        app.include_router(jobs.router)
-        client = TestClient(app)
-
-        jobs._jobs.clear()
-
+        repo = InMemoryJobRepository()
         job_id = f"job-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        jobs._jobs[job_id] = {
-            "id": job_id,
-            "name": "Test Job",
-            "type": "batch",
-            "status": "paused",
-            "progress": 0.5,
-            "created": now,
-        }
+        self._create_job(repo, job_id, "Test Job", status="paused")
+        app = self._make_app(repo)
+        client = TestClient(app)
 
         response = client.post(f"/api/jobs/{job_id}/resume")
         assert response.status_code == 200
 
-        # Verify job is resumed
         get_response = client.get(f"/api/jobs/{job_id}")
         assert get_response.status_code == 200
         assert get_response.json()["status"] == "running"
 
     def test_resume_job_not_found(self):
         """Test resuming non-existent job."""
-        app = FastAPI()
-        app.include_router(jobs.router)
+        repo = InMemoryJobRepository()
+        app = self._make_app(repo)
         client = TestClient(app)
-
-        jobs._jobs.clear()
 
         response = client.post("/api/jobs/nonexistent/resume")
         assert response.status_code == 404
 
     def test_delete_job_success(self):
         """Test successful job deletion."""
-        app = FastAPI()
-        app.include_router(jobs.router)
-        client = TestClient(app)
-
-        jobs._jobs.clear()
-
+        repo = InMemoryJobRepository()
         job_id = f"job-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        jobs._jobs[job_id] = {
-            "id": job_id,
-            "name": "Test Job",
-            "type": "batch",
-            "status": "completed",
-            "progress": 1.0,
-            "created": now,
-        }
+        self._create_job(repo, job_id, "Test Job", status="completed")
+        app = self._make_app(repo)
+        client = TestClient(app)
 
         response = client.delete(f"/api/jobs/{job_id}")
         assert response.status_code == 200
 
-        # Verify job is deleted
         get_response = client.get(f"/api/jobs/{job_id}")
         assert get_response.status_code == 404
 
     def test_delete_job_not_found(self):
         """Test deleting non-existent job."""
-        app = FastAPI()
-        app.include_router(jobs.router)
+        repo = InMemoryJobRepository()
+        app = self._make_app(repo)
         client = TestClient(app)
-
-        jobs._jobs.clear()
 
         response = client.delete("/api/jobs/nonexistent")
         assert response.status_code == 404
 
     def test_clear_completed_jobs_success(self):
         """Test successful clearing of completed jobs."""
-        app = FastAPI()
-        app.include_router(jobs.router)
-        client = TestClient(app)
-
-        jobs._jobs.clear()
-
-        # Create completed and running jobs
-        now = datetime.utcnow().isoformat()
+        repo = InMemoryJobRepository()
         job_id1 = f"job-{uuid.uuid4().hex[:8]}"
         job_id2 = f"job-{uuid.uuid4().hex[:8]}"
-
-        jobs._jobs[job_id1] = {
-            "id": job_id1,
-            "name": "Completed Job",
-            "type": "batch",
-            "status": "completed",
-            "progress": 1.0,
-            "created": now,
-        }
-
-        jobs._jobs[job_id2] = {
-            "id": job_id2,
-            "name": "Running Job",
-            "type": "batch",
-            "status": "running",
-            "progress": 0.5,
-            "created": now,
-        }
+        self._create_job(repo, job_id1, "Completed Job", status="completed")
+        self._create_job(repo, job_id2, "Running Job", status="running")
+        app = self._make_app(repo)
+        client = TestClient(app)
 
         response = client.delete("/api/jobs")
         assert response.status_code == 200
 
-        # Verify only completed jobs are deleted
         get_response = client.get("/api/jobs")
         data = get_response.json()
         assert len(data) == 1

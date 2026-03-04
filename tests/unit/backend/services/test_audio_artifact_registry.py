@@ -1,36 +1,39 @@
-import os
+"""
+Unit tests for canonical audio registry persistence (M9).
+
+Verifies registry DB persists across restart (new instance loads from disk).
+"""
+
+from __future__ import annotations
+
 from pathlib import Path
 
-from backend.services.AudioArtifactRegistry import get_audio_registry, reset_audio_registry
-from backend.services.ContentAddressedAudioCache import reset_audio_cache
+from backend.services.audio_artifacts.registry_db import AudioRegistryDB
+from backend.services.audio_artifacts.store import AudioArtifactStore
+
+MINIMAL_WAV = (
+    b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00"
+    b"\x44\xac\x00\x00\x88X\x01\x00\x02\x00\x10\x00data\x00\x00\x00\x00"
+)
 
 
-def test_audio_artifact_registry_persists_across_restart(tmp_path: Path, monkeypatch):
-    cache_dir = tmp_path / "cache"
-    registry_path = tmp_path / "cache" / "audio_registry.json"
-    cache_dir.mkdir(parents=True, exist_ok=True)
+def test_registry_persists_across_restart(tmp_path: Path) -> None:
+    """Registry DB persists across restart (new instance loads from disk)."""
+    db_path = tmp_path / "audio_registry.db"
+    artifacts_root = tmp_path / "artifacts"
+    artifacts_root.mkdir(parents=True, exist_ok=True)
+    store = AudioArtifactStore(artifacts_root=artifacts_root)
 
-    # Route cache + registry to temp paths
-    monkeypatch.setenv("VOICESTUDIO_CACHE_DIR", str(cache_dir))
-    monkeypatch.setenv("VOICESTUDIO_AUDIO_REGISTRY_PATH", str(registry_path))
-
-    # Reset singletons for isolation
-    reset_audio_cache()
-    reset_audio_registry()
-
-    # Create a tiny WAV-like file (content doesn't matter for hashing/copy)
+    # First instance: register file
+    registry1 = AudioRegistryDB(db_path=db_path, store_factory=lambda: store)
     source = tmp_path / "source.wav"
-    source.write_bytes(b"RIFFxxxxWAVEfmt " + b"\x00" * 64)
+    source.write_bytes(MINIMAL_WAV)
+    artifact = registry1.create_from_path(source, created_by="test")
+    audio_id = artifact.audio_id
+    assert Path(artifact.path).exists()
 
-    registry = get_audio_registry()
-    audio_id = "audio_test_1"
-    cached_path, hash_value = registry.register_file(audio_id, str(source))
-
-    assert hash_value
-    assert os.path.exists(cached_path)
-
-    # Simulate restart: new registry instance should load from disk
-    reset_audio_registry()
-    registry2 = get_audio_registry()
-
-    assert registry2.get(audio_id) == cached_path
+    # Second instance (simulate restart): load from same db, resolve
+    registry2 = AudioRegistryDB(db_path=db_path, store_factory=lambda: store)
+    resolved = registry2.resolve_path(audio_id)
+    assert resolved.exists()
+    assert resolved.read_bytes() == MINIMAL_WAV

@@ -5,12 +5,16 @@ Validates the full audio lifecycle:
 
 This is the Phase 1 exit gate test. All 7 steps must pass for Phase 1
 to be considered complete.
+
+When VOICESTUDIO_GOLDEN_PATH_OUTPUT_DIR is set (e.g. by write_golden_path_stub_proof.py),
+test_golden_path_output_artifact produces a WAV file and output_manifest.json for proof.
 """
 
 from __future__ import annotations
 
 import hashlib
 import io
+import json
 import os
 import struct
 import tempfile
@@ -174,3 +178,88 @@ class TestGoldenPathIntegrity:
         """Preflight endpoint should report engine readiness."""
         resp = await client.get("/api/health/preflight")
         assert resp.status_code == 200
+
+
+class TestGoldenPathOutputArtifact:
+    """Produces WAV output for proof generation. Requires VOICESTUDIO_GOLDEN_PATH_OUTPUT_DIR."""
+
+    @pytest.mark.asyncio
+    async def test_golden_path_output_artifact(
+        self, client: AsyncClient, test_wav_bytes: bytes
+    ):
+        """
+        Full flow: create profile, synthesize, write output WAV to VOICESTUDIO_GOLDEN_PATH_OUTPUT_DIR.
+        FAILS (no skip) if env var missing. Used by write_golden_path_stub_proof.py.
+        """
+        output_dir = os.environ.get("VOICESTUDIO_GOLDEN_PATH_OUTPUT_DIR")
+        if not output_dir or not os.path.isdir(output_dir):
+            pytest.fail(
+                "VOICESTUDIO_GOLDEN_PATH_OUTPUT_DIR must be set to an existing directory. "
+                "This test produces the output artifact for proof generation."
+            )
+
+        os.makedirs(output_dir, exist_ok=True)
+
+        profile_resp = await client.post(
+            "/api/profiles",
+            json={"name": "golden-path-test", "description": "Phase 1 E2E test profile"},
+        )
+        assert profile_resp.status_code in (200, 201, 422), f"Profile: {profile_resp.status_code}"
+
+        profile_id = None
+        if profile_resp.status_code in (200, 201):
+            data = profile_resp.json()
+            profile_id = data.get("id") or data.get("profile_id")
+
+        if not profile_id:
+            files = {"file": ("test.wav", io.BytesIO(test_wav_bytes), "audio/wav")}
+            upload_resp = await client.post(
+                "/api/library/assets/upload", files=files
+            )
+            assert upload_resp.status_code in (200, 201), f"Upload: {upload_resp.status_code}"
+            upload_data = upload_resp.json()
+            audio_id = upload_data.get("id") or upload_data.get("audio_id")
+            profile_resp = await client.post(
+                "/api/profiles",
+                json={"name": "gp-test", "description": "test"},
+            )
+            if profile_resp.status_code in (200, 201):
+                profile_id = profile_resp.json().get("id") or profile_resp.json().get("profile_id")
+
+        if not profile_id:
+            pytest.fail("Could not create profile for synthesis")
+
+        synth_resp = await client.post(
+            "/api/voice/synthesize",
+            json={
+                "profile_id": profile_id,
+                "engine": "piper",
+                "text": "Hello, VoiceStudio golden path.",
+                "language": "en",
+            },
+        )
+        assert synth_resp.status_code in (200, 201, 202), (
+            f"Synthesis failed: {synth_resp.status_code} - {synth_resp.text[:200]}"
+        )
+
+        synth_data = synth_resp.json()
+        audio_url = synth_data.get("audio_url")
+        if not audio_url and synth_data.get("audio_id"):
+            audio_url = f"/api/voice/audio/{synth_data['audio_id']}"
+        if not audio_url:
+            pytest.fail("Synthesis returned no audio_url or audio_id")
+
+        audio_resp = await client.get(audio_url)
+        assert audio_resp.status_code == 200, f"Audio fetch failed: {audio_resp.status_code}"
+
+        wav_bytes = audio_resp.content
+        assert len(wav_bytes) > 100
+
+        out_path = os.path.join(output_dir, "golden_path_output.wav")
+        with open(out_path, "wb") as f:
+            f.write(wav_bytes)
+
+        manifest = {"output_wav": "golden_path_output.wav"}
+        manifest_path = os.path.join(output_dir, "output_manifest.json")
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=2)

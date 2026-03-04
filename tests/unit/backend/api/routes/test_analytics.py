@@ -138,7 +138,7 @@ class TestAnalyticsEndpoints:
             from backend.api.routes import voice
 
             voice._audio_storage[audio_id] = "/path/to/audio.wav"
-        except ImportError:
+        except (ImportError, AttributeError):
             ...
 
         # Mock ModelExplainer
@@ -166,7 +166,7 @@ class TestAnalyticsEndpoints:
             from backend.api.routes import voice
 
             voice._audio_storage[audio_id] = "/path/to/audio.wav"
-        except ImportError:
+        except (ImportError, AttributeError):
             ...
 
         # Mock ModelExplainer
@@ -245,7 +245,7 @@ class TestAnalyticsEndpoints:
             from backend.api.routes import voice
 
             voice._audio_storage[audio_id] = "/path/to/audio.wav"
-        except ImportError:
+        except (ImportError, AttributeError):
             ...
 
         with (
@@ -278,7 +278,7 @@ class TestAnalyticsEndpoints:
             from backend.api.routes import voice
 
             voice._audio_storage.clear()
-        except ImportError:
+        except (ImportError, AttributeError):
             ...
 
         with patch("backend.api.routes.analytics._get_model_explainer") as mock_get_explainer:

@@ -5,8 +5,9 @@ Tests verifying the fixes from the UI/Backend Gap Analysis report.
 Covers: ViewModel property completeness, backend route hardening,
 command architecture, and data model fixes.
 """
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 from pydantic import BaseModel
 
 

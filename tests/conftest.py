@@ -59,6 +59,30 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "canonical_audio: Tests that use the canonical test audio (Allan Watts)"
     )
+    config.addinivalue_line(
+        "markers", "requires_models: Tests that require downloaded voice models"
+    )
+    config.addinivalue_line(
+        "markers", "requires_winappdriver: Tests that require WinAppDriver for UI automation"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Auto-skip env-dependent tests when prerequisites are not met."""
+    skip_models = pytest.mark.skip(reason="VOICESTUDIO_MODELS_PATH not set or empty")
+    skip_backend = pytest.mark.skip(reason="VOICESTUDIO_BACKEND_URL not set or backend not running")
+    skip_winappdriver = pytest.mark.skip(reason="WinAppDriver not available")
+    skip_gpu = pytest.mark.skip(reason="GPU not available")
+
+    for item in items:
+        if "requires_models" in item.keywords and not os.getenv("VOICESTUDIO_MODELS_PATH"):
+            item.add_marker(skip_models)
+        if "requires_backend" in item.keywords and not os.getenv("VOICESTUDIO_BACKEND_URL"):
+            item.add_marker(skip_backend)
+        if "requires_winappdriver" in item.keywords and os.getenv("VOICESTUDIO_WINAPPDRIVER", "").lower() not in ("1", "true", "yes"):
+            item.add_marker(skip_winappdriver)
+        if "requires_gpu" in item.keywords and os.getenv("VOICESTUDIO_GPU", "").lower() not in ("1", "true", "yes"):
+            item.add_marker(skip_gpu)
 
 
 # ============================================================================

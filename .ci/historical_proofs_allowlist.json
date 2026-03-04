@@ -1,1 +1,6 @@
-[]
+[
+  {"path": "docs/reports/verification/PROOF_GATE_C_2026-03-02.json"},
+  {"path": "docs/reports/verification/PROOF_INSTALLER_2026-03-02.json"},
+  {"path": "docs/reports/verification/PROOF_PAYLOAD_DETOX_2026-03-02.json"},
+  {"path": "docs/reports/verification/PROOF_PROVENANCE_2026-03-02.json"}
+]

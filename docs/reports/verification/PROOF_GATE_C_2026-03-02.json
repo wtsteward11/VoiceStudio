@@ -1,16 +1,24 @@
 {
   "git_branch": "main",
   "ui_smoke": {
-    "nav_steps_completed": 0,
+    "nav_steps_completed": 11,
     "binding_failure_count": 0,
-    "exit_code": 0
+    "exit_code": 0,
+    "summary_path": ".buildlogs/x64/Release/gatec-publish/ui_smoke_summary.json",
+    "log_path": ".buildlogs/x64/Release/gatec-publish/gatec-ui-smoke.log",
+    "summary_sha256": "3e4b1f7a9a94aa0bc977e359e8dcf44259ba798bd0ed3a0a54cc8af81957998d",
+    "log_sha256": "9e3f5b571e44dc7dcf32a824997198bffa7a4bb92dabd602244f95e4a28f22cb"
   },
   "step": "gate_c_publish_ui_smoke",
   "command": ".\\scripts\\gatec-publish-launch.ps1 -Configuration Release -RuntimeIdentifier win-x64 -UiSmoke -UiSmokeTimeoutSeconds 120",
   "gatec_log": "Timestamp: 2026-03-01T23:56:56.0400384-06:00\r\nBinlog: E:\\VoiceStudio\\.buildlogs\\gatec-publish-20260301-235626-34584.binlog\r\nPublishDir: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\r\nExe: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\\VoiceStudio.App.exe\r\nResult: ui_smoke\r\nUiSmokeResult: exited\r\nUiSmokeExitCode: 0\r\nUiSmokeLog: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\\gatec-ui-smoke.log\r\nUiSmokeSummary: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\\ui_smoke_summary.json\r\nExitCode: 0\r\n",
-  "date": "2026-03-02",
+  "date": "2026-03-04",
   "exit_code": 0,
-  "git_commit": "f0bf8e208e6a2ed3e609dfa1085c5f5118af0d70",
-  "timestamp": "2026-03-02T10:10:38Z",
-  "evidence_fingerprint": "fe881a3b3f92f0052e94cf66b098942fffb60d4c2d9d5943e0e8671c775ad527"
+  "git_commit": "a25bf0c45f27836dfb13f46b74904db49242fb7b",
+  "timestamp": "2026-03-04T09:27:44Z",
+  "evidence_fingerprint": "beae019020d06709d1cafcad12519ce629485499029e0c99bbef76dee6417a6a",
+  "refreshed": true,
+  "refreshed_reason": "Phase F: refresh proofs to match HEAD after commit batches",
+  "refreshed_at": "2026-03-04T09:27:44Z",
+  "historical_proof": true
 }

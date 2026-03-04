@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 # Try to get version from version_lock.json
-_version = "1.0.0"
+_version = "1.1.0"
 _build_date = None
 _git_commit = None
 
@@ -22,7 +22,7 @@ try:
     if version_file.exists():
         with open(version_file, encoding="utf-8") as f:
             version_data = json.load(f)
-            _version = version_data.get("version", "1.0.0")
+            _version = version_data.get("version", "1.1.0")
             _build_date = version_data.get("build_date")
             _git_commit = version_data.get("git_commit")
 except Exception:

@@ -173,7 +173,7 @@ app = FastAPI(
     Rate limit information is provided in response headers.
     See the rate limiting documentation for details.
     """,
-    version="1.0.0",
+    version="1.1.0",
     contact={
         "name": "VoiceStudio Support",
         "url": "https://github.com/voicestudio",

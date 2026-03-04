@@ -1,8 +1,8 @@
 {
   "command": "python -m pytest tests/integration/test_golden_path_e2e.py -v --tb=short",
   "exit_code": 0,
-  "timestamp": "2026-03-04T12:18:12Z",
-  "git_commit": "89bcb2fbee05f962b35d750b3ccf726b484f2b2e",
+  "timestamp": "2026-03-04T13:19:52Z",
+  "git_commit": "5d742506afb39f7679c0116ec792bf80981a9300",
   "git_branch": "main",
   "engine_mode": "stub",
   "checks": {
@@ -18,11 +18,11 @@
   },
   "passed": true,
   "test_ran": true,
-  "pytest_stdout_sha256": "4a8e9de1a4960e7f5d9939f17082c5e123c4e9b1da730be0e8068dc1c44fa6a7",
-  "pytest_stderr_sha256": "95fae9c2c6ca35d0b76b5c47b31774f1cb46e1434d31d8e3f92420080c90226f",
-  "pytest_duration_seconds": 17.57,
-  "artifact_path": ".buildlogs/proof_runs/golden_path_stub_20260304T121755Z_89bcb2fb/golden_path_output.wav",
+  "pytest_stdout_sha256": "ad7bcf94e71ac304319eed6bd3d4a226cf71554a6bbd30063f7f977994d22478",
+  "pytest_stderr_sha256": "b3d5d40453ed6c1dba7f5949f9617c666c42a75ab223f030312c8aa6b89b0198",
+  "pytest_duration_seconds": 18.77,
+  "artifact_path": ".buildlogs/proof_runs/golden_path_stub_20260304T131933Z_5d742506/golden_path_output.wav",
   "artifact_sha256": "41d1a763672d0a7e21ebcbd245b5e8761af6f4ee65f3d26e04c687f40808ef86",
   "artifact_bytes": 16044,
-  "evidence_fingerprint": "2ae103b8a6d852ae4a590e4e30beac0e0a1be280fdf561966f10ee1d6ebee565"
+  "evidence_fingerprint": "2657c092d59840964b7f866246709e8d418fab5f11131548c9aef4c5d7112b4d"
 }

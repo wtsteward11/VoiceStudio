@@ -3,6 +3,7 @@ Unit tests for scripts/ci/check_state_proofs.py (M9/M11 Proof Schema + Fingerpri
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -296,6 +297,45 @@ def test_validate_proof_gate_c_ui_smoke_exit_code_zero_passes(tmp_path: Path) ->
     with patch.object(check_module, "ROOT", tmp_path):
         errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
     assert len(errs) == 0
+
+
+def test_validate_proof_gate_c_nav_steps_zero_fails_with_full_schema(tmp_path: Path) -> None:
+    """PROOF_GATE_C with nav_steps_completed=0 fails when schema has nav_steps_completed_min."""
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True)
+    buildlogs = tmp_path / ".buildlogs" / "x64" / "Release" / "gatec-publish"
+    buildlogs.mkdir(parents=True)
+    summary_file = buildlogs / "ui_smoke_summary.json"
+    log_file = buildlogs / "gatec-ui-smoke.log"
+    summary_file.write_text("{}", encoding="utf-8")
+    log_file.write_text("log", encoding="utf-8")
+    summary_sha = hashlib.sha256(summary_file.read_bytes()).hexdigest()
+    log_sha = hashlib.sha256(log_file.read_bytes()).hexdigest()
+    proof_file = proof_dir / "PROOF_GATE_C_2026-03-02.json"
+    data = {
+        "command": ".\\scripts\\gatec-publish-launch.ps1 -UiSmoke",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "ui_smoke": {
+            "exit_code": 0,
+            "nav_steps_completed": 0,
+            "binding_failure_count": 0,
+            "summary_path": ".buildlogs/x64/Release/gatec-publish/ui_smoke_summary.json",
+            "log_path": ".buildlogs/x64/Release/gatec-publish/gatec-ui-smoke.log",
+            "summary_sha256": summary_sha,
+            "log_sha256": log_sha,
+        },
+        "gatec_log": "log content",
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_GATE_C")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
+    schema = check_module.load_schema()
+    with patch.object(check_module, "ROOT", tmp_path):
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
+    assert any("nav_steps_completed" in e for e in errs)
+    assert any("must be >= 8" in e or ">= 8" in e for e in errs)
 
 
 def test_validate_proof_installer_missing_step_fails(tmp_path: Path) -> None:

@@ -16,11 +16,11 @@
   },
   "date": "2026-03-04",
   "exit_code": 0,
-  "git_commit": "e6f87739af422a6c22bae8f969bf38d30543930f",
-  "timestamp": "2026-03-04T11:58:32Z",
+  "git_commit": "89bcb2fbee05f962b35d750b3ccf726b484f2b2e",
+  "timestamp": "2026-03-04T12:18:18Z",
   "evidence_fingerprint": "6349b6b1cdd3ab075412c142cf624a08e61c56ce798836a1c4e389a4728a6d05",
   "refreshed": true,
-  "refreshed_reason": "Phase F: align proofs to HEAD after CI fixes",
-  "refreshed_at": "2026-03-04T11:58:32Z",
+  "refreshed_reason": "Phase F CI fix round 3",
+  "refreshed_at": "2026-03-04T12:18:18Z",
   "historical_proof": true
 }

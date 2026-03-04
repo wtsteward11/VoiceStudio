@@ -14,11 +14,11 @@
   "gatec_log": "Timestamp: 2026-03-01T23:56:56.0400384-06:00\r\nBinlog: E:\\VoiceStudio\\.buildlogs\\gatec-publish-20260301-235626-34584.binlog\r\nPublishDir: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\r\nExe: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\\VoiceStudio.App.exe\r\nResult: ui_smoke\r\nUiSmokeResult: exited\r\nUiSmokeExitCode: 0\r\nUiSmokeLog: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\\gatec-ui-smoke.log\r\nUiSmokeSummary: E:\\VoiceStudio\\.buildlogs\\x64\\Release\\gatec-publish\\ui_smoke_summary.json\r\nExitCode: 0\r\n",
   "date": "2026-03-04",
   "exit_code": 0,
-  "git_commit": "e6f87739af422a6c22bae8f969bf38d30543930f",
-  "timestamp": "2026-03-04T11:58:32Z",
+  "git_commit": "89bcb2fbee05f962b35d750b3ccf726b484f2b2e",
+  "timestamp": "2026-03-04T12:18:18Z",
   "evidence_fingerprint": "beae019020d06709d1cafcad12519ce629485499029e0c99bbef76dee6417a6a",
   "refreshed": true,
-  "refreshed_reason": "Phase F: align proofs to HEAD after CI fixes",
-  "refreshed_at": "2026-03-04T11:58:32Z",
+  "refreshed_reason": "Phase F CI fix round 3",
+  "refreshed_at": "2026-03-04T12:18:18Z",
   "historical_proof": true
 }

@@ -337,7 +337,7 @@ class ParakeetEngine(EngineProtocol):
                 logger.info(f"Audio saved to: {output_path}")
                 return None
             else:
-                # Synthesize to temporary file then read
+                # Synthesize to intermediate file then read
                 import tempfile
 
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:

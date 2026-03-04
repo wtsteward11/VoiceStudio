@@ -12,6 +12,7 @@ If this test fails, the release is NOT ready.
 Ship Plan Phase B - Created 2026-02-15
 """
 
+import json
 import logging
 import os
 import sys
@@ -31,8 +32,8 @@ sys.path.insert(0, str(project_root))
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configuration
-API_BASE_URL = os.environ.get("VOICESTUDIO_API_URL", "http://localhost:8000/api")
+# Configuration: base URL without /api suffix (routes add /api/... themselves)
+API_BASE_URL = os.environ.get("VOICESTUDIO_API_URL", "http://localhost:8000")
 TIMEOUT_SECONDS = 60  # Maximum time for long operations
 
 
@@ -63,7 +64,7 @@ class GoldenPathTestData:
 
         for resource_type, resource_id in resources_to_delete:
             try:
-                requests.delete(f"{API_BASE_URL}/{resource_type}/{resource_id}", timeout=5)
+                requests.delete(f"{API_BASE_URL}/api/{resource_type}/{resource_id}", timeout=5)
                 logger.info(f"Cleaned up {resource_type}/{resource_id}")
             except Exception as e:
                 logger.warning(f"Failed to clean up {resource_type}/{resource_id}: {e}")
@@ -432,16 +433,56 @@ class TestGoldenPath:
                 )
 
                 if audio_accessible and audio_size > 0:
-                    export_dir = os.path.join(tempfile.gettempdir(), "voicestudio_golden_path")
+                    proof_output_dir = os.environ.get(
+                        "VOICESTUDIO_GOLDEN_PATH_OUTPUT_DIR"
+                    )
+                    if proof_output_dir:
+                        if not os.path.isdir(proof_output_dir):
+                            pytest.fail(
+                                f"VOICESTUDIO_GOLDEN_PATH_OUTPUT_DIR "
+                                f"set but not a directory: "
+                                f"{proof_output_dir}"
+                            )
+                        export_dir = proof_output_dir
+                    else:
+                        export_dir = os.path.join(
+                            tempfile.gettempdir(),
+                            "voicestudio_golden_path",
+                        )
                     os.makedirs(export_dir, exist_ok=True)
-                    export_path = os.path.join(export_dir, "golden_path_export.wav")
+                    wav_filename = "golden_path_export.wav"
+                    export_path = os.path.join(
+                        export_dir, wav_filename
+                    )
                     with open(export_path, "wb") as f:
                         f.write(audio_response.content)
-                    exported = os.path.exists(export_path) and os.path.getsize(export_path) > 1024
+                    exported = (
+                        os.path.exists(export_path)
+                        and os.path.getsize(export_path) > 1024
+                    )
                     validations.append(
-                        ("audio exported to disk", exported, f"path={export_path}, size={os.path.getsize(export_path)}")
+                        (
+                            "audio exported to disk",
+                            exported,
+                            f"path={export_path}, "
+                            f"size={os.path.getsize(export_path)}",
+                        )
                     )
                     logger.info(f"  Exported audio to: {export_path}")
+
+                    if proof_output_dir:
+                        manifest = {
+                            "output_wav": wav_filename,
+                        }
+                        manifest_path = os.path.join(
+                            export_dir, "output_manifest.json"
+                        )
+                        with open(manifest_path, "w",
+                                  encoding="utf-8") as mf:
+                            json.dump(manifest, mf, indent=2)
+                        logger.info(
+                            f"  Manifest: {manifest_path}"
+                        )
             except Exception as e:
                 validations.append(("audio downloadable", False, f"error={e}"))
         else:

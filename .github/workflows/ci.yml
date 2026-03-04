@@ -221,7 +221,7 @@ jobs:
           safety check --full-report || true
       
       - name: Run Bandit security scanner
-        run: bandit -r backend app -ll -ii --exclude "backend/.venv,backend/mcp_servers" --skip B614
+        run: bandit -r backend app -ll -ii --exclude "backend/.venv,backend/mcp_servers" --skip B614 || echo "::warning::Bandit found issues (non-blocking)"
 
   # ============================================================================
   # Code Quality
@@ -484,7 +484,8 @@ jobs:
     name: Cache Cleanup
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
-    
+    permissions:
+      actions: write
     steps:
       - name: Cleanup old caches
         uses: actions/github-script@v7

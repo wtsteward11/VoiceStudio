@@ -177,3 +177,7 @@ tools/print_xaml.targets
 
 # Per-machine session state (canonical copy is .cursor/STATE.md, already gitignored via .cursor/)
 STATE.md
+
+# Temp/scratch files
+turl.txt
+docs/reports/items_*_*.plan.md

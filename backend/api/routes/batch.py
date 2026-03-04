@@ -16,10 +16,9 @@ from enum import Enum
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-
-from backend.api.dependencies import require_synthesis_clearance
 from pydantic import BaseModel
 
+from backend.api.dependencies import require_synthesis_clearance
 from backend.infrastructure.adapters.job_state_store import get_job_state_store
 from backend.ml.models.engine_service import get_engine_service
 

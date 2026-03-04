@@ -14,9 +14,9 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from backend.api.dependencies import require_synthesis_clearance
-from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 

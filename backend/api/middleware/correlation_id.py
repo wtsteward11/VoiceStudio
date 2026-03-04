@@ -142,11 +142,10 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         request.state.correlation_id = correlation_id
 
         try:
-            # Log request with correlation ID
+            # Log request with correlation ID (correlation_id comes from factory/filter)
             logger.info(
                 "Request started",
                 extra={
-                    "correlation_id": correlation_id,
                     "method": request.method,
                     "path": request.url.path,
                     "client_ip": request.client.host if request.client else "unknown",
@@ -163,7 +162,6 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
             logger.info(
                 "Request completed",
                 extra={
-                    "correlation_id": correlation_id,
                     "status_code": response.status_code,
                     "method": request.method,
                     "path": request.url.path,
@@ -173,11 +171,10 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
             return response
 
         except Exception as e:
-            # Log exception with correlation ID
+            # Log exception (correlation_id comes from factory/filter)
             logger.error(
                 f"Request failed: {e}",
                 extra={
-                    "correlation_id": correlation_id,
                     "method": request.method,
                     "path": request.url.path,
                     "exception_type": type(e).__name__,

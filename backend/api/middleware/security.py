@@ -9,7 +9,6 @@ from __future__ import annotations
 import os
 import re
 
-
 _TRAVERSAL_PATTERNS = re.compile(
     r"(\.\./|\.\.\\|%2e%2e|%252e|%c0%ae|%c1%9c|\x00|\\\\[a-zA-Z])"
     r"|^[a-zA-Z]:\\",

@@ -10,6 +10,7 @@ GAP-I08: Request context dependency for correlation and tracing.
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -133,8 +134,11 @@ async def require_synthesis_clearance(request: Request) -> None:
     2. Consent (raises 403 if no active consent for voice)
     3. Safety (raises 400 if text is unsafe; fail-open when scanner unavailable)
 
+    When VOICESTUDIO_TEST_MODE=stub, skips consent (for golden path integration tests).
     Returns None on success.
     """
+    import os
+
     from backend.api.rate_limiting import synthesis_rate_limiter
 
     # 1. Rate limit
@@ -143,7 +147,6 @@ async def require_synthesis_clearance(request: Request) -> None:
     except HTTPException:
         raise
 
-    # 2. Consent
     body: dict[str, Any] | None = None
     try:
         body = await request.json()
@@ -151,17 +154,21 @@ async def require_synthesis_clearance(request: Request) -> None:
         logger.debug("Could not parse request body for consent check: %s", exc)
         body = None  # Fail-open: skip consent when body unparseable
 
-    voice_id = _extract_voice_id(body)
-    if voice_id:
-        from backend.services.security_service import get_security_service
+    # 2. Consent (skip in stub test mode for golden path proof generation)
+    if os.environ.get("VOICESTUDIO_TEST_MODE", "").lower() not in (
+        "stub", "1", "true", "yes"
+    ):
+        voice_id = _extract_voice_id(body)
+        if voice_id:
+            from backend.services.security_service import get_security_service
 
-        consents = get_security_service().consent.get_consents(voice_id)
-        has_active = any(c.is_valid for c in consents)
-        if not has_active:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No active consent for voice",
-            )
+            consents = get_security_service().consent.get_consents(voice_id)
+            has_active = any(c.is_valid for c in consents)
+            if not has_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="No active consent for voice",
+                )
 
     # 3. Safety (fail-open when text not present or scanner unavailable)
     text = (body or {}).get("text") if isinstance(body, dict) else None

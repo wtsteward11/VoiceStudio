@@ -50,6 +50,38 @@ class Telemetry(VoiceStudioBaseModel):
 
 
 # =============================================================================
+# Profile Models (shared by profiles route and voice_morph, voice_cloning_wizard)
+# =============================================================================
+
+
+class VoiceProfile(VoiceStudioBaseModel):
+    """Voice profile model with avatar support."""
+
+    id: str
+    name: str
+    language: str = "en"
+    emotion: str | None = None
+    quality_score: float = 0.0
+    tags: list[str] = []
+    reference_audio_url: str | None = None
+    avatar_url: str | None = None  # URL or path to profile avatar image
+
+
+class ProfileCreateRequest(VoiceStudioBaseModel):
+    """Request model for creating a new voice profile."""
+
+    name: str
+    language: str = "en"
+    emotion: str | None = None
+    tags: list[str] = []
+    avatar_url: str | None = None
+    description: str | None = None  # Used by voice_cloning_wizard
+    reference_audio_id: str | None = None  # Used by voice_cloning_wizard
+    engine: str | None = None  # Used by voice_cloning_wizard
+    quality_mode: str | None = None  # Used by voice_cloning_wizard
+
+
+# =============================================================================
 # Audio Processing Models (use VoiceStudioBaseModel)
 # =============================================================================
 
@@ -182,6 +214,11 @@ class VoiceSynthesizeRequest(VoiceStudioBaseModel):
         default=False,
         description="Enable quality enhancement pipeline",
     )
+    consent_id: str | None = Field(
+        default=None,
+        description="Consent record ID required when synthesizing with a third-party voice profile",
+        max_length=100,
+    )
 
     @validator("engine")
     def validate_engine(cls, v):
@@ -195,10 +232,12 @@ class VoiceSynthesizeRequest(VoiceStudioBaseModel):
 
     @validator("profile_id")
     def validate_profile_id(cls, v):
-        """Validate profile ID format."""
-        if not re.match(r"^[a-zA-Z0-9_-]+$", v):
+        """Validate profile ID format. Allows alphanumeric, hyphen, underscore for local;
+        also colon, slash, dot for third-party IDs (e.g. external/voice_001)."""
+        if not re.match(r"^[a-zA-Z0-9_\-:./]{1,100}$", v):
             raise ValueError(
-                "Profile ID must contain only alphanumeric characters, " "hyphens, and underscores"
+                "Profile ID must contain only alphanumeric, hyphens, underscores, "
+                "and optionally colons/slashes/dots for third-party IDs"
             )
         return v
 
@@ -484,6 +523,10 @@ class MultiPassSynthesisRequest(VoiceStudioBaseModel):
     adaptive: bool | None = Field(
         default=True,
         description="Adaptively determine optimal pass count",
+    )
+    consent_id: str | None = Field(
+        default=None,
+        description="Consent record ID required when synthesizing with a third-party voice profile",
     )
 
     @validator("engine")
@@ -1553,3 +1596,45 @@ class ActionsListResponse(BaseModel):
 
     actions: list[ActionInfo]
     count: int
+
+
+# =============================================================================
+# Voice Consent (Item 22: Trust and Safety)
+# =============================================================================
+
+
+class VoiceConsentRecord(VoiceStudioBaseModel):
+    """Voice consent record for API responses."""
+
+    consent_id: str = Field(description="Unique consent identifier")
+    voice_id: str = Field(description="Voice/subject identifier")
+    grantor_id: str = Field(description="Identity of the consent grantor")
+    grantor_name: str | None = Field(default=None, description="Display name of grantor")
+    consent_type: str = Field(description="Type: voice_cloning, voice_usage, etc.")
+    status: str = Field(description="pending, granted, denied, revoked, expired")
+    granted_at: str | None = Field(default=None, description="When consent was granted (ISO)")
+    expires_at: str | None = Field(default=None, description="When consent expires (ISO)")
+    reference_audio_hash: str | None = Field(
+        default=None,
+        description="SHA256 hash of reference audio (proof of consent scope)",
+    )
+    allowed_uses: dict[str, Any] | None = Field(default=None, description="Scope")
+    signature: str | None = Field(default=None, description="Consent signature")
+
+
+class VoiceConsentCreate(VoiceStudioBaseModel):
+    """Request to create or request consent."""
+
+    voice_id: str = Field(description="Voice identifier")
+    grantor_id: str = Field(description="Grantor identity")
+    grantor_name: str | None = None
+    consent_type: str = Field(default="voice_cloning", description="Type of consent")
+    reference_audio_hash: str | None = Field(default=None, description="Hash of reference audio")
+    expires_days: int | None = Field(default=None, description="Consent validity in days")
+    allowed_uses: dict[str, Any] | None = None
+
+
+class VoiceConsentRevoke(VoiceStudioBaseModel):
+    """Request to revoke consent."""
+
+    consent_id: str = Field(description="Consent to revoke")

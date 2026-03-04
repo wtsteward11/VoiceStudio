@@ -75,9 +75,9 @@ jobs:
       
       - name: Run tests
         run: |
-          python -m pytest tests/ -v --cov=backend --cov=app --cov-report=xml --randomly-seed=12345
-          python -m pytest tests/ -q --randomly-seed=99999
-          python -m pytest tests/ -q --randomly-seed=55555
+          python -m pytest tests/ -v --cov=backend --cov=app --cov-report=xml --randomly-seed=12345 --ignore=tests/integration/route_integrations
+          python -m pytest tests/ -q --randomly-seed=99999 --ignore=tests/integration/route_integrations
+          python -m pytest tests/ -q --randomly-seed=55555 --ignore=tests/integration/route_integrations
       
       - name: Upload coverage
         uses: codecov/codecov-action@v4

@@ -1,5 +1,5 @@
 """
-Unit tests for scripts/ci/check_state_proofs.py (M9 Proof Schema Enforcement).
+Unit tests for scripts/ci/check_state_proofs.py (M9/M11 Proof Schema + Fingerprint Enforcement).
 """
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 import scripts.ci.check_state_proofs as check_module
+from scripts.ci.proof_fingerprint import compute_fingerprint
 
 
 def test_extract_proof_paths() -> None:
@@ -54,6 +55,17 @@ def test_get_proof_type() -> None:
     assert check_module.get_proof_type("PROOF_UNKNOWN_2026.json") is None
 
 
+def test_get_proof_type_phase_weak_returns_proof_phase() -> None:
+    """get_proof_type returns PROOF_PHASE for weak phase proof filenames."""
+    assert check_module.get_proof_type("PROOF_PHASE_BULLETPROOF_2026.json") == "PROOF_PHASE"
+
+
+def test_get_proof_type_phase_strict_returns_specific() -> None:
+    """get_proof_type returns specific type for strict phase proofs."""
+    assert check_module.get_proof_type("PROOF_PHASE_2_1_BULLETPROOF_2026-03-03.json") == "PROOF_PHASE_2_1"
+    assert check_module.get_proof_type("PROOF_PHASE_3_BULLETPROOF_2026-03-02.json") == "PROOF_PHASE_3"
+
+
 def test_get_required_keys() -> None:
     """get_required_keys returns common + type-specific keys."""
     schema = {
@@ -75,20 +87,19 @@ def test_validate_proof_valid(tmp_path: Path) -> None:
     proof_dir = tmp_path / "docs" / "reports" / "verification"
     proof_dir.mkdir(parents=True)
     proof_file = proof_dir / "PROOF_PROVENANCE_2026-03-02.json"
-    proof_file.write_text(
-        json.dumps({
-            "command": "pytest tests/unit/test_foo.py -q",
-            "exit_code": 0,
-            "timestamp": "2026-03-02T12:00:00Z",
-            "git_commit": "a" * 40,
-            "git_branch": "main",
-            "stdout": "passed",
-            "stderr": "",
-        }),
-        encoding="utf-8",
-    )
+    data = {
+        "command": "pytest tests/unit/test_foo.py -q",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "stdout": "passed",
+        "stderr": "",
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_PROVENANCE")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
     schema = {
-        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch"],
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch", "evidence_fingerprint"],
         "type_specific": {"PROOF_PROVENANCE": {"required": ["stdout", "stderr"]}},
         "historical_proof_allowlist": [],
     }
@@ -129,20 +140,19 @@ def test_validate_proof_exit_code_nonzero(tmp_path: Path) -> None:
     proof_dir = tmp_path / "docs" / "reports" / "verification"
     proof_dir.mkdir(parents=True)
     proof_file = proof_dir / "PROOF_PROVENANCE_2026-03-02.json"
-    proof_file.write_text(
-        json.dumps({
-            "command": "pytest tests/unit/test_foo.py -q",
-            "exit_code": 1,
-            "timestamp": "2026-03-02T12:00:00Z",
-            "git_commit": "a" * 40,
-            "git_branch": "main",
-            "stdout": "",
-            "stderr": "",
-        }),
-        encoding="utf-8",
-    )
+    data = {
+        "command": "pytest tests/unit/test_foo.py -q",
+        "exit_code": 1,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "stdout": "",
+        "stderr": "",
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_PROVENANCE")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
     schema = {
-        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch"],
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch", "evidence_fingerprint"],
         "type_specific": {"PROOF_PROVENANCE": {"required": ["stdout", "stderr"]}},
         "historical_proof_allowlist": [],
     }
@@ -156,20 +166,19 @@ def test_validate_proof_bad_timestamp(tmp_path: Path) -> None:
     proof_dir = tmp_path / "docs" / "reports" / "verification"
     proof_dir.mkdir(parents=True)
     proof_file = proof_dir / "PROOF_PROVENANCE_2026-03-02.json"
-    proof_file.write_text(
-        json.dumps({
-            "command": "pytest tests/unit/test_foo.py -q",
-            "exit_code": 0,
-            "timestamp": "not-a-date",
-            "git_commit": "a" * 40,
-            "git_branch": "main",
-            "stdout": "",
-            "stderr": "",
-        }),
-        encoding="utf-8",
-    )
+    data = {
+        "command": "pytest tests/unit/test_foo.py -q",
+        "exit_code": 0,
+        "timestamp": "not-a-date",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "stdout": "",
+        "stderr": "",
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_PROVENANCE")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
     schema = {
-        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch"],
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch", "evidence_fingerprint"],
         "type_specific": {"PROOF_PROVENANCE": {"required": ["stdout", "stderr"]}},
         "historical_proof_allowlist": [],
     }
@@ -183,20 +192,19 @@ def test_validate_proof_git_commit_mismatch(tmp_path: Path) -> None:
     proof_dir = tmp_path / "docs" / "reports" / "verification"
     proof_dir.mkdir(parents=True)
     proof_file = proof_dir / "PROOF_PROVENANCE_2026-03-02.json"
-    proof_file.write_text(
-        json.dumps({
-            "command": "pytest tests/unit/test_foo.py -q",
-            "exit_code": 0,
-            "timestamp": "2026-03-02T12:00:00Z",
-            "git_commit": "a" * 40,
-            "git_branch": "main",
-            "stdout": "",
-            "stderr": "",
-        }),
-        encoding="utf-8",
-    )
+    data = {
+        "command": "pytest tests/unit/test_foo.py -q",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "stdout": "",
+        "stderr": "",
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_PROVENANCE")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
     schema = {
-        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch"],
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch", "evidence_fingerprint"],
         "type_specific": {"PROOF_PROVENANCE": {"required": ["stdout", "stderr"]}},
         "historical_proof_allowlist": [],
     }
@@ -212,21 +220,20 @@ def test_validate_proof_historical_skips_git_match(tmp_path: Path) -> None:
     proof_dir = tmp_path / "docs" / "reports" / "verification"
     proof_dir.mkdir(parents=True)
     proof_file = proof_dir / "PROOF_PROVENANCE_2026-03-02.json"
-    proof_file.write_text(
-        json.dumps({
-            "command": "pytest tests/unit/test_foo.py -q",
-            "exit_code": 0,
-            "timestamp": "2026-03-02T12:00:00Z",
-            "git_commit": "a" * 40,
-            "git_branch": "main",
-            "stdout": "",
-            "stderr": "",
-            "historical_proof": True,
-        }),
-        encoding="utf-8",
-    )
+    data = {
+        "command": "pytest tests/unit/test_foo.py -q",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "stdout": "",
+        "stderr": "",
+        "historical_proof": True,
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_PROVENANCE")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
     schema = {
-        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch"],
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch", "evidence_fingerprint"],
         "type_specific": {"PROOF_PROVENANCE": {"required": ["stdout", "stderr"]}},
         "historical_proof_allowlist": [],
     }
@@ -243,18 +250,17 @@ def test_validate_proof_gate_c_ui_smoke_exit_code_nonzero_fails(tmp_path: Path) 
     proof_dir = tmp_path / "docs" / "reports" / "verification"
     proof_dir.mkdir(parents=True)
     proof_file = proof_dir / "PROOF_GATE_C_2026-03-02.json"
-    proof_file.write_text(
-        json.dumps({
-            "command": ".\\scripts\\gatec-publish-launch.ps1 -UiSmoke",
-            "exit_code": 0,
-            "timestamp": "2026-03-02T12:00:00Z",
-            "git_commit": "a" * 40,
-            "git_branch": "main",
-            "ui_smoke": {"exit_code": 1, "nav_steps_completed": 0, "binding_failure_count": 0},
-            "gatec_log": "log content",
-        }),
-        encoding="utf-8",
-    )
+    data = {
+        "command": ".\\scripts\\gatec-publish-launch.ps1 -UiSmoke",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "ui_smoke": {"exit_code": 1, "nav_steps_completed": 0, "binding_failure_count": 0},
+        "gatec_log": "log content",
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_GATE_C")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
     schema = {
         "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch"],
         "type_specific": {"PROOF_GATE_C": {"required": ["ui_smoke", "gatec_log"]}},
@@ -267,24 +273,23 @@ def test_validate_proof_gate_c_ui_smoke_exit_code_nonzero_fails(tmp_path: Path) 
 
 
 def test_validate_proof_gate_c_ui_smoke_exit_code_zero_passes(tmp_path: Path) -> None:
-    """PROOF_GATE_C with ui_smoke.exit_code == 0 passes nested check."""
+    """PROOF_GATE_C with minimal schema (exit_code only) passes when exit_code==0."""
     proof_dir = tmp_path / "docs" / "reports" / "verification"
     proof_dir.mkdir(parents=True)
     proof_file = proof_dir / "PROOF_GATE_C_2026-03-02.json"
-    proof_file.write_text(
-        json.dumps({
-            "command": ".\\scripts\\gatec-publish-launch.ps1 -UiSmoke",
-            "exit_code": 0,
-            "timestamp": "2026-03-02T12:00:00Z",
-            "git_commit": "a" * 40,
-            "git_branch": "main",
-            "ui_smoke": {"exit_code": 0, "nav_steps_completed": 0, "binding_failure_count": 0},
-            "gatec_log": "log content",
-        }),
-        encoding="utf-8",
-    )
+    data = {
+        "command": ".\\scripts\\gatec-publish-launch.ps1 -UiSmoke",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "ui_smoke": {"exit_code": 0, "nav_steps_completed": 0, "binding_failure_count": 0},
+        "gatec_log": "log content",
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_GATE_C")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
     schema = {
-        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch"],
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch", "evidence_fingerprint"],
         "type_specific": {"PROOF_GATE_C": {"required": ["ui_smoke", "gatec_log"]}},
         "nested_semantics": {"PROOF_GATE_C": {"ui_smoke.exit_code": 0}},
     }
@@ -298,21 +303,17 @@ def test_validate_proof_installer_missing_step_fails(tmp_path: Path) -> None:
     proof_dir = tmp_path / "docs" / "reports" / "verification"
     proof_dir.mkdir(parents=True)
     proof_file = proof_dir / "PROOF_INSTALLER_2026-03-02.json"
-    proof_file.write_text(
-        json.dumps({
-            "command": ".\\installer\\test-installer-lifecycle.ps1",
-            "exit_code": 0,
-            "timestamp": "2026-03-02T12:00:00Z",
-            "git_commit": "a" * 40,
-            "git_branch": "main",
-            "results": {
-                "InstallV1": "PASS",
-                "LaunchV1": "PASS",
-            },
-            "all_passed": True,
-        }),
-        encoding="utf-8",
-    )
+    data = {
+        "command": ".\\installer\\test-installer-lifecycle.ps1",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "results": {"InstallV1": "PASS", "LaunchV1": "PASS"},
+        "all_passed": True,
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_INSTALLER")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
     schema = {
         "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch"],
         "type_specific": {"PROOF_INSTALLER": {"required": ["results", "all_passed"]}},
@@ -336,26 +337,25 @@ def test_validate_proof_installer_step_fail_when_all_passed_fails(tmp_path: Path
     proof_dir = tmp_path / "docs" / "reports" / "verification"
     proof_dir.mkdir(parents=True)
     proof_file = proof_dir / "PROOF_INSTALLER_2026-03-02.json"
-    proof_file.write_text(
-        json.dumps({
-            "command": ".\\installer\\test-installer-lifecycle.ps1",
-            "exit_code": 0,
-            "timestamp": "2026-03-02T12:00:00Z",
-            "git_commit": "a" * 40,
-            "git_branch": "main",
-            "results": {
-                "InstallV1": "PASS",
-                "LaunchV1": "PASS",
-                "UpgradeV1ToV2": "PASS",
-                "LaunchV2": "PASS",
-                "RollbackV2ToV1": "PASS",
-                "LaunchV1AfterRollback": "PASS",
-                "UninstallV1": "FAIL",
-            },
-            "all_passed": True,
-        }),
-        encoding="utf-8",
-    )
+    data = {
+        "command": ".\\installer\\test-installer-lifecycle.ps1",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "results": {
+            "InstallV1": "PASS",
+            "LaunchV1": "PASS",
+            "UpgradeV1ToV2": "PASS",
+            "LaunchV2": "PASS",
+            "RollbackV2ToV1": "PASS",
+            "LaunchV1AfterRollback": "PASS",
+            "UninstallV1": "FAIL",
+        },
+        "all_passed": True,
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_INSTALLER")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
     schema = {
         "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch"],
         "type_specific": {"PROOF_INSTALLER": {"required": ["results", "all_passed"]}},
@@ -372,3 +372,282 @@ def test_validate_proof_installer_step_fail_when_all_passed_fails(tmp_path: Path
     with patch.object(check_module, "ROOT", tmp_path):
         errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
     assert any("all_passed=true but results not all PASS" in e for e in errs)
+
+
+# --- M11 Proof Immutability tests ---
+
+
+def test_fingerprint_mismatch_fails(tmp_path: Path) -> None:
+    """Proof with wrong evidence_fingerprint fails."""
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True)
+    proof_file = proof_dir / "PROOF_PROVENANCE_2026-03-02.json"
+    data = {
+        "command": "pytest tests/unit/test_foo.py -q",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "stdout": "passed",
+        "stderr": "",
+        "evidence_fingerprint": "0" * 64,
+    }
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
+    schema = {
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch", "evidence_fingerprint"],
+        "type_specific": {"PROOF_PROVENANCE": {"required": ["stdout", "stderr"]}},
+    }
+    with patch.object(check_module, "ROOT", tmp_path):
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
+    assert any("evidence_fingerprint mismatch" in e for e in errs)
+
+
+def test_fingerprint_missing_fails(tmp_path: Path) -> None:
+    """Proof without evidence_fingerprint fails."""
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True)
+    proof_file = proof_dir / "PROOF_PROVENANCE_2026-03-02.json"
+    data = {
+        "command": "pytest tests/unit/test_foo.py -q",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "stdout": "passed",
+        "stderr": "",
+    }
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
+    schema = {
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch", "evidence_fingerprint"],
+        "type_specific": {"PROOF_PROVENANCE": {"required": ["stdout", "stderr"]}},
+    }
+    with patch.object(check_module, "ROOT", tmp_path):
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
+    assert any("evidence_fingerprint" in e for e in errs)
+
+
+def test_refreshed_without_historical_proof_fails(tmp_path: Path) -> None:
+    """refreshed=true requires historical_proof=true."""
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True)
+    proof_file = proof_dir / "PROOF_PROVENANCE_2026-03-02.json"
+    data = {
+        "command": "pytest tests/unit/test_foo.py -q",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "stdout": "passed",
+        "stderr": "",
+        "refreshed": True,
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_PROVENANCE")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
+    schema = {
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch", "evidence_fingerprint"],
+        "type_specific": {"PROOF_PROVENANCE": {"required": ["stdout", "stderr"]}},
+        "historical_proofs_allowlist_path": ".ci/historical_proofs_allowlist.json",
+    }
+    with patch.object(check_module, "ROOT", tmp_path):
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
+    assert any("refreshed=true requires historical_proof=true" in e for e in errs)
+
+
+def test_refreshed_historical_but_not_allowlisted_fails(tmp_path: Path) -> None:
+    """refreshed + historical_proof but path not in allowlist fails."""
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True)
+    proof_file = proof_dir / "PROOF_PROVENANCE_2026-03-02.json"
+    data = {
+        "command": "pytest tests/unit/test_foo.py -q",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "stdout": "passed",
+        "stderr": "",
+        "refreshed": True,
+        "historical_proof": True,
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_PROVENANCE")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
+    allowlist_path = tmp_path / ".ci"
+    allowlist_path.mkdir(parents=True)
+    (allowlist_path / "historical_proofs_allowlist.json").write_text("[]", encoding="utf-8")
+    schema = {
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch", "evidence_fingerprint"],
+        "type_specific": {"PROOF_PROVENANCE": {"required": ["stdout", "stderr"]}},
+        "historical_proofs_allowlist_path": ".ci/historical_proofs_allowlist.json",
+    }
+    with patch.object(check_module, "ROOT", tmp_path):
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
+    assert any("not in .ci/historical_proofs_allowlist.json" in e for e in errs)
+
+
+def test_refreshed_historical_and_allowlisted_passes(tmp_path: Path) -> None:
+    """refreshed + historical_proof + allowlisted passes."""
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True)
+    proof_file = proof_dir / "PROOF_PROVENANCE_2026-03-02.json"
+    data = {
+        "command": "pytest tests/unit/test_foo.py -q",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "stdout": "passed",
+        "stderr": "",
+        "refreshed": True,
+        "historical_proof": True,
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_PROVENANCE")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
+    allowlist_path = tmp_path / ".ci"
+    allowlist_path.mkdir(parents=True)
+    allowlist_path.joinpath("historical_proofs_allowlist.json").write_text(
+        json.dumps([{"path": "docs/reports/verification/PROOF_PROVENANCE_2026-03-02.json", "reason": "test", "approved_by": "test", "date": "2026-03-02"}]),
+        encoding="utf-8",
+    )
+    schema = {
+        "common_required": ["command", "exit_code", "timestamp", "git_commit", "git_branch", "evidence_fingerprint"],
+        "type_specific": {"PROOF_PROVENANCE": {"required": ["stdout", "stderr"]}},
+        "historical_proofs_allowlist_path": ".ci/historical_proofs_allowlist.json",
+    }
+    with patch.object(check_module, "ROOT", tmp_path):
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
+    assert len(errs) == 0
+
+
+# --- PROOF_PHASE legacy-only tests ---
+
+
+def test_proof_phase_without_historical_fails(tmp_path: Path) -> None:
+    """PROOF_PHASE without historical_proof fails with clear message."""
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True)
+    proof_file = proof_dir / "PROOF_PHASE_BULLETPROOF_2026.json"
+    data = {"phase": "2.1", "date": "2026-02-28", "checks": {"check_service_boundaries": {"exit_code": 0}}}
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
+    schema = {
+        "type_specific": {
+            "PROOF_PHASE": {"override_common": True, "required": ["phase", "date", "checks"]},
+        },
+        "historical_proofs_allowlist_path": ".ci/historical_proofs_allowlist.json",
+    }
+    (tmp_path / ".ci").mkdir(parents=True)
+    (tmp_path / ".ci" / "historical_proofs_allowlist.json").write_text("[]", encoding="utf-8")
+    with patch.object(check_module, "ROOT", tmp_path):
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
+    assert any("PROOF_PHASE (weak)" in e or "no longer accepted" in e for e in errs)
+
+
+def test_proof_phase_with_historical_but_not_allowlisted_fails(tmp_path: Path) -> None:
+    """PROOF_PHASE with historical_proof but not allowlisted fails."""
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True)
+    proof_file = proof_dir / "PROOF_PHASE_BULLETPROOF_2026.json"
+    data = {
+        "phase": "2.1",
+        "date": "2026-02-28",
+        "checks": {"check_service_boundaries": {"exit_code": 0}},
+        "historical_proof": True,
+    }
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
+    schema = {
+        "type_specific": {
+            "PROOF_PHASE": {"override_common": True, "required": ["phase", "date", "checks"]},
+        },
+        "historical_proofs_allowlist_path": ".ci/historical_proofs_allowlist.json",
+    }
+    (tmp_path / ".ci").mkdir(parents=True)
+    (tmp_path / ".ci" / "historical_proofs_allowlist.json").write_text("[]", encoding="utf-8")
+    with patch.object(check_module, "ROOT", tmp_path):
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
+    assert any("PROOF_PHASE (weak)" in e or "no longer accepted" in e for e in errs)
+
+
+def test_proof_phase_with_historical_and_allowlisted_passes(tmp_path: Path) -> None:
+    """PROOF_PHASE with historical_proof and allowlisted passes."""
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True)
+    proof_file = proof_dir / "PROOF_PHASE_BULLETPROOF_2026.json"
+    data = {
+        "phase": "2.1",
+        "date": "2026-02-28",
+        "checks": {"check_service_boundaries": {"exit_code": 0}},
+        "historical_proof": True,
+    }
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
+    schema = {
+        "type_specific": {
+            "PROOF_PHASE": {"override_common": True, "required": ["phase", "date", "checks"]},
+        },
+        "historical_proofs_allowlist_path": ".ci/historical_proofs_allowlist.json",
+    }
+    (tmp_path / ".ci").mkdir(parents=True)
+    (tmp_path / ".ci" / "historical_proofs_allowlist.json").write_text(
+        json.dumps([
+            {"path": "docs/reports/verification/PROOF_PHASE_BULLETPROOF_2026.json", "reason": "legacy"},
+        ]),
+        encoding="utf-8",
+    )
+    with patch.object(check_module, "ROOT", tmp_path):
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
+    assert len(errs) == 0
+
+
+def test_strict_phase_proof_requires_evidence_fingerprint(tmp_path: Path) -> None:
+    """PROOF_PHASE_2_1 without evidence_fingerprint fails."""
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True)
+    proof_file = proof_dir / "PROOF_PHASE_2_1_BULLETPROOF_2026.json"
+    data = {
+        "phase": "2.1",
+        "date": "2026-03-03",
+        "checks": {"check_service_boundaries": {"exit_code": 0}},
+        "command": "check_service_boundaries",
+        "exit_code": 0,
+        "timestamp": "2026-03-03T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+    }
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
+    schema = {
+        "common_required": [
+            "command", "exit_code", "timestamp", "git_commit", "git_branch", "evidence_fingerprint",
+        ],
+        "type_specific": {"PROOF_PHASE_2_1": {"override_common": False, "required": ["phase", "date", "checks"]}},
+    }
+    with patch.object(check_module, "ROOT", tmp_path):
+        errs = check_module.validate_proof(proof_file, schema, no_git_match=True)
+    assert any("evidence_fingerprint" in e for e in errs)
+
+
+def test_refresh_script_refuses_to_change_fingerprint(tmp_path: Path) -> None:
+    """Refresh script refuses to refresh when evidence was tampered (fingerprint mismatch)."""
+    import subprocess
+    import sys
+    proof_file = tmp_path / "PROOF_GATE_C_2026-03-02.json"
+    data = {
+        "command": ".\\scripts\\gatec-publish-launch.ps1 -UiSmoke",
+        "exit_code": 0,
+        "timestamp": "2026-03-02T12:00:00Z",
+        "git_commit": "a" * 40,
+        "git_branch": "main",
+        "ui_smoke": {"exit_code": 0, "nav_steps_completed": 0, "binding_failure_count": 0},
+        "gatec_log": "ExitCode: 0",
+    }
+    data["evidence_fingerprint"] = compute_fingerprint(data, "PROOF_GATE_C")
+    proof_file.write_text(json.dumps(data), encoding="utf-8")
+    tampered = json.loads(proof_file.read_text(encoding="utf-8"))
+    tampered["gatec_log"] = "ExitCode: 1"
+    proof_file.write_text(json.dumps(tampered), encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "-m", "scripts.ci.refresh_proof_git_metadata", "--reason", "test", str(proof_file.resolve())],
+        cwd=str(check_module.ROOT),
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode != 0
+    assert "fingerprint" in result.stderr.lower() or "evidence" in result.stderr.lower()

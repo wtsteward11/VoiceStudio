@@ -143,6 +143,15 @@ def check_strict() -> int:
         baseline = get_payload_dir_baseline(policy, dir_rel)
         files, count, total = scan_payload_dir(dir_rel)
 
+        # installer/runtime: forbidden unless VOICESTUDIO_ALLOW_REPO_RUNTIME=1 (local dev opt-in)
+        if dir_rel == "installer/runtime" and os.environ.get("VOICESTUDIO_ALLOW_REPO_RUNTIME") != "1":
+            if count > 0:
+                errors.append(
+                    "FORBIDDEN DIR: installer/runtime must be empty in CI. "
+                    "Set VOICESTUDIO_ALLOW_REPO_RUNTIME=1 for local dev only."
+                )
+            continue
+
         if baseline is None:
             if count > 0:
                 errors.append(f"PAYLOAD DIR: {dir_rel} has {count} files but no baseline (add baseline or remove files)")

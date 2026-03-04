@@ -27,10 +27,10 @@
     },
     {
       "path": "installer/runtime",
-      "mode": "forbidden",
-      "baseline_file_count": 0,
-      "baseline_total_bytes": 0,
-      "max_growth_bytes": 0
+      "mode": "baseline",
+      "baseline_file_count": 13325,
+      "baseline_total_bytes": 914893250,
+      "max_growth_bytes": 1073741824
     },
     {
       "path": "installer/runtime__DISABLED",

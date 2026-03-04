@@ -1,0 +1,26 @@
+﻿{
+    "moved_files":  [
+                        {
+                            "size_bytes":  273159993,
+                            "sha256":  "1dd220375f09322427de4bc560cd03b3fa82846831a6498715a144e2db78e32a",
+                            "original_path":  "installer\\Output\\VoiceStudio-Setup-v1.0.0.exe",
+                            "payload_path":  "C:\\Users\\Tyler\\AppData\\Local\\VoiceStudioPayloads\\installer\\Output\\VoiceStudio-Setup-v1.0.0.exe"
+                        },
+                        {
+                            "size_bytes":  50637934,
+                            "sha256":  "c1792037f433320ef356c31f073675a134ebf98bc4b8fda9653cd84863f898ae",
+                            "original_path":  "tests\\assets\\canonical\\originals\\allan_watts.m4a",
+                            "payload_path":  "C:\\Users\\Tyler\\AppData\\Local\\VoiceStudioPayloads\\tests\\assets\\canonical\\originals\\allan_watts.m4a"
+                        },
+                        {
+                            "size_bytes":  137983054,
+                            "sha256":  "b628e372e730fa681bed65d3fbf6e7ba410c2032c3c39d7a60ad081750a3b9cc",
+                            "original_path":  "tests\\assets\\canonical\\standard\\allan_watts.wav",
+                            "payload_path":  "C:\\Users\\Tyler\\AppData\\Local\\VoiceStudioPayloads\\tests\\assets\\canonical\\standard\\allan_watts.wav"
+                        }
+                    ],
+    "moved_at":  "2026-03-02T00:36:02.7441921-06:00",
+    "dry_run":  false,
+    "repo_root":  "E:\\VoiceStudio",
+    "payload_root":  "C:\\Users\\Tyler\\AppData\\Local\\VoiceStudioPayloads"
+}

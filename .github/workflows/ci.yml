@@ -8,6 +8,12 @@ on:
     branches: [main, develop, "release/*"]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      run_runtime_gates:
+        description: "Run Windows runtime gates (support bundle, perf budget, real golden path)"
+        type: boolean
+        default: true
 
 env:
   PYTHON_VERSION: "3.11"
@@ -38,6 +44,14 @@ jobs:
           python scripts/ci/check_service_boundaries.py
           python scripts/ci/check_service_size.py
           python scripts/ci/check_repo_payloads.py
+
+      - name: UI Command Surface gate
+        run: |
+          python -m pytest tests/ci/test_ui_command_surface.py -v
+
+      - name: Support Bundle gate
+        run: |
+          python -m pytest tests/ci/test_support_bundle_surface.py -v
       
       - name: Install dependencies
         run: |
@@ -165,13 +179,13 @@ jobs:
         run: |
           python -m pytest tests/integration/test_golden_path_e2e.py -v --tb=short
 
-      - name: Generate SSOT proof artifact
+      - name: Generate SSOT stub proof artifact
         env:
           VOICESTUDIO_TEST_MODE: stub
         run: |
-          python scripts/ci/write_golden_path_proof.py --engine-mode stub --no-run-test
+          python scripts/ci/write_golden_path_stub_proof.py --no-run-test
 
-      - name: Validate SSOT proof (schema + fingerprint + git match)
+      - name: Validate SSOT stub proof (schema + fingerprint + git match)
         run: |
           python scripts/ci/check_state_proofs.py --validate-file "docs/reports/verification/PROOF_GOLDEN_PATH_STUB_*.json"
 
@@ -536,6 +550,64 @@ jobs:
           path: |
             installer/*.exe
             checksums.txt
+
+  # ============================================================================
+  # Runtime Gates (Windows, workflow_dispatch only)
+  # ============================================================================
+  runtime-gates:
+    name: Runtime Gates (Windows)
+    runs-on: windows-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.run_runtime_gates
+    needs: [python-tests]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,extras]"
+
+      - name: Support Bundle runtime proof
+        run: |
+          python scripts/ci/write_support_bundle_runtime_proof.py
+
+      - name: Validate Support Bundle proof
+        run: |
+          python scripts/ci/check_state_proofs.py --validate-file "docs/reports/verification/PROOF_SUPPORT_BUNDLE_RUNTIME_*.json"
+
+      - name: Perf Budget runtime proof
+        run: |
+          python scripts/ci/write_perf_budget_runtime_proof.py
+
+      - name: Validate Perf Budget proof
+        run: |
+          python scripts/ci/check_state_proofs.py --validate-file "docs/reports/verification/PROOF_PERF_BUDGET_RUNTIME_*.json"
+
+      - name: Golden Path real proof (if models available)
+        run: |
+          python scripts/ci/write_golden_path_real_proof.py
+        continue-on-error: false
+
+      - name: Validate Golden Path real proof
+        run: |
+          python scripts/ci/check_state_proofs.py --validate-file "docs/reports/verification/PROOF_GOLDEN_PATH_REAL_*.json"
+
+      - name: Upload runtime proof artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-gate-proofs
+          path: |
+            docs/reports/verification/PROOF_SUPPORT_BUNDLE_RUNTIME_*.json
+            docs/reports/verification/PROOF_PERF_BUDGET_RUNTIME_*.json
+            docs/reports/verification/PROOF_GOLDEN_PATH_REAL_*.json
+          retention-days: 90
 
   # ============================================================================
   # Summary Job

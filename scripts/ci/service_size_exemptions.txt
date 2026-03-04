@@ -1,0 +1,4 @@
+# Service files exempt from 1500-line limit.
+# Add one path per line (relative to backend/services).
+# Pre-existing large files; should be decomposed in future phases.
+plugin_service.py

@@ -2,15 +2,17 @@
   "milestone": "M8 Repo Payload Detox",
   "step": "payload_detox",
   "date": "2026-03-02",
-  "timestamp": "2026-03-02T09:40:35Z",
+  "timestamp": "2026-03-02T10:04:45Z",
   "command": "python scripts/ci/check_repo_payloads.py",
   "exit_code": 0,
-  "git_commit": "5940e5ce522a27184c3e82683b88d20e830b3c1b",
+  "git_commit": "f0bf8e208e6a2ed3e609dfa1085c5f5118af0d70",
   "git_branch": "main",
   "check_repo_payloads": "PASS (git-tracked large files: 0; large_file_exceptions: empty)",
   "policy_file_summary": {
     "large_file_exceptions_count": 0,
     "payload_dir_baselines": 5
   },
-  "note": "check_repo_payloads passes when run in clean environment. Local installer/runtime (gitignored) may cause FORBIDDEN DIR; CI clone has no installer/runtime."
+  "note": "check_repo_payloads passes when run in clean environment. Local installer/runtime (gitignored) may cause FORBIDDEN DIR; CI clone has no installer/runtime.",
+  "moved_payloads": [],
+  "evidence_fingerprint": "9d4f90c4a19946890eda71c12357f096bae0dfe4ebfbae50a9e5d1a85603e363"
 }

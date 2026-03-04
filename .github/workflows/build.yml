@@ -421,10 +421,28 @@ jobs:
           if [ -f requirements_engines.txt ]; then pip install -r requirements_engines.txt; fi
           if [ -f requirements_missing_libraries.txt ]; then pip install -r requirements_missing_libraries.txt; fi
 
-      - name: CI guardrails (route boundaries + repo payloads)
+      - name: State proof verification
+        run: |
+          if ls docs/reports/verification/PROOF_*.json 1>/dev/null 2>&1; then
+            for f in docs/reports/verification/PROOF_*.json; do
+              python scripts/ci/check_state_proofs.py --validate-file "$f"
+            done
+          else
+            echo "No committed proofs found. Skipping proof verification."
+          fi
+
+      - name: CI guardrails (route boundaries + route size + service boundaries + service size + repo payloads)
         run: |
           python scripts/ci/check_route_boundaries.py
+          python scripts/ci/check_route_size.py
+          python scripts/ci/check_service_boundaries.py
+          python scripts/ci/check_service_size.py
           python scripts/ci/check_repo_payloads.py
+
+      - name: Artifact spine compliance
+        run: |
+          python scripts/ci/check_artifact_spine_compliance.py
+          python -m pytest tests/guardrails/test_route_table_and_spine.py -q
 
       - name: Verify Python installation
         run: |

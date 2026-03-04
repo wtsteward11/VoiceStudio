@@ -125,3 +125,17 @@ def test_voice_py_god_route_deleted():
         f"God-route voice.py still exists ({god_route.stat().st_size:,} bytes). "
         "Phase A3 requires deletion after migrating all endpoints to voice/ submodules."
     )
+
+
+def test_mediator_layer_deleted():
+    """Phase B: backend/application/ must not contain .py files (ADR-046).
+
+    The mediator/CQRS layer was deleted. If the directory exists (e.g. __pycache__
+    ghost), it must contain zero .py source files. Prevents resurrection.
+    """
+    app_dir = PROJECT_ROOT / "backend" / "application"
+    py_files = list(app_dir.rglob("*.py")) if app_dir.exists() else []
+    assert not py_files, (
+        f"backend/application/ contains .py files (ADR-046 violation): "
+        f"{[str(p.relative_to(PROJECT_ROOT)) for p in py_files]}"
+    )

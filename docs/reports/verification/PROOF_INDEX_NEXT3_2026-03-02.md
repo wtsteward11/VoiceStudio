@@ -77,6 +77,18 @@ python scripts/ci/write_payload_detox_proof.py
 
 ---
 
+## Refresh Git Metadata (when proofs are stale)
+
+Refresh is **historical only** and requires an entry in `.ci/historical_proofs_allowlist.json`. Use only when gatec/installer cannot be re-run:
+
+```bash
+python scripts/ci/refresh_proof_git_metadata.py --reason "pull after gatec run" docs/reports/verification/PROOF_GATE_C_2026-03-02.json
+```
+
+After refresh, add the proof path to `.ci/historical_proofs_allowlist.json` with reason, approved_by, and date. Prefer full regeneration when possible.
+
+---
+
 ## CI Enforcement
 
 `scripts/ci/check_state_proofs.py` runs in build-backend. It parses STATE.md, extracts Proof: paths, validates schema and semantics (exit_code, timestamp, git_commit), and exits 1 if any referenced file is missing or invalid.

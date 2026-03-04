@@ -19,6 +19,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.ci.proof_fingerprint import compute_fingerprint
+
 PROOF_PATH = ROOT / "docs" / "reports" / "verification" / "PROOF_PAYLOAD_DETOX_2026-03-02.json"
 POLICY_PATH = ROOT / ".ci" / "repo_payload_policy.json"
 
@@ -98,9 +103,11 @@ def main() -> int:
         "git_branch": git_branch,
         "check_repo_payloads": summary,
         "policy_file_summary": policy_summary,
+        "moved_payloads": [],
         "note": "check_repo_payloads passes when run in clean environment. Local installer/runtime (gitignored) may cause FORBIDDEN DIR; CI clone has no installer/runtime.",
     }
 
+    proof["evidence_fingerprint"] = compute_fingerprint(proof, "PROOF_PAYLOAD_DETOX")
     proof_path.write_text(json.dumps(proof, indent=2), encoding="utf-8")
     print(f"Proof written to {proof_path}")
     return 0

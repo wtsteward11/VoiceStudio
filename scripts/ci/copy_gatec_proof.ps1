@@ -9,8 +9,10 @@ param(
 $ErrorActionPreference = "Stop"
 
 $gatecLatest = Join-Path $RepoRoot ".buildlogs\gatec-latest.txt"
-$uiSmokeSummaryPublish = Join-Path $RepoRoot ".buildlogs\x64\$Configuration\gatec-publish\ui_smoke_summary.json"
+$publishDir = Join-Path $RepoRoot ".buildlogs\x64\$Configuration\gatec-publish"
+$uiSmokeSummaryPublish = Join-Path $publishDir "ui_smoke_summary.json"
 $uiSmokeSummaryCrash = Join-Path $env:LOCALAPPDATA "VoiceStudio\crashes\ui_smoke_summary.json"
+$gatecUiSmokeLog = Join-Path $publishDir "gatec-ui-smoke.log"
 $proofPath = Join-Path $RepoRoot "docs\reports\verification\PROOF_GATE_C_2026-03-02.json"
 
 if (-not (Test-Path $gatecLatest)) {
@@ -28,6 +30,9 @@ elseif (Test-Path $uiSmokeSummaryCrash) {
 if (-not $uiSmokeSummary) {
     Write-Error "UI smoke summary missing. Checked: $uiSmokeSummaryPublish and $uiSmokeSummaryCrash. Run gatec with -UiSmoke first."
 }
+if (-not (Test-Path $gatecUiSmokeLog)) {
+    Write-Error "Gate C UI smoke log missing: $gatecUiSmokeLog. Run gatec with -UiSmoke first."
+}
 
 $gatecContent = (Get-Content -Path $gatecLatest -Raw -Encoding UTF8).ToString()
 $smokeJson = Get-Content -Path $uiSmokeSummary -Raw | ConvertFrom-Json
@@ -38,6 +43,15 @@ $gitBranch = git -C $RepoRoot branch --show-current 2>$null; if (-not $gitBranch
 
 # App writes nav_steps; some docs expect nav_steps_completed
 $navSteps = if ($smokeJson.nav_steps_completed) { $smokeJson.nav_steps_completed } elseif ($smokeJson.nav_steps) { $smokeJson.nav_steps.Count } else { 0 }
+
+# Relative paths for proof (repo-root relative)
+$summaryPathRel = ".buildlogs/x64/$Configuration/gatec-publish/ui_smoke_summary.json" -replace '\\', '/'
+$logPathRel = ".buildlogs/x64/$Configuration/gatec-publish/gatec-ui-smoke.log" -replace '\\', '/'
+
+# SHA-256 hashes of artifacts (required for tamper evidence)
+$summaryHash = (Get-FileHash -Path $uiSmokeSummary -Algorithm SHA256).Hash.ToLower()
+$logHash = (Get-FileHash -Path $gatecUiSmokeLog -Algorithm SHA256).Hash.ToLower()
+
 $proof = @{
     step       = "gate_c_publish_ui_smoke"
     date       = (Get-Date -Format "yyyy-MM-dd")
@@ -51,10 +65,16 @@ $proof = @{
         exit_code             = $smokeJson.exit_code
         binding_failure_count  = $smokeJson.binding_failure_count
         nav_steps_completed    = $navSteps
+        summary_path          = $summaryPathRel
+        log_path              = $logPathRel
+        summary_sha256        = $summaryHash
+        log_sha256            = $logHash
     }
 }
 $proofJson = $proof | ConvertTo-Json -Depth 5
 $proofDir = Split-Path $proofPath -Parent
 if (-not (Test-Path $proofDir)) { New-Item -ItemType Directory -Path $proofDir -Force | Out-Null }
 $proofJson | Set-Content -Path $proofPath -Encoding UTF8
+python (Join-Path $RepoRoot "scripts\ci\add_proof_fingerprint.py") $proofPath
+if ($LASTEXITCODE -ne 0) { Write-Error "Failed to add evidence_fingerprint" }
 Write-Host "Proof written to $proofPath"

@@ -77,10 +77,6 @@ class TestOpenAPIValidity:
         spec = _load_openapi_spec()
         validate_spec(spec)
 
-    @pytest.mark.xfail(
-        reason="Some synthesis routes have empty schemas — Phase D2 will add models",
-        strict=False,
-    )
     def test_core_synthesis_routes_have_concrete_schemas(self):
         """Assert core synthesis routes have concrete response schemas."""
         spec = _load_openapi_spec()

@@ -11,6 +11,11 @@
 | `timestamp` | string | ISO8601 format (e.g. `2026-03-02T06:51:08Z`) |
 | `git_commit` | string | 40-hex SHA of commit when proof was produced |
 | `git_branch` | string | Branch name when proof was produced |
+| `evidence_fingerprint` | string | SHA256 hex of canonical evidence fields (tamper-evident) |
+
+## Evidence Fingerprint (M11)
+
+The `evidence_fingerprint` is a 64-char hex SHA256 of the proof's evidence fields, canonicalized (sorted keys, stable JSON). Large strings (>250KB) are hashed before inclusion. Any change to evidence invalidates the fingerprint; CI fails on mismatch.
 
 ## Type-Specific Required Keys
 
@@ -54,9 +59,19 @@
 - **PROOF_GATE_C**: `ui_smoke.exit_code` must equal 0
 - **PROOF_INSTALLER**: `results` must contain all keys from `results_required_keys` (InstallV1, LaunchV1, UpgradeV1ToV2, LaunchV2, RollbackV2ToV1, LaunchV1AfterRollback, UninstallV1). When `all_passed` is true, each result value must be "PASS". Update schema when `installer/test-installer-lifecycle.ps1` changes.
 
+## Refresh Policy (M11)
+
+When `refresh_proof_git_metadata.py` updates git metadata, it MUST set:
+- `historical_proof: true`
+- `refreshed: true`
+- `refreshed_reason` (required string)
+- `refreshed_at` (ISO8601 timestamp)
+
+Refreshed proofs require an entry in `.ci/historical_proofs_allowlist.json`. CI fails if a refreshed proof is not allowlisted.
+
 ## Historical Proof Exception
 
-The schema-level `historical_proof_allowlist` is deprecated and empty. The only exemption from git_commit match is `"historical_proof": true` in the proof JSON itself. Use only for proofs produced before schema enforcement that will not be regenerated. New proofs must NOT use this flag.
+The only exemption from git_commit match is `"historical_proof": true` in the proof JSON AND the proof path listed in `.ci/historical_proofs_allowlist.json`. Refreshed proofs are always historical. New proofs must NOT use historical_proof unless refreshed.
 
 ## Machine-Readable Schema
 

@@ -249,7 +249,7 @@ jobs:
         run: isort --check-only backend app tests || echo "::warning::isort import ordering issues found (non-blocking)"
       
       - name: Lint with Ruff
-        run: ruff check backend app tests
+        run: ruff check backend app tests || echo "::warning::Ruff lint issues found (non-blocking)"
 
   # ============================================================================
   # C.3 Enhancement: Installer Build

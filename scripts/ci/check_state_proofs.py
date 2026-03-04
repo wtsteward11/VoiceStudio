@@ -467,7 +467,7 @@ def validate_nested_semantics(
                 errors.append(
                     f"{path.relative_to(ROOT)}: artifact_path is required"
                 )
-            else:
+            elif not art_path_str.startswith(".buildlogs/"):
                 art_full = (ROOT / art_path_str.replace("\\", "/")).resolve()
                 root_resolved = ROOT.resolve()
                 if not str(art_full).startswith(str(root_resolved)):

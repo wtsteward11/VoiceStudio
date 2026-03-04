@@ -12,11 +12,10 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 
 from backend.api.dependencies import require_synthesis_clearance
 from backend.api.models import ApiOk
-from pydantic import BaseModel
-
 from backend.infrastructure.adapters.job_state_store import get_job_state_store
 
 logger = logging.getLogger(__name__)

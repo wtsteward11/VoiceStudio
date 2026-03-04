@@ -1,0 +1,9 @@
+{
+  "scope": [
+    "backend/api/routes/voice/",
+    "backend/services/synthesis_service.py",
+    "backend/services/engine_service.py"
+  ],
+  "baseline_errors": 110,
+  "last_updated": "2026-03-04"
+}

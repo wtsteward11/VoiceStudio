@@ -82,7 +82,7 @@ Six phases. Every milestone has a CI gate, a specific command, or a hard fork de
 |-----------|------|-----------|
 | I-1 Router Uniqueness | No duplicate method+path; voice router from one source | `tests/ci/test_router_uniqueness.py` |
 | I-2 Trust/Safety Choke Point | All synthesis routes have `require_synthesis_clearance` dependency | `tests/ci/test_synthesis_safety_coverage.py` |
-| I-3 Proof Artifact Completeness | Required fields: git_commit, timestamp, engine_mode, model_hashes, output_file_hash, output_duration_seconds, output_energy_rms, all_steps_passed | `tests/ci/test_proof_artifact_schema.py` |
+| I-3 Proof Artifact Completeness | Required fields enforced | Schema: `.ci/proof_schema.json`, Validator: `scripts/ci/check_state_proofs.py`, Drift guard: `tests/ci/test_proof_schema_fingerprint_alignment.py` |
 | I-4 OpenAPI Spec Validity | Zero unresolvable $ref; concrete schemas on core routes | `tests/ci/test_openapi_validity.py` |
 | I-5 Crash Traceback Completeness | Exception handler logs full traceback | `tests/ci/test_exception_handler.py` |
 
@@ -106,15 +106,16 @@ Six phases. Every milestone has a CI gate, a specific command, or a hard fork de
 - [x] **D1**: Build trust/safety choke point dependency + enable I-2 (already passing)
 - [x] **D2**: Fix OpenAPI $ref resolution + enable I-4 (concrete schemas on 6 routes, xfail removed)
 
-### Phase E: Golden Path — COMPLETE (2026-03-03)
+### Phase E: Golden Path — SCAFFOLDING COMPLETE (stub only, 2026-03-03)
 
 - [x] **E1**: Pre-conditions checklist (models, env, clean start) — `scripts/golden_path_preconditions.py`, URL fix in test_golden_path.py
-- [x] **E2**: Full engine run (import → transcribe → clone → synthesize → validate) — stub mode, 10 tests passed
+- [x] **E2**: Full engine run (import → transcribe → clone → synthesize → validate) — stub mode only, 10 tests passed (does NOT satisfy 100% completion per governing principle)
 - [x] **E3**: Proof artifact generation (I-3 compliant) — `scripts/golden_path_proof.py`, proof.json in .buildlogs/proof_runs/
 - [x] **E4**: Golden path in CI (stub mode) — golden-path job in .github/workflows/ci.yml
 
 ### Phase F: v1.1.0 Release
 
+- **F0**: PROOF_GOLDEN_PATH_REAL must exist before any "100% complete" declaration
 - **F1**: Documentation and debt closure
 - **F2**: Final gate check (all invariants + deterministic tests + Release build)
 - **F3**: Tag v1.1.0-release
@@ -134,8 +135,8 @@ Six phases. Every milestone has a CI gate, a specific command, or a hard fork de
 | 7 | Phase B | B-DELETE (mediator removed) | DECISION | After route decomp | DONE |
 | 8 | Phase D | D1 — Safety Choke Point + I-2 | HIGH | Must be done before Golden Path | DONE |
 | 9 | Phase D | D2 — OpenAPI + I-4 | MEDIUM | API contract | DONE |
-| 10 | Phase E | E1-E3 — Real Engine Run + Proof | RELEASE GATE | Requires all previous phases | DONE |
-| 11 | Phase E | E4 — Golden Path CI | MEDIUM | Automated regression guard | DONE |
+| 10 | Phase E | E1-E3 — Real Engine Run + Proof | RELEASE GATE | Requires all previous phases | STUB DONE |
+| 11 | Phase E | E4 — Golden Path CI | MEDIUM | Automated regression guard | STUB DONE |
 | 12 | Phase F | F1-F3 — Release | FINAL | Only after steps 1-11 | NEXT |
 
 ---

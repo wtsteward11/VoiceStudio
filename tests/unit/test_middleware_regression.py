@@ -16,7 +16,6 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -63,6 +62,7 @@ class _CallNextInExceptVisitor(ast.NodeVisitor):
 def _test_app_client():
     """Build a minimal TestClient with InputValidationMiddleware."""
     from fastapi import FastAPI
+
     from backend.api.middleware.input_validation import InputValidationMiddleware
 
     app = FastAPI()

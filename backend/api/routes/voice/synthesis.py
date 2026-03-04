@@ -10,10 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
-
-from backend.api.dependencies import require_synthesis_clearance
 from fastapi.responses import FileResponse
 
+from backend.api.dependencies import require_synthesis_clearance
 from backend.services.audio_artifacts.use_cases import create_audio_artifact_from_file
 
 from ...models_additional import (

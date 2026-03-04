@@ -5,9 +5,7 @@ then re-exports `router` for use by route_registry.py.
 
 Phase A3: replaces the 139 KB voice.py god-route.
 """
-from backend.api.routes.voice._shared import router
-
-from backend.api.routes.voice import (  # noqa: F401
+from backend.api.routes.voice import (
     analysis,
     audio,
     cloning,
@@ -16,5 +14,6 @@ from backend.api.routes.voice import (  # noqa: F401
     synthesis,
     testing,
 )
+from backend.api.routes.voice._shared import router
 
 __all__ = ["router"]

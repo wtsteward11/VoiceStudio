@@ -15,9 +15,9 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from backend.api.dependencies import require_synthesis_clearance
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 

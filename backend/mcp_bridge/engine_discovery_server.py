@@ -12,18 +12,24 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, Response, jsonify, request
-from flask_cors import CORS
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI(title="VoiceStudio Engine Discovery")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 ENGINES_DIR = Path(__file__).resolve().parents[2] / "engines"
 DEFAULT_PORT = 9901
@@ -189,36 +195,39 @@ def _reload_manifests(engines_dir: Path | None = None) -> None:
     logger.info("Loaded %d engine manifests", len(_manifests))
 
 
-@app.route("/", methods=["GET"])
+@app.get("/")
 def root():
-    return jsonify({
+    return {
         "name": "VoiceStudio Engine Discovery",
         "description": "MCP server for discovering VoiceStudio engine capabilities",
         "mcp_endpoint": "/mcp",
         "engine_count": len(_manifests),
-    })
+    }
 
 
 def _sse_stream():
     yield "event: endpoint\ndata: {\"url\": \"/mcp\"}\n\n"
 
 
-@app.route("/mcp", methods=["GET", "POST"])
-@app.route("/sse", methods=["GET", "POST"])
-@app.route("/sse/", methods=["GET", "POST"])
-def mcp_endpoint():
+@app.api_route("/mcp", methods=["GET", "POST"])
+@app.api_route("/sse", methods=["GET", "POST"])
+@app.api_route("/sse/", methods=["GET", "POST"])
+async def mcp_endpoint(request: Request):
     """MCP endpoint. GET returns SSE stream; POST handles JSON-RPC."""
     if request.method == "GET":
-        return Response(
+        return StreamingResponse(
             _sse_stream(),
-            mimetype="text/event-stream",
+            media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
     try:
-        body = request.get_json(force=True, silent=True) or {}
+        body = await request.json() or {}
     except Exception:
-        return jsonify({"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}}), 400
+        return JSONResponse(
+            {"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}},
+            status_code=400,
+        )
 
     msg_id = body.get("id")
     method = body.get("method")
@@ -227,16 +236,16 @@ def mcp_endpoint():
     logger.info("[MCP] method=%s id=%s", method, msg_id)
 
     if msg_id is None and method:
-        return "", 202
+        return Response(status_code=202)
 
     if method == "ping":
-        return jsonify({"jsonrpc": "2.0", "id": msg_id, "result": {}})
+        return {"jsonrpc": "2.0", "id": msg_id, "result": {}}
 
     if method == "initialize":
         client_version = (params.get("protocolVersion") or "2025-06-18").strip()
         supported = ("2024-11-05", "2025-03-26", "2025-06-18")
         protocol_version = client_version if client_version in supported else "2025-06-18"
-        return jsonify({
+        return {
             "jsonrpc": "2.0",
             "id": msg_id,
             "result": {
@@ -249,32 +258,32 @@ def mcp_endpoint():
                 },
                 "instructions": MCP_SERVER_INSTRUCTIONS,
             },
-        })
+        }
 
     if method == "tools/list":
-        return jsonify({
+        return {
             "jsonrpc": "2.0",
             "id": msg_id,
             "result": {"tools": MCP_TOOLS},
-        })
+        }
 
     if method == "resources/list":
-        return jsonify({"jsonrpc": "2.0", "id": msg_id, "result": {"resources": []}})
+        return {"jsonrpc": "2.0", "id": msg_id, "result": {"resources": []}}
 
     if method == "prompts/list":
-        return jsonify({"jsonrpc": "2.0", "id": msg_id, "result": {"prompts": []}})
+        return {"jsonrpc": "2.0", "id": msg_id, "result": {"prompts": []}}
 
     if method == "resources/read":
-        return jsonify({
+        return {
             "jsonrpc": "2.0", "id": msg_id,
             "error": {"code": -32602, "message": "Resource not found"},
-        })
+        }
 
     if method == "prompts/get":
-        return jsonify({
+        return {
             "jsonrpc": "2.0", "id": msg_id,
             "error": {"code": -32602, "message": "Prompt not found"},
-        })
+        }
 
     if method == "tools/call":
         name = params.get("name")
@@ -285,36 +294,36 @@ def mcp_endpoint():
         elif name == "get_engine_details":
             engine_id = args.get("engine_id", "")
             if not engine_id:
-                return jsonify({
+                return {
                     "jsonrpc": "2.0", "id": msg_id,
                     "result": {
                         "content": [{"type": "text", "text": json.dumps({"error": "engine_id is required"})}],
                         "isError": True,
                     },
-                })
+                }
             text = _tool_get_engine_details(_manifests, engine_id)
         elif name == "get_streaming_engines":
             text = _tool_get_streaming_engines(_manifests)
         else:
-            return jsonify({
+            return {
                 "jsonrpc": "2.0", "id": msg_id,
                 "error": {"code": -32601, "message": f"Unknown tool: {name}"},
-            })
+            }
 
         is_error = "error" in json.loads(text)
-        return jsonify({
+        return {
             "jsonrpc": "2.0",
             "id": msg_id,
             "result": {
                 "content": [{"type": "text", "text": text}],
                 "isError": is_error,
             },
-        })
+        }
 
-    return jsonify({
+    return {
         "jsonrpc": "2.0", "id": msg_id,
         "error": {"code": -32601, "message": f"Method not found: {method}"},
-    })
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -323,10 +332,12 @@ def mcp_endpoint():
 
 def run_server(engines_dir: Path | None = None, port: int = DEFAULT_PORT) -> None:
     """Start the MCP engine discovery server."""
+    import uvicorn
+
     _reload_manifests(engines_dir)
     print(f"Engine Discovery MCP server starting on port {port}")
     print(f"Loaded {len(_manifests)} engine manifests from {engines_dir or ENGINES_DIR}")
-    app.run(host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":

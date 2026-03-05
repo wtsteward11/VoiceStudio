@@ -103,10 +103,9 @@ def engines_tmpdir(tmp_path):
 
 
 @pytest.fixture()
-def flask_client():
-    app.config["TESTING"] = True
-    with app.test_client() as client:
-        yield client
+def test_client():
+    from starlette.testclient import TestClient
+    return TestClient(app)
 
 
 # ---------------------------------------------------------------------------
@@ -302,11 +301,11 @@ class TestMCPEndpoint:
             body["params"] = params
         resp = client.post("/mcp", json=body)
         assert resp.status_code == 200
-        return resp.get_json()
+        return resp.json()
 
-    def test_initialize(self, flask_client):
+    def test_initialize(self, test_client):
         result = self._rpc(
-            flask_client,
+            test_client,
             "initialize",
             {"protocolVersion": "2025-03-26"},
         )
@@ -318,10 +317,10 @@ class TestMCPEndpoint:
         )
 
     def test_tools_list_returns_three_tools(
-        self, flask_client
+        self, test_client
     ):
         result = self._rpc(
-            flask_client, "tools/list"
+            test_client, "tools/list"
         )
         tools = result["result"]["tools"]
         assert len(tools) == 3
@@ -332,21 +331,21 @@ class TestMCPEndpoint:
             "get_streaming_engines",
         }
 
-    def test_ping(self, flask_client):
-        result = self._rpc(flask_client, "ping")
+    def test_ping(self, test_client):
+        result = self._rpc(test_client, "ping")
         assert result["result"] == {}
 
-    def test_unknown_method(self, flask_client):
+    def test_unknown_method(self, test_client):
         result = self._rpc(
-            flask_client, "bogus/method"
+            test_client, "bogus/method"
         )
         assert "error" in result
         assert result["error"]["code"] == -32601
 
     def test_notification_returns_202(
-        self, flask_client
+        self, test_client
     ):
-        resp = flask_client.post(
+        resp = test_client.post(
             "/mcp",
             json={
                 "jsonrpc": "2.0",
@@ -356,17 +355,17 @@ class TestMCPEndpoint:
         assert resp.status_code == 202
 
     def test_tools_call_unknown_tool(
-        self, flask_client
+        self, test_client
     ):
         result = self._rpc(
-            flask_client,
+            test_client,
             "tools/call",
             {"name": "no_such_tool"},
         )
         assert "error" in result
         assert result["error"]["code"] == -32601
 
-    def test_sse_get(self, flask_client):
-        resp = flask_client.get("/mcp")
+    def test_sse_get(self, test_client):
+        resp = test_client.get("/mcp")
         assert resp.status_code == 200
-        assert "text/event-stream" in resp.content_type
+        assert "text/event-stream" in resp.headers.get("content-type", "")

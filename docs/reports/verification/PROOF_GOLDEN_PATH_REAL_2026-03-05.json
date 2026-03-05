@@ -1,8 +1,8 @@
 {
   "command": "python -m pytest tests/e2e/test_golden_path.py -v --tb=short",
   "exit_code": 0,
-  "timestamp": "2026-03-05T11:10:27Z",
-  "git_commit": "5bf115ce73b856b8de64e57de325ec97a9fbb7ce",
+  "timestamp": "2026-03-05T22:32:27Z",
+  "git_commit": "3515dbc5867ab126d72c0f3926206f8f6ccdc86c",
   "git_branch": "main",
   "engine_mode": "real",
   "checks": {
@@ -20,12 +20,12 @@
   },
   "passed": true,
   "test_ran": true,
-  "pytest_stdout_sha256": "a639e1217fb3cd3baa3b8a9c2e388810efbef122671a9b4480033a9f4e2a059a",
+  "pytest_stdout_sha256": "acbc35d5b271dcae8d5bdbf0c6b742fcce4dc188ae192a0f35e48e0d2809451c",
   "pytest_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "pytest_duration_seconds": 35.84,
-  "artifact_path": ".buildlogs/proof_runs/golden_path_real_20260305T110951Z_4a405d78/golden_path_export.wav",
+  "pytest_duration_seconds": 32.78,
+  "artifact_path": ".buildlogs/proof_runs/golden_path_real_20260305T223154Z_3515dbc5/golden_path_export.wav",
   "artifact_sha256": "41d1a763672d0a7e21ebcbd245b5e8761af6f4ee65f3d26e04c687f40808ef86",
   "artifact_bytes": 16044,
   "historical_proof": false,
-  "evidence_fingerprint": "e9f0f9250795233184fc585bd81d710907f8d25172987ca2ed4a02a0e34f64a9"
+  "evidence_fingerprint": "45b6dcb016fe217c8f0969a5e1eee3a8826626b7900c7696b7b4f08838b2a2c5"
 }

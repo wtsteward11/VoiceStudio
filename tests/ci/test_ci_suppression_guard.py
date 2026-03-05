@@ -21,13 +21,12 @@ WORKFLOWS = [ROOT / ".github" / "workflows" / "ci.yml", ROOT / ".github" / "work
 
 # (workflow_basename, job_id, step_name) -> category label
 ALLOWED_SUPPRESSIONS = {
-    ("ci.yml", "python-tests", "Run linting"): "advisory:formatting",
-    ("ci.yml", "python-tests", "Run type checking"): "advisory:type-diagnostics",
-    ("ci.yml", "security-scan", "Check dependencies for vulnerabilities"): "advisory:vuln-scan",
-    ("ci.yml", "security-scan", "Run Bandit security scanner"): "advisory:static-analysis",
     ("ci.yml", "code-quality", "Check formatting with Black"): "advisory:formatting",
     ("ci.yml", "code-quality", "Check imports with isort"): "advisory:formatting",
     ("ci.yml", "code-quality", "Lint with Ruff"): "advisory:formatting",
+    ("ci.yml", "code-quality", "Run type checking"): "advisory:type-diagnostics",
+    ("ci.yml", "code-quality", "Check dependencies for vulnerabilities"): "advisory:vuln-scan",
+    ("ci.yml", "code-quality", "Run Bandit security scanner"): "advisory:static-analysis",
     ("ci.yml", "performance-tests", "Run performance benchmarks"): "advisory:perf-regression",
     ("test.yml", "test-backend", "Upload coverage reports"): "infra:upload",
     ("test.yml", "test-frontend", "Generate coverage report"): "infra:report",
@@ -70,7 +69,6 @@ GATE_JOBS = {
     ("ci.yml", "dotnet-build"),
     ("ci.yml", "integration-tests"),
     ("ci.yml", "golden-path"),
-    ("ci.yml", "security-scan"),  # partially gate - some steps are advisory
     ("build.yml", "build-frontend"),
     ("build.yml", "build-backend"),
     ("build.yml", "verify-gates"),

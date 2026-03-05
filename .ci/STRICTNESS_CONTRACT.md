@@ -12,7 +12,6 @@ These jobs **must never** use `continue-on-error: true` or `|| true` / `|| echo 
 | ci.yml | dotnet-build |
 | ci.yml | integration-tests |
 | ci.yml | golden-path |
-| ci.yml | security-scan |
 | build.yml | build-frontend |
 | build.yml | build-backend |
 | build.yml | verify-gates |
@@ -25,8 +24,7 @@ These jobs **must never** use `continue-on-error: true` or `|| true` / `|| echo 
 
 These jobs may use suppressions when labeled in the suppression guard allowlist:
 
-- code-quality (formatting, linting)
-- security-scan (vuln scans, static analysis)
+- code-quality (formatting, linting, type checking, vuln scans, static analysis)
 - performance-tests
 - quality-scorecard
 - nightly-ui-automation

@@ -11,6 +11,7 @@ using VoiceStudio.Core.Services;
 using VoiceStudio.Core.State;
 using VoiceStudio.App.Core.Commands;
 using VoiceStudio.App.UseCases;
+using VoiceStudio.App.Utilities;
 using VoiceStudio.App.ViewModels;
 
 namespace VoiceStudio.App.Services
@@ -230,6 +231,7 @@ namespace VoiceStudio.App.Services
     private static void RegisterAllPanels()
     {
       var sw = Stopwatch.StartNew();
+      using var profiler = PerformanceProfiler.StartPanelLoad("RegistryInit");
       var registry = GetPanelRegistry();
 
       // Register advanced panels (TextSpeechEditor, Prosody, SpatialAudio, etc.)

@@ -17,12 +17,12 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent.parent
 
 import sys
+
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.ci.check_state_proofs import validate_proof, load_schema
+from scripts.ci.check_state_proofs import load_schema, validate_proof
 from scripts.ci.proof_fingerprint import compute_fingerprint
-
 
 SCHEMA = load_schema()
 
@@ -138,6 +138,32 @@ class TestGoldenPathStubNegative:
         path = _write_proof(tmp_path, "PROOF_GOLDEN_PATH_STUB_2026-03-03.json", proof)
         errors = validate_proof(path, SCHEMA, no_git_match=True)
         assert any("evidence_fingerprint mismatch" in e for e in errors), f"Expected fingerprint rejection, got: {errors}"
+
+    def test_nonexistent_buildlogs_artifact_rejected(self, tmp_path: Path) -> None:
+        """Prove .buildlogs/ artifact paths are NOT exempt from existence validation."""
+        proof = copy.deepcopy(VALID_STUB_PROOF)
+        proof["artifact_path"] = ".buildlogs/fake/nonexistent.wav"
+        proof["artifact_sha256"] = "0" * 64
+        proof["historical_proof"] = False
+        proof["evidence_fingerprint"] = compute_fingerprint(proof, "PROOF_GOLDEN_PATH_STUB")
+        path = _write_proof(tmp_path, "PROOF_GOLDEN_PATH_STUB_2026-03-03.json", proof)
+        errors = validate_proof(path, SCHEMA, no_git_match=True)
+        assert any("artifact_path does not exist" in e for e in errors), (
+            f"Expected nonexistent .buildlogs/ artifact rejection, got: {errors}"
+        )
+
+    def test_sha256_unverifiable_when_artifact_missing_rejected(self, tmp_path: Path) -> None:
+        """Prove SHA256 cannot be verified when artifact file does not exist."""
+        proof = copy.deepcopy(VALID_STUB_PROOF)
+        proof["artifact_path"] = ".buildlogs/fake/nonexistent.wav"
+        proof["artifact_sha256"] = "a" * 64  # valid format, but file doesn't exist
+        proof["historical_proof"] = False
+        proof["evidence_fingerprint"] = compute_fingerprint(proof, "PROOF_GOLDEN_PATH_STUB")
+        path = _write_proof(tmp_path, "PROOF_GOLDEN_PATH_STUB_2026-03-03.json", proof)
+        errors = validate_proof(path, SCHEMA, no_git_match=True)
+        assert any("cannot verify artifact_sha256" in e or "artifact_path does not exist" in e for e in errors), (
+            f"Expected SHA256 unverifiable (missing artifact) rejection, got: {errors}"
+        )
 
 
 class TestGateCNegative:

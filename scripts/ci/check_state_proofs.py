@@ -475,14 +475,14 @@ def validate_nested_semantics(
                 errors.append(
                     f"{_rel(path)}: artifact_path is required"
                 )
-            elif not art_path_str.startswith(".buildlogs/"):
+            else:
                 art_full = (ROOT / art_path_str.replace("\\", "/")).resolve()
                 root_resolved = ROOT.resolve()
                 if not str(art_full).startswith(str(root_resolved)):
                     errors.append(
                         f"{_rel(path)}: artifact_path must be under repo root"
                     )
-                elif not art_full.exists():
+                elif not data.get("historical_proof") and not art_full.exists():
                     errors.append(
                         f"{_rel(path)}: artifact_path does not exist: {art_path_str}"
                     )
@@ -504,6 +504,10 @@ def validate_nested_semantics(
                             errors.append(
                                 f"{_rel(path)}: artifact_sha256 does not match file at artifact_path"
                             )
+                    elif not data.get("historical_proof"):
+                        errors.append(
+                            f"{_rel(path)}: cannot verify artifact_sha256: artifact file does not exist"
+                        )
 
     return errors
 

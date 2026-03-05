@@ -71,20 +71,79 @@ def _get_models_path() -> Path:
     return Path(os.path.expanduser("~/.voicestudio/models"))
 
 
-def _check_whisper_cpp() -> dict:
-    """Check whisper.cpp GGUF model exists."""
+def _check_whisper() -> dict:
+    """Check whisper model exists (whisper.cpp GGUF or faster_whisper CTranslate2)."""
     models_root = _get_models_path()
     explicit = os.getenv("WHISPER_CPP_MODEL_PATH")
     if explicit:
         path = Path(explicit)
-    else:
-        path = models_root / "whisper" / "whisper-medium.en.gguf"
+        exists = path.exists() and path.is_file()
+        return {
+            "ok": exists,
+            "path": str(path),
+            "format": "whisper_cpp",
+            "message": f"Whisper GGUF at {path}" if exists else f"Missing: {path}",
+        }
 
-    exists = path.exists() and path.is_file()
+    gguf_path = models_root / "whisper" / "whisper-medium.en.gguf"
+    if gguf_path.exists() and gguf_path.is_file():
+        return {
+            "ok": True,
+            "path": str(gguf_path),
+            "format": "whisper_cpp",
+            "message": f"Whisper GGUF at {gguf_path}",
+        }
+
+    # Fallback: project-root models when default path lacks whisper (e.g. CI/venv)
+    project_gguf = PROJECT_ROOT / "models" / "whisper" / "whisper-medium.en.gguf"
+    if project_gguf.exists() and project_gguf.is_file():
+        return {
+            "ok": True,
+            "path": str(project_gguf),
+            "format": "whisper_cpp",
+            "message": f"Whisper GGUF at {project_gguf}",
+        }
+
+    fw_dir = models_root / "whisper"
+    if fw_dir.exists():
+        for sub in fw_dir.iterdir():
+            if sub.is_dir() and (sub / "model.bin").exists():
+                return {
+                    "ok": True,
+                    "path": str(sub),
+                    "format": "faster_whisper",
+                    "message": f"Faster Whisper at {sub}",
+                }
+
+    try:
+        from faster_whisper.utils import get_assets_path
+        cached = Path(get_assets_path())
+        if cached.exists():
+            return {
+                "ok": True,
+                "path": str(cached),
+                "format": "faster_whisper_cached",
+                "message": f"Faster Whisper cached at {cached}",
+            }
+    except (ImportError, Exception):
+        pass
+
+    try:
+        from faster_whisper import WhisperModel
+        WhisperModel("base", device="cpu", compute_type="int8")
+        return {
+            "ok": True,
+            "path": "huggingface_cache",
+            "format": "faster_whisper",
+            "message": "Faster Whisper base loadable (cached by HuggingFace)",
+        }
+    except (ImportError, Exception):
+        pass
+
     return {
-        "ok": exists,
-        "path": str(path),
-        "message": f"Whisper GGUF at {path}" if exists else f"Missing: {path}. Download via scripts/download_all_models.py",
+        "ok": False,
+        "path": str(gguf_path),
+        "message": f"No whisper model found. Download via: python scripts/download_all_models.py --engine whisper",
     }
 
 
@@ -161,7 +220,7 @@ def run_checks(check_backend: str | None = None) -> dict:
         "python": _check_python_version(),
         "packages": _check_packages(),
         "models_path": str(_get_models_path()),
-        "whisper_cpp": _check_whisper_cpp(),
+        "whisper_cpp": _check_whisper(),
         "piper": _check_piper(),
         "xtts": _check_xtts(),
         "test_audio": _check_test_audio(),

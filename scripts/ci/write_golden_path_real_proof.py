@@ -19,7 +19,7 @@ import struct
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -96,9 +96,12 @@ def _compute_wav_metrics(path: Path) -> dict:
 
 def _collect_model_hashes() -> dict[str, str]:
     """Compute SHA-256 hashes for available model files."""
-    models_root = Path(
-        os.environ.get("VOICESTUDIO_MODELS_PATH", "models")
-    )
+    if os.name == "nt":
+        program_data = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
+        default_root = str(Path(program_data) / "VoiceStudio" / "models")
+    else:
+        default_root = "models"
+    models_root = Path(os.environ.get("VOICESTUDIO_MODELS_PATH", default_root))
     hashes: dict[str, str] = {}
 
     whisper = models_root / "whisper"
@@ -106,6 +109,12 @@ def _collect_model_hashes() -> dict[str, str]:
         for gguf in whisper.glob("*.gguf"):
             hashes[f"whisper_cpp:{gguf.name}"] = _file_sha256(gguf)
             break
+        if not hashes:
+            for sub in whisper.iterdir():
+                model_bin = sub / "model.bin"
+                if sub.is_dir() and model_bin.exists():
+                    hashes[f"faster_whisper:{sub.name}"] = _file_sha256(model_bin)
+                    break
 
     piper = models_root / "piper"
     if piper.exists():
@@ -123,10 +132,14 @@ def _collect_model_hashes() -> dict[str, str]:
 
 
 def main() -> int:
+    api_host = os.environ.get("VOICESTUDIO_API_HOST", "localhost")
+    api_port = os.environ.get("VOICESTUDIO_API_PORT", "8001")
+    backend_url = f"http://{api_host}:{api_port}"
+
     precond = subprocess.run(
         [sys.executable,
          str(ROOT / "scripts" / "golden_path_preconditions.py"),
-         "--check-backend", "http://localhost:8000", "--json"],
+         "--check-backend", backend_url, "--json"],
         cwd=ROOT, capture_output=True, text=True, timeout=15,
     )
     if precond.returncode != 0:
@@ -156,19 +169,21 @@ def main() -> int:
     command = f"python -m pytest {E2E_TEST} -v --tb=short"
 
     git_sha = _get_git_commit()[:8]
-    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     output_dir = BUILDLOGS / f"golden_path_real_{ts}_{git_sha}"
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    os.environ["VOICESTUDIO_TEST_MODE"] = "real"
-    os.environ["VOICESTUDIO_GOLDEN_PATH_OUTPUT_DIR"] = str(output_dir)
 
     start = time.perf_counter()
     result = subprocess.run(
         [sys.executable, "-m", "pytest",
-         str(ROOT / E2E_TEST), "-v", "--tb=short"],
+         str(ROOT / E2E_TEST), "-v", "--tb=short",
+         "-p", "no:randomly", "-o", "addopts="],
         cwd=ROOT, timeout=180,
         capture_output=True, text=True,
+        env={**os.environ,
+             "VOICESTUDIO_API_URL": backend_url,
+             "VOICESTUDIO_TEST_MODE": "real",
+             "VOICESTUDIO_GOLDEN_PATH_OUTPUT_DIR": str(output_dir)},
     )
     duration_sec = round(time.perf_counter() - start, 2)
 
@@ -238,7 +253,7 @@ def main() -> int:
     proof = {
         "command": command,
         "exit_code": 0,
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "git_commit": _get_git_commit(),
         "git_branch": _get_git_branch(),
         "engine_mode": "real",
@@ -256,13 +271,14 @@ def main() -> int:
         "artifact_path": artifact_rel,
         "artifact_sha256": metrics["output_sha256"],
         "artifact_bytes": artifact_bytes,
+        "historical_proof": True,
     }
     proof["evidence_fingerprint"] = compute_fingerprint(
         proof, "PROOF_GOLDEN_PATH_REAL"
     )
 
     VERIFICATION_DIR.mkdir(parents=True, exist_ok=True)
-    date_str = datetime.utcnow().strftime("%Y-%m-%d")
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     out_path = (
         VERIFICATION_DIR
         / f"PROOF_GOLDEN_PATH_REAL_{date_str}.json"

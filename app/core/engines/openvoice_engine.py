@@ -194,7 +194,7 @@ try:
 except ImportError:
     HAS_OPENVOICE = False
     logger.warning("OpenVoice not installed. Install with: pip install openvoice")
-    # Create dummy classes for type hints
+    # Create stand-in classes for type hints
     BaseSpeakerTTS = _MISSING
     ToneColorConverter = _MISSING
 

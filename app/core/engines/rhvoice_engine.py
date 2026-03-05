@@ -402,7 +402,7 @@ class RHVoiceEngine(EngineProtocol):
                 return np.asarray(audio)
 
             finally:
-                # Cleanup temporary files
+                # Cleanup temp files
                 try:
                     if os.path.exists(tmp_output):
                         os.unlink(tmp_output)

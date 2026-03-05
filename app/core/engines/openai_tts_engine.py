@@ -413,7 +413,7 @@ class OpenAITTSEngine(EngineProtocol):
         try:
             import tempfile
 
-            # Create temporary file
+            # Create temp file
             with tempfile.NamedTemporaryFile(delete=False, suffix=f".{format}") as tmp_file:
                 tmp_file.write(audio_data)
                 tmp_path = tmp_file.name
@@ -443,7 +443,7 @@ class OpenAITTSEngine(EngineProtocol):
                 return cast(npt.NDArray[np.float32], audio)
 
             finally:
-                # Clean up temporary file
+                # Clean up temp file
                 with contextlib.suppress(Exception):
                     os.unlink(tmp_path)
 

@@ -209,7 +209,7 @@ class GPTSovitsEngine(EngineProtocol):
                 logger.warning(
                     f"Model path not found: {self.model_path}. GPT-SoVITS may need to be downloaded."
                 )
-                # Continue with initialization - model can be loaded later
+                # Continue with initialization - model can be loaded on first use
 
             # Initialize device
             if self.device == "cuda" and not torch.cuda.is_available():
@@ -575,7 +575,7 @@ class GPTSovitsEngine(EngineProtocol):
             ref_audio_path = None
             if ref_audio is not None:
                 if isinstance(ref_audio, np.ndarray):
-                    # Save numpy array to temporary file
+                    # Save numpy array to temp file
                     ref_audio_path = tempfile.mktemp(suffix=".wav")
                     sf.write(ref_audio_path, ref_audio, 22050, format="WAV")
                 elif isinstance(ref_audio, str):
@@ -585,7 +585,7 @@ class GPTSovitsEngine(EngineProtocol):
                         logger.warning(f"Reference audio file not found: {ref_audio}")
                         return None
                 elif isinstance(ref_audio, bytes):
-                    # Save bytes to temporary file
+                    # Save bytes to temp file
                     ref_audio_path = tempfile.mktemp(suffix=".wav")
                     with open(ref_audio_path, "wb") as f:
                         f.write(ref_audio)
@@ -643,7 +643,7 @@ class GPTSovitsEngine(EngineProtocol):
                         # Read audio from bytes
                         audio, _sr = sf.read(io.BytesIO(audio_bytes))
 
-                        # Clean up temporary file if we created it
+                        # Clean up temp file if we created it
                         if (
                             ref_audio is not None
                             and isinstance(ref_audio, np.ndarray)
@@ -671,7 +671,7 @@ class GPTSovitsEngine(EngineProtocol):
                 logger.error(f"GPT-SoVITS API request exception: {e}")
                 return None
             finally:
-                # Clean up temporary file if we created it
+                # Clean up temp file if we created it
                 if (
                     ref_audio is not None
                     and isinstance(ref_audio, np.ndarray)
@@ -713,7 +713,7 @@ class GPTSovitsEngine(EngineProtocol):
             ref_audio_path = None
             if ref_audio is not None:
                 if isinstance(ref_audio, np.ndarray):
-                    # Save to temporary file
+                    # Save to temp file
                     import tempfile
 
                     ref_audio_path = tempfile.mktemp(suffix=".wav")
@@ -742,7 +742,7 @@ class GPTSovitsEngine(EngineProtocol):
                     **kwargs,
                 )
 
-            # Clean up temporary file
+            # Clean up temp file
             if (
                 ref_audio is not None
                 and isinstance(ref_audio, np.ndarray)

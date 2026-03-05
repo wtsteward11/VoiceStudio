@@ -38,7 +38,7 @@ except ImportError:
     _model_cache = _MISSING
     logger.debug("General model cache not available, using MockingBird-specific cache")
 
-# Fallback: MockingBird-specific cache (for backward compatibility)
+# Fallback: MB-specific cache (for backward compatibility)
 _MOCKINGBIRD_MODEL_CACHE: OrderedDict = OrderedDict()
 _MAX_CACHE_SIZE = 2  # Maximum number of models to cache in memory
 
@@ -56,7 +56,7 @@ def _get_cached_mockingbird_model(model_path: str, device: str):
         if cached is not None:
             return cached
 
-    # Fallback to MockingBird-specific cache
+    # Fallback to MB-specific cache
     cache_key = _get_cache_key(model_path, device)
     if cache_key in _MOCKINGBIRD_MODEL_CACHE:
         _MOCKINGBIRD_MODEL_CACHE.move_to_end(cache_key)
@@ -74,7 +74,7 @@ def _cache_mockingbird_model(model_path: str, device: str, model_data: dict):
         except Exception as e:
             logger.warning(f"Failed to cache in general cache: {e}, using fallback")
 
-    # Fallback to MockingBird-specific cache
+    # Fallback to MB-specific cache
     cache_key = _get_cache_key(model_path, device)
 
     if cache_key in _MOCKINGBIRD_MODEL_CACHE:
@@ -405,7 +405,7 @@ class MockingBirdEngine(EngineProtocol):
 
             logger.info(f"Loading MockingBird model from {self.model_path}")
 
-            # Load MockingBird models
+            # Load MB models
             try:
                 from pathlib import Path
 
@@ -494,11 +494,11 @@ class MockingBirdEngine(EngineProtocol):
 
             sample_rate = 22050
 
-            # Try to use actual MockingBird model if available
+            # Try to use actual MB model if available
             if self._model and not self._model.get("fallback", False):
                 return self._synthesize_with_model(text, ref_audio, sample_rate, **kwargs)
 
-            # Try to use MockingBird API if available
+            # Try to use MB API if available
             api_url = kwargs.get("api_url") or os.getenv("MOCKINGBIRD_API_URL")
             if api_url:
                 return self._synthesize_via_api(text, ref_audio, api_url, **kwargs)
@@ -521,7 +521,7 @@ class MockingBirdEngine(EngineProtocol):
             if self._model is None:
                 return None
 
-            # Try to import MockingBird modules
+            # Try to import MB modules
             try:
                 from MockingBird.encoder import inference as encoder_inference
                 from MockingBird.synthesizer import Synthesizer
@@ -532,7 +532,7 @@ class MockingBirdEngine(EngineProtocol):
                     import sys
                     from pathlib import Path
 
-                    # Look for MockingBird in common locations
+                    # Look for MB package in common locations
                     mockingbird_paths = [
                         Path(__file__).parent.parent.parent / "MockingBird",
                     ]

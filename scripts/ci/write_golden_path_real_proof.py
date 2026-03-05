@@ -133,7 +133,7 @@ def _collect_model_hashes() -> dict[str, str]:
 
 def main() -> int:
     api_host = os.environ.get("VOICESTUDIO_API_HOST", "localhost")
-    api_port = os.environ.get("VOICESTUDIO_API_PORT", "8001")
+    api_port = os.environ.get("VOICESTUDIO_API_PORT", "8000")
     backend_url = f"http://{api_host}:{api_port}"
 
     precond = subprocess.run(
@@ -192,6 +192,10 @@ def main() -> int:
             "Golden path real test failed.",
             file=sys.stderr,
         )
+        if result.stdout:
+            print(result.stdout, file=sys.stderr)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
         return 1
 
     stdout_sha = hashlib.sha256(
@@ -271,7 +275,7 @@ def main() -> int:
         "artifact_path": artifact_rel,
         "artifact_sha256": metrics["output_sha256"],
         "artifact_bytes": artifact_bytes,
-        "historical_proof": True,
+        "historical_proof": False,
     }
     proof["evidence_fingerprint"] = compute_fingerprint(
         proof, "PROOF_GOLDEN_PATH_REAL"

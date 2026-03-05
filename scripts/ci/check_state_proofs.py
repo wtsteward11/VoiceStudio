@@ -554,7 +554,7 @@ def validate_nested_semantics(
                     errors.append(
                         f"{_rel(path)}: artifact_path must be under repo root"
                     )
-                elif not data.get("historical_proof") and not art_full.exists():
+                elif not art_full.exists():
                     errors.append(
                         f"{_rel(path)}: artifact_path does not exist: {art_path_str}"
                     )
@@ -576,7 +576,7 @@ def validate_nested_semantics(
                             errors.append(
                                 f"{_rel(path)}: artifact_sha256 does not match file at artifact_path"
                             )
-                    elif not data.get("historical_proof"):
+                    else:
                         errors.append(
                             f"{_rel(path)}: cannot verify artifact_sha256: artifact file does not exist"
                         )

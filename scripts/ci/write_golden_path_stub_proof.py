@@ -20,7 +20,7 @@ import struct
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -94,7 +94,7 @@ def main() -> int:
     command = f"python -m pytest {TEST_PATH} -v --tb=short"
 
     git_sha = _get_git_commit()[:8]
-    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     output_dir = BUILDLOGS / f"golden_path_stub_{ts}_{git_sha}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -147,7 +147,7 @@ def main() -> int:
     proof = {
         "command": command,
         "exit_code": 0,
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "git_commit": _get_git_commit(),
         "git_branch": _get_git_branch(),
         "engine_mode": "stub",
@@ -162,13 +162,14 @@ def main() -> int:
         "artifact_path": artifact_rel,
         "artifact_sha256": metrics["output_sha256"],
         "artifact_bytes": artifact_bytes,
+        "historical_proof": False,
     }
     proof["evidence_fingerprint"] = compute_fingerprint(
         proof, "PROOF_GOLDEN_PATH_STUB"
     )
 
     VERIFICATION_DIR.mkdir(parents=True, exist_ok=True)
-    date_str = datetime.utcnow().strftime("%Y-%m-%d")
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     out_path = VERIFICATION_DIR / f"PROOF_GOLDEN_PATH_STUB_{date_str}.json"
 
     with open(out_path, "w", encoding="utf-8") as f:

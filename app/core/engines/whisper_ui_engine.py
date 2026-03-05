@@ -310,7 +310,7 @@ class WhisperUIEngine(EngineProtocol):
             # Perform transcription
             result = self._perform_transcription(audio_path, language, **kwargs)
 
-            # Cleanup temporary file if created
+            # Cleanup temp file if created
             if isinstance(audio, bytes) and os.path.exists(audio_path):
                 with contextlib.suppress(Exception):
                     os.remove(audio_path)
@@ -400,7 +400,7 @@ class WhisperUIEngine(EngineProtocol):
                     logger.error(f"Audio file not found: {audio}")
                     return None
             elif isinstance(audio, bytes):
-                # Save to temporary file
+                # Save to temp file
                 import tempfile
 
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:

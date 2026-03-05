@@ -1844,7 +1844,7 @@ class RVCEngine(EngineProtocol):
                 hubert_model.eval()
                 hubert_model.to(device)
 
-                # Store feature extractor for later use
+                # Store feature extractor for subsequent use
                 self.feature_extractor = feature_extractor
 
                 logger.info(f"Loaded HuBERT model from HuggingFace: {model_name}")

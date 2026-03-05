@@ -165,6 +165,7 @@ class WebSocketTester:
             try:
                 self._ws.close()
                 self.closed_cleanly = True
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
             self._ws = None

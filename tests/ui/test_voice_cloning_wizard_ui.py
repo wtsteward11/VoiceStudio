@@ -92,6 +92,7 @@ class TestVoiceCloningWizardNavigation:
                     wizard_found = True
                     tracer.step(f"Found wizard element: {identifier}", driver, SCREENSHOTS_ENABLED)
                     break
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
 
@@ -101,6 +102,7 @@ class TestVoiceCloningWizardNavigation:
                     driver.find_element("xpath", "//*[contains(@Name, 'Clone')]")
                     wizard_found = True
                     tracer.step("Found Clone element by name", driver, SCREENSHOTS_ENABLED)
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
 

@@ -291,6 +291,7 @@ class VisualRegressionChecker:
                 panel = self.driver.find_element("accessibility id", panel_id)
                 if panel.is_displayed():
                     break
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
             time.sleep(0.1)

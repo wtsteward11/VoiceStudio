@@ -39,6 +39,7 @@ def _get_git_commit() -> str:
         )
         if out.returncode == 0 and out.stdout.strip():
             return out.stdout.strip()[:40]
+    # ALLOWED: bare except - best effort, failure acceptable
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
     return "0" * 40
@@ -56,6 +57,7 @@ def _get_git_branch() -> str:
         )
         if out.returncode == 0 and out.stdout.strip():
             return out.stdout.strip()
+    # ALLOWED: bare except - best effort, failure acceptable
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
     return "unknown"

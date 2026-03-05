@@ -155,7 +155,7 @@ Run the script to update after adding or modifying tools.
 | `setup_cython` | Setup script for compiling Cython modules. | `scripts/setup/setup_cython.py` |
 | `setup_gpu_venv` | .SYNOPSIS | `scripts/setup_gpu_venv.ps1` |
 | `setup_huggingface_token` | VoiceStudio HuggingFace Token Setup Script Run this script t... | `scripts/hf/setup_huggingface_token.ps1` |
-| `setup_xtts_venv` | XTTS Isolated Virtual Environment Setup Creates a separate v... | `scripts/setup_xtts_venv.ps1` |
+| `setup_xtts_venv` | XTTS Isolated Virtual Environment Setup Creates a separate v... | `scripts/setup/setup_xtts_venv.ps1` |
 | `show_role_budgets` | Show role-specific context budget allocation. | `scripts/show_role_budgets.py` |
 | `smoke` | .SYNOPSIS | `scripts/smoke.ps1` |
 | `start_backend` | VoiceStudio Backend Starter | `scripts/start_backend.ps1` |

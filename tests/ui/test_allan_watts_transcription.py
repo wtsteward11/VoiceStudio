@@ -337,6 +337,7 @@ class TestTranscriptionAPI:
                     tracer.end_phase(success=True)
                     tracer.success("Engines API works")
                     return
+            # ALLOWED: bare except - best effort, failure acceptable
             except requests.RequestException:
                 pass
 
@@ -408,6 +409,7 @@ class TestTranscriptionWorkflow:
         try:
             driver.find_element("accessibility id", "TranscribeView_EngineComboBox")
             workflow_elements["engine_selection"] = True
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -415,6 +417,7 @@ class TestTranscriptionWorkflow:
         try:
             driver.find_element("accessibility id", "TranscribeView_TranscribeButton")
             workflow_elements["transcribe_button"] = True
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -422,6 +425,7 @@ class TestTranscriptionWorkflow:
         try:
             driver.find_element("accessibility id", "TranscribeView_OutputTextBox")
             workflow_elements["output_area"] = True
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 

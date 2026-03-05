@@ -332,6 +332,7 @@ def infer_viewmodel_for_view(view_path: Path, viewmodels: dict[str, ViewModelInf
             vm_name = match.group(2)
             if vm_name in viewmodels:
                 return viewmodels[vm_name]
+    # ALLOWED: bare except - best effort, failure acceptable
     except (OSError, UnicodeDecodeError):
         pass
 

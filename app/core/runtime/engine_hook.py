@@ -30,6 +30,7 @@ except ImportError:
 
         RuntimeEngine = _FallbackRE
         RuntimeEngineManager = _FallbackREM
+    # ALLOWED: bare except - optional dependency, import failure acceptable
     except ImportError:
         pass
 

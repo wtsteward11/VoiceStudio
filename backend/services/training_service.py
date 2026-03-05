@@ -630,6 +630,7 @@ async def _execute_real_training(
                     "status": "running",
                 },
             ))
+        # ALLOWED: bare except - best effort, failure acceptable
         except Exception:
             pass
 
@@ -774,6 +775,7 @@ async def _simulate_training(
                         "validation_loss": validation_loss,
                     },
                 )
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
 

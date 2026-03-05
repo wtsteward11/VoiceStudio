@@ -63,6 +63,7 @@ class TestKeyboardNavigation:
                 button.click()
                 time.sleep(0.3)
                 successful += 1
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 

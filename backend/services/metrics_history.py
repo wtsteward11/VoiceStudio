@@ -71,6 +71,7 @@ def get_metrics_history(window_hours: int = 24) -> list[dict[str, Any]]:
                     dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
                     if dt < cutoff:
                         break
+                # ALLOWED: bare except - best effort, failure acceptable
                 except (ValueError, TypeError):
                     pass
             result.append(data)

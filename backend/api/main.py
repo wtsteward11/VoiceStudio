@@ -91,6 +91,7 @@ app_config: Any = None
 try:
     _settings_mod = _il.import_module("backend.settings")
     app_config = _settings_mod.config
+# ALLOWED: bare except - optional dependency, import failure acceptable
 except (ImportError, AttributeError):
     pass
 

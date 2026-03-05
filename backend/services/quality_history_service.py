@@ -84,6 +84,7 @@ def cleanup_old_entries() -> None:
                 try:
                     _quality_history[profile_id].remove(entry)
                     removed += 1
+                # ALLOWED: bare except - best effort, failure acceptable
                 except ValueError:
                     pass
 

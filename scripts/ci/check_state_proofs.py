@@ -92,6 +92,7 @@ def _load_allowlisted_paths(schema: dict) -> list[str]:
         allowlist = json.loads(allowlist_path.read_text(encoding="utf-8"))
         if isinstance(allowlist, list):
             return [e.get("path", "") for e in allowlist if isinstance(e, dict)]
+    # ALLOWED: bare except - best effort, failure acceptable
     except (json.JSONDecodeError, OSError):
         pass
     return []

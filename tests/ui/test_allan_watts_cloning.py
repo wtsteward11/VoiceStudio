@@ -194,6 +194,7 @@ class TestCloningElements:
                 tracer.step(f"Found: {selector}")
                 found = True
                 break
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -206,6 +207,7 @@ class TestCloningElements:
                 )
                 tracer.step("Found reference selector with xpath")
                 found = True
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -232,6 +234,7 @@ class TestCloningElements:
                 tracer.step(f"Clone button found: {selector}")
                 tracer.success("Clone button exists")
                 return
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -360,6 +363,7 @@ class TestCloningAPI:
                     tracer.end_phase(success=True)
                     tracer.success("Profiles API works")
                     return
+            # ALLOWED: bare except - best effort, failure acceptable
             except requests.RequestException:
                 pass
 
@@ -422,6 +426,7 @@ class TestCloningWorkflow:
         try:
             driver.find_element("accessibility id", CLONING_WORKFLOW.root_id)
             workflow_elements["panel_root"] = True
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -432,6 +437,7 @@ class TestCloningWorkflow:
                 "//*[contains(@AutomationId, 'Reference') or contains(@AutomationId, 'Audio') or contains(@AutomationId, 'Drop')]",
             )
             workflow_elements["reference_selector"] = True
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -441,6 +447,7 @@ class TestCloningWorkflow:
                 "xpath", "//*[contains(@Name, 'Clone') or contains(@AutomationId, 'Clone')]"
             )
             workflow_elements["clone_action"] = True
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 

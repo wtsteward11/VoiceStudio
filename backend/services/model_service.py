@@ -24,6 +24,7 @@ def get_model_info(engine_id: str | None = None, model_id: str | None = None) ->
                         return m
                 return {}
             return {"models": models}
+    # ALLOWED: bare except - optional dependency, import failure acceptable
     except ImportError:
         pass
     return {"models": []}
@@ -37,6 +38,7 @@ def list_models(engine_id: str | None = None) -> list[dict[str, Any]]:
         registry = get_model_registry_service()
         if registry:
             return registry.list_models(engine_id=engine_id)
+    # ALLOWED: bare except - optional dependency, import failure acceptable
     except ImportError:
         pass
     return []

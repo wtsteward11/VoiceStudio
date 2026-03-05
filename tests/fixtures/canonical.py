@@ -219,6 +219,7 @@ def _generate_synthetic_if_needed(segment: bool = True) -> Path | None:
         )
         if result.returncode == 0 and target.exists():
             return target
+    # ALLOWED: bare except - best effort, failure acceptable
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
 

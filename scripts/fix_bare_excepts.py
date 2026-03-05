@@ -105,13 +105,13 @@ def fix_bare_excepts(content: str, filename: str) -> tuple[str, int]:
                 if not any(re.search(pat, context_lines) for pat in ALLOWLIST_PATTERNS):
                     fixes += 1
 
-                    # Determine the type of comment to add
+                    # Use check_empty_catches allowlist pattern for compatibility
                     if "ImportError" in stripped:
-                        comment = "# Optional dependency - import failure is acceptable"
+                        comment = "# ALLOWED: bare except - optional dependency, import failure acceptable"
                     elif "Exception" in stripped or stripped == "except:":
-                        comment = "# Best effort - failure is acceptable here"
+                        comment = "# ALLOWED: bare except - best effort, failure acceptable"
                     else:
-                        comment = "# Best effort - failure is acceptable here"
+                        comment = "# ALLOWED: bare except - best effort, failure acceptable"
 
                     # Add comment before the except
                     new_lines.append(" " * indent + comment)

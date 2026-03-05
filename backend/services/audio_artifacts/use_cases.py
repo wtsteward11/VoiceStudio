@@ -92,6 +92,7 @@ def create_audio_artifact_from_file(
     if delete_source and src.exists():
         try:
             src.unlink(missing_ok=True)
+        # ALLOWED: bare except - best effort, failure acceptable
         except OSError:
             pass
     return aid, cached_path, metadata

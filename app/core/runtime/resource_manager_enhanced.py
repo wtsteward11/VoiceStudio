@@ -548,6 +548,7 @@ class EnhancedResourceManager(ResourceManager):
             if result.returncode == 0 and result.stdout.strip():
                 free_mb = float(result.stdout.strip().split("\n")[0])
                 return free_mb / 1024.0
+        # ALLOWED: bare except - best effort, failure acceptable
         except Exception:
             pass
         total_allocated = sum(
@@ -579,6 +580,7 @@ class EnhancedResourceManager(ResourceManager):
             for cb in self.alert_callbacks:
                 try:
                     cb("engine_evicted", f"Engine {engine_id} evicted from GPU (LRU)", {"engine_id": engine_id})
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
 

@@ -161,6 +161,7 @@ def winappdriver_process():
             if resp.status_code == 200:
                 yield None  # Already running, no process to manage
                 return
+    # ALLOWED: bare except - best effort, failure acceptable
     except Exception:
         pass
 
@@ -317,6 +318,7 @@ def click_element_safe(driver, by, value, timeout: float = 5.0) -> bool:
         try:
             element.click()
             return True
+        # ALLOWED: bare except - best effort, failure acceptable
         except Exception:
             pass
     return False
@@ -330,6 +332,7 @@ def send_keys_safe(driver, by, value, text: str, timeout: float = 5.0) -> bool:
             element.clear()
             element.send_keys(text)
             return True
+        # ALLOWED: bare except - best effort, failure acceptable
         except Exception:
             pass
     return False

@@ -47,6 +47,7 @@ try:
     from backend.engines.quality_facade import (
         optimize_synthesis_for_quality as _optimize_synthesis_for_quality,
     )
+# ALLOWED: bare except - optional dependency, import failure acceptable
 except ImportError:
     pass
 

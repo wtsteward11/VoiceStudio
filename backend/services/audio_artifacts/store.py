@@ -100,6 +100,7 @@ class AudioArtifactStore:
         except OSError:
             try:
                 os.unlink(tmp_path)
+            # ALLOWED: bare except - best effort, failure acceptable
             except OSError:
                 pass
             raise
@@ -264,6 +265,7 @@ class AudioArtifactStore:
         finally:
             try:
                 Path(tmp_path).unlink(missing_ok=True)
+            # ALLOWED: bare except - best effort, failure acceptable
             except OSError:
                 pass
 

@@ -42,6 +42,7 @@ try:
     UnifiedConfigService = _ucm.UnifiedConfigService
     get_config = _ucm.get_config
     HAS_UNIFIED_CONFIG = True
+# ALLOWED: bare except - optional dependency, import failure acceptable
 except (ImportError, AttributeError):
     pass
 

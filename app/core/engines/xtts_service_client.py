@@ -69,7 +69,7 @@ class XTTSServiceClient:
 
         # Check if setup is complete
         if not setup_marker.exists():
-            logger.error("XTTS service not set up. Run: scripts\\setup_xtts_venv.ps1")
+            logger.error("XTTS service not set up. Run: scripts\\setup\\setup_xtts_venv.ps1")
             return False
 
         if not venv_python.exists():
@@ -149,7 +149,7 @@ class XTTSServiceClient:
         if not self.ensure_running():
             return {
                 "success": False,
-                "error": "XTTS service not available. Run: scripts\\setup_xtts_venv.ps1",
+                "error": "XTTS service not available. Run: scripts\\setup\\setup_xtts_venv.ps1",
             }
 
         try:

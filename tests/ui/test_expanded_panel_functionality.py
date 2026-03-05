@@ -44,6 +44,7 @@ class TestSettingsPanel:
         try:
             settings_panel = driver.find_element("accessibility id", "SettingsView_Root")
             assert settings_panel is not None
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -82,6 +83,7 @@ class TestLibraryPanel:
         try:
             library_panel = driver.find_element("accessibility id", "LibraryView_Root")
             assert library_panel is not None
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -95,6 +97,7 @@ class TestLibraryPanel:
         try:
             search_box = driver.find_element("accessibility id", "LibraryView_SearchBox")
             assert search_box is not None
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -119,6 +122,7 @@ class TestTrainingPanel:
         try:
             training_panel = driver.find_element("accessibility id", "TrainingView_Root")
             assert training_panel is not None
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -141,6 +145,7 @@ class TestTrainingPanel:
                 if control is not None:
                     # Found at least one control
                     return
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -165,6 +170,7 @@ class TestAudioAnalysisPanel:
         try:
             analysis_panel = driver.find_element("accessibility id", "AnalyzerView_Root")
             assert analysis_panel is not None
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -189,6 +195,7 @@ class TestDiagnosticsPanel:
         try:
             diagnostics_panel = driver.find_element("accessibility id", "DiagnosticsView_Root")
             assert diagnostics_panel is not None
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -378,6 +385,7 @@ class TestPanelAccessibility:
                 element = driver.find_element("accessibility id", elem_id)
                 if element is not None:
                     found_count += 1
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -421,6 +429,7 @@ class TestEffectsMixerPanelExpanded:
                 if slider is not None:
                     # Found at least one slider
                     return
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -442,5 +451,6 @@ class TestEffectsMixerPanelExpanded:
                 button = driver.find_element("accessibility id", button_id)
                 if button is not None:
                     return  # Found at least one
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass

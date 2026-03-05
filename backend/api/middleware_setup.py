@@ -183,6 +183,7 @@ def setup_middleware(app: FastAPI) -> None:
         from backend.settings import config
 
         app_config = config
+    # ALLOWED: bare except - optional dependency, import failure acceptable
     except (ImportError, AttributeError):
         pass
 

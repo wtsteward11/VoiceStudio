@@ -231,6 +231,7 @@ class TestPanelNavigationTiming:
 
                     elapsed_ms = (time.perf_counter() - start) * 1000
                     timings.append(elapsed_ms)
+                # ALLOWED: bare except - best effort, failure acceptable
                 except RuntimeError:
                     pass
 
@@ -430,6 +431,7 @@ class TestOperationThroughput:
                 response = api_monitor.get("/api/v3/health")
                 if response.status_code == 200:
                     successes += 1
+            # ALLOWED: bare except - best effort, failure acceptable
             except requests.RequestException:
                 pass
 

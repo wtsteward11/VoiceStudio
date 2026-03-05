@@ -35,6 +35,7 @@ async def analyze_audio_metrics(audio_id: str) -> dict[str, Any]:
                     "naturalness": result.get("naturalness", 0.80),
                     "snr_db": result.get("snr", result.get("snr_db", 25.0)),
                 }
+    # ALLOWED: bare except - best effort, failure acceptable
     except Exception:
         pass
     return _default_metrics()

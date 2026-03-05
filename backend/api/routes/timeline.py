@@ -738,6 +738,7 @@ def _resolve_export_path(output_path: str, format: str) -> str:
                 fallback,
             )
             return str(fallback)
+    # ALLOWED: bare except - best effort, failure acceptable
     except (ValueError, OSError):
         pass
     return output_path

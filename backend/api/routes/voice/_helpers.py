@@ -592,6 +592,7 @@ async def _try_utility_tts_fallback(
         finally:
             try:
                 os.unlink(fallback_mp3)
+            # ALLOWED: bare except - best effort, failure acceptable
             except OSError:
                 pass
 
@@ -616,6 +617,7 @@ async def _try_utility_tts_fallback(
             try:
                 if os.path.exists(fallback_wav):
                     os.unlink(fallback_wav)
+            # ALLOWED: bare except - best effort, failure acceptable
             except OSError:
                 pass
     except ImportError:

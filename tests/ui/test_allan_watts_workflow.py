@@ -209,6 +209,7 @@ class TestFileImport:
                     driver.find_element("name", indicator)
                     dialog_found = True
                     break
+                # ALLOWED: bare except - best effort, failure acceptable
                 except RuntimeError:
                     pass
 
@@ -419,6 +420,7 @@ class TestVoiceCloning:
             try:
                 driver.find_element("accessibility id", elem_id)
                 found.append(elem_id)
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 

@@ -165,5 +165,6 @@ class TestContentCreatorWorkflow:
             try:
                 import shutil
                 shutil.rmtree(export_dir, ignore_errors=True)
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass

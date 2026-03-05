@@ -465,5 +465,6 @@ class TestErrorDisclosure:
                     assert "/etc/" not in message
                     assert "C:\\" not in message
                     assert "SELECT " not in message.upper()
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass

@@ -172,6 +172,7 @@ def winappdriver_process():
         resp = requests.get(f"{WINAPPDRIVER_URL}/status", timeout=2)
         if resp.status_code == 200:
             return None
+    # ALLOWED: bare except - best effort, failure acceptable
     except Exception:
         pass
 

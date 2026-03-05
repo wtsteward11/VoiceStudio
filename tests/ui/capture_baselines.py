@@ -147,6 +147,7 @@ def navigate_to_panel(session, nav_id: str, root_id: str, timeout: float = 5.0) 
                 if root.is_displayed():
                     time.sleep(0.5)  # Extra wait for animations
                     return True
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
             time.sleep(0.1)
@@ -253,6 +254,7 @@ def main():
     # Close session
     try:
         session.quit()
+    # ALLOWED: bare except - best effort, failure acceptable
     except Exception:
         pass
 

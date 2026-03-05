@@ -176,6 +176,7 @@ class TestIPCTimeoutRecovery:
 
         try:
             await task
+        # ALLOWED: bare except - best effort, failure acceptable
         except asyncio.CancelledError:
             pass
 

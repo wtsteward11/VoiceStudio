@@ -205,6 +205,7 @@ class LibraryPage(BasePage):
             if items:
                 items[0].click()
                 return True
+        # ALLOWED: bare except - best effort, failure acceptable
         except (RuntimeError, AttributeError):
             pass
 

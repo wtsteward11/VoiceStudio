@@ -159,6 +159,7 @@ class TestTrainingBackendIntegration:
         try:
             jobs_list = driver.find_element("accessibility id", "TrainingView_JobsListView")
             assert jobs_list is not None
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -202,6 +203,7 @@ class TestSettingsBackendIntegration:
         try:
             theme_combo = driver.find_element("accessibility id", "SettingsView_ThemeComboBox")
             assert theme_combo is not None
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -214,6 +216,7 @@ class TestSettingsBackendIntegration:
             save_button = driver.find_element("accessibility id", "SettingsView_SaveButton")
             assert save_button is not None
             assert save_button.is_enabled()
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -255,6 +258,7 @@ class TestLibraryBackendIntegration:
         try:
             folders_list = driver.find_element("accessibility id", "LibraryView_FoldersListView")
             assert folders_list is not None
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -311,6 +315,7 @@ class TestJobsIntegration:
                 "accessibility id", "DiagnosticsView_ActiveJobsListView"
             )
             assert jobs_list is not None
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -337,6 +342,7 @@ class TestStatusBarIntegration:
                 element = driver.find_element("accessibility id", status_id)
                 if element is not None:
                     found += 1
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 

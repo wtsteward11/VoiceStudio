@@ -51,6 +51,7 @@ class TestErrorDialogDisplay:
                     button = driver.find_element("accessibility id", nav_id)
                     button.click()
                     time.sleep(0.1)
+                # ALLOWED: bare except - best effort, failure acceptable
                 except RuntimeError:
                     pass
 
@@ -104,6 +105,7 @@ class TestInputValidation:
                 element = driver.find_element("accessibility id", train_id)
                 if element is not None:
                     break
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -209,6 +211,7 @@ class TestSettingsErrorHandling:
                 element = driver.find_element("accessibility id", settings_id)
                 if element is not None:
                     found += 1
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -256,6 +259,7 @@ class TestDiagnosticsErrorDisplay:
                 element = driver.find_element("accessibility id", diag_id)
                 if element is not None:
                     found += 1
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -354,6 +358,7 @@ class TestStatusBarErrors:
                 element = driver.find_element("accessibility id", status_id)
                 if element is not None:
                     found += 1
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 

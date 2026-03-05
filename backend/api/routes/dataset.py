@@ -632,6 +632,7 @@ async def export_dataset(req: DatasetExportRequest):
             try:
                 from backend.services.usage_stats import record_export_completed
                 record_export_completed()
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
             return FileResponse(
@@ -689,6 +690,7 @@ async def export_dataset(req: DatasetExportRequest):
             try:
                 from backend.services.usage_stats import record_export_completed
                 record_export_completed()
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
             return FileResponse(

@@ -345,6 +345,7 @@ class WinAppDriverSession:
                 ["taskkill", "/F", "/IM", "VoiceStudio.App.exe"], capture_output=True, timeout=5
             )
             time.sleep(1)
+        # ALLOWED: bare except - best effort, failure acceptable
         except Exception:
             pass
 
@@ -465,6 +466,7 @@ class WinAppDriverSession:
             subprocess.run(
                 ["taskkill", "/F", "/IM", "VoiceStudio.App.exe"], capture_output=True, timeout=5
             )
+        # ALLOWED: bare except - best effort, failure acceptable
         except Exception:
             pass
 

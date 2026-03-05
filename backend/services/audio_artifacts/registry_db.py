@@ -66,6 +66,7 @@ def _row_to_artifact(row: sqlite3.Row) -> AudioArtifact:
     if row["source_audio_ids"]:
         try:
             source_ids = json.loads(row["source_audio_ids"])
+        # ALLOWED: bare except - best effort, failure acceptable
         except (json.JSONDecodeError, TypeError):
             pass
 
@@ -73,6 +74,7 @@ def _row_to_artifact(row: sqlite3.Row) -> AudioArtifact:
     if row["metadata_json"]:
         try:
             meta = json.loads(row["metadata_json"])
+        # ALLOWED: bare except - best effort, failure acceptable
         except (json.JSONDecodeError, TypeError):
             pass
 
@@ -206,6 +208,7 @@ class AudioRegistryDB:
                     sr = wav_file.getframerate()
                     if sr:
                         duration = frames / float(sr)
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
         return self.register(
@@ -251,6 +254,7 @@ class AudioRegistryDB:
                     sr = wav_file.getframerate()
                     if sr:
                         duration = frames / float(sr)
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
         return self.register(

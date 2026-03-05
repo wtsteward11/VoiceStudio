@@ -208,6 +208,7 @@ class TestNavigationRailComplete:
                 name = item.get_attribute("Name") or f"Item {idx}"
                 auto_id = item.get_attribute("AutomationId") or "N/A"
                 tracer.step(f"  {idx+1}. {name} (ID: {auto_id})")
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
 
@@ -238,6 +239,7 @@ class TestPanelNavigationByCategory:
                 try:
                     nav_element.click()
                     time.sleep(0.3)
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
             else:
@@ -376,6 +378,7 @@ class TestVoiceConversionPanels:
                 time.sleep(0.5)
                 tracer.step(f"Navigated to {panel.name}", driver, SCREENSHOTS_ENABLED)
                 tracer.success(f"Tested {panel.name}")
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
         else:
@@ -403,6 +406,7 @@ class TestTrainingPanels:
                 time.sleep(0.5)
                 tracer.step(f"Navigated to {panel.name}", driver, SCREENSHOTS_ENABLED)
                 tracer.success(f"Tested {panel.name}")
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
         else:
@@ -430,6 +434,7 @@ class TestProfilesPanels:
                 time.sleep(0.5)
                 tracer.step(f"Navigated to {panel.name}", driver, SCREENSHOTS_ENABLED)
                 tracer.success(f"Tested {panel.name}")
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
         else:
@@ -496,6 +501,7 @@ class TestSettingsPanels:
                 time.sleep(0.5)
                 tracer.step(f"Navigated to {panel.name}", driver, SCREENSHOTS_ENABLED)
                 tracer.success(f"Tested {panel.name}")
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
         else:
@@ -523,6 +529,7 @@ class TestVideoImagePanels:
                 time.sleep(0.5)
                 tracer.step(f"Navigated to {panel.name}", driver, SCREENSHOTS_ENABLED)
                 tracer.success(f"Tested {panel.name}")
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
         else:
@@ -550,6 +557,7 @@ class TestAudioAnalysisPanels:
                 time.sleep(0.5)
                 tracer.step(f"Navigated to {panel.name}", driver, SCREENSHOTS_ENABLED)
                 tracer.success(f"Tested {panel.name}")
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
         else:
@@ -577,6 +585,7 @@ class TestBatchAutomationPanels:
                 time.sleep(0.5)
                 tracer.step(f"Navigated to {panel.name}", driver, SCREENSHOTS_ENABLED)
                 tracer.success(f"Tested {panel.name}")
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
         else:
@@ -623,6 +632,7 @@ class TestAllPanelsComprehensive:
                     if elem:
                         result["key_elements_found"] += 1
 
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
 

@@ -241,6 +241,7 @@ class BasePage(ABC):
                 element = self.driver.find_element("accessibility id", automation_id)
                 if element.is_enabled():
                     return True
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
             time.sleep(0.2)

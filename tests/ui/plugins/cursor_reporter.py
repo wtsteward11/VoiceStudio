@@ -278,6 +278,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo) -> None:
                     # Note: This requires an active WinAppDriver session
                     # capture_screenshot(screenshot_path)
                     result["screenshot"] = str(screenshot_path)
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
 

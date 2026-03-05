@@ -246,6 +246,7 @@ class TestAPIErrors:
                 try:
                     error_detail = response.json()
                     tracer.step(f"Error detail: {error_detail}")
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
 
@@ -564,6 +565,7 @@ class TestErrorMessageQuality:
                     error_body = response.json()
                     if "detail" in error_body:
                         tracer.step(f"  Detail: {error_body['detail'][:100]}")
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
             except requests.RequestException as e:

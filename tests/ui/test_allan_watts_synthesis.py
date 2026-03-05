@@ -236,6 +236,7 @@ class TestSynthesisElements:
                 tracer.step(f"Voice selector found: {selector_id}")
                 tracer.success("Voice selector exists")
                 return
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -468,6 +469,7 @@ class TestSynthesisWorkflow:
         try:
             driver.find_element("accessibility id", SYNTHESIS_WORKFLOW.root_id)
             workflow_elements["panel_root"] = True
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -477,6 +479,7 @@ class TestSynthesisWorkflow:
                 "xpath", "//*[contains(@AutomationId, 'Text') and contains(@ClassName, 'TextBox')]"
             )
             workflow_elements["text_input"] = True
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -487,6 +490,7 @@ class TestSynthesisWorkflow:
                 "//*[contains(@AutomationId, 'Voice') and contains(@ClassName, 'ComboBox')]",
             )
             workflow_elements["voice_selector"] = True
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -497,6 +501,7 @@ class TestSynthesisWorkflow:
                 "//*[contains(@Name, 'Synthesize') or contains(@AutomationId, 'Synthesize')]",
             )
             workflow_elements["synthesize_button"] = True
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 

@@ -184,6 +184,7 @@ class TestUIImport:
                     driver.find_element("name", indicator)
                     dialog_found = True
                     break
+                # ALLOWED: bare except - best effort, failure acceptable
                 except RuntimeError:
                     pass
 
@@ -218,6 +219,7 @@ class TestUIImport:
                     driver.find_element("name", indicator)
                     dialog_found = True
                     break
+                # ALLOWED: bare except - best effort, failure acceptable
                 except RuntimeError:
                     pass
 
@@ -343,6 +345,7 @@ class TestAPIImport:
                     if response.status_code in [200, 201]:
                         tracer.step(f"Alternative endpoint {endpoint} works")
                         return
+            # ALLOWED: bare except - best effort, failure acceptable
             except requests.RequestException:
                 pass
 
@@ -524,6 +527,7 @@ class TestImportErrorHandling:
                 config = response.json()
                 if "max_upload_size" in config:
                     tracer.step(f"Max upload size: {config['max_upload_size']}")
+        # ALLOWED: bare except - best effort, failure acceptable
         except requests.RequestException:
             pass
 

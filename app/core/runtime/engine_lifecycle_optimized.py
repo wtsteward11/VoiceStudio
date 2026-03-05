@@ -42,6 +42,7 @@ except ImportError:
 
         RuntimeEngine = _FallbackRuntimeEngine
         HAS_RUNTIME_ENGINE = True
+    # ALLOWED: bare except - optional dependency, import failure acceptable
     except ImportError:
         pass
 

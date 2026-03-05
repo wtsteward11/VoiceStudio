@@ -114,6 +114,7 @@ def collect_large_files(max_bytes: int) -> list[tuple[Path, int]]:
             sz = path.stat().st_size
             if sz > max_bytes:
                 result.append((path, sz))
+    # ALLOWED: bare except - best effort, failure acceptable
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
     return result

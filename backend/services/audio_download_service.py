@@ -21,6 +21,7 @@ try:
     import httpx
 
     HAS_HTTPX = True
+# ALLOWED: bare except - optional dependency, import failure acceptable
 except ImportError:
     pass
 

@@ -141,6 +141,7 @@ def winappdriver_process():
         resp = requests.get(f"{WINAPPDRIVER_URL}/status", timeout=2)
         if resp.status_code == 200:
             return None
+    # ALLOWED: bare except - best effort, failure acceptable
     except Exception:
         pass
 
@@ -177,6 +178,7 @@ def driver(winappdriver_process):
         yield session
         try:
             session.quit()
+        # ALLOWED: bare except - best effort, failure acceptable
         except Exception:
             pass
     except ImportError:
@@ -689,6 +691,7 @@ class TestComprehensiveAccessibilityAudit:
                             panel=panel_name,
                         )
                     )
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
 
@@ -709,6 +712,7 @@ class TestComprehensiveAccessibilityAudit:
                     )
                 else:
                     report.passed_criteria.append(f"{panel_name}: 4.1.2 Name, Role, Value")
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
 

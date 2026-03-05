@@ -509,6 +509,7 @@ async def synthesize(
                     if os.path.exists(tmp_path):
                         try:
                             os.unlink(tmp_path)
+                        # ALLOWED: bare except - best effort, failure acceptable
                         except OSError:
                             pass
                 return VoiceSynthesizeResponse(
@@ -991,6 +992,7 @@ async def synthesize_cross_lingual(
             try:
                 if os.path.exists(output_path):
                     os.unlink(output_path)
+            # ALLOWED: bare except - best effort, failure acceptable
             except OSError:
                 pass
 

@@ -43,6 +43,7 @@ def _count_skip_calls() -> int:
         try:
             text = path.read_text(encoding="utf-8")
             total += len(re.findall(r"pytest\.skip\s*\(", text))
+        # ALLOWED: bare except - best effort, failure acceptable
         except (OSError, UnicodeDecodeError):
             pass
     return total
@@ -55,6 +56,7 @@ def _count_module_level_skips() -> int:
         try:
             text = path.read_text(encoding="utf-8")
             total += len(re.findall(r"allow_module_level\s*=\s*True", text))
+        # ALLOWED: bare except - best effort, failure acceptable
         except (OSError, UnicodeDecodeError):
             pass
     return total

@@ -8,7 +8,7 @@ $pythonPath = "$VenvPath\Scripts\python.exe"
 # Check if setup is complete
 if (-not (Test-Path "$XTTSPath\.setup_complete")) {
     Write-Host "XTTS environment not set up. Running setup..." -ForegroundColor Yellow
-    & "$PSScriptRoot\setup_xtts_venv.ps1"
+    & "$PSScriptRoot\setup\setup_xtts_venv.ps1"
 }
 
 if (-not (Test-Path $pythonPath)) {

@@ -297,6 +297,7 @@ def ensure_test_audio_available() -> Path | None:
             actual_hash = compute_sha256(real_audio)
             if actual_hash == expected_hash:
                 return real_audio  # Real canonical audio available
+        # ALLOWED: bare except - best effort, failure acceptable
         except (json.JSONDecodeError, KeyError):
             pass
 

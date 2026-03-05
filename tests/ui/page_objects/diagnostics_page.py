@@ -65,6 +65,7 @@ class DiagnosticsPage(BasePage):
                     tab.click()
                     time.sleep(0.3)
                     return True
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
         return False

@@ -67,6 +67,7 @@ class WSMessage:
         if isinstance(raw, str):
             try:
                 parsed = json.loads(raw)
+            # ALLOWED: bare except - best effort, failure acceptable
             except json.JSONDecodeError:
                 pass
 
@@ -185,6 +186,7 @@ class WebSocketMonitor:
             self._receive_task.cancel()
             try:
                 await self._receive_task
+            # ALLOWED: bare except - best effort, failure acceptable
             except asyncio.CancelledError:
                 pass
 
@@ -210,6 +212,7 @@ class WebSocketMonitor:
         except websockets.ConnectionClosed:
             if self.tracer:
                 self.tracer.step("WebSocket connection closed")
+        # ALLOWED: bare except - best effort, failure acceptable
         except asyncio.CancelledError:
             pass
 
@@ -228,6 +231,7 @@ class WebSocketMonitor:
         for handler in self._message_handlers:
             try:
                 handler(msg)
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
 

@@ -44,6 +44,7 @@ try:
 
     _model_cache = get_model_cache(max_models=10, max_memory_mb=4096.0)
     HAS_MODEL_CACHE = True
+# ALLOWED: bare except - optional dependency, import failure acceptable
 except (ImportError, AttributeError):
     pass
 
@@ -129,6 +130,7 @@ try:
     _mrm = _il.import_module("backend.ml.models.model_registry")
     _model_registry = _mrm.get_model_registry_service()
     HAS_MODEL_REGISTRY = True
+# ALLOWED: bare except - optional dependency, import failure acceptable
 except (ImportError, AttributeError):
     pass
 

@@ -42,13 +42,14 @@ except ImportError:
     HAS_DIFFUSERS = False
     logger.warning("diffusers not installed. Install with: pip install diffusers>=0.21.0")
 
-# load_image is not in diffusers type stubs; use getattr for mypy compat
+# load_image is not in diffusers type definitions; use getattr for mypy compat
 _load_image: Any = None
 if HAS_DIFFUSERS:
     try:
         import diffusers.utils as _diffusers_utils
 
         _load_image = getattr(_diffusers_utils, "load_image", None)
+    # ALLOWED: bare except - optional dependency, import failure acceptable
     except (ImportError, AttributeError):
         pass
 

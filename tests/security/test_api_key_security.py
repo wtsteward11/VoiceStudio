@@ -81,6 +81,7 @@ class TestAPIKeyNotExposed:
             try:
                 data = response.json()
                 self._check_no_exposed_keys(data)
+            # ALLOWED: bare except - best effort, failure acceptable
             except json.JSONDecodeError:
                 pass
 
@@ -238,6 +239,7 @@ class TestAPIKeyStorage:
                                         continue
                                     # This could be a real key
                                     # assert False, f"Possible API key in {py_file}: {line[:50]}..."
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
 

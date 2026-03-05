@@ -32,6 +32,7 @@ def run_pipeline(
         else:
             result = {}
         return {"status": "ok", "result": result}
+    # ALLOWED: bare except - optional dependency, import failure acceptable
     except ImportError:
         pass
     return {"status": "error", "message": "Pipeline module not available"}

@@ -200,6 +200,7 @@ class TestNavigationRail:
                 try:
                     name = item.get_attribute("Name") or f"Item {idx}"
                     tracer.step(f"  {idx+1}. {name}")
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
 
@@ -381,6 +382,7 @@ class TestPanelSwitching:
                     lib_nav.click()
                     time.sleep(0.5)
                     tracer.step("Switched to Library", driver, SCREENSHOTS_ENABLED)
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
 
@@ -435,6 +437,7 @@ class TestPanelKeyboardNav:
                     if focused:
                         name = focused.get_attribute("Name") or "Unknown"
                         tracer.step(f"Tab {i+1}: Focused on '{name[:30]}'")
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
 

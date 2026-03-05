@@ -22,6 +22,7 @@ try:
         _original_np_random_seed(seed)
 
     np.random.seed = _safe_np_random_seed
+# ALLOWED: bare except - optional dependency, import failure acceptable
 except ImportError:
     pass
 
@@ -329,18 +330,21 @@ def clear_route_job_stores():
 
         ensemble_mod._ensemble_jobs.clear()
         ensemble_mod._multi_engine_ensemble_jobs.clear()
+    # ALLOWED: bare except - optional dependency, import failure acceptable
     except (ImportError, AttributeError):
         pass
     try:
         import backend.api.routes.multi_voice_generator as mvg_mod
 
         mvg_mod._multi_voice_jobs.clear()
+    # ALLOWED: bare except - optional dependency, import failure acceptable
     except (ImportError, AttributeError):
         pass
     try:
         import backend.api.routes.voice_cloning_wizard as wizard_mod
 
         wizard_mod._wizard_jobs.clear()
+    # ALLOWED: bare except - optional dependency, import failure acceptable
     except (ImportError, AttributeError):
         pass
 

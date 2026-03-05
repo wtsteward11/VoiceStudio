@@ -135,6 +135,7 @@ class TestLoadPerformance:
                         data = mem_resp.json()
                         if "memory_mb" in data:
                             memory_samples.append(data["memory_mb"])
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
 

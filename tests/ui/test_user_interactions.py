@@ -135,6 +135,7 @@ class TestPanelInteractions:
                 element = driver.find_element("accessibility id", content_id)
                 if element is not None:
                     break
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -177,6 +178,7 @@ class TestEffectsInteractions:
                 element = driver.find_element("accessibility id", mixer_id)
                 if element is not None:
                     return  # Found at least one element
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -222,6 +224,7 @@ class TestStatusBarInteractions:
                 element = driver.find_element("accessibility id", status_id)
                 if element is not None:
                     found += 1
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 

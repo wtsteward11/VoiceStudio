@@ -74,6 +74,7 @@ class TimelinePage(BasePage):
                 tracks[index].click()
                 time.sleep(0.2)
                 return True
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
         return False

@@ -66,6 +66,7 @@ def run_safety_scan() -> list[Vulnerability]:
 
     except FileNotFoundError:
         print("Safety not installed. Install with: pip install safety")
+    # ALLOWED: bare except - best effort, failure acceptable
     except json.JSONDecodeError:
         pass
     except Exception as e:
@@ -104,6 +105,7 @@ def run_pip_audit() -> list[Vulnerability]:
 
     except FileNotFoundError:
         print("pip-audit not installed. Install with: pip install pip-audit")
+    # ALLOWED: bare except - best effort, failure acceptable
     except json.JSONDecodeError:
         pass
     except Exception as e:

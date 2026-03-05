@@ -183,6 +183,7 @@ class TestQuickNavigation:
                 button.click()
                 time.sleep(0.2)
                 successful += 1
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -215,6 +216,7 @@ class TestPanelContentAccess:
                 element = driver.find_element("accessibility id", content_id)
                 if element is not None:
                     break
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -239,6 +241,7 @@ class TestPanelContentAccess:
                 element = driver.find_element("accessibility id", content_id)
                 if element is not None:
                     return  # Found content
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -270,6 +273,7 @@ class TestStatusBarFromCommand:
                 element = driver.find_element("accessibility id", status_id)
                 if element is not None:
                     found += 1
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 

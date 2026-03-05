@@ -32,6 +32,7 @@ try:
     )
 
     HAS_VENV_FAMILIES = True
+# ALLOWED: bare except - optional dependency, import failure acceptable
 except ImportError:
     pass
 

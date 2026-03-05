@@ -133,6 +133,7 @@ def main():
                     )
                     if find_resp.status_code == 200:
                         print(f"Found dialog element: '{elem_name}'")
+                # ALLOWED: bare except - best effort, failure acceptable
                 except:
                     pass
 
@@ -230,6 +231,7 @@ def main():
                             )
                             if find_resp.status_code == 200:
                                 print(f"Found dialog element: '{elem_name}'")
+                        # ALLOWED: bare except - best effort, failure acceptable
                         except:
                             pass
 

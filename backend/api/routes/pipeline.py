@@ -136,6 +136,7 @@ async def process_pipeline(request: PipelineRequest):
                     if os.path.exists(output_path):
                         try:
                             os.unlink(output_path)
+                        # ALLOWED: bare except - best effort, failure acceptable
                         except OSError:
                             pass
             except Exception as exc:

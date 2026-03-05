@@ -409,6 +409,7 @@ class BackendHelper:
                 )
                 if response and response.status_code in (200, 201):
                     return response.json()
+        # ALLOWED: bare except - best effort, failure acceptable
         except (OSError, requests.RequestException):
             pass
         return None

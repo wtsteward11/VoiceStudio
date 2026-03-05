@@ -21,6 +21,7 @@ def clear_response_cache():
         from backend.api.optimization import _response_cache
 
         _response_cache.clear()
+    # ALLOWED: bare except - optional dependency, import failure acceptable
     except ImportError:
         pass
     yield
@@ -28,5 +29,6 @@ def clear_response_cache():
         from backend.api.optimization import _response_cache
 
         _response_cache.clear()
+    # ALLOWED: bare except - optional dependency, import failure acceptable
     except ImportError:
         pass

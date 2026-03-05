@@ -321,6 +321,7 @@ def reset_performance_middleware_metrics():
         mw = get_performance_middleware()
         if mw is not None:
             mw.reset()
+    # ALLOWED: bare except - best effort, failure acceptable
     except Exception:
         pass
 

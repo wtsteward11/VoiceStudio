@@ -59,6 +59,7 @@ def _has_clearance_dependency(endpoint) -> bool:
                 dep = getattr(default.dependency, "__name__", str(default.dependency))
                 if "require_synthesis_clearance" in dep or "synthesis_clearance" in dep:
                     return True
+    # ALLOWED: bare except - best effort, failure acceptable
     except (TypeError, ValueError):
         pass
     return False

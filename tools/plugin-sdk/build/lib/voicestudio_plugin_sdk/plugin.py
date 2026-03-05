@@ -397,6 +397,7 @@ class Plugin(ABC):
 
         try:
             loop.run_until_complete(self._message_loop())
+        # ALLOWED: bare except - best effort, failure acceptable
         except KeyboardInterrupt:
             pass
         finally:

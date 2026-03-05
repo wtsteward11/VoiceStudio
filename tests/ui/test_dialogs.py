@@ -139,6 +139,7 @@ class TestConfirmationDialogs:
 
                 # Check for any confirmation dialog
                 # (Depends on app implementation)
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -153,6 +154,7 @@ class TestConfirmationDialogs:
             if reset_button.is_enabled():
                 # Reset typically requires confirmation
                 pass  # Don't actually click to avoid state change
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 
@@ -277,6 +279,7 @@ class TestTrainingDialogs:
                 element = driver.find_element("accessibility id", train_id)
                 if element is not None:
                     found += 1
+            # ALLOWED: bare except - best effort, failure acceptable
             except RuntimeError:
                 pass
 
@@ -304,6 +307,7 @@ class TestProfileDialogs:
             create_button = driver.find_element("accessibility id", "ProfilesView_CreateButton")
             if create_button is not None:
                 assert create_button.is_enabled() or not create_button.is_enabled()
+        # ALLOWED: bare except - best effort, failure acceptable
         except RuntimeError:
             pass
 

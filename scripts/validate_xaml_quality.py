@@ -111,6 +111,7 @@ def check_resources(project_root: Path, verbose: bool = False) -> CheckResult:
                 content = xaml_file.read_text(encoding="utf-8")
                 for match in RESOURCE_DEF_PATTERN.finditer(content):
                     defined[match.group(1)] = xaml_file
+            # ALLOWED: bare except - best effort, failure acceptable
             except (OSError, UnicodeDecodeError):
                 pass
 
@@ -129,6 +130,7 @@ def check_resources(project_root: Path, verbose: bool = False) -> CheckResult:
                         if key not in referenced:
                             referenced[key] = []
                         referenced[key].append((xaml_file, i))
+            # ALLOWED: bare except - best effort, failure acceptable
             except (OSError, UnicodeDecodeError):
                 pass
 

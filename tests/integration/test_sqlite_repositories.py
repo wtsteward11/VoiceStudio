@@ -25,6 +25,7 @@ def temp_db_path():
     yield db_path
     try:
         os.unlink(db_path)
+    # ALLOWED: bare except - best effort, failure acceptable
     except OSError:
         pass
 

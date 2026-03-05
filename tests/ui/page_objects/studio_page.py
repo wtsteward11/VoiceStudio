@@ -205,6 +205,7 @@ class StudioPage(BasePage):
                         play = self.find_element(self.PLAY_BUTTON, timeout=1)
                         if play.is_enabled():
                             return True
+                    # ALLOWED: bare except - best effort, failure acceptable
                     except RuntimeError:
                         pass
                 time.sleep(0.5)

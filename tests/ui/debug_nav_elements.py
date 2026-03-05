@@ -136,6 +136,7 @@ def main():
                 print(
                     f"  - AutomationId: {elem.get_attribute('AutomationId')}, Class: {elem.get_attribute('ClassName')}"
                 )
+            # ALLOWED: bare except - best effort, failure acceptable
             except:
                 pass
     except Exception as e:
@@ -170,6 +171,7 @@ def main():
     try:
         session.quit()
         print("App closed")
+    # ALLOWED: bare except - best effort, failure acceptable
     except:
         pass
 

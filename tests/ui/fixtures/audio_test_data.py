@@ -160,6 +160,7 @@ def get_or_upload_asset(api_monitor, audio_path: Path) -> dict | None:
                     "path": str(audio_path),
                     "response": data,
                 }
+    # ALLOWED: bare except - best effort, failure acceptable
     except Exception:
         pass
 

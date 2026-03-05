@@ -131,7 +131,7 @@
       "tools": [
         "scripts/install-engine-deps.ps1",
         "scripts/setup_gpu_venv.ps1",
-        "scripts/setup_xtts_venv.ps1",
+        "scripts/setup/setup_xtts_venv.ps1",
         "scripts/start_xtts_service.ps1",
         "scripts/run-benchmarks.ps1",
         "scripts/fix_numpy_xtts.ps1"

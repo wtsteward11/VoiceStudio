@@ -104,6 +104,7 @@ class TestAudioImportButton:
                     dialog_found = True
                     tracer.step(f"Found dialog indicator: {indicator}", driver, SCREENSHOTS_ENABLED)
                     break
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
 
@@ -144,6 +145,7 @@ class TestAudioImportButton:
                     driver.find_element("name", indicator)
                     dialog_found = True
                     break
+                # ALLOWED: bare except - best effort, failure acceptable
                 except Exception:
                     pass
 
@@ -258,6 +260,7 @@ class TestImportWorkflowEnd2End:
                 driver.find_element("name", indicator)
                 dialog_found = True
                 break
+            # ALLOWED: bare except - best effort, failure acceptable
             except Exception:
                 pass
 

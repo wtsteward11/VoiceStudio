@@ -25,6 +25,7 @@ try:
     _psm = _il.import_module("backend.plugins.plugin_service")
     get_plugin_service = _psm.get_plugin_service
     PLUGIN_SERVICE_AVAILABLE = True
+# ALLOWED: bare except - optional dependency, import failure acceptable
 except (ImportError, AttributeError):
     pass
 

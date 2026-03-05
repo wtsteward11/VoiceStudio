@@ -134,9 +134,8 @@ jobs:
       
       - name: Start backend server
         run: |
-          # Start backend in background
-          cd backend
-          python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 > /tmp/backend.log 2>&1 &
+          # Start backend in background (from repo root; backend.api.main requires root in path)
+          python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 > /tmp/backend.log 2>&1 &
           
           # Store PID for cleanup
           echo $! > /tmp/backend.pid

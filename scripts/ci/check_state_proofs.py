@@ -116,6 +116,7 @@ def get_proof_type(basename: str) -> str | None:
         "PROOF_CRASH_RECOVERY",
         "PROOF_SUPPORT_BUNDLE_RUNTIME",
         "PROOF_SUPPORT_BUNDLE",
+        "PROOF_BACKEND_COLD_START",
         "PROOF_PERF_BUDGET_RUNTIME",
         "PROOF_PERF_BUDGET",
         "PROOF_PHASE_3",
@@ -460,6 +461,34 @@ def validate_nested_semantics(
                             f"{_rel(path)}: measured.{key} ({mv}) "
                             f"exceeds budget ({bv})"
                         )
+
+    elif proof_type == "PROOF_BACKEND_COLD_START":
+        if data.get("within_budget") is not True:
+            errors.append(
+                f"{_rel(path)}: within_budget must be true"
+            )
+        env = data.get("environment")
+        if not isinstance(env, dict) or env.get("os") != "Windows":
+            errors.append(
+                f"{_rel(path)}: environment.os must be 'Windows'"
+            )
+        for key, budget_key in (
+            ("cold_start_ms", "ColdStartMs"),
+            ("first_api_ms", "FirstApiMs"),
+            ("warm_api_ms", "WarmApiMs"),
+        ):
+            mv = data.get(key)
+            if not isinstance(mv, (int, float)) or mv <= 0:
+                errors.append(
+                    f"{_rel(path)}: {key} must be > 0"
+                )
+            budgets = data.get("budgets")
+            if isinstance(budgets, dict) and isinstance(mv, (int, float)):
+                bv = budgets.get(budget_key)
+                if isinstance(bv, (int, float)) and mv > bv:
+                    errors.append(
+                        f"{_rel(path)}: {key} ({mv}) exceeds budget {budget_key} ({bv})"
+                    )
 
     elif proof_type in ("PROOF_GOLDEN_PATH_STUB", "PROOF_GOLDEN_PATH_REAL"):
         if data.get("passed") is not True:

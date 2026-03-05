@@ -120,6 +120,16 @@ EVIDENCE_FIELDS: dict[str, list[str]] = {
         "artifact_path",
         "artifact_sha256",
     ],
+    "PROOF_BACKEND_COLD_START": [
+        "command",
+        "exit_code",
+        "cold_start_ms",
+        "first_api_ms",
+        "warm_api_ms",
+        "budgets",
+        "within_budget",
+        "environment",
+    ],
 }
 
 LARGE_STRING_THRESHOLD = 256000  # 250KB

@@ -77,7 +77,7 @@ try:
 except ImportError:
     HAS_FACE_ALIGNMENT = False
 
-# cv2.data is valid at runtime but absent from type stubs
+# cv2.data is valid at runtime but absent from type definitions
 _cv2_data: Any = getattr(cv2, "data", None) if HAS_CV2 else None
 
 

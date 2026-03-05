@@ -276,7 +276,7 @@ class AeneasEngine(EngineProtocol):
             boundary_type = kwargs.get("boundary_type", "auto")
             boundary_percent = kwargs.get("boundary_percent", 50)
 
-            # Create temporary text file (use reusable temp dir if available)
+            # Create temp text file (use reusable temp dir if available)
             temp_dir = self._temp_dir if self._temp_dir else None
             with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".txt", delete=False, encoding="utf-8", dir=temp_dir
@@ -284,7 +284,7 @@ class AeneasEngine(EngineProtocol):
                 tmp_text.write(text)
                 tmp_text_path = tmp_text.name
 
-            # Create temporary output file (use reusable temp dir if available)
+            # Create temp output file (use reusable temp dir if available)
             if output_path:
                 output_file = Path(output_path)
             else:
@@ -419,14 +419,14 @@ class AeneasEngine(EngineProtocol):
                         return None
 
             finally:
-                # Cleanup temporary text file
+                # Cleanup temp text file
                 try:
                     if os.path.exists(tmp_text_path):
                         os.unlink(tmp_text_path)
                 except Exception as e:
                     logger.warning(f"Failed to cleanup temp file: {e}")
 
-                # Cleanup output file if it was temporary
+                # Cleanup output file if it was a temp file
                 if output_path is None:
                     try:
                         if os.path.exists(output_file):

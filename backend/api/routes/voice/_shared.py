@@ -160,7 +160,7 @@ AUDIO_STORAGE_MAX_SIZE = 2000  # Maximum number of registered audio IDs to keep
 ENGINE_AVAILABLE = False
 engine_router = None
 quality_metrics = None
-_voice_engine_service = None
+# NOTE: Do not overwrite _voice_engine_service here - it is set in the try block above
 
 # Engines that support streaming synthesis
 STREAMING_ENGINES = {

@@ -47,29 +47,25 @@ Write-Host "Installing Coqui TTS..." -ForegroundColor Yellow
 & $pythonPath -m pip install "coqui-tts==0.25.3"
 
 Write-Host "Installing additional dependencies..." -ForegroundColor Yellow
-& $pythonPath -m pip install soundfile scipy flask
+& $pythonPath -m pip install soundfile scipy fastapi uvicorn
 
 # Copy the XTTS service script
 $serviceScript = @'
 """
 XTTS Microservice
 Runs XTTS in an isolated environment with compatible numpy version.
-Communicates via HTTP (Flask) or stdin/stdout.
+Communicates via HTTP (FastAPI) or stdin/stdout.
 """
 
 import argparse
 import json
 import logging
-import os
 import sys
 import tempfile
-from pathlib import Path
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Lazy import TTS to delay numpy load
 _tts_instance = None
 
 def get_tts():
@@ -90,64 +86,36 @@ def synthesize(text: str, speaker_wav: str, language: str = "en", output_path: s
     """Synthesize speech using XTTS."""
     try:
         tts = get_tts()
-        
         if output_path is None:
             output_path = tempfile.mktemp(suffix=".wav")
-        
-        tts.tts_to_file(
-            text=text,
-            speaker_wav=speaker_wav,
-            language=language,
-            file_path=output_path
-        )
-        
-        return {
-            "success": True,
-            "output_path": output_path,
-            "message": "Synthesis completed"
-        }
+        tts.tts_to_file(text=text, speaker_wav=speaker_wav, language=language, file_path=output_path)
+        return {"success": True, "output_path": output_path, "message": "Synthesis completed"}
     except Exception as e:
-        logger.error(f"Synthesis failed: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        logger.error("Synthesis failed: %s", e)
+        return {"success": False, "error": str(e)}
 
 def run_http_server(host: str = "127.0.0.1", port: int = 8081):
     """Run as HTTP microservice."""
-    from flask import Flask, request, jsonify, send_file
-    
-    app = Flask(__name__)
-    
-    @app.route("/health", methods=["GET"])
+    import uvicorn
+    from fastapi import FastAPI, Request
+    from fastapi.responses import FileResponse, JSONResponse
+    app = FastAPI()
+    @app.get("/health")
     def health():
-        return jsonify({"status": "ok", "service": "xtts"})
-    
-    @app.route("/synthesize", methods=["POST"])
-    def api_synthesize():
-        data = request.json
-        result = synthesize(
-            text=data.get("text", ""),
-            speaker_wav=data.get("speaker_wav", ""),
-            language=data.get("language", "en"),
-            output_path=data.get("output_path")
-        )
-        return jsonify(result)
-    
-    @app.route("/synthesize_and_return", methods=["POST"])
-    def api_synthesize_and_return():
-        data = request.json
-        result = synthesize(
-            text=data.get("text", ""),
-            speaker_wav=data.get("speaker_wav", ""),
-            language=data.get("language", "en")
-        )
+        return {"status": "ok", "service": "xtts"}
+    @app.post("/synthesize")
+    async def api_synthesize(request):
+        data = await request.json()
+        return synthesize(text=data.get("text", ""), speaker_wav=data.get("speaker_wav", ""), language=data.get("language", "en"), output_path=data.get("output_path"))
+    @app.post("/synthesize_and_return")
+    async def api_synthesize_and_return(request):
+        data = await request.json()
+        result = synthesize(text=data.get("text", ""), speaker_wav=data.get("speaker_wav", ""), language=data.get("language", "en"))
         if result.get("success"):
-            return send_file(result["output_path"], mimetype="audio/wav")
-        return jsonify(result), 500
-    
-    logger.info(f"Starting XTTS service on {host}:{port}")
-    app.run(host=host, port=port, threaded=True)
+            return FileResponse(result["output_path"], media_type="audio/wav")
+        return JSONResponse(result, status_code=500)
+    logger.info("Starting XTTS service on %s:%s", host, port)
+    uvicorn.run(app, host=host, port=port)
 
 def run_stdio():
     """Run in stdio mode for subprocess communication."""

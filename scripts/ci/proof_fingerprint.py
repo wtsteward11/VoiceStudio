@@ -79,7 +79,9 @@ EVIDENCE_FIELDS: dict[str, list[str]] = {
         "exit_code",
         "required_files",
         "ui_wiring_verified",
-        "bundle_path",
+        "bundle_path_hash",
+        "bundle_manifest_present",
+        "crash_evidence_present",
     ],
     "PROOF_PERF_BUDGET_RUNTIME": [
         "command",

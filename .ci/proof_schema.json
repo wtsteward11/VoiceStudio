@@ -41,7 +41,8 @@
     ],
     "PROOF_SUPPORT_BUNDLE_RUNTIME": [
       "command", "exit_code", "required_files",
-      "ui_wiring_verified", "bundle_path"
+      "ui_wiring_verified", "bundle_path_hash",
+      "bundle_manifest_present", "crash_evidence_present"
     ],
     "PROOF_PERF_BUDGET_RUNTIME": [
       "command", "exit_code", "measured", "budgets",
@@ -116,7 +117,8 @@
     },
     "PROOF_SUPPORT_BUNDLE_RUNTIME": {
       "required": [
-        "required_files", "ui_wiring_verified", "bundle_path"
+        "required_files", "ui_wiring_verified", "bundle_path_hash",
+        "bundle_manifest_present", "crash_evidence_present"
       ]
     },
     "PROOF_PERF_BUDGET_RUNTIME": {
@@ -194,7 +196,10 @@
     },
     "PROOF_SUPPORT_BUNDLE_RUNTIME": {
       "ui_wiring_verified_must_be_true": true,
-      "all_required_files_exist": true
+      "all_required_files_exist": true,
+      "bundle_manifest_present_must_be_true": true,
+      "crash_evidence_present_must_be_true": true,
+      "bundle_path_hash_must_be_64_hex": true
     },
     "PROOF_PERF_BUDGET_RUNTIME": {
       "within_budget_must_be_true": true,

@@ -363,35 +363,63 @@ def validate_nested_semantics(
             errors.append(
                 f"{_rel(path)}: ui_wiring_verified must be true"
             )
+        bph = data.get("bundle_path_hash", "")
+        if not re.match(r"^[a-f0-9]{64}$", str(bph)):
+            errors.append(
+                f"{_rel(path)}: bundle_path_hash must be 64-hex SHA-256"
+            )
+        if data.get("bundle_manifest_present") is not True:
+            errors.append(
+                f"{_rel(path)}: bundle_manifest_present must be true"
+            )
+        if data.get("crash_evidence_present") is not True:
+            errors.append(
+                f"{_rel(path)}: crash_evidence_present must be true"
+            )
         rf = data.get("required_files")
         if not isinstance(rf, list) or not rf:
             errors.append(
                 f"{_rel(path)}: required_files must be a non-empty list"
             )
         else:
+            name_to_entry = {e.get("name", ""): e for e in rf if isinstance(e, dict)}
+            categories = [
+                ("system_info", ["system_info.json", "hardware_info.json"]),
+                ("engine_manifests", ["engine_manifests_list.txt", "engine_manifests.json"]),
+                ("build_version", ["build_version_source.txt", "build_version.json"]),
+                ("bundle_manifest", ["BUNDLE_MANIFEST.json"]),
+            ]
+            for cat_name, names in categories:
+                satisfied = any(
+                    name_to_entry.get(n, {}).get("exists") is True
+                    and isinstance(name_to_entry.get(n, {}).get("bytes"), int)
+                    and name_to_entry.get(n, {}).get("bytes", 0) > 0
+                    for n in names
+                )
+                if not satisfied:
+                    errors.append(
+                        f"{_rel(path)}: required_files must satisfy category "
+                        f"'{cat_name}' (one of {names} with exists and bytes>0)"
+                    )
             for i, entry in enumerate(rf):
                 if not isinstance(entry, dict):
                     errors.append(
                         f"{_rel(path)}: required_files[{i}] must be object"
                     )
                     continue
-                if entry.get("exists") is not True:
-                    errors.append(
-                        f"{_rel(path)}: required_files[{i}] "
-                        f"({entry.get('name', '?')}) exists must be true"
-                    )
-                b = entry.get("bytes", 0)
-                if not isinstance(b, int) or b <= 0:
-                    errors.append(
-                        f"{_rel(path)}: required_files[{i}] "
-                        f"({entry.get('name', '?')}) bytes must be > 0"
-                    )
-                h = entry.get("sha256", "")
-                if not re.match(r"^[a-f0-9]{64}$", str(h)):
-                    errors.append(
-                        f"{_rel(path)}: required_files[{i}] "
-                        f"({entry.get('name', '?')}) sha256 must be 64-hex"
-                    )
+                if entry.get("exists") is True:
+                    b = entry.get("bytes", 0)
+                    if not isinstance(b, int) or b <= 0:
+                        errors.append(
+                            f"{_rel(path)}: required_files[{i}] "
+                            f"({entry.get('name', '?')}) bytes must be > 0 when exists"
+                        )
+                    h = entry.get("sha256", "")
+                    if not re.match(r"^[a-f0-9]{64}$", str(h)):
+                        errors.append(
+                            f"{_rel(path)}: required_files[{i}] "
+                            f"({entry.get('name', '?')}) sha256 must be 64-hex when exists"
+                        )
 
     elif proof_type == "PROOF_PERF_BUDGET_RUNTIME":
         if data.get("within_budget") is not True:

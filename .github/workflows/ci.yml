@@ -550,6 +550,7 @@ jobs:
           pip install -e ".[dev,extras]"
 
       - name: Support Bundle runtime proof
+        continue-on-error: false
         run: |
           python scripts/ci/write_support_bundle_runtime_proof.py
 
@@ -558,6 +559,7 @@ jobs:
           python scripts/ci/check_state_proofs.py --validate-file "docs/reports/verification/PROOF_SUPPORT_BUNDLE_RUNTIME_*.json"
 
       - name: Perf Budget runtime proof
+        continue-on-error: false
         run: |
           python scripts/ci/write_perf_budget_runtime_proof.py
 
@@ -565,10 +567,19 @@ jobs:
         run: |
           python scripts/ci/check_state_proofs.py --validate-file "docs/reports/verification/PROOF_PERF_BUDGET_RUNTIME_*.json"
 
+      - name: Backend Cold-Start proof
+        continue-on-error: false
+        run: |
+          python scripts/ci/write_backend_cold_start_proof.py
+
+      - name: Validate Backend Cold-Start proof
+        run: |
+          python scripts/ci/check_state_proofs.py --validate-file "docs/reports/verification/PROOF_BACKEND_COLD_START_*.json"
+
       - name: Golden Path real proof (if models available)
+        continue-on-error: false
         run: |
           python scripts/ci/write_golden_path_real_proof.py
-        continue-on-error: false
 
       - name: Validate Golden Path real proof
         run: |
@@ -582,6 +593,7 @@ jobs:
           path: |
             docs/reports/verification/PROOF_SUPPORT_BUNDLE_RUNTIME_*.json
             docs/reports/verification/PROOF_PERF_BUDGET_RUNTIME_*.json
+            docs/reports/verification/PROOF_BACKEND_COLD_START_*.json
             docs/reports/verification/PROOF_GOLDEN_PATH_REAL_*.json
           retention-days: 90
 
@@ -595,18 +607,35 @@ jobs:
     if: always()
     
     steps:
-      - name: Check job results
+      - name: CI Gate Summary
         run: |
-          echo "Python Tests: ${{ needs.python-tests.result }}"
-          echo ".NET Build: ${{ needs.dotnet-build.result }}"
-          echo "Integration Tests: ${{ needs.integration-tests.result }}"
-          echo "Golden Path: ${{ needs.golden-path.result }}"
-          echo "Code Quality: ${{ needs.code-quality.result }}"
-          
+          echo "========================================"
+          echo "  VOICESTUDIO CI GATE SUMMARY"
+          echo "========================================"
+          echo ""
+          echo "--- SURFACE GATES (PR, Ubuntu, fast) ---"
+          echo "  Python Tests:      ${{ needs.python-tests.result }}"
+          echo "  .NET Build:        ${{ needs.dotnet-build.result }}"
+          echo "  Integration Tests: ${{ needs.integration-tests.result }}"
+          echo "  Golden Path Stub:  ${{ needs.golden-path.result }}"
+          echo "  Code Quality:      ${{ needs.code-quality.result }}"
+          echo ""
+          echo "NOTE: Surface gates verify code correctness"
+          echo "and stub-mode proof generation. They do NOT"
+          echo "verify runtime performance, real-engine"
+          echo "synthesis, or Windows-only measurements."
+          echo ""
+          echo "--- RUNTIME GATES (dispatch only) ---"
+          echo "  Runtime gates require: workflow_dispatch"
+          echo "  with run_runtime_gates=true on windows-latest."
+          echo "  Proofs: PROOF_SUPPORT_BUNDLE_RUNTIME,"
+          echo "  PROOF_PERF_BUDGET_RUNTIME,"
+          echo "  PROOF_BACKEND_COLD_START,"
+          echo "  PROOF_GOLDEN_PATH_REAL"
+          echo "========================================"
+
           if [[ "${{ needs.python-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.dotnet-build.result }}" == "failure" ]]; then
-            echo "Critical jobs failed!"
+            echo "CRITICAL SURFACE GATE FAILURE"
             exit 1
           fi
-          
-          echo "CI completed successfully!"

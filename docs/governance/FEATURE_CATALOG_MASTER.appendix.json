@@ -1,0 +1,585 @@
+{
+  "schema_version": "1.0.0",
+  "catalog_id": "FEATURE_CATALOG_MASTER",
+  "generated_at_utc": "2026-03-05T07:15:50.025179+00:00",
+  "source_scope": {
+    "primary_root": "E:\\VoiceStudio",
+    "snapshots": [
+      "E:\\VoiceStudio-baseline",
+      "E:\\VoiceStudio-feb13",
+      "E:\\VoiceStudio-golden",
+      "E:\\VoiceStudio-integration"
+    ],
+    "auxiliary_roots": [
+      "E:\\__feature_harvest",
+      "E:\\__cleanup_staging",
+      "E:\\cursor"
+    ]
+  },
+  "canonical_ui": {
+    "registered_panel_count": 47,
+    "panel_regions": {
+      "Center": 26,
+      "Left": 3,
+      "Right": 17,
+      "Bottom": 1
+    },
+    "panels": [
+      {
+        "index": 1,
+        "panel_id": "VoiceSynthesis",
+        "display_name": "Voice Synthesis",
+        "region": "Center"
+      },
+      {
+        "index": 2,
+        "panel_id": "EnsembleSynthesis",
+        "display_name": "Ensemble Synthesis",
+        "region": "Center"
+      },
+      {
+        "index": 3,
+        "panel_id": "BatchProcessing",
+        "display_name": "Batch Processing",
+        "region": "Center"
+      },
+      {
+        "index": 4,
+        "panel_id": "TrainingDatasetEditor",
+        "display_name": "Training Dataset Editor",
+        "region": "Center"
+      },
+      {
+        "index": 5,
+        "panel_id": "ModelManager",
+        "display_name": "Model Manager",
+        "region": "Center"
+      },
+      {
+        "index": 6,
+        "panel_id": "Training",
+        "display_name": "Training",
+        "region": "Left"
+      },
+      {
+        "index": 7,
+        "panel_id": "Transcribe",
+        "display_name": "Transcribe",
+        "region": "Center"
+      },
+      {
+        "index": 8,
+        "panel_id": "Recording",
+        "display_name": "Recording",
+        "region": "Center"
+      },
+      {
+        "index": 9,
+        "panel_id": "AudioAnalysis",
+        "display_name": "Audio Analysis",
+        "region": "Center"
+      },
+      {
+        "index": 10,
+        "panel_id": "QualityControl",
+        "display_name": "Quality Control",
+        "region": "Right"
+      },
+      {
+        "index": 11,
+        "panel_id": "Timeline",
+        "display_name": "Timeline",
+        "region": "Center"
+      },
+      {
+        "index": 12,
+        "panel_id": "Profiles",
+        "display_name": "Profiles",
+        "region": "Left"
+      },
+      {
+        "index": 13,
+        "panel_id": "Library",
+        "display_name": "Library",
+        "region": "Left"
+      },
+      {
+        "index": 14,
+        "panel_id": "EffectsMixer",
+        "display_name": "Effects Mixer",
+        "region": "Right"
+      },
+      {
+        "index": 15,
+        "panel_id": "Analyzer",
+        "display_name": "Analyzer",
+        "region": "Right"
+      },
+      {
+        "index": 16,
+        "panel_id": "VoiceMorph",
+        "display_name": "Voice Morph",
+        "region": "Center"
+      },
+      {
+        "index": 17,
+        "panel_id": "EmotionControl",
+        "display_name": "Emotion Control",
+        "region": "Right"
+      },
+      {
+        "index": 18,
+        "panel_id": "Diagnostics",
+        "display_name": "Diagnostics",
+        "region": "Bottom"
+      },
+      {
+        "index": 19,
+        "panel_id": "Settings",
+        "display_name": "Settings",
+        "region": "Right"
+      },
+      {
+        "index": 20,
+        "panel_id": "Help",
+        "display_name": "Help",
+        "region": "Right"
+      },
+      {
+        "index": 21,
+        "panel_id": "SSMLControl",
+        "display_name": "SSML Control",
+        "region": "Right"
+      },
+      {
+        "index": 22,
+        "panel_id": "VoiceQuickClone",
+        "display_name": "Quick Clone",
+        "region": "Center"
+      },
+      {
+        "index": 23,
+        "panel_id": "QualityDashboard",
+        "display_name": "Quality Dashboard",
+        "region": "Center"
+      },
+      {
+        "index": 24,
+        "panel_id": "QualityBenchmark",
+        "display_name": "Quality Benchmark",
+        "region": "Center"
+      },
+      {
+        "index": 25,
+        "panel_id": "ImageGen",
+        "display_name": "Image Generation",
+        "region": "Center"
+      },
+      {
+        "index": 26,
+        "panel_id": "VideoGen",
+        "display_name": "Video Generation",
+        "region": "Center"
+      },
+      {
+        "index": 27,
+        "panel_id": "DeepfakeCreator",
+        "display_name": "Deepfake Creator",
+        "region": "Center"
+      },
+      {
+        "index": 28,
+        "panel_id": "DatasetQA",
+        "display_name": "Dataset QA",
+        "region": "Center"
+      },
+      {
+        "index": 29,
+        "panel_id": "ScriptEditor",
+        "display_name": "Script Editor",
+        "region": "Center"
+      },
+      {
+        "index": 30,
+        "panel_id": "SceneBuilder",
+        "display_name": "Scene Builder",
+        "region": "Center"
+      },
+      {
+        "index": 31,
+        "panel_id": "Macro",
+        "display_name": "Macro",
+        "region": "Center"
+      },
+      {
+        "index": 32,
+        "panel_id": "WorkflowAutomation",
+        "display_name": "Workflow Automation",
+        "region": "Center"
+      },
+      {
+        "index": 33,
+        "panel_id": "AdvancedSettings",
+        "display_name": "Advanced Settings",
+        "region": "Right"
+      },
+      {
+        "index": 34,
+        "panel_id": "APIKeyManager",
+        "display_name": "API Key Manager",
+        "region": "Right"
+      },
+      {
+        "index": 35,
+        "panel_id": "GPUStatus",
+        "display_name": "GPU Status",
+        "region": "Right"
+      },
+      {
+        "index": 36,
+        "panel_id": "TodoPanel",
+        "display_name": "Todo Panel",
+        "region": "Right"
+      },
+      {
+        "index": 37,
+        "panel_id": "text-speech-editor",
+        "display_name": "Text Speech Editor",
+        "region": "Center"
+      },
+      {
+        "index": 38,
+        "panel_id": "prosody",
+        "display_name": "Prosody & Phoneme Control",
+        "region": "Center"
+      },
+      {
+        "index": 39,
+        "panel_id": "spatial-audio",
+        "display_name": "Spatial Audio",
+        "region": "Right"
+      },
+      {
+        "index": 40,
+        "panel_id": "ai-mixing-mastering",
+        "display_name": "AI Mixing & Mastering",
+        "region": "Right"
+      },
+      {
+        "index": 41,
+        "panel_id": "voice-style-transfer",
+        "display_name": "Voice Style Transfer",
+        "region": "Center"
+      },
+      {
+        "index": 42,
+        "panel_id": "embedding-explorer",
+        "display_name": "Speaker Embedding Explorer",
+        "region": "Right"
+      },
+      {
+        "index": 43,
+        "panel_id": "ai-production-assistant",
+        "display_name": "AI Production Assistant",
+        "region": "Right"
+      },
+      {
+        "index": 44,
+        "panel_id": "pronunciation-lexicon",
+        "display_name": "Pronunciation Lexicon",
+        "region": "Right"
+      },
+      {
+        "index": 45,
+        "panel_id": "voice-morphing-blending",
+        "display_name": "Voice Morphing/Blending",
+        "region": "Center"
+      },
+      {
+        "index": 46,
+        "panel_id": "plugin-gallery",
+        "display_name": "Plugin Gallery",
+        "region": "Center"
+      },
+      {
+        "index": 47,
+        "panel_id": "theme-editor",
+        "display_name": "Theme Editor",
+        "region": "Right"
+      }
+    ]
+  },
+  "api_surface": {
+    "route_files_total": 143,
+    "route_files_active": 126,
+    "route_files_archived": 10,
+    "route_files_contexts": 7,
+    "active_operations": {
+      "get": 410,
+      "post": 343,
+      "put": 51,
+      "delete": 69,
+      "patch": 1,
+      "options": 0,
+      "head": 0,
+      "trace": 0,
+      "websocket": 6,
+      "total": 880
+    },
+    "route_registration_parity": {
+      "route_module_names_count": 111,
+      "include_route_count": 109,
+      "module_names_not_included": [
+        "consent",
+        "metrics",
+        "telemetry"
+      ],
+      "included_not_in_module_names": [
+        "experiments"
+      ]
+    }
+  },
+  "engine_surface": {
+    "manifest_count": 70,
+    "manifest_type_distribution": {
+      "audio": 38,
+      "image": 13,
+      "llm": 3,
+      "stt": 1,
+      "tts": 5,
+      "unknown": 2,
+      "video": 8
+    },
+    "adapter_modules_primary_count": 54,
+    "adapter_modules_primary_added_vs_baseline": [
+      "gemini_live_engine.py",
+      "openai_realtime_engine.py",
+      "tacotron2_engine.py",
+      "whisperx_engine.py"
+    ],
+    "manifest_ids_added_vs_baseline": [
+      "bark",
+      "coqui_tts",
+      "fish_speech",
+      "gemini_live",
+      "localai_llm",
+      "mars5",
+      "ollama_llm",
+      "openai_chat",
+      "openai_realtime",
+      "openai_tts",
+      "openvoice_v2",
+      "parler_tts",
+      "rvc_v2",
+      "so_vits_svc",
+      "speaker_encoder",
+      "styletts2",
+      "tacotron2",
+      "vosk",
+      "whisperx"
+    ]
+  },
+  "plugin_surface": {
+    "category_count": 8,
+    "plugin_count": 3,
+    "plugin_ids": [
+      "com.voicestudio.noise_reduction",
+      "com.voicestudio.format_converter",
+      "com.voicestudio.silence_detector"
+    ],
+    "category_ids": [
+      "voice_synthesis",
+      "speech_recognition",
+      "audio_effects",
+      "audio_analysis",
+      "voice_conversion",
+      "utilities",
+      "integrations",
+      "developer_tools"
+    ]
+  },
+  "snapshot_comparison": {
+    "current": {
+      "panel_ids": 47,
+      "route_files": 143,
+      "route_registry_modules": 111,
+      "route_included_modules": 109,
+      "engine_adapters": 55,
+      "engine_manifests": 70,
+      "plugin_count": 3,
+      "plugin_categories": 8,
+      "openapi_paths": 777,
+      "openapi_operations": 916,
+      "archived_doc_entries": 2244,
+      "engine_manifest_types": {
+        "audio": 38,
+        "image": 13,
+        "llm": 3,
+        "stt": 1,
+        "tts": 5,
+        "unknown": 2,
+        "video": 8
+      }
+    },
+    "baseline": {
+      "panel_ids": 9,
+      "route_files": 101,
+      "route_registry_modules": 0,
+      "route_included_modules": 0,
+      "engine_adapters": 50,
+      "engine_manifests": 45,
+      "plugin_count": 0,
+      "plugin_categories": 0,
+      "openapi_paths": 21,
+      "openapi_operations": 21,
+      "archived_doc_entries": 1841,
+      "engine_manifest_types": {
+        "audio": 24,
+        "image": 13,
+        "video": 8
+      }
+    },
+    "feb13": {
+      "panel_ids": 11,
+      "route_files": 124,
+      "route_registry_modules": 0,
+      "route_included_modules": 0,
+      "engine_adapters": 54,
+      "engine_manifests": 68,
+      "plugin_count": 0,
+      "plugin_categories": 0,
+      "openapi_paths": 23,
+      "openapi_operations": 23,
+      "archived_doc_entries": 1851,
+      "engine_manifest_types": {
+        "audio": 38,
+        "image": 13,
+        "llm": 3,
+        "stt": 1,
+        "tts": 5,
+        "video": 8
+      }
+    },
+    "golden": {
+      "panel_ids": 47,
+      "route_files": 136,
+      "route_registry_modules": 0,
+      "route_included_modules": 0,
+      "engine_adapters": 54,
+      "engine_manifests": 70,
+      "plugin_count": 3,
+      "plugin_categories": 8,
+      "openapi_paths": 23,
+      "openapi_operations": 23,
+      "archived_doc_entries": 2234,
+      "engine_manifest_types": {
+        "audio": 38,
+        "image": 13,
+        "llm": 3,
+        "stt": 1,
+        "tts": 5,
+        "unknown": 2,
+        "video": 8
+      }
+    },
+    "integration": {
+      "panel_ids": 47,
+      "route_files": 136,
+      "route_registry_modules": 0,
+      "route_included_modules": 0,
+      "engine_adapters": 54,
+      "engine_manifests": 70,
+      "plugin_count": 3,
+      "plugin_categories": 8,
+      "openapi_paths": 23,
+      "openapi_operations": 23,
+      "archived_doc_entries": 2234,
+      "engine_manifest_types": {
+        "audio": 38,
+        "image": 13,
+        "llm": 3,
+        "stt": 1,
+        "tts": 5,
+        "unknown": 2,
+        "video": 8
+      }
+    },
+    "delta_current_vs_baseline": {
+      "panels_added_count": 38,
+      "route_files_added_count": 53,
+      "engine_adapter_files_added_count": 5,
+      "panels_added": [
+        "APIKeyManager",
+        "AdvancedSettings",
+        "Analyzer",
+        "AudioAnalysis",
+        "BatchProcessing",
+        "DatasetQA",
+        "DeepfakeCreator",
+        "Diagnostics",
+        "EffectsMixer",
+        "EmotionControl",
+        "EnsembleSynthesis",
+        "GPUStatus",
+        "Help",
+        "ImageGen",
+        "Library",
+        "Macro",
+        "ModelManager",
+        "Profiles",
+        "QualityBenchmark",
+        "QualityControl",
+        "QualityDashboard",
+        "Recording",
+        "SSMLControl",
+        "SceneBuilder",
+        "ScriptEditor",
+        "Settings",
+        "Timeline",
+        "TodoPanel",
+        "Training",
+        "TrainingDatasetEditor",
+        "Transcribe",
+        "VideoGen",
+        "VoiceMorph",
+        "VoiceQuickClone",
+        "VoiceSynthesis",
+        "WorkflowAutomation",
+        "plugin-gallery",
+        "theme-editor"
+      ]
+    }
+  },
+  "verification_status": {
+    "timestamp_utc": "2026-03-05T07:15:50.025179+00:00",
+    "all_passed": true,
+    "failed_checks": []
+  },
+  "known_risks": [
+    "route_registry_parity_drift",
+    "feature_harvest_contaminated_with_non_product_content",
+    "archive_volume_high_and_partially_unclassified"
+  ],
+  "next_20_tasks_ordered": [
+    "Close Gate B from 9/10 to 10/10.",
+    "Add CI assertion for zero empty catches to prevent regression.",
+    "Create and adopt one canonical feature doc in docs/governance.",
+    "Mark outdated feature docs as superseded with explicit pointers to canonical doc.",
+    "Build a generator script that updates panel/API/engine/plugin counts from code.",
+    "Add CI check that fails on stale canonical inventory.",
+    "Add route parity test: route file presence vs registry include vs module list.",
+    "Resolve consent/metrics/telemetry/experiments route registry mismatch.",
+    "Classify all _archived/* route modules as keep/delete/migrate.",
+    "Classify all contexts/* route modules as active contract or dead scaffolding.",
+    "Add panel parity test: registry IDs must map to View + ViewModel + navigation entry.",
+    "Audit unregistered panel XAML surfaces and tag each as active/deprecated/dead.",
+    "Remove or archive dead panel surfaces from active source paths.",
+    "Normalize engine manifest taxonomy unknown types/subtypes.",
+    "Build engine viability matrix (manifest/import/health/smoke synthesis).",
+    "Expand plugin catalog from 3 plugins or trim category taxonomy to reality.",
+    "Replace stub golden-path proof with real-engine proof artifact.",
+    "Formalize snapshot policy for baseline/feb13/golden/integration copies.",
+    "Purge or relocate cleanup_staging and invalid harvest artifacts from feature workflows.",
+    "Add weekly release-readiness report (verify, gates, drift, doc freshness)."
+  ]
+}

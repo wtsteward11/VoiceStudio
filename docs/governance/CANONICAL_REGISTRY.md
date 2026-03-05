@@ -3,7 +3,7 @@
 This registry is the single source of truth for all canonical documents in VoiceStudio.
 Before creating a new document, check this registry to ensure the topic isn't already covered.
 
-> **Last Updated**: 2026-02-21 (Phase 11: Post-GA polish, type safety, performance baselines)
+> **Last Updated**: 2026-03-05 (Feature Catalog Master adoption)
 
 ---
 
@@ -39,6 +39,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Plugin System Guidelines** | `docs/governance/PLUGIN_SYSTEM_GUIDELINES.md` | 2026-02-16 | Canonical plugin governance: architecture, security, performance, DX, testing, UI, compatibility, risk, observability (10 sections). Companion to ADR-036. |
 | **Provenance Policy** | `docs/governance/PROVENANCE_POLICY.md` | 2026-03-01 | Best-effort provenance and usage recording for audio outputs; do not claim full traceability |
 | **Completion Roadmap v2.0** | `docs/governance/VOICESTUDIO_COMPLETION_ROADMAP_V2.md` | 2026-03-03 | CI-enforced hardened roadmap for v1.1.0; 7 gaps, 6 phases (0/A/B/C/D/E/F), 5 permanent CI invariants |
+| **Feature Catalog Master** | `docs/governance/FEATURE_CATALOG_MASTER.md` | 2026-03-05 | Single canonical feature inventory; 47 panels, API/engine/plugin surface; machine appendix: [FEATURE_CATALOG_MASTER.appendix.json](FEATURE_CATALOG_MASTER.appendix.json); CI drift check in `tests/ci/test_feature_catalog_appendix.py` |
 
 ## Architecture
 

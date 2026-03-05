@@ -110,18 +110,31 @@ class TranscriptionResult:
         }
 
 
-def _resolve_audio_path(
+async def _resolve_audio_path(
     audio_id: str,
     project_id: str | None,
 ) -> str | None:
-    """Resolve audio file path from audio_id, with project fallback."""
+    """Resolve audio file path from audio_id, with library asset and project fallback."""
     from backend.services.audio_path_resolver import resolve_audio_path
     from backend.services.project_service import ensure_project_dir
 
+    # 1. Standard resolution (AudioRegistry, upload dirs, project dirs)
     audio_path = resolve_audio_path(audio_id)
     if audio_path and os.path.exists(str(audio_path)):
         return str(audio_path)
 
+    # 2. Library asset lookup (audio_id from POST /api/library/assets/upload)
+    try:
+        from backend.data.repositories.library_repository import get_library_asset_repository
+
+        asset_repo = get_library_asset_repository()
+        entity = await asset_repo.get_by_id(audio_id)
+        if entity and entity.path and os.path.exists(entity.path):
+            return entity.path
+    except Exception as e:
+        logger.debug("Library asset lookup failed for audio_id %s: %s", audio_id, e)
+
+    # 3. Project audio directory fallback
     if not project_id:
         return None
 
@@ -260,7 +273,7 @@ async def transcribe_audio(
             ),
         )
 
-    audio_path = _resolve_audio_path(request.audio_id, project_id)
+    audio_path = await _resolve_audio_path(request.audio_id, project_id)
     if not audio_path or not os.path.exists(audio_path):
         error_msg = f"Audio file not found for audio_id: {request.audio_id}. "
         if project_id:

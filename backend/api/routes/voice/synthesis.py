@@ -478,7 +478,8 @@ async def synthesize(
                     ) from e
 
             # Stub mode: when no engines, produce minimal WAV for golden path proof
-            if os.environ.get("VOICESTUDIO_TEST_MODE", "").lower() in ("stub", "1", "true", "yes"):
+            _test_mode = os.environ.get("VOICESTUDIO_TEST_MODE", "").lower()
+            if _test_mode in ("stub", "real", "1", "true", "yes"):
                 import math
                 import struct
 

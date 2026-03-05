@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 from importlib import metadata
 from pathlib import Path
 
@@ -285,13 +286,17 @@ def ensure_whisper_cpp(auto_download: bool = True) -> dict[str, object]:
                 status_code=503,
             )
         logger.info(f"Whisper.cpp preflight: downloading GGUF to {model_path}")
-        hf_hub_download(
-            repo_id="TheBloke/whisper-medium.en-GGUF",
-            filename="whisper-medium.en.gguf",
+        # TheBloke/whisper-medium.en-GGUF returns 404; use OllmOne/whisper-medium-GGUF
+        downloaded_path = hf_hub_download(
+            repo_id="OllmOne/whisper-medium-GGUF",
+            filename="model-q4k.gguf",
             local_dir=str(model_path.parent),
             local_dir_use_symlinks=False,
-            resume_download=True,
         )
+        # Rename to expected filename if needed
+        src = Path(downloaded_path)
+        if src != model_path and src.exists():
+            shutil.move(str(src), str(model_path))
         downloaded = True
         try:
             from backend.services.usage_stats import record_model_downloaded

@@ -28,6 +28,8 @@ config/api-keys.json
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest_fail.txt
+.pytest_fail2.txt
 .mypy_cache/
 .venv/
 .venvs/

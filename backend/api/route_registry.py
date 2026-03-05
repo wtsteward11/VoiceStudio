@@ -202,6 +202,7 @@ def register_all_routes(app: FastAPI) -> None:
     _include_route("models")
     _include_route("effects")
     _include_route("batch")
+    _include_route("consent")
     _include_route("transcribe")
     _include_route("training")
     _include_route("training_audit")

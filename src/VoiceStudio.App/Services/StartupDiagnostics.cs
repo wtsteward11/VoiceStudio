@@ -526,6 +526,9 @@ namespace VoiceStudio.App.Services
                 Directory.CreateDirectory(localAppData);
 
                 var panelLoadMs = AppServices.PanelRegistrationMs;
+                var startupMs = AppServices.AppStartupMs > 0
+                    ? AppServices.AppStartupMs
+                    : TotalDuration.TotalMilliseconds;
 
                 var report = new Dictionary<string, object>
                 {
@@ -535,6 +538,7 @@ namespace VoiceStudio.App.Services
                     ["totalDurationMs"] = TotalDuration.TotalMilliseconds,
                     ["allPassed"] = AllChecksPassed,
                     ["hasCriticalFailures"] = HasCriticalFailures,
+                    ["startup_ms"] = startupMs,
                     ["panel_load_ms"] = panelLoadMs,
                     ["checks"] = CreateChecksReport()
                 };
@@ -543,9 +547,17 @@ namespace VoiceStudio.App.Services
                 var reportPath = Path.Combine(localAppData, "startup_diagnostics.json");
                 await File.WriteAllTextAsync(reportPath, json, cancellationToken);
             }
-            // ALLOWED: empty catch - Diagnostics should not fail startup
-            catch
+            catch (Exception ex)
             {
+                try
+                {
+                    var errPath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "VoiceStudio", "Logs", "diagnostics_error.txt");
+                    File.WriteAllText(errPath,
+                        $"{DateTime.UtcNow:O}: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
+                }
+                catch { /* last resort */ }
             }
         }
 

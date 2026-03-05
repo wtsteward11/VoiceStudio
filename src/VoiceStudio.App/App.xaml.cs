@@ -437,6 +437,7 @@ namespace VoiceStudio.App
       if (_startupProfiler != null)
       {
         var totalTime = _startupProfiler.ElapsedMilliseconds;
+        AppServices.AppStartupMs = totalTime;
         Debug.WriteLine(_startupProfiler.GetReport());
 
         // Target: < 3 seconds

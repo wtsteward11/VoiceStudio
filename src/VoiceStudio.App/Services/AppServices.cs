@@ -32,6 +32,12 @@ namespace VoiceStudio.App.Services
     public static double PanelRegistrationMs { get; private set; }
 
     /// <summary>
+    /// Total WinUI app startup time (constructor to window ready).
+    /// Set from App.xaml.cs after _startupProfiler finishes; used for startup_ms in startup_diagnostics.json.
+    /// </summary>
+    public static double AppStartupMs { get; set; }
+
+    /// <summary>
     /// Sets the root service provider (e.g. from a built ServiceCollection).
     /// </summary>
     public static void Initialize(IServiceProvider provider)

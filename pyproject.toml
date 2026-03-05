@@ -55,6 +55,7 @@ dev = [
     "pytest-timeout>=2.2.0",
     "pytest-xdist>=3.5.0",
     "pytest-randomly>=3.15.0",
+    "openapi-spec-validator>=0.6.0",
     "httpx>=0.26.0",
     # Code quality
     "black>=24.1.0",

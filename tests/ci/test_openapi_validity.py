@@ -71,7 +71,6 @@ class TestOpenAPIValidity:
 
     def test_openapi_spec_validates_with_openapi_spec_validator(self):
         """Spec must pass openapi_spec_validator.validate() (resolves $ref)."""
-        pytest.importorskip("openapi_spec_validator")
         from openapi_spec_validator import validate_spec
 
         spec = _load_openapi_spec()

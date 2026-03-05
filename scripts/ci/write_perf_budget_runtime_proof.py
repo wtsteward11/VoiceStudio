@@ -185,7 +185,7 @@ def main() -> int:
         sys.exit(1)
 
     api_host = os.environ.get("VOICESTUDIO_API_HOST", "localhost")
-    api_port = os.environ.get("VOICESTUDIO_API_PORT", "8001")
+    api_port = os.environ.get("VOICESTUDIO_API_PORT", "8000")
     api_url = f"http://{api_host}:{api_port}/api/health"
 
     print(f"Startup: {startup_ms:.0f}ms (from startup_diagnostics.json)")

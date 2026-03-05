@@ -8,6 +8,7 @@ the validator, confirming it rejects the forgery.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import tempfile
 from pathlib import Path
@@ -25,6 +26,32 @@ from scripts.ci.check_state_proofs import load_schema, validate_proof
 from scripts.ci.proof_fingerprint import compute_fingerprint
 
 SCHEMA = load_schema()
+
+# Artifact path for tests that need a valid artifact (so validator reaches semantic checks)
+_NEGATIVE_ARTIFACT_REL = ".buildlogs/proof_runs/negative_validation/artifact.wav"
+
+
+def _ensure_valid_artifact() -> tuple[str, str]:
+    """Create artifact under ROOT; return (artifact_path, artifact_sha256)."""
+    full = (ROOT / _NEGATIVE_ARTIFACT_REL).resolve()
+    full.parent.mkdir(parents=True, exist_ok=True)
+    content = b"\x00" * 1024  # minimal content
+    full.write_bytes(content)
+    sha = hashlib.sha256(content).hexdigest()
+    return (_NEGATIVE_ARTIFACT_REL, sha)
+
+
+def _stub_proof_with_valid_artifact() -> dict:
+    """Return VALID_STUB_PROOF with artifact that exists and hash matches."""
+    art_path, art_sha = _ensure_valid_artifact()
+    proof = copy.deepcopy(VALID_STUB_PROOF)
+    proof["artifact_path"] = art_path
+    proof["artifact_sha256"] = art_sha
+    proof["output_metrics"]["output_sha256"] = art_sha
+    proof["historical_proof"] = False
+    proof["evidence_fingerprint"] = compute_fingerprint(proof, "PROOF_GOLDEN_PATH_STUB")
+    return proof
+
 
 VALID_STUB_PROOF = {
     "command": "pytest tests/e2e/test_golden_path.py -v --engine-mode=stub",
@@ -133,7 +160,7 @@ class TestGoldenPathStubNegative:
         assert any("duration_seconds must be > 0" in e for e in errors), f"Expected duration rejection, got: {errors}"
 
     def test_fingerprint_mismatch_rejected(self, tmp_path: Path) -> None:
-        proof = copy.deepcopy(VALID_STUB_PROOF)
+        proof = _stub_proof_with_valid_artifact()
         proof["evidence_fingerprint"] = "0" * 64
         path = _write_proof(tmp_path, "PROOF_GOLDEN_PATH_STUB_2026-03-03.json", proof)
         errors = validate_proof(path, SCHEMA, no_git_match=True)
@@ -247,7 +274,7 @@ class TestGeneralNegative:
         assert any("file missing" in e for e in errors), f"Expected file missing rejection, got: {errors}"
 
     def test_invalid_git_commit_rejected(self, tmp_path: Path) -> None:
-        proof = copy.deepcopy(VALID_STUB_PROOF)
+        proof = _stub_proof_with_valid_artifact()
         proof["git_commit"] = "not_a_valid_commit"
         proof["evidence_fingerprint"] = compute_fingerprint(proof, "PROOF_GOLDEN_PATH_STUB")
         path = _write_proof(tmp_path, "PROOF_GOLDEN_PATH_STUB_2026-03-03.json", proof)
@@ -255,7 +282,7 @@ class TestGeneralNegative:
         assert any("git_commit must be 40 hex" in e for e in errors), f"Expected git_commit rejection, got: {errors}"
 
     def test_nonzero_exit_code_rejected(self, tmp_path: Path) -> None:
-        proof = copy.deepcopy(VALID_STUB_PROOF)
+        proof = _stub_proof_with_valid_artifact()
         proof["exit_code"] = 1
         proof["evidence_fingerprint"] = compute_fingerprint(proof, "PROOF_GOLDEN_PATH_STUB")
         path = _write_proof(tmp_path, "PROOF_GOLDEN_PATH_STUB_2026-03-03.json", proof)

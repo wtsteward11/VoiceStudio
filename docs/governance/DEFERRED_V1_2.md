@@ -21,3 +21,5 @@ Items deferred from v1.1.0 ship. Non-blocking for v1.1.0 release.
 - **Bandit B614 torch.load exemption** — Document and formalize exemption for `torch.load` in ML/engine code; ensure `weights_only` or equivalent when feasible.
 
 - **OpenAPI drift check dep alignment** — Ensure Sentinel (or any workflow running OpenAPI drift) uses the same dependency set as backend runtime; avoid minimal deps that cause route import failures.
+
+- **Sentinel smoke backend startup** — Backend cold-start in CI (Ubuntu, requirements.txt only) can exceed 2min; sentinel-smoke is continue-on-error for v1.1.0. Investigate startup time, dependency gaps, or increase wait budget.

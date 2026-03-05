@@ -9,27 +9,27 @@ namespace VoiceStudio.App.Tests.Fixtures
 {
     /// <summary>
     /// Mock implementation of IViewModelContext for testing ViewModels.
-    /// Provides a test-friendly logger and null dispatcher.
+    /// Provides a test-friendly logger and mock dispatcher.
     /// </summary>
     public class MockViewModelContext : IViewModelContext
     {
         private readonly ILogger _logger;
-        private readonly object _dispatcherQueue;
+        private readonly IDispatcher _dispatcher;
 
         public MockViewModelContext()
             : this(NullLogger.Instance, new MockDispatcherQueue())
         {
         }
 
-        public MockViewModelContext(ILogger logger, object dispatcherQueue)
+        public MockViewModelContext(ILogger logger, IDispatcher dispatcher)
         {
             _logger = logger;
-            _dispatcherQueue = dispatcherQueue;
+            _dispatcher = dispatcher;
         }
 
         public ILogger Logger => _logger;
 
-        public object DispatcherQueue => _dispatcherQueue;
+        public IDispatcher Dispatcher => _dispatcher;
 
         /// <summary>
         /// Creates a MockViewModelContext with a test logger that records log entries.
@@ -45,8 +45,9 @@ namespace VoiceStudio.App.Tests.Fixtures
 
     /// <summary>
     /// Mock dispatcher queue that executes actions synchronously for testing.
+    /// Implements IDispatcher for ViewModel testability.
     /// </summary>
-    public class MockDispatcherQueue
+    public class MockDispatcherQueue : IDispatcher
     {
         /// <summary>
         /// Synchronously executes the action (mimics dispatcher behavior in tests).
@@ -57,6 +58,14 @@ namespace VoiceStudio.App.Tests.Fixtures
         {
             action?.Invoke();
             return true;
+        }
+
+        /// <summary>
+        /// Creates a mock timer for testing.
+        /// </summary>
+        public IDispatcherTimer CreateTimer()
+        {
+            return new MockDispatcherQueueTimer();
         }
 
         /// <summary>
@@ -71,6 +80,19 @@ namespace VoiceStudio.App.Tests.Fixtures
             action?.Invoke();
             return true;
         }
+    }
+
+    /// <summary>
+    /// Mock timer for testing ViewModels that use IDispatcherTimer.
+    /// </summary>
+    public class MockDispatcherQueueTimer : IDispatcherTimer
+    {
+        public TimeSpan Interval { get; set; }
+        public bool IsRepeating { get; set; }
+        public event EventHandler<object>? Tick;
+
+        public void Start() { }
+        public void Stop() { }
     }
 
     /// <summary>

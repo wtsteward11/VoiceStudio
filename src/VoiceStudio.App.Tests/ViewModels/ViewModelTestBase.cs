@@ -36,7 +36,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       // Also provide Moq-based mock for IViewModelContext
       MockContextMoq = new Mock<IViewModelContext>();
       MockContextMoq.Setup(x => x.Logger).Returns(MockContext.Logger);
-      MockContextMoq.Setup(x => x.DispatcherQueue).Returns(MockContext.DispatcherQueue);
+      MockContextMoq.Setup(x => x.Dispatcher).Returns(MockContext.Dispatcher);
 
       // Reset test data generators
       TestDataGenerators.ResetIdCounter();

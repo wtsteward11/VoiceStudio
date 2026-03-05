@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.UI.Dispatching;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Core.Models;
@@ -23,7 +22,7 @@ namespace VoiceStudio.App.ViewModels
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly IErrorPresentationService? _errorService;
     private readonly IErrorLoggingService? _logService;
-    private readonly DispatcherQueueTimer _statusTimer;
+    private readonly IDispatcherTimer _statusTimer;
     private readonly MicrophoneRecordingService _microphoneService;
 
     public string PanelId => "recording";
@@ -383,7 +382,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private void StatusTimer_Tick(DispatcherQueueTimer sender, object args)
+    private void StatusTimer_Tick(object? sender, object? args)
     {
       if (!_microphoneService.IsRecording)
         return;

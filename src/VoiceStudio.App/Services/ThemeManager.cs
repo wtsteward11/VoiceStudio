@@ -71,18 +71,22 @@ namespace VoiceStudio.App.Services
     
     /// <summary>
     /// Applies accent color to application resources.
+    /// No-op when Application.Current is null (e.g. in unit tests).
     /// </summary>
     private void ApplyAccentToResources(ThemeAccent accent)
     {
-      if (Application.Current.Resources.ContainsKey("SystemAccentColor"))
+      var resources = Application.Current?.Resources;
+      if (resources == null)
+        return;
+
+      if (resources.ContainsKey("SystemAccentColor"))
       {
-        Application.Current.Resources["SystemAccentColor"] = accent.Primary;
+        resources["SystemAccentColor"] = accent.Primary;
       }
-      
-      // Also set the accent brushes if they exist
-      if (Application.Current.Resources.ContainsKey("VSQ.Accent.PrimaryBrush"))
+
+      if (resources.ContainsKey("VSQ.Accent.PrimaryBrush"))
       {
-        Application.Current.Resources["VSQ.Accent.PrimaryBrush"] = 
+        resources["VSQ.Accent.PrimaryBrush"] =
             new Microsoft.UI.Xaml.Media.SolidColorBrush(
                 Microsoft.UI.ColorHelper.FromArgb(accent.Primary.A, accent.Primary.R, accent.Primary.G, accent.Primary.B));
       }
@@ -133,7 +137,7 @@ namespace VoiceStudio.App.Services
     public void ApplyTheme(string name)
     {
       CurrentThemeName = name;
-      
+
       // Update enum based on theme name
       _currentTheme = name.ToLowerInvariant() switch
       {
@@ -143,26 +147,29 @@ namespace VoiceStudio.App.Services
         _ => AppTheme.Dark
       };
 
-      // Remove existing theme dictionaries
-      var toRemove = new System.Collections.Generic.List<ResourceDictionary>();
-      foreach (var dict in Application.Current.Resources.MergedDictionaries)
+      // Apply to XAML resources when Application is available (no-op in unit tests)
+      var resources = Application.Current?.Resources;
+      if (resources != null)
       {
-        if (dict.Source?.ToString().Contains("Theme.") == true)
+        var toRemove = new System.Collections.Generic.List<ResourceDictionary>();
+        foreach (var dict in resources.MergedDictionaries)
         {
-          toRemove.Add(dict);
+          if (dict.Source?.ToString().Contains("Theme.") == true)
+          {
+            toRemove.Add(dict);
+          }
         }
-      }
-      foreach (var dict in toRemove)
-      {
-        Application.Current.Resources.MergedDictionaries.Remove(dict);
-      }
+        foreach (var dict in toRemove)
+        {
+          resources.MergedDictionaries.Remove(dict);
+        }
 
-      // Add new theme
-      var themeDict = new ResourceDictionary
-      {
-        Source = new Uri($"ms-appx:///Resources/Theme.{name}.xaml")
-      };
-      Application.Current.Resources.MergedDictionaries.Add(themeDict);
+        var themeDict = new ResourceDictionary
+        {
+          Source = new Uri($"ms-appx:///Resources/Theme.{name}.xaml")
+        };
+        resources.MergedDictionaries.Add(themeDict);
+      }
 
       Persist();
       RaiseThemeChanged();
@@ -172,26 +179,29 @@ namespace VoiceStudio.App.Services
     {
       Density = density;
 
-      // Remove existing density dictionaries
-      var toRemove = new System.Collections.Generic.List<ResourceDictionary>();
-      foreach (var dict in Application.Current.Resources.MergedDictionaries)
+      // Apply to XAML resources when Application is available (no-op in unit tests)
+      var resources = Application.Current?.Resources;
+      if (resources != null)
       {
-        if (dict.Source?.ToString().Contains("Density.") == true)
+        var toRemove = new System.Collections.Generic.List<ResourceDictionary>();
+        foreach (var dict in resources.MergedDictionaries)
         {
-          toRemove.Add(dict);
+          if (dict.Source?.ToString().Contains("Density.") == true)
+          {
+            toRemove.Add(dict);
+          }
         }
-      }
-      foreach (var dict in toRemove)
-      {
-        Application.Current.Resources.MergedDictionaries.Remove(dict);
-      }
+        foreach (var dict in toRemove)
+        {
+          resources.MergedDictionaries.Remove(dict);
+        }
 
-      // Add new density
-      var densityDict = new ResourceDictionary
-      {
-        Source = new Uri($"ms-appx:///Resources/Density.{density}.xaml")
-      };
-      Application.Current.Resources.MergedDictionaries.Add(densityDict);
+        var densityDict = new ResourceDictionary
+        {
+          Source = new Uri($"ms-appx:///Resources/Density.{density}.xaml")
+        };
+        resources.MergedDictionaries.Add(densityDict);
+      }
 
       Persist();
     }

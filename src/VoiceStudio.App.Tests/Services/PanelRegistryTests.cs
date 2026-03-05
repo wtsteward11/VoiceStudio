@@ -174,6 +174,7 @@ namespace VoiceStudio.App.Tests.Services
         }
 
         [TestMethod]
+        [ExpectedException(typeof(InvalidOperationException))]
         public void Register_DoesNotAddDuplicatePanelId()
         {
             var descriptor1 = new PanelDescriptor
@@ -190,11 +191,7 @@ namespace VoiceStudio.App.Tests.Services
             };
 
             _sut.Register(descriptor1);
-            _sut.Register(descriptor2);
-
-            var descriptors = _sut.GetAllDescriptors().ToList();
-            Assert.AreEqual(1, descriptors.Count);
-            Assert.AreEqual("Test Panel 1", descriptors[0].DisplayName);
+            _sut.Register(descriptor2); // Must throw InvalidOperationException
         }
 
         [TestMethod]

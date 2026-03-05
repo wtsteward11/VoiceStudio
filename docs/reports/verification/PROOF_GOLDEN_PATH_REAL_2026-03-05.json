@@ -2,7 +2,7 @@
   "command": "python -m pytest tests/e2e/test_golden_path.py -v --tb=short",
   "exit_code": 0,
   "timestamp": "2026-03-05T11:10:27Z",
-  "git_commit": "4a405d78a350a2c05c3cf67faadbbd40ba92a2e3",
+  "git_commit": "5bf115ce73b856b8de64e57de325ec97a9fbb7ce",
   "git_branch": "main",
   "engine_mode": "real",
   "checks": {

@@ -84,6 +84,7 @@ namespace VoiceStudio.App.Services
             await CheckEngineAvailabilityAsync(cancellationToken);
             await CheckDiskSpaceAsync(cancellationToken);
             await CheckMemoryAsync(cancellationToken);
+            await CheckPanelInfrastructureAsync(cancellationToken);
 
             _totalStopwatch.Stop();
 
@@ -469,6 +470,61 @@ namespace VoiceStudio.App.Services
             AddCheck(check);
         }
 
+        private async Task CheckPanelInfrastructureAsync(CancellationToken cancellationToken)
+        {
+            var check = new DiagnosticCheck
+            {
+                Name = "Panel Infrastructure",
+                Description = "Verifies Views/Panels directory exists and contains panel XAML files",
+                IsCritical = false
+            };
+
+            var stopwatch = Stopwatch.StartNew();
+
+            try
+            {
+                var baseDir = AppContext.BaseDirectory;
+                var panelsPath = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "src", "VoiceStudio.App", "Views", "Panels"));
+                if (!Directory.Exists(panelsPath))
+                {
+                    panelsPath = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "src", "VoiceStudio.App", "Views", "Panels"));
+                }
+
+                if (!Directory.Exists(panelsPath))
+                {
+                    panelsPath = Path.Combine(baseDir, "Views", "Panels");
+                }
+
+                if (!Directory.Exists(panelsPath))
+                {
+                    check.Status = CheckStatus.Failed;
+                    check.Message = "Views/Panels directory not found";
+                    check.Details = new Dictionary<string, object> { ["searchedPaths"] = new[] { baseDir, panelsPath } };
+                }
+                else
+                {
+                    var xamlFiles = Directory.EnumerateFiles(panelsPath, "*.xaml", SearchOption.TopDirectoryOnly).ToList();
+                    check.Status = CheckStatus.Passed;
+                    check.Message = $"Found {xamlFiles.Count} panel XAML files";
+                    check.Details = new Dictionary<string, object>
+                    {
+                        ["panelsPath"] = panelsPath,
+                        ["panelCount"] = xamlFiles.Count
+                    };
+                }
+
+                await Task.Delay(1, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                check.Status = CheckStatus.Failed;
+                check.Message = ex.Message;
+            }
+
+            check.Duration = stopwatch.Elapsed;
+            AddCheck(check);
+        }
+
         private void AddCheck(DiagnosticCheck check)
         {
             _checks.Add(check);
@@ -486,6 +542,13 @@ namespace VoiceStudio.App.Services
 
                 Directory.CreateDirectory(localAppData);
 
+                var panelLoadMs = 0.0;
+                var panelCheck = _checks.Find(c => c.Name == "Panel Infrastructure");
+                if (panelCheck != null)
+                {
+                    panelLoadMs = panelCheck.Duration.TotalMilliseconds;
+                }
+
                 var report = new Dictionary<string, object>
                 {
                     ["timestamp"] = DateTime.UtcNow.ToString(
@@ -494,6 +557,7 @@ namespace VoiceStudio.App.Services
                     ["totalDurationMs"] = TotalDuration.TotalMilliseconds,
                     ["allPassed"] = AllChecksPassed,
                     ["hasCriticalFailures"] = HasCriticalFailures,
+                    ["panel_load_ms"] = panelLoadMs,
                     ["checks"] = CreateChecksReport()
                 };
 

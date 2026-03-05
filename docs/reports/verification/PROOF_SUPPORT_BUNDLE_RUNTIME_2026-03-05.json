@@ -1,0 +1,56 @@
+{
+  "command": "powershell -ExecutionPolicy Bypass -File collect-support-bundle.ps1",
+  "exit_code": 0,
+  "timestamp": "2026-03-05T08:23:48Z",
+  "git_commit": "745663d77954afc4ad9570b7225834de3942f2c0",
+  "git_branch": "main",
+  "required_files": [
+    {
+      "name": "system_info.json",
+      "exists": true,
+      "bytes": 241,
+      "sha256": "c712a88fba7a01d7d1cc78ab86b7b786adf43cdacd5fd7a5077d47c55a808a87"
+    },
+    {
+      "name": "hardware_info.json",
+      "exists": false,
+      "bytes": 0,
+      "sha256": ""
+    },
+    {
+      "name": "engine_manifests_list.txt",
+      "exists": true,
+      "bytes": 4196,
+      "sha256": "58f90ca396e57975f23647752ba867f69b387c875eebc2f1b32d08e32ab0c330"
+    },
+    {
+      "name": "engine_manifests.json",
+      "exists": false,
+      "bytes": 0,
+      "sha256": ""
+    },
+    {
+      "name": "build_version_source.txt",
+      "exists": true,
+      "bytes": 2391,
+      "sha256": "0bff5366ef6b8b4baa1a0e79b10d105f7d82a792a81e75433f3995a37b3e02c6"
+    },
+    {
+      "name": "build_version.json",
+      "exists": false,
+      "bytes": 0,
+      "sha256": ""
+    },
+    {
+      "name": "BUNDLE_MANIFEST.json",
+      "exists": true,
+      "bytes": 4529,
+      "sha256": "c83c93fe7c812f9d341526b2380b7ac39a9d604ec730f1e8be4ade5fc588830c"
+    }
+  ],
+  "ui_wiring_verified": true,
+  "bundle_path_hash": "0f8053b6e2dafbdad9eb5bb5b011b88da7efc4ec4eed81f47111e2ced0cdfca9",
+  "bundle_manifest_present": true,
+  "crash_evidence_present": true,
+  "evidence_fingerprint": "5f315bec56b39c46dc099ccca349012d9c220fdeef25aa031cc0013e76df913f"
+}

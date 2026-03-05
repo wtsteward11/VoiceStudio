@@ -235,7 +235,17 @@ namespace VoiceStudio.App.Services
                     }
                 },
                 ServicePriority.Normal);
-            
+
+            // Normal priority: Startup diagnostics (writes startup_diagnostics.json for perf proof)
+            initializer.RegisterAsync(
+                "StartupDiagnostics",
+                async ct =>
+                {
+                    var diagnostics = new StartupDiagnostics();
+                    await diagnostics.RunAllChecksAsync(ct);
+                },
+                ServicePriority.Normal);
+
             return initializer;
         }
     }

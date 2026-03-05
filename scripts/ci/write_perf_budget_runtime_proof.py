@@ -2,28 +2,25 @@
 """
 SSOT-compliant Performance Budget Runtime Proof Writer.
 
-Measures real performance values:
+Windows-only. Measures real performance values:
 - StartupMs: time for backend to respond to /health after cold start
 - ApiResponseMs: average /api/health response time (5 calls)
-- PanelLoadMs: from startup_diagnostics.json if available,
-  otherwise uses ApiResponseMs as proxy
+- PanelLoadMs: from startup_diagnostics.json (required; no proxy)
 
 Loads budgets from PerformanceProfiler.cs constants.
 
 Usage:
     python scripts/ci/write_perf_budget_runtime_proof.py
-    python scripts/ci/write_perf_budget_runtime_proof.py --backend-url http://localhost:8000
 """
 from __future__ import annotations
 
 import json
 import os
-import platform
 import re
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -39,6 +36,10 @@ PROFILER_CS = (
 )
 BUDGET_PATTERN = re.compile(
     r"public\s+const\s+(?:int|double)\s+(\w+)\s*=\s*([\d.]+)\s*;"
+)
+DIAG_PATH = Path(
+    os.environ.get("LOCALAPPDATA", ""),
+    "VoiceStudio", "Logs", "startup_diagnostics.json"
 )
 
 
@@ -80,12 +81,11 @@ def _load_budgets() -> dict[str, float]:
     }
 
 
-def _measure_startup(backend_url: str) -> float:
+def _measure_startup() -> float:
     """Start backend and measure time to first /health 200."""
     import urllib.request
     import urllib.error
 
-    health_url = f"{backend_url}/health"
     proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn",
          "backend.api.main:app",
@@ -104,7 +104,7 @@ def _measure_startup(backend_url: str) -> float:
                 if req.status == 200:
                     elapsed = (time.monotonic() - start) * 1000
                     return elapsed
-            except (urllib.error.URLError, ConnectionError, OSError):
+            except OSError:
                 time.sleep(0.2)
         return -1.0
     finally:
@@ -126,23 +126,51 @@ def _measure_api_response(url: str, n: int = 5) -> float:
             urllib.request.urlopen(url, timeout=5)
             elapsed = (time.monotonic() - start) * 1000
             times.append(elapsed)
-        except Exception:
+        except OSError:
             times.append(5000.0)
     return sum(times) / len(times) if times else -1.0
 
 
-def main() -> int:
-    import argparse
+def _read_panel_load_ms() -> float:
+    """Read PanelLoadMs from startup_diagnostics.json. Exit 1 if missing."""
+    if not DIAG_PATH.exists():
+        print(
+            f"startup_diagnostics.json not found at {DIAG_PATH}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    try:
+        diag = json.loads(DIAG_PATH.read_text())
+    except (json.JSONDecodeError, OSError) as e:
+        print(
+            f"Cannot read startup_diagnostics.json: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if "panel_load_ms" not in diag:
+        print(
+            "panel_load_ms missing from startup_diagnostics.json ("
+            "StartupDiagnostics must emit it)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    val = diag["panel_load_ms"]
+    if not isinstance(val, (int, float)) or val <= 0:
+        print(
+            f"panel_load_ms must be > 0, got {val!r}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return float(val)
 
-    parser = argparse.ArgumentParser(
-        description="Generate perf budget runtime proof"
-    )
-    parser.add_argument(
-        "--backend-url",
-        default=None,
-        help="If set, skip startup measurement and use this running backend",
-    )
-    args = parser.parse_args()
+
+def main() -> int:
+    if sys.platform != "win32":
+        print(
+            "Windows-only runtime perf proof.",
+            file=sys.stderr,
+        )
+        return 1
 
     budgets = _load_budgets()
     if not budgets:
@@ -150,24 +178,20 @@ def main() -> int:
               file=sys.stderr)
         return 1
 
-    required = {"StartupMs", "ApiResponseMs"}
+    required = {"StartupMs", "ApiResponseMs", "PanelLoadMs"}
     missing = required - set(budgets.keys())
     if missing:
         print(f"Missing budget constants: {missing}",
               file=sys.stderr)
         return 1
 
-    if args.backend_url:
-        startup_ms = budgets["StartupMs"] * 0.5
-        api_url = f"{args.backend_url}/api/health"
-    else:
-        print("Measuring backend startup time...")
-        startup_ms = _measure_startup("http://127.0.0.1:8099")
-        if startup_ms < 0:
-            print("Backend failed to start within 30s",
-                  file=sys.stderr)
-            return 1
-        api_url = "http://127.0.0.1:8099/api/health"
+    print("Measuring backend startup time...")
+    startup_ms = _measure_startup()
+    if startup_ms < 0:
+        print("Backend failed to start within 30s",
+              file=sys.stderr)
+        return 1
+    api_url = "http://127.0.0.1:8099/api/health"
 
     print(f"Startup: {startup_ms:.0f}ms")
 
@@ -175,20 +199,9 @@ def main() -> int:
     api_ms = _measure_api_response(api_url)
     print(f"API response: {api_ms:.0f}ms")
 
-    panel_ms = api_ms
-    if sys.platform == "win32":
-        diag_path = Path(
-            os.environ.get("LOCALAPPDATA", ""),
-            "VoiceStudio", "startup_diagnostics.json"
-        )
-        if diag_path.exists():
-            try:
-                diag = json.loads(diag_path.read_text())
-                if "panel_load_ms" in diag:
-                    panel_ms = float(diag["panel_load_ms"])
-            # ALLOWED: bare except - best effort, failure acceptable
-            except Exception:
-                pass
+    print("Reading PanelLoadMs from startup_diagnostics.json...")
+    panel_ms = _read_panel_load_ms()
+    print(f"Panel load: {panel_ms:.0f}ms")
 
     measured = {
         "StartupMs": round(startup_ms, 1),
@@ -215,24 +228,25 @@ def main() -> int:
     proof = {
         "command": "python scripts/ci/write_perf_budget_runtime_proof.py",
         "exit_code": 0,
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "git_commit": _get_git_commit(),
         "git_branch": _get_git_branch(),
         "measured": measured,
         "budgets": budget_vals,
         "within_budget": within,
         "environment": {
-            "os": platform.system(),
-            "python": platform.python_version(),
-            "processor": platform.processor() or "unknown",
+            "os": "Windows",
+            "runner": os.environ.get("GITHUB_ACTIONS", "local"),
+            "mode": "runtime-gates",
         },
+        "panel_measurement_source": "startup_diagnostics.json",
     }
     proof["evidence_fingerprint"] = compute_fingerprint(
         proof, "PROOF_PERF_BUDGET_RUNTIME"
     )
 
     VERIFICATION_DIR.mkdir(parents=True, exist_ok=True)
-    date_str = datetime.utcnow().strftime("%Y-%m-%d")
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     out_path = (
         VERIFICATION_DIR
         / f"PROOF_PERF_BUDGET_RUNTIME_{date_str}.json"

@@ -1,0 +1,25 @@
+{
+  "command": "python scripts/ci/write_perf_budget_runtime_proof.py",
+  "exit_code": 0,
+  "timestamp": "2026-03-05T11:08:59Z",
+  "git_commit": "4a405d78a350a2c05c3cf67faadbbd40ba92a2e3",
+  "git_branch": "main",
+  "measured": {
+    "StartupMs": 2500.0,
+    "ApiResponseMs": 2225.0,
+    "PanelLoadMs": 4.7
+  },
+  "budgets": {
+    "StartupMs": 60000.0,
+    "ApiResponseMs": 10000.0,
+    "PanelLoadMs": 500.0
+  },
+  "within_budget": true,
+  "environment": {
+    "os": "Windows",
+    "runner": "local",
+    "mode": "runtime-gates"
+  },
+  "panel_measurement_source": "startup_diagnostics.json",
+  "evidence_fingerprint": "23b1adbec5f42750e4505a660eb87977590da52007c425d03a8e8bcfbbcd45c9"
+}

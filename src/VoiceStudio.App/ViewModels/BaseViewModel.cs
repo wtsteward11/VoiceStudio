@@ -2,13 +2,12 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using CommunityToolkit.Mvvm.ComponentModel;
+using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Utilities;
 using VoiceStudio.Core.Exceptions;
-using VoiceStudio.Core.Services;
 using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.ViewModels
@@ -20,7 +19,7 @@ namespace VoiceStudio.App.ViewModels
   public abstract class BaseViewModel : ObservableObject, IDisposable
   {
     protected ILogger Logger { get; }
-    protected DispatcherQueue Dispatcher { get; }
+    protected IDispatcher Dispatcher { get; }
 
     protected IErrorLoggingService? ErrorLoggingService { get; }
     protected IErrorDialogService? ErrorDialogService { get; }
@@ -81,7 +80,7 @@ namespace VoiceStudio.App.ViewModels
       if (context == null) throw new ArgumentNullException(nameof(context));
 
       Logger = context.Logger ?? throw new ArgumentNullException(nameof(context.Logger));
-      Dispatcher = context.DispatcherQueue as DispatcherQueue ?? throw new ArgumentNullException(nameof(context.DispatcherQueue));
+      Dispatcher = context.Dispatcher ?? throw new ArgumentNullException(nameof(context.Dispatcher));
 
       ErrorLoggingService = errorLoggingService;
       ErrorDialogService = errorDialogService;

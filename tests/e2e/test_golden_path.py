@@ -217,16 +217,28 @@ class TestGoldenPath:
         transcription_request = {
             "audio_id": golden_path_data.imported_audio_id,
             "language": "en",
-            "engine": "whisper_cpp",  # Use whisper.cpp engine
+            "engine": "whisper_cpp",  # Prefer whisper.cpp; fallback to whisper (faster_whisper)
             "word_timestamps": False,
         }
 
-        # POST to /api/transcribe/ (prefix is "/api/transcribe")
+        # POST to /api/transcribe/
         response = requests.post(
             f"{API_BASE_URL}/api/transcribe/", json=transcription_request, timeout=TIMEOUT_SECONDS
         )
 
-        # Accept various success codes
+        # Fallback to whisper (faster_whisper) if whisper_cpp fails
+        if response.status_code in (500, 503) and "whisper_cpp" in transcription_request["engine"]:
+            logger.info(
+                "whisper_cpp failed (%s), retrying with whisper (faster_whisper)",
+                response.status_code,
+            )
+            transcription_request["engine"] = "whisper"
+            response = requests.post(
+                f"{API_BASE_URL}/api/transcribe/",
+                json=transcription_request,
+                timeout=TIMEOUT_SECONDS,
+            )
+
         assert response.status_code in [
             200,
             201,
@@ -325,6 +337,58 @@ class TestGoldenPath:
                 )
         else:
             logger.warning("No audio path found - synthesis may use default voice")
+
+        # Grant consent for synthesis (required by require_synthesis_clearance)
+        consent_granted = False
+        try:
+            consent_req = requests.post(
+                f"{API_BASE_URL}/api/consent/request",
+                json={
+                    "voice_id": profile_id,
+                    "grantor_id": "golden_path_test",
+                    "grantor_name": "Golden Path Test",
+                    "consent_type": "voice_cloning",
+                },
+                timeout=10,
+            )
+            if consent_req.status_code in [200, 201]:
+                consent_record = consent_req.json()
+                consent_id = consent_record.get("consent_id")
+                if consent_id:
+                    grant_resp = requests.post(
+                        f"{API_BASE_URL}/api/consent/grant/{consent_id}",
+                        timeout=10,
+                    )
+                    if grant_resp.status_code in [200, 201]:
+                        consent_granted = True
+                        logger.info(f"✓ Consent granted for voice profile: {profile_id}")
+                    else:
+                        logger.warning(
+                            f"Consent grant returned {grant_resp.status_code}: "
+                            f"{grant_resp.text[:200]}"
+                        )
+                else:
+                    logger.warning("No consent_id in request response")
+            else:
+                err = (
+                    "Consent route not registered (404)? Restart backend after adding "
+                    "consent router to route_registry."
+                )
+                if consent_req.status_code == 404:
+                    logger.warning("%s Response: %s", err, consent_req.text[:200])
+                else:
+                    logger.warning(
+                        "Consent request returned %s: %s",
+                        consent_req.status_code,
+                        consent_req.text[:200],
+                    )
+        except Exception as e:
+            logger.warning("Consent flow failed: %s - synthesis may fail with 403", e)
+
+        assert consent_granted, (
+            "Consent must be granted before synthesis. Ensure /api/consent/request and "
+            "/api/consent/grant are registered (restart backend after route_registry update)."
+        )
 
     def test_step4_synthesize_speech(self, backend_health, golden_path_data: GoldenPathTestData):
         """

@@ -88,6 +88,18 @@ $info = @{
 }
 $info | ConvertTo-Json | Out-File (Join-Path $bundleDir "system_info.json") -Encoding utf8
 
+# BUNDLE_MANIFEST.json: relative paths only, no sensitive data
+$manifestFiles = @()
+Get-ChildItem $bundleDir -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
+    $rel = $_.FullName.Substring($bundleDir.Length).TrimStart('\', '/')
+    $manifestFiles += @{ path = $rel; bytes = $_.Length }
+}
+@{
+    version = "1.0"
+    timestamp = $timestamp
+    included_files = $manifestFiles
+} | ConvertTo-Json -Depth 3 | Out-File (Join-Path $bundleDir "BUNDLE_MANIFEST.json") -Encoding utf8
+
 $zipPath = Join-Path $OutputDir "voicestudio-support-$timestamp.zip"
 Compress-Archive -Path "$bundleDir\*" -DestinationPath $zipPath -Force
 

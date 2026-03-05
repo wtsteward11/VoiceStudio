@@ -90,6 +90,7 @@ EVIDENCE_FIELDS: dict[str, list[str]] = {
         "budgets",
         "within_budget",
         "environment",
+        "panel_measurement_source",
     ],
     "PROOF_GOLDEN_PATH_STUB": [
         "command",

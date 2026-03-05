@@ -46,7 +46,7 @@
     ],
     "PROOF_PERF_BUDGET_RUNTIME": [
       "command", "exit_code", "measured", "budgets",
-      "within_budget", "environment"
+      "within_budget", "environment", "panel_measurement_source"
     ],
     "PROOF_GOLDEN_PATH_STUB": [
       "command", "exit_code", "engine_mode", "checks",
@@ -123,7 +123,8 @@
     },
     "PROOF_PERF_BUDGET_RUNTIME": {
       "required": [
-        "measured", "budgets", "within_budget", "environment"
+        "measured", "budgets", "within_budget", "environment",
+        "panel_measurement_source"
       ]
     },
     "PROOF_GOLDEN_PATH_STUB": {
@@ -203,7 +204,10 @@
     },
     "PROOF_PERF_BUDGET_RUNTIME": {
       "within_budget_must_be_true": true,
-      "measured_values_positive": true
+      "measured_values_positive": true,
+      "environment_os_must_be_windows": true,
+      "panel_measurement_source_required": true,
+      "all_measured_within_budget": true
     },
     "PROOF_GOLDEN_PATH_STUB": {
       "passed_must_be_true": true,

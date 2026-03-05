@@ -426,6 +426,20 @@ def validate_nested_semantics(
             errors.append(
                 f"{_rel(path)}: within_budget must be true"
             )
+        env = data.get("environment")
+        if not isinstance(env, dict) or env.get("os") != "Windows":
+            errors.append(
+                f"{_rel(path)}: environment.os must be 'Windows'"
+            )
+        if isinstance(env, dict) and not (env.get("runner") or "").strip():
+            errors.append(
+                f"{_rel(path)}: environment.runner must be non-empty"
+            )
+        pms = data.get("panel_measurement_source", "")
+        if not isinstance(pms, str) or not pms.strip():
+            errors.append(
+                f"{_rel(path)}: panel_measurement_source must be non-empty"
+            )
         measured = data.get("measured")
         budgets = data.get("budgets")
         if not isinstance(measured, dict) or not isinstance(budgets, dict):
@@ -433,7 +447,7 @@ def validate_nested_semantics(
                 f"{_rel(path)}: measured and budgets must be objects"
             )
         else:
-            for key in ("StartupMs", "ApiResponseMs"):
+            for key in ("StartupMs", "ApiResponseMs", "PanelLoadMs"):
                 mv = measured.get(key)
                 bv = budgets.get(key)
                 if not isinstance(mv, (int, float)) or mv <= 0:

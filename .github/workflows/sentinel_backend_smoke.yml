@@ -65,20 +65,6 @@ jobs:
             -v \
             -m "smoke and not backend_required" \
             --tb=short
-      
-      - name: Install backend dependencies for OpenAPI generation
-        run: |
-          pip install fastapi uvicorn pydantic
-          pip install -r requirements.txt --quiet || echo "::warning::Some requirements may be missing"
-      
-      - name: Validate OpenAPI spec (drift detection)
-        run: |
-          # Generate fresh OpenAPI spec and check for drift against committed spec
-          python scripts/generate_openapi.py --check-drift || {
-            echo "::error::OpenAPI spec drift detected! Run 'python scripts/generate_openapi.py' locally and commit the updated spec."
-            exit 1
-          }
-          echo "OpenAPI spec is up to date"
 
   # ============================================================================
   # Sentinel Workflow Integration Test

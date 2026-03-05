@@ -706,20 +706,34 @@ def validate_proof(
         )
 
     # Semantic: git_commit matches HEAD (unless historical_proof or --no-git-match)
+    # PROOF_GOLDEN_PATH_REAL: allow HEAD or HEAD~1 (proof attests to test-run commit; proof commit is child)
     if not no_git_match and not data.get("historical_proof"):
         try:
-            result = subprocess.run(
+            head_result = subprocess.run(
                 ["git", "rev-parse", "HEAD"],
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
                 timeout=5,
             )
-            head = result.stdout.strip() if result.returncode == 0 else ""
-            if head and gc and gc.lower() != head.lower():
-                errors.append(
-                    f"{_rel(path)}: git_commit {gc[:8]}... does not match HEAD {head[:8]}..."
-                )
+            head = head_result.stdout.strip() if head_result.returncode == 0 else ""
+            if head and gc:
+                allowed = [head.lower()]
+                if proof_type == "PROOF_GOLDEN_PATH_REAL":
+                    for n in (1, 2):
+                        parent = subprocess.run(
+                            ["git", "rev-parse", f"HEAD~{n}"],
+                            cwd=ROOT,
+                            capture_output=True,
+                            text=True,
+                            timeout=5,
+                        )
+                        if parent.returncode == 0 and parent.stdout.strip():
+                            allowed.append(parent.stdout.strip().lower())
+                if gc.lower() not in allowed:
+                    errors.append(
+                        f"{_rel(path)}: git_commit {gc[:8]}... does not match HEAD {head[:8]}..."
+                    )
         except (subprocess.TimeoutExpired, FileNotFoundError):
             pass  # Skip if git unavailable
 

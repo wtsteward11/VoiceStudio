@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -22,6 +23,12 @@ namespace VoiceStudio.App.Services
   {
     private static IServiceProvider? _provider;
     private static ToastNotificationService? _toastOverride;
+
+    /// <summary>
+    /// Elapsed milliseconds for PanelRegistry initialization (RegisterAllPanels).
+    /// Used by StartupDiagnostics for panel_load_ms in startup_diagnostics.json.
+    /// </summary>
+    public static double PanelRegistrationMs { get; private set; }
 
     /// <summary>
     /// Sets the root service provider (e.g. from a built ServiceCollection).
@@ -222,6 +229,7 @@ namespace VoiceStudio.App.Services
     /// </summary>
     private static void RegisterAllPanels()
     {
+      var sw = Stopwatch.StartNew();
       var registry = GetPanelRegistry();
 
       // Register advanced panels (TextSpeechEditor, Prosody, SpatialAudio, etc.)
@@ -230,8 +238,10 @@ namespace VoiceStudio.App.Services
       // Register core panels - these were previously hardcoded in MainWindow
       CorePanelRegistrationService.RegisterCorePanels(registry);
 
-      System.Diagnostics.Debug.WriteLine(
-        $"[AppServices] Registered {registry.GetAllDescriptors().Count()} panels in PanelRegistry");
+      sw.Stop();
+      PanelRegistrationMs = sw.Elapsed.TotalMilliseconds;
+      Debug.WriteLine(
+        $"[AppServices] Registered {registry.GetAllDescriptors().Count()} panels in PanelRegistry in {PanelRegistrationMs:F1}ms");
     }
 
     /// <summary>

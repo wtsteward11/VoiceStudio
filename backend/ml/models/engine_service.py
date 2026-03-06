@@ -423,6 +423,11 @@ class EngineService(IEngineService):
         except Exception:
             return {}
 
+    def get_engine_router(self):
+        """Get the engine router for direct access."""
+        self._ensure_engines_loaded()
+        return self._engine_router
+
 
 # Singleton instance for dependency injection
 _engine_service_instance: Optional[EngineService] = None

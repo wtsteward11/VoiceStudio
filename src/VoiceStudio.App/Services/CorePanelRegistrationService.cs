@@ -27,7 +27,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Voice Synthesis",
         Region = PanelRegion.Center,
         ViewType = typeof(VoiceSynthesisView),
-        ViewModelType = typeof(VoiceSynthesisViewModel)
+        ViewModelType = typeof(VoiceSynthesisViewModel),
+        MenuCategory = "Voice",
+        Maturity = PanelMaturity.Stable
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -36,7 +38,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Ensemble Synthesis",
         Region = PanelRegion.Center,
         ViewType = typeof(EnsembleSynthesisView),
-        ViewModelType = typeof(EnsembleSynthesisViewModel)
+        ViewModelType = typeof(EnsembleSynthesisViewModel),
+        MenuCategory = "Voice",
+        Maturity = PanelMaturity.Beta
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -45,7 +49,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Batch Processing",
         Region = PanelRegion.Center,
         ViewType = typeof(BatchProcessingView),
-        ViewModelType = typeof(BatchProcessingViewModel)
+        ViewModelType = typeof(BatchProcessingViewModel),
+        MenuCategory = "Automation",
+        Maturity = PanelMaturity.Stable
       });
 
       // Training panels
@@ -55,7 +61,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Training Dataset Editor",
         Region = PanelRegion.Center,
         ViewType = typeof(TrainingDatasetEditorView),
-        ViewModelType = typeof(TrainingDatasetEditorViewModel)
+        ViewModelType = typeof(TrainingDatasetEditorViewModel),
+        MenuCategory = "Training",
+        Maturity = PanelMaturity.Beta
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -64,7 +72,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Model Manager",
         Region = PanelRegion.Center,
         ViewType = typeof(ModelManagerView),
-        ViewModelType = typeof(ModelManagerViewModel)
+        ViewModelType = typeof(ModelManagerViewModel),
+        MenuCategory = "Training",
+        Maturity = PanelMaturity.Beta
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -73,7 +83,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Training",
         Region = PanelRegion.Left,
         ViewType = typeof(TrainingView),
-        ViewModelType = typeof(TrainingViewModel)
+        ViewModelType = typeof(TrainingViewModel),
+        MenuCategory = "Training",
+        Maturity = PanelMaturity.Stable
       });
 
       // Audio processing panels
@@ -83,16 +95,20 @@ namespace VoiceStudio.App.Services
         DisplayName = "Transcribe",
         Region = PanelRegion.Center,
         ViewType = typeof(TranscribeView),
-        ViewModelType = typeof(TranscribeViewModel)
+        ViewModelType = typeof(TranscribeViewModel),
+        MenuCategory = "Audio",
+        Maturity = PanelMaturity.Stable
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
         PanelId = "Recording",
         DisplayName = "Recording",
-        Region = PanelRegion.Center,
+        Region = PanelRegion.Right,
         ViewType = typeof(RecordingView),
-        ViewModelType = typeof(RecordingViewModel)
+        ViewModelType = typeof(RecordingViewModel),
+        MenuCategory = "Audio",
+        Maturity = PanelMaturity.Stable
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -101,7 +117,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Audio Analysis",
         Region = PanelRegion.Center,
         ViewType = typeof(AudioAnalysisView),
-        ViewModelType = typeof(AudioAnalysisViewModel)
+        ViewModelType = typeof(AudioAnalysisViewModel),
+        MenuCategory = "Audio",
+        Maturity = PanelMaturity.Stable
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -110,7 +128,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Quality Control",
         Region = PanelRegion.Right,
         ViewType = typeof(QualityControlView),
-        ViewModelType = typeof(QualityControlViewModel)
+        ViewModelType = typeof(QualityControlViewModel),
+        MenuCategory = "Analysis",
+        Maturity = PanelMaturity.Stable
       });
 
       // Navigation panels
@@ -120,7 +140,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Timeline",
         Region = PanelRegion.Center,
         ViewType = typeof(TimelineView),
-        ViewModelType = typeof(TimelineViewModel)
+        ViewModelType = typeof(TimelineViewModel),
+        MenuCategory = "Editing",
+        Maturity = PanelMaturity.Stable
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -129,7 +151,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Profiles",
         Region = PanelRegion.Left,
         ViewType = typeof(ProfilesView),
-        ViewModelType = typeof(ProfilesViewModel)
+        ViewModelType = typeof(ProfilesViewModel),
+        MenuCategory = "Management",
+        Maturity = PanelMaturity.Stable
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -138,7 +162,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Library",
         Region = PanelRegion.Left,
         ViewType = typeof(LibraryView),
-        ViewModelType = typeof(LibraryViewModel)
+        ViewModelType = typeof(LibraryViewModel),
+        MenuCategory = "Management",
+        Maturity = PanelMaturity.Stable
       });
 
       // Effect panels
@@ -148,7 +174,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Effects Mixer",
         Region = PanelRegion.Right,
         ViewType = typeof(EffectsMixerView),
-        ViewModelType = typeof(EffectsMixerViewModel)
+        ViewModelType = typeof(EffectsMixerViewModel),
+        MenuCategory = "Audio",
+        Maturity = PanelMaturity.Stable
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -157,7 +185,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Analyzer",
         Region = PanelRegion.Right,
         ViewType = typeof(AnalyzerView),
-        ViewModelType = typeof(AnalyzerViewModel)
+        ViewModelType = typeof(AnalyzerViewModel),
+        MenuCategory = "Analysis",
+        Maturity = PanelMaturity.Stable
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -166,7 +196,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Voice Morph",
         Region = PanelRegion.Center,
         ViewType = typeof(VoiceMorphView),
-        ViewModelType = typeof(VoiceMorphViewModel)
+        ViewModelType = typeof(VoiceMorphViewModel),
+        MenuCategory = "Voice",
+        Maturity = PanelMaturity.Experimental
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -175,7 +207,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Emotion Control",
         Region = PanelRegion.Right,
         ViewType = typeof(EmotionControlView),
-        ViewModelType = typeof(EmotionControlViewModel)
+        ViewModelType = typeof(EmotionControlViewModel),
+        MenuCategory = "Voice",
+        Maturity = PanelMaturity.Beta
       });
 
       // Utility panels
@@ -185,7 +219,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Diagnostics",
         Region = PanelRegion.Bottom,
         ViewType = typeof(DiagnosticsView),
-        ViewModelType = typeof(DiagnosticsViewModel)
+        ViewModelType = typeof(DiagnosticsViewModel),
+        MenuCategory = "System",
+        Maturity = PanelMaturity.Stable
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -194,7 +230,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Settings",
         Region = PanelRegion.Right,
         ViewType = typeof(SettingsView),
-        ViewModelType = typeof(SettingsViewModel)
+        ViewModelType = typeof(SettingsViewModel),
+        MenuCategory = "System",
+        Maturity = PanelMaturity.Stable
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -203,7 +241,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Help",
         Region = PanelRegion.Right,
         ViewType = typeof(HelpView),
-        ViewModelType = typeof(HelpViewModel)
+        ViewModelType = typeof(HelpViewModel),
+        MenuCategory = "System",
+        Maturity = PanelMaturity.Stable
       });
 
       // Advanced panels
@@ -213,7 +253,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "SSML Control",
         Region = PanelRegion.Right,
         ViewType = typeof(SSMLControlView),
-        ViewModelType = typeof(SSMLControlViewModel)
+        ViewModelType = typeof(SSMLControlViewModel),
+        MenuCategory = "Editing",
+        Maturity = PanelMaturity.Beta
       });
 
       // Voice cloning panels
@@ -223,7 +265,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Quick Clone",
         Region = PanelRegion.Center,
         ViewType = typeof(VoiceQuickCloneView),
-        ViewModelType = typeof(VoiceQuickCloneViewModel)
+        ViewModelType = typeof(VoiceQuickCloneViewModel),
+        MenuCategory = "Voice",
+        Maturity = PanelMaturity.Beta
       });
 
       // Quality panels
@@ -233,7 +277,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Quality Dashboard",
         Region = PanelRegion.Center,
         ViewType = typeof(QualityDashboardView),
-        ViewModelType = typeof(QualityDashboardViewModel)
+        ViewModelType = typeof(QualityDashboardViewModel),
+        MenuCategory = "Analysis",
+        Maturity = PanelMaturity.Beta
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -242,7 +288,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Quality Benchmark",
         Region = PanelRegion.Center,
         ViewType = typeof(QualityBenchmarkView),
-        ViewModelType = typeof(QualityBenchmarkViewModel)
+        ViewModelType = typeof(QualityBenchmarkViewModel),
+        MenuCategory = "Analysis",
+        Maturity = PanelMaturity.Beta
       });
 
       // Image/Video panels
@@ -252,7 +300,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Image Generation",
         Region = PanelRegion.Center,
         ViewType = typeof(ImageGenView),
-        ViewModelType = typeof(ImageGenViewModel)
+        ViewModelType = typeof(ImageGenViewModel),
+        MenuCategory = "Media",
+        Maturity = PanelMaturity.Experimental
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -261,7 +311,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Video Generation",
         Region = PanelRegion.Center,
         ViewType = typeof(VideoGenView),
-        ViewModelType = typeof(VideoGenViewModel)
+        ViewModelType = typeof(VideoGenViewModel),
+        MenuCategory = "Media",
+        Maturity = PanelMaturity.Experimental
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -270,7 +322,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Deepfake Creator",
         Region = PanelRegion.Center,
         ViewType = typeof(DeepfakeCreatorView),
-        ViewModelType = typeof(DeepfakeCreatorViewModel)
+        ViewModelType = typeof(DeepfakeCreatorViewModel),
+        MenuCategory = "Media",
+        Maturity = PanelMaturity.Experimental
       });
 
       // Script/Scene panels
@@ -280,7 +334,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Dataset QA",
         Region = PanelRegion.Center,
         ViewType = typeof(DatasetQAView),
-        ViewModelType = typeof(DatasetQAViewModel)
+        ViewModelType = typeof(DatasetQAViewModel),
+        MenuCategory = "Training",
+        Maturity = PanelMaturity.Beta
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -289,7 +345,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Script Editor",
         Region = PanelRegion.Center,
         ViewType = typeof(ScriptEditorView),
-        ViewModelType = typeof(ScriptEditorViewModel)
+        ViewModelType = typeof(ScriptEditorViewModel),
+        MenuCategory = "Editing",
+        Maturity = PanelMaturity.Stable
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -298,7 +356,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Scene Builder",
         Region = PanelRegion.Center,
         ViewType = typeof(SceneBuilderView),
-        ViewModelType = typeof(SceneBuilderViewModel)
+        ViewModelType = typeof(SceneBuilderViewModel),
+        MenuCategory = "Editing",
+        Maturity = PanelMaturity.Beta
       });
 
       // Automation panels
@@ -306,9 +366,11 @@ namespace VoiceStudio.App.Services
       {
         PanelId = "Macro",
         DisplayName = "Macro",
-        Region = PanelRegion.Center,
+        Region = PanelRegion.Bottom,
         ViewType = typeof(MacroView),
-        ViewModelType = typeof(MacroViewModel)
+        ViewModelType = typeof(MacroViewModel),
+        MenuCategory = "Automation",
+        Maturity = PanelMaturity.Stable
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -317,7 +379,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Workflow Automation",
         Region = PanelRegion.Center,
         ViewType = typeof(WorkflowAutomationView),
-        ViewModelType = typeof(WorkflowAutomationViewModel)
+        ViewModelType = typeof(WorkflowAutomationViewModel),
+        MenuCategory = "Automation",
+        Maturity = PanelMaturity.Stable
       });
 
       // Settings panels
@@ -327,7 +391,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Advanced Settings",
         Region = PanelRegion.Right,
         ViewType = typeof(AdvancedSettingsView),
-        ViewModelType = typeof(AdvancedSettingsViewModel)
+        ViewModelType = typeof(AdvancedSettingsViewModel),
+        MenuCategory = "System",
+        Maturity = PanelMaturity.Beta
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -336,7 +402,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "API Key Manager",
         Region = PanelRegion.Right,
         ViewType = typeof(APIKeyManagerView),
-        ViewModelType = typeof(APIKeyManagerViewModel)
+        ViewModelType = typeof(APIKeyManagerViewModel),
+        MenuCategory = "System",
+        Maturity = PanelMaturity.Beta
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -345,7 +413,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "GPU Status",
         Region = PanelRegion.Right,
         ViewType = typeof(GPUStatusView),
-        ViewModelType = typeof(GPUStatusViewModel)
+        ViewModelType = typeof(GPUStatusViewModel),
+        MenuCategory = "System",
+        Maturity = PanelMaturity.Beta
       });
 
       // Todo panel
@@ -355,7 +425,9 @@ namespace VoiceStudio.App.Services
         DisplayName = "Todo Panel",
         Region = PanelRegion.Right,
         ViewType = typeof(TodoPanelView),
-        ViewModelType = typeof(TodoPanelViewModel)
+        ViewModelType = typeof(TodoPanelViewModel),
+        MenuCategory = "System",
+        Maturity = PanelMaturity.Stable
       });
     }
 

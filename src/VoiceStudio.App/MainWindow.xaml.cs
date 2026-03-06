@@ -176,64 +176,7 @@ namespace VoiceStudio.App
     /// </summary>
     private readonly Dictionary<string, (PanelRegion DefaultRegion, string Title, Func<UserControl> Factory)> _legacyPanelRegistry = new(StringComparer.OrdinalIgnoreCase)
     {
-      // Core synthesis panels
-      ["VoiceSynthesis"] = (PanelRegion.Center, "Voice Synthesis", () => new VoiceSynthesisView()),
-      ["EnsembleSynthesis"] = (PanelRegion.Center, "Ensemble Synthesis", () => new EnsembleSynthesisView()),
-      ["BatchProcessing"] = (PanelRegion.Center, "Batch Processing", () => new BatchProcessingView()),
-      ["TextSpeechEditor"] = (PanelRegion.Center, "Text Speech Editor", () => new TextSpeechEditorView()),
-      // Training panels
-      ["TrainingDatasetEditor"] = (PanelRegion.Center, "Training Dataset Editor", () => new TrainingDatasetEditorView()),
-      ["ModelManager"] = (PanelRegion.Center, "Model Manager", () => new ModelManagerView()),
-      ["Training"] = (PanelRegion.Left, "Training", () => new TrainingView()),
-      // Audio processing panels
-      ["Transcribe"] = (PanelRegion.Center, "Transcribe", () => new TranscribeView()),
-      ["Recording"] = (PanelRegion.Center, "Recording", () => new RecordingView()),
-      ["AudioAnalysis"] = (PanelRegion.Center, "Audio Analysis", () => new AudioAnalysisView()),
-      ["QualityControl"] = (PanelRegion.Right, "Quality Control", () => new QualityControlView()),
-      // Navigation panels
-      ["Timeline"] = (PanelRegion.Center, "Timeline", () => new TimelineView()),
-      ["Profiles"] = (PanelRegion.Left, "Profiles", () => new ProfilesView()),
-      ["Library"] = (PanelRegion.Left, "Library", () => new LibraryView()),
-      // Effect panels
-      ["EffectsMixer"] = (PanelRegion.Right, "Effects Mixer", () => new EffectsMixerView()),
-      ["Analyzer"] = (PanelRegion.Right, "Analyzer", () => new AnalyzerView()),
-      ["VoiceMorph"] = (PanelRegion.Center, "Voice Morph", () => new VoiceMorphView()),
-      ["Prosody"] = (PanelRegion.Right, "Prosody", () => new ProsodyView()),
-      ["EmotionControl"] = (PanelRegion.Right, "Emotion Control", () => new EmotionControlView()),
-      // Utility panels
-      ["Diagnostics"] = (PanelRegion.Bottom, "Diagnostics", () => new DiagnosticsView()),
-      ["Settings"] = (PanelRegion.Right, "Settings", () => new SettingsView()),
-      ["Help"] = (PanelRegion.Right, "Help", () => new HelpView()),
-      // Advanced panels
-      ["SSMLControl"] = (PanelRegion.Right, "SSML Control", () => new SSMLControlView()),
-      // Appearance panels
-      ["ThemeEditor"] = (PanelRegion.Right, "Theme Editor", () => new ThemeEditorView()),
-      // Voice cloning panels
-      ["VoiceQuickClone"] = (PanelRegion.Center, "Quick Clone", () => new VoiceQuickCloneView()),
-      ["VoiceMorphingBlending"] = (PanelRegion.Center, "Voice Morphing & Blending", () => new VoiceMorphingBlendingView()),
-      // Audio processing panels
-      ["SpatialAudio"] = (PanelRegion.Center, "Spatial Audio", () => new SpatialAudioView()),
-      ["AIMixingMastering"] = (PanelRegion.Center, "AI Mixing & Mastering", () => new AIMixingMasteringView()),
-      // Quality panels
-      ["QualityDashboard"] = (PanelRegion.Center, "Quality Dashboard", () => new QualityDashboardView()),
-      ["QualityBenchmark"] = (PanelRegion.Center, "Quality Benchmark", () => new QualityBenchmarkView()),
-      // Image/Video panels
-      ["ImageGen"] = (PanelRegion.Center, "Image Generation", () => new ImageGenView()),
-      ["VideoGen"] = (PanelRegion.Center, "Video Generation", () => new VideoGenView()),
-      ["DeepfakeCreator"] = (PanelRegion.Center, "Deepfake Creator", () => new DeepfakeCreatorView()),
-      // Script/Scene panels
-      ["DatasetQA"] = (PanelRegion.Center, "Dataset QA", () => new DatasetQAView()),
-      ["ScriptEditor"] = (PanelRegion.Center, "Script Editor", () => new ScriptEditorView()),
-      ["SceneBuilder"] = (PanelRegion.Center, "Scene Builder", () => new SceneBuilderView()),
-      // Automation panels
-      ["Macro"] = (PanelRegion.Center, "Macro", () => new MacroView()),
-      ["WorkflowAutomation"] = (PanelRegion.Center, "Workflow Automation", () => new WorkflowAutomationView()),
-      // Settings panels
-      ["AdvancedSettings"] = (PanelRegion.Right, "Advanced Settings", () => new AdvancedSettingsView()),
-      ["APIKeyManager"] = (PanelRegion.Right, "API Key Manager", () => new APIKeyManagerView()),
-      ["GPUStatus"] = (PanelRegion.Right, "GPU Status", () => new GPUStatusView()),
-      // Todo panel
-      ["TodoPanel"] = (PanelRegion.Right, "Todo Panel", () => new TodoPanelView()),
+      // Toggle panel only — all other panels promoted to Core/Advanced/Module registration
       ["MiniTimeline"] = (PanelRegion.Bottom, "Mini Timeline", () => new MiniTimelineView()),
     };
 
@@ -436,7 +379,7 @@ namespace VoiceStudio.App
         // Default to MacroView (MiniTimeline can be toggled via View menu - IDEA 6)
         if (bottomPanelHost != null)
         {
-          OpenPanelById("Macro", PanelRegion.Bottom);
+          OpenPanelById("Macro");
           SetPanelHostMeta(bottomPanelHost, "Macros", "⚡");
         }
         profiler.Checkpoint("MacroView Created (Default)");
@@ -795,7 +738,7 @@ namespace VoiceStudio.App
 
         // Audio processing panels (4 steps)
         ("PanelTranscribe", () => AssertPanelOpened("Transcribe", PanelRegion.Center)),
-        ("PanelRecording", () => AssertPanelOpened("Recording", PanelRegion.Center)),
+        ("PanelRecording", () => AssertPanelOpened("Recording", PanelRegion.Right)),
         ("PanelAudioAnalysis", () => AssertPanelOpened("AudioAnalysis", PanelRegion.Center)),
         ("PanelQualityControl", () => AssertPanelOpened("QualityControl", PanelRegion.Right)),
 
@@ -1987,7 +1930,7 @@ namespace VoiceStudio.App
         }
         else
         {
-          OpenPanelById("Macro", PanelRegion.Bottom);
+          OpenPanelById("Macro");
           SetPanelHostMeta(bottomPanelHost, "Macros", "⚡");
         }
       }
@@ -2949,7 +2892,7 @@ namespace VoiceStudio.App
         var recordingView = rightPanelHost.Content as RecordingView;
         if (recordingView == null)
         {
-          OpenPanelById("Recording", PanelRegion.Right);
+          OpenPanelById("Recording");
           recordingView = rightPanelHost.Content as RecordingView;
         }
 

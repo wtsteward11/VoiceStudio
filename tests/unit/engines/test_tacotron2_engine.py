@@ -127,11 +127,13 @@ class TestTacotron2EngineWithMocks:
         assert info["engine_id"] == "tacotron2"
 
     def test_health_check_false_when_not_initialized(self):
-        """health_check should return False when not initialized."""
+        """health_check should return healthy=False when not initialized."""
         from app.core.engines.tacotron2_engine import Tacotron2Engine
 
         engine = Tacotron2Engine()
-        assert engine.health_check() is False
+        result = engine.health_check()
+        assert result["healthy"] is False
+        assert result["engine"] == "tacotron2"
 
     def test_get_health_details_structure(self):
         """get_health_details should return proper structure."""

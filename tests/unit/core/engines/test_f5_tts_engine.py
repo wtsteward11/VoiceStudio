@@ -88,18 +88,13 @@ class TestF5TTSEngineCaching:
         if hasattr(f5_tts_engine, "F5TTSEngine"):
             engine = f5_tts_engine.F5TTSEngine(device="cpu", gpu=False)
             # Check initial state (should be True by default)
-            assert engine.enable_caching is True, "Caching should be enabled by default"
+            assert engine._caching_enabled is True, "Caching should be enabled by default"
             # Test that enable_caching method exists and can be called
             assert hasattr(engine, "enable_caching"), "enable_caching should exist"
-            # The method sets self.enable_caching, so after calling it becomes a property
-            # We test that the method exists and the property can be accessed
-            enable_caching_method = engine.enable_caching
-            if callable(enable_caching_method):
-                # Call the method to disable caching
-                enable_caching_method(False)
-                # After calling, enable_caching becomes a boolean property
-                # Verify it was set correctly by checking the attribute directly
-                assert hasattr(engine, "enable_caching"), "enable_caching should still exist"
+            assert callable(engine.enable_caching), "enable_caching should be callable"
+            # Call the method to disable caching
+            engine.enable_caching(False)
+            assert engine._caching_enabled is False, "Caching should be disabled after call"
 
 
 class TestF5TTSEngineBatchProcessing:

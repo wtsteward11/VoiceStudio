@@ -239,7 +239,7 @@ These are useful historical records, but they are not runtime feature truth.
 14. Eliminate `unknown` engine manifest taxonomy entries.
 15. Build engine viability matrix: manifest/import/health/smoke synthesis.
 16. Expand plugin catalog beyond 3, or shrink category taxonomy to match reality.
-17. Replace stub golden-path proof with real-engine proof artifact.
+17. [x] Replace stub golden-path proof with real-engine proof artifact.
 18. Formalize lifecycle policy for baseline/feb13/golden/integration roots.
 19. Purge or relocate non-canonical staging and contaminated harvest outputs.
 20. Add weekly release-readiness report (verify, gates, drift, doc freshness).

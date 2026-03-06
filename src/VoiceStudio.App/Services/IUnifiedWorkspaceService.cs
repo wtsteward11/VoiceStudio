@@ -73,6 +73,16 @@ public interface IUnifiedWorkspaceService
     void SaveRegionState(PanelRegion region, string activePanelId, List<string> openedPanels);
 
     /// <summary>
+    /// Saves panel state for a specific region including splitter ratios.
+    /// </summary>
+    void SaveRegionState(PanelRegion region, string activePanelId, List<string> openedPanels, double? widthRatio, double? heightRatio);
+
+    /// <summary>
+    /// Saves the collapsed state for a region.
+    /// </summary>
+    void SaveRegionCollapsedState(PanelRegion region, bool isCollapsed);
+
+    /// <summary>
     /// Saves panel-specific state.
     /// </summary>
     void SavePanelState(PanelRegion region, string panelId, PanelState state);

@@ -67,6 +67,11 @@ namespace VoiceStudio.Core.Models
     public double? WidthRatio { get; set; }
 
     public double? HeightRatio { get; set; }
+
+    /// <summary>
+    /// Whether the region is collapsed (minimized).
+    /// </summary>
+    public bool IsCollapsed { get; set; }
   }
 
   /// <summary>

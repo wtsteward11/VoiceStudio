@@ -149,6 +149,11 @@ namespace VoiceStudio.App.Services
     /// <param name="openedPanels">List of panel IDs open in the region (e.g. for tabs).</param>
     public void SaveRegionState(PanelRegion region, string activePanelId, List<string> openedPanels)
     {
+      SaveRegionState(region, activePanelId, openedPanels, null, null);
+    }
+
+    public void SaveRegionState(PanelRegion region, string activePanelId, List<string> openedPanels, double? widthRatio, double? heightRatio)
+    {
       var layout = GetCurrentLayout();
       var regionState = layout.Regions.FirstOrDefault(r => r.Region == region);
 
@@ -168,6 +173,36 @@ namespace VoiceStudio.App.Services
         regionState.OpenedPanels = openedPanels ?? new List<string>();
       }
 
+      if (widthRatio.HasValue)
+        regionState.WidthRatio = widthRatio.Value;
+      if (heightRatio.HasValue)
+        regionState.HeightRatio = heightRatio.Value;
+
+      layout.ModifiedAt = DateTime.UtcNow;
+      layout.Version = "1.1";
+      SaveCurrentWorkspace();
+    }
+
+    /// <summary>
+    /// Saves the collapsed state for a region.
+    /// </summary>
+    public void SaveRegionCollapsedState(PanelRegion region, bool isCollapsed)
+    {
+      var layout = GetCurrentLayout();
+      var regionState = layout.Regions.FirstOrDefault(r => r.Region == region);
+
+      if (regionState == null)
+      {
+        regionState = new RegionState
+        {
+          Region = region,
+          ActivePanelId = string.Empty,
+          OpenedPanels = new List<string>()
+        };
+        layout.Regions.Add(regionState);
+      }
+
+      regionState.IsCollapsed = isCollapsed;
       layout.ModifiedAt = DateTime.UtcNow;
       SaveCurrentWorkspace();
     }

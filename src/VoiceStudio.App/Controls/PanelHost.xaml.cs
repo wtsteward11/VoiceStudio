@@ -366,6 +366,55 @@ namespace VoiceStudio.App.Controls
         refreshItem.Visibility = showRefresh ? Visibility.Visible : Visibility.Collapsed;
       if (OptionsFlyout.Items[1] is MenuFlyoutSeparator separator)
         separator.Visibility = showRefresh ? Visibility.Visible : Visibility.Collapsed;
+
+      PopulateSwitchPanelMenu();
+    }
+
+    private void PopulateSwitchPanelMenu()
+    {
+      if (_panelRegistry == null)
+        return;
+
+      SwitchPanelSubMenu.Items.Clear();
+
+      var descriptors = _panelRegistry.GetAllDescriptors()
+        .Where(d => d.Maturity != PanelMaturity.Deprecated)
+        .Where(d => !string.IsNullOrEmpty(d.MenuCategory))
+        .OrderBy(d => d.MenuCategory)
+        .ThenBy(d => d.DisplayName);
+
+      string? currentCategory = null;
+
+      foreach (var desc in descriptors)
+      {
+        if (currentCategory != null && !string.Equals(currentCategory, desc.MenuCategory, StringComparison.Ordinal))
+        {
+          SwitchPanelSubMenu.Items.Add(new MenuFlyoutSeparator());
+        }
+        currentCategory = desc.MenuCategory;
+
+        var item = new MenuFlyoutItem { Text = $"{desc.DisplayName}" };
+        var panelId = desc.PanelId;
+
+        item.Click += (_, _) =>
+        {
+          var panel = LoadPanel(panelId);
+          if (panel != null)
+          {
+            PanelTitle = desc.DisplayName;
+            if (!string.IsNullOrEmpty(desc.Icon))
+              PanelIcon = desc.Icon;
+          }
+        };
+
+        SwitchPanelSubMenu.Items.Add(item);
+      }
+
+      if (SwitchPanelSubMenu.Items.Count == 0)
+      {
+        var empty = new MenuFlyoutItem { Text = "No panels available", IsEnabled = false };
+        SwitchPanelSubMenu.Items.Add(empty);
+      }
     }
 
     private async void OptionsRefresh_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
@@ -654,6 +703,7 @@ namespace VoiceStudio.App.Controls
         }
 
         _panelStateService.SaveRegionState(_region, activePanelId, openedPanels);
+        _panelStateService.SaveRegionCollapsedState(_region, IsCollapsed);
       }
       catch (Exception ex)
       {

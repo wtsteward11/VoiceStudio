@@ -414,10 +414,10 @@ class TestEnhancedResourceManager:
         manager._collect_resource_usage()
         manager._check_resource_alerts()
 
-        # Should have triggered alert
-        assert len(manager.resource_alerts) > 0
-        alert = manager.resource_alerts[-1]
-        assert alert["type"] == "vram_high"
+        # Should have triggered VRAM alert (CPU may also trigger on busy systems)
+        vram_alerts = [a for a in manager.resource_alerts if a["type"] == "vram_high"]
+        assert len(vram_alerts) > 0, f"Expected vram_high alert, got: {manager.resource_alerts}"
+        alert = vram_alerts[0]
         assert "VRAM usage" in alert["message"]
 
     def test_statistics_tracking(self):

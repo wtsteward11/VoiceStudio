@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import shutil
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -733,6 +734,17 @@ async def preprocess_reference_audio(
                 recommendations=[],
                 optimal_segments=optimal_segments,
             )
+
+        # Write reference audio to canonical profile path so synthesis can find it
+        from backend.services.profile_storage_service import ensure_profile_dir
+
+        canonical_dir = ensure_profile_dir(profile_id)
+        canonical_ref = canonical_dir / "reference_audio.wav"
+
+        if req.auto_enhance and improvements_applied and processed_audio is not None:
+            sf.write(str(canonical_ref), processed_audio, sample_rate)
+        else:
+            shutil.copy2(reference_audio_path, str(canonical_ref))
 
         return ReferenceAudioPreprocessResponse(
             processed_audio_id=processed_audio_id or f"original_{profile_id}",

@@ -90,13 +90,13 @@ class TestXTTSEngineOptimization:
 
     @patch("app.core.engines.xtts_engine.TTS")
     def test_enable_caching(self, mock_tts_class):
-        """Test enabling/disabling caching."""
+        """Test enabling/disabling caching (XTTS uses set_caching_enabled)."""
         engine = XTTSEngine()
 
-        engine.enable_caching(True)
+        engine.set_caching_enabled(True)
         assert engine._use_cache is True
 
-        engine.enable_caching(False)
+        engine.set_caching_enabled(False)
         assert engine._use_cache is False
 
     @patch("app.core.engines.xtts_engine.TTS")

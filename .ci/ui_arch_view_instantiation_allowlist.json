@@ -1,0 +1,8 @@
+{
+  "description": "Frozen list of View class names allowed in new XxxView() outside _legacyPanelRegistry. CI fails if a new instantiation appears that is not in this list.",
+  "frozen_at": "2026-03-06",
+  "source_file": "src/VoiceStudio.App/MainWindow.xaml.cs",
+  "view_class_names": [
+    "WelcomeView"
+  ]
+}

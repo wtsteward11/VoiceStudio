@@ -44,6 +44,7 @@
     "AdvancedSettings",
     "APIKeyManager",
     "GPUStatus",
-    "TodoPanel"
+    "TodoPanel",
+    "MiniTimeline"
   ]
 }

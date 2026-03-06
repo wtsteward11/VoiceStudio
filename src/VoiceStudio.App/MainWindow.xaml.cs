@@ -162,6 +162,13 @@ namespace VoiceStudio.App
       return true;
     }
 
+    private static void SetPanelHostMeta(Controls.PanelHost? host, string title, string icon)
+    {
+      if (host == null) return;
+      host.PanelTitle = title;
+      host.PanelIcon = icon;
+    }
+
     /// <summary>
     /// [DEPRECATED] Legacy panel registry mapping panel IDs to their factory functions.
     /// Used for backward compatibility during migration to unified PanelRegistry.
@@ -227,6 +234,7 @@ namespace VoiceStudio.App
       ["GPUStatus"] = (PanelRegion.Right, "GPU Status", () => new GPUStatusView()),
       // Todo panel
       ["TodoPanel"] = (PanelRegion.Right, "Todo Panel", () => new TodoPanelView()),
+      ["MiniTimeline"] = (PanelRegion.Bottom, "Mini Timeline", () => new MiniTimelineView()),
     };
 
     private T? FindInContent<T>(string name) where T : class
@@ -405,25 +413,22 @@ namespace VoiceStudio.App
       {
         if (leftPanelHost != null)
         {
-          leftPanelHost.Content = new ProfilesView();
-          leftPanelHost.PanelTitle = "Voice Profiles";
-          leftPanelHost.PanelIcon = "👤";
+          OpenPanelById("Profiles");
+          SetPanelHostMeta(leftPanelHost, "Voice Profiles", "👤");
         }
         profiler.Checkpoint("ProfilesView Created (Default)");
 
         if (centerPanelHost != null)
         {
-          centerPanelHost.Content = new TimelineView();
-          centerPanelHost.PanelTitle = "Timeline";
-          centerPanelHost.PanelIcon = "🎬";
+          OpenPanelById("Timeline");
+          SetPanelHostMeta(centerPanelHost, "Timeline", "🎬");
         }
         profiler.Checkpoint("TimelineView Created (Default)");
 
         if (rightPanelHost != null)
         {
-          rightPanelHost.Content = new EffectsMixerView();
-          rightPanelHost.PanelTitle = "Effects & Mixer";
-          rightPanelHost.PanelIcon = "🎚️";
+          OpenPanelById("EffectsMixer");
+          SetPanelHostMeta(rightPanelHost, "Effects & Mixer", "🎚️");
         }
         profiler.Checkpoint("EffectsMixerView Created (Default)");
 
@@ -431,9 +436,8 @@ namespace VoiceStudio.App
         // Default to MacroView (MiniTimeline can be toggled via View menu - IDEA 6)
         if (bottomPanelHost != null)
         {
-          bottomPanelHost.Content = new MacroView();
-          bottomPanelHost.PanelTitle = "Macros";
-          bottomPanelHost.PanelIcon = "⚡";
+          OpenPanelById("Macro", PanelRegion.Bottom);
+          SetPanelHostMeta(bottomPanelHost, "Macros", "⚡");
         }
         profiler.Checkpoint("MacroView Created (Default)");
       }
@@ -1652,19 +1656,19 @@ namespace VoiceStudio.App
 
       // Panel Quick-Switch (IDEA 1): Ctrl+1-9 for direct panel switching
       // Left PanelHost: Ctrl+1-3
-      RegisterPanelQuickSwitchShortcut(1, PanelRegion.Left, 0, "Profiles", () => new ProfilesView());
-      RegisterPanelQuickSwitchShortcut(2, PanelRegion.Left, 1, "Library", () => new LibraryView());
-      RegisterPanelQuickSwitchShortcut(3, PanelRegion.Left, 2, "Training", () => new TrainingView());
+      RegisterPanelQuickSwitchShortcut(1, PanelRegion.Left, 0, "Profiles");
+      RegisterPanelQuickSwitchShortcut(2, PanelRegion.Left, 1, "Library");
+      RegisterPanelQuickSwitchShortcut(3, PanelRegion.Left, 2, "Training");
 
       // Center PanelHost: Ctrl+4-6
-      RegisterPanelQuickSwitchShortcut(4, PanelRegion.Center, 0, "Timeline", () => new TimelineView());
-      RegisterPanelQuickSwitchShortcut(5, PanelRegion.Center, 1, "Voice Synthesis", () => new VoiceSynthesisView());
-      RegisterPanelQuickSwitchShortcut(6, PanelRegion.Center, 2, "Text Speech Editor", () => new TextSpeechEditorView());
+      RegisterPanelQuickSwitchShortcut(4, PanelRegion.Center, 0, "Timeline");
+      RegisterPanelQuickSwitchShortcut(5, PanelRegion.Center, 1, "VoiceSynthesis");
+      RegisterPanelQuickSwitchShortcut(6, PanelRegion.Center, 2, "TextSpeechEditor");
 
       // Right PanelHost: Ctrl+7-9
-      RegisterPanelQuickSwitchShortcut(7, PanelRegion.Right, 0, "Effects Mixer", () => new EffectsMixerView());
-      RegisterPanelQuickSwitchShortcut(8, PanelRegion.Right, 1, "Analyzer", () => new AnalyzerView());
-      RegisterPanelQuickSwitchShortcut(9, PanelRegion.Right, 2, "Quality Control", () => new QualityControlView());
+      RegisterPanelQuickSwitchShortcut(7, PanelRegion.Right, 0, "EffectsMixer");
+      RegisterPanelQuickSwitchShortcut(8, PanelRegion.Right, 1, "Analyzer");
+      RegisterPanelQuickSwitchShortcut(9, PanelRegion.Right, 2, "QualityControl");
 
       // GAP-E02: Panel region cycling and direct focus
       _keyboardShortcutService.RegisterShortcut(
@@ -1713,7 +1717,7 @@ namespace VoiceStudio.App
     /// <summary>
     /// Registers a panel quick-switch shortcut (IDEA 1).
     /// </summary>
-    private void RegisterPanelQuickSwitchShortcut(int number, PanelRegion region, int _, string panelName, Func<UserControl> panelFactory)
+    private void RegisterPanelQuickSwitchShortcut(int number, PanelRegion region, int _, string panelId)
     {
       VirtualKey key = number switch
       {
@@ -1729,12 +1733,13 @@ namespace VoiceStudio.App
         _ => VirtualKey.Number1
       };
 
+      var title = GetPanelTitle(panelId);
       _keyboardShortcutService.RegisterShortcut(
           $"nav.panel.{number}",
           key,
           VirtualKeyModifiers.Control,
-          () => SwitchToPanel(region, panelName, panelFactory),
-          $"Switch to {panelName}");
+          () => OpenPanelById(panelId, region),
+          $"Switch to {title}");
     }
 
     /// <summary>
@@ -1971,17 +1976,13 @@ namespace VoiceStudio.App
       {
         if (_isMiniTimelineVisible)
         {
-          // Show Mini Timeline
-          bottomPanelHost.Content = new MiniTimelineView();
-          bottomPanelHost.PanelTitle = "Mini Timeline";
-          bottomPanelHost.PanelIcon = "🎬";
+          OpenPanelById("MiniTimeline", PanelRegion.Bottom);
+          SetPanelHostMeta(bottomPanelHost, "Mini Timeline", "🎬");
         }
         else
         {
-          // Show Macro View
-          bottomPanelHost.Content = new MacroView();
-          bottomPanelHost.PanelTitle = "Macros";
-          bottomPanelHost.PanelIcon = "⚡";
+          OpenPanelById("Macro", PanelRegion.Bottom);
+          SetPanelHostMeta(bottomPanelHost, "Macros", "⚡");
         }
       }
 
@@ -2167,7 +2168,7 @@ namespace VoiceStudio.App
     private async void OpenProject()
     {
       // First ensure the Timeline panel is visible in Center
-      SwitchToPanel(PanelRegion.Center, "Timeline", () => new TimelineView());
+      OpenPanelById("Timeline", PanelRegion.Center);
       SetActiveNavButton("NavStudio");
 
       // Give UI time to render the panel
@@ -2942,9 +2943,12 @@ namespace VoiceStudio.App
         var recordingView = rightPanelHost.Content as RecordingView;
         if (recordingView == null)
         {
-          recordingView = new RecordingView();
-          rightPanelHost.Content = recordingView;
+          OpenPanelById("Recording", PanelRegion.Right);
+          recordingView = rightPanelHost.Content as RecordingView;
         }
+
+        if (recordingView == null)
+          return;
 
         var viewModel = recordingView.ViewModel;
         if (viewModel.IsRecording)

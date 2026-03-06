@@ -786,6 +786,10 @@ class SpeakerEncoderEngine(EngineProtocol):
         self._model_caching_enabled = enable
         logger.info(f"Model caching {'enabled' if enable else 'disabled'}")
 
+    def enable_model_caching(self, enable: bool = True) -> None:
+        """Enable or disable model caching (alias for set_model_caching_enabled)."""
+        self.set_model_caching_enabled(enable)
+
     def _get_memory_usage(self) -> dict[str, float]:
         """Get GPU memory usage in MB."""
         if not HAS_TORCH or not torch.cuda.is_available():

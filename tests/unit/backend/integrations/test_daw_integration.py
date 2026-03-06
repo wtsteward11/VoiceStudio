@@ -79,36 +79,36 @@ class TestReaperImport:
 
     def test_open_project_parses_sample_rate_and_tempo(self, reaper):
         rpp_path = FIXTURES_DIR / "sample.rpp"
-        project = asyncio.get_event_loop().run_until_complete(reaper.open_project(rpp_path))
+        project = asyncio.run(reaper.open_project(rpp_path))
         assert project.sample_rate == 48000
         assert project.tempo == 140.0
         assert len(project.tracks) == 3
 
     def test_import_from_daw_returns_valid_path(self, reaper):
         rpp_path = FIXTURES_DIR / "sample.rpp"
-        project = asyncio.get_event_loop().run_until_complete(reaper.open_project(rpp_path))
-        audio_path = asyncio.get_event_loop().run_until_complete(reaper.import_from_daw(project, 0))
+        project = asyncio.run(reaper.open_project(rpp_path))
+        audio_path = asyncio.run(reaper.import_from_daw(project, 0))
         assert audio_path.exists()
         assert audio_path.suffix == ".wav"
 
     def test_import_track_index_out_of_range(self, reaper):
         rpp_path = FIXTURES_DIR / "sample.rpp"
-        project = asyncio.get_event_loop().run_until_complete(reaper.open_project(rpp_path))
+        project = asyncio.run(reaper.open_project(rpp_path))
         with pytest.raises(IndexError, match="out of range"):
-            asyncio.get_event_loop().run_until_complete(reaper.import_from_daw(project, 99))
+            asyncio.run(reaper.import_from_daw(project, 99))
 
     def test_import_midi_track_raises(self, reaper):
         rpp_path = FIXTURES_DIR / "sample.rpp"
-        project = asyncio.get_event_loop().run_until_complete(reaper.open_project(rpp_path))
+        project = asyncio.run(reaper.open_project(rpp_path))
         with pytest.raises(FileNotFoundError, match="no audio file"):
-            asyncio.get_event_loop().run_until_complete(reaper.import_from_daw(project, 2))
+            asyncio.run(reaper.import_from_daw(project, 2))
 
     def test_import_empty_tracks_raises(self, reaper):
         rpp_path = FIXTURES_DIR / "sample.rpp"
-        project = asyncio.get_event_loop().run_until_complete(reaper.open_project(rpp_path))
+        project = asyncio.run(reaper.open_project(rpp_path))
         project.tracks = []
         with pytest.raises(FileNotFoundError, match="No tracks found"):
-            asyncio.get_event_loop().run_until_complete(reaper.import_from_daw(project, 0))
+            asyncio.run(reaper.import_from_daw(project, 0))
 
 
 # ── AUP3 Fixture Helper ──
@@ -174,24 +174,24 @@ class TestAudacityImport:
     def test_open_project_aup3(self, audacity, tmp_path):
         aup3 = tmp_path / "TestProject.aup3"
         _create_minimal_aup3(aup3)
-        project = asyncio.get_event_loop().run_until_complete(audacity.open_project(aup3))
+        project = asyncio.run(audacity.open_project(aup3))
         assert len(project.tracks) == 2
         assert project.sample_rate == 44100
 
     def test_import_from_daw_aup3_returns_wav(self, audacity, tmp_path):
         aup3 = tmp_path / "TestProject.aup3"
         _create_minimal_aup3(aup3)
-        project = asyncio.get_event_loop().run_until_complete(audacity.open_project(aup3))
-        audio = asyncio.get_event_loop().run_until_complete(audacity.import_from_daw(project, 0))
+        project = asyncio.run(audacity.open_project(aup3))
+        audio = asyncio.run(audacity.import_from_daw(project, 0))
         assert audio.exists()
         assert audio.suffix == ".wav"
 
     def test_import_track_index_out_of_range(self, audacity, tmp_path):
         aup3 = tmp_path / "TestProject.aup3"
         _create_minimal_aup3(aup3)
-        project = asyncio.get_event_loop().run_until_complete(audacity.open_project(aup3))
+        project = asyncio.run(audacity.open_project(aup3))
         with pytest.raises(IndexError):
-            asyncio.get_event_loop().run_until_complete(audacity.import_from_daw(project, 99))
+            asyncio.run(audacity.import_from_daw(project, 99))
 
 
 # ── Manager Tests ──

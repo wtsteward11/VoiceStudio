@@ -256,6 +256,13 @@ A task is complete when:
 
 3. **CI Status Check**
    ```powershell
+   # Wait for current branch CI to complete (canonical waiter)
+   .\scripts\ci\wait_for_gh_run.ps1 -Workflow "CI"
+
+   # Or target a specific run by ID
+   .\scripts\ci\wait_for_gh_run.ps1 -RunId 22752889042
+
+   # Quick status listing (no wait)
    gh run list --workflow=ci.yml --limit=5
    ```
 

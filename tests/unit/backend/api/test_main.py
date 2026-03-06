@@ -71,14 +71,11 @@ class TestCacheEndpoints:
 
     def test_cache_stats_endpoint(self, client, mock_cache):
         """Test GET /api/cache/stats endpoint."""
-
-        async def mock_middleware(request, call_next):
-            return await call_next(request)
-
-        with patch("backend.api.main._lazy_import_response_cache") as mock_import:
-            mock_get_cache = MagicMock(return_value=mock_cache)
-            mock_import.return_value = (mock_get_cache, mock_middleware)
-
+        mock_get_cache = MagicMock(return_value=mock_cache)
+        with (
+            patch("backend.api.middleware_setup._get_response_cache_fn", mock_get_cache),
+            patch("backend.api.middleware_setup._response_cache_middleware_fn", MagicMock()),
+        ):
             response = client.get("/api/cache/stats")
             assert response.status_code == 200
             data = response.json()
@@ -92,14 +89,11 @@ class TestCacheEndpoints:
 
     def test_cache_clear_endpoint(self, client, mock_cache):
         """Test POST /api/cache/clear endpoint."""
-
-        async def mock_middleware(request, call_next):
-            return await call_next(request)
-
-        with patch("backend.api.main._lazy_import_response_cache") as mock_import:
-            mock_get_cache = MagicMock(return_value=mock_cache)
-            mock_import.return_value = (mock_get_cache, mock_middleware)
-
+        mock_get_cache = MagicMock(return_value=mock_cache)
+        with (
+            patch("backend.api.middleware_setup._get_response_cache_fn", mock_get_cache),
+            patch("backend.api.middleware_setup._response_cache_middleware_fn", MagicMock()),
+        ):
             response = client.post("/api/cache/clear")
             assert response.status_code == 200
             data = response.json()
@@ -111,14 +105,11 @@ class TestCacheEndpoints:
 
     def test_cache_invalidate_with_pattern(self, client, mock_cache):
         """Test POST /api/cache/invalidate with pattern."""
-
-        async def mock_middleware(request, call_next):
-            return await call_next(request)
-
-        with patch("backend.api.main._lazy_import_response_cache") as mock_import:
-            mock_get_cache = MagicMock(return_value=mock_cache)
-            mock_import.return_value = (mock_get_cache, mock_middleware)
-
+        mock_get_cache = MagicMock(return_value=mock_cache)
+        with (
+            patch("backend.api.middleware_setup._get_response_cache_fn", mock_get_cache),
+            patch("backend.api.middleware_setup._response_cache_middleware_fn", MagicMock()),
+        ):
             response = client.post("/api/cache/invalidate", params={"pattern": "key1"})
             assert response.status_code == 200
             data = response.json()
@@ -133,14 +124,11 @@ class TestCacheEndpoints:
 
     def test_cache_invalidate_with_tags(self, client, mock_cache):
         """Test POST /api/cache/invalidate with tags."""
-
-        async def mock_middleware(request, call_next):
-            return await call_next(request)
-
-        with patch("backend.api.main._lazy_import_response_cache") as mock_import:
-            mock_get_cache = MagicMock(return_value=mock_cache)
-            mock_import.return_value = (mock_get_cache, mock_middleware)
-
+        mock_get_cache = MagicMock(return_value=mock_cache)
+        with (
+            patch("backend.api.middleware_setup._get_response_cache_fn", mock_get_cache),
+            patch("backend.api.middleware_setup._response_cache_middleware_fn", MagicMock()),
+        ):
             response = client.post("/api/cache/invalidate", params={"tags": "tag1,tag2"})
             assert response.status_code == 200
             data = response.json()
@@ -153,14 +141,11 @@ class TestCacheEndpoints:
 
     def test_cache_invalidate_with_path_prefix(self, client, mock_cache):
         """Test POST /api/cache/invalidate with path_prefix."""
-
-        async def mock_middleware(request, call_next):
-            return await call_next(request)
-
-        with patch("backend.api.main._lazy_import_response_cache") as mock_import:
-            mock_get_cache = MagicMock(return_value=mock_cache)
-            mock_import.return_value = (mock_get_cache, mock_middleware)
-
+        mock_get_cache = MagicMock(return_value=mock_cache)
+        with (
+            patch("backend.api.middleware_setup._get_response_cache_fn", mock_get_cache),
+            patch("backend.api.middleware_setup._response_cache_middleware_fn", MagicMock()),
+        ):
             response = client.post("/api/cache/invalidate", params={"path_prefix": "/api/profiles"})
             assert response.status_code == 200
             data = response.json()
@@ -173,14 +158,11 @@ class TestCacheEndpoints:
 
     def test_cache_invalidate_with_all_params(self, client, mock_cache):
         """Test POST /api/cache/invalidate with all parameters."""
-
-        async def mock_middleware(request, call_next):
-            return await call_next(request)
-
-        with patch("backend.api.main._lazy_import_response_cache") as mock_import:
-            mock_get_cache = MagicMock(return_value=mock_cache)
-            mock_import.return_value = (mock_get_cache, mock_middleware)
-
+        mock_get_cache = MagicMock(return_value=mock_cache)
+        with (
+            patch("backend.api.middleware_setup._get_response_cache_fn", mock_get_cache),
+            patch("backend.api.middleware_setup._response_cache_middleware_fn", MagicMock()),
+        ):
             response = client.post(
                 "/api/cache/invalidate",
                 params={
@@ -202,14 +184,11 @@ class TestCacheEndpoints:
 
     def test_cache_invalidate_with_no_params(self, client, mock_cache):
         """Test POST /api/cache/invalidate with no parameters (invalidates all)."""
-
-        async def mock_middleware(request, call_next):
-            return await call_next(request)
-
-        with patch("backend.api.main._lazy_import_response_cache") as mock_import:
-            mock_get_cache = MagicMock(return_value=mock_cache)
-            mock_import.return_value = (mock_get_cache, mock_middleware)
-
+        mock_get_cache = MagicMock(return_value=mock_cache)
+        with (
+            patch("backend.api.middleware_setup._get_response_cache_fn", mock_get_cache),
+            patch("backend.api.middleware_setup._response_cache_middleware_fn", MagicMock()),
+        ):
             response = client.post("/api/cache/invalidate")
             assert response.status_code == 200
             data = response.json()

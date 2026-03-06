@@ -316,12 +316,7 @@ class TestEndpointMetricsEndpoints:
 
     def test_endpoint_metrics_detail(self, client, mock_middleware):
         """Test GET /api/endpoints/metrics/{endpoint_key} endpoint."""
-        with (
-            patch("backend.api.main._get_performance_middleware") as mock_get,
-            patch.object(main, "_performance_middleware", mock_middleware, create=True),
-        ):
-            mock_get.return_value = mock_middleware
-
+        with patch("backend.api.middleware_setup._performance_middleware", mock_middleware):
             response = client.get("/api/endpoints/metrics/GET:/api/test")
             assert response.status_code == 200
             data = response.json()

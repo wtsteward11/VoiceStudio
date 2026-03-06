@@ -259,7 +259,6 @@ class EngineProtocol(ABC):
             # Try to create a small tensor on CUDA
             test_tensor = torch.zeros(1, device="cuda")
             del test_tensor
-            return "cuda"
         except RuntimeError as e:
             error_msg = str(e).lower()
             if "cuda" in error_msg or "not compiled" in error_msg:
@@ -271,6 +270,26 @@ class EngineProtocol(ABC):
         except Exception as e:
             logger.warning(f"CUDA detection failed: {e}. Using CPU.")
             return "cpu"
+
+        # Check if device architecture is supported by this PyTorch build.
+        # RTX 50-series (sm_120) and other new GPUs may pass the tensor test
+        # but fail during complex kernel dispatch (no kernel image available).
+        try:
+            cap = torch.cuda.get_device_capability(0)
+            arch = f"sm_{cap[0]}{cap[1]}"
+            supported = torch.cuda.get_arch_list()
+            if supported and arch not in supported:
+                logger.warning(
+                    "GPU arch %s not supported by PyTorch (supports: %s). "
+                    "Using CPU.",
+                    arch,
+                    " ".join(supported),
+                )
+                return "cpu"
+        except Exception:
+            pass  # If we can't check, trust the tensor test above
+
+        return "cuda"
 
     @abstractmethod
     def initialize(self) -> bool:

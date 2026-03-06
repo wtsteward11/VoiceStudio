@@ -175,6 +175,25 @@ async def synthesize(
                 try:
                     # Get engine instance (creates if not exists)
                     engine = _shared.engine_router.get_engine(engine_id)
+                    # If requested engine failed to init, try fallback chain
+                    if engine is None and valid_engines:
+                        try:
+                            fallback_chain = get_config().get_fallback_chain("tts")
+                        except Exception:
+                            fallback_chain = []
+                        if not fallback_chain:
+                            fallback_chain = ["xtts_v2", "xtts", "piper", "espeak_ng"]
+                        for fb in fallback_chain:
+                            if fb != engine_id and fb in valid_engines:
+                                engine = _shared.engine_router.get_engine(fb)
+                                if engine is not None:
+                                    logger.info(
+                                        "Engine '%s' failed to init, using fallback '%s'",
+                                        engine_id,
+                                        fb,
+                                    )
+                                    engine_id = fb
+                                    break
                     if engine is None:
                         raise EngineUnavailableException(
                             engine=requested_engine,

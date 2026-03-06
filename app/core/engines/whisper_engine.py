@@ -403,11 +403,21 @@ class WhisperEngine(EngineProtocol):
         whisper_cache = os.path.join(models_root, "whisper")
         os.makedirs(whisper_cache, exist_ok=True)
 
+        # Prefer local CTranslate2 model directory if it exists
+        model_id = self.model_name
+        local_ct2_dir = os.path.join(
+            whisper_cache, f"faster-whisper-{self.model_name}"
+        )
+        model_bin = os.path.join(local_ct2_dir, "model.bin")
+        if os.path.isdir(local_ct2_dir) and os.path.exists(model_bin):
+            model_id = local_ct2_dir
+
         self.model = WhisperModel(
-            model_size_or_path=self.model_name,
+            model_size_or_path=model_id,
             device=self.whisper_device,
             compute_type=self.compute_type,
             download_root=whisper_cache,
+            local_files_only=True,  # Never download; fail fast if missing
         )
 
         # Cache model

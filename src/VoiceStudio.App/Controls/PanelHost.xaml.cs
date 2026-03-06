@@ -716,8 +716,9 @@ namespace VoiceStudio.App.Controls
     /// Shows loading indicator while panel is being loaded.
     /// </summary>
     /// <param name="panelId">The panel ID to load</param>
+    /// <param name="legacyFactory">Optional factory for panels not in the unified registry (e.g. MiniTimeline).</param>
     /// <returns>The loaded panel, or null if loading failed</returns>
-    public async System.Threading.Tasks.Task<UserControl?> LoadPanelAsync(string panelId)
+    public async System.Threading.Tasks.Task<UserControl?> LoadPanelAsync(string panelId, Func<UserControl>? legacyFactory = null)
     {
       if (_panelRegistry == null)
       {
@@ -754,6 +755,8 @@ namespace VoiceStudio.App.Controls
 
           var startTime = DateTime.UtcNow;
           var panel = _panelRegistry.CreatePanel(panelId) as UserControl;
+          if (panel == null && legacyFactory != null)
+            panel = legacyFactory();
 
           if (panel != null && !_loadingCts.IsCancellationRequested)
           {
@@ -791,8 +794,9 @@ namespace VoiceStudio.App.Controls
     /// Prefer LoadPanelAsync for better UI responsiveness.
     /// </summary>
     /// <param name="panelId">The panel ID to load</param>
+    /// <param name="legacyFactory">Optional factory for panels not in the unified registry (e.g. MiniTimeline).</param>
     /// <returns>The loaded panel, or null if loading failed</returns>
-    public UserControl? LoadPanel(string panelId)
+    public UserControl? LoadPanel(string panelId, Func<UserControl>? legacyFactory = null)
     {
       if (_panelRegistry == null)
       {
@@ -810,6 +814,9 @@ namespace VoiceStudio.App.Controls
       try
       {
         var panel = _panelRegistry.CreatePanel(panelId) as UserControl;
+        if (panel == null && legacyFactory != null)
+          panel = legacyFactory();
+
         if (panel != null)
         {
           _loadedPanels[panelId] = panel;

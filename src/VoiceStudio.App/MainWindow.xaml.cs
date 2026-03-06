@@ -154,11 +154,39 @@ namespace VoiceStudio.App
     /// <returns>True if the panel was opened; false if the ID was not found in any registry.</returns>
     private bool OpenPanelById(string panelId, PanelRegion? overrideRegion = null)
     {
-      var panel = CreatePanelFromRegistry(panelId);
-      if (panel == null) return false;
       var region = overrideRegion ?? GetPanelRegion(panelId);
+      return SwitchToPanelById(region, panelId);
+    }
+
+    /// <summary>
+    /// Switches to a panel by ID, using LoadPanelAsync (cached) with legacy factory fallback.
+    /// </summary>
+    private bool SwitchToPanelById(PanelRegion region, string panelId)
+    {
+      Controls.PanelHost? targetHost = region switch
+      {
+        PanelRegion.Left => FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
+        PanelRegion.Center => FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
+        PanelRegion.Right => FindNameOnContent("RightPanelHost") as Controls.PanelHost,
+        PanelRegion.Bottom => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
+        _ => null
+      };
+
+      if (targetHost == null)
+        return false;
+
+      Func<UserControl>? legacyFactory = null;
+      if (_legacyPanelRegistry.TryGetValue(panelId, out var legacyEntry))
+        legacyFactory = legacyEntry.Factory;
+
+      var panel = targetHost.LoadPanel(panelId, legacyFactory);
+      if (panel == null)
+        return false;
+
       var title = GetPanelTitle(panelId);
-      SwitchToPanel(region, title, () => panel);
+      if (!IsGateCSmokeMode())
+        ShowPanelQuickSwitchIndicator(title, region, targetHost);
+
       return true;
     }
 
@@ -1293,21 +1321,28 @@ namespace VoiceStudio.App
         return;
       }
 
-      var panelView = CreatePanelFromRegistry(canonicalId);
-      if (panelView == null)
+      var region = GetPanelRegion(canonicalId);
+      if (!OpenPanelById(canonicalId, region))
       {
         var toastService = ServiceProvider.GetToastNotificationService();
         toastService?.ShowError("Panel Not Found", $"Could not create panel: {canonicalId}");
         return;
       }
 
-      var region = GetPanelRegion(canonicalId);
-      var title = GetPanelTitle(canonicalId);
-      SwitchToPanel(region, title, () => panelView);
+      var targetHost = region switch
+      {
+        PanelRegion.Left => FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
+        PanelRegion.Center => FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
+        PanelRegion.Right => FindNameOnContent("RightPanelHost") as Controls.PanelHost,
+        PanelRegion.Bottom => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
+        _ => null
+      };
+      var panelView = targetHost?.Content as UserControl;
 
       var resultType = (result as dynamic)?.Type ?? string.Empty;
       var resultTitle = (result as dynamic)?.Title ?? "Unknown";
-      TrySelectItemInPanel(panelView, itemId, resultType);
+      if (panelView != null)
+        TrySelectItemInPanel(panelView, itemId, resultType);
 
       var successToast = ServiceProvider.GetToastNotificationService();
       successToast?.ShowSuccess("Navigation Complete", $"Navigated to {resultType}: {resultTitle}");
@@ -1694,6 +1729,7 @@ namespace VoiceStudio.App
     /// <summary>
     /// Switches to a panel and shows visual feedback (IDEA 1).
     /// </summary>
+    [Obsolete("Use OpenPanelById or SwitchToPanelById instead.")]
     private void SwitchToPanel(PanelRegion region, string panelName, Func<UserControl> panelFactory)
     {
       // Get the target PanelHost

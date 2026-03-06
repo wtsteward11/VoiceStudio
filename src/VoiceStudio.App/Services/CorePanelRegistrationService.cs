@@ -29,7 +29,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(VoiceSynthesisView),
         ViewModelType = typeof(VoiceSynthesisViewModel),
         MenuCategory = "Voice",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "voice", "synthesis", "TTS", "text-to-speech", "speak" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -40,7 +41,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(EnsembleSynthesisView),
         ViewModelType = typeof(EnsembleSynthesisViewModel),
         MenuCategory = "Voice",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "ensemble", "multi-voice", "synthesis", "blend" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -51,7 +53,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(BatchProcessingView),
         ViewModelType = typeof(BatchProcessingViewModel),
         MenuCategory = "Automation",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "batch", "bulk", "queue", "automation", "jobs" }
       });
 
       // Training panels
@@ -63,7 +66,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(TrainingDatasetEditorView),
         ViewModelType = typeof(TrainingDatasetEditorViewModel),
         MenuCategory = "Training",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "dataset", "training", "samples", "edit", "voice clone" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -74,7 +78,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(ModelManagerView),
         ViewModelType = typeof(ModelManagerViewModel),
         MenuCategory = "Training",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "model", "checkpoint", "training", "manage", "export" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -85,7 +90,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(TrainingView),
         ViewModelType = typeof(TrainingViewModel),
         MenuCategory = "Training",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "training", "train", "fine-tune", "voice model" }
       });
 
       // Audio processing panels
@@ -97,7 +103,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(TranscribeView),
         ViewModelType = typeof(TranscribeViewModel),
         MenuCategory = "Audio",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "transcribe", "speech-to-text", "STT", "transcription" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -108,7 +115,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(RecordingView),
         ViewModelType = typeof(RecordingViewModel),
         MenuCategory = "Audio",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "record", "microphone", "audio", "capture" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -119,7 +127,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(AudioAnalysisView),
         ViewModelType = typeof(AudioAnalysisViewModel),
         MenuCategory = "Audio",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "audio", "analysis", "waveform", "spectrum" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -130,7 +139,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(QualityControlView),
         ViewModelType = typeof(QualityControlViewModel),
         MenuCategory = "Analysis",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "quality", "QC", "MOS", "assessment" }
       });
 
       // Navigation panels
@@ -142,7 +152,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(TimelineView),
         ViewModelType = typeof(TimelineViewModel),
         MenuCategory = "Editing",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "timeline", "tracks", "edit", "arrange", "project" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -153,7 +164,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(ProfilesView),
         ViewModelType = typeof(ProfilesViewModel),
         MenuCategory = "Management",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "profiles", "voices", "presets", "manage" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -164,7 +176,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(LibraryView),
         ViewModelType = typeof(LibraryViewModel),
         MenuCategory = "Management",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "library", "assets", "media", "files", "browse" }
       });
 
       // Effect panels
@@ -176,7 +189,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(EffectsMixerView),
         ViewModelType = typeof(EffectsMixerViewModel),
         MenuCategory = "Audio",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "effects", "mixer", "EQ", "audio", "process" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -187,7 +201,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(AnalyzerView),
         ViewModelType = typeof(AnalyzerViewModel),
         MenuCategory = "Analysis",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "analyzer", "spectrum", "frequency", "audio" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -198,7 +213,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(VoiceMorphView),
         ViewModelType = typeof(VoiceMorphViewModel),
         MenuCategory = "Voice",
-        Maturity = PanelMaturity.Experimental
+        Maturity = PanelMaturity.Experimental,
+        Keywords = new[] { "morph", "voice", "blend", "interpolate" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -209,7 +225,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(EmotionControlView),
         ViewModelType = typeof(EmotionControlViewModel),
         MenuCategory = "Voice",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "emotion", "prosody", "expression", "voice" }
       });
 
       // Utility panels
@@ -221,7 +238,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(DiagnosticsView),
         ViewModelType = typeof(DiagnosticsViewModel),
         MenuCategory = "System",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "diagnostics", "logs", "debug", "system" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -232,7 +250,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(SettingsView),
         ViewModelType = typeof(SettingsViewModel),
         MenuCategory = "System",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "settings", "preferences", "config", "options" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -243,7 +262,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(HelpView),
         ViewModelType = typeof(HelpViewModel),
         MenuCategory = "System",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "help", "docs", "about", "support" }
       });
 
       // Advanced panels
@@ -255,7 +275,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(SSMLControlView),
         ViewModelType = typeof(SSMLControlViewModel),
         MenuCategory = "Editing",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "SSML", "markup", "speech", "tags" }
       });
 
       // Voice cloning panels
@@ -267,7 +288,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(VoiceQuickCloneView),
         ViewModelType = typeof(VoiceQuickCloneViewModel),
         MenuCategory = "Voice",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "clone", "voice", "quick", "sample" }
       });
 
       // Quality panels
@@ -279,7 +301,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(QualityDashboardView),
         ViewModelType = typeof(QualityDashboardViewModel),
         MenuCategory = "Analysis",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "quality", "dashboard", "metrics", "MOS" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -290,7 +313,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(QualityBenchmarkView),
         ViewModelType = typeof(QualityBenchmarkViewModel),
         MenuCategory = "Analysis",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "benchmark", "quality", "compare", "test" }
       });
 
       // Image/Video panels
@@ -302,7 +326,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(ImageGenView),
         ViewModelType = typeof(ImageGenViewModel),
         MenuCategory = "Media",
-        Maturity = PanelMaturity.Experimental
+        Maturity = PanelMaturity.Experimental,
+        Keywords = new[] { "image", "generate", "AI", "picture" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -313,7 +338,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(VideoGenView),
         ViewModelType = typeof(VideoGenViewModel),
         MenuCategory = "Media",
-        Maturity = PanelMaturity.Experimental
+        Maturity = PanelMaturity.Experimental,
+        Keywords = new[] { "video", "generate", "AI", "clip" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -324,7 +350,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(DeepfakeCreatorView),
         ViewModelType = typeof(DeepfakeCreatorViewModel),
         MenuCategory = "Media",
-        Maturity = PanelMaturity.Experimental
+        Maturity = PanelMaturity.Experimental,
+        Keywords = new[] { "deepfake", "face", "video", "lip-sync" }
       });
 
       // Script/Scene panels
@@ -336,7 +363,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(DatasetQAView),
         ViewModelType = typeof(DatasetQAViewModel),
         MenuCategory = "Training",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "dataset", "QA", "quality", "review" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -347,7 +375,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(ScriptEditorView),
         ViewModelType = typeof(ScriptEditorViewModel),
         MenuCategory = "Editing",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "script", "editor", "text", "dialogue" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -358,7 +387,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(SceneBuilderView),
         ViewModelType = typeof(SceneBuilderViewModel),
         MenuCategory = "Editing",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "scene", "builder", "storyboard", "sequence" }
       });
 
       // Automation panels
@@ -370,7 +400,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(MacroView),
         ViewModelType = typeof(MacroViewModel),
         MenuCategory = "Automation",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "macro", "shortcut", "automation", "record" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -381,7 +412,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(WorkflowAutomationView),
         ViewModelType = typeof(WorkflowAutomationViewModel),
         MenuCategory = "Automation",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "workflow", "automation", "pipeline", "batch" }
       });
 
       // Settings panels
@@ -393,7 +425,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(AdvancedSettingsView),
         ViewModelType = typeof(AdvancedSettingsViewModel),
         MenuCategory = "System",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "advanced", "settings", "config", "tweaks" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -404,7 +437,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(APIKeyManagerView),
         ViewModelType = typeof(APIKeyManagerViewModel),
         MenuCategory = "System",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "API", "key", "credentials", "secrets" }
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -415,7 +449,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(GPUStatusView),
         ViewModelType = typeof(GPUStatusViewModel),
         MenuCategory = "System",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "GPU", "CUDA", "hardware", "status" }
       });
 
       // Todo panel
@@ -427,7 +462,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(TodoPanelView),
         ViewModelType = typeof(TodoPanelViewModel),
         MenuCategory = "System",
-        Maturity = PanelMaturity.Stable
+        Maturity = PanelMaturity.Stable,
+        Keywords = new[] { "todo", "tasks", "notes", "checklist" }
       });
     }
 

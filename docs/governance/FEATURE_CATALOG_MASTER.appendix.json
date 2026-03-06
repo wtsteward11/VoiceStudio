@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "catalog_id": "FEATURE_CATALOG_MASTER",
-  "generated_at_utc": "2026-03-05T07:15:50.025179+00:00",
+  "generated_at_utc": "2026-03-06T16:12:05.235+00:00",
   "source_scope": {
     "primary_root": "E:\\VoiceStudio",
     "snapshots": [
@@ -17,303 +17,237 @@
     ]
   },
   "canonical_ui": {
-    "registered_panel_count": 47,
+    "registered_panel_count": 36,
     "panel_regions": {
-      "Center": 26,
+      "Center": 21,
       "Left": 3,
-      "Right": 17,
+      "Right": 11,
       "Bottom": 1
     },
     "panels": [
       {
-        "index": 1,
         "panel_id": "VoiceSynthesis",
         "display_name": "Voice Synthesis",
-        "region": "Center"
+        "region": "Center",
+        "index": 1
       },
       {
-        "index": 2,
         "panel_id": "EnsembleSynthesis",
         "display_name": "Ensemble Synthesis",
-        "region": "Center"
+        "region": "Center",
+        "index": 2
       },
       {
-        "index": 3,
         "panel_id": "BatchProcessing",
         "display_name": "Batch Processing",
-        "region": "Center"
+        "region": "Center",
+        "index": 3
       },
       {
-        "index": 4,
         "panel_id": "TrainingDatasetEditor",
         "display_name": "Training Dataset Editor",
-        "region": "Center"
+        "region": "Center",
+        "index": 4
       },
       {
-        "index": 5,
         "panel_id": "ModelManager",
         "display_name": "Model Manager",
-        "region": "Center"
+        "region": "Center",
+        "index": 5
       },
       {
-        "index": 6,
         "panel_id": "Training",
         "display_name": "Training",
-        "region": "Left"
+        "region": "Left",
+        "index": 6
       },
       {
-        "index": 7,
         "panel_id": "Transcribe",
         "display_name": "Transcribe",
-        "region": "Center"
+        "region": "Center",
+        "index": 7
       },
       {
-        "index": 8,
         "panel_id": "Recording",
         "display_name": "Recording",
-        "region": "Center"
+        "region": "Center",
+        "index": 8
       },
       {
-        "index": 9,
         "panel_id": "AudioAnalysis",
         "display_name": "Audio Analysis",
-        "region": "Center"
+        "region": "Center",
+        "index": 9
       },
       {
-        "index": 10,
         "panel_id": "QualityControl",
         "display_name": "Quality Control",
-        "region": "Right"
+        "region": "Right",
+        "index": 10
       },
       {
-        "index": 11,
         "panel_id": "Timeline",
         "display_name": "Timeline",
-        "region": "Center"
+        "region": "Center",
+        "index": 11
       },
       {
-        "index": 12,
         "panel_id": "Profiles",
         "display_name": "Profiles",
-        "region": "Left"
+        "region": "Left",
+        "index": 12
       },
       {
-        "index": 13,
         "panel_id": "Library",
         "display_name": "Library",
-        "region": "Left"
+        "region": "Left",
+        "index": 13
       },
       {
-        "index": 14,
         "panel_id": "EffectsMixer",
         "display_name": "Effects Mixer",
-        "region": "Right"
+        "region": "Right",
+        "index": 14
       },
       {
-        "index": 15,
         "panel_id": "Analyzer",
         "display_name": "Analyzer",
-        "region": "Right"
+        "region": "Right",
+        "index": 15
       },
       {
-        "index": 16,
         "panel_id": "VoiceMorph",
         "display_name": "Voice Morph",
-        "region": "Center"
+        "region": "Center",
+        "index": 16
       },
       {
-        "index": 17,
         "panel_id": "EmotionControl",
         "display_name": "Emotion Control",
-        "region": "Right"
+        "region": "Right",
+        "index": 17
       },
       {
-        "index": 18,
         "panel_id": "Diagnostics",
         "display_name": "Diagnostics",
-        "region": "Bottom"
+        "region": "Bottom",
+        "index": 18
       },
       {
-        "index": 19,
         "panel_id": "Settings",
         "display_name": "Settings",
-        "region": "Right"
+        "region": "Right",
+        "index": 19
       },
       {
-        "index": 20,
         "panel_id": "Help",
         "display_name": "Help",
-        "region": "Right"
+        "region": "Right",
+        "index": 20
       },
       {
-        "index": 21,
         "panel_id": "SSMLControl",
         "display_name": "SSML Control",
-        "region": "Right"
+        "region": "Right",
+        "index": 21
       },
       {
-        "index": 22,
         "panel_id": "VoiceQuickClone",
         "display_name": "Quick Clone",
-        "region": "Center"
+        "region": "Center",
+        "index": 22
       },
       {
-        "index": 23,
         "panel_id": "QualityDashboard",
         "display_name": "Quality Dashboard",
-        "region": "Center"
+        "region": "Center",
+        "index": 23
       },
       {
-        "index": 24,
         "panel_id": "QualityBenchmark",
         "display_name": "Quality Benchmark",
-        "region": "Center"
+        "region": "Center",
+        "index": 24
       },
       {
-        "index": 25,
         "panel_id": "ImageGen",
         "display_name": "Image Generation",
-        "region": "Center"
+        "region": "Center",
+        "index": 25
       },
       {
-        "index": 26,
         "panel_id": "VideoGen",
         "display_name": "Video Generation",
-        "region": "Center"
+        "region": "Center",
+        "index": 26
       },
       {
-        "index": 27,
         "panel_id": "DeepfakeCreator",
         "display_name": "Deepfake Creator",
-        "region": "Center"
+        "region": "Center",
+        "index": 27
       },
       {
-        "index": 28,
         "panel_id": "DatasetQA",
         "display_name": "Dataset QA",
-        "region": "Center"
+        "region": "Center",
+        "index": 28
       },
       {
-        "index": 29,
         "panel_id": "ScriptEditor",
         "display_name": "Script Editor",
-        "region": "Center"
+        "region": "Center",
+        "index": 29
       },
       {
-        "index": 30,
         "panel_id": "SceneBuilder",
         "display_name": "Scene Builder",
-        "region": "Center"
+        "region": "Center",
+        "index": 30
       },
       {
-        "index": 31,
         "panel_id": "Macro",
         "display_name": "Macro",
-        "region": "Center"
+        "region": "Center",
+        "index": 31
       },
       {
-        "index": 32,
         "panel_id": "WorkflowAutomation",
         "display_name": "Workflow Automation",
-        "region": "Center"
+        "region": "Center",
+        "index": 32
       },
       {
-        "index": 33,
         "panel_id": "AdvancedSettings",
         "display_name": "Advanced Settings",
-        "region": "Right"
+        "region": "Right",
+        "index": 33
       },
       {
-        "index": 34,
         "panel_id": "APIKeyManager",
         "display_name": "API Key Manager",
-        "region": "Right"
+        "region": "Right",
+        "index": 34
       },
       {
-        "index": 35,
         "panel_id": "GPUStatus",
         "display_name": "GPU Status",
-        "region": "Right"
+        "region": "Right",
+        "index": 35
       },
       {
-        "index": 36,
         "panel_id": "TodoPanel",
         "display_name": "Todo Panel",
-        "region": "Right"
-      },
-      {
-        "index": 37,
-        "panel_id": "text-speech-editor",
-        "display_name": "Text Speech Editor",
-        "region": "Center"
-      },
-      {
-        "index": 38,
-        "panel_id": "prosody",
-        "display_name": "Prosody & Phoneme Control",
-        "region": "Center"
-      },
-      {
-        "index": 39,
-        "panel_id": "spatial-audio",
-        "display_name": "Spatial Audio",
-        "region": "Right"
-      },
-      {
-        "index": 40,
-        "panel_id": "ai-mixing-mastering",
-        "display_name": "AI Mixing & Mastering",
-        "region": "Right"
-      },
-      {
-        "index": 41,
-        "panel_id": "voice-style-transfer",
-        "display_name": "Voice Style Transfer",
-        "region": "Center"
-      },
-      {
-        "index": 42,
-        "panel_id": "embedding-explorer",
-        "display_name": "Speaker Embedding Explorer",
-        "region": "Right"
-      },
-      {
-        "index": 43,
-        "panel_id": "ai-production-assistant",
-        "display_name": "AI Production Assistant",
-        "region": "Right"
-      },
-      {
-        "index": 44,
-        "panel_id": "pronunciation-lexicon",
-        "display_name": "Pronunciation Lexicon",
-        "region": "Right"
-      },
-      {
-        "index": 45,
-        "panel_id": "voice-morphing-blending",
-        "display_name": "Voice Morphing/Blending",
-        "region": "Center"
-      },
-      {
-        "index": 46,
-        "panel_id": "plugin-gallery",
-        "display_name": "Plugin Gallery",
-        "region": "Center"
-      },
-      {
-        "index": 47,
-        "panel_id": "theme-editor",
-        "display_name": "Theme Editor",
-        "region": "Right"
+        "region": "Right",
+        "index": 36
       }
     ]
   },
   "api_surface": {
-    "route_files_total": 143,
-    "route_files_active": 126,
-    "route_files_archived": 10,
-    "route_files_contexts": 7,
+    "route_files_total": 148,
+    "route_files_active": 137,
+    "route_files_archived": 11,
+    "route_files_contexts": 8,
     "active_operations": {
       "get": 410,
       "post": 343,
@@ -327,11 +261,10 @@
       "total": 880
     },
     "route_registration_parity": {
-      "route_module_names_count": 111,
-      "include_route_count": 109,
+      "route_module_names_count": 114,
+      "include_route_count": 112,
       "module_names_not_included": [
         "consent",
-        "metrics",
         "telemetry"
       ],
       "included_not_in_module_names": [
@@ -343,45 +276,17 @@
     "manifest_count": 70,
     "manifest_type_distribution": {
       "audio": 38,
+      "unknown": 2,
+      "tts": 5,
       "image": 13,
       "llm": 3,
-      "stt": 1,
-      "tts": 5,
-      "unknown": 2,
-      "video": 8
-    },
-    "adapter_modules_primary_count": 54,
-    "adapter_modules_primary_added_vs_baseline": [
-      "gemini_live_engine.py",
-      "openai_realtime_engine.py",
-      "tacotron2_engine.py",
-      "whisperx_engine.py"
-    ],
-    "manifest_ids_added_vs_baseline": [
-      "bark",
-      "coqui_tts",
-      "fish_speech",
-      "gemini_live",
-      "localai_llm",
-      "mars5",
-      "ollama_llm",
-      "openai_chat",
-      "openai_realtime",
-      "openai_tts",
-      "openvoice_v2",
-      "parler_tts",
-      "rvc_v2",
-      "so_vits_svc",
-      "speaker_encoder",
-      "styletts2",
-      "tacotron2",
-      "vosk",
-      "whisperx"
-    ]
+      "video": 8,
+      "stt": 1
+    }
   },
   "plugin_surface": {
-    "category_count": 8,
     "plugin_count": 3,
+    "category_count": 8,
     "plugin_ids": [
       "com.voicestudio.noise_reduction",
       "com.voicestudio.format_converter",
@@ -551,7 +456,7 @@
     }
   },
   "verification_status": {
-    "timestamp_utc": "2026-03-05T07:15:50.025179+00:00",
+    "timestamp_utc": "2026-03-06T16:12:05.235+00:00",
     "all_passed": true,
     "failed_checks": []
   },

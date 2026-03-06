@@ -3008,6 +3008,7 @@ namespace VoiceStudio.App
               {
                 targetHost.Content = panel;
                 targetHost.PanelTitle = GetPanelTitle(activePanelId);
+                targetHost.IsCollapsed = regionState.IsCollapsed;
                 restoredAny = true;
                 System.Diagnostics.Debug.WriteLine($"Restored panel '{activePanelId}' to {regionState.Region}");
               }

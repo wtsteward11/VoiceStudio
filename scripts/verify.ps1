@@ -61,7 +61,8 @@ param(
     [switch]$SkipUI,
     [switch]$SkipGates,
     [switch]$RealUI,
-    [switch]$StrictMypy
+    [switch]$StrictMypy,
+    [switch]$ReleaseCandidate
 )
 
 $ErrorActionPreference = "Stop"
@@ -81,6 +82,21 @@ if ($Quick) {
     $SkipIntegration = $true
     $SkipUI = $true
     # Note: SkipGates intentionally NOT set - gate validation is fast and critical
+}
+
+if ($ReleaseCandidate) {
+    $Configuration = "Release"
+    $SkipBuild = $false
+    $SkipPythonLint = $false
+    $SkipCSharpTests = $false
+    $SkipPythonTests = $false
+    $SkipContractTests = $false
+    $SkipIntegration = $false
+    $SkipGates = $false
+    Write-Host "========================================" -ForegroundColor Yellow
+    Write-Host "  RELEASE CANDIDATE VERIFICATION MODE"
+    Write-Host "  All stages enabled. No skips allowed."
+    Write-Host "========================================" -ForegroundColor Yellow
 }
 
 # ============================================================================

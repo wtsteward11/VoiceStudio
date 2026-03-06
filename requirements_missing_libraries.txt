@@ -24,7 +24,8 @@ spleeter>=2.3.0
 pedalboard>=0.7.0
 
 # Audio augmentation (for dataset creation)
-audiomentations>=1.7.0
+# Note: PyPI max is 0.43.1; 1.7.0 does not exist
+audiomentations>=0.43.0
 
 # High-quality resampling
 resampy>=0.4.2

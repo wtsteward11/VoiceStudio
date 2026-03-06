@@ -124,7 +124,7 @@ def register_all_routes(app: FastAPI) -> None:
         "drift",
         "emotion_style",
         "errors",
-        "metrics",
+        "experiments",
         "mix_assistant",
         "multilingual",
         "search",
@@ -284,8 +284,7 @@ def register_all_routes(app: FastAPI) -> None:
     _include_route("multilingual")
     _include_route("mix_assistant")
     _include_route("advanced_spectrogram")
-    # Note: /api/metrics is registered by register_observability_routes() in main.py.
-    # Do NOT register the metrics route module here — it causes I-1 duplication.
+    _include_route("telemetry")
 
     # Gap Remediation Phase 7-9 routes (previously imported but not registered)
     _include_route("feedback")

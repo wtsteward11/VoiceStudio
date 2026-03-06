@@ -541,9 +541,11 @@ def validate_nested_semantics(
                     f"{_rel(path)}: test_ran must be true"
                 )
 
-        # Ephemeral artifacts (.buildlogs/proof_runs/) are not committed; skip existence in CI
+        # Ephemeral artifacts (.buildlogs/proof_runs/) may not survive across commits;
+        # skip existence check only for historical proofs where cleanup is expected.
         _art_path = (data.get("artifact_path") or "").replace("\\", "/")
-        _art_ephemeral = ".buildlogs" in _art_path or "proof_runs" in _art_path
+        _is_historical = data.get("historical_proof", False) is True
+        _art_ephemeral = _is_historical and (".buildlogs" in _art_path or "proof_runs" in _art_path)
 
         if nested.get("artifact_path_required"):
             art_path_str = data.get("artifact_path", "")

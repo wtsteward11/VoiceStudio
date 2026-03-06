@@ -6,17 +6,58 @@ This document defines the contract for panel registration, navigation, layout pe
 
 ---
 
+## PanelRegistry SSOT
+
+`PanelRegistry` is the single source of truth for all panel definitions. No panel may be opened without prior registration via `PanelDescriptor`. All discovery (Command Palette, menus, workspace restore) MUST use `GetAllDescriptors()` or `TryGetDescriptor(panelId)`. The `_legacyPanelRegistry` in `MainWindow.xaml.cs` is **frozen** (see `.ci/ui_arch_legacy_allowlist.json`). No new entries may be added to the legacy registry.
+
+**Enforcement**: CI enforces that the legacy allowlist cannot grow.
+
+---
+
+## OpenPanel(panelId) Only
+
+All panel opens MUST go through a single entrypoint. Current implementation: `MainWindow.OpenPanelById(panelId)` which delegates to `PanelRegistry.CreatePanel(panelId)`. Future: expose `OpenPanel(panelId)` as the canonical API (e.g., on a service or MainWindow). No direct `CreatePanel` calls from navigation; routing is via `panelId` only.
+
+---
+
+## Workspace Layout Persistence Model
+
+| Version | State | Description |
+|---------|-------|--------------|
+| **v1** | Current | 4-region layout — Left, Center, Right, Bottom (plus Floating). Persisted as JSON with `regions[]` containing `region`, `activePanelId`, `openedPanels[]`. See [WorkspaceDefinition](../../src/VoiceStudio.Core/Panels/WorkspaceDefinition.cs), [Studio.json](../../src/VoiceStudio.App/Resources/Workspaces/Studio.json). |
+| **v2** | Next | Tabbed panels within regions. Requires ADR. Panels in same region shown as tabs; `PanelPlacement.Order` determines tab order. |
+| **v3** | Future | Full docking tree. Requires ADR. Panels can be split, nested, or floated with position/size persistence. |
+
+---
+
+## Panel Metadata Contract
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `Category` | `PanelCategory` enum | Grouping for menus/palette (General, Voice, Training, Audio, Settings, Diagnostics, Library, Effects, Automation, Other) |
+| `Maturity` | `PanelMaturity` enum | Stability level (Stable, Beta, Experimental, Deprecated) |
+| `Keywords` | `IReadOnlyList<string>?` | Search/filter terms for Command Palette. Optional; null by default. |
+
+---
+
+## Design System Usage Rules
+
+- **Tokens:** All colors, spacing, typography MUST use VSQ.* tokens from [DesignTokens.xaml](../../src/VoiceStudio.Common.UI/Themes/DesignTokens.xaml). No hardcoded hex colors in panel XAML or code-behind.
+- **Empty state:** Use `VSQ.EmptyState.TextBrush` for "no items" messages. Provide icon + message + optional action.
+- **Loading state:** Use `VSQ.Loading.*` brushes; show progress indicator (ProgressRing/Bar) with `VSQ.Progress.ForegroundBrush`.
+- **Error state:** Use `VSQ.Error.Brush` for error text; `VSQ.Warn.Brush` for warnings. Include retry/action where applicable.
+
+---
+
 ## Rules
 
 ### Rule 1 — Single Panel Registry
 
-All panels MUST be registered via `PanelDescriptor` in `PanelRegistry` (`src/VoiceStudio.App/Services/PanelRegistry.cs`). The `_legacyPanelRegistry` in `MainWindow.xaml.cs` is **frozen** (see `.ci/ui_arch_legacy_allowlist.json`). No new entries may be added to the legacy registry.
-
-**Enforcement**: CI enforces that the legacy allowlist cannot grow.
+All panels MUST be registered via `PanelDescriptor` in `PanelRegistry` (`src/VoiceStudio.App/Services/PanelRegistry.cs`). See PanelRegistry SSOT above.
 
 ### Rule 2 — Single Navigation Entrypoint
 
-All panel opens MUST go through `PanelRegistry.CreatePanel(panelId)` (or the future `OpenPanel(panelId)` when implemented). Direct `new XxxView()` in MainWindow is forbidden for **new** panels.
+All panel opens MUST go through the single entrypoint. See OpenPanel(panelId) Only above. Direct `new XxxView()` in MainWindow is forbidden for **new** panels.
 
 **Legacy exception**: Existing `new XxxView()` calls in MainWindow are quarantined via the allowlist. New panels must use the registry only.
 
@@ -26,7 +67,7 @@ Saved layout state MUST contain panel IDs only. No serialized View types, no bin
 
 ### Rule 4 — Metadata-Driven Menu/Palette
 
-Command Palette and menus MUST source panel entries from `PanelRegistry.GetAllDescriptors()`. `PanelDescriptor` will gain `Category` and `Maturity` fields (future work; documented as roadmap item).
+Command Palette and menus MUST source panel entries from `PanelRegistry.GetAllDescriptors()`. `PanelDescriptor` includes `Category`, `Maturity`, and `Keywords` for grouping and search.
 
 ### Rule 5 — No `new View()` in MainWindow (Quarantined Allowlist)
 

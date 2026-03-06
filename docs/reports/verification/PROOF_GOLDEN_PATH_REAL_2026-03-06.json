@@ -1,8 +1,8 @@
 {
   "command": "python -m pytest tests/e2e/test_golden_path.py -v --tb=short",
   "exit_code": 0,
-  "timestamp": "2026-03-06T06:42:51Z",
-  "git_commit": "71e40e5a2cabc762a877360da3a3183b51aec3bf",
+  "timestamp": "2026-03-06T18:54:34Z",
+  "git_commit": "c8ccad8794528355a3a2a513866b6d938355958d",
   "git_branch": "main",
   "engine_mode": "real",
   "checks": {
@@ -10,22 +10,25 @@
     "e2e_test": "passed"
   },
   "output_metrics": {
-    "duration_seconds": 0.5,
-    "rms_energy": 0.007057,
-    "output_sha256": "41d1a763672d0a7e21ebcbd245b5e8761af6f4ee65f3d26e04c687f40808ef86"
+    "duration_seconds": 26.881,
+    "rms_energy": 0.063884,
+    "output_sha256": "cbca8247a4a9e7a84eb7160397081976ab9c87471b3bae84ff51035daa5bbf7e"
   },
   "models": {
+    "whisper_cpp:whisper-medium.en.gguf": "7270c26c1714e4a9a136bdea88e5dd369aedf146feefe13ab2591e8687ff4aaf",
     "piper:en_US-amy-medium.onnx": "b3a6e47b57b8c7fbe6a0ce2518161a50f59a9cdd8a50835c02cb02bdd6206c18",
-    "xtts:model.pth": "9d121d9068896e5e1427ffc6dd069f1785baf1ed0d63d5a3d6855c47aed340ad"
+    "xtts:model.pth": "c7ea20001c6a0a841c77e252d8409f6a74fb423e79b3206a0771ba5989776187"
   },
   "passed": true,
   "test_ran": true,
-  "pytest_stdout_sha256": "3d159ec8b5880fc0f3f7238a989f16f8f25710714fc1f4ab0cd24264300fda6c",
+  "pytest_stdout_sha256": "59f1de9b448cf1434794bc908509385083c4c8b7623a4b5f8941369ab19dc57d",
   "pytest_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "pytest_duration_seconds": 33.24,
-  "artifact_path": ".buildlogs/proof_runs/golden_path_real_20260306T064218Z_71e40e5a/golden_path_export.wav",
-  "artifact_sha256": "41d1a763672d0a7e21ebcbd245b5e8761af6f4ee65f3d26e04c687f40808ef86",
-  "artifact_bytes": 16044,
+  "pytest_duration_seconds": 101.37,
+  "artifact_path": "docs/reports/verification/artifacts/golden_path_export.wav",
+  "artifact_sha256": "cbca8247a4a9e7a84eb7160397081976ab9c87471b3bae84ff51035daa5bbf7e",
+  "artifact_bytes": 1290316,
+  "stt_step_ran": true,
+  "stt_engine_name": "whisper_cpp",
   "historical_proof": false,
-  "evidence_fingerprint": "1b57a55c0e2342cb1b449381b96ec172d7eeb0c89d9deca194b4b6b4ec173dd2"
+  "evidence_fingerprint": "baff5176f24997a80e637f1d852453337f874861156c323b52df6f44479cbe03"
 }

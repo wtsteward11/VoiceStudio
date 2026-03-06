@@ -45,6 +45,14 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## Active Task
 
+- **ID**: FIX-ENGINE-ROUTER
+- **Title**: Fix Engine Router Wiring (Release Proof Hardening)
+- **Status**: **PARTIAL** (2026-03-06)
+- **Completed**: get_engine_router() added to ml/models EngineService; engine-availability precondition check; synthesis _shared ref fix (ENGINE_AVAILABLE/engine_router now read at runtime). Synthesis 503 resolved. **Profile reference audio fix** (2026-03-06): preprocess_reference_audio now writes reference audio to canonical profile path `{profiles_dir}/{profile_id}/reference_audio.wav` — step 4 no longer fails with "reference audio not found".
+- **Blocked**: Proof regeneration blocked by engine availability at runtime (whisper/xtts_v2 return 503 from backend despite preconditions reporting models on disk). Remove allowlist and retag deferred until proof regenerates in environment with working engines.
+
+## Previous Active Task
+
 - **ID**: ROADMAP-V2-PHASE-F
 - **Title**: Phase F — v1.1.0 Release (F0–F3)
 - **Status**: **COMPLETE** (2026-03-06)

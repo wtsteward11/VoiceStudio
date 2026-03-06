@@ -235,6 +235,118 @@ def _check_engine_availability(base_url: str) -> dict:
         return {"ok": False, "message": f"Engine availability check failed: {e}"}
 
 
+def _generate_sine_wav(duration_sec: float = 1.0) -> bytes | None:
+    """Generate a minimal WAV (sine tone) for smoke tests. Returns None if scipy unavailable."""
+    try:
+        import numpy as np
+        import scipy.io.wavfile as wav
+        import io
+
+        sample_rate = 22050
+        t = np.linspace(0, duration_sec, int(sample_rate * duration_sec), False)
+        audio = (np.sin(2 * np.pi * 440 * t) * 32767).astype(np.int16)
+        buf = io.BytesIO()
+        wav.write(buf, sample_rate, audio)
+        return buf.getvalue()
+    except ImportError:
+        return None
+
+
+def _check_stt_smoke(base_url: str) -> dict:
+    """Run STT smoke: upload tiny WAV, transcribe. Verifies engines can actually transcribe."""
+    try:
+        import requests
+
+        wav_bytes = _generate_sine_wav(1.0)
+        if not wav_bytes:
+            return {
+                "ok": False,
+                "engine": None,
+                "message": "scipy required for STT smoke (pip install scipy)",
+            }
+
+        url = base_url.rstrip("/")
+        # Upload
+        files = {"file": ("smoke.wav", wav_bytes, "audio/wav")}
+        up = requests.post(
+            f"{url}/api/library/assets/upload",
+            files=files,
+            data={"folder_id": None},
+            timeout=10,
+        )
+        if up.status_code not in (200, 201):
+            return {
+                "ok": False,
+                "engine": None,
+                "message": f"Upload failed: {up.status_code} - {up.text[:200]}",
+            }
+
+        audio_id = up.json().get("id")
+        if not audio_id:
+            return {"ok": False, "engine": None, "message": "No audio_id in upload response"}
+
+        # Transcribe (prefer whisper_cpp, fallback to whisper)
+        for engine_name in ("whisper_cpp", "whisper"):
+            trans = requests.post(
+                f"{url}/api/transcribe/",
+                json={
+                    "audio_id": audio_id,
+                    "engine": engine_name,
+                    "language": "en",
+                    "word_timestamps": False,
+                },
+                timeout=60,
+            )
+            if trans.status_code == 200:
+                eng = trans.json().get("engine", engine_name)
+                return {
+                    "ok": True,
+                    "engine": eng,
+                    "message": f"STT smoke passed (engine: {eng})",
+                }
+
+        return {
+            "ok": False,
+            "engine": None,
+            "message": f"Transcribe failed: {trans.status_code} - {trans.text[:200]}",
+        }
+    except ImportError:
+        return {"ok": False, "engine": None, "message": "requests not installed"}
+    except Exception as e:
+        return {"ok": False, "engine": None, "message": f"STT smoke error: {e}"}
+
+
+def _check_tts_smoke(base_url: str) -> dict:
+    """Run TTS smoke: verify at least one TTS engine is loaded and reachable."""
+    try:
+        import requests
+
+        url = base_url.rstrip("/")
+        r = requests.get(f"{url}/api/engines", timeout=10)
+        if r.status_code != 200:
+            return {
+                "ok": False,
+                "message": f"Engines endpoint returned {r.status_code}",
+            }
+        data = r.json()
+        engines = data.get("engines", [])
+        tts = [
+            e for e in engines
+            if isinstance(e, dict) and e.get("type") == "tts"
+        ]
+        if not tts:
+            return {"ok": False, "message": "No TTS engines available"}
+        names = [e.get("id", "?") for e in tts[:5]]
+        return {
+            "ok": True,
+            "message": f"TTS engines available: {', '.join(names)}",
+        }
+    except ImportError:
+        return {"ok": False, "message": "requests not installed"}
+    except Exception as e:
+        return {"ok": False, "message": f"TTS smoke error: {e}"}
+
+
 def _check_test_audio() -> dict:
     """Check test audio fixture exists."""
     paths = [
@@ -267,9 +379,13 @@ def run_checks(check_backend: str | None = None) -> dict:
     if check_backend:
         report["backend"] = _check_backend_health(check_backend)
         report["engines_available"] = _check_engine_availability(check_backend)
+        report["stt_smoke"] = _check_stt_smoke(check_backend)
+        report["tts_smoke"] = _check_tts_smoke(check_backend)
     else:
         report["backend"] = {"ok": None, "message": "Skipped (use --check-backend URL)"}
         report["engines_available"] = {"ok": None, "message": "Skipped (use --check-backend URL)"}
+        report["stt_smoke"] = {"ok": None, "message": "Skipped (use --check-backend URL)"}
+        report["tts_smoke"] = {"ok": None, "message": "Skipped (use --check-backend URL)"}
 
     # Overall readiness for real-mode golden path
     engines_ok = report["whisper_cpp"]["ok"] and (report["piper"]["ok"] or report["xtts"]["ok"])
@@ -278,11 +394,17 @@ def run_checks(check_backend: str | None = None) -> dict:
         if check_backend
         else False
     )
+    smoke_ok = (
+        report["stt_smoke"]["ok"] and report["tts_smoke"]["ok"]
+        if check_backend
+        else False
+    )
     report["ready_for_real_mode"] = (
         report["python"]["ok"]
         and report["packages"]["ok"]
         and engines_ok
         and backend_ok
+        and smoke_ok
     )
     report["ready_for_stub_mode"] = report["python"]["ok"] and report["packages"]["ok"]
 

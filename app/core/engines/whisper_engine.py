@@ -409,16 +409,23 @@ class WhisperEngine(EngineProtocol):
             whisper_cache, f"faster-whisper-{self.model_name}"
         )
         model_bin = os.path.join(local_ct2_dir, "model.bin")
-        if os.path.isdir(local_ct2_dir) and os.path.exists(model_bin):
+        use_local_dir = (
+            os.path.isdir(local_ct2_dir)
+            and os.path.exists(model_bin)
+        )
+        if use_local_dir:
             model_id = local_ct2_dir
 
-        self.model = WhisperModel(
-            model_size_or_path=model_id,
-            device=self.whisper_device,
-            compute_type=self.compute_type,
-            download_root=whisper_cache,
-            local_files_only=True,  # Never download; fail fast if missing
-        )
+        kwargs = {
+            "model_size_or_path": model_id,
+            "device": self.whisper_device,
+            "compute_type": self.compute_type,
+            "local_files_only": True,
+        }
+        if use_local_dir:
+            kwargs["download_root"] = whisper_cache
+
+        self.model = WhisperModel(**kwargs)
 
         # Cache model
         if self._caching_enabled:

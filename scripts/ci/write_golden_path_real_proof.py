@@ -160,7 +160,7 @@ def main() -> int:
         [sys.executable,
          str(ROOT / "scripts" / "golden_path_preconditions.py"),
          "--check-backend", backend_url, "--json"],
-        cwd=ROOT, capture_output=True, text=True, timeout=15,
+        cwd=ROOT, capture_output=True, text=True, timeout=90,
     )
     if precond.returncode != 0:
         print(

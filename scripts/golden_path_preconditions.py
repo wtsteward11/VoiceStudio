@@ -197,6 +197,44 @@ def _check_backend_health(base_url: str) -> dict:
         return {"ok": False, "message": f"Backend unreachable: {e}"}
 
 
+def _check_engine_availability(base_url: str) -> dict:
+    """Check that backend has at least one TTS engine available for synthesis."""
+    try:
+        import requests
+        url = f"{base_url.rstrip('/')}/api/engines"
+        r = requests.get(url, timeout=10)
+        if r.status_code != 200:
+            return {
+                "ok": False,
+                "url": url,
+                "status_code": r.status_code,
+                "message": f"Engines endpoint returned {r.status_code}",
+            }
+        data = r.json()
+        count = data.get("count", 0)
+        available = data.get("available", False)
+        engines = data.get("engines", [])
+        tts_engines = [e for e in engines if isinstance(e, dict) and e.get("type") == "tts"]
+        has_tts = len(tts_engines) > 0
+        ok = count > 0 and available and has_tts
+        return {
+            "ok": ok,
+            "url": url,
+            "count": count,
+            "available": available,
+            "tts_count": len(tts_engines),
+            "message": (
+                f"{count} engines, {len(tts_engines)} TTS available"
+                if ok
+                else f"No TTS engines available (count={count}, available={available})"
+            ),
+        }
+    except ImportError:
+        return {"ok": False, "message": "requests not installed"}
+    except Exception as e:
+        return {"ok": False, "message": f"Engine availability check failed: {e}"}
+
+
 def _check_test_audio() -> dict:
     """Check test audio fixture exists."""
     paths = [
@@ -228,16 +266,23 @@ def run_checks(check_backend: str | None = None) -> dict:
 
     if check_backend:
         report["backend"] = _check_backend_health(check_backend)
+        report["engines_available"] = _check_engine_availability(check_backend)
     else:
         report["backend"] = {"ok": None, "message": "Skipped (use --check-backend URL)"}
+        report["engines_available"] = {"ok": None, "message": "Skipped (use --check-backend URL)"}
 
     # Overall readiness for real-mode golden path
     engines_ok = report["whisper_cpp"]["ok"] and (report["piper"]["ok"] or report["xtts"]["ok"])
+    backend_ok = (
+        report["backend"]["ok"] and report["engines_available"]["ok"]
+        if check_backend
+        else False
+    )
     report["ready_for_real_mode"] = (
         report["python"]["ok"]
         and report["packages"]["ok"]
         and engines_ok
-        and (report["backend"]["ok"] if check_backend else False)
+        and backend_ok
     )
     report["ready_for_stub_mode"] = report["python"]["ok"] and report["packages"]["ok"]
 

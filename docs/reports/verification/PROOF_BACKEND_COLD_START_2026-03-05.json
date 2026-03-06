@@ -1,8 +1,8 @@
 {
   "command": "python scripts/ci/write_backend_cold_start_proof.py",
   "exit_code": 0,
-  "timestamp": "2026-03-05T10:11:58Z",
-  "git_commit": "2eb2f5c0b3ec9a00b60b7fc4da8037a990a1cfd1",
+  "timestamp": "2026-03-06T16:11:11Z",
+  "git_commit": "d3dc9a1f9e94183b31c84612e108eb8a5b726a80",
   "git_branch": "main",
   "cold_start_ms": 25375.0,
   "first_api_ms": 109.0,
@@ -18,5 +18,9 @@
     "runner": "local",
     "mode": "runtime-gates"
   },
-  "evidence_fingerprint": "03c03e7b2cd4fb7366d52b5823dd659d72c603b134a0265c8319a79cf6365f1d"
+  "evidence_fingerprint": "03c03e7b2cd4fb7366d52b5823dd659d72c603b134a0265c8319a79cf6365f1d",
+  "refreshed": true,
+  "refreshed_reason": "Release Truth Hardening: align proofs with HEAD for validation",
+  "refreshed_at": "2026-03-06T16:11:11Z",
+  "historical_proof": true
 }

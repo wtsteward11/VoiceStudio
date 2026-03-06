@@ -34,7 +34,26 @@ def get_proof_type(basename: str) -> str | None:
     if not basename.startswith("PROOF_") or not basename.endswith(".json"):
         return None
     stem = basename[: -len(".json")]
-    for prefix in ("PROOF_PAYLOAD_DETOX", "PROOF_PROVENANCE", "PROOF_GATE_C", "PROOF_INSTALLER"):
+    # Match longest prefix first (same order as check_state_proofs)
+    for prefix in (
+        "PROOF_PAYLOAD_DETOX",
+        "PROOF_PROVENANCE",
+        "PROOF_GATE_C",
+        "PROOF_INSTALLER",
+        "PROOF_GOLDEN_PATH_STUB",
+        "PROOF_GOLDEN_PATH_REAL",
+        "PROOF_GOLDEN_PATH",
+        "PROOF_UI_COMMAND_SURFACE",
+        "PROOF_CRASH_RECOVERY",
+        "PROOF_SUPPORT_BUNDLE_RUNTIME",
+        "PROOF_SUPPORT_BUNDLE",
+        "PROOF_BACKEND_COLD_START",
+        "PROOF_PERF_BUDGET_RUNTIME",
+        "PROOF_PERF_BUDGET",
+        "PROOF_PHASE_3",
+        "PROOF_PHASE_2_1",
+        "PROOF_PHASE",
+    ):
         if stem == prefix or stem.startswith(prefix + "_"):
             return prefix
     return None

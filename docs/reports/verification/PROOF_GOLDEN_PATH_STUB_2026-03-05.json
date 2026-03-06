@@ -1,8 +1,8 @@
 {
   "command": "python -m pytest tests/integration/test_golden_path_e2e.py -v --tb=short",
   "exit_code": 0,
-  "timestamp": "2026-03-05T11:09:06Z",
-  "git_commit": "4a405d78a350a2c05c3cf67faadbbd40ba92a2e3",
+  "timestamp": "2026-03-06T16:11:11Z",
+  "git_commit": "d3dc9a1f9e94183b31c84612e108eb8a5b726a80",
   "git_branch": "main",
   "engine_mode": "stub",
   "checks": {
@@ -24,6 +24,9 @@
   "artifact_path": ".buildlogs/proof_runs/golden_path_stub_20260305T110845Z_4a405d78/golden_path_output.wav",
   "artifact_sha256": "41d1a763672d0a7e21ebcbd245b5e8761af6f4ee65f3d26e04c687f40808ef86",
   "artifact_bytes": 16044,
-  "historical_proof": false,
-  "evidence_fingerprint": "76cbb8f697f259f176a255d1459d67bb31b84f57127643e3da7dc72d8b0ab0a7"
+  "historical_proof": true,
+  "evidence_fingerprint": "76cbb8f697f259f176a255d1459d67bb31b84f57127643e3da7dc72d8b0ab0a7",
+  "refreshed": true,
+  "refreshed_reason": "Release Truth Hardening: align proofs with HEAD for validation",
+  "refreshed_at": "2026-03-06T16:11:11Z"
 }

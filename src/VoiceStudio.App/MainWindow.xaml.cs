@@ -130,6 +130,22 @@ namespace VoiceStudio.App
     }
 
     /// <summary>
+    /// Opens a panel by its canonical registry ID, using the unified PanelRegistry with legacy fallback.
+    /// </summary>
+    /// <param name="panelId">The canonical panel ID (case-insensitive, e.g. "Timeline", "EffectsMixer").</param>
+    /// <param name="overrideRegion">Optional region override; defaults to the registry-defined region.</param>
+    /// <returns>True if the panel was opened; false if the ID was not found in any registry.</returns>
+    private bool OpenPanelById(string panelId, PanelRegion? overrideRegion = null)
+    {
+      var panel = CreatePanelFromRegistry(panelId);
+      if (panel == null) return false;
+      var region = overrideRegion ?? GetPanelRegion(panelId);
+      var title = GetPanelTitle(panelId);
+      SwitchToPanel(region, title, () => panel);
+      return true;
+    }
+
+    /// <summary>
     /// [DEPRECATED] Legacy panel registry mapping panel IDs to their factory functions.
     /// Used for backward compatibility during migration to unified PanelRegistry.
     /// New panels should be registered via CorePanelRegistrationService.
@@ -465,9 +481,9 @@ namespace VoiceStudio.App
     #region Navigation Button Click Handlers
 
     /// <summary>
-    /// Executes a navigation command via CommandRouter, falling back to direct panel switch if unavailable.
+    /// Executes a navigation command via CommandRouter, falling back to OpenPanelById if unavailable.
     /// </summary>
-    private void ExecuteNavCommand(string commandId, string fallbackPanel, PanelRegion fallbackRegion, Func<UserControl> fallbackFactory, string buttonName)
+    private void ExecuteNavCommand(string commandId, string fallbackPanelId, PanelRegion fallbackRegion, string buttonName)
     {
       if (_commandRouter != null)
       {
@@ -477,10 +493,10 @@ namespace VoiceStudio.App
       }
       else
       {
-        // Fallback to direct panel switch
-        SwitchToPanel(fallbackRegion, fallbackPanel, fallbackFactory);
+        // Fallback to registry-based panel open
+        OpenPanelById(fallbackPanelId, fallbackRegion);
         SetActiveNavButton(buttonName);
-        Debug.WriteLine($"[MainWindow] Nav fallback executed: {fallbackPanel}");
+        Debug.WriteLine($"[MainWindow] Nav fallback executed: {fallbackPanelId}");
       }
     }
 
@@ -489,7 +505,7 @@ namespace VoiceStudio.App
       Debug.WriteLine("[DEBUG] NavStudio_Click fired");
       try
       {
-        ExecuteNavCommand("nav.studio", "Timeline", PanelRegion.Center, () => new TimelineView(), "NavStudio");
+        ExecuteNavCommand("nav.studio", "Timeline", PanelRegion.Center, "NavStudio");
         Debug.WriteLine("[DEBUG] NavStudio_Click completed");
       }
       catch (Exception ex)
@@ -505,37 +521,37 @@ namespace VoiceStudio.App
 
     private void NavProfiles_Click(object _, RoutedEventArgs __)
     {
-      ExecuteNavCommand("nav.profiles", "Profiles", PanelRegion.Left, () => new ProfilesView(), "NavProfiles");
+      ExecuteNavCommand("nav.profiles", "Profiles", PanelRegion.Left, "NavProfiles");
     }
 
     private void NavLibrary_Click(object _, RoutedEventArgs __)
     {
-      ExecuteNavCommand("nav.library", "Library", PanelRegion.Left, () => new LibraryView(), "NavLibrary");
+      ExecuteNavCommand("nav.library", "Library", PanelRegion.Left, "NavLibrary");
     }
 
     private void NavEffects_Click(object _, RoutedEventArgs __)
     {
-      ExecuteNavCommand("nav.effects", "Effects Mixer", PanelRegion.Right, () => new EffectsMixerView(), "NavEffects");
+      ExecuteNavCommand("nav.effects", "EffectsMixer", PanelRegion.Right, "NavEffects");
     }
 
     private void NavTrain_Click(object _, RoutedEventArgs __)
     {
-      ExecuteNavCommand("nav.train", "Training", PanelRegion.Left, () => new TrainingView(), "NavTrain");
+      ExecuteNavCommand("nav.train", "Training", PanelRegion.Left, "NavTrain");
     }
 
     private void NavAnalyze_Click(object _, RoutedEventArgs __)
     {
-      ExecuteNavCommand("nav.analyze", "Analyzer", PanelRegion.Right, () => new AnalyzerView(), "NavAnalyze");
+      ExecuteNavCommand("nav.analyze", "Analyzer", PanelRegion.Right, "NavAnalyze");
     }
 
     private void NavSettings_Click(object _, RoutedEventArgs __)
     {
-      ExecuteNavCommand("nav.settings", "Settings", PanelRegion.Right, () => new SettingsView(), "NavSettings");
+      ExecuteNavCommand("nav.settings", "Settings", PanelRegion.Right, "NavSettings");
     }
 
     private void NavLogs_Click(object _, RoutedEventArgs __)
     {
-      ExecuteNavCommand("nav.logs", "Diagnostics", PanelRegion.Bottom, () => new DiagnosticsView(), "NavLogs");
+      ExecuteNavCommand("nav.logs", "Diagnostics", PanelRegion.Bottom, "NavLogs");
     }
 
     #endregion Navigation Button Click Handlers
@@ -552,68 +568,49 @@ namespace VoiceStudio.App
         return;
       }
 
-      // Map panel ID to panel info and switch
       var panelId = e.NewPanelId.ToLowerInvariant();
       Debug.WriteLine($"[MainWindow] OnNavigationChanged: {panelId}");
 
-      // Dispatch to UI thread
       DispatcherQueue.TryEnqueue(() =>
       {
         try
         {
-          switch (panelId)
+          // Resolve short aliases to canonical registry IDs
+          var canonicalId = panelId switch
           {
-            case "studio":
-            case "timeline":
-            case "home":
-              SwitchToPanel(PanelRegion.Center, "Timeline", () => new TimelineView());
-              SetActiveNavButton("NavStudio");
-              break;
-            case "profiles":
-              SwitchToPanel(PanelRegion.Left, "Profiles", () => new ProfilesView());
-              SetActiveNavButton("NavProfiles");
-              break;
-            case "library":
-              SwitchToPanel(PanelRegion.Left, "Library", () => new LibraryView());
-              SetActiveNavButton("NavLibrary");
-              break;
-            case "effects":
-              SwitchToPanel(PanelRegion.Right, "Effects Mixer", () => new EffectsMixerView());
-              SetActiveNavButton("NavEffects");
-              break;
-            case "train":
-              SwitchToPanel(PanelRegion.Left, "Training", () => new TrainingView());
-              SetActiveNavButton("NavTrain");
-              break;
-            case "analyze":
-              SwitchToPanel(PanelRegion.Right, "Analyzer", () => new AnalyzerView());
-              SetActiveNavButton("NavAnalyze");
-              break;
-            case "settings":
-              SwitchToPanel(PanelRegion.Right, "Settings", () => new SettingsView());
-              SetActiveNavButton("NavSettings");
-              break;
-            case "logs":
-              SwitchToPanel(PanelRegion.Bottom, "Diagnostics", () => new DiagnosticsView());
-              SetActiveNavButton("NavLogs");
-              break;
-            case "synthesis":
-              SwitchToPanel(PanelRegion.Center, "Voice Synthesis", () => new VoiceSynthesisView());
-              break;
-            default:
-              // Try unified panel registry lookup (GAP-F04)
-              var panel = CreatePanelFromRegistry(panelId);
-              if (panel != null)
-              {
-                var region = GetPanelRegion(panelId);
-                var title = GetPanelTitle(panelId);
-                SwitchToPanel(region, title, () => panel);
-              }
-              else
-              {
-                Debug.WriteLine($"[MainWindow] Unknown panel ID in navigation: {panelId}");
-              }
-              break;
+            "studio" or "home" or "timeline" => "Timeline",
+            "profiles" => "Profiles",
+            "library" => "Library",
+            "effects" => "EffectsMixer",
+            "train" => "Training",
+            "analyze" => "Analyzer",
+            "settings" => "Settings",
+            "logs" => "Diagnostics",
+            "synthesis" => "VoiceSynthesis",
+            _ => e.NewPanelId, // Preserve original casing for registry lookup
+          };
+
+          if (OpenPanelById(canonicalId))
+          {
+            // Highlight the matching nav-rail button for top-level panels
+            var navButton = canonicalId switch
+            {
+              "Timeline" => "NavStudio",
+              "Profiles" => "NavProfiles",
+              "Library" => "NavLibrary",
+              "EffectsMixer" => "NavEffects",
+              "Training" => "NavTrain",
+              "Analyzer" => "NavAnalyze",
+              "Settings" => "NavSettings",
+              "Diagnostics" => "NavLogs",
+              _ => string.Empty,
+            };
+            if (!string.IsNullOrEmpty(navButton))
+              SetActiveNavButton(navButton);
+          }
+          else
+          {
+            Debug.WriteLine($"[MainWindow] Unknown panel ID in navigation: {panelId}");
           }
         }
         catch (Exception ex)
@@ -1306,76 +1303,44 @@ namespace VoiceStudio.App
       var panelId = (result as dynamic)?.PanelId?.ToLowerInvariant() ?? string.Empty;
       var itemId = (result as dynamic)?.Id ?? string.Empty;
 
-      // Map panel IDs to PanelHost regions and view types
-      Controls.PanelHost? targetHost = null;
-      UserControl? panelView = null;
-
-      switch (panelId)
+      // Resolve panel ID aliases to canonical registry IDs
+      var canonicalId = panelId switch
       {
-        case "profiles":
-        case "profilesview":
-          targetHost = FindNameOnContent("LeftPanelHost") as Controls.PanelHost;
-          panelView = new ProfilesView();
-          break;
+        "profiles" or "profilesview" => "Profiles",
+        "timeline" or "timelineview" => "Timeline",
+        "effectsmixer" or "effectsmixerview" or "effects" => "EffectsMixer",
+        "macro" or "macroview" or "macros" => "Macro",
+        "analyzer" or "analyzerview" => "Analyzer",
+        "library" or "libraryview" => "Library",
+        _ => string.Empty,
+      };
 
-        case "timeline":
-        case "timelineview":
-          targetHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-          panelView = new TimelineView();
-          break;
-
-        case "effectsmixer":
-        case "effectsmixerview":
-        case "effects":
-          targetHost = FindNameOnContent("RightPanelHost") as Controls.PanelHost;
-          panelView = new EffectsMixerView();
-          break;
-
-        case "macro":
-        case "macroview":
-        case "macros":
-          targetHost = FindNameOnContent("BottomPanelHost") as Controls.PanelHost;
-          panelView = new MacroView();
-          break;
-
-        case "analyzer":
-        case "analyzerview":
-          targetHost = FindNameOnContent("RightPanelHost") as Controls.PanelHost;
-          panelView = new AnalyzerView();
-          break;
-
-        case "library":
-        case "libraryview":
-          targetHost = FindNameOnContent("LeftPanelHost") as Controls.PanelHost;
-          panelView = new LibraryView();
-          break;
-
-        default:
-          // Unknown panel - show error
-          var toastService = ServiceProvider.GetToastNotificationService();
-          var resultPanelId = (result as dynamic)?.PanelId ?? "Unknown";
-          toastService?.ShowError(
-              "Panel Not Found",
-              $"Could not find panel: {resultPanelId}");
-          return;
-      }
-
-      if (targetHost != null && panelView != null)
+      if (string.IsNullOrEmpty(canonicalId))
       {
-        // Switch to the panel
-        targetHost.Content = panelView;
-
-        // Attempt to select the item in the panel
-        var resultType = (result as dynamic)?.Type ?? string.Empty;
-        var resultTitle = (result as dynamic)?.Title ?? "Unknown";
-        TrySelectItemInPanel(panelView, itemId, resultType);
-
-        // Show success toast
         var toastService = ServiceProvider.GetToastNotificationService();
-        toastService?.ShowSuccess(
-            "Navigation Complete",
-            $"Navigated to {resultType}: {resultTitle}");
+        var resultPanelId = (result as dynamic)?.PanelId ?? "Unknown";
+        toastService?.ShowError("Panel Not Found", $"Could not find panel: {resultPanelId}");
+        return;
       }
+
+      var panelView = CreatePanelFromRegistry(canonicalId);
+      if (panelView == null)
+      {
+        var toastService = ServiceProvider.GetToastNotificationService();
+        toastService?.ShowError("Panel Not Found", $"Could not create panel: {canonicalId}");
+        return;
+      }
+
+      var region = GetPanelRegion(canonicalId);
+      var title = GetPanelTitle(canonicalId);
+      SwitchToPanel(region, title, () => panelView);
+
+      var resultType = (result as dynamic)?.Type ?? string.Empty;
+      var resultTitle = (result as dynamic)?.Title ?? "Unknown";
+      TrySelectItemInPanel(panelView, itemId, resultType);
+
+      var successToast = ServiceProvider.GetToastNotificationService();
+      successToast?.ShowSuccess("Navigation Complete", $"Navigated to {resultType}: {resultTitle}");
     }
 
     /// <summary>

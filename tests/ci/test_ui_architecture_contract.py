@@ -18,7 +18,7 @@ ALLOWLIST_JSON = ROOT / ".ci" / "ui_arch_legacy_allowlist.json"
 
 # Current count of new XxxView() outside _legacyPanelRegistry block (lines 137-197).
 # Must only shrink; never increase. Migrate to CreatePanelFromRegistry.
-MAX_LEGACY_VIEW_INSTANTIATIONS = 126
+MAX_LEGACY_VIEW_INSTANTIATIONS = 103
 
 
 def _find_legacy_block_boundaries(lines: list[str]) -> tuple[int | None, int | None]:

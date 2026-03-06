@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -29,8 +30,10 @@ if str(ROOT) not in sys.path:
 from scripts.ci.proof_fingerprint import compute_fingerprint
 
 VERIFICATION_DIR = ROOT / "docs" / "reports" / "verification"
+ARTIFACTS_DIR = VERIFICATION_DIR / "artifacts"
 E2E_TEST = "tests/e2e/test_golden_path.py"
 BUILDLOGS = ROOT / ".buildlogs" / "proof_runs"
+DURABLE_ARTIFACT_NAME = "golden_path_export.wav"
 
 
 def _get_git_commit() -> str:
@@ -129,6 +132,23 @@ def _collect_model_hashes() -> dict[str, str]:
             break
 
     return hashes
+
+
+def _detect_stt_engine(model_hashes: dict[str, str]) -> str:
+    """Detect which STT engine was used from model hashes.
+
+    The E2E test Step 2 runs transcription; if it passed, an STT engine ran.
+    Model keys indicate which engine: whisper_cpp:*, faster_whisper:*, whisper:*.
+    """
+    for key in model_hashes:
+        if key.startswith("whisper_cpp:"):
+            return "whisper_cpp"
+        if key.startswith("faster_whisper:"):
+            return "faster_whisper"
+        if key.startswith("whisper:"):
+            return "whisper"
+    # Test passed but no whisper model in our scan (e.g. model elsewhere, backend default)
+    return "backend_default"
 
 
 def main() -> int:
@@ -249,9 +269,16 @@ def main() -> int:
         )
         return 1
 
-    artifact_bytes = wav_path.stat().st_size
+    stt_engine_name = _detect_stt_engine(model_hashes)
+
+    # Copy WAV to durable location for release evidence
+    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+    durable_wav = ARTIFACTS_DIR / DURABLE_ARTIFACT_NAME
+    shutil.copy2(wav_path, durable_wav)
+
+    artifact_bytes = durable_wav.stat().st_size
     artifact_rel = str(
-        wav_path.relative_to(ROOT)
+        durable_wav.relative_to(ROOT)
     ).replace("\\", "/")
 
     proof = {
@@ -275,6 +302,8 @@ def main() -> int:
         "artifact_path": artifact_rel,
         "artifact_sha256": metrics["output_sha256"],
         "artifact_bytes": artifact_bytes,
+        "stt_step_ran": True,
+        "stt_engine_name": stt_engine_name,
         "historical_proof": False,
     }
     proof["evidence_fingerprint"] = compute_fingerprint(

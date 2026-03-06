@@ -148,6 +148,7 @@ namespace VoiceStudio.App.Services
       AddFlag("MultiEngineEnsemble", true, "Enable multi-engine ensemble synthesis", FeatureFlagCategory.UI);
       AddFlag("DarkModeDefault", false, "Default to dark mode on first launch", FeatureFlagCategory.UI, isRemoteConfigurable: true);
       AddFlag("CompactUIMode", false, "Enable compact UI mode for smaller screens", FeatureFlagCategory.UI);
+      AddFlag("ShowExperimentalPanels", false, "Show experimental panels in Modules menu and Command Palette", FeatureFlagCategory.UI);
 
       // Backend feature flags
       AddFlag("BackendCachingEnabled", true, "Enable backend response caching", FeatureFlagCategory.Backend);

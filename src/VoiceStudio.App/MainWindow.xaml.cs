@@ -46,6 +46,11 @@ namespace VoiceStudio.App
     private PanelQuickSwitchIndicator? _panelQuickSwitchIndicator;
     private DispatcherTimer? _quickSwitchHideTimer;
     private bool _isMiniTimelineVisible;
+    private bool GetShowExperimentalPanels()
+    {
+      var featureFlags = AppServices.TryGetFeatureFlagsService();
+      return featureFlags?.IsEnabled("ShowExperimentalPanels") ?? false;
+    }
 
     // Phase 0: avoid MenuBar XAML compiler crashes by creating menu items in code.
     private MenuFlyoutSubItem? _recentProjectsSubMenu;
@@ -2537,112 +2542,28 @@ namespace VoiceStudio.App
     {
       var item = new MenuBarItem { Title = "Modules" };
 
-      // --- Voice ---
-      var voice = new MenuFlyoutSubItem { Text = "Voice" };
-      voice.Items.Add(CreateMenuItem("Voice Synthesis", () => SwitchToPanel(PanelRegion.Center, "Voice Synthesis", () => new VoiceSynthesisView())));
-      voice.Items.Add(CreateMenuItem("Voice Cloning Wizard", () => SwitchToPanel(PanelRegion.Center, "Voice Cloning Wizard", () => new VoiceCloningWizardView())));
-      voice.Items.Add(CreateMenuItem("Quick Clone", () => SwitchToPanel(PanelRegion.Center, "Quick Clone", () => new VoiceQuickCloneView())));
-      voice.Items.Add(CreateMenuItem("Voice Morph", () => SwitchToPanel(PanelRegion.Center, "Voice Morph", () => new VoiceMorphView())));
-      voice.Items.Add(CreateMenuItem("Voice Blending", () => SwitchToPanel(PanelRegion.Center, "Voice Blending", () => new VoiceMorphingBlendingView())));
-      voice.Items.Add(CreateMenuItem("Style Transfer", () => SwitchToPanel(PanelRegion.Center, "Style Transfer", () => new VoiceStyleTransferView())));
-      voice.Items.Add(CreateMenuItem("Multi-Voice Generator", () => SwitchToPanel(PanelRegion.Center, "Multi-Voice Generator", () => new MultiVoiceGeneratorView())));
-      voice.Items.Add(CreateMenuItem("Ensemble Synthesis", () => SwitchToPanel(PanelRegion.Center, "Ensemble Synthesis", () => new EnsembleSynthesisView())));
-      voice.Items.Add(CreateMenuItem("Real-Time Converter", () => SwitchToPanel(PanelRegion.Center, "Real-Time Converter", () => new RealTimeVoiceConverterView())));
-      voice.Items.Add(new MenuFlyoutSeparator());
-      voice.Items.Add(CreateMenuItem("Emotion Control", () => SwitchToPanel(PanelRegion.Right, "Emotion Control", () => new EmotionControlView())));
-      voice.Items.Add(CreateMenuItem("Emotion Style", () => SwitchToPanel(PanelRegion.Right, "Emotion Style", () => new EmotionStyleControlView())));
-      voice.Items.Add(CreateMenuItem("Multilingual", () => SwitchToPanel(PanelRegion.Right, "Multilingual", () => new MultilingualSupportView())));
-      item.Items.Add(voice);
+      var descriptors = UnifiedPanelRegistry.GetAllDescriptors()
+        .Where(d => d.Maturity != PanelMaturity.Deprecated)
+        .Where(d => d.Maturity != PanelMaturity.Experimental || GetShowExperimentalPanels())
+        .Where(d => !string.IsNullOrEmpty(d.MenuCategory))
+        .OrderBy(d => d.MenuCategory)
+        .ThenBy(d => d.DisplayName)
+        .ToList();
 
-      // --- Audio ---
-      var audio = new MenuFlyoutSubItem { Text = "Audio" };
-      audio.Items.Add(CreateMenuItem("Transcribe", () => SwitchToPanel(PanelRegion.Center, "Transcribe", () => new TranscribeView())));
-      audio.Items.Add(CreateMenuItem("Recording", () => SwitchToPanel(PanelRegion.Center, "Recording", () => new RecordingView())));
-      audio.Items.Add(CreateMenuItem("Effects Mixer", () => SwitchToPanel(PanelRegion.Right, "Effects Mixer", () => new EffectsMixerView())));
-      audio.Items.Add(CreateMenuItem("Spatial Audio", () => SwitchToPanel(PanelRegion.Center, "Spatial Audio", () => new SpatialAudioView())));
-      audio.Items.Add(CreateMenuItem("AI Mixing & Mastering", () => SwitchToPanel(PanelRegion.Right, "AI Mixing & Mastering", () => new AIMixingMasteringView())));
-      audio.Items.Add(CreateMenuItem("Audio Analysis", () => SwitchToPanel(PanelRegion.Center, "Audio Analysis", () => new AudioAnalysisView())));
-      item.Items.Add(audio);
+      var grouped = descriptors.GroupBy(d => d.MenuCategory!);
 
-      // --- Analysis ---
-      var analysis = new MenuFlyoutSubItem { Text = "Analysis" };
-      analysis.Items.Add(CreateMenuItem("Analyzer", () => SwitchToPanel(PanelRegion.Right, "Analyzer", () => new AnalyzerView())));
-      analysis.Items.Add(CreateMenuItem("Spectrogram", () => SwitchToPanel(PanelRegion.Center, "Spectrogram", () => new SpectrogramView())));
-      analysis.Items.Add(CreateMenuItem("Real-Time Visualizer", () => SwitchToPanel(PanelRegion.Center, "Real-Time Visualizer", () => new RealTimeAudioVisualizerView())));
-      analysis.Items.Add(CreateMenuItem("Sonography", () => SwitchToPanel(PanelRegion.Center, "Sonography", () => new SonographyVisualizationView())));
-      analysis.Items.Add(CreateMenuItem("Embedding Explorer", () => SwitchToPanel(PanelRegion.Center, "Embedding Explorer", () => new EmbeddingExplorerView())));
-      analysis.Items.Add(new MenuFlyoutSeparator());
-      analysis.Items.Add(CreateMenuItem("Quality Dashboard", () => SwitchToPanel(PanelRegion.Center, "Quality Dashboard", () => new QualityDashboardView())));
-      analysis.Items.Add(CreateMenuItem("Quality Benchmark", () => SwitchToPanel(PanelRegion.Center, "Quality Benchmark", () => new QualityBenchmarkView())));
-      analysis.Items.Add(CreateMenuItem("Quality Optimizer", () => SwitchToPanel(PanelRegion.Center, "Quality Optimizer", () => new QualityOptimizationWizardView())));
-      analysis.Items.Add(CreateMenuItem("A/B Testing", () => SwitchToPanel(PanelRegion.Center, "A/B Testing", () => new ABTestingView())));
-      analysis.Items.Add(CreateMenuItem("Profile Comparison", () => SwitchToPanel(PanelRegion.Center, "Profile Comparison", () => new ProfileComparisonView())));
-      item.Items.Add(analysis);
-
-      // --- Media ---
-      var media = new MenuFlyoutSubItem { Text = "Media" };
-      media.Items.Add(CreateMenuItem("Image Generation", () => SwitchToPanel(PanelRegion.Center, "Image Generation", () => new ImageGenView())));
-      media.Items.Add(CreateMenuItem("Video Generation", () => SwitchToPanel(PanelRegion.Center, "Video Generation", () => new VideoGenView())));
-      media.Items.Add(CreateMenuItem("Deepfake Creator", () => SwitchToPanel(PanelRegion.Center, "Deepfake Creator", () => new DeepfakeCreatorView())));
-      media.Items.Add(CreateMenuItem("Upscaling", () => SwitchToPanel(PanelRegion.Center, "Upscaling", () => new UpscalingView())));
-      media.Items.Add(CreateMenuItem("Image Search", () => SwitchToPanel(PanelRegion.Left, "Image Search", () => new ImageSearchView())));
-      media.Items.Add(CreateMenuItem("Video Editor", () => SwitchToPanel(PanelRegion.Center, "Video Editor", () => new VideoEditView())));
-      item.Items.Add(media);
-
-      // --- Training ---
-      var training = new MenuFlyoutSubItem { Text = "Training" };
-      training.Items.Add(CreateMenuItem("Training", () => SwitchToPanel(PanelRegion.Center, "Training", () => new TrainingView())));
-      training.Items.Add(CreateMenuItem("Dataset Editor", () => SwitchToPanel(PanelRegion.Center, "Dataset Editor", () => new TrainingDatasetEditorView())));
-      training.Items.Add(CreateMenuItem("Model Manager", () => SwitchToPanel(PanelRegion.Center, "Model Manager", () => new ModelManagerView())));
-      training.Items.Add(CreateMenuItem("Dataset QA", () => SwitchToPanel(PanelRegion.Center, "Dataset QA", () => new DatasetQAView())));
-      item.Items.Add(training);
-
-      // --- Editing ---
-      var editing = new MenuFlyoutSubItem { Text = "Editing" };
-      editing.Items.Add(CreateMenuItem("Timeline", () => SwitchToPanel(PanelRegion.Center, "Timeline", () => new TimelineView())));
-      editing.Items.Add(CreateMenuItem("Text/Speech Editor", () => SwitchToPanel(PanelRegion.Center, "Text/Speech Editor", () => new TextSpeechEditorView())));
-      editing.Items.Add(CreateMenuItem("Script Editor", () => SwitchToPanel(PanelRegion.Center, "Script Editor", () => new ScriptEditorView())));
-      editing.Items.Add(CreateMenuItem("Scene Builder", () => SwitchToPanel(PanelRegion.Center, "Scene Builder", () => new SceneBuilderView())));
-      editing.Items.Add(new MenuFlyoutSeparator());
-      editing.Items.Add(CreateMenuItem("SSML Controls", () => SwitchToPanel(PanelRegion.Right, "SSML Controls", () => new SSMLControlView())));
-      editing.Items.Add(CreateMenuItem("Prosody", () => SwitchToPanel(PanelRegion.Right, "Prosody", () => new ProsodyView())));
-      editing.Items.Add(CreateMenuItem("Pronunciation Lexicon", () => SwitchToPanel(PanelRegion.Right, "Pronunciation Lexicon", () => new PronunciationLexiconView())));
-      item.Items.Add(editing);
-
-      // --- Automation ---
-      var automation = new MenuFlyoutSubItem { Text = "Automation" };
-      automation.Items.Add(CreateMenuItem("Macros", () => SwitchToPanel(PanelRegion.Center, "Macros", () => new MacroView())));
-      automation.Items.Add(CreateMenuItem("Workflow Designer", () => SwitchToPanel(PanelRegion.Center, "Workflow Designer", () => new WorkflowAutomationView())));
-      automation.Items.Add(CreateMenuItem("Batch Processing", () => SwitchToPanel(PanelRegion.Center, "Batch Processing", () => new BatchProcessingView())));
-      automation.Items.Add(CreateMenuItem("Automation", () => SwitchToPanel(PanelRegion.Center, "Automation", () => new AutomationView())));
-      item.Items.Add(automation);
-
-      // --- Management ---
-      var management = new MenuFlyoutSubItem { Text = "Management" };
-      management.Items.Add(CreateMenuItem("Profiles", () => SwitchToPanel(PanelRegion.Left, "Profiles", () => new ProfilesView())));
-      management.Items.Add(CreateMenuItem("Library", () => SwitchToPanel(PanelRegion.Left, "Library", () => new LibraryView())));
-      management.Items.Add(CreateMenuItem("Presets", () => SwitchToPanel(PanelRegion.Left, "Presets", () => new PresetLibraryView())));
-      management.Items.Add(CreateMenuItem("Templates", () => SwitchToPanel(PanelRegion.Left, "Templates", () => new TemplateLibraryView())));
-      management.Items.Add(new MenuFlyoutSeparator());
-      management.Items.Add(CreateMenuItem("Tags", () => SwitchToPanel(PanelRegion.Right, "Tags", () => new TagManagerView())));
-      management.Items.Add(CreateMenuItem("Markers", () => SwitchToPanel(PanelRegion.Right, "Markers", () => new MarkerManagerView())));
-      management.Items.Add(CreateMenuItem("Backup & Restore", () => SwitchToPanel(PanelRegion.Center, "Backup & Restore", () => new BackupRestoreView())));
-      management.Items.Add(CreateMenuItem("Plugins", () => SwitchToPanel(PanelRegion.Center, "Plugins", () => new PluginManagementView())));
-      item.Items.Add(management);
-
-      // --- System ---
-      var system = new MenuFlyoutSubItem { Text = "System" };
-      system.Items.Add(CreateMenuItem("Settings", () => SwitchToPanel(PanelRegion.Right, "Settings", () => new SettingsView())));
-      system.Items.Add(CreateMenuItem("Advanced Settings", () => SwitchToPanel(PanelRegion.Right, "Advanced Settings", () => new AdvancedSettingsView())));
-      system.Items.Add(CreateMenuItem("API Keys", () => SwitchToPanel(PanelRegion.Right, "API Keys", () => new APIKeyManagerView())));
-      system.Items.Add(CreateMenuItem("GPU Status", () => SwitchToPanel(PanelRegion.Right, "GPU Status", () => new GPUStatusView())));
-      system.Items.Add(new MenuFlyoutSeparator());
-      system.Items.Add(CreateMenuItem("Diagnostics", () => SwitchToPanel(PanelRegion.Bottom, "Diagnostics", () => new DiagnosticsView())));
-      system.Items.Add(CreateMenuItem("Health Check", () => SwitchToPanel(PanelRegion.Right, "Health Check", () => new HealthCheckView())));
-      system.Items.Add(CreateMenuItem("Job Progress", () => SwitchToPanel(PanelRegion.Bottom, "Job Progress", () => new JobProgressView())));
-      system.Items.Add(CreateMenuItem("MCP Dashboard", () => SwitchToPanel(PanelRegion.Center, "MCP Dashboard", () => new MCPDashboardView())));
-      system.Items.Add(CreateMenuItem("Help", () => SwitchToPanel(PanelRegion.Right, "Help", () => new HelpView())));
-      item.Items.Add(system);
+      foreach (var group in grouped)
+      {
+        var subItem = new MenuFlyoutSubItem { Text = group.Key };
+        foreach (var descriptor in group)
+        {
+          var panelId = descriptor.PanelId;
+          var region = descriptor.DefaultRegion;
+          var displayName = descriptor.DisplayName;
+          subItem.Items.Add(CreateMenuItem(displayName, () => OpenPanelById(panelId, region)));
+        }
+        item.Items.Add(subItem);
+      }
 
       return item;
     }
@@ -2696,10 +2617,10 @@ namespace VoiceStudio.App
       var item = new MenuBarItem { Title = "AI" };
       item.Items.Add(CreateMenuItem(
           "AI Mixing & Mastering",
-          () => SwitchToPanel(PanelRegion.Right, "AI Mixing & Mastering", () => new AIMixingMasteringView())));
+          () => OpenPanelById("AIMixingMastering")));
       item.Items.Add(CreateMenuItem(
           "Ensemble Synthesis",
-          () => SwitchToPanel(PanelRegion.Center, "Ensemble Synthesis", () => new EnsembleSynthesisView())));
+          () => OpenPanelById("EnsembleSynthesis")));
       return item;
     }
 

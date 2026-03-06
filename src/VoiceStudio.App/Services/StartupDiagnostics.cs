@@ -557,7 +557,7 @@ namespace VoiceStudio.App.Services
                     File.WriteAllText(errPath,
                         $"{DateTime.UtcNow:O}: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
                 }
-                catch { /* last resort */ }
+                catch (Exception diagEx) { System.Diagnostics.Debug.WriteLine($"Diagnostics log write failed: {diagEx.Message}"); }
             }
         }
 

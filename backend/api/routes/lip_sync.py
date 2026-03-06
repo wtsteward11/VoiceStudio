@@ -251,7 +251,7 @@ async def get_engine_status(engine_id: str):
         from backend.media.lip_sync.lip_sync_service import get_lip_sync_service
 
         service = get_lip_sync_service()
-        status = service.get_engine_status(engine_id)
+        status = await service.get_engine_status(engine_id)
 
         if not status:
             raise HTTPException(status_code=404, detail=f"Engine '{engine_id}' not found")

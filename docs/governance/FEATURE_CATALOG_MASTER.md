@@ -175,19 +175,16 @@ This list is the feature scope authority for the UI panel surface.
 
 ### FCM-006.1 Route registry parity findings
 
-- In `route_module_names` but not `_include_route`: `consent`, `metrics`, `telemetry`
-- In `_include_route` but not `route_module_names`: `experiments`
-
-This is avoidable governance debt. It creates false confidence in what is truly registered.
+RESOLVED (2026-03-06, commit 2b744691). Parity enforced by `tests/ci/test_route_registry_parity.py`.
 
 ### FCM-006.2 Verification baseline finding
 
 - Latest run `.\scripts\verify.ps1 -Quick` is GREEN (`20260305_011208`).
 - Gate/Ledger validation passed including `empty_catch_check`.
-- Gate status still includes Gate B open (9/10).
+- Gate B CLOSED (10/10) as of 2026-03-06.
 - Historical note: an earlier same-day quick run failed on empty catches, then recovered.
 
-Until Gate B is closed and real-engine golden-path proof is complete, claims of “bulletproof” are not credible.
+Real-engine golden-path proof remains a prerequisite; claims of “bulletproof” are not credible.
 
 ## FCM-007 Snapshot Comparison
 
@@ -226,14 +223,14 @@ These are useful historical records, but they are not runtime feature truth.
 
 ## FCM-009 Ordered Next 20 Tasks
 
-1. Close Gate B from 9/10 to 10/10.
+1. [x] Close Gate B from 9/10 to 10/10.
 2. Add a CI assertion that enforces zero empty catches to prevent regression.
 3. Adopt this document as canonical in governance index.
 4. Mark old feature docs as superseded with pointer to this file.
 5. Build generator script for panel/API/engine/plugin inventory refresh.
 6. Add CI check for stale catalog versus generated appendix.
-7. Add route parity test: files vs `route_module_names` vs `_include_route`.
-8. Resolve `consent`, `metrics`, `telemetry`, `experiments` parity drift.
+7. [x] Add route parity test: files vs `route_module_names` vs `_include_route`.
+8. [x] Resolve `consent`, `metrics`, `telemetry`, `experiments` parity drift.
 9. Classify all `_archived/*` routes as keep/delete/migrate.
 10. Classify all `contexts/*` routes as contract/dead scaffolding.
 11. Add panel parity test: registry ID requires View + ViewModel + navigation.

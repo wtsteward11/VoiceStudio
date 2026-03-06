@@ -1254,6 +1254,7 @@ _Previous:_
 | 2026-03-05 | PHASE-F-RUNTIME | docs/reports/verification/PROOF_SUPPORT_BUNDLE_RUNTIME_2026-03-05.json | Runtime Gate | Verified |
 | 2026-03-04 | PHASE-F-RUNTIME | PROOF_PERF_BUDGET_RUNTIME (workflow_dispatch, Windows runner; requires app launch + backend) | Runtime Gate | Pending |
 | 2026-03-04 | PHASE-F-RUNTIME | PROOF_GOLDEN_PATH_STUB (PR CI, ubuntu-latest) | Runtime Gate | Active |
+| 2026-03-06 | F0-SHIP-V1.1.0 | docs/reports/verification/PROOF_GOLDEN_PATH_REAL_2026-03-06.json | Golden Path Proof | Verified |
 | 2026-03-05 | PHASE-F-RUNTIME | docs/reports/verification/PROOF_GOLDEN_PATH_REAL_2026-03-05.json | Golden Path Proof | Verified |
 | 2026-03-03 | ROADMAP-V2-PHASE-E | docs/reports/verification/PROOF_GOLDEN_PATH_STUB_2026-03-04.json (I-3 compliant, stub mode) | Golden Path Proof | Verified |
 | 2026-03-03 | ROADMAP-V2-PHASE-0 | pytest tests/ci/ (pre-SSOT; CI gate tests verified at time of completion) | CI Gate Tests | Verified |

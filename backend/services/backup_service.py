@@ -112,9 +112,15 @@ class BackupService:
         self._manifests: dict[str, BackupManifest] = {}
         self._running = False
         self._scheduler_task: asyncio.Task | None = None
-        self._lock = asyncio.Lock()
+        self._lock: asyncio.Lock | None = None  # Lazy init in async context
 
         self._load_manifests()
+
+    def _ensure_lock(self) -> asyncio.Lock:
+        """Get or create the async lock (must be called from async context)."""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     def _load_manifests(self) -> None:
         """Load backup manifests from disk."""
@@ -232,7 +238,7 @@ class BackupService:
         Returns:
             Backup manifest
         """
-        async with self._lock:
+        async with self._ensure_lock():
             backup_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
             manifest = BackupManifest(

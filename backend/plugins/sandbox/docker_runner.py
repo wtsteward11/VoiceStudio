@@ -156,7 +156,7 @@ class DockerRunner:
 
     # Communication
     _communication_task: Optional[asyncio.Task] = field(default=None, repr=False)
-    _request_queue: asyncio.Queue = field(default_factory=asyncio.Queue, repr=False)
+    _request_queue: Optional[asyncio.Queue] = field(default=None, repr=False)
     _response_futures: Dict[str, asyncio.Future] = field(default_factory=dict, repr=False)
     _next_request_id: int = field(default=0, repr=False)
 
@@ -175,7 +175,7 @@ class DockerRunner:
         self._on_state_change = []
         self._on_crash = []
         self._response_futures = {}
-        self._request_queue = asyncio.Queue()
+        # _request_queue created lazily in async context to avoid get_event_loop() in sync tests
 
         if not DOCKER_AVAILABLE:
             logger.warning("Docker package not installed. Install with: pip install docker")
@@ -672,8 +672,8 @@ except ImportError:
         """Send a request to the plugin in the container."""
         request_id = request["id"]
 
-        # Create future for response
-        future: asyncio.Future = asyncio.get_event_loop().create_future()
+        # Create future for response (use running loop; we're in async context)
+        future: asyncio.Future = asyncio.get_running_loop().create_future()
         self._response_futures[request_id] = future
 
         try:

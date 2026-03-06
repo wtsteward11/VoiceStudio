@@ -3,7 +3,7 @@
 **Date**: March 3, 2026 | **Target**: v1.1.0 | **Confidential**
 
 **Stack**: WinUI 3 / C# + FastAPI / Python
-**Engines**: XTTS v2 (primary) · Piper · whisper_cpp · 42 adapters
+**Engines**: XTTS v2 (primary) · Piper · STT engine (whisper_cpp, faster-whisper, or equivalent) · 42 adapters
 
 ---
 
@@ -25,7 +25,7 @@ v1.0 roadmap: correct gaps, weak enforcement. ChatGPT critique: mostly valid on 
 
 ### Governing Principle — UNCHANGED
 
-100% complete means exactly one thing: `pytest tests/e2e/test_golden_path.py` exits 0 with real XTTS + whisper_cpp loaded, real audio in, real synthesized audio out, proof artifact on disk with model hashes and git commit. Everything else is scaffolding.
+100% complete means exactly one thing: `pytest tests/e2e/test_golden_path.py` exits 0 with real XTTS + STT engine loaded, real audio in, real synthesized audio out, proof artifact on disk with model hashes and git commit. Everything else is scaffolding.
 
 ---
 
@@ -151,4 +151,4 @@ Six phases. Every milestone has a CI gate, a specific command, or a hard fork de
 
 ## Section 5: The One Metric That Cannot Be Faked
 
-`pytest tests/e2e/test_golden_path.py -v` exits 0 with `engine_mode='real'`, XTTS + whisper_cpp loaded, real WAV in, synthesized audio out with RMS > 0.001, proof artifact at `.buildlogs/proof_runs/` with all I-3 fields.
+`pytest tests/e2e/test_golden_path.py -v` exits 0 with `engine_mode='real'`, XTTS + STT engine loaded, real WAV in, synthesized audio out with RMS > 0.001, proof artifact at `.buildlogs/proof_runs/` with all I-3 fields.

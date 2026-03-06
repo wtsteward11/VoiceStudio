@@ -528,7 +528,14 @@ def validate_nested_semantics(
                 errors.append(
                     f"{_rel(path)}: models must be a non-empty dict for real mode"
                 )
-            elif models:
+            else:
+                min_count = nested.get("models_min_count")
+                if min_count is not None and len(models) < min_count:
+                    errors.append(
+                        f"{_rel(path)}: models must have >= {min_count} entries "
+                        f"(synthesis + STT engine), got {len(models)}"
+                    )
+            if models:
                 for mk, mv in models.items():
                     if not re.match(r"^[a-f0-9]{64}$", str(mv)):
                         errors.append(

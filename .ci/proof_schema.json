@@ -231,6 +231,7 @@
       "passed_must_be_true": true,
       "engine_mode_must_be_real": true,
       "models_must_have_hashes": true,
+      "models_min_count": 2,
       "output_metrics_positive": true,
       "test_ran_must_be_true": true,
       "artifact_sha256_required": true,

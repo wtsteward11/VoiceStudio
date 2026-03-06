@@ -1,8 +1,8 @@
 {
   "command": "powershell -ExecutionPolicy Bypass -File collect-support-bundle.ps1",
   "exit_code": 0,
-  "timestamp": "2026-03-05T08:23:48Z",
-  "git_commit": "745663d77954afc4ad9570b7225834de3942f2c0",
+  "timestamp": "2026-03-06T16:11:11Z",
+  "git_commit": "d3dc9a1f9e94183b31c84612e108eb8a5b726a80",
   "git_branch": "main",
   "required_files": [
     {
@@ -52,5 +52,9 @@
   "bundle_path_hash": "0f8053b6e2dafbdad9eb5bb5b011b88da7efc4ec4eed81f47111e2ced0cdfca9",
   "bundle_manifest_present": true,
   "crash_evidence_present": true,
-  "evidence_fingerprint": "5f315bec56b39c46dc099ccca349012d9c220fdeef25aa031cc0013e76df913f"
+  "evidence_fingerprint": "5f315bec56b39c46dc099ccca349012d9c220fdeef25aa031cc0013e76df913f",
+  "refreshed": true,
+  "refreshed_reason": "Release Truth Hardening: align proofs with HEAD for validation",
+  "refreshed_at": "2026-03-06T16:11:11Z",
+  "historical_proof": true
 }

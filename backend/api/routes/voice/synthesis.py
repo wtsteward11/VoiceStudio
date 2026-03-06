@@ -33,8 +33,8 @@ from ._helpers import (
     _resolve_profile_audio,
     _try_utility_tts_fallback,
 )
+from . import _shared
 from ._shared import (
-    ENGINE_AVAILABLE,
     HAS_QUALITY_OPTIMIZATION,
     EngineConfigServiceDep,
     EngineProcessingException,
@@ -42,7 +42,6 @@ from ._shared import (
     EventType,
     InvalidEngineException,
     ProfileNotFoundException,
-    engine_router,
     get_config,
     get_engine_breaker,
     instrument_flow,
@@ -112,13 +111,13 @@ async def synthesize(
         try:
             # Dynamically discover available engines from router
             valid_engines: list[str] = []
-            if ENGINE_AVAILABLE and engine_router:
-                valid_engines = engine_router.list_engines()
-            if not valid_engines and engine_router is not None:
+            if _shared.ENGINE_AVAILABLE and _shared.engine_router:
+                valid_engines = _shared.engine_router.list_engines()
+            if not valid_engines and _shared.engine_router is not None:
                 # If no engines loaded, try loading from manifests
                 try:
-                    engine_router.load_all_engines("engines")
-                    valid_engines = engine_router.list_engines()
+                    _shared.engine_router.load_all_engines("engines")
+                    valid_engines = _shared.engine_router.list_engines()
                 except Exception as e:
                     logger.warning(f"Failed to auto-load engines: {e}")
                     valid_engines = []
@@ -172,10 +171,10 @@ async def synthesize(
                 )
 
             # If engines are available, use them
-            if ENGINE_AVAILABLE and engine_router:
+            if _shared.ENGINE_AVAILABLE and _shared.engine_router:
                 try:
                     # Get engine instance (creates if not exists)
-                    engine = engine_router.get_engine(engine_id)
+                    engine = _shared.engine_router.get_engine(engine_id)
                     if engine is None:
                         raise EngineUnavailableException(
                             engine=requested_engine,
@@ -566,14 +565,14 @@ async def synthesize_multipass(
     )
 
     try:
-        if not ENGINE_AVAILABLE or not engine_router:
+        if not _shared.ENGINE_AVAILABLE or not _shared.engine_router:
             raise HTTPException(
                 status_code=503,
                 detail="Engine router not available for multi-pass synthesis",
             )
 
         # Validate engine
-        valid_engines = engine_router.list_engines()
+        valid_engines = _shared.engine_router.list_engines()
         requested_engine = req.engine
         engine_id = _normalize_engine_id(requested_engine)
         if engine_id not in valid_engines:
@@ -583,7 +582,7 @@ async def synthesize_multipass(
             )
 
         # Get engine instance
-        engine = engine_router.get_engine(engine_id)
+        engine = _shared.engine_router.get_engine(engine_id)
         if engine is None:
             raise HTTPException(
                 status_code=503,
@@ -768,7 +767,7 @@ async def synthesize_with_style(
     # Demo mode gate (GPT Research Phase 2)
     if os.environ.get("VOICESTUDIO_DEMO_MODE", "").strip().lower() in ("true", "1", "yes"):
         raise HTTPException(status_code=403, detail="Style synthesis disabled in demo mode.")
-    if not ENGINE_AVAILABLE or not engine_router:
+    if not _shared.ENGINE_AVAILABLE or not _shared.engine_router:
         raise HTTPException(status_code=503, detail="Engine router not available")
 
     if engine != "openvoice":
@@ -778,7 +777,7 @@ async def synthesize_with_style(
         )
 
     try:
-        engine_instance = engine_router.get_engine(engine)
+        engine_instance = _shared.engine_router.get_engine(engine)
         if engine_instance is None:
             raise HTTPException(status_code=503, detail=f"Engine '{engine}' is not available")
 
@@ -905,7 +904,7 @@ async def synthesize_cross_lingual(
     # Demo mode gate (GPT Research Phase 2)
     if os.environ.get("VOICESTUDIO_DEMO_MODE", "").strip().lower() in ("true", "1", "yes"):
         raise HTTPException(status_code=403, detail="Cross-lingual synthesis disabled in demo mode.")
-    if not ENGINE_AVAILABLE or not engine_router:
+    if not _shared.ENGINE_AVAILABLE or not _shared.engine_router:
         raise HTTPException(status_code=503, detail="Engine router not available")
 
     if engine != "openvoice":
@@ -915,7 +914,7 @@ async def synthesize_cross_lingual(
         )
 
     try:
-        engine_instance = engine_router.get_engine(engine)
+        engine_instance = _shared.engine_router.get_engine(engine)
         if engine_instance is None:
             raise HTTPException(status_code=503, detail=f"Engine '{engine}' is not available")
 

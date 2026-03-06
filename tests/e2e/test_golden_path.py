@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 # Configuration: base URL without /api suffix (routes add /api/... themselves)
 API_BASE_URL = os.environ.get("VOICESTUDIO_API_URL", "http://localhost:8000")
-TIMEOUT_SECONDS = 60  # Maximum time for long operations
+TIMEOUT_SECONDS = 180  # Maximum time for long operations (XTTS CPU cold start)
 
 
 class GoldenPathTestData:

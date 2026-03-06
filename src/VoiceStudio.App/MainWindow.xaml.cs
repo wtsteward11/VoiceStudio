@@ -59,6 +59,18 @@ namespace VoiceStudio.App
     private MenuFlyoutItem? _checkForUpdatesMenuItem;
     private MenuFlyoutItem? _keyboardShortcutsMenuItem;
 
+    // Workspace splitter drag state (WinUI 3 has no built-in GridSplitter)
+    private enum SplitterKind { None, Vertical1, Vertical2, Horizontal }
+    private SplitterKind _activeSplitter;
+    private double _splitterStartX;
+    private double _splitterStartY;
+    private double _splitterStartLeft;
+    private double _splitterStartCenter;
+    private double _splitterStartRight;
+    private double _splitterStartTop;
+    private double _splitterStartBottom;
+    private const double MinStarValue = 0.5;
+
     /// <summary>
     /// Gets the unified panel registry from DI container.
     /// Use CreatePanelFromRegistry() for panel creation.
@@ -3021,7 +3033,6 @@ namespace VoiceStudio.App
 
         foreach (var regionState in layout.Regions)
         {
-          // Get the panel host for this region
           Controls.PanelHost? targetHost = regionState.Region switch
           {
             PanelRegion.Left => FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
@@ -3034,7 +3045,6 @@ namespace VoiceStudio.App
           if (targetHost == null)
             continue;
 
-          // Try to restore the active panel for this region (GAP-F04)
           var activePanelId = regionState.ActivePanelId;
           if (!string.IsNullOrEmpty(activePanelId))
           {
@@ -3060,6 +3070,8 @@ namespace VoiceStudio.App
           }
         }
 
+        RestoreSplitterRatios(layout);
+
         return restoredAny;
       }
       catch (Exception ex)
@@ -3069,8 +3081,40 @@ namespace VoiceStudio.App
       }
     }
 
+    private void RestoreSplitterRatios(WorkspaceLayout layout)
+    {
+      var leftCol = FindNameOnContent("LeftColumn") as ColumnDefinition;
+      var centerCol = FindNameOnContent("CenterColumn") as ColumnDefinition;
+      var rightCol = FindNameOnContent("RightColumn") as ColumnDefinition;
+      var topRow = FindNameOnContent("TopRow") as RowDefinition;
+      var bottomRow = FindNameOnContent("BottomRow") as RowDefinition;
+      if (leftCol == null || centerCol == null || rightCol == null || topRow == null || bottomRow == null)
+        return;
+
+      var leftState = layout.Regions.FirstOrDefault(r => r.Region == PanelRegion.Left);
+      var centerState = layout.Regions.FirstOrDefault(r => r.Region == PanelRegion.Center);
+      var rightState = layout.Regions.FirstOrDefault(r => r.Region == PanelRegion.Right);
+      var bottomState = layout.Regions.FirstOrDefault(r => r.Region == PanelRegion.Bottom);
+
+      if (leftState?.WidthRatio > 0 && centerState?.WidthRatio > 0 && rightState?.WidthRatio > 0)
+      {
+        leftCol.Width = new GridLength(leftState.WidthRatio.Value, GridUnitType.Star);
+        centerCol.Width = new GridLength(centerState.WidthRatio.Value, GridUnitType.Star);
+        rightCol.Width = new GridLength(rightState.WidthRatio.Value, GridUnitType.Star);
+        Debug.WriteLine($"Restored column ratios: L={leftState.WidthRatio:F3} C={centerState.WidthRatio:F3} R={rightState.WidthRatio:F3}");
+      }
+
+      var topState = leftState ?? centerState;
+      if (topState?.HeightRatio > 0 && bottomState?.HeightRatio > 0)
+      {
+        topRow.Height = new GridLength(topState.HeightRatio.Value, GridUnitType.Star);
+        bottomRow.Height = new GridLength(bottomState.HeightRatio.Value, GridUnitType.Star);
+        Debug.WriteLine($"Restored row ratios: T={topState.HeightRatio:F3} B={bottomState.HeightRatio:F3}");
+      }
+    }
+
     /// <summary>
-    /// Saves current workspace layout including all panel states.
+    /// Saves current workspace layout including all panel states and splitter ratios.
     /// </summary>
     private void SaveWorkspaceLayout()
     {
@@ -3079,15 +3123,25 @@ namespace VoiceStudio.App
 
       try
       {
-        // Save state for each panel host
-        var leftPanelHost = FindNameOnContent("LeftPanelHost") as Controls.PanelHost;
-        var centerPanelHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-        var rightPanelHost = FindNameOnContent("RightPanelHost") as Controls.PanelHost;
-        var bottomPanelHost = FindNameOnContent("BottomPanelHost") as Controls.PanelHost;
-        leftPanelHost?.SaveRegionState();
-        centerPanelHost?.SaveRegionState();
-        rightPanelHost?.SaveRegionState();
-        bottomPanelHost?.SaveRegionState();
+        var leftCol = FindNameOnContent("LeftColumn") as ColumnDefinition;
+        var centerCol = FindNameOnContent("CenterColumn") as ColumnDefinition;
+        var rightCol = FindNameOnContent("RightColumn") as ColumnDefinition;
+        var topRow = FindNameOnContent("TopRow") as RowDefinition;
+        var bottomRow = FindNameOnContent("BottomRow") as RowDefinition;
+
+        double colSum = (leftCol?.Width.Value ?? 20) + (centerCol?.Width.Value ?? 55) + (rightCol?.Width.Value ?? 25);
+        double rowSum = (topRow?.Height.Value ?? 4) + (bottomRow?.Height.Value ?? 1);
+
+        double leftRatio = (leftCol?.Width.Value ?? 20) / colSum;
+        double centerRatio = (centerCol?.Width.Value ?? 55) / colSum;
+        double rightRatio = (rightCol?.Width.Value ?? 25) / colSum;
+        double topRatio = (topRow?.Height.Value ?? 4) / rowSum;
+        double bottomRatio = (bottomRow?.Height.Value ?? 1) / rowSum;
+
+        SavePanelHostRegion("LeftPanelHost", PanelRegion.Left, leftRatio, topRatio);
+        SavePanelHostRegion("CenterPanelHost", PanelRegion.Center, centerRatio, topRatio);
+        SavePanelHostRegion("RightPanelHost", PanelRegion.Right, rightRatio, topRatio);
+        SavePanelHostRegion("BottomPanelHost", PanelRegion.Bottom, null, bottomRatio);
       }
       catch (Exception ex)
       {
@@ -3095,18 +3149,66 @@ namespace VoiceStudio.App
       }
     }
 
+    private void SavePanelHostRegion(string hostName, PanelRegion region, double? widthRatio, double? heightRatio)
+    {
+      var host = FindNameOnContent(hostName) as Controls.PanelHost;
+      if (host == null || _panelStateService == null)
+        return;
+
+      string activePanelId = string.Empty;
+      var openedPanels = new List<string>();
+
+      if (host.Content != null)
+      {
+        var panelId = GetPanelIdFromHost(host);
+        if (!string.IsNullOrEmpty(panelId))
+        {
+          activePanelId = panelId;
+          openedPanels.Add(panelId);
+        }
+      }
+
+      _panelStateService.SaveRegionState(region, activePanelId, openedPanels, widthRatio, heightRatio);
+    }
+
+    private static string? GetPanelIdFromHost(Controls.PanelHost host)
+    {
+      if (host.Content is FrameworkElement fe)
+      {
+        var typeName = fe.GetType().Name;
+        if (typeName.EndsWith("View", StringComparison.Ordinal))
+          return typeName[..^4];
+      }
+      return null;
+    }
+
     /// <summary>
     /// Handles workspace profile changes.
     /// </summary>
     private void OnWorkspaceProfileChanged(object? sender, WorkspaceProfileChangedEventArgs e)
     {
-      try
+      var enqueued = DispatcherQueue.TryEnqueue(() =>
       {
-        RestorePanelsFromLayout();
-      }
-      catch (Exception ex)
+        try
+        {
+          RestorePanelsFromLayout();
+        }
+        catch (Exception ex)
+        {
+          System.Diagnostics.Debug.WriteLine(
+            $"[MainWindow] WorkspaceProfileChanged restore failed: {ex.Message}");
+          var toastService = ServiceProvider.TryGetToastNotificationService();
+          toastService?.ShowError(
+            "Workspace Restore Failed",
+            "Could not restore workspace layout after profile switch.");
+        }
+      });
+
+      if (!enqueued)
       {
-        System.Diagnostics.Debug.WriteLine($"Failed to handle workspace profile change: {ex.Message}");
+        System.Diagnostics.Debug.WriteLine(
+          "[MainWindow] OnWorkspaceProfileChanged: DispatcherQueue.TryEnqueue returned false — " +
+          "window may be closing. Restore skipped.");
       }
     }
 
@@ -3228,6 +3330,126 @@ namespace VoiceStudio.App
       {
       }
     }
+
+    #region Workspace Splitter Handlers
+
+    private void WorkspaceSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+      if (sender is not FrameworkElement splitter)
+        return;
+
+      var workspaceGrid = FindNameOnContent("WorkspaceGrid") as Grid;
+      var leftCol = FindNameOnContent("LeftColumn") as ColumnDefinition;
+      var centerCol = FindNameOnContent("CenterColumn") as ColumnDefinition;
+      var rightCol = FindNameOnContent("RightColumn") as ColumnDefinition;
+      var topRow = FindNameOnContent("TopRow") as RowDefinition;
+      var bottomRow = FindNameOnContent("BottomRow") as RowDefinition;
+      if (workspaceGrid == null || leftCol == null || centerCol == null || rightCol == null || topRow == null || bottomRow == null)
+        return;
+
+      var pt = e.GetCurrentPoint(workspaceGrid);
+      _splitterStartX = pt.Position.X;
+      _splitterStartY = pt.Position.Y;
+      _splitterStartLeft = leftCol.Width.IsStar ? leftCol.Width.Value : 20;
+      _splitterStartCenter = centerCol.Width.IsStar ? centerCol.Width.Value : 55;
+      _splitterStartRight = rightCol.Width.IsStar ? rightCol.Width.Value : 25;
+      _splitterStartTop = topRow.Height.IsStar ? topRow.Height.Value : 4;
+      _splitterStartBottom = bottomRow.Height.IsStar ? bottomRow.Height.Value : 1;
+
+      var name = splitter.Name;
+      if (string.Equals(name, "VerticalSplitter1", StringComparison.Ordinal))
+        _activeSplitter = SplitterKind.Vertical1;
+      else if (string.Equals(name, "VerticalSplitter2", StringComparison.Ordinal))
+        _activeSplitter = SplitterKind.Vertical2;
+      else if (string.Equals(name, "HorizontalSplitter", StringComparison.Ordinal))
+        _activeSplitter = SplitterKind.Horizontal;
+      else
+        _activeSplitter = SplitterKind.None;
+
+      if (_activeSplitter != SplitterKind.None)
+      {
+        splitter.CapturePointer(e.Pointer);
+        e.Handled = true;
+      }
+    }
+
+    private void WorkspaceSplitter_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+      if (_activeSplitter == SplitterKind.None)
+        return;
+
+      var workspaceGrid = FindNameOnContent("WorkspaceGrid") as Grid;
+      var leftCol = FindNameOnContent("LeftColumn") as ColumnDefinition;
+      var centerCol = FindNameOnContent("CenterColumn") as ColumnDefinition;
+      var rightCol = FindNameOnContent("RightColumn") as ColumnDefinition;
+      var topRow = FindNameOnContent("TopRow") as RowDefinition;
+      var bottomRow = FindNameOnContent("BottomRow") as RowDefinition;
+      if (workspaceGrid == null || leftCol == null || centerCol == null || rightCol == null || topRow == null || bottomRow == null)
+        return;
+
+      var pt = e.GetCurrentPoint(workspaceGrid);
+      var deltaX = pt.Position.X - _splitterStartX;
+      var deltaY = pt.Position.Y - _splitterStartY;
+
+      // Scale: ~100px drag ≈ 1 star unit
+      var scale = 100.0;
+      var dStar = deltaX / scale;
+      var dStarV = deltaY / scale;
+
+      if (_activeSplitter == SplitterKind.Vertical1)
+      {
+        var newLeft = Math.Max(MinStarValue, Math.Min(_splitterStartLeft + _splitterStartCenter - MinStarValue, _splitterStartLeft + dStar));
+        var newCenter = _splitterStartLeft + _splitterStartCenter - newLeft;
+        if (newCenter >= MinStarValue)
+        {
+          leftCol.Width = new GridLength(newLeft, GridUnitType.Star);
+          centerCol.Width = new GridLength(newCenter, GridUnitType.Star);
+          _splitterStartX = pt.Position.X;
+          _splitterStartLeft = newLeft;
+          _splitterStartCenter = newCenter;
+        }
+      }
+      else if (_activeSplitter == SplitterKind.Vertical2)
+      {
+        var newCenter = Math.Max(MinStarValue, Math.Min(_splitterStartCenter + _splitterStartRight - MinStarValue, _splitterStartCenter + dStar));
+        var newRight = _splitterStartCenter + _splitterStartRight - newCenter;
+        if (newRight >= MinStarValue)
+        {
+          centerCol.Width = new GridLength(newCenter, GridUnitType.Star);
+          rightCol.Width = new GridLength(newRight, GridUnitType.Star);
+          _splitterStartX = pt.Position.X;
+          _splitterStartCenter = newCenter;
+          _splitterStartRight = newRight;
+        }
+      }
+      else if (_activeSplitter == SplitterKind.Horizontal)
+      {
+        var newTop = Math.Max(MinStarValue, Math.Min(_splitterStartTop + _splitterStartBottom - MinStarValue, _splitterStartTop + dStarV));
+        var newBottom = _splitterStartTop + _splitterStartBottom - newTop;
+        if (newBottom >= MinStarValue)
+        {
+          topRow.Height = new GridLength(newTop, GridUnitType.Star);
+          bottomRow.Height = new GridLength(newBottom, GridUnitType.Star);
+          _splitterStartY = pt.Position.Y;
+          _splitterStartTop = newTop;
+          _splitterStartBottom = newBottom;
+        }
+      }
+
+      e.Handled = true;
+    }
+
+    private void WorkspaceSplitter_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+      if (sender is FrameworkElement splitter && _activeSplitter != SplitterKind.None)
+      {
+        splitter.ReleasePointerCapture(e.Pointer);
+        _activeSplitter = SplitterKind.None;
+        e.Handled = true;
+      }
+    }
+
+    #endregion
 
     private void MainWindow_Closed(object sender, WindowEventArgs e)
     {

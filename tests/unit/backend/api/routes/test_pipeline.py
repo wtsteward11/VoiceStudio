@@ -119,7 +119,7 @@ class TestPipelineProcess:
         )
         assert response.status_code == 422
 
-    @patch("app.core.pipeline.orchestrator.PipelineOrchestrator")
+    @patch("backend.pipeline.facade.PipelineOrchestrator")
     def test_process_pipeline_init_failure(self, mock_orchestrator_class, pipeline_client):
         """Test pipeline returns 503 when initialization fails."""
         # Mock orchestrator that fails to initialize
@@ -134,7 +134,7 @@ class TestPipelineProcess:
         assert response.status_code == 503
         assert "initialization failed" in response.json()["detail"].lower()
 
-    @patch("app.core.pipeline.orchestrator.PipelineOrchestrator")
+    @patch("backend.pipeline.facade.PipelineOrchestrator")
     def test_process_pipeline_success(self, mock_orchestrator_class, pipeline_client):
         """Test successful pipeline processing."""
         # Mock successful orchestrator
@@ -160,7 +160,7 @@ class TestPipelineProcess:
         assert "session_id" in data
         assert data["session_id"].startswith("sess-")
 
-    @patch("app.core.pipeline.orchestrator.PipelineOrchestrator")
+    @patch("backend.pipeline.facade.PipelineOrchestrator")
     def test_process_pipeline_with_options(self, mock_orchestrator_class, pipeline_client):
         """Test pipeline processing with custom options."""
         mock_orchestrator = MagicMock()
@@ -189,7 +189,7 @@ class TestPipelineProcess:
         data = response.json()
         assert data["response_text"] == "Custom response"
 
-    @patch("app.core.pipeline.orchestrator.PipelineOrchestrator")
+    @patch("backend.pipeline.facade.PipelineOrchestrator")
     def test_process_pipeline_error_handling(self, mock_orchestrator_class, pipeline_client):
         """Test pipeline handles processing errors gracefully."""
         mock_orchestrator = MagicMock()

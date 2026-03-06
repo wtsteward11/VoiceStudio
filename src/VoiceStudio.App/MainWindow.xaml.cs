@@ -764,6 +764,12 @@ namespace VoiceStudio.App
 
       AppendStepLog("WARMUP_DONE");
 
+      void AssertPanelOpened(string panelId, PanelRegion region)
+      {
+        if (!OpenPanelById(panelId, region))
+          throw new InvalidOperationException($"Smoke: failed to open panel {panelId}");
+      }
+
       var steps = new (string Name, Action Action)[]
       {
         // Primary navigation buttons (8 steps)
@@ -777,31 +783,31 @@ namespace VoiceStudio.App
         ("NavLogs", () => NavLogs_Click(this, new RoutedEventArgs())),
 
         // Core synthesis panels (4 steps)
-        ("PanelVoiceSynthesis", () => SwitchToPanel(PanelRegion.Center, "Voice Synthesis", () => new VoiceSynthesisView())),
-        ("PanelEnsembleSynthesis", () => SwitchToPanel(PanelRegion.Center, "Ensemble Synthesis", () => new EnsembleSynthesisView())),
-        ("PanelBatchProcessing", () => SwitchToPanel(PanelRegion.Center, "Batch Processing", () => new BatchProcessingView())),
-        ("PanelTextSpeechEditor", () => SwitchToPanel(PanelRegion.Center, "Text Speech Editor", () => new TextSpeechEditorView())),
+        ("PanelVoiceSynthesis", () => AssertPanelOpened("VoiceSynthesis", PanelRegion.Center)),
+        ("PanelEnsembleSynthesis", () => AssertPanelOpened("EnsembleSynthesis", PanelRegion.Center)),
+        ("PanelBatchProcessing", () => AssertPanelOpened("BatchProcessing", PanelRegion.Center)),
+        ("PanelTextSpeechEditor", () => AssertPanelOpened("TextSpeechEditor", PanelRegion.Center)),
 
         // Training panels (3 steps)
-        ("PanelTrainingDatasetEditor", () => SwitchToPanel(PanelRegion.Center, "Training Dataset Editor", () => new TrainingDatasetEditorView())),
-        ("PanelModelManager", () => SwitchToPanel(PanelRegion.Center, "Model Manager", () => new ModelManagerView())),
-        ("PanelTraining", () => SwitchToPanel(PanelRegion.Center, "Training", () => new TrainingView())),
+        ("PanelTrainingDatasetEditor", () => AssertPanelOpened("TrainingDatasetEditor", PanelRegion.Center)),
+        ("PanelModelManager", () => AssertPanelOpened("ModelManager", PanelRegion.Center)),
+        ("PanelTraining", () => AssertPanelOpened("Training", PanelRegion.Center)),
 
         // Audio processing panels (4 steps)
-        ("PanelTranscribe", () => SwitchToPanel(PanelRegion.Center, "Transcribe", () => new TranscribeView())),
-        ("PanelRecording", () => SwitchToPanel(PanelRegion.Center, "Recording", () => new RecordingView())),
-        ("PanelAudioAnalysis", () => SwitchToPanel(PanelRegion.Center, "Audio Analysis", () => new AudioAnalysisView())),
-        ("PanelQualityControl", () => SwitchToPanel(PanelRegion.Right, "Quality Control", () => new QualityControlView())),
+        ("PanelTranscribe", () => AssertPanelOpened("Transcribe", PanelRegion.Center)),
+        ("PanelRecording", () => AssertPanelOpened("Recording", PanelRegion.Center)),
+        ("PanelAudioAnalysis", () => AssertPanelOpened("AudioAnalysis", PanelRegion.Center)),
+        ("PanelQualityControl", () => AssertPanelOpened("QualityControl", PanelRegion.Right)),
 
         // Utility panels (3 steps)
-        ("PanelTimeline", () => SwitchToPanel(PanelRegion.Center, "Timeline", () => new TimelineView())),
-        ("PanelDiagnostics", () => SwitchToPanel(PanelRegion.Right, "Diagnostics", () => new DiagnosticsView())),
-        ("PanelHelp", () => SwitchToPanel(PanelRegion.Right, "Help", () => new HelpView())),
+        ("PanelTimeline", () => AssertPanelOpened("Timeline", PanelRegion.Center)),
+        ("PanelDiagnostics", () => AssertPanelOpened("Diagnostics", PanelRegion.Right)),
+        ("PanelHelp", () => AssertPanelOpened("Help", PanelRegion.Right)),
 
         // Voice control panels (3 steps)
-        ("PanelVoiceMorph", () => SwitchToPanel(PanelRegion.Center, "Voice Morph", () => new VoiceMorphView())),
-        ("PanelProsody", () => SwitchToPanel(PanelRegion.Right, "Prosody", () => new ProsodyView())),
-        ("PanelEmotionControl", () => SwitchToPanel(PanelRegion.Right, "Emotion Control", () => new EmotionControlView())),
+        ("PanelVoiceMorph", () => AssertPanelOpened("VoiceMorph", PanelRegion.Center)),
+        ("PanelProsody", () => AssertPanelOpened("Prosody", PanelRegion.Right)),
+        ("PanelEmotionControl", () => AssertPanelOpened("EmotionControl", PanelRegion.Right)),
       };
 
       foreach (var step in steps)

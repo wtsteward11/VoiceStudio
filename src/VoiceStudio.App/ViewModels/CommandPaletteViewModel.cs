@@ -59,18 +59,27 @@ namespace VoiceStudio.App.ViewModels
 
     void LoadDefaultItems()
     {
-      // Load panels from all regions
-      foreach (var region in Enum.GetValues<PanelRegion>())
+      foreach (var d in _panelRegistry.GetAllDescriptors()
+        .Where(d => d.Maturity != PanelMaturity.Deprecated)
+        .OrderBy(d => d.MenuCategory ?? d.Category.ToString())
+        .ThenBy(d => d.DisplayName))
       {
-        foreach (var d in _panelRegistry.GetPanelsForRegion(region))
+        var maturitySuffix = d.Maturity switch
         {
-          Items.Add(new CommandItem
-          {
-            Id = "open:" + d.PanelId,
-            Title = "Open " + d.DisplayName,
-            Kind = "Panel"
-          });
-        }
+          PanelMaturity.Experimental => " [Experimental]",
+          PanelMaturity.Beta => " [Beta]",
+          _ => ""
+        };
+
+        var keywordsText = d.Keywords != null ? string.Join(" ", d.Keywords) : "";
+
+        Items.Add(new CommandItem
+        {
+          Id = "open:" + d.PanelId,
+          Title = "Open " + d.DisplayName + maturitySuffix,
+          Kind = d.MenuCategory ?? d.Category.ToString(),
+          SearchText = d.DisplayName + " " + keywordsText
+        });
       }
 
       Items.Add(new CommandItem { Id = "help:keymap", Title = "Show keybindings", Kind = "System", Shortcut = "Ctrl+/" });
@@ -127,7 +136,9 @@ namespace VoiceStudio.App.ViewModels
       var src = string.IsNullOrEmpty(q)
           ? Items
           : new ObservableCollection<CommandItem>(
-              Items.Where(i => (i.Title ?? "").ToLowerInvariant().Contains(q))
+              Items.Where(i =>
+                (i.Title ?? "").ToLowerInvariant().Contains(q) ||
+                (i.SearchText ?? "").ToLowerInvariant().Contains(q))
           );
 
       FilteredItems.Clear();
@@ -211,5 +222,10 @@ namespace VoiceStudio.App.ViewModels
     /// Indicates if this command is registered with the UnifiedCommandRegistry.
     /// </summary>
     public bool IsRegistryCommand { get; set; }
+
+    /// <summary>
+    /// Optional searchable text (e.g. panel keywords) for filter matching.
+    /// </summary>
+    public string? SearchText { get; set; }
   }
 }

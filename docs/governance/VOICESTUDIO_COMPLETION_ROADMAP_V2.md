@@ -113,12 +113,12 @@ Six phases. Every milestone has a CI gate, a specific command, or a hard fork de
 - [x] **E3**: Proof artifact generation (I-3 compliant) — `scripts/golden_path_proof.py`, proof.json in .buildlogs/proof_runs/
 - [x] **E4**: Golden path in CI (stub mode) — golden-path job in .github/workflows/ci.yml
 
-### Phase F: v1.1.0 Release
+### Phase F: v1.1.0 Release — COMPLETE (2026-03-06)
 
-- **F0**: PROOF_GOLDEN_PATH_REAL must exist before any "100% complete" declaration
-- **F1**: Documentation and debt closure
-- **F2**: Final gate check (all invariants + deterministic tests + Release build)
-- **F3**: Tag v1.1.0-release
+- [x] **F0**: PROOF_GOLDEN_PATH_REAL must exist before any "100% complete" declaration
+- [x] **F1**: Documentation and debt closure
+- [x] **F2**: Final gate check (all invariants + deterministic tests + Release build)
+- [x] **F3**: Tag v1.1.0-release
 
 ---
 
@@ -137,7 +137,7 @@ Six phases. Every milestone has a CI gate, a specific command, or a hard fork de
 | 9 | Phase D | D2 — OpenAPI + I-4 | MEDIUM | API contract | DONE |
 | 10 | Phase E | E1-E3 — Real Engine Run + Proof | RELEASE GATE | Requires all previous phases | STUB DONE |
 | 11 | Phase E | E4 — Golden Path CI | MEDIUM | Automated regression guard | STUB DONE |
-| 12 | Phase F | F1-F3 — Release | FINAL | Only after steps 1-11 | NEXT |
+| 12 | Phase F | F0-F3 — Release | FINAL | Only after steps 1-11 | DONE |
 
 ---
 

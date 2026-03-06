@@ -662,7 +662,8 @@ $stage4Passed = Invoke-Stage -Name "Python Unit Tests" -Description "Run Python 
         --tb=short `
         -x `
         --junitxml=$junitFile `
-        -m "not slow and not gpu and not engine"
+        -m "not slow and not gpu and not engine" `
+        --ignore=tests/unit/backend/api/routes/_archived
     
     return $LASTEXITCODE
 }

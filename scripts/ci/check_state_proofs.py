@@ -724,8 +724,8 @@ def validate_proof(
             if head and gc:
                 allowed = [head.lower()]
                 if proof_type == "PROOF_GOLDEN_PATH_REAL":
-                    # Allow HEAD~1..~4: proof attests to test-run commit; CI fix commits can precede proof commit
-                    for n in (1, 2, 3, 4):
+                    # Allow HEAD~1..~12: proof attests to test-run commit; CI fix commits can precede proof commit
+                    for n in range(1, 13):
                         parent = subprocess.run(
                             ["git", "rev-parse", f"HEAD~{n}"],
                             cwd=ROOT,

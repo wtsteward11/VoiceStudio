@@ -594,6 +594,17 @@ def validate_nested_semantics(
                             f"{_rel(path)}: cannot verify artifact_sha256: artifact file does not exist"
                         )
 
+        # STT evidence required for non-historical proofs only (historical proofs lack these fields)
+        if proof_type == "PROOF_GOLDEN_PATH_REAL" and not _is_historical:
+            if nested.get("stt_step_ran_must_be_true") and data.get("stt_step_ran") is not True:
+                errors.append(
+                    f"{_rel(path)}: stt_step_ran must be true for non-historical proofs"
+                )
+            if nested.get("stt_engine_name_required") and not data.get("stt_engine_name"):
+                errors.append(
+                    f"{_rel(path)}: stt_engine_name is required for non-historical proofs"
+                )
+
     return errors
 
 

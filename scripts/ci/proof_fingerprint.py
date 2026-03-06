@@ -119,6 +119,8 @@ EVIDENCE_FIELDS: dict[str, list[str]] = {
         "pytest_stderr_sha256",
         "artifact_path",
         "artifact_sha256",
+        "stt_engine_name",
+        "stt_step_ran",
     ],
     "PROOF_BACKEND_COLD_START": [
         "command",

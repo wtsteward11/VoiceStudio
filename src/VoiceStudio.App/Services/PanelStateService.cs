@@ -259,6 +259,59 @@ namespace VoiceStudio.App.Services
     }
 
     /// <summary>
+    /// Migrates panel state from one region to another when a panel is docked/moved.
+    /// Ensures panel state follows the panelId across regions.
+    /// </summary>
+    public void MigratePanelState(string panelId, PanelRegion fromRegion, PanelRegion toRegion)
+    {
+      if (fromRegion == toRegion) return;
+      var layout = GetCurrentLayout();
+      var fromState = layout.Regions.FirstOrDefault(r => r.Region == fromRegion);
+      if (fromState?.PanelStates.TryGetValue(panelId, out var state) == true)
+      {
+        var toState = layout.Regions.FirstOrDefault(r => r.Region == toRegion);
+        if (toState != null)
+        {
+          toState.PanelStates[panelId] = state;
+          fromState.PanelStates.Remove(panelId);
+          layout.ModifiedAt = DateTime.UtcNow;
+          SaveCurrentWorkspace();
+        }
+      }
+    }
+
+    /// <summary>
+    /// Toggles whether a panel is pinned in the Tool Catalog (pinned panels appear at top).
+    /// </summary>
+    /// <param name="panelId">The panel ID to toggle.</param>
+    /// <returns>True if the panel is now pinned, false if unpinned.</returns>
+    public bool TogglePinnedPanel(string panelId)
+    {
+      var layout = GetCurrentLayout();
+      layout.PinnedPanelIds ??= new HashSet<string>();
+      if (layout.PinnedPanelIds.Contains(panelId))
+      {
+        layout.PinnedPanelIds.Remove(panelId);
+        layout.ModifiedAt = DateTime.UtcNow;
+        SaveCurrentWorkspace();
+        return false;
+      }
+      layout.PinnedPanelIds.Add(panelId);
+      layout.ModifiedAt = DateTime.UtcNow;
+      SaveCurrentWorkspace();
+      return true;
+    }
+
+    /// <summary>
+    /// Returns whether a panel is pinned in the Tool Catalog.
+    /// </summary>
+    public bool IsPanelPinned(string panelId)
+    {
+      var layout = GetCurrentLayout();
+      return layout.PinnedPanelIds?.Contains(panelId) ?? false;
+    }
+
+    /// <summary>
     /// Saves panel state for a specific project.
     /// </summary>
     /// <param name="projectId">The project identifier.</param>

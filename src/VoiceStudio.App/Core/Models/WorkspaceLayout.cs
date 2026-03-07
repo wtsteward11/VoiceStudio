@@ -34,6 +34,11 @@ namespace VoiceStudio.Core.Models
     /// Whether this is the default workspace profile.
     /// </summary>
     public bool IsDefault { get; set; }
+
+    /// <summary>
+    /// Panel IDs pinned/favorited in the Tool Catalog (shown at top of list).
+    /// </summary>
+    public HashSet<string> PinnedPanelIds { get; set; } = new HashSet<string>();
   }
 
   /// <summary>

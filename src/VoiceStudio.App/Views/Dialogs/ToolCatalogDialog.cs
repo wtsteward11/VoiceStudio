@@ -16,9 +16,12 @@ namespace VoiceStudio.App.Views.Dialogs
   public sealed class ToolCatalogDialog : ContentDialog
   {
     private readonly IPanelRegistry _registry;
+    private readonly PanelStateService _panelStateService;
     private ListView _listView = null!;
     private AutoSuggestBox _searchBox = null!;
     private ComboBox _regionChooser = null!;
+    private ComboBox _categoryFilter = null!;
+    private ComboBox _maturityFilter = null!;
     private List<PanelDescriptor> _allDescriptors = new();
     private List<PanelDescriptor> _filteredDescriptors = new();
 
@@ -34,6 +37,7 @@ namespace VoiceStudio.App.Views.Dialogs
       XamlRoot = xamlRoot;
 
       _registry = AppServices.GetPanelRegistry();
+      _panelStateService = AppServices.GetPanelStateService();
 
       var mainStack = new StackPanel { Spacing = 12 };
 
@@ -46,6 +50,25 @@ namespace VoiceStudio.App.Views.Dialogs
       _searchBox.TextChanged += SearchBox_TextChanged;
       _searchBox.QuerySubmitted += SearchBox_QuerySubmitted;
       mainStack.Children.Add(_searchBox);
+
+      var filterStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+      _categoryFilter = new ComboBox
+      {
+        Header = "Category",
+        Width = 140,
+        HorizontalAlignment = HorizontalAlignment.Left
+      };
+      _categoryFilter.SelectionChanged += (_, _) => ApplyFilter(_searchBox.Text);
+      filterStack.Children.Add(_categoryFilter);
+      _maturityFilter = new ComboBox
+      {
+        Header = "Maturity",
+        Width = 120,
+        HorizontalAlignment = HorizontalAlignment.Left
+      };
+      _maturityFilter.SelectionChanged += (_, _) => ApplyFilter(_searchBox.Text);
+      filterStack.Children.Add(_maturityFilter);
+      mainStack.Children.Add(filterStack);
 
       _regionChooser = new ComboBox
       {
@@ -67,6 +90,7 @@ namespace VoiceStudio.App.Views.Dialogs
       _listView.ItemClick += ListView_ItemClick;
       _listView.SelectionChanged += ListView_SelectionChanged;
       _listView.DoubleTapped += ListView_DoubleTapped;
+      _listView.ContextRequested += ListView_ContextRequested;
       mainStack.Children.Add(_listView);
 
       Content = mainStack;
@@ -91,6 +115,18 @@ namespace VoiceStudio.App.Views.Dialogs
         .OrderBy(d => d.MenuCategory ?? "Other")
         .ThenBy(d => d.DisplayName)
         .ToList();
+
+      var categories = new List<string> { "All" };
+      categories.AddRange(_allDescriptors
+        .Select(d => d.MenuCategory ?? "Other")
+        .Distinct()
+        .OrderBy(c => c));
+      _categoryFilter.ItemsSource = categories;
+      _categoryFilter.SelectedIndex = 0;
+
+      _maturityFilter.ItemsSource = new[] { "All", "Stable", "Beta", "Experimental" };
+      _maturityFilter.SelectedIndex = 0;
+
       ApplyFilter(_searchBox.Text);
     }
 
@@ -109,23 +145,68 @@ namespace VoiceStudio.App.Views.Dialogs
 
     private void ApplyFilter(string? query)
     {
-      if (string.IsNullOrWhiteSpace(query))
+      var filtered = _allDescriptors.AsEnumerable();
+
+      var categorySel = _categoryFilter.SelectedItem as string;
+      if (!string.IsNullOrEmpty(categorySel) && categorySel != "All")
+        filtered = filtered.Where(d => (d.MenuCategory ?? "Other") == categorySel);
+
+      var maturitySel = _maturityFilter.SelectedItem as string;
+      if (!string.IsNullOrEmpty(maturitySel) && maturitySel != "All")
       {
-        _filteredDescriptors = _allDescriptors.ToList();
+        var maturity = maturitySel switch
+        {
+          "Stable" => PanelMaturity.Stable,
+          "Beta" => PanelMaturity.Beta,
+          "Experimental" => PanelMaturity.Experimental,
+          _ => (PanelMaturity?)null
+        };
+        if (maturity.HasValue)
+          filtered = filtered.Where(d => d.Maturity == maturity.Value);
       }
-      else
+
+      if (!string.IsNullOrWhiteSpace(query))
       {
         var q = query.Trim();
-        _filteredDescriptors = _allDescriptors.Where(d =>
+        filtered = filtered.Where(d =>
           (d.DisplayName?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false) ||
           (d.Description?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false) ||
           (d.Keywords?.Any(k => k.Contains(q, StringComparison.OrdinalIgnoreCase)) ?? false) ||
           (d.PanelId?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false) ||
-          (d.MenuCategory?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+          (d.MenuCategory?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false));
       }
 
+      _filteredDescriptors = filtered
+        .OrderByDescending(d => _panelStateService.IsPanelPinned(d.PanelId ?? string.Empty))
+        .ThenBy(d => d.MenuCategory ?? "Other")
+        .ThenBy(d => d.DisplayName)
+        .ToList();
       _listView.ItemsSource = null;
       _listView.ItemsSource = _filteredDescriptors;
+    }
+
+    private void ListView_ContextRequested(object sender, Microsoft.UI.Xaml.Input.ContextRequestedEventArgs e)
+    {
+      var listView = (ListView)sender;
+      var item = listView.SelectedItem as PanelDescriptor;
+      if (item?.PanelId == null) return;
+
+      var flyout = new MenuFlyout();
+      var isPinned = _panelStateService.IsPanelPinned(item.PanelId);
+      var pinItem = new MenuFlyoutItem
+      {
+        Text = isPinned ? "Unpin" : "Pin to top"
+      };
+      pinItem.Click += (_, _) =>
+      {
+        _panelStateService.TogglePinnedPanel(item.PanelId);
+        ApplyFilter(_searchBox.Text);
+      };
+      flyout.Items.Add(pinItem);
+      if (e.TryGetPosition(listView, out var point))
+        flyout.ShowAt(listView, point);
+      else
+        flyout.ShowAt(listView);
     }
 
     private void ListView_ItemClick(object sender, ItemClickEventArgs e)

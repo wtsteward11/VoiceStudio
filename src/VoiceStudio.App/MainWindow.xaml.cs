@@ -1351,6 +1351,11 @@ namespace VoiceStudio.App
             if (!string.IsNullOrEmpty(targetPanelId))
                 await targetHost.UnloadPanelAsync(targetPanelId);
 
+            if (!string.IsNullOrEmpty(sourcePanelId))
+                _panelStateService?.MigratePanelState(sourcePanelId, sourceRegion, targetRegion);
+            if (!string.IsNullOrEmpty(targetPanelId))
+                _panelStateService?.MigratePanelState(targetPanelId, targetRegion, sourceRegion);
+
             if (!string.IsNullOrEmpty(targetPanelId))
                 await OpenPanelByIdAsync(targetPanelId, sourceRegion);
             if (!string.IsNullOrEmpty(sourcePanelId))
@@ -2181,10 +2186,11 @@ namespace VoiceStudio.App
                 if (result == ContentDialogResult.Primary && dialog.SelectedDescriptor != null)
                 {
                     var desc = dialog.SelectedDescriptor;
-                    var opened = await OpenPanelByIdAsync(desc.PanelId, desc.DefaultRegion);
+                    var region = dialog.SelectedRegion ?? desc.DefaultRegion;
+                    var opened = await OpenPanelByIdAsync(desc.PanelId, region);
                     if (opened)
                     {
-                        var host = desc.DefaultRegion switch
+                        var host = region switch
                         {
                             PanelRegion.Left => FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
                             PanelRegion.Center => FindNameOnContent("CenterPanelHost") as Controls.PanelHost,

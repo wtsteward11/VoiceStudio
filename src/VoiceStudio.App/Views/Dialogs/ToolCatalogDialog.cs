@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using VoiceStudio.App.Services;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -101,7 +102,7 @@ namespace VoiceStudio.App.Views.Dialogs
         if (selected != null)
         {
           SelectedDescriptor = selected;
-          SelectedRegion = _regionChooser.SelectedItem as PanelRegion?;
+          SelectedRegion = _regionChooser.SelectedItem is PanelRegion pr ? pr : (PanelRegion?)null;
         }
       };
 
@@ -188,6 +189,13 @@ namespace VoiceStudio.App.Views.Dialogs
     private void ListView_ContextRequested(object sender, Microsoft.UI.Xaml.Input.ContextRequestedEventArgs e)
     {
       var listView = (ListView)sender;
+
+      var element = e.OriginalSource as DependencyObject;
+      while (element != null && element is not ListViewItem)
+        element = VisualTreeHelper.GetParent(element);
+      if (element is ListViewItem lvi)
+        listView.SelectedIndex = listView.IndexFromContainer(lvi);
+
       var item = listView.SelectedItem as PanelDescriptor;
       if (item?.PanelId == null) return;
 
@@ -231,7 +239,7 @@ namespace VoiceStudio.App.Views.Dialogs
       if (_listView.SelectedItem is PanelDescriptor desc)
       {
         SelectedDescriptor = desc;
-        SelectedRegion = _regionChooser.SelectedItem as PanelRegion?;
+        SelectedRegion = _regionChooser.SelectedItem is PanelRegion pr2 ? pr2 : (PanelRegion?)null;
         Hide();
       }
     }

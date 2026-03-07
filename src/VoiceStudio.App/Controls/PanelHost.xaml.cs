@@ -182,7 +182,27 @@ namespace VoiceStudio.App.Controls
         _isUnloaded = true;
         _loadingCts?.Cancel();
         _loadingCts?.Dispose();
-        _loadLock.Wait();
+        _ = CleanupCacheAsync();
+      };
+    }
+
+    private static void OnContentChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+      if (d is PanelHost host)
+      {
+        // Fire-and-forget async lifecycle handling
+        _ = host.HandleContentChangeAsync(e.OldValue as UIElement, e.NewValue as UIElement);
+      }
+    }
+
+    /// <summary>
+    /// Async cleanup of cached panels on unload. Fire-and-forget from Unloaded handler to avoid blocking UI thread.
+    /// </summary>
+    private async Task CleanupCacheAsync()
+    {
+      try
+      {
+        await _loadLock.WaitAsync().ConfigureAwait(false);
         try
         {
           foreach (var cached in _loadedPanels.Values)
@@ -199,15 +219,10 @@ namespace VoiceStudio.App.Controls
         {
           _loadLock.Release();
         }
-      };
-    }
-
-    private static void OnContentChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-      if (d is PanelHost host)
+      }
+      catch (ObjectDisposedException)
       {
-        // Fire-and-forget async lifecycle handling
-        _ = host.HandleContentChangeAsync(e.OldValue as UIElement, e.NewValue as UIElement);
+        // Lock disposed during shutdown, ignore
       }
     }
 
@@ -852,62 +867,6 @@ namespace VoiceStudio.App.Controls
     }
 
     /// <summary>
-    /// Loads a panel synchronously (falls back to creating if not already loaded).
-    /// Prefer LoadPanelAsync for better UI responsiveness.
-    /// </summary>
-    /// <param name="panelId">The panel ID to load</param>
-    /// <param name="legacyFactory">Optional factory for panels not in the unified registry (e.g. MiniTimeline).</param>
-    /// <returns>The loaded panel, or null if loading failed</returns>
-    public UserControl? LoadPanel(string panelId, Func<UserControl>? legacyFactory = null)
-    {
-      if (_isUnloaded)
-      {
-        System.Diagnostics.Debug.WriteLine($"[PanelHost] Unloaded, skipping load of {panelId}");
-        return null;
-      }
-      if (_panelRegistry == null)
-      {
-        System.Diagnostics.Debug.WriteLine($"[PanelHost] PanelRegistry not available, cannot load {panelId}");
-        return null;
-      }
-
-      _loadLock.Wait();
-      try
-      {
-        if (_isUnloaded) return null;
-        // Return cached panel if already loaded
-        if (_loadedPanels.TryGetValue(panelId, out var cached))
-        {
-          TouchLru(panelId);
-          Content = cached;
-          return cached;
-        }
-
-        var panel = _panelRegistry.CreatePanel(panelId) as UserControl;
-        if (panel == null && legacyFactory != null)
-          panel = legacyFactory();
-
-        if (panel != null)
-        {
-          _loadedPanels[panelId] = panel;
-          _lruOrder.Add(panelId);
-          EvictIfOverCapacity(panelId);
-          Content = panel;
-        }
-        return panel;
-      }
-      catch (Exception ex)
-      {
-        System.Diagnostics.Debug.WriteLine($"[PanelHost] Error loading panel {panelId}: {ex.Message}");
-        return null;
-      }
-      finally
-      {
-        _loadLock.Release();
-      }
-    }
-
-    /// <summary>
     /// Checks if a panel is loaded in the cache.
     /// </summary>
     public bool IsPanelLoaded(string panelId)
@@ -916,11 +875,11 @@ namespace VoiceStudio.App.Controls
     }
 
     /// <summary>
-    /// Unloads a panel from memory.
+    /// Unloads a panel from memory asynchronously.
     /// </summary>
-    public void UnloadPanel(string panelId)
+    public async Task UnloadPanelAsync(string panelId)
     {
-      _loadLock.Wait();
+      await _loadLock.WaitAsync().ConfigureAwait(false);
       try
       {
         if (_loadedPanels.TryRemove(panelId, out var panel))

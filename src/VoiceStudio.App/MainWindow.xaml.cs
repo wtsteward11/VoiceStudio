@@ -58,6 +58,7 @@ namespace VoiceStudio.App
     private MenuFlyoutItem? _customizeToolbarMenuItem;
     private MenuFlyoutItem? _checkForUpdatesMenuItem;
     private MenuFlyoutItem? _keyboardShortcutsMenuItem;
+    private MenuFlyoutItem? _manageWorkspacesMenuItem;
 
     // Workspace splitter drag state (WinUI 3 has no built-in GridSplitter)
     private enum SplitterKind { None, Vertical1, Vertical2, Horizontal }
@@ -152,16 +153,17 @@ namespace VoiceStudio.App
     /// <param name="panelId">The canonical panel ID (case-insensitive, e.g. "Timeline", "EffectsMixer").</param>
     /// <param name="overrideRegion">Optional region override; defaults to the registry-defined region.</param>
     /// <returns>True if the panel was opened; false if the ID was not found in any registry.</returns>
-    private bool OpenPanelById(string panelId, PanelRegion? overrideRegion = null)
+    private async Task<bool> OpenPanelByIdAsync(string panelId, PanelRegion? overrideRegion = null)
     {
       var region = overrideRegion ?? GetPanelRegion(panelId);
-      return SwitchToPanelById(region, panelId);
+      return await SwitchToPanelByIdAsync(region, panelId);
     }
 
     /// <summary>
     /// Switches to a panel by ID, using LoadPanelAsync (cached) with legacy factory fallback.
+    /// Never blocks the UI thread; uses WaitAsync consistently.
     /// </summary>
-    private bool SwitchToPanelById(PanelRegion region, string panelId)
+    private async Task<bool> SwitchToPanelByIdAsync(PanelRegion region, string panelId)
     {
       Controls.PanelHost? targetHost = region switch
       {
@@ -179,7 +181,7 @@ namespace VoiceStudio.App
       if (_legacyPanelRegistry.TryGetValue(panelId, out var legacyEntry))
         legacyFactory = legacyEntry.Factory;
 
-      var panel = targetHost.LoadPanel(panelId, legacyFactory);
+      var panel = await targetHost.LoadPanelAsync(panelId, legacyFactory);
       if (panel == null)
         return false;
 
@@ -263,6 +265,8 @@ namespace VoiceStudio.App
       _checkForUpdatesMenuItem.Click += CheckForUpdatesMenuItem_Click;
       _keyboardShortcutsMenuItem = new MenuFlyoutItem { Text = "Keyboard Shortcuts" };
       _keyboardShortcutsMenuItem.Click += KeyboardShortcutsMenuItem_Click;
+      _manageWorkspacesMenuItem = new MenuFlyoutItem { Text = "Manage Workspaces..." };
+      _manageWorkspacesMenuItem.Click += ManageWorkspaces_Click;
       profiler.Checkpoint("Menu Items Created");
 
       InitializeMenuBar();
@@ -380,40 +384,7 @@ namespace VoiceStudio.App
 
       // Phase 5.1.6: Panel assignment using PanelRegistry
       // If workspace layout has saved panels, restore them via registry; otherwise use defaults
-      if (!RestorePanelsFromLayout())
-      {
-        if (leftPanelHost != null)
-        {
-          OpenPanelById("Profiles");
-          SetPanelHostMeta(leftPanelHost, "Voice Profiles", "👤");
-        }
-        profiler.Checkpoint("ProfilesView Created (Default)");
-
-        if (centerPanelHost != null)
-        {
-          OpenPanelById("Timeline");
-          SetPanelHostMeta(centerPanelHost, "Timeline", "🎬");
-        }
-        profiler.Checkpoint("TimelineView Created (Default)");
-
-        if (rightPanelHost != null)
-        {
-          OpenPanelById("EffectsMixer");
-          SetPanelHostMeta(rightPanelHost, "Effects & Mixer", "🎚️");
-        }
-        profiler.Checkpoint("EffectsMixerView Created (Default)");
-
-        // BottomPanelHost can show MiniTimeline or MacroView
-        // Default to MacroView (MiniTimeline can be toggled via View menu - IDEA 6)
-        if (bottomPanelHost != null)
-        {
-          OpenPanelById("Macro");
-          SetPanelHostMeta(bottomPanelHost, "Macros", "⚡");
-        }
-        profiler.Checkpoint("MacroView Created (Default)");
-      }
-
-      SetActiveNavButton("NavStudio");
+      _ = InitializePanelsAsync(leftPanelHost, centerPanelHost, rightPanelHost, bottomPanelHost);
 
       // Start status bar metrics timer
       StartStatusBarTimer();
@@ -470,24 +441,71 @@ namespace VoiceStudio.App
       Debug.WriteLine(profiler.GetReport());
     }
 
+    private async Task InitializePanelsAsync(
+      Controls.PanelHost? leftPanelHost,
+      Controls.PanelHost? centerPanelHost,
+      Controls.PanelHost? rightPanelHost,
+      Controls.PanelHost? bottomPanelHost)
+    {
+      var (restored, hadRegions) = await RestorePanelsFromLayoutAsync();
+      if (!restored)
+      {
+        if (hadRegions)
+        {
+          var toast = ServiceProvider.TryGetToastNotificationService();
+          toast?.ShowError(
+            "Workspace restore failed — reset to Studio?",
+            "Restore Failed",
+            () => { _ = _panelStateService?.SwitchWorkspaceProfileAsync("studio"); });
+        }
+        if (leftPanelHost != null)
+        {
+          await OpenPanelByIdAsync("Profiles", PanelRegion.Left);
+          SetPanelHostMeta(leftPanelHost, "Voice Profiles", "👤");
+        }
+        if (centerPanelHost != null)
+        {
+          await OpenPanelByIdAsync("Timeline", PanelRegion.Center);
+          SetPanelHostMeta(centerPanelHost, "Timeline", "🎬");
+        }
+        if (rightPanelHost != null)
+        {
+          await OpenPanelByIdAsync("EffectsMixer", PanelRegion.Right);
+          SetPanelHostMeta(rightPanelHost, "Effects & Mixer", "🎚️");
+        }
+        if (bottomPanelHost != null)
+        {
+          await OpenPanelByIdAsync("Macro", PanelRegion.Bottom);
+          SetPanelHostMeta(bottomPanelHost, "Macros", "⚡");
+        }
+      }
+      SetActiveNavButton("NavStudio");
+    }
+
     #region Navigation Button Click Handlers
 
     /// <summary>
-    /// Executes a navigation command via CommandRouter, falling back to OpenPanelById if unavailable.
+    /// Executes a navigation command via CommandRouter, falling back to OpenPanelByIdAsync if unavailable.
     /// </summary>
     private void ExecuteNavCommand(string commandId, string fallbackPanelId, PanelRegion fallbackRegion, string buttonName)
     {
+      _ = ExecuteNavCommandAsync(commandId, fallbackPanelId, fallbackRegion, buttonName);
+    }
+
+    /// <summary>
+    /// Async variant for smoke tests and callers that need to wait for panel load.
+    /// </summary>
+    private async Task ExecuteNavCommandAsync(string commandId, string fallbackPanelId, PanelRegion fallbackRegion, string buttonName)
+    {
       if (_commandRouter != null)
       {
-        // Use CommandRouter for unified command execution
         _commandRouter.ExecuteFireAndForget(commandId);
         Debug.WriteLine($"[MainWindow] Nav command executed via CommandRouter: {commandId}");
       }
       else
       {
-        // Fallback to registry-based panel open
-        OpenPanelById(fallbackPanelId, fallbackRegion);
-        SetActiveNavButton(buttonName);
+        if (await OpenPanelByIdAsync(fallbackPanelId, fallbackRegion))
+          SetActiveNavButton(buttonName);
         Debug.WriteLine($"[MainWindow] Nav fallback executed: {fallbackPanelId}");
       }
     }
@@ -565,51 +583,54 @@ namespace VoiceStudio.App
 
       DispatcherQueue.TryEnqueue(() =>
       {
-        try
-        {
-          // Resolve short aliases to canonical registry IDs
-          var canonicalId = panelId switch
-          {
-            "studio" or "home" or "timeline" => "Timeline",
-            "profiles" => "Profiles",
-            "library" => "Library",
-            "effects" => "EffectsMixer",
-            "train" => "Training",
-            "analyze" => "Analyzer",
-            "settings" => "Settings",
-            "logs" => "Diagnostics",
-            "synthesis" => "VoiceSynthesis",
-            _ => e.NewPanelId, // Preserve original casing for registry lookup
-          };
-
-          if (OpenPanelById(canonicalId))
-          {
-            // Highlight the matching nav-rail button for top-level panels
-            var navButton = canonicalId switch
-            {
-              "Timeline" => "NavStudio",
-              "Profiles" => "NavProfiles",
-              "Library" => "NavLibrary",
-              "EffectsMixer" => "NavEffects",
-              "Training" => "NavTrain",
-              "Analyzer" => "NavAnalyze",
-              "Settings" => "NavSettings",
-              "Diagnostics" => "NavLogs",
-              _ => string.Empty,
-            };
-            if (!string.IsNullOrEmpty(navButton))
-              SetActiveNavButton(navButton);
-          }
-          else
-          {
-            Debug.WriteLine($"[MainWindow] Unknown panel ID in navigation: {panelId}");
-          }
-        }
-        catch (Exception ex)
-        {
-          Debug.WriteLine($"[MainWindow] Navigation failed: {ex.Message}");
-        }
+        _ = OnNavigationChangedCoreAsync(panelId, e.NewPanelId);
       });
+    }
+
+    private async Task OnNavigationChangedCoreAsync(string panelId, string originalPanelId)
+    {
+      try
+      {
+        var canonicalId = panelId switch
+        {
+          "studio" or "home" or "timeline" => "Timeline",
+          "profiles" => "Profiles",
+          "library" => "Library",
+          "effects" => "EffectsMixer",
+          "train" => "Training",
+          "analyze" => "Analyzer",
+          "settings" => "Settings",
+          "logs" => "Diagnostics",
+          "synthesis" => "VoiceSynthesis",
+          _ => originalPanelId,
+        };
+
+        if (await OpenPanelByIdAsync(canonicalId))
+        {
+          var navButton = canonicalId switch
+          {
+            "Timeline" => "NavStudio",
+            "Profiles" => "NavProfiles",
+            "Library" => "NavLibrary",
+            "EffectsMixer" => "NavEffects",
+            "Training" => "NavTrain",
+            "Analyzer" => "NavAnalyze",
+            "Settings" => "NavSettings",
+            "Diagnostics" => "NavLogs",
+            _ => string.Empty,
+          };
+          if (!string.IsNullOrEmpty(navButton))
+            SetActiveNavButton(navButton);
+        }
+        else
+        {
+          Debug.WriteLine($"[MainWindow] Unknown panel ID in navigation: {panelId}");
+        }
+      }
+      catch (Exception ex)
+      {
+        Debug.WriteLine($"[MainWindow] Navigation failed: {ex.Message}");
+      }
     }
 
     #endregion Command-Driven Navigation
@@ -713,6 +734,47 @@ namespace VoiceStudio.App
         return tcs.Task;
       }
 
+      Task RunOnUiThreadAsyncTask(string stepName, Func<Task> action)
+      {
+        var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        try
+        {
+          var enqueued = dispatcher.TryEnqueue(() =>
+          {
+            async Task RunAsync()
+            {
+              try
+              {
+                AppendStepLog($"DISPATCH_ENTER\t{stepName}");
+                await action();
+                AppendStepLog($"DISPATCH_EXIT\t{stepName}");
+                tcs.TrySetResult(null);
+              }
+              catch (Exception ex)
+              {
+                AppendStepLog($"DISPATCH_EXCEPTION\t{stepName}\t{ex.GetType().Name}\t{ex.Message}");
+                tcs.TrySetException(ex);
+              }
+            }
+            _ = RunAsync();
+          });
+
+          if (!enqueued)
+          {
+            AppendStepLog($"ENQUEUE_FAILED\t{stepName}");
+            tcs.TrySetException(new InvalidOperationException("Failed to enqueue UI smoke step onto DispatcherQueue."));
+          }
+        }
+        catch (Exception ex)
+        {
+          AppendStepLog($"ENQUEUE_EXCEPTION\t{stepName}\t{ex.GetType().Name}\t{ex.Message}");
+          tcs.TrySetException(ex);
+        }
+
+        return tcs.Task;
+      }
+
       // Warm up: verify the UI thread is pumping the DispatcherQueue before we attempt navigation.
       AppendStepLog("WARMUP_BEGIN");
       var warmupTask = RunOnUiThreadAsync("Warmup", () => { });
@@ -735,23 +797,23 @@ namespace VoiceStudio.App
 
       AppendStepLog("WARMUP_DONE");
 
-      void AssertPanelOpened(string panelId, PanelRegion region)
+      async Task AssertPanelOpened(string panelId, PanelRegion region)
       {
-        if (!OpenPanelById(panelId, region))
+        if (!await OpenPanelByIdAsync(panelId, region))
           throw new InvalidOperationException($"Smoke: failed to open panel {panelId}");
       }
 
-      var steps = new (string Name, Action Action)[]
+      var steps = new (string Name, Func<Task> Action)[]
       {
         // Primary navigation buttons (8 steps)
-        ("NavStudio", () => NavStudio_Click(this, new RoutedEventArgs())),
-        ("NavProfiles", () => NavProfiles_Click(this, new RoutedEventArgs())),
-        ("NavLibrary", () => NavLibrary_Click(this, new RoutedEventArgs())),
-        ("NavTrain", () => NavTrain_Click(this, new RoutedEventArgs())),
-        ("NavEffects", () => NavEffects_Click(this, new RoutedEventArgs())),
-        ("NavAnalyze", () => NavAnalyze_Click(this, new RoutedEventArgs())),
-        ("NavSettings", () => NavSettings_Click(this, new RoutedEventArgs())),
-        ("NavLogs", () => NavLogs_Click(this, new RoutedEventArgs())),
+        ("NavStudio", () => ExecuteNavCommandAsync("nav.studio", "Timeline", PanelRegion.Center, "NavStudio")),
+        ("NavProfiles", () => ExecuteNavCommandAsync("nav.profiles", "Profiles", PanelRegion.Left, "NavProfiles")),
+        ("NavLibrary", () => ExecuteNavCommandAsync("nav.library", "Library", PanelRegion.Left, "NavLibrary")),
+        ("NavTrain", () => ExecuteNavCommandAsync("nav.train", "Training", PanelRegion.Left, "NavTrain")),
+        ("NavEffects", () => ExecuteNavCommandAsync("nav.effects", "EffectsMixer", PanelRegion.Right, "NavEffects")),
+        ("NavAnalyze", () => ExecuteNavCommandAsync("nav.analyze", "Analyzer", PanelRegion.Right, "NavAnalyze")),
+        ("NavSettings", () => ExecuteNavCommandAsync("nav.settings", "Settings", PanelRegion.Right, "NavSettings")),
+        ("NavLogs", () => ExecuteNavCommandAsync("nav.logs", "Diagnostics", PanelRegion.Bottom, "NavLogs")),
 
         // Core synthesis panels (4 steps)
         ("PanelVoiceSynthesis", () => AssertPanelOpened("VoiceSynthesis", PanelRegion.Center)),
@@ -786,7 +848,7 @@ namespace VoiceStudio.App
         executed.Add(step.Name);
         AppendStepLog($"STEP_BEGIN\t{step.Name}");
 
-        var stepTask = RunOnUiThreadAsync(step.Name, step.Action);
+        var stepTask = RunOnUiThreadAsyncTask(step.Name, step.Action);
         var completed = await Task.WhenAny(stepTask, Task.Delay(perStepTimeout)).ConfigureAwait(false);
         if (completed != stepTask)
         {
@@ -843,8 +905,9 @@ namespace VoiceStudio.App
 
               if (!string.Equals(actualContentType, wsStep.ExpectedCenterViewType, StringComparison.Ordinal))
               {
-                AppendStepLog($"WORKSPACE_ASSERT_SKIP\t{wsStep.Name}\t(expected {wsStep.ExpectedCenterViewType}, got {actualContentType})");
-                return;
+                var message = $"Workspace restore failed: expected '{wsStep.ExpectedCenterViewType}', got '{actualContentType}'";
+                AppendStepLog($"WORKSPACE_ASSERT_FAIL\t{wsStep.Name}\t{message}");
+                throw new InvalidOperationException(message);
               }
             });
 
@@ -1221,10 +1284,15 @@ namespace VoiceStudio.App
 
     /// <summary>
     /// Animates panel docking with visual feedback.
+    /// After animation, unloads stale cache entries and reloads via OpenPanelByIdAsync (no direct Content bypass).
     /// </summary>
     private void AnimatePanelDock(Controls.PanelHost sourceHost, Controls.PanelHost targetHost, UIElement? sourceContent, UIElement? targetContent)
     {
-      // Create fade-out animation for source
+      var sourceRegion = sourceHost.PanelRegion;
+      var targetRegion = targetHost.PanelRegion;
+      var sourcePanelId = Controls.PanelHost.TryGetPanelIdFromContent(sourceContent, out var s) ? s : null;
+      var targetPanelId = Controls.PanelHost.TryGetPanelIdFromContent(targetContent, out var t) ? t : null;
+
       var sourceFadeOut = new Microsoft.UI.Xaml.Media.Animation.DoubleAnimation
       {
         To = 0,
@@ -1233,7 +1301,6 @@ namespace VoiceStudio.App
       Storyboard.SetTarget(sourceFadeOut, sourceHost);
       Storyboard.SetTargetProperty(sourceFadeOut, "Opacity");
 
-      // Create fade-in animation for target
       var targetFadeIn = new Microsoft.UI.Xaml.Media.Animation.DoubleAnimation
       {
         From = 0,
@@ -1250,38 +1317,47 @@ namespace VoiceStudio.App
 
       storyboard.Completed += (_, _) =>
       {
-        var sourceRegion = sourceHost.PanelRegion;
-        var targetRegion = targetHost.PanelRegion;
-
-        // Swap contents after animation
-        sourceHost.Content = targetContent;
-        targetHost.Content = sourceContent;
-
-        // Update panel regions if needed
-        sourceHost.PanelRegion = targetRegion;
-        targetHost.PanelRegion = sourceRegion;
-
-        // Reset opacity
         sourceHost.Opacity = 1;
         targetHost.Opacity = 1;
-
-        // Show success toast
-        var toastService = ServiceProvider.TryGetToastNotificationService();
-        toastService?.ShowSuccess("Panel Docked", $"Panel moved to {targetHost.PanelRegion} region");
+        _ = CompletePanelDockAsync(sourceHost, targetHost, sourceRegion, targetRegion, sourcePanelId, targetPanelId);
       };
 
       storyboard.Begin();
     }
 
+    private async Task CompletePanelDockAsync(
+      Controls.PanelHost sourceHost,
+      Controls.PanelHost targetHost,
+      PanelRegion sourceRegion,
+      PanelRegion targetRegion,
+      string? sourcePanelId,
+      string? targetPanelId)
+    {
+      if (!string.IsNullOrEmpty(sourcePanelId))
+        await sourceHost.UnloadPanelAsync(sourcePanelId);
+      if (!string.IsNullOrEmpty(targetPanelId))
+        await targetHost.UnloadPanelAsync(targetPanelId);
+
+      if (!string.IsNullOrEmpty(targetPanelId))
+        await OpenPanelByIdAsync(targetPanelId, sourceRegion);
+      if (!string.IsNullOrEmpty(sourcePanelId))
+        await OpenPanelByIdAsync(sourcePanelId, targetRegion);
+
+      SaveWorkspaceLayout();
+
+      var toastService = ServiceProvider.TryGetToastNotificationService();
+      toastService?.ShowSuccess("Panel Docked", $"Panel moved to {targetHost.PanelRegion} region");
+    }
+
     #endregion Panel Docking (IDEA 14)
 
-    private void GlobalSearchView_NavigateRequested(object? sender, Views.SearchNavigationEventArgs e)
+    private async void GlobalSearchView_NavigateRequested(object? sender, Views.SearchNavigationEventArgs e)
     {
       HideGlobalSearch();
 
       try
       {
-        NavigateToSearchResult(e.Result);
+        await NavigateToSearchResultAsync(e.Result);
       }
       catch (Exception ex)
       {
@@ -1295,7 +1371,7 @@ namespace VoiceStudio.App
     /// <summary>
     /// Navigates to a search result by opening the appropriate panel and selecting the item.
     /// </summary>
-    private void NavigateToSearchResult(VoiceStudio.Core.Models.SearchResultItem result)
+    private async Task NavigateToSearchResultAsync(VoiceStudio.Core.Models.SearchResultItem result)
     {
       // Use fully qualified property access to resolve ambiguity
       var panelId = (result as dynamic)?.PanelId?.ToLowerInvariant() ?? string.Empty;
@@ -1322,7 +1398,7 @@ namespace VoiceStudio.App
       }
 
       var region = GetPanelRegion(canonicalId);
-      if (!OpenPanelById(canonicalId, region))
+      if (!await OpenPanelByIdAsync(canonicalId, region))
       {
         var toastService = ServiceProvider.GetToastNotificationService();
         toastService?.ShowError("Panel Not Found", $"Could not create panel: {canonicalId}");
@@ -1701,7 +1777,7 @@ namespace VoiceStudio.App
     /// <summary>
     /// Registers a panel quick-switch shortcut (IDEA 1).
     /// </summary>
-    private void RegisterPanelQuickSwitchShortcut(int number, PanelRegion region, int _, string panelId)
+    private void RegisterPanelQuickSwitchShortcut(int number, PanelRegion region, int unused, string panelId)
     {
       VirtualKey key = number switch
       {
@@ -1722,14 +1798,14 @@ namespace VoiceStudio.App
           $"nav.panel.{number}",
           key,
           VirtualKeyModifiers.Control,
-          () => OpenPanelById(panelId, region),
+          () => { _ = OpenPanelByIdAsync(panelId, region); },
           $"Switch to {title}");
     }
 
     /// <summary>
     /// Switches to a panel and shows visual feedback (IDEA 1).
     /// </summary>
-    [Obsolete("Use OpenPanelById or SwitchToPanelById instead.")]
+    [Obsolete("Use OpenPanelByIdAsync. Direct content assignment is forbidden.", error: true)]
     private void SwitchToPanel(PanelRegion region, string panelName, Func<UserControl> panelFactory)
     {
       // Get the target PanelHost
@@ -1952,7 +2028,7 @@ namespace VoiceStudio.App
     /// <summary>
     /// Toggles Mini Timeline visibility in BottomPanelHost (IDEA 6).
     /// </summary>
-    private void ToggleMiniTimelineMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async void ToggleMiniTimelineMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
       _isMiniTimelineVisible = !_isMiniTimelineVisible;
 
@@ -1961,12 +2037,12 @@ namespace VoiceStudio.App
       {
         if (_isMiniTimelineVisible)
         {
-          OpenPanelById("MiniTimeline", PanelRegion.Bottom);
+          await OpenPanelByIdAsync("MiniTimeline", PanelRegion.Bottom);
           SetPanelHostMeta(bottomPanelHost, "Mini Timeline", "🎬");
         }
         else
         {
-          OpenPanelById("Macro");
+          await OpenPanelByIdAsync("Macro", PanelRegion.Bottom);
           SetPanelHostMeta(bottomPanelHost, "Macros", "⚡");
         }
       }
@@ -2008,6 +2084,23 @@ namespace VoiceStudio.App
         toastService?.ShowError(
             "Customization Failed",
             $"Could not open toolbar customization: {ex.Message}");
+      }
+    }
+
+    private async void ManageWorkspaces_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+      try
+      {
+        var xamlRoot = (Content as FrameworkElement)?.XamlRoot;
+        var dialog = new Views.Dialogs.WorkspaceManagerDialog(xamlRoot);
+        await dialog.ShowAsync();
+      }
+      catch (Exception ex)
+      {
+        var toastService = ServiceProvider.TryGetToastNotificationService();
+        toastService?.ShowError(
+            "Workspace Management",
+            $"Could not open workspace manager: {ex.Message}");
       }
     }
 
@@ -2153,7 +2246,7 @@ namespace VoiceStudio.App
     private async void OpenProject()
     {
       // First ensure the Timeline panel is visible in Center
-      OpenPanelById("Timeline", PanelRegion.Center);
+      await OpenPanelByIdAsync("Timeline", PanelRegion.Center);
       SetActiveNavButton("NavStudio");
 
       // Give UI time to render the panel
@@ -2558,7 +2651,7 @@ namespace VoiceStudio.App
           var panelId = descriptor.PanelId;
           var region = descriptor.DefaultRegion;
           var displayName = descriptor.DisplayName;
-          subItem.Items.Add(CreateMenuItem(displayName, () => OpenPanelById(panelId, region)));
+          subItem.Items.Add(CreateMenuItem(displayName, () => _ = OpenPanelByIdAsync(panelId, region)));
         }
         item.Items.Add(subItem);
       }
@@ -2599,6 +2692,10 @@ namespace VoiceStudio.App
       {
         item.Items.Add(_customizeToolbarMenuItem);
       }
+      if (_manageWorkspacesMenuItem != null)
+      {
+        item.Items.Add(_manageWorkspacesMenuItem);
+      }
       if (_checkForUpdatesMenuItem != null)
       {
         item.Items.Add(_checkForUpdatesMenuItem);
@@ -2615,10 +2712,10 @@ namespace VoiceStudio.App
       var item = new MenuBarItem { Title = "AI" };
       item.Items.Add(CreateMenuItem(
           "AI Mixing & Mastering",
-          () => OpenPanelById("AIMixingMastering")));
+          () => _ = OpenPanelByIdAsync("AIMixingMastering")));
       item.Items.Add(CreateMenuItem(
           "Ensemble Synthesis",
-          () => OpenPanelById("EnsembleSynthesis")));
+          () => _ = OpenPanelByIdAsync("EnsembleSynthesis")));
       return item;
     }
 
@@ -2916,7 +3013,7 @@ namespace VoiceStudio.App
       }
     }
 
-    private void ToggleRecording()
+    private async void ToggleRecording()
     {
       try
       {
@@ -2928,7 +3025,7 @@ namespace VoiceStudio.App
         var recordingView = rightPanelHost.Content as RecordingView;
         if (recordingView == null)
         {
-          OpenPanelById("Recording");
+          await OpenPanelByIdAsync("Recording", PanelRegion.Right);
           recordingView = rightPanelHost.Content as RecordingView;
         }
 
@@ -3000,22 +3097,21 @@ namespace VoiceStudio.App
     /// Restores panels from saved workspace layout.
     /// Only the active panel per region is restored. OpenedPanels is persisted for future tab support;
     /// PanelHost currently supports a single panel per region.
-    /// Returns true if panels were restored, false if using defaults.
+    /// Returns (restored, hadRegions): hadRegions true when layout had regions to restore; restored true when at least one succeeded.
     /// </summary>
-    private bool RestorePanelsFromLayout()
+    private async Task<(bool restored, bool hadRegions)> RestorePanelsFromLayoutAsync()
     {
       if (_panelStateService == null)
-        return false;
+        return (false, false);
 
       try
       {
         var layout = _panelStateService.GetCurrentLayout();
 
-        // Check if there are any saved regions to restore
         if (layout.Regions == null || layout.Regions.Count == 0)
         {
           System.Diagnostics.Debug.WriteLine("No saved regions to restore, using defaults.");
-          return false;
+          return (false, false);
         }
 
         bool restoredAny = false;
@@ -3037,12 +3133,11 @@ namespace VoiceStudio.App
           var activePanelId = regionState.ActivePanelId;
           if (!string.IsNullOrEmpty(activePanelId))
           {
-            var panel = CreatePanelFromRegistry(activePanelId);
+            var panel = await targetHost.LoadPanelAsync(activePanelId, legacyFactory: null);
             if (panel != null)
             {
               try
               {
-                targetHost.Content = panel;
                 targetHost.PanelTitle = GetPanelTitle(activePanelId);
                 targetHost.IsCollapsed = regionState.IsCollapsed;
                 restoredAny = true;
@@ -3062,12 +3157,12 @@ namespace VoiceStudio.App
 
         RestoreSplitterRatios(layout);
 
-        return restoredAny;
+        return (restoredAny, true);
       }
       catch (Exception ex)
       {
         System.Diagnostics.Debug.WriteLine($"Failed to restore panels from layout: {ex.Message}");
-        return false;
+        return (false, true);
       }
     }
 
@@ -3159,10 +3254,18 @@ namespace VoiceStudio.App
       }
 
       _panelStateService.SaveRegionState(region, activePanelId, openedPanels, widthRatio, heightRatio);
+      _panelStateService.SaveRegionCollapsedState(region, host.IsCollapsed);
     }
 
     private static string? GetPanelIdFromHost(Controls.PanelHost host)
     {
+      if (host.Content == null) return null;
+
+      if (host.Content is UserControl uc
+          && uc.DataContext is IPanelView pv
+          && !string.IsNullOrEmpty(pv.PanelId))
+        return pv.PanelId;
+
       if (host.Content is FrameworkElement fe)
       {
         var typeName = fe.GetType().Name;
@@ -3179,19 +3282,21 @@ namespace VoiceStudio.App
     {
       var enqueued = DispatcherQueue.TryEnqueue(() =>
       {
-        try
+        _ = RestorePanelsFromLayoutAsync().ContinueWith(t =>
         {
-          RestorePanelsFromLayout();
-        }
-        catch (Exception ex)
-        {
-          System.Diagnostics.Debug.WriteLine(
-            $"[MainWindow] WorkspaceProfileChanged restore failed: {ex.Message}");
-          var toastService = ServiceProvider.TryGetToastNotificationService();
-          toastService?.ShowError(
-            "Workspace Restore Failed",
-            "Could not restore workspace layout after profile switch.");
-        }
+          if (t.IsFaulted)
+          {
+            System.Diagnostics.Debug.WriteLine(
+              $"[MainWindow] WorkspaceProfileChanged restore failed: {t.Exception?.GetBaseException()?.Message}");
+            DispatcherQueue.TryEnqueue(() =>
+            {
+              var toastService = ServiceProvider.TryGetToastNotificationService();
+              toastService?.ShowError(
+                "Workspace Restore Failed",
+                "Could not restore workspace layout after profile switch.");
+            });
+          }
+        }, TaskScheduler.Default);
       });
 
       if (!enqueued)

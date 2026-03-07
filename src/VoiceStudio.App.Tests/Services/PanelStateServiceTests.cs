@@ -82,5 +82,92 @@ namespace VoiceStudio.App.Tests.Services
             Assert.AreEqual(testPanelId, regionState.ActivePanelId);
             CollectionAssert.AreEquivalent(originalOpenedPanels, regionState.OpenedPanels);
         }
+
+        /// <summary>
+        /// Proves that switching workspace saves the current profile to its disk file before loading the new one.
+        /// </summary>
+        [TestMethod]
+        public async Task SwitchWorkspace_SavesCurrentProfileToDisk()
+        {
+            var mockSettings = new MockSettingsService();
+            mockSettings.Settings = mockSettings.GetDefaultSettings();
+            mockSettings.Settings.WorkspaceLayout = null;
+
+            var service = new PanelStateService(mockSettings);
+            await Task.Delay(150);
+
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var wsDir = Path.Combine(appData, "VoiceStudio", "WorkspaceProfiles");
+            var filePath = Path.Combine(wsDir, "isolation_test_ws.json");
+
+            service.SaveRegionState(PanelRegion.Left, "Profiles", new List<string> { "Profiles", "Timeline" });
+            var profile = await service.CreateWorkspaceProfileAsync("isolation_test_ws");
+            Assert.IsNotNull(profile);
+            Assert.IsTrue(File.Exists(filePath), $"Profile file should exist after create at {filePath}");
+
+            service.SaveRegionState(PanelRegion.Left, "Timeline", new List<string> { "Timeline", "EffectsMixer" });
+
+            var switched = await service.SwitchWorkspaceProfileAsync("recording");
+            Assert.IsTrue(switched);
+
+            var json = await File.ReadAllTextAsync(filePath);
+            Assert.IsTrue(json.Contains("Timeline"), "Profile file should contain modified state (Timeline)");
+            Assert.IsTrue(json.Contains("EffectsMixer"), "Profile file should contain modified state (EffectsMixer)");
+        }
+
+        /// <summary>
+        /// Proves that rename moves the profile file and updates the name.
+        /// </summary>
+        [TestMethod]
+        public async Task RenameWorkspace_MovesProfileFile()
+        {
+            var mockSettings = new MockSettingsService();
+            mockSettings.Settings = mockSettings.GetDefaultSettings();
+            mockSettings.Settings.WorkspaceLayout = null;
+
+            var service = new PanelStateService(mockSettings);
+            await Task.Delay(150);
+
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var wsDir = Path.Combine(appData, "VoiceStudio", "WorkspaceProfiles");
+            var oldPath = Path.Combine(wsDir, "rename_source.json");
+            var newPath = Path.Combine(wsDir, "rename_target.json");
+
+            var profile = await service.CreateWorkspaceProfileAsync("rename_source");
+            Assert.IsNotNull(profile);
+            Assert.IsTrue(File.Exists(oldPath), $"Source file should exist at {oldPath}");
+
+            var renamed = await service.RenameWorkspaceProfileAsync("rename_source", "rename_target");
+            Assert.IsTrue(renamed);
+            Assert.IsFalse(File.Exists(oldPath), "Old file should be deleted");
+            Assert.IsTrue(File.Exists(newPath), "New file should exist");
+        }
+
+        /// <summary>
+        /// Proves that reset restores a profile to its embedded template layout.
+        /// </summary>
+        [TestMethod]
+        public async Task ResetWorkspace_RestoresEmbeddedLayout()
+        {
+            var mockSettings = new MockSettingsService();
+            mockSettings.Settings = mockSettings.GetDefaultSettings();
+            mockSettings.Settings.WorkspaceLayout = null;
+
+            var service = new PanelStateService(mockSettings);
+            await Task.Delay(150);
+
+            service.SaveRegionState(PanelRegion.Left, "CustomPanel", new List<string> { "CustomPanel" });
+            await service.CreateWorkspaceProfileAsync("recording");
+
+            var reset = await service.ResetWorkspaceProfileAsync("recording");
+            Assert.IsTrue(reset);
+
+            service.SaveRegionState(PanelRegion.Left, "x", new List<string> { "x" });
+            await service.SwitchWorkspaceProfileAsync("recording");
+
+            var regionState = service.GetRegionState(PanelRegion.Left);
+            Assert.IsNotNull(regionState);
+            Assert.AreEqual("Recording", regionState.ActivePanelId, "Reset should restore embedded layout (Recording in Left)");
+        }
     }
 }

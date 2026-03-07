@@ -26,7 +26,9 @@ namespace VoiceStudio.App.Controls
     private PanelStateService? _panelStateService;
     private IPanelRegistry? _panelRegistry;
     private readonly ConcurrentDictionary<string, UserControl> _loadedPanels = new();
+    private readonly List<string> _lruOrder = new();
     private readonly SemaphoreSlim _loadLock = new(1, 1);
+    private volatile bool _isUnloaded;
     private string? _previousPanelId;
     private PanelRegion _region = PanelRegion.Center;
     private DragDropVisualFeedbackService? _dragDropService;
@@ -173,12 +175,30 @@ namespace VoiceStudio.App.Controls
       // Enable drop on the entire PanelHost for docking
       this.AllowDrop = true;
 
-      // Cleanup when unloaded
+      // Cleanup when unloaded: cancel loading, dispose cached panel ViewModels, clear cache.
+      // Do NOT dispose _loadLock — other threads may still hold or wait on it; disposing causes ObjectDisposedException.
       this.Unloaded += (_, _) =>
       {
+        _isUnloaded = true;
         _loadingCts?.Cancel();
         _loadingCts?.Dispose();
-        _loadLock.Dispose();
+        _loadLock.Wait();
+        try
+        {
+          foreach (var cached in _loadedPanels.Values)
+          {
+            if (cached is UserControl uc && uc.DataContext is IDisposable d)
+            {
+              try { d.Dispose(); } catch { /* don't break teardown */ }
+            }
+          }
+          _loadedPanels.Clear();
+          _lruOrder.Clear();
+        }
+        finally
+        {
+          _loadLock.Release();
+        }
       };
     }
 
@@ -203,8 +223,7 @@ namespace VoiceStudio.App.Controls
         // 1. Deactivate old content's ViewModel
         await DeactivateViewModelAsync(oldContent, ct);
 
-        // 2. Dispose previous ViewModel if it implements IDisposable
-        DisposePreviousViewModel(oldContent);
+        // 2. Panels in cache must NOT be disposed on deactivation (removed DisposePreviousViewModel)
 
         // 3. Save previous panel state before changing content
         SaveCurrentPanelState();
@@ -396,9 +415,9 @@ namespace VoiceStudio.App.Controls
         var item = new MenuFlyoutItem { Text = $"{desc.DisplayName}" };
         var panelId = desc.PanelId;
 
-        item.Click += (_, _) =>
+        item.Click += async (_, _) =>
         {
-          var panel = LoadPanel(panelId);
+          var panel = await LoadPanelAsync(panelId);
           if (panel != null)
           {
             PanelTitle = desc.DisplayName;
@@ -612,40 +631,64 @@ namespace VoiceStudio.App.Controls
 
     /// <summary>
     /// Gets panel ID from content by checking if it has a ViewModel implementing IPanelView.
+    /// Public for use by MainWindow when resolving panel IDs during dock operations.
     /// </summary>
-    private bool GetPanelIdFromContent(UIElement content, out string? panelId)
+    public static bool TryGetPanelIdFromContent(UIElement? content, out string? panelId)
     {
       panelId = null;
-
-      // Try to get ViewModel from UserControl's DataContext
-      if (content is UserControl userControl)
+      if (content == null) return false;
+      if (content is UserControl userControl && userControl.DataContext is IPanelView pv1)
       {
-        var viewModel = userControl.DataContext;
-        if (viewModel is IPanelView panelView)
-        {
-          panelId = panelView.PanelId;
-          return true;
-        }
+        panelId = pv1.PanelId;
+        return true;
       }
-
-      // Try to get from FrameworkElement's DataContext
-      if (content is FrameworkElement frameworkElement)
+      if (content is FrameworkElement fe && fe.DataContext is IPanelView pv2)
       {
-        var viewModel = frameworkElement.DataContext;
-        if (viewModel is IPanelView panelView)
-        {
-          panelId = panelView.PanelId;
-          return true;
-        }
+        panelId = pv2.PanelId;
+        return true;
       }
-
       return false;
+    }
+
+    private bool GetPanelIdFromContent(UIElement content, out string? panelId) =>
+      TryGetPanelIdFromContent(content, out panelId);
+
+    private const int MaxCachedPanels = 8;
+
+    private void TouchLru(string panelId)
+    {
+      _lruOrder.Remove(panelId);
+      _lruOrder.Add(panelId);
+    }
+
+    private void EvictIfOverCapacity(string currentPanelId)
+    {
+      if (_loadedPanels.Count <= MaxCachedPanels) return;
+      string? toEvict = null;
+      for (int i = 0; i < _lruOrder.Count; i++)
+      {
+        if (_lruOrder[i] != currentPanelId)
+        {
+          toEvict = _lruOrder[i];
+          _lruOrder.RemoveAt(i);
+          break;
+        }
+      }
+      if (toEvict != null && _loadedPanels.TryRemove(toEvict, out var evicted))
+      {
+        if (evicted is UserControl uc && uc.DataContext is IDisposable d)
+        {
+          try { d.Dispose(); } catch { /* don't break eviction */ }
+        }
+        System.Diagnostics.Debug.WriteLine($"[PanelHost] LRU evicted: {toEvict}");
+      }
     }
 
     /// <summary>
     /// Disposes the ViewModel from the previous content if it implements IDisposable.
     /// This ensures proper cleanup when switching panels.
     /// </summary>
+    [Obsolete("Cached panels must not be disposed on navigation. Disposal happens in Unloaded handler only.", error: true)]
     private void DisposePreviousViewModel(UIElement? oldContent)
     {
       if (oldContent == null)
@@ -720,17 +763,32 @@ namespace VoiceStudio.App.Controls
     /// <returns>The loaded panel, or null if loading failed</returns>
     public async System.Threading.Tasks.Task<UserControl?> LoadPanelAsync(string panelId, Func<UserControl>? legacyFactory = null)
     {
+      if (_isUnloaded)
+      {
+        System.Diagnostics.Debug.WriteLine($"[PanelHost] Unloaded, skipping load of {panelId}");
+        return null;
+      }
       if (_panelRegistry == null)
       {
         System.Diagnostics.Debug.WriteLine($"[PanelHost] PanelRegistry not available, cannot lazy load {panelId}");
         return null;
       }
 
-      // Return cached panel if already loaded
-      if (_loadedPanels.TryGetValue(panelId, out var cached))
+      // Return cached panel if already loaded — use WaitAsync to avoid blocking UI thread
+      await _loadLock.WaitAsync(CancellationToken.None);
+      try
       {
-        Content = cached;
-        return cached;
+        if (_isUnloaded) return null;
+        if (_loadedPanels.TryGetValue(panelId, out var cached))
+        {
+          TouchLru(panelId);
+          Content = cached;
+          return cached;
+        }
+      }
+      finally
+      {
+        _loadLock.Release();
       }
 
       // Cancel any previous loading operation
@@ -746,9 +804,11 @@ namespace VoiceStudio.App.Controls
         await _loadLock.WaitAsync(_loadingCts.Token);
         try
         {
+          if (_isUnloaded) return null;
           // Double-check after acquiring lock
           if (_loadedPanels.TryGetValue(panelId, out var existing))
           {
+            TouchLru(panelId);
             Content = existing;
             return existing;
           }
@@ -761,6 +821,8 @@ namespace VoiceStudio.App.Controls
           if (panel != null && !_loadingCts.IsCancellationRequested)
           {
             _loadedPanels[panelId] = panel;
+            _lruOrder.Add(panelId);
+            EvictIfOverCapacity(panelId);
             Content = panel;
             var loadTime = DateTime.UtcNow - startTime;
             System.Diagnostics.Debug.WriteLine($"[PanelHost] Loaded panel {panelId} in {loadTime.TotalMilliseconds:F1}ms");
@@ -798,21 +860,29 @@ namespace VoiceStudio.App.Controls
     /// <returns>The loaded panel, or null if loading failed</returns>
     public UserControl? LoadPanel(string panelId, Func<UserControl>? legacyFactory = null)
     {
+      if (_isUnloaded)
+      {
+        System.Diagnostics.Debug.WriteLine($"[PanelHost] Unloaded, skipping load of {panelId}");
+        return null;
+      }
       if (_panelRegistry == null)
       {
         System.Diagnostics.Debug.WriteLine($"[PanelHost] PanelRegistry not available, cannot load {panelId}");
         return null;
       }
 
-      // Return cached panel if already loaded
-      if (_loadedPanels.TryGetValue(panelId, out var cached))
-      {
-        Content = cached;
-        return cached;
-      }
-
+      _loadLock.Wait();
       try
       {
+        if (_isUnloaded) return null;
+        // Return cached panel if already loaded
+        if (_loadedPanels.TryGetValue(panelId, out var cached))
+        {
+          TouchLru(panelId);
+          Content = cached;
+          return cached;
+        }
+
         var panel = _panelRegistry.CreatePanel(panelId) as UserControl;
         if (panel == null && legacyFactory != null)
           panel = legacyFactory();
@@ -820,6 +890,8 @@ namespace VoiceStudio.App.Controls
         if (panel != null)
         {
           _loadedPanels[panelId] = panel;
+          _lruOrder.Add(panelId);
+          EvictIfOverCapacity(panelId);
           Content = panel;
         }
         return panel;
@@ -828,6 +900,10 @@ namespace VoiceStudio.App.Controls
       {
         System.Diagnostics.Debug.WriteLine($"[PanelHost] Error loading panel {panelId}: {ex.Message}");
         return null;
+      }
+      finally
+      {
+        _loadLock.Release();
       }
     }
 
@@ -844,13 +920,22 @@ namespace VoiceStudio.App.Controls
     /// </summary>
     public void UnloadPanel(string panelId)
     {
-      if (_loadedPanels.TryRemove(panelId, out var panel))
+      _loadLock.Wait();
+      try
       {
-        if (panel is IDisposable disposable)
+        if (_loadedPanels.TryRemove(panelId, out var panel))
         {
-          disposable.Dispose();
+          _lruOrder.Remove(panelId);
+          if (panel is IDisposable disposable)
+          {
+            disposable.Dispose();
+          }
+          System.Diagnostics.Debug.WriteLine($"[PanelHost] Unloaded panel: {panelId}");
         }
-        System.Diagnostics.Debug.WriteLine($"[PanelHost] Unloaded panel: {panelId}");
+      }
+      finally
+      {
+        _loadLock.Release();
       }
     }
 

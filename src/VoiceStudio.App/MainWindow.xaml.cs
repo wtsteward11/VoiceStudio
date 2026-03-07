@@ -63,6 +63,8 @@ namespace VoiceStudio.App
     // Workspace splitter drag state (WinUI 3 has no built-in GridSplitter)
     private enum SplitterKind { None, Vertical1, Vertical2, Horizontal }
     private SplitterKind _activeSplitter;
+
+    private Debouncer? _layoutSaveDebouncer;
     private double _splitterStartX;
     private double _splitterStartY;
     private double _splitterStartLeft;
@@ -236,6 +238,8 @@ namespace VoiceStudio.App
 
       _panelStateService = ServiceProvider.GetPanelStateService();
       profiler.Checkpoint("PanelStateService Retrieved");
+
+      _layoutSaveDebouncer = new Debouncer(() => SaveWorkspaceLayout(), 2000);
 
       _recentProjectsService = ServiceProvider.GetRecentProjectsService();
       profiler.Checkpoint("RecentProjectsService Retrieved");
@@ -1352,7 +1356,7 @@ namespace VoiceStudio.App
       if (!string.IsNullOrEmpty(sourcePanelId))
         await OpenPanelByIdAsync(sourcePanelId, targetRegion);
 
-      SaveWorkspaceLayout();
+      _layoutSaveDebouncer?.Invoke();
 
       var toastService = ServiceProvider.TryGetToastNotificationService();
       toastService?.ShowSuccess("Panel Docked", $"Panel moved to {targetHost.PanelRegion} region");
@@ -3566,6 +3570,7 @@ namespace VoiceStudio.App
         splitter.ReleasePointerCapture(e.Pointer);
         _activeSplitter = SplitterKind.None;
         e.Handled = true;
+        _layoutSaveDebouncer?.Invoke();
       }
     }
 
@@ -3574,7 +3579,7 @@ namespace VoiceStudio.App
     private void MainWindow_Closed(object sender, WindowEventArgs e)
     {
       _statusBarTimer?.Stop();
-      // Save workspace layout before closing
+      _layoutSaveDebouncer?.Cancel();
       SaveWorkspaceLayout();
       Cleanup();
     }
@@ -3612,7 +3617,7 @@ namespace VoiceStudio.App
       _previewHideTimer?.Dispose();
       _previewHideTimer = null;
 
-      // Save workspace layout before cleanup
+      _layoutSaveDebouncer?.Cancel();
       SaveWorkspaceLayout();
 
       // Unsubscribe from events

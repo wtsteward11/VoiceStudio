@@ -1669,6 +1669,13 @@ namespace VoiceStudio.App
           () => ShowCommandPalette(),
           "Command Palette");
 
+      _keyboardShortcutService.RegisterShortcut(
+          "nav.toolcatalog",
+          VirtualKey.T,
+          VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift,
+          () => { _ = ShowToolCatalogAsync(); },
+          "Tool Catalog");
+
       // Global Search (IDEA 5)
       _keyboardShortcutService.RegisterShortcut(
           "nav.globalsearch",
@@ -2162,6 +2169,43 @@ namespace VoiceStudio.App
       {
         // Fallback: Show simple message if CommandPaletteService fails
         // In production, this would show a proper command palette
+      }
+    }
+
+    private async Task ShowToolCatalogAsync()
+    {
+      try
+      {
+        var dialog = new Views.Dialogs.ToolCatalogDialog(this.Content.XamlRoot);
+        var result = await dialog.ShowAsync();
+        if (result == ContentDialogResult.Primary && dialog.SelectedDescriptor != null)
+        {
+          var desc = dialog.SelectedDescriptor;
+          var opened = await OpenPanelByIdAsync(desc.PanelId, desc.DefaultRegion);
+          if (opened)
+          {
+            var host = desc.DefaultRegion switch
+            {
+              PanelRegion.Left => FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
+              PanelRegion.Center => FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
+              PanelRegion.Right => FindNameOnContent("RightPanelHost") as Controls.PanelHost,
+              PanelRegion.Bottom => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
+              _ => null
+            };
+            if (host != null)
+            {
+              host.PanelTitle = desc.DisplayName;
+              if (!string.IsNullOrEmpty(desc.Icon))
+                host.PanelIcon = desc.Icon;
+            }
+          }
+        }
+      }
+      catch (Exception ex)
+      {
+        System.Diagnostics.Debug.WriteLine($"[MainWindow] ToolCatalog failed: {ex.Message}");
+        var toast = ServiceProvider.TryGetToastNotificationService();
+        toast?.ShowError("Tool Catalog", ex.Message);
       }
     }
 

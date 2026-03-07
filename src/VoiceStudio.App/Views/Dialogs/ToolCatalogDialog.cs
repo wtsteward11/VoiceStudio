@@ -18,10 +18,12 @@ namespace VoiceStudio.App.Views.Dialogs
     private readonly IPanelRegistry _registry;
     private ListView _listView = null!;
     private AutoSuggestBox _searchBox = null!;
+    private ComboBox _regionChooser = null!;
     private List<PanelDescriptor> _allDescriptors = new();
     private List<PanelDescriptor> _filteredDescriptors = new();
 
     public PanelDescriptor? SelectedDescriptor { get; private set; }
+    public PanelRegion? SelectedRegion { get; private set; }
 
     public ToolCatalogDialog(XamlRoot? xamlRoot = null)
     {
@@ -45,6 +47,15 @@ namespace VoiceStudio.App.Views.Dialogs
       _searchBox.QuerySubmitted += SearchBox_QuerySubmitted;
       mainStack.Children.Add(_searchBox);
 
+      _regionChooser = new ComboBox
+      {
+        Header = "Region",
+        Width = double.NaN,
+        HorizontalAlignment = HorizontalAlignment.Stretch,
+        ItemsSource = new[] { PanelRegion.Left, PanelRegion.Center, PanelRegion.Right, PanelRegion.Bottom }
+      };
+      mainStack.Children.Add(_regionChooser);
+
       _listView = new ListView
       {
         SelectionMode = ListViewSelectionMode.Single,
@@ -54,6 +65,7 @@ namespace VoiceStudio.App.Views.Dialogs
         DisplayMemberPath = "DisplayName"
       };
       _listView.ItemClick += ListView_ItemClick;
+      _listView.SelectionChanged += ListView_SelectionChanged;
       _listView.DoubleTapped += ListView_DoubleTapped;
       mainStack.Children.Add(_listView);
 
@@ -65,6 +77,7 @@ namespace VoiceStudio.App.Views.Dialogs
         if (selected != null)
         {
           SelectedDescriptor = selected;
+          SelectedRegion = _regionChooser.SelectedItem as PanelRegion?;
         }
       };
 
@@ -123,11 +136,21 @@ namespace VoiceStudio.App.Views.Dialogs
       }
     }
 
+    private void ListView_SelectionChanged(object sender, Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs e)
+    {
+      if (_listView.SelectedItem is PanelDescriptor desc)
+      {
+        var region = desc.DefaultRegion is PanelRegion.Floating ? PanelRegion.Center : desc.DefaultRegion;
+        _regionChooser.SelectedItem = region;
+      }
+    }
+
     private void ListView_DoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
     {
       if (_listView.SelectedItem is PanelDescriptor desc)
       {
         SelectedDescriptor = desc;
+        SelectedRegion = _regionChooser.SelectedItem as PanelRegion?;
         Hide();
       }
     }

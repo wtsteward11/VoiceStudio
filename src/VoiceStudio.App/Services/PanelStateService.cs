@@ -475,6 +475,83 @@ namespace VoiceStudio.App.Services
     }
 
     /// <summary>
+    /// Renames a workspace profile.
+    /// </summary>
+    /// <param name="oldName">The current profile name.</param>
+    /// <param name="newName">The new profile name.</param>
+    /// <returns>True if renamed; false if source not found, studio protected, or new name conflicts.</returns>
+    public async Task<bool> RenameWorkspaceProfileAsync(string oldName, string newName)
+    {
+      if (string.IsNullOrWhiteSpace(oldName) || string.IsNullOrWhiteSpace(newName))
+        return false;
+      if (string.Equals(oldName, "studio", StringComparison.OrdinalIgnoreCase))
+        return false;
+
+      var source = await LoadWorkspaceProfileAsync(oldName).ConfigureAwait(false);
+      if (source == null)
+        return false;
+
+      var existing = await LoadWorkspaceProfileAsync(newName).ConfigureAwait(false);
+      if (existing != null)
+        return false;
+
+      var renamed = new WorkspaceProfile
+      {
+        Name = newName,
+        Description = source.Description,
+        Layout = source.Layout,
+        CreatedAt = source.CreatedAt,
+        ModifiedAt = DateTime.UtcNow
+      };
+      await SaveWorkspaceProfileAsync(renamed).ConfigureAwait(false);
+
+      try
+      {
+        var oldPath = Path.Combine(_workspaceProfilesDirectory, $"{oldName}.json");
+        if (File.Exists(oldPath))
+          File.Delete(oldPath);
+      }
+      catch (Exception ex)
+      {
+        System.Diagnostics.Debug.WriteLine($"Failed to delete old profile file after rename: {ex.Message}");
+      }
+
+      if (string.Equals(_currentWorkspaceProfile, oldName, StringComparison.OrdinalIgnoreCase))
+        _currentWorkspaceProfile = newName;
+
+      return true;
+    }
+
+    /// <summary>
+    /// Resets a workspace profile to its embedded template (if one exists).
+    /// </summary>
+    /// <param name="profileName">The profile name to reset.</param>
+    /// <returns>True if reset; false if no embedded template exists for the profile.</returns>
+    public async Task<bool> ResetWorkspaceProfileAsync(string profileName)
+    {
+      if (string.IsNullOrWhiteSpace(profileName))
+        return false;
+
+      var embedded = await TryLoadEmbeddedLayoutAsync(profileName).ConfigureAwait(false);
+      if (embedded == null)
+        return false;
+
+      await SaveWorkspaceProfileAsync(embedded).ConfigureAwait(false);
+
+      if (string.Equals(_currentWorkspaceProfile, profileName, StringComparison.OrdinalIgnoreCase))
+      {
+        _currentLayout = embedded.Layout;
+        WorkspaceProfileChanged?.Invoke(this, new WorkspaceProfileChangedEventArgs
+        {
+          ProfileName = profileName,
+          Layout = embedded.Layout
+        });
+      }
+
+      return true;
+    }
+
+    /// <summary>
     /// Switches to a different workspace profile.
     /// </summary>
     /// <param name="profileName">The profile name or ID to switch to (e.g. studio, recording).</param>
@@ -483,8 +560,18 @@ namespace VoiceStudio.App.Services
     {
       try
       {
-        // Save current layout before switching
-        SaveCurrentWorkspace();
+        // Save current profile to its disk file (not just settings) before switching.
+        // This prevents state bleed between workspaces.
+        if (!string.IsNullOrEmpty(_currentWorkspaceProfile))
+        {
+          var outgoing = new WorkspaceProfile
+          {
+            Name = _currentWorkspaceProfile,
+            Layout = GetCurrentLayout(),
+            ModifiedAt = DateTime.UtcNow
+          };
+          await SaveWorkspaceProfileAsync(outgoing).ConfigureAwait(false);
+        }
 
         // Load new profile from disk first
         var profile = await LoadWorkspaceProfileAsync(profileName).ConfigureAwait(false);

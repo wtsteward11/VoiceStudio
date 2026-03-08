@@ -14,6 +14,11 @@ namespace VoiceStudio.App.Core.Models
     public string Id { get; set; } = string.Empty;
 
     /// <summary>
+    /// Alias for Id (backend returns "id"). Use for playback/streaming.
+    /// </summary>
+    public string AudioId => Id;
+
+    /// <summary>
     /// Original filename.
     /// </summary>
     [JsonPropertyName("filename")]

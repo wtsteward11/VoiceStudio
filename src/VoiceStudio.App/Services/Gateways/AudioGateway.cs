@@ -92,7 +92,7 @@ namespace VoiceStudio.App.Services.Gateways
         CancellationToken cancellationToken = default)
     {
       return await _transport.GetStreamAsync(
-          $"/api/audio/{Uri.EscapeDataString(audioId)}/stream",
+          $"/api/audio/file/{Uri.EscapeDataString(audioId)}",
           cancellationToken);
     }
 

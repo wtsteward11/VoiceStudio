@@ -16,6 +16,32 @@ namespace VoiceStudio.App
 {
     public sealed partial class MainWindow
     {
+        private bool _isResettingToStudio;
+
+        private async void ResetToStudioWorkspace()
+        {
+            if (_panelStateService == null) return;
+            try
+            {
+                _isResettingToStudio = true;
+                await _panelStateService.SwitchWorkspaceProfileAsync("studio");
+                var leftHost = FindNameOnContent("LeftPanelHost") as Controls.PanelHost;
+                var centerHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
+                var rightHost = FindNameOnContent("RightPanelHost") as Controls.PanelHost;
+                var bottomHost = FindNameOnContent("BottomPanelHost") as Controls.PanelHost;
+                await InitializePanelsAsync(leftHost, centerHost, rightHost, bottomHost);
+                Debug.WriteLine("[MainWindow] Reset to Studio completed");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindow] Reset to Studio failed: {ex.Message}");
+            }
+            finally
+            {
+                _isResettingToStudio = false;
+            }
+        }
+
         private async Task InitializePanelsAsync(
           Controls.PanelHost? leftPanelHost,
           Controls.PanelHost? centerPanelHost,
@@ -32,7 +58,7 @@ namespace VoiceStudio.App
                     toast?.ShowError(
                       msg,
                       "Restore Failed",
-                      () => { _ = _panelStateService?.SwitchWorkspaceProfileAsync("studio"); });
+                      () => ResetToStudioWorkspace());
                 }
                 if (leftPanelHost != null)
                 {
@@ -62,7 +88,7 @@ namespace VoiceStudio.App
                 toast?.ShowError(
                   msg,
                   "Partial Restore Failed",
-                  () => { _ = _panelStateService?.SwitchWorkspaceProfileAsync("studio"); });
+                  () => ResetToStudioWorkspace());
             }
             SetActiveNavButton("NavStudio");
         }
@@ -305,6 +331,7 @@ namespace VoiceStudio.App
         /// </summary>
         private void OnWorkspaceProfileChanged(object? sender, WorkspaceProfileChangedEventArgs e)
         {
+            if (_isResettingToStudio) return;
             var enqueued = DispatcherQueue.TryEnqueue(() =>
             {
                 _ = RestorePanelsFromLayoutAsync().ContinueWith(t =>
@@ -319,7 +346,7 @@ namespace VoiceStudio.App
                       toastService?.ShowError(
                   "Workspace restore failed — reset to Studio?",
                   "Restore Failed",
-                  () => { _ = _panelStateService?.SwitchWorkspaceProfileAsync("studio"); });
+                  () => ResetToStudioWorkspace());
                   });
                   }
                   else if (t.IsCompletedSuccessfully && ((!t.Result.restored && t.Result.hadRegions) || t.Result.failedItems.Count > 0))
@@ -332,7 +359,7 @@ namespace VoiceStudio.App
                       toastService?.ShowError(
                   msg,
                   title,
-                  () => { _ = _panelStateService?.SwitchWorkspaceProfileAsync("studio"); });
+                  () => ResetToStudioWorkspace());
                   });
                   }
               }, TaskScheduler.Default);

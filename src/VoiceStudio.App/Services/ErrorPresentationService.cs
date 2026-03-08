@@ -51,6 +51,10 @@ namespace VoiceStudio.App.Services
       try { client = AppServices.GetBackendClient(); }
       catch (InvalidOperationException) { return; }
 
+      var toast = ToastNotificationService;
+      if (toast != null)
+        toast.SuppressTransientBackendErrors = true;
+
       _monitor = new BackendConnectionMonitor(client);
       _monitor.Connected += OnBackendConnected;
       _monitor.Disconnected += OnBackendDisconnected;
@@ -68,7 +72,7 @@ namespace VoiceStudio.App.Services
       var toast = ToastNotificationService;
       if (toast != null)
       {
-        toast.SuppressConnectivityErrors = true;
+        toast.SuppressTransientBackendErrors = true;
         toast.ShowWarning("Backend is offline. Reconnecting\u2026", "Connection Lost");
       }
 
@@ -86,7 +90,7 @@ namespace VoiceStudio.App.Services
       var toast = ToastNotificationService;
       if (toast != null)
       {
-        toast.SuppressConnectivityErrors = false;
+        toast.SuppressTransientBackendErrors = false;
         toast.ShowSuccess("Backend reconnected.", "Connection Restored");
       }
 
@@ -196,19 +200,24 @@ namespace VoiceStudio.App.Services
     }
 
     /// <summary>
-    /// Returns true when <paramref name="message"/> looks like a backend-connectivity error
-    /// so it can be suppressed while the offline toast is already visible.
+    /// Returns true when <paramref name="message"/> looks like a transient backend error
+    /// (connectivity, rate-limit, or burst-404) that should be suppressed while the
+    /// offline/degraded toast is already visible.
     /// </summary>
     private static bool IsConnectivityMessage(string message)
     {
       var m = message.AsSpan();
       return m.Contains("unable to connect".AsSpan(), StringComparison.OrdinalIgnoreCase)
-          || m.Contains("backend".AsSpan(), StringComparison.OrdinalIgnoreCase)
-             && (m.Contains("connect".AsSpan(), StringComparison.OrdinalIgnoreCase)
-                 || m.Contains("unavailable".AsSpan(), StringComparison.OrdinalIgnoreCase)
-                 || m.Contains("not running".AsSpan(), StringComparison.OrdinalIgnoreCase))
           || m.Contains("connection refused".AsSpan(), StringComparison.OrdinalIgnoreCase)
-          || m.Contains("No connection could be made".AsSpan(), StringComparison.OrdinalIgnoreCase);
+          || m.Contains("No connection could be made".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("rate limit".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("too many requests".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("requests per second".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("requested resource was not found".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || (m.Contains("backend".AsSpan(), StringComparison.OrdinalIgnoreCase)
+              && (m.Contains("connect".AsSpan(), StringComparison.OrdinalIgnoreCase)
+                  || m.Contains("unavailable".AsSpan(), StringComparison.OrdinalIgnoreCase)
+                  || m.Contains("not running".AsSpan(), StringComparison.OrdinalIgnoreCase)));
     }
 
     public void ResetBackendToastGuard()

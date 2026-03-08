@@ -36,9 +36,10 @@ namespace VoiceStudio.App.Services
 
     /// <summary>
     /// When true, <see cref="ShowError"/> silently drops messages that look like
-    /// backend-connectivity errors.  Managed by <see cref="ErrorPresentationService"/>.
+    /// transient backend errors (connectivity, rate-limit, not-found during burst).
+    /// Managed by <see cref="ErrorPresentationService"/>.
     /// </summary>
-    public bool SuppressConnectivityErrors { get; set; }
+    public bool SuppressTransientBackendErrors { get; set; }
 
     public ToastNotificationService(StackPanel container)
     {
@@ -52,17 +53,21 @@ namespace VoiceStudio.App.Services
 
     public void ShowError(string message, string? title = null, Action? viewDetailsAction = null)
     {
-      if (SuppressConnectivityErrors && LooksLikeConnectivityError(message))
+      if (SuppressTransientBackendErrors && LooksLikeTransientBackendError(message))
         return;
       ShowToast(ToastType.Error, message, title, 0, viewDetailsAction);
     }
 
-    private static bool LooksLikeConnectivityError(string message)
+    private static bool LooksLikeTransientBackendError(string message)
     {
       var m = message.AsSpan();
       return m.Contains("unable to connect".AsSpan(), StringComparison.OrdinalIgnoreCase)
           || m.Contains("connection refused".AsSpan(), StringComparison.OrdinalIgnoreCase)
           || m.Contains("No connection could be made".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("rate limit".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("too many requests".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("requests per second".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("requested resource was not found".AsSpan(), StringComparison.OrdinalIgnoreCase)
           || (m.Contains("backend".AsSpan(), StringComparison.OrdinalIgnoreCase)
               && (m.Contains("connect".AsSpan(), StringComparison.OrdinalIgnoreCase)
                   || m.Contains("unavailable".AsSpan(), StringComparison.OrdinalIgnoreCase)

@@ -878,14 +878,14 @@ namespace VoiceStudio.App
         {
             return buttonName switch
             {
-                "NavStudio" => ("Studio", "Studio", "Main workspace for voice synthesis and editing. Access timeline, mixer, and all core tools.", "\uE8A5"),
+                "NavStudio" => ("Timeline", "Studio", "Main workspace for voice synthesis and editing. Access timeline, mixer, and all core tools.", "\uE8A5"),
                 "NavProfiles" => ("Profiles", "Profiles", "Manage voice profiles and voice cloning models. Create, edit, and organize your voice library.", "\uE77B"),
                 "NavLibrary" => ("Library", "Library", "Browse and organize your audio files, voice samples, and project assets.", "\uE8F1"),
-                "NavEffects" => ("Effects", "Effects & Mixer", "Apply audio effects, adjust mixing parameters, and fine-tune your voice output.", "\uE8F5"),
-                "NavTrain" => ("Train", "Voice Training", "Train custom voice models and improve voice cloning quality.", "\uE8F6"),
-                "NavAnalyze" => ("Analyze", "Analyzer", "Analyze audio quality, waveforms, spectral analysis, and voice characteristics.", "\uE890"),
+                "NavEffects" => ("EffectsMixer", "Effects & Mixer", "Apply audio effects, adjust mixing parameters, and fine-tune your voice output.", "\uE8F5"),
+                "NavTrain" => ("Training", "Voice Training", "Train custom voice models and improve voice cloning quality.", "\uE8F6"),
+                "NavAnalyze" => ("Analyzer", "Analyzer", "Analyze audio quality, waveforms, spectral analysis, and voice characteristics.", "\uE890"),
                 "NavSettings" => ("Settings", "Settings", "Configure application settings, preferences, and system options.", "\uE713"),
-                "NavLogs" => ("Logs", "Diagnostics", "View system logs, diagnostics, and debugging information.", "\uE8F7"),
+                "NavLogs" => ("Diagnostics", "Diagnostics", "View system logs, diagnostics, and debugging information.", "\uE8F7"),
                 _ => null
             };
         }
@@ -899,6 +899,12 @@ namespace VoiceStudio.App
 
             switch (panelId)
             {
+                case "Timeline":
+                    stackPanel.Children.Add(new TextBlock { Text = "• Main workspace", FontSize = 12 });
+                    stackPanel.Children.Add(new TextBlock { Text = "• Timeline and mixer", FontSize = 12 });
+                    stackPanel.Children.Add(new TextBlock { Text = "• Core synthesis tools", FontSize = 12 });
+                    break;
+
                 case "Profiles":
                     stackPanel.Children.Add(new TextBlock { Text = "• Voice profile management", FontSize = 12 });
                     stackPanel.Children.Add(new TextBlock { Text = "• Quality score tracking", FontSize = 12 });
@@ -911,19 +917,19 @@ namespace VoiceStudio.App
                     stackPanel.Children.Add(new TextBlock { Text = "• Quick preview", FontSize = 12 });
                     break;
 
-                case "Effects":
+                case "EffectsMixer":
                     stackPanel.Children.Add(new TextBlock { Text = "• Audio effects chain", FontSize = 12 });
                     stackPanel.Children.Add(new TextBlock { Text = "• Mixing controls", FontSize = 12 });
                     stackPanel.Children.Add(new TextBlock { Text = "• Real-time processing", FontSize = 12 });
                     break;
 
-                case "Train":
+                case "Training":
                     stackPanel.Children.Add(new TextBlock { Text = "• Model training interface", FontSize = 12 });
                     stackPanel.Children.Add(new TextBlock { Text = "• Training progress tracking", FontSize = 12 });
                     stackPanel.Children.Add(new TextBlock { Text = "• Quality metrics", FontSize = 12 });
                     break;
 
-                case "Analyze":
+                case "Analyzer":
                     stackPanel.Children.Add(new TextBlock { Text = "• Waveform visualization", FontSize = 12 });
                     stackPanel.Children.Add(new TextBlock { Text = "• Spectral analysis", FontSize = 12 });
                     stackPanel.Children.Add(new TextBlock { Text = "• Quality metrics", FontSize = 12 });
@@ -935,7 +941,7 @@ namespace VoiceStudio.App
                     stackPanel.Children.Add(new TextBlock { Text = "• System settings", FontSize = 12 });
                     break;
 
-                case "Logs":
+                case "Diagnostics":
                     stackPanel.Children.Add(new TextBlock { Text = "• System diagnostics", FontSize = 12 });
                     stackPanel.Children.Add(new TextBlock { Text = "• Error logs", FontSize = 12 });
                     stackPanel.Children.Add(new TextBlock { Text = "• Performance metrics", FontSize = 12 });

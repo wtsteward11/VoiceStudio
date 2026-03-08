@@ -2005,8 +2005,10 @@ namespace VoiceStudio.App
 
         public async void ImportAudioFile()
         {
+#if DEBUG
             var logPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoiceStudio", "import_debug.log");
             System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(logPath)!);
+#endif
             void Log(string msg)
             {
                 var line = $"[{DateTime.Now:HH:mm:ss.fff}] {msg}";

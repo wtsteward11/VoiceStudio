@@ -476,6 +476,7 @@ namespace VoiceStudio.App
                 if (success)
                 {
                     Debug.WriteLine($"[MainWindow] Nav command succeeded via CommandRouter: {commandId}");
+                    SetActiveNavButton(buttonName);
                     return;
                 }
                 Debug.WriteLine($"[MainWindow] Nav command failed; falling back to OpenPanelByIdAsync: {fallbackPanelId}");

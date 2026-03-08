@@ -12,7 +12,7 @@ Items deferred from v1.1.0 ship. Non-blocking for v1.1.0 release.
 
 ## Deferred
 
-- **Skip debt cleanup** — Remove or consolidate skip markers in tests; address when bandwidth allows.
+- **Skip debt cleanup** — Remove or consolidate skip markers in tests; address when bandwidth allows. Realistic estimate: 2–3 days (312+ skipped tests). Target: reduce to fewer than 200 skips by v1.2 ship. Run `python -m pytest tests/ --co -q 2>&1 | rg "SKIP" > skip_report.txt` to regenerate skip report.
 
 - **Workflow consolidation** — Reduce duplication across Build, CI, Tests, Sentinel workflows; align job structure and caching.
 

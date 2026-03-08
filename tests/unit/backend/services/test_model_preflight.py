@@ -34,12 +34,18 @@ def test_run_preflight_aggregates_results(monkeypatch):
         "ensure_sovits",
         lambda auto_download: {"ok": True, "engine": "sovits"},
     )
+    monkeypatch.setattr(
+        model_preflight,
+        "ensure_faster_whisper",
+        lambda auto_download: {"ok": True, "engine": "faster_whisper"},
+    )
 
     result = model_preflight.run_preflight(auto_download=False)
     assert set(result["results"].keys()) == {
         "xtts_v2",
         "piper",
         "whisper_cpp",
+        "faster_whisper",
         "gpt_sovits",
     }
     assert result["results"]["xtts_v2"]["engine"] == "xtts"

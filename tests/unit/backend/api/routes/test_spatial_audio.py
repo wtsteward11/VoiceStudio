@@ -298,11 +298,11 @@ class TestSpatialAudioProcessingEndpoints:
     @patch("os.path.exists", return_value=True)
     @patch("soundfile.write")
     @patch("soundfile.read")
-    @patch("backend.api.routes.voice._register_audio_file")
     @patch(
-        "backend.api.routes.voice._audio_storage", new={"test_audio_123": "/fake/path/audio.wav"}
+        "backend.services.audio_artifacts.AudioRegistry.get_path",
+        side_effect=lambda aid: "/fake/path/audio.wav" if aid == "test_audio_123" else None,
     )
-    def test_apply_spatial_audio(self, mock_register, mock_sf_read, mock_sf_write, mock_exists):
+    def test_apply_spatial_audio(self, mock_get_path, mock_sf_read, mock_sf_write, mock_exists):
         """Test applying spatial audio to an audio file."""
         # Create sample audio data
         sample_rate = 44100
@@ -348,11 +348,11 @@ class TestSpatialAudioProcessingEndpoints:
     @patch("os.path.exists", return_value=True)
     @patch("soundfile.write")
     @patch("soundfile.read")
-    @patch("backend.api.routes.voice._register_audio_file")
     @patch(
-        "backend.api.routes.voice._audio_storage", new={"test_audio_123": "/fake/path/audio.wav"}
+        "backend.services.audio_artifacts.AudioRegistry.get_path",
+        side_effect=lambda aid: "/fake/path/audio.wav" if aid == "test_audio_123" else None,
     )
-    def test_preview_spatial_audio(self, mock_register, mock_sf_read, mock_sf_write, mock_exists):
+    def test_preview_spatial_audio(self, mock_get_path, mock_sf_read, mock_sf_write, mock_exists):
         """Test previewing spatial audio."""
         # Create sample audio data
         sample_rate = 44100
@@ -381,8 +381,11 @@ class TestSpatialAudioProcessingEndpoints:
             assert "audio_id" in data
             assert "position" in data
 
-    @patch("backend.api.routes.voice._audio_storage", new={})
-    def test_preview_spatial_audio_not_found(self):
+    @patch(
+        "backend.services.audio_artifacts.AudioRegistry.get_path",
+        return_value=None,
+    )
+    def test_preview_spatial_audio_not_found(self, mock_get_path):
         """Test previewing with non-existent audio."""
         app = FastAPI()
         app.include_router(spatial_audio.router)
@@ -498,11 +501,11 @@ class TestSpatialAudioProcessingEndpoints:
     @patch("os.path.exists", return_value=True)
     @patch("soundfile.write")
     @patch("soundfile.read")
-    @patch("backend.api.routes.voice._register_audio_file")
     @patch(
-        "backend.api.routes.voice._audio_storage", new={"test_audio_123": "/fake/path/audio.wav"}
+        "backend.services.audio_artifacts.AudioRegistry.get_path",
+        side_effect=lambda aid: "/fake/path/audio.wav" if aid == "test_audio_123" else None,
     )
-    def test_generate_binaural_audio(self, mock_register, mock_sf_read, mock_sf_write, mock_exists):
+    def test_generate_binaural_audio(self, mock_get_path, mock_sf_read, mock_sf_write, mock_exists):
         """Test generating binaural audio."""
         # Create sample audio data
         sample_rate = 44100

@@ -7,7 +7,7 @@ import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import numpy as np
 import pytest
@@ -317,11 +317,12 @@ class TestStyleAnalysis:
         client = TestClient(app)
 
         with patch("os.path.exists", return_value=True):
-            with patch("backend.api.routes.voice._audio_storage") as mock_storage:
-                mock_storage.__contains__ = lambda x: x == "audio-123"
-                mock_storage.__getitem__ = lambda x: "/path/to/audio.wav"
+            with patch(
+                "backend.services.audio_artifacts.AudioRegistry.get_path",
+                side_effect=lambda aid: "/path/to/audio.wav" if aid == "audio-123" else None,
+            ):
 
-                with patch("app.core.audio.audio_utils.load_audio") as mock_load:
+                with patch("backend.audio.audio_utils.load_audio") as mock_load:
                     sample_rate = 44100
                     duration = 1.0
                     samples = int(sample_rate * duration)
@@ -329,7 +330,7 @@ class TestStyleAnalysis:
                     mock_load.return_value = (mock_audio, sample_rate)
 
                     with patch(
-                        "app.core.audio.audio_utils.analyze_voice_characteristics"
+                        "backend.audio.audio_utils.analyze_voice_characteristics"
                     ) as mock_analyze:
                         mock_analyze.return_value = {
                             "f0_mean": 150.0,
@@ -356,8 +357,10 @@ class TestStyleAnalysis:
         app.include_router(style_transfer.router)
         client = TestClient(app)
 
-        with patch("backend.api.routes.style_transfer._style_transfer_jobs") as mock_jobs:
-            mock_jobs.get.return_value = None
+        with patch(
+            "backend.services.audio_artifacts.AudioRegistry.get_path",
+            return_value=None,
+        ):
 
             request_data = {
                 "audio_id": "nonexistent",
@@ -375,11 +378,12 @@ class TestStyleAnalysis:
         client = TestClient(app)
 
         with patch("os.path.exists", return_value=True):
-            with patch("backend.api.routes.voice._audio_storage") as mock_storage:
-                mock_storage.__contains__ = lambda x: x == "audio-123"
-                mock_storage.__getitem__ = lambda x: "/path/to/audio.wav"
+            with patch(
+                "backend.services.audio_artifacts.AudioRegistry.get_path",
+                side_effect=lambda aid: "/path/to/audio.wav" if aid == "audio-123" else None,
+            ):
 
-                with patch("app.core.audio.audio_utils.load_audio") as mock_load:
+                with patch("backend.audio.audio_utils.load_audio") as mock_load:
                     sample_rate = 44100
                     duration = 1.0
                     samples = int(sample_rate * duration)
@@ -421,7 +425,10 @@ class TestStyleAnalysis:
         app.include_router(style_transfer.router)
         client = TestClient(app)
 
-        with patch("backend.api.routes.voice.synthesize") as mock_synth:
+        with patch(
+            "backend.voice.services.synthesis_service.SynthesisService.synthesize",
+            new_callable=AsyncMock,
+        ) as mock_synth:
             mock_synth.return_value = type(
                 "obj",
                 (object,),

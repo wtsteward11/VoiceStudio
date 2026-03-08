@@ -1056,7 +1056,8 @@ namespace VoiceStudio.App
             _layoutSaveDebouncer?.Invoke();
 
             var toastService = ServiceProvider.TryGetToastNotificationService();
-            toastService?.ShowSuccess("Panel Docked", $"Panel moved to {targetHost.PanelRegion} region");
+            var movedName = sourcePanelId ?? targetPanelId ?? "Panel";
+            toastService?.ShowSuccess("Panel Docked", $"Docked {movedName} -> {targetRegion}");
         }
 
         #endregion Panel Docking (IDEA 14)

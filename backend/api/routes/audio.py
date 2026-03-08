@@ -149,6 +149,24 @@ def _get_audio_path(audio_id: str) -> str | None:
     return resolve_audio_path(audio_id)
 
 
+@router.get("/file/{audio_id}")
+async def get_audio_file(audio_id: str):
+    """Stream an audio file by ID (uploaded, synthesized, or project audio)."""
+    from starlette.responses import FileResponse
+
+    file_path = _get_audio_path(audio_id)
+    if not file_path or not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail=f"Audio not found: {audio_id}")
+    ext = os.path.splitext(file_path)[1].lower()
+    media_type = {
+        ".wav": "audio/wav",
+        ".mp3": "audio/mpeg",
+        ".flac": "audio/flac",
+        ".ogg": "audio/ogg",
+    }.get(ext, "audio/wav")
+    return FileResponse(file_path, media_type=media_type, filename=f"{audio_id}{ext}")
+
+
 def _downsample_waveform(
     audio: np.ndarray, sample_rate: int, target_width: int, mode: str = "peak"
 ) -> np.ndarray:

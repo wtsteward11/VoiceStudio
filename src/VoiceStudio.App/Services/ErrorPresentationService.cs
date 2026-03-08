@@ -1,19 +1,34 @@
 using System;
+using VoiceStudio.App.Logging;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Services
 {
   /// <summary>
   /// Implementation of error presentation service that decides the best way to present errors.
+  /// Also owns the <see cref="BackendConnectionMonitor"/> and centralises all
+  /// backend-connectivity toast suppression so that at most ONE offline toast appears per session.
   /// </summary>
   public class ErrorPresentationService : IErrorPresentationService
   {
     private readonly IErrorDialogService? _errorDialogService;
     private readonly IErrorLoggingService? _errorLoggingService;
 
-    // ToastNotificationService requires UI elements and is registered manually after UI creation.
-    // Access it lazily via AppServices to avoid DI resolution failures at startup.
+    private bool _backendOfflineToastShown;
+    private BackendConnectionMonitor? _monitor;
+
     private ToastNotificationService? ToastNotificationService => AppServices.TryGetToastNotificationService();
+
+    /// <summary>
+    /// True when the monitor reports the backend as unreachable.
+    /// </summary>
+    public static bool IsBackendOffline { get; private set; }
+
+    /// <summary>
+    /// Raised on the thread-pool when backend reachability changes.
+    /// Argument is true when backend is reachable, false when offline.
+    /// </summary>
+    public static event EventHandler<bool>? BackendReachabilityChanged;
 
     public ErrorPresentationService(
         IErrorDialogService? errorDialogService = null,
@@ -23,87 +38,126 @@ namespace VoiceStudio.App.Services
       _errorLoggingService = errorLoggingService;
     }
 
+    /// <summary>
+    /// Creates a <see cref="BackendConnectionMonitor"/>, subscribes to its events,
+    /// and starts the health-check loop.  Safe to call more than once (no-ops on repeat).
+    /// </summary>
+    public void StartBackendMonitoring()
+    {
+      if (_monitor != null)
+        return;
+
+      IBackendClient? client;
+      try { client = AppServices.GetBackendClient(); }
+      catch (InvalidOperationException) { return; }
+
+      _monitor = new BackendConnectionMonitor(client);
+      _monitor.Connected += OnBackendConnected;
+      _monitor.Disconnected += OnBackendDisconnected;
+      _monitor.StartMonitoring();
+    }
+
+    private void OnBackendDisconnected(object? sender, EventArgs e)
+    {
+      if (IsBackendOffline)
+        return;
+
+      IsBackendOffline = true;
+      _backendOfflineToastShown = true;
+
+      var toast = ToastNotificationService;
+      if (toast != null)
+      {
+        toast.SuppressConnectivityErrors = true;
+        toast.ShowWarning("Backend is offline. Reconnecting\u2026", "Connection Lost");
+      }
+
+      BackendReachabilityChanged?.Invoke(this, false);
+    }
+
+    private void OnBackendConnected(object? sender, EventArgs e)
+    {
+      if (!IsBackendOffline)
+        return;
+
+      IsBackendOffline = false;
+      _backendOfflineToastShown = false;
+
+      var toast = ToastNotificationService;
+      if (toast != null)
+      {
+        toast.SuppressConnectivityErrors = false;
+        toast.ShowSuccess("Backend reconnected.", "Connection Restored");
+      }
+
+      BackendReachabilityChanged?.Invoke(this, true);
+    }
+
+    // ── ShowError (Exception) ─────────────────────────────────────
+
     public void ShowError(Exception exception, string context, ErrorPresentationType type = ErrorPresentationType.Toast)
     {
       if (exception == null)
         return;
 
-      // Log the error
       _errorLoggingService?.LogError(exception, context);
 
-      // Determine presentation type if not explicitly specified
       if (type == ErrorPresentationType.Toast)
-      {
         type = DeterminePresentationType(exception);
-      }
 
-      // Present error based on type
       switch (type)
       {
         case ErrorPresentationType.Toast:
           ShowErrorToast(exception, context);
           break;
-
         case ErrorPresentationType.Dialog:
           ShowErrorDialog(exception, context);
           break;
-
         case ErrorPresentationType.Inline:
-          // Inline errors are typically handled by the ViewModel/View
-          // This service can't directly set inline errors, so fall back to toast
           ShowErrorToast(exception, context);
           break;
       }
     }
+
+    // ── ShowError (string) ────────────────────────────────────────
 
     public void ShowError(string message, string context, ErrorPresentationType type = ErrorPresentationType.Toast)
     {
       if (string.IsNullOrWhiteSpace(message))
         return;
 
-      // Log the error
       _errorLoggingService?.LogWarning(message, context);
 
-      // Present error based on type
+      if (_backendOfflineToastShown && IsConnectivityMessage(message))
+        return;
+
       switch (type)
       {
         case ErrorPresentationType.Toast:
           ToastNotificationService?.ShowError(message, "Error");
           break;
-
         case ErrorPresentationType.Dialog:
           _ = _errorDialogService?.ShowErrorAsync(message, "Error", context);
           break;
-
         case ErrorPresentationType.Inline:
-          // Inline errors are typically handled by the ViewModel/View
-          // This service can't directly set inline errors, so fall back to toast
           ToastNotificationService?.ShowError(message, "Error");
           break;
       }
     }
 
+    // ── Private helpers ───────────────────────────────────────────
+
     private ErrorPresentationType DeterminePresentationType(Exception exception)
     {
-      // Critical errors that require user action should use dialogs
       if (IsCriticalError(exception))
-      {
         return ErrorPresentationType.Dialog;
-      }
-
-      // Transient errors can use toasts
       if (IsTransientError(exception))
-      {
         return ErrorPresentationType.Toast;
-      }
-
-      // Default to toast for most errors
       return ErrorPresentationType.Toast;
     }
 
-    private bool IsCriticalError(Exception exception)
+    private static bool IsCriticalError(Exception exception)
     {
-      // Critical errors that require user action
       return exception is
           System.Security.SecurityException or
           System.UnauthorizedAccessException or
@@ -111,9 +165,8 @@ namespace VoiceStudio.App.Services
           OutOfMemoryException;
     }
 
-    private bool IsTransientError(Exception exception)
+    private static bool IsTransientError(Exception exception)
     {
-      // Transient errors that might resolve on retry
       return exception is
           System.Net.Http.HttpRequestException or
           System.TimeoutException or
@@ -124,8 +177,43 @@ namespace VoiceStudio.App.Services
 
     private void ShowErrorToast(Exception exception, string _)
     {
+      if (IsBackendConnectivityError(exception))
+      {
+        if (_backendOfflineToastShown)
+          return;
+        _backendOfflineToastShown = true;
+      }
       var userMessage = GetUserFriendlyMessage(exception);
       ToastNotificationService?.ShowError(userMessage, GetErrorTitle(exception));
+    }
+
+    private static bool IsBackendConnectivityError(Exception exception)
+    {
+      return exception is
+          VoiceStudio.Core.Exceptions.BackendUnavailableException or
+          VoiceStudio.Core.Exceptions.BackendTimeoutException or
+          System.Net.Http.HttpRequestException;
+    }
+
+    /// <summary>
+    /// Returns true when <paramref name="message"/> looks like a backend-connectivity error
+    /// so it can be suppressed while the offline toast is already visible.
+    /// </summary>
+    private static bool IsConnectivityMessage(string message)
+    {
+      var m = message.AsSpan();
+      return m.Contains("unable to connect".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("backend".AsSpan(), StringComparison.OrdinalIgnoreCase)
+             && (m.Contains("connect".AsSpan(), StringComparison.OrdinalIgnoreCase)
+                 || m.Contains("unavailable".AsSpan(), StringComparison.OrdinalIgnoreCase)
+                 || m.Contains("not running".AsSpan(), StringComparison.OrdinalIgnoreCase))
+          || m.Contains("connection refused".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("No connection could be made".AsSpan(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void ResetBackendToastGuard()
+    {
+      _backendOfflineToastShown = false;
     }
 
     private void ShowErrorDialog(Exception exception, string context)
@@ -133,7 +221,7 @@ namespace VoiceStudio.App.Services
       _ = _errorDialogService?.ShowErrorAsync(exception, GetErrorTitle(exception), context);
     }
 
-    private string GetUserFriendlyMessage(Exception exception)
+    private static string GetUserFriendlyMessage(Exception exception)
     {
       return exception switch
       {
@@ -149,7 +237,7 @@ namespace VoiceStudio.App.Services
       };
     }
 
-    private string GetErrorTitle(Exception exception)
+    private static string GetErrorTitle(Exception exception)
     {
       return exception switch
       {

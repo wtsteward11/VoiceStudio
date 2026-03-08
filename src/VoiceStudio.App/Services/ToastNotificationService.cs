@@ -34,25 +34,39 @@ namespace VoiceStudio.App.Services
     private const int AutoDismissInfoMs = 5000;
     private const int AutoDismissWarningMs = 5000;
 
+    /// <summary>
+    /// When true, <see cref="ShowError"/> silently drops messages that look like
+    /// backend-connectivity errors.  Managed by <see cref="ErrorPresentationService"/>.
+    /// </summary>
+    public bool SuppressConnectivityErrors { get; set; }
+
     public ToastNotificationService(StackPanel container)
     {
       _toastContainer = container ?? throw new ArgumentNullException(nameof(container));
     }
 
-    /// <summary>
-    /// Shows a success toast notification.
-    /// </summary>
     public void ShowSuccess(string message, string? title = null)
     {
       ShowToast(ToastType.Success, message, title, AutoDismissSuccessMs);
     }
 
-    /// <summary>
-    /// Shows an error toast notification.
-    /// </summary>
     public void ShowError(string message, string? title = null, Action? viewDetailsAction = null)
     {
-      ShowToast(ToastType.Error, message, title, 0, viewDetailsAction); // Errors don't auto-dismiss
+      if (SuppressConnectivityErrors && LooksLikeConnectivityError(message))
+        return;
+      ShowToast(ToastType.Error, message, title, 0, viewDetailsAction);
+    }
+
+    private static bool LooksLikeConnectivityError(string message)
+    {
+      var m = message.AsSpan();
+      return m.Contains("unable to connect".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("connection refused".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("No connection could be made".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || (m.Contains("backend".AsSpan(), StringComparison.OrdinalIgnoreCase)
+              && (m.Contains("connect".AsSpan(), StringComparison.OrdinalIgnoreCase)
+                  || m.Contains("unavailable".AsSpan(), StringComparison.OrdinalIgnoreCase)
+                  || m.Contains("not running".AsSpan(), StringComparison.OrdinalIgnoreCase)));
     }
 
     /// <summary>

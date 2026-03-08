@@ -10,6 +10,7 @@ namespace VoiceStudio.App.Services;
 
 /// <summary>
 /// Monitors backend connection and handles automatic reconnection with exponential backoff.
+/// Singleton accessible via <see cref="Current"/> after construction.
 /// </summary>
 public sealed class BackendConnectionMonitor : IDisposable
 {
@@ -23,30 +24,19 @@ public sealed class BackendConnectionMonitor : IDisposable
   private int _consecutiveFailures;
   private DateTime _lastSuccessfulPing = DateTime.MinValue;
 
-  // Configuration
-  private const int HealthCheckIntervalMs = 10000;     // 10 seconds between health checks
-  private const int InitialReconnectDelayMs = 1000;    // Start at 1 second
-  private const int MaxReconnectDelayMs = 60000;       // Max 60 seconds
-  private const int MaxConsecutiveFailures = 10;       // Before giving up
+  private const int HealthCheckIntervalMs = 10000;
+  private const int InitialReconnectDelayMs = 1000;
+  private const int MaxReconnectDelayMs = 60000;
+  private const int MaxConsecutiveFailures = 10;
 
   /// <summary>
-  /// Event raised when connection is established or restored.
+  /// The active monitor instance. Set in constructor, cleared on Dispose.
   /// </summary>
+  public static BackendConnectionMonitor? Current { get; private set; }
+
   public event EventHandler? Connected;
-
-  /// <summary>
-  /// Event raised when connection is lost.
-  /// </summary>
   public event EventHandler? Disconnected;
-
-  /// <summary>
-  /// Event raised when reconnection attempt starts.
-  /// </summary>
   public event EventHandler<ReconnectEventArgs>? ReconnectAttempt;
-
-  /// <summary>
-  /// Event raised when all reconnection attempts have failed.
-  /// </summary>
   public event EventHandler? ReconnectFailed;
 
   /// <summary>
@@ -55,18 +45,17 @@ public sealed class BackendConnectionMonitor : IDisposable
   public bool IsConnected { get; private set; }
 
   /// <summary>
-  /// Gets the number of consecutive connection failures.
+  /// Last error message from a failed health check, or null when healthy.
   /// </summary>
-  public int ConsecutiveFailures => _consecutiveFailures;
+  public string? LastError { get; private set; }
 
-  /// <summary>
-  /// Gets the time of the last successful health check.
-  /// </summary>
+  public int ConsecutiveFailures => _consecutiveFailures;
   public DateTime LastSuccessfulPing => _lastSuccessfulPing;
 
   public BackendConnectionMonitor(IBackendClient backendClient)
   {
     _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+    Current = this;
 
     _httpClient = new HttpClient
     {
@@ -144,15 +133,23 @@ public sealed class BackendConnectionMonitor : IDisposable
   {
     try
     {
-      var response = await _httpClient.GetAsync("/health", cancellationToken);
-      return response.IsSuccessStatusCode;
+      var response = await _httpClient.GetAsync("/api/health", cancellationToken);
+      if (response.IsSuccessStatusCode)
+      {
+        LastError = null;
+        return true;
+      }
+      LastError = $"Health check returned {(int)response.StatusCode}";
+      return false;
     }
-    catch (HttpRequestException)
+    catch (HttpRequestException ex)
     {
+      LastError = ex.Message;
       return false;
     }
     catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
     {
+      LastError = "Health check timed out";
       return false;
     }
   }
@@ -261,6 +258,7 @@ public sealed class BackendConnectionMonitor : IDisposable
 
   public void Dispose()
   {
+    if (Current == this) Current = null;
     StopMonitoring();
     _cts.Dispose();
     _httpClient.Dispose();

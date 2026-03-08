@@ -197,21 +197,21 @@ namespace VoiceStudio.App.Controls
 
     /// <summary>
     /// Async cleanup of cached panels on unload. Fire-and-forget from Unloaded handler to avoid blocking UI thread.
+    /// Disposes ViewModels on UI thread when possible to avoid UI-thread affinity crashes.
     /// </summary>
     private async Task CleanupCacheAsync()
     {
+      List<IDisposable>? toDispose = null;
       try
       {
         await _loadLock.WaitAsync().ConfigureAwait(false);
         try
         {
+          toDispose = new List<IDisposable>();
           foreach (var cached in _loadedPanels.Values)
           {
             if (cached is UserControl uc && uc.DataContext is IDisposable d)
-            {
-              // ALLOWED: empty catch - panel teardown must not propagate exceptions to caller
-              try { d.Dispose(); } catch { /* don't break teardown */ }
-            }
+              toDispose.Add(d);
           }
           _loadedPanels.Clear();
           _lruOrder.Clear();
@@ -225,6 +225,40 @@ namespace VoiceStudio.App.Controls
       catch (ObjectDisposedException)
       {
         // Lock disposed during shutdown, ignore
+        return;
+      }
+
+      if (toDispose == null || toDispose.Count == 0)
+        return;
+
+      var dq = DispatcherQueue;
+      if (dq != null && !dq.HasThreadAccess)
+      {
+        dq.TryEnqueue(() =>
+        {
+          foreach (var d in toDispose)
+          {
+            // ALLOWED: empty catch - panel teardown must not propagate exceptions to caller
+            try { d.Dispose(); } catch { /* don't break teardown */ }
+          }
+        });
+      }
+      else if (dq == null)
+      {
+        System.Diagnostics.Debug.WriteLine("[PanelHost] CleanupCacheAsync: DispatcherQueue null, disposing on current thread (may cause UI-thread affinity issues)");
+        foreach (var d in toDispose)
+        {
+          // ALLOWED: empty catch - panel teardown must not propagate exceptions to caller
+          try { d.Dispose(); } catch { /* don't break teardown */ }
+        }
+      }
+      else
+      {
+        foreach (var d in toDispose)
+        {
+          // ALLOWED: empty catch - panel teardown must not propagate exceptions to caller
+          try { d.Dispose(); } catch { /* don't break teardown */ }
+        }
       }
     }
 

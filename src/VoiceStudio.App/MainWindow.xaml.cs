@@ -311,7 +311,8 @@ namespace VoiceStudio.App
                         System.Diagnostics.Debug.WriteLine($"[Theme] Failed to initialize: {ex.Message}");
                     }
 
-                    // Log visual tree info after loaded
+#if DEBUG
+                    // Log visual tree info after loaded (DEBUG only - avoid production file I/O)
                     var diagPath = System.IO.Path.Combine(
               Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
               "VoiceStudio", "crashes", "visualtree_diag.txt");
@@ -334,7 +335,7 @@ namespace VoiceStudio.App
                     // ALLOWED: empty catch - diagnostic file write is best-effort
                     catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Diagnostic write failed: {ex.Message}"); }
 
-                    // Add pointer event handler
+                    // Add pointer event handler (DEBUG only - avoid production file I/O on every click)
                     contentFE.AddHandler(
               UIElement.PointerPressedEvent,
               new Microsoft.UI.Xaml.Input.PointerEventHandler((sender, args) =>
@@ -351,6 +352,7 @@ namespace VoiceStudio.App
                         catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Input diagnostic write failed: {ex.Message}"); }
                     }),
               true); // handledEventsToo = true
+#endif
                 };
             }
 
@@ -497,11 +499,13 @@ namespace VoiceStudio.App
             catch (Exception ex)
             {
                 Debug.WriteLine($"[DEBUG] NavStudio_Click EXCEPTION: {ex}");
+#if DEBUG
                 var diagPath = Path.Combine(
                   Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                   "VoiceStudio", "crashes", "click_diag.txt");
                 // ALLOWED: empty catch - diagnostic file write is best-effort
                 try { File.AppendAllText(diagPath, $"[{DateTime.UtcNow:O}] NavStudio_Click EXCEPTION: {ex}\n"); } catch (Exception diagEx) { System.Diagnostics.Debug.WriteLine($"Click diagnostic write failed: {diagEx.Message}"); }
+#endif
             }
         }
 
@@ -2002,8 +2006,10 @@ namespace VoiceStudio.App
             {
                 var line = $"[{DateTime.Now:HH:mm:ss.fff}] {msg}";
                 Debug.WriteLine(line);
+#if DEBUG
                 // ALLOWED: empty catch - Best effort debug logging, failure is acceptable
                 try { System.IO.File.AppendAllText(logPath, line + Environment.NewLine); } catch { }
+#endif
             }
 
             Log("[MainWindow] ImportAudioFile() called");

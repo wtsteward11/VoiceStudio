@@ -1057,8 +1057,17 @@ namespace VoiceStudio.App
             _layoutSaveDebouncer?.Invoke();
 
             var toastService = ServiceProvider.TryGetToastNotificationService();
-            var movedName = sourcePanelId ?? targetPanelId ?? "Panel";
-            toastService?.ShowSuccess("Panel Docked", $"Docked {movedName} -> {targetRegion}");
+            if (!string.IsNullOrEmpty(sourcePanelId) && !string.IsNullOrEmpty(targetPanelId))
+            {
+                toastService?.ShowSuccess("Panel Swapped",
+                    $"Swapped {targetPanelId} ({sourceRegion}) \u2194 {sourcePanelId} ({targetRegion})");
+            }
+            else
+            {
+                var movedName = sourcePanelId ?? targetPanelId ?? "Panel";
+                var destRegion = !string.IsNullOrEmpty(sourcePanelId) ? targetRegion : sourceRegion;
+                toastService?.ShowSuccess("Panel Moved", $"Moved {movedName} -> {destRegion}");
+            }
         }
 
         #endregion Panel Docking (IDEA 14)

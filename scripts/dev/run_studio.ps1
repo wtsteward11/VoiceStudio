@@ -17,7 +17,7 @@
 #>
 [CmdletBinding()]
 param(
-    [int]$Port = $(if ($env:VOICESTUDIO_API_PORT) { [int]$env:VOICESTUDIO_API_PORT } else { 8001 }),
+    [int]$Port = $(if ($env:VOICESTUDIO_API_PORT) { [int]$env:VOICESTUDIO_API_PORT } else { 8000 }),
     [switch]$SkipBuild
 )
 

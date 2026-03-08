@@ -59,7 +59,7 @@ namespace VoiceStudio.App.Services
 
       // Config and backend - use environment variable with fallback to 8001
       var apiHost = Environment.GetEnvironmentVariable("VOICESTUDIO_API_HOST") ?? "localhost";
-      var apiPort = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT") ?? "8001";
+      var apiPort = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT") ?? "8000";
       var baseUrl = $"http://{apiHost}:{apiPort}";
       var wsUrl = $"ws://{apiHost}:{apiPort}/ws/realtime";
       services.AddSingleton(new BackendClientConfig { BaseUrl = baseUrl, WebSocketUrl = wsUrl });
@@ -253,6 +253,50 @@ namespace VoiceStudio.App.Services
       PanelRegistrationMs = sw.Elapsed.TotalMilliseconds;
       Debug.WriteLine(
         $"[AppServices] Registered {registry.GetAllDescriptors().Count()} panels in PanelRegistry in {PanelRegistrationMs:F1}ms");
+
+#if DEBUG
+      var failures = new List<(string panelId, string viewModelType, string message)>();
+      var total = 0;
+      foreach (var d in registry.GetAllDescriptors())
+      {
+        if (d.ViewModelType == null)
+          continue;
+        total++;
+        try
+        {
+          ActivatorUtilities.CreateInstance(_provider!, d.ViewModelType);
+        }
+        catch (Exception ex)
+        {
+          failures.Add((d.PanelId, d.ViewModelType.FullName ?? d.ViewModelType.Name ?? "?", ex.Message));
+        }
+      }
+      var passed = total - failures.Count;
+      Debug.WriteLine($"[Startup] VM resolvability: {passed}/{total} passed, {failures.Count} failed");
+      if (failures.Count > 0)
+      {
+        try
+        {
+          var diagDir = System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "VoiceStudio", "crashes");
+          System.IO.Directory.CreateDirectory(diagDir);
+          var path = System.IO.Path.Combine(diagDir, "vm_resolution_diag.txt");
+          var lines = new List<string>
+          {
+            $"[{DateTime.UtcNow:O}] VM resolvability check: {failures.Count} failures",
+            ""
+          };
+          foreach (var (panelId, vmType, msg) in failures)
+            lines.Add($"  {panelId}: {vmType} — {msg}");
+          System.IO.File.WriteAllText(path, string.Join(Environment.NewLine, lines));
+        }
+        catch (Exception ex)
+        {
+          Debug.WriteLine($"[Startup] Failed to write vm_resolution_diag.txt: {ex.Message}");
+        }
+      }
+#endif
     }
 
     /// <summary>

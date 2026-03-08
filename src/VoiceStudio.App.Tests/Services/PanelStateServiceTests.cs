@@ -32,6 +32,7 @@ namespace VoiceStudio.App.Tests.Services
         {
             if (_tempWorkspaceRoot != null && Directory.Exists(_tempWorkspaceRoot))
             {
+                // ALLOWED: empty catch - test teardown cleanup; failure is non-actionable
                 try { Directory.Delete(_tempWorkspaceRoot, recursive: true); } catch { /* best effort */ }
             }
         }

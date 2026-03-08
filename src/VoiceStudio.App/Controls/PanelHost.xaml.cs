@@ -209,6 +209,7 @@ namespace VoiceStudio.App.Controls
           {
             if (cached is UserControl uc && uc.DataContext is IDisposable d)
             {
+              // ALLOWED: empty catch - panel teardown must not propagate exceptions to caller
               try { d.Dispose(); } catch { /* don't break teardown */ }
             }
           }
@@ -220,6 +221,7 @@ namespace VoiceStudio.App.Controls
           _loadLock.Release();
         }
       }
+      // ALLOWED: empty catch - lock disposed during shutdown, expected
       catch (ObjectDisposedException)
       {
         // Lock disposed during shutdown, ignore
@@ -693,6 +695,7 @@ namespace VoiceStudio.App.Controls
       {
         if (evicted is UserControl uc && uc.DataContext is IDisposable d)
         {
+          // ALLOWED: empty catch - cache eviction must not break the UI eviction loop
           try { d.Dispose(); } catch { /* don't break eviction */ }
         }
         System.Diagnostics.Debug.WriteLine($"[PanelHost] LRU evicted: {toEvict}");

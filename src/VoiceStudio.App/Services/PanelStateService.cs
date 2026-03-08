@@ -621,6 +621,7 @@ namespace VoiceStudio.App.Services
           System.Diagnostics.Debug.WriteLine($"Failed case-only rename: {ex.Message}");
           if (File.Exists(tempPath))
           {
+            // ALLOWED: empty catch - best effort restore; failure is acceptable, not actionable
             try { File.Move(tempPath, oldPath); } catch { /* best effort restore */ }
           }
           return false;

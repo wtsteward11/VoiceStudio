@@ -473,15 +473,17 @@ namespace VoiceStudio.App
         {
             if (_commandRouter != null)
             {
-                _commandRouter.ExecuteFireAndForget(commandId);
-                Debug.WriteLine($"[MainWindow] Nav command executed via CommandRouter: {commandId}");
+                var success = await _commandRouter.ExecuteSafeAsync(commandId);
+                if (success)
+                {
+                    Debug.WriteLine($"[MainWindow] Nav command succeeded via CommandRouter: {commandId}");
+                    return;
+                }
+                Debug.WriteLine($"[MainWindow] Nav command failed; falling back to OpenPanelByIdAsync: {fallbackPanelId}");
             }
-            else
-            {
-                if (await OpenPanelByIdAsync(fallbackPanelId, fallbackRegion))
-                    SetActiveNavButton(buttonName);
-                Debug.WriteLine($"[MainWindow] Nav fallback executed: {fallbackPanelId}");
-            }
+
+            if (await OpenPanelByIdAsync(fallbackPanelId, fallbackRegion))
+                SetActiveNavButton(buttonName);
         }
 
         private void NavStudio_Click(object _, RoutedEventArgs __)

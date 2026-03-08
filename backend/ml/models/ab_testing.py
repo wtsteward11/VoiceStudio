@@ -328,6 +328,93 @@ class ABTestingService:
         
         return True
 
+    def register_experiment(self, experiment: Experiment) -> None:
+        """Register or update an experiment (stores and persists)."""
+        self._experiments[experiment.id] = experiment
+        self._save_experiments()
+        logger.info(f"Registered experiment: {experiment.id}")
+
+    def archive_experiment(self, experiment_id: str) -> None:
+        """Archive an experiment (set status to ARCHIVED)."""
+        self.update_experiment_status(experiment_id, ExperimentStatus.ARCHIVED)
+
+    def start_experiment(self, experiment_id: str) -> bool:
+        """Start an experiment (DRAFT -> RUNNING)."""
+        exp = self._experiments.get(experiment_id)
+        if not exp:
+            return False
+        if exp.status != ExperimentStatus.DRAFT:
+            return False
+        self.update_experiment_status(experiment_id, ExperimentStatus.RUNNING)
+        return True
+
+    def pause_experiment(self, experiment_id: str) -> bool:
+        """Pause a running experiment."""
+        exp = self._experiments.get(experiment_id)
+        if not exp:
+            return False
+        if exp.status != ExperimentStatus.RUNNING:
+            return False
+        self.update_experiment_status(experiment_id, ExperimentStatus.PAUSED)
+        return True
+
+    def resume_experiment(self, experiment_id: str) -> bool:
+        """Resume a paused experiment."""
+        exp = self._experiments.get(experiment_id)
+        if not exp:
+            return False
+        if exp.status != ExperimentStatus.PAUSED:
+            return False
+        self.update_experiment_status(experiment_id, ExperimentStatus.RUNNING)
+        return True
+
+    def complete_experiment(self, experiment_id: str) -> bool:
+        """Mark an experiment as completed."""
+        exp = self._experiments.get(experiment_id)
+        if not exp:
+            return False
+        if exp.status not in (ExperimentStatus.RUNNING, ExperimentStatus.PAUSED):
+            return False
+        self.update_experiment_status(experiment_id, ExperimentStatus.COMPLETED)
+        return True
+
+    def get_variant_stats(
+        self, experiment_id: str, variant_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get statistics for a specific variant."""
+        stats = self.get_experiment_stats(experiment_id)
+        if not stats or "variants" not in stats:
+            return None
+        for v in stats["variants"]:
+            if v.get("id") == variant_id:
+                return v
+        return None
+
+    def get_experiment_events(
+        self,
+        experiment_id: str,
+        event_type: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Get events for an experiment, optionally filtered by type."""
+        filtered = [
+            e for e in self._events
+            if e.experiment_id == experiment_id
+            and (event_type is None or e.event_type == event_type)
+        ]
+        filtered.sort(key=lambda e: e.timestamp, reverse=True)
+        return [
+            {
+                "user_id_hash": e.user_id_hash,
+                "experiment_id": e.experiment_id,
+                "variant_id": e.variant_id,
+                "event_type": e.event_type,
+                "event_data": e.event_data,
+                "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+            }
+            for e in filtered[:limit]
+        ]
+
     # =========================================================================
     # Variant Assignment
     # =========================================================================

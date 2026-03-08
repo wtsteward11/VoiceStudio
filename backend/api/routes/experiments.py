@@ -19,6 +19,7 @@ from backend.ml.models.ab_testing import (
     Experiment,
     ExperimentStatus,
     Variant,
+    get_ab_testing_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -109,7 +110,7 @@ class ExperimentListResponse(BaseModel):
 
 def get_ab_service() -> ABTestingService:
     """Get or create ABTestingService instance."""
-    return ABTestingService()
+    return get_ab_testing_service()
 
 
 # ==============================================================================

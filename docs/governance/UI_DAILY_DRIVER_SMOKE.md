@@ -2,6 +2,10 @@
 
 Contract for "UI is functioning." Each step: Action | Expected Outcome.
 
+## Pre-requisites
+
+Close the app or run `scripts/dev/stop_voicestudio.ps1` before building.
+
 | # | Action | Expected Outcome |
 |---|--------|------------------|
 | 1 | Launch app | Default workspace loads; no crash. |

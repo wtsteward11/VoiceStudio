@@ -39,7 +39,7 @@ namespace VoiceStudio.App.Tests.UI
       var profilesViewModel = new VoiceStudio.App.Views.Panels.ProfilesViewModel(
           _mockBackendClient!,
           profilesUseCase,
-          new VoiceStudio.App.Services.AudioPlayerService(),
+          new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()),
           new VoiceStudio.App.Services.MultiSelectService(),
           toastNotificationService: null,
           undoRedoService: new VoiceStudio.App.Services.UndoRedoService(),
@@ -47,7 +47,7 @@ namespace VoiceStudio.App.Tests.UI
           logService: null);
       var synthesisViewModel = new VoiceStudio.App.Views.Panels.VoiceSynthesisViewModel(
           _mockBackendClient!,
-          new VoiceStudio.App.Services.AudioPlayerService());
+          new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()));
 
       // Act
       // Verify all components exist for the workflow
@@ -68,7 +68,7 @@ namespace VoiceStudio.App.Tests.UI
       var profilesViewModel = new VoiceStudio.App.Views.Panels.ProfilesViewModel(
           _mockBackendClient!,
           profilesUseCase,
-          new VoiceStudio.App.Services.AudioPlayerService(),
+          new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()),
           new VoiceStudio.App.Services.MultiSelectService(),
           toastNotificationService: null,
           undoRedoService: new VoiceStudio.App.Services.UndoRedoService(),
@@ -95,7 +95,7 @@ namespace VoiceStudio.App.Tests.UI
       var profilesViewModel = new VoiceStudio.App.Views.Panels.ProfilesViewModel(
           _mockBackendClient!,
           profilesUseCase,
-          new VoiceStudio.App.Services.AudioPlayerService(),
+          new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()),
           new VoiceStudio.App.Services.MultiSelectService(),
           toastNotificationService: null,
           undoRedoService: new VoiceStudio.App.Services.UndoRedoService(),
@@ -103,10 +103,10 @@ namespace VoiceStudio.App.Tests.UI
           logService: null);
       var synthesisViewModel = new VoiceStudio.App.Views.Panels.VoiceSynthesisViewModel(
           _mockBackendClient!,
-          new VoiceStudio.App.Services.AudioPlayerService());
+          new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()));
       var timelineViewModel = new VoiceStudio.App.Views.Panels.TimelineViewModel(
           _mockBackendClient!,
-          new VoiceStudio.App.Services.AudioPlayerService(),
+          new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()),
           new VoiceStudio.App.Services.MultiSelectService(),
           toastNotificationService: null,
           undoRedoService: new VoiceStudio.App.Services.UndoRedoService(),

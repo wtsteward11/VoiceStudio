@@ -349,7 +349,8 @@ namespace VoiceStudio.App.Views.Panels
         var assetName = GetPropertyValue(fileData, "Name")?.ToString() ?? "Unknown";
         var assetType = GetPropertyValue(fileData, "Type")?.ToString() ?? "";
         var assetUrl = GetPropertyValue(fileData, "Url")?.ToString() ?? "";
-        var assetPath = GetPropertyValue(fileData, "FilePath")?.ToString() ?? "";
+        var assetPath = GetPropertyValue(fileData, "FilePath")?.ToString()
+            ?? GetPropertyValue(fileData, "Path")?.ToString() ?? "";
 
         switch (action.ToLower())
         {
@@ -429,27 +430,31 @@ namespace VoiceStudio.App.Views.Panels
         }
         else if (!string.IsNullOrEmpty(assetUrl))
         {
-          // If URL is a local path, use it; otherwise we'd need to download
+          // If URL is a local path, use it
           if (System.IO.File.Exists(assetUrl))
           {
             audioPath = assetUrl;
           }
-          else
-          {
-            _toastService?.ShowToast(ToastType.Warning, "Playback", "Remote audio playback not yet supported");
-            return;
-          }
         }
 
-        if (string.IsNullOrEmpty(audioPath))
+        if (!string.IsNullOrEmpty(audioPath))
         {
-          _toastService?.ShowToast(ToastType.Warning, "Playback", $"Audio file not found for {assetName}");
+          await _audioPlayer.PlayFileAsync(audioPath, () => _toastService?.ShowToast(ToastType.Info, "Playback Complete", $"Finished playing {assetName}"));
+          _toastService?.ShowToast(ToastType.Success, "Playing", $"Now playing: {assetName}");
           return;
         }
 
-        await _audioPlayer.PlayFileAsync(audioPath, () => _toastService?.ShowToast(ToastType.Info, "Playback Complete", $"Finished playing {assetName}"));
+        // No local file - try backend audio ID if we have one
+        if (!string.IsNullOrEmpty(assetId))
+        {
+          var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+              ?? "http://localhost:8000";
+          await _audioPlayer.PlayBackendAudioIdAsync(assetId, baseUrl, () => _toastService?.ShowToast(ToastType.Info, "Playback Complete", $"Finished playing {assetName}"));
+          _toastService?.ShowToast(ToastType.Success, "Playing", $"Now playing: {assetName}");
+          return;
+        }
 
-        _toastService?.ShowToast(ToastType.Success, "Playing", $"Now playing: {assetName}");
+        _toastService?.ShowToast(ToastType.Warning, "Playback", $"Audio file not found for {assetName}");
       }
       catch (Exception ex)
       {

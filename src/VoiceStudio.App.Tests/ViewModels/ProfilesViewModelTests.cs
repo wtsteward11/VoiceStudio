@@ -23,7 +23,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public override void TestInitialize()
     {
       base.TestInitialize();
-      _audioPlayerService = new AudioPlayerService();
+      _audioPlayerService = new AudioPlayerService(new System.Net.Http.HttpClient());
       var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(MockBackendClient!);
       var multiSelectService = new MultiSelectService();
       var undoRedoService = new UndoRedoService();

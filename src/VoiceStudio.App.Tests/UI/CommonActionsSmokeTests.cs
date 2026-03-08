@@ -36,7 +36,7 @@ namespace VoiceStudio.App.Tests.UI
       var viewModel = new VoiceStudio.App.Views.Panels.ProfilesViewModel(
           _mockBackendClient!,
           profilesUseCase,
-          new VoiceStudio.App.Services.AudioPlayerService(),
+          new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()),
           new VoiceStudio.App.Services.MultiSelectService(),
           toastNotificationService: null,
           undoRedoService: new VoiceStudio.App.Services.UndoRedoService(),
@@ -65,7 +65,7 @@ namespace VoiceStudio.App.Tests.UI
       // Arrange
       var viewModel = new VoiceStudio.App.Views.Panels.VoiceSynthesisViewModel(
           _mockBackendClient!,
-          new VoiceStudio.App.Services.AudioPlayerService());
+          new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()));
 
       // Act
       // In a real implementation, this would:
@@ -113,7 +113,7 @@ namespace VoiceStudio.App.Tests.UI
       var profilesViewModel = new VoiceStudio.App.Views.Panels.ProfilesViewModel(
           _mockBackendClient!,
           profilesUseCase,
-          new VoiceStudio.App.Services.AudioPlayerService(),
+          new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()),
           new VoiceStudio.App.Services.MultiSelectService(),
           toastNotificationService: null,
           undoRedoService: new VoiceStudio.App.Services.UndoRedoService(),

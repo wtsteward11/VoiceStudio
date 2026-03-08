@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Threading.Tasks;
 using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Services;
@@ -13,11 +14,15 @@ namespace VoiceStudio.App.Services
   /// </summary>
   public class AudioPlayerService : IAudioPlayerService, IDisposable
   {
+    private readonly HttpClient _httpClient;
+
     private NAudio.Wave.WaveOutEvent? _waveOut;
     private NAudio.Wave.AudioFileReader? _audioFileReader;
     private NAudio.Wave.RawSourceWaveStream? _rawStream;
     private bool _disposed;
     private double _volume = 1.0;
+
+    private static bool _hasShownPlaybackErrorThisSession;
 
     // Preview playback (separate from main playback)
     private NAudio.Wave.WaveOutEvent? _previewWaveOut;
@@ -27,6 +32,13 @@ namespace VoiceStudio.App.Services
     // Inter-panel workflow
     private readonly IEventAggregator? _eventAggregator;
     private ISubscriptionToken? _playbackRequestedSubscription;
+
+    public AudioPlayerService(HttpClient httpClient)
+    {
+      _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+      _eventAggregator = AppServices.TryGetEventAggregator();
+      _playbackRequestedSubscription = _eventAggregator?.Subscribe<PlaybackRequestedEvent>(OnPlaybackRequested);
+    }
 
     public bool IsPlaying { get; private set; }
     public bool IsPaused { get; private set; }
@@ -53,14 +65,6 @@ namespace VoiceStudio.App.Services
     public event EventHandler<double>? PositionChanged;
     public event EventHandler? PlaybackCompleted;
     public event EventHandler<bool>? IsPlayingChanged;
-
-    public AudioPlayerService()
-    {
-      // Initialize with default settings
-      // Subscribe to PlaybackRequestedEvent for inter-panel workflow
-      _eventAggregator = AppServices.TryGetEventAggregator();
-      _playbackRequestedSubscription = _eventAggregator?.Subscribe<PlaybackRequestedEvent>(OnPlaybackRequested);
-    }
 
     public async Task PlayFileAsync(string filePath, Action? onPlaybackComplete = null)
     {
@@ -204,6 +208,84 @@ namespace VoiceStudio.App.Services
           throw new InvalidOperationException($"Failed to play audio stream: {ex.Message}", ex);
         }
       });
+    }
+
+    public async Task PlayUrlAsync(string audioUrl, Action? onPlaybackComplete = null)
+    {
+      if (string.IsNullOrWhiteSpace(audioUrl))
+        throw new ArgumentException("Audio URL cannot be null or empty", nameof(audioUrl));
+
+      string? tempPath = null;
+      try
+      {
+        var response = await _httpClient.GetAsync(audioUrl).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        var contentType = response.Content.Headers.ContentType?.MediaType;
+        var ext = ".wav";
+        if (!string.IsNullOrEmpty(contentType))
+        {
+          ext = contentType switch
+          {
+            "audio/wav" or "audio/wave" or "audio/x-wav" => ".wav",
+            "audio/mpeg" or "audio/mp3" => ".mp3",
+            "audio/flac" or "audio/x-flac" => ".flac",
+            "audio/ogg" => ".ogg",
+            _ => Path.GetExtension(new Uri(audioUrl).AbsolutePath).TrimStart('.')
+              is { Length: > 0 } e ? "." + e : ".wav"
+          };
+        }
+        else
+        {
+          var urlExt = Path.GetExtension(new Uri(audioUrl).AbsolutePath).TrimStart('.');
+          if (!string.IsNullOrEmpty(urlExt))
+            ext = "." + urlExt;
+        }
+
+        var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+        tempPath = Path.Combine(Path.GetTempPath(), $"voicestudio_{Guid.NewGuid():N}{ext}");
+        await File.WriteAllBytesAsync(tempPath, bytes).ConfigureAwait(false);
+
+        var pathToPlay = tempPath;
+        await PlayFileAsync(pathToPlay, () =>
+        {
+          try
+          {
+            if (File.Exists(pathToPlay))
+              File.Delete(pathToPlay);
+          }
+          catch (Exception ex)
+          {
+            ErrorLogger.LogWarning($"Best effort cleanup failed: {ex.Message}", "AudioPlayerService.PlayUrlAsync");
+          }
+          onPlaybackComplete?.Invoke();
+        }).ConfigureAwait(false);
+      }
+      catch (Exception ex)
+      {
+        if (_hasShownPlaybackErrorThisSession)
+        {
+          ErrorLogger.LogError($"Failed to play audio: {ex.Message}", "AudioPlayerService.PlayUrlAsync");
+          throw;
+        }
+        _hasShownPlaybackErrorThisSession = true;
+        var toast = ServiceProvider.TryGetToastNotificationService();
+        toast?.ShowError("Playback Failed", $"Could not play audio: {ex.Message}");
+        ErrorLogger.LogError($"Failed to play audio: {ex.Message}", "AudioPlayerService.PlayUrlAsync");
+        throw;
+      }
+    }
+
+    public async Task PlayBackendAudioIdAsync(string audioId, string baseUrl, Action? onPlaybackComplete = null)
+    {
+      if (string.IsNullOrWhiteSpace(audioId))
+        throw new ArgumentException("Audio ID cannot be null or empty", nameof(audioId));
+      if (string.IsNullOrWhiteSpace(baseUrl))
+        throw new ArgumentException("Base URL cannot be null or empty", nameof(baseUrl));
+
+      var baseTrimmed = baseUrl.TrimEnd('/');
+      var fullUrl = $"{baseTrimmed}/api/audio/file/{Uri.EscapeDataString(audioId)}";
+      await PlayUrlAsync(fullUrl, onPlaybackComplete).ConfigureAwait(false);
     }
 
     public void Stop()
@@ -383,27 +465,29 @@ namespace VoiceStudio.App.Services
 
     /// <summary>
     /// Handles the PlaybackRequestedEvent from Library or other panels.
-    /// Plays the requested audio file.
+    /// Plays the requested audio file or backend audio by ID.
     /// </summary>
     private async void OnPlaybackRequested(PlaybackRequestedEvent e)
     {
       try
       {
-        if (string.IsNullOrEmpty(e.AssetPath))
+        if (!string.IsNullOrEmpty(e.AssetPath) && File.Exists(e.AssetPath))
         {
-          System.Diagnostics.Debug.WriteLine("[AudioPlayer] PlaybackRequested: No asset path provided");
+          await PlayFileAsync(e.AssetPath);
+          System.Diagnostics.Debug.WriteLine($"[AudioPlayer] Playing: {e.AssetName ?? e.AssetPath}");
           return;
         }
 
-        if (!File.Exists(e.AssetPath))
+        if (!string.IsNullOrEmpty(e.AssetId))
         {
-          System.Diagnostics.Debug.WriteLine($"[AudioPlayer] PlaybackRequested: File not found: {e.AssetPath}");
+          var baseUrl = AppServices.GetService<VoiceStudio.Core.Services.BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+              ?? "http://localhost:8000";
+          await PlayBackendAudioIdAsync(e.AssetId, baseUrl);
+          System.Diagnostics.Debug.WriteLine($"[AudioPlayer] Playing backend audio: {e.AssetName ?? e.AssetId}");
           return;
         }
 
-        // Play the requested audio file
-        await PlayFileAsync(e.AssetPath);
-        System.Diagnostics.Debug.WriteLine($"[AudioPlayer] Playing: {e.AssetName ?? e.AssetPath}");
+        System.Diagnostics.Debug.WriteLine("[AudioPlayer] PlaybackRequested: No asset path or ID provided");
       }
       catch (Exception ex)
       {

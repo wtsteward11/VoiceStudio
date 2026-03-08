@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -57,7 +58,7 @@ namespace VoiceStudio.App.Services
       // Must be registered before ErrorLoggingService and BackendClient
       services.AddSingleton<ICorrelationIdProvider, CorrelationIdProvider>();
 
-      // Config and backend - use environment variable with fallback to 8001
+      // Config and backend - use environment variable with fallback to 8000
       var apiHost = Environment.GetEnvironmentVariable("VOICESTUDIO_API_HOST") ?? "localhost";
       var apiPort = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT") ?? "8000";
       var baseUrl = $"http://{apiHost}:{apiPort}";
@@ -72,7 +73,8 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IWebSocketService>(sp => new WebSocketService(
           sp.GetRequiredService<BackendClientConfig>().WebSocketUrl));
       services.AddSingleton<IWebSocketClientFactory>(sp => new WebSocketClientFactory(
-          sp.GetService<IWebSocketService>()));
+          sp.GetService<IWebSocketService>(),
+          sp.GetRequiredService<BackendClientConfig>().BaseUrl));
 
       // Use cases
       services.AddSingleton<IProfilesUseCase, ProfilesUseCase>();
@@ -104,7 +106,8 @@ namespace VoiceStudio.App.Services
         sp.GetRequiredService<ICorrelationIdProvider>()));
       services.AddSingleton<IAuditLoggingService>(sp => new AuditLoggingService(sp.GetRequiredService<IErrorLoggingService>()));
       services.AddSingleton<IHelpOverlayService, HelpOverlayService>();
-      services.AddSingleton<IAudioPlayerService, AudioPlayerService>();
+      services.AddSingleton<HttpClient>(_ => new HttpClient());
+      services.AddSingleton<IAudioPlayerService>(sp => new AudioPlayerService(sp.GetRequiredService<HttpClient>()));
       services.AddSingleton<OperationQueueService>();
       services.AddSingleton<StatePersistenceService>();
       services.AddSingleton<StateCacheService>();

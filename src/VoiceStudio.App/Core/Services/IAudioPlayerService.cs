@@ -28,6 +28,23 @@ namespace VoiceStudio.Core.Services
     Task PlayStreamAsync(System.IO.Stream audioStream, int sampleRate = 22050, int channels = 1, Action? onPlaybackComplete = null);
 
     /// <summary>
+    /// Plays audio from a URL by downloading to a temp file and playing locally.
+    /// </summary>
+    /// <param name="audioUrl">Full URL to the audio file</param>
+    /// <param name="onPlaybackComplete">Optional callback when playback completes</param>
+    /// <returns>Task representing the playback operation</returns>
+    Task PlayUrlAsync(string audioUrl, Action? onPlaybackComplete = null);
+
+    /// <summary>
+    /// Plays audio by backend audio ID via the canonical /api/audio/file/{id} endpoint.
+    /// </summary>
+    /// <param name="audioId">Backend audio ID (from upload or synthesis)</param>
+    /// <param name="baseUrl">Backend base URL (e.g., http://localhost:8000)</param>
+    /// <param name="onPlaybackComplete">Optional callback when playback completes</param>
+    /// <returns>Task representing the playback operation</returns>
+    Task PlayBackendAudioIdAsync(string audioId, string baseUrl, Action? onPlaybackComplete = null);
+
+    /// <summary>
     /// Stops the current playback.
     /// </summary>
     void Stop();

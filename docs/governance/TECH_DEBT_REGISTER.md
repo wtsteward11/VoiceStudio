@@ -10,7 +10,7 @@
 
 | ID | Title | Priority | Added | Category | Description |
 |----|-------|----------|-------|----------|-------------|
-| — | (none) | — | — | — | All technical debt closed as of 2026-02-28 |
+| **TD-043** | experiments.py routes call non-existent ABTestingService methods | HIGH if shipped | 2026-03-08 | API | register_experiment, archive_experiment, start_experiment, pause_experiment, resume_experiment, complete_experiment, get_variant_stats, get_experiment_events — none exist on ABTestingService. Every /api/experiments/* endpoint returns AttributeError. |
 
 ---
 
@@ -59,6 +59,7 @@
 | **TD-039** | Dynamic Transcription Engine Discovery | 2026-02-28 | Implemented in TranscribeViewModel.cs via GAP-CS-003: LoadEnginesAsync() calls GetTranscriptionEnginesAsync(), populates Engines dynamically, falls back to hardcoded list on backend error | TranscribeViewModel.cs lines 229-280 |
 | **TD-040** | Starlette Double call_next AssertionError | 2026-03-03 | Fixed double call_next in performance_profiling_middleware and request_size_limit_middleware except blocks; replaced with raise. Added Unicode control character path rejection in InputValidationMiddleware (C-T1) | tests/unit/test_middleware_regression.py (8 pass) |
 | **TD-041** | Test Isolation (Order-Dependent Tests) | 2026-03-03 | Installed pytest-randomly; added --randomly-seed=last to pytest.ini; autouse fixtures clear module-level job stores (conftest.py) and performance middleware metrics (integration/conftest.py); CI runs two seeds (C-T2) | ci.yml dual-seed runs |
+| **TD-042** | lip_sync_service.py missing asyncio import | 2026-03-08 | Added `import asyncio` at module level; _run_wav2lip, _run_sadtalker, _run_fomm use asyncio.create_subprocess_exec | backend/services/lip_sync_service.py |
 
 ---
 

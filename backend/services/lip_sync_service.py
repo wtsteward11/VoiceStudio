@@ -30,6 +30,7 @@ When models are not available, creates placeholder output with:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import tempfile

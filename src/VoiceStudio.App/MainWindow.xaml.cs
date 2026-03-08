@@ -2306,28 +2306,12 @@ namespace VoiceStudio.App
         {
             var item = new MenuBarItem { Title = "File" };
 
-            // Use CommandRouter for file operations if available
-            if (_commandRouter != null)
-            {
-                item.Items.Add(CreateCommandMenuItem("New Project", "file.new", "Ctrl+N"));
-                item.Items.Add(CreateCommandMenuItem("Open Project", "file.open", "Ctrl+O"));
-                item.Items.Add(CreateCommandMenuItem("Save Project", "file.save", "Ctrl+S"));
-                item.Items.Add(CreateCommandMenuItem("Save As...", "file.saveAs", "Ctrl+Shift+S"));
-                item.Items.Add(new MenuFlyoutSeparator());
-                item.Items.Add(CreateCommandMenuItem("Import Audio...", "file.import", "Ctrl+I"));
-                item.Items.Add(CreateCommandMenuItem("Export Audio...", "file.export", "Ctrl+E"));
-                item.Items.Add(new MenuFlyoutSeparator());
-                item.Items.Add(CreateCommandMenuItem("Close Project", "file.close", "Ctrl+W"));
-            }
-            else
-            {
-                // Fallback to legacy method calls
-                item.Items.Add(CreateMenuItem("New Project", CreateNewProject));
-                item.Items.Add(CreateMenuItem("Open Project", OpenProject));
-                item.Items.Add(CreateMenuItem("Save Project", SaveProject));
-                item.Items.Add(new MenuFlyoutSeparator());
-                item.Items.Add(CreateMenuItem("Import Audio File...", ImportAudioFile));
-            }
+            // Use direct method calls so critical file operations never silently no-op
+            item.Items.Add(CreateMenuItem("New Project", CreateNewProject, "Ctrl+N"));
+            item.Items.Add(CreateMenuItem("Open Project", OpenProject, "Ctrl+O"));
+            item.Items.Add(CreateMenuItem("Save Project", SaveProject, "Ctrl+S"));
+            item.Items.Add(new MenuFlyoutSeparator());
+            item.Items.Add(CreateMenuItem("Import Audio File...", ImportAudioFile, "Ctrl+I"));
 
             item.Items.Add(new MenuFlyoutSeparator());
             if (_recentProjectsSubMenu != null)
@@ -2351,15 +2335,15 @@ namespace VoiceStudio.App
         {
             var item = new MenuBarItem { Title = "View" };
 
-            // Navigation shortcuts
+            // Navigation shortcuts - use fallback-aware CreateNavMenuItem so panels always open
+            item.Items.Add(CreateNavMenuItem("Studio", "nav.studio", "Timeline", PanelRegion.Center, "NavStudio", "Ctrl+1"));
+            item.Items.Add(CreateNavMenuItem("Library", "nav.library", "Library", PanelRegion.Left, "NavLibrary", "Ctrl+2"));
+            item.Items.Add(CreateNavMenuItem("Profiles", "nav.profiles", "Profiles", PanelRegion.Left, "NavProfiles", "Ctrl+3"));
+            item.Items.Add(CreateNavMenuItem("Effects", "nav.effects", "EffectsMixer", PanelRegion.Right, "NavEffects", "Ctrl+4"));
+            item.Items.Add(CreateNavMenuItem("Settings", "nav.settings", "Settings", PanelRegion.Right, "NavSettings", "Ctrl+,"));
+            item.Items.Add(new MenuFlyoutSeparator());
             if (_commandRouter != null)
             {
-                item.Items.Add(CreateCommandMenuItem("Studio", "nav.studio", "Ctrl+1"));
-                item.Items.Add(CreateCommandMenuItem("Library", "nav.library", "Ctrl+2"));
-                item.Items.Add(CreateCommandMenuItem("Profiles", "nav.profiles", "Ctrl+3"));
-                item.Items.Add(CreateCommandMenuItem("Effects", "nav.effects", "Ctrl+4"));
-                item.Items.Add(CreateCommandMenuItem("Settings", "nav.settings", "Ctrl+,"));
-                item.Items.Add(new MenuFlyoutSeparator());
                 item.Items.Add(CreateCommandMenuItem("Go Back", "nav.back", "Alt+Left"));
                 item.Items.Add(CreateCommandMenuItem("Go Forward", "nav.forward", "Alt+Right"));
                 item.Items.Add(new MenuFlyoutSeparator());
@@ -2471,10 +2455,24 @@ namespace VoiceStudio.App
             return item;
         }
 
-        private MenuFlyoutItem CreateMenuItem(string text, Action action)
+        private MenuFlyoutItem CreateMenuItem(string text, Action action, string? shortcut = null)
         {
             var item = new MenuFlyoutItem { Text = text };
+            if (!string.IsNullOrEmpty(shortcut))
+                item.KeyboardAcceleratorTextOverride = shortcut;
             item.Click += (_, __) => action();
+            return item;
+        }
+
+        /// <summary>
+        /// Creates a nav menu item that uses ExecuteNavCommand (fallback to OpenPanelByIdAsync when command fails).
+        /// </summary>
+        private MenuFlyoutItem CreateNavMenuItem(string text, string commandId, string fallbackPanelId, PanelRegion fallbackRegion, string buttonName, string? shortcut = null)
+        {
+            var item = new MenuFlyoutItem { Text = text };
+            if (!string.IsNullOrEmpty(shortcut))
+                item.KeyboardAcceleratorTextOverride = shortcut;
+            item.Click += (_, __) => ExecuteNavCommand(commandId, fallbackPanelId, fallbackRegion, buttonName);
             return item;
         }
 

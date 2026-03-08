@@ -108,6 +108,8 @@ namespace VoiceStudio.App
                 }
 
                 bool restoredAny = false;
+                int expectedCount = 0;
+                int restoredCount = 0;
 
                 foreach (var regionState in layout.Regions)
                 {
@@ -128,6 +130,7 @@ namespace VoiceStudio.App
                         var activePanelId = regionState.ActivePanelId;
                         if (!string.IsNullOrEmpty(activePanelId))
                         {
+                            expectedCount++;
                             Func<UserControl>? legacyFactory = null;
                             if (_legacyPanelRegistry.TryGetValue(activePanelId, out var legacyEntry))
                             {
@@ -140,6 +143,7 @@ namespace VoiceStudio.App
                                 targetHost.PanelTitle = GetPanelTitle(activePanelId);
                                 targetHost.IsCollapsed = regionState.IsCollapsed;
                                 restoredAny = true;
+                                restoredCount++;
                                 Debug.WriteLine($"Restored panel '{activePanelId}' to {regionState.Region}");
                             }
                             else
@@ -155,6 +159,12 @@ namespace VoiceStudio.App
                         var pid = regionState.ActivePanelId ?? string.Empty;
                         failedItems.Add((regionState.Region, pid));
                     }
+                }
+
+                if (expectedCount >= 2 && restoredCount < 2)
+                {
+                    Debug.WriteLine($"[MainWindow] Insufficient restore: {restoredCount}/{expectedCount} panels loaded; treating as failure");
+                    restoredAny = false;
                 }
 
                 RestoreSplitterRatios(layout);

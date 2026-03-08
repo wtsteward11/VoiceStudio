@@ -412,9 +412,6 @@ namespace VoiceStudio.App
             // Save workspace layout on window close
             this.Closed += MainWindow_Closed;
 
-            // Show welcome dialog on first run
-            this.Activated += MainWindow_Activated;
-
             // Wire up Global Search navigation
             var globalSearchView = FindNameOnContent("GlobalSearchView") as Views.GlobalSearchView;
             if (globalSearchView != null)

@@ -242,7 +242,7 @@ def _save_audio_to_project(project_id: str, audio_id: str, source_path: str) -> 
     return str(dest_path)
 
 
-def _ensure_engine_router():
+def _ensure_engine_router() -> None:
     """Lazy initialization of engine router - called at request time, not import time."""
     if _shared.engine_router is not None:
         return  # Already initialized
@@ -264,15 +264,18 @@ def _ensure_engine_router():
             _shared.ENGINE_AVAILABLE = len(engines) > 0
             if _shared.ENGINE_AVAILABLE:
                 logger.info(f"Voice engine router initialized with {len(engines)} engines")
+                _shared.quality_metrics = _get_quality_metrics()
         else:
             _shared.ENGINE_AVAILABLE = False
+            _shared.quality_metrics = None
             logger.warning("Engine router not available from service")
     except Exception as e:
         logger.warning(f"Failed to initialize engine router: {e}")
         _shared.ENGINE_AVAILABLE = False
+        _shared.quality_metrics = None
 
 
-def _get_quality_metrics():
+def _get_quality_metrics() -> dict[str, Any]:
     """Get quality metrics functions via EngineService."""
     if _shared._voice_engine_service is None:
         return {}

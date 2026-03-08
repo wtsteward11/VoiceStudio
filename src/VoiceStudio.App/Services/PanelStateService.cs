@@ -87,16 +87,43 @@ namespace VoiceStudio.App.Services
       ["pro_mix"] = "ProMix"
     };
 
+    private static readonly HashSet<string> ReservedDeviceNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+      "CON", "PRN", "AUX", "NUL",
+      "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+      "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    };
+
+    private static bool IsValidProfileName(string? name, out string? reason)
+    {
+      reason = null;
+      if (name == null) { reason = "null"; return false; }
+      var trimmed = name.Trim();
+      if (trimmed.Length == 0) { reason = "empty"; return false; }
+      if (trimmed.Length > 64) { reason = "too long"; return false; }
+      if (trimmed.Contains('/') || trimmed.Contains('\\')) { reason = "path separator"; return false; }
+      if (trimmed.Contains("..")) { reason = "traversal"; return false; }
+      foreach (var c in trimmed)
+        if (c < 0x20) { reason = "control char"; return false; }
+      if (trimmed.IndexOfAny(new[] { '<', '>', ':', '"', '|', '?', '*' }) >= 0) { reason = "illegal char"; return false; }
+      if (trimmed[0] == '.' || trimmed[^1] == '.' || trimmed[0] == ' ' || trimmed[^1] == ' ') { reason = "leading/trailing"; return false; }
+      var dotIdx = trimmed.IndexOf('.');
+      var baseName = dotIdx >= 0 ? trimmed[..dotIdx] : trimmed;
+      if (ReservedDeviceNames.Contains(baseName)) { reason = "reserved"; return false; }
+      return true;
+    }
+
     /// <summary>
     /// Initializes the panel state service.
     /// </summary>
     /// <param name="settingsService">Settings service for loading and saving workspace layout to app settings.</param>
-    public PanelStateService(ISettingsService settingsService)
+    /// <param name="appDataOverride">Optional override for app data root (used by tests for isolation). When null, uses LocalApplicationData.</param>
+    public PanelStateService(ISettingsService settingsService, string? appDataOverride = null)
     {
       _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
 
       // Set up directories
-      var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+      var appDataPath = appDataOverride ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
       _workspaceProfilesDirectory = Path.Combine(appDataPath, "VoiceStudio", "WorkspaceProfiles");
       _projectStatesDirectory = Path.Combine(appDataPath, "VoiceStudio", "ProjectStates");
       Directory.CreateDirectory(_workspaceProfilesDirectory);
@@ -360,9 +387,15 @@ namespace VoiceStudio.App.Services
     /// <param name="profile">The workspace profile to save.</param>
     public async Task SaveWorkspaceProfileAsync(WorkspaceProfile profile)
     {
+      if (!IsValidProfileName(profile?.Name, out var reason))
+      {
+        System.Diagnostics.Debug.WriteLine($"[PanelStateService] Cannot save profile with invalid name: {reason}");
+        return;
+      }
+
       try
       {
-        var filePath = Path.Combine(_workspaceProfilesDirectory, $"{profile.Name}.json");
+        var filePath = Path.Combine(_workspaceProfilesDirectory, $"{profile!.Name}.json");
         profile.ModifiedAt = DateTime.UtcNow;
         var json = JsonSerializer.Serialize(profile, _jsonOptions);
         await File.WriteAllTextAsync(filePath, json);
@@ -537,16 +570,30 @@ namespace VoiceStudio.App.Services
     {
       if (string.IsNullOrWhiteSpace(oldName) || string.IsNullOrWhiteSpace(newName))
         return false;
+      if (!IsValidProfileName(newName, out var reason))
+      {
+        System.Diagnostics.Debug.WriteLine($"[PanelStateService] Invalid rename target: {reason}");
+        return false;
+      }
       if (string.Equals(oldName, "studio", StringComparison.OrdinalIgnoreCase))
         return false;
+
+      // No-op: already renamed (exact match)
+      if (string.Equals(oldName, newName, StringComparison.Ordinal))
+        return true;
 
       var source = await LoadWorkspaceProfileAsync(oldName).ConfigureAwait(false);
       if (source == null)
         return false;
 
-      var existing = await LoadWorkspaceProfileAsync(newName).ConfigureAwait(false);
-      if (existing != null)
-        return false;
+      var isCaseOnlyRename = oldName.Equals(newName, StringComparison.OrdinalIgnoreCase) && !oldName.Equals(newName, StringComparison.Ordinal);
+
+      if (!isCaseOnlyRename)
+      {
+        var existing = await LoadWorkspaceProfileAsync(newName).ConfigureAwait(false);
+        if (existing != null)
+          return false;
+      }
 
       var renamed = new WorkspaceProfile
       {
@@ -556,23 +603,64 @@ namespace VoiceStudio.App.Services
         CreatedAt = source.CreatedAt,
         ModifiedAt = DateTime.UtcNow
       };
-      await SaveWorkspaceProfileAsync(renamed).ConfigureAwait(false);
 
-      try
+      var oldPath = Path.Combine(_workspaceProfilesDirectory, $"{oldName}.json");
+      var newPath = Path.Combine(_workspaceProfilesDirectory, $"{newName}.json");
+
+      if (isCaseOnlyRename)
       {
-        var oldPath = Path.Combine(_workspaceProfilesDirectory, $"{oldName}.json");
-        if (File.Exists(oldPath))
-          File.Delete(oldPath);
+        // Windows NTFS: oldPath and newPath resolve to same file. Use temp intermediate.
+        var tempPath = Path.Combine(_workspaceProfilesDirectory, $"_rename_{Guid.NewGuid():N}.json");
+        try
+        {
+          File.Move(oldPath, tempPath);
+          File.Move(tempPath, newPath);
+        }
+        catch (Exception ex)
+        {
+          System.Diagnostics.Debug.WriteLine($"Failed case-only rename: {ex.Message}");
+          if (File.Exists(tempPath))
+          {
+            try { File.Move(tempPath, oldPath); } catch { /* best effort restore */ }
+          }
+          return false;
+        }
       }
-      catch (Exception ex)
+      else
       {
-        System.Diagnostics.Debug.WriteLine($"Failed to delete old profile file after rename: {ex.Message}");
+        await SaveWorkspaceProfileAsync(renamed).ConfigureAwait(false);
+        if (!TryDeleteWithRetry(oldPath))
+          System.Diagnostics.Debug.WriteLine($"Failed to delete old profile file after rename: {oldPath}");
+      }
+
+      if (isCaseOnlyRename)
+      {
+        var json = JsonSerializer.Serialize(renamed, _jsonOptions);
+        await File.WriteAllTextAsync(newPath, json).ConfigureAwait(false);
       }
 
       if (string.Equals(_currentWorkspaceProfile, oldName, StringComparison.OrdinalIgnoreCase))
         _currentWorkspaceProfile = newName;
 
       return true;
+    }
+
+    private static bool TryDeleteWithRetry(string path, int maxAttempts = 3)
+    {
+      for (var attempt = 0; attempt < maxAttempts; attempt++)
+      {
+        try
+        {
+          if (File.Exists(path))
+            File.Delete(path);
+          return true;
+        }
+        catch (IOException) when (attempt < maxAttempts - 1)
+        {
+          System.Threading.Thread.Sleep(100);
+        }
+      }
+      return false;
     }
 
     /// <summary>
@@ -782,6 +870,12 @@ namespace VoiceStudio.App.Services
     /// <returns>The created workspace profile.</returns>
     public async Task<WorkspaceProfile> CreateWorkspaceProfileAsync(string name, string? description = null)
     {
+      if (!IsValidProfileName(name, out var reason))
+      {
+        System.Diagnostics.Debug.WriteLine($"[PanelStateService] Invalid profile name: {reason}");
+        throw new ArgumentException($"Invalid profile name: {reason}", nameof(name));
+      }
+
       var profile = new WorkspaceProfile
       {
         Name = name,
@@ -803,6 +897,12 @@ namespace VoiceStudio.App.Services
     /// <returns>The duplicated profile, or null if the source was not found.</returns>
     public async Task<WorkspaceProfile?> DuplicateWorkspaceProfileAsync(string sourceName, string newName)
     {
+      if (!IsValidProfileName(newName, out var reason))
+      {
+        System.Diagnostics.Debug.WriteLine($"[PanelStateService] Invalid duplicate target name: {reason}");
+        return null;
+      }
+
       var source = await LoadWorkspaceProfileAsync(sourceName);
       if (source == null) return null;
 
@@ -875,6 +975,11 @@ namespace VoiceStudio.App.Services
       {
         var profile = JsonSerializer.Deserialize<WorkspaceProfile>(json, _jsonOptions);
         if (profile == null) return null;
+        if (!IsValidProfileName(profile.Name, out var reason))
+        {
+          System.Diagnostics.Debug.WriteLine($"[PanelStateService] Import rejected: invalid profile name: {reason}");
+          return null;
+        }
 
         // Ensure unique name
         var existing = await LoadWorkspaceProfileAsync(profile.Name);

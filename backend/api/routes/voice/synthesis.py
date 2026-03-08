@@ -33,7 +33,6 @@ from ._helpers import (
     _resolve_profile_audio,
     _try_utility_tts_fallback,
 )
-from . import _shared
 from ._shared import (
     HAS_QUALITY_OPTIMIZATION,
     EngineConfigServiceDep,
@@ -45,7 +44,6 @@ from ._shared import (
     get_config,
     get_engine_breaker,
     instrument_flow,
-    quality_metrics,
     router,
 )
 
@@ -859,14 +857,14 @@ async def synthesize_with_style(
             source="style_transfer",
         )
 
-        # Calculate quality if requested
+        # Calculate quality if requested (use _shared.quality_metrics set by _ensure_engine_router)
         quality_metrics = None
-        if calculate_quality and quality_metrics:
+        if calculate_quality and _shared.quality_metrics:
             try:
                 import soundfile as sf
 
                 audio_array, sr = sf.read(output_path)
-                metrics = quality_metrics["calculate_all"](audio_array, sr)
+                metrics = _shared.quality_metrics["calculate_all"](audio_array, sr)
                 quality_metrics = QualityMetrics(
                     mos_score=metrics.get("mos_score"),
                     similarity=metrics.get("similarity"),
@@ -979,12 +977,12 @@ async def synthesize_cross_lingual(
                 duration = 2.5
 
             quality_metrics_obj = None
-            if calculate_quality and quality_metrics:
+            if calculate_quality and _shared.quality_metrics:
                 try:
                     import soundfile as sf
 
                     audio_array, sr = sf.read(output_path)
-                    metrics = quality_metrics["calculate_all"](audio_array, sr)
+                    metrics = _shared.quality_metrics["calculate_all"](audio_array, sr)
                     quality_metrics_obj = QualityMetrics(
                         mos_score=metrics.get("mos_score"),
                         similarity=metrics.get("similarity"),

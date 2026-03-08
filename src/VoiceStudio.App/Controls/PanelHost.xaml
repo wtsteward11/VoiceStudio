@@ -74,6 +74,8 @@
                             <MenuFlyout x:Name="OptionsFlyout" Opening="OptionsFlyout_Opening">
                                 <MenuFlyoutItem x:Name="RefreshMenuItem" Text="Refresh" Click="OptionsRefresh_Click" />
                                 <MenuFlyoutSeparator x:Name="OptionsSeparator" />
+                                <MenuFlyoutSubItem x:Name="SwitchPanelSubMenu" Text="Switch Panel" />
+                                <MenuFlyoutSeparator />
                                 <MenuFlyoutItem x:Name="PopOutMenuItem" Text="Pop out" Click="OptionsPopOut_Click" />
                             </MenuFlyout>
                         </Button.Flyout>

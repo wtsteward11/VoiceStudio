@@ -100,3 +100,22 @@ def test_main_window_uses_selected_region() -> None:
     assert "dialog.SelectedRegion" in combined, (
         "MainWindow must use dialog.SelectedRegion when opening panel from Tool Catalog"
     )
+
+
+def test_tool_catalog_region_flows_to_open() -> None:
+    """Prove Tool Catalog region selection flows through to OpenPanelByIdAsync (not bypassed)."""
+    main_files = list(MAIN_WINDOW_DIR.glob("MainWindow*.cs"))
+    if not main_files:
+        pytest.skip("No MainWindow*.cs files found")
+    combined = ""
+    for p in main_files:
+        combined += p.read_text(encoding="utf-8-sig")
+    assert "dialog.SelectedRegion ?? desc.DefaultRegion" in combined, (
+        "ShowToolCatalogAsync must use override cascade: dialog.SelectedRegion ?? desc.DefaultRegion"
+    )
+    assert "OpenPanelByIdAsync(desc.PanelId, region)" in combined, (
+        "ShowToolCatalogAsync must pass region variable to OpenPanelByIdAsync, not desc.DefaultRegion"
+    )
+    assert "OpenPanelByIdAsync(desc.PanelId, desc.DefaultRegion)" not in combined, (
+        "ShowToolCatalogAsync must NOT bypass SelectedRegion by passing desc.DefaultRegion directly"
+    )

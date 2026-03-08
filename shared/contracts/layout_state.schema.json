@@ -2,12 +2,12 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "layout_state.schema.json",
   "title": "LayoutState",
-  "description": "UI layout state contract for persisting window/panel arrangements",
+  "description": "UI layout state contract for persisting window/panel arrangements. Version 1.1 adds splitter ratio support.",
   "type": "object",
   "properties": {
     "version": { 
       "type": "string",
-      "description": "Layout state schema version"
+      "description": "Layout state schema version (1.1 = ratio support)"
     },
     "regions": {
       "type": "array",
@@ -17,7 +17,7 @@
         "properties": {
           "region": { 
             "type": "string",
-            "description": "Region identifier (e.g., left, center, right)"
+            "description": "Region identifier (e.g., left, center, right, bottom)"
           },
           "activePanelId": { 
             "type": "string",
@@ -27,6 +27,14 @@
             "type": "array",
             "items": { "type": "string" },
             "description": "List of opened panel IDs in this region"
+          },
+          "widthRatio": {
+            "type": "number",
+            "description": "Optional normalized width ratio (0-1) for left/center/right columns"
+          },
+          "heightRatio": {
+            "type": "number",
+            "description": "Optional normalized height ratio (0-1) for top/bottom rows"
           }
         },
         "required": ["region", "activePanelId"]

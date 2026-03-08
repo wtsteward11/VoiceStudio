@@ -17,6 +17,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Union
 
+import numpy as np
+
 from backend.services.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
@@ -382,7 +384,7 @@ class EngineService(IEngineService):
             engine_id: self.get_engine_health(engine_id) for engine_id in self._circuit_breakers
         }
 
-    def _ensure_engines_loaded(self):
+    def _ensure_engines_loaded(self) -> None:
         """Lazy load engine modules to avoid import issues at startup."""
         if self._engines_loaded:
             return
@@ -391,8 +393,10 @@ class EngineService(IEngineService):
             from app.core.engines import router
 
             self._engine_router = router
-        except ImportError:
+            logger.debug("Engine router module loaded successfully")
+        except ImportError as e:
             self._engine_router = None
+            logger.warning("Failed to import engine router: %s", e)
 
         try:
             from app.core.engines import quality_metrics
@@ -416,6 +420,12 @@ class EngineService(IEngineService):
             self._quality_presets = None
 
         self._engines_loaded = True
+        if self._engine_router is not None:
+            failed: dict[str, str] = getattr(
+                self._engine_router, "get_failed_engines", lambda: {}
+            )()
+            if failed:
+                logger.debug("Engines that failed to load: %s", list(failed.keys()))
 
     # -------------------------------------------------------------------------
     # Engine Discovery and Management
@@ -428,7 +438,11 @@ class EngineService(IEngineService):
             return []
 
         try:
-            return self._engine_router.list_engines()
+            engines = self._engine_router.list_engines()
+            if not engines and hasattr(self._engine_router, "load_all_engines"):
+                self._engine_router.load_all_engines("engines")
+                engines = self._engine_router.list_engines()
+            return engines
         except Exception as e:
             # ALLOWED: Return empty list - engine router may fail for many reasons
             logger.debug(f"Failed to list engines: {e}")

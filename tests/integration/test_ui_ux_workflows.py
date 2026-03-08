@@ -30,11 +30,58 @@ def retry_on_rate_limit(func, *args, max_retries=3, **kwargs):
     return result
 
 
+def _create_api_client():
+    """Create HTTP client: try live backend first, fall back to TestClient."""
+    try:
+        client = httpx.Client(base_url=BASE_URL, timeout=30.0)
+        r = client.get("/api/health")
+        if r.status_code == 200:
+            return client, True
+        client.close()
+    except (httpx.ConnectError, OSError):
+        pass
+    # Fallback: use FastAPI TestClient (no running backend required)
+    from fastapi.testclient import TestClient
+
+    from backend.api.main import app
+
+    tc = TestClient(app)
+
+    class _TestClientAdapter:
+        """Adapter so TestClient matches httpx-style .get/.post interface."""
+
+        def __init__(self, inner):
+            self._inner = inner
+
+        def get(self, path, **kwargs):
+            p = path if path.startswith("/") else f"/api/{path.lstrip('/')}"
+            return self._inner.get(p, **kwargs)
+
+        def post(self, path, **kwargs):
+            p = path if path.startswith("/") else f"/api/{path.lstrip('/')}"
+            return self._inner.post(p, **kwargs)
+
+        def put(self, path, **kwargs):
+            p = path if path.startswith("/") else f"/api/{path.lstrip('/')}"
+            return self._inner.put(p, **kwargs)
+
+        def delete(self, path, **kwargs):
+            p = path if path.startswith("/") else f"/api/{path.lstrip('/')}"
+            return self._inner.delete(p, **kwargs)
+
+    return _TestClientAdapter(tc), False
+
+
 @pytest.fixture(scope="module")
 def api_client():
-    """Create a shared HTTP client for the test module."""
-    with httpx.Client(base_url=BASE_URL, timeout=30.0) as client:
-        yield client
+    """Create a shared HTTP client for the test module.
+
+    Uses live backend at localhost:8001 if available, otherwise TestClient.
+    """
+    client, is_httpx = _create_api_client()
+    yield client
+    if is_httpx:
+        client.close()
 
 
 @pytest.fixture(autouse=True)

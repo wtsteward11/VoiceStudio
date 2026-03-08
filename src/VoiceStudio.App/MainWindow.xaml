@@ -16,19 +16,22 @@
     <!-- Top command toolbar -->
     <controls:CustomizableToolbar Grid.Row="0" Margin="8,0,8,4" x:Name="CommandToolbar" />
     <!-- Main workspace -->
-    <Grid Grid.Row="1" Margin="8,0,8,4">
+    <Grid Grid.Row="1" Margin="8,0,8,4" x:Name="WorkspaceGrid">
       <Grid.RowDefinitions>
-        <RowDefinition Height="4*" />
-        <RowDefinition Height="*" />
+        <RowDefinition x:Name="TopRow" Height="4*" />
+        <RowDefinition Height="4" />
+        <RowDefinition x:Name="BottomRow" Height="*" />
       </Grid.RowDefinitions>
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="64" />
-        <ColumnDefinition Width="20*" />
-        <ColumnDefinition Width="55*" />
-        <ColumnDefinition Width="25*" />
+        <ColumnDefinition x:Name="LeftColumn" Width="20*" />
+        <ColumnDefinition Width="4" />
+        <ColumnDefinition x:Name="CenterColumn" Width="55*" />
+        <ColumnDefinition Width="4" />
+        <ColumnDefinition x:Name="RightColumn" Width="25*" />
       </Grid.ColumnDefinitions>
       <!-- Nav rail -->
-      <Border Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+      <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="0"
         Background="{StaticResource VSQ.NavRail.BackgroundBrush}"
         CornerRadius="{StaticResource VSQ.CornerRadius.Panel}"
         Padding="{StaticResource VSQ.Spacing.Small}">
@@ -96,10 +99,27 @@
       </Border>
       <!-- Left / Center / Right PanelHosts -->
       <controls:PanelHost Grid.Row="0" Grid.Column="1" Margin="4,0,4,4" x:Name="LeftPanelHost" />
-      <controls:PanelHost Grid.Row="0" Grid.Column="2" Margin="0,0,4,4" x:Name="CenterPanelHost" />
-      <controls:PanelHost Grid.Row="0" Grid.Column="3" Margin="0,0,0,4" x:Name="RightPanelHost" />
+      <controls:PanelHost Grid.Row="0" Grid.Column="3" Margin="0,0,4,4" x:Name="CenterPanelHost" />
+      <controls:PanelHost Grid.Row="0" Grid.Column="5" Margin="0,0,0,4" x:Name="RightPanelHost" />
+      <!-- Vertical splitter gutters (resizable via pointer drag - see MainWindow.xaml.cs) -->
+      <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="2" Width="4"
+        Background="{StaticResource VSQ.Panel.BorderBrush}" x:Name="VerticalSplitter1"
+        PointerPressed="WorkspaceSplitter_PointerPressed" PointerMoved="WorkspaceSplitter_PointerMoved"
+        PointerReleased="WorkspaceSplitter_PointerReleased" PointerCanceled="WorkspaceSplitter_PointerReleased"
+        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+      <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="4" Width="4"
+        Background="{StaticResource VSQ.Panel.BorderBrush}" x:Name="VerticalSplitter2"
+        PointerPressed="WorkspaceSplitter_PointerPressed" PointerMoved="WorkspaceSplitter_PointerMoved"
+        PointerReleased="WorkspaceSplitter_PointerReleased" PointerCanceled="WorkspaceSplitter_PointerReleased"
+        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+      <!-- Horizontal splitter gutter -->
+      <Border Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="5" Height="4"
+        Background="{StaticResource VSQ.Panel.BorderBrush}" x:Name="HorizontalSplitter"
+        PointerPressed="WorkspaceSplitter_PointerPressed" PointerMoved="WorkspaceSplitter_PointerMoved"
+        PointerReleased="WorkspaceSplitter_PointerReleased" PointerCanceled="WorkspaceSplitter_PointerReleased"
+        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
       <!-- Bottom PanelHost -->
-      <controls:PanelHost Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" x:Name="BottomPanelHost" />
+      <controls:PanelHost Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="5" x:Name="BottomPanelHost" />
     </Grid>
     <!-- Status bar -->
     <Border Grid.Row="2" Height="26" Background="{StaticResource VSQ.StatusBar.BackgroundBrush}"

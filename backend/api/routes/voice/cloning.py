@@ -385,6 +385,8 @@ async def clone(
                             result = None
 
                         # Handle tuple return (audio, metrics) or single audio
+                        audio: Any = None
+                        metrics: dict[str, Any] = {}
                         if isinstance(result, tuple):
                             audio, metrics = result
                             logger.info(
@@ -392,7 +394,6 @@ async def clone(
                             )
                         else:
                             audio = result
-                            metrics = {}
                             logger.info(f"Result is single value: audio type={type(audio)}")
 
                         if isinstance(metrics, dict):

@@ -246,6 +246,9 @@ namespace VoiceStudio.App.Services
       // Register core panels - these were previously hardcoded in MainWindow
       CorePanelRegistrationService.RegisterCorePanels(registry);
 
+      // Register module panels (Modules menu items not in Core/Advanced)
+      ModulePanelRegistrationService.RegisterModulePanels(registry);
+
       sw.Stop();
       PanelRegistrationMs = sw.Elapsed.TotalMilliseconds;
       Debug.WriteLine(

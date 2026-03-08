@@ -158,8 +158,8 @@ AUDIO_STORAGE_MAX_SIZE = 2000  # Maximum number of registered audio IDs to keep
 
 # Engine router for voice synthesis (initialized lazily)
 ENGINE_AVAILABLE = False
-engine_router = None
-quality_metrics = None
+engine_router: Any | None = None
+quality_metrics: dict[str, Any] | None = None
 # NOTE: Do not overwrite _voice_engine_service here - it is set in the try block above
 
 # Engines that support streaming synthesis

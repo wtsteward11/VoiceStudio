@@ -237,9 +237,11 @@ async def get_job_queue_status(
 # GAP-API-001: Alias for frontend compatibility with JobGateway
 @router.get("/queue/status", response_model=JobQueueResponse, response_model_by_alias=True)
 @cache_response(ttl=5)
-async def get_job_queue_status_alias():
+async def get_job_queue_status_alias(
+    repo: JobRepository = Depends(get_repo),
+):
     """Alias for /status to match frontend JobGateway expectations."""
-    return await get_job_queue_status()
+    return await get_job_queue_status(repo)
 
 
 @router.get("/{job_id}", response_model=JobProgress)

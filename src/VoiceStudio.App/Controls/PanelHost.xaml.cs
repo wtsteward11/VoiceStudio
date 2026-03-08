@@ -948,6 +948,11 @@ namespace VoiceStudio.App.Controls
         if (_loadedPanels.TryRemove(panelId, out var panel))
         {
           _lruOrder.Remove(panelId);
+          if (panel is UserControl uc && uc.DataContext is IDisposable vmDisposable)
+          {
+            // ALLOWED: empty catch - teardown disposal is best-effort
+            try { vmDisposable.Dispose(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[PanelHost] VM dispose failed for {panelId}: {ex.Message}"); }
+          }
           if (panel is IDisposable disposable)
           {
             disposable.Dispose();

@@ -22,14 +22,15 @@ namespace VoiceStudio.App
           Controls.PanelHost? rightPanelHost,
           Controls.PanelHost? bottomPanelHost)
         {
-            var (restored, hadRegions, failedRegions) = await RestorePanelsFromLayoutAsync();
+            var (restored, hadRegions, failedItems) = await RestorePanelsFromLayoutAsync();
             if (!restored)
             {
                 if (hadRegions)
                 {
+                    var msg = FormatRestoreFailureMessage(failedItems);
                     var toast = ServiceProvider.TryGetToastNotificationService();
                     toast?.ShowError(
-                      "Workspace restore failed — reset to Studio?",
+                      msg,
                       "Restore Failed",
                       () => { _ = _panelStateService?.SwitchWorkspaceProfileAsync("studio"); });
                 }
@@ -54,12 +55,12 @@ namespace VoiceStudio.App
                     SetPanelHostMeta(bottomPanelHost, "Macros", "⚡");
                 }
             }
-            else if (failedRegions.Count > 0)
+            else if (failedItems.Count > 0)
             {
-                var failedList = string.Join(", ", failedRegions);
+                var msg = FormatRestoreFailureMessage(failedItems);
                 var toast = ServiceProvider.TryGetToastNotificationService();
                 toast?.ShowError(
-                  $"Some regions failed to restore ({failedList}). Reset to Studio?",
+                  msg,
                   "Partial Restore Failed",
                   () => { _ = _panelStateService?.SwitchWorkspaceProfileAsync("studio"); });
             }
@@ -87,14 +88,14 @@ namespace VoiceStudio.App
         /// Restores panels from saved workspace layout.
         /// Only the active panel per region is restored. OpenedPanels is persisted for future tab support;
         /// PanelHost currently supports a single panel per region.
-        /// Returns (restored, hadRegions, failedRegions): hadRegions true when layout had regions to restore;
-        /// restored true when at least one succeeded; failedRegions lists regions that failed to restore.
+        /// Returns (restored, hadRegions, failedItems): hadRegions true when layout had regions to restore;
+        /// restored true when at least one succeeded; failedItems lists (region, panelId) for panels that failed.
         /// </summary>
-        private async Task<(bool restored, bool hadRegions, List<PanelRegion> failedRegions)> RestorePanelsFromLayoutAsync()
+        private async Task<(bool restored, bool hadRegions, List<(PanelRegion region, string panelId)> failedItems)> RestorePanelsFromLayoutAsync()
         {
-            var failedRegions = new List<PanelRegion>();
+            var failedItems = new List<(PanelRegion region, string panelId)>();
             if (_panelStateService == null)
-                return (false, false, failedRegions);
+                return (false, false, failedItems);
 
             try
             {
@@ -103,7 +104,7 @@ namespace VoiceStudio.App
                 if (layout.Regions == null || layout.Regions.Count == 0)
                 {
                     Debug.WriteLine("No saved regions to restore, using defaults.");
-                    return (false, false, failedRegions);
+                    return (false, false, failedItems);
                 }
 
                 bool restoredAny = false;
@@ -138,25 +139,26 @@ namespace VoiceStudio.App
                             else
                             {
                                 Debug.WriteLine($"Panel ID '{activePanelId}' not found in registry for region {regionState.Region}; skipping.");
-                                failedRegions.Add(regionState.Region);
+                                failedItems.Add((regionState.Region, activePanelId));
                             }
                         }
                     }
                     catch (Exception ex)
                     {
                         Debug.WriteLine($"[MainWindow] Failed to restore {regionState.Region}: {ex.Message}");
-                        failedRegions.Add(regionState.Region);
+                        var pid = regionState.ActivePanelId ?? string.Empty;
+                        failedItems.Add((regionState.Region, pid));
                     }
                 }
 
                 RestoreSplitterRatios(layout);
 
-                return (restoredAny, true, failedRegions);
+                return (restoredAny, true, failedItems);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to restore panels from layout: {ex.Message}");
-                return (false, true, failedRegions);
+                return (false, true, failedItems);
             }
         }
 
@@ -251,6 +253,19 @@ namespace VoiceStudio.App
             _panelStateService.SaveRegionCollapsedState(region, host.IsCollapsed);
         }
 
+        private static string FormatRestoreFailureMessage(List<(PanelRegion region, string panelId)> failedItems)
+        {
+            if (failedItems == null || failedItems.Count == 0)
+                return "Workspace restore failed — reset to Studio?";
+            var take = Math.Min(5, failedItems.Count);
+            var parts = failedItems.Take(take)
+                .Select(x => $"'{x.panelId}' ({x.region})")
+                .ToList();
+            var list = string.Join(", ", parts);
+            var more = failedItems.Count > 5 ? $" (+{failedItems.Count - 5} more)" : "";
+            return $"Failed to restore: {list}{more}. Reset to Studio?";
+        }
+
         private static string? GetPanelIdFromHost(Controls.PanelHost host)
         {
             if (host.Content == null) return null;
@@ -291,14 +306,16 @@ namespace VoiceStudio.App
                   () => { _ = _panelStateService?.SwitchWorkspaceProfileAsync("studio"); });
                   });
                   }
-                  else if (t.IsCompletedSuccessfully && !t.Result.restored && t.Result.hadRegions)
+                  else if (t.IsCompletedSuccessfully && ((!t.Result.restored && t.Result.hadRegions) || t.Result.failedItems.Count > 0))
                   {
+                      var msg = FormatRestoreFailureMessage(t.Result.failedItems);
+                      var title = t.Result.restored ? "Partial Restore Failed" : "Restore Failed";
                       DispatcherQueue.TryEnqueue(() =>
                 {
                       var toastService = ServiceProvider.TryGetToastNotificationService();
                       toastService?.ShowError(
-                  "Workspace restore failed — reset to Studio?",
-                  "Restore Failed",
+                  msg,
+                  title,
                   () => { _ = _panelStateService?.SwitchWorkspaceProfileAsync("studio"); });
                   });
                   }

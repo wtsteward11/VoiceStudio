@@ -819,33 +819,59 @@ namespace VoiceStudio.App.Controls
         IsLoading = true;
         LoadingMessage = $"Loading {panelId}...";
 
+        // Create panel OUTSIDE lock — expensive (DI + view + VM init). Avoids UI freeze.
+        UserControl? panel = null;
+        try
+        {
+          panel = _panelRegistry.CreatePanel(panelId) as UserControl;
+          if (panel == null && legacyFactory != null)
+            panel = legacyFactory();
+        }
+        catch (Exception ex)
+        {
+          System.Diagnostics.Debug.WriteLine($"[PanelHost] Error creating panel {panelId}: {ex.Message}");
+          return null;
+        }
+
+        if (panel == null || _loadingCts.IsCancellationRequested)
+          return null;
+
+        var startTime = DateTime.UtcNow;
+
+        // Re-acquire lock to commit or handle duplicate-load race
         await _loadLock.WaitAsync(_loadingCts.Token);
         try
         {
-          if (_isUnloaded) return null;
-          // Double-check after acquiring lock
+          if (_isUnloaded)
+          {
+            if (panel is UserControl uc && uc.DataContext is IDisposable d)
+            {
+              // ALLOWED: empty catch - unload teardown must not propagate
+              try { d.Dispose(); } catch { /* don't break teardown */ }
+            }
+            return null;
+          }
+
+          // Race guard: another thread may have loaded it while we were creating
           if (_loadedPanels.TryGetValue(panelId, out var existing))
           {
+            System.Diagnostics.Debug.WriteLine($"[PanelHost] Duplicate load race for {panelId} — discarding newly created instance");
+            if (panel is UserControl uc2 && uc2.DataContext is IDisposable d2)
+            {
+              // ALLOWED: empty catch - duplicate race teardown must not propagate
+              try { d2.Dispose(); } catch { /* don't break teardown */ }
+            }
             TouchLru(panelId);
             Content = existing;
             return existing;
           }
 
-          var startTime = DateTime.UtcNow;
-          var panel = _panelRegistry.CreatePanel(panelId) as UserControl;
-          if (panel == null && legacyFactory != null)
-            panel = legacyFactory();
-
-          if (panel != null && !_loadingCts.IsCancellationRequested)
-          {
-            _loadedPanels[panelId] = panel;
-            _lruOrder.Add(panelId);
-            EvictIfOverCapacity(panelId);
-            Content = panel;
-            var loadTime = DateTime.UtcNow - startTime;
-            System.Diagnostics.Debug.WriteLine($"[PanelHost] Loaded panel {panelId} in {loadTime.TotalMilliseconds:F1}ms");
-          }
-
+          _loadedPanels[panelId] = panel;
+          _lruOrder.Add(panelId);
+          EvictIfOverCapacity(panelId);
+          Content = panel;
+          var loadTime = DateTime.UtcNow - startTime;
+          System.Diagnostics.Debug.WriteLine($"[PanelHost] Loaded panel {panelId} in {loadTime.TotalMilliseconds:F1}ms");
           return panel;
         }
         finally

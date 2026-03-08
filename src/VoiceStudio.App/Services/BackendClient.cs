@@ -440,6 +440,30 @@ namespace VoiceStudio.App.Services
     }
 
     /// <summary>
+    /// Static health probe for UI self-test. Does not require a BackendClient instance.
+    /// </summary>
+    /// <param name="baseUrl">Backend base URL (e.g. http://localhost:8001).</param>
+    /// <param name="timeoutMs">Timeout in milliseconds. Default 3000.</param>
+    /// <returns>True if GET /api/health returns success.</returns>
+    public static async Task<bool> TryCheckHealthAsync(string baseUrl, int timeoutMs = 3000)
+    {
+      if (string.IsNullOrWhiteSpace(baseUrl))
+        return false;
+      var url = baseUrl.TrimEnd('/') + "/api/health";
+      try
+      {
+        using var cts = new CancellationTokenSource(timeoutMs);
+        using var client = new HttpClient();
+        var response = await client.GetAsync(url, cts.Token);
+        return response.IsSuccessStatusCode;
+      }
+      catch
+      {
+        return false;
+      }
+    }
+
+    /// <summary>
     /// Expected API version for this client.
     /// </summary>
     public const string ExpectedApiVersion = "v2";
@@ -987,12 +1011,13 @@ namespace VoiceStudio.App.Services
     {
       return await ExecuteWithRetryAsync(async () =>
       {
-        var response = await _httpClient.GetAsync($"/api/voice/audio/{audioId}", cancellationToken);
+        var response = await _httpClient.GetAsync($"/api/audio/file/{audioId}", cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+          response = await _httpClient.GetAsync($"/api/voice/audio/{audioId}", cancellationToken);
 
         if (!response.IsSuccessStatusCode)
-        {
           throw await CreateExceptionFromResponseAsync(response);
-        }
 
         return await response.Content.ReadAsStreamAsync(cancellationToken);
       });

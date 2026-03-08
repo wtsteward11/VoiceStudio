@@ -36,6 +36,11 @@ namespace VoiceStudio.App.Controls
     private bool _isDragging;
     private System.Threading.CancellationTokenSource? _loadingCts;
 
+    private string? _lastRequestedPanelId;
+    private Func<UserControl>? _lastRequestedLegacyFactory;
+    private bool _subscribedToReachability;
+    private Grid? _offlineOverlay;
+
     public static new readonly DependencyProperty ContentProperty =
         DependencyProperty.Register(nameof(Content), typeof(UIElement), typeof(PanelHost),
             new PropertyMetadata(null, OnContentChanged));
@@ -815,6 +820,10 @@ namespace VoiceStudio.App.Controls
     /// <returns>The loaded panel, or null if loading failed</returns>
     public async System.Threading.Tasks.Task<UserControl?> LoadPanelAsync(string panelId, Func<UserControl>? legacyFactory = null)
     {
+      _lastRequestedPanelId = panelId;
+      _lastRequestedLegacyFactory = legacyFactory;
+      EnsureReachabilitySubscription();
+
       if (_isUnloaded)
       {
         System.Diagnostics.Debug.WriteLine($"[PanelHost] Unloaded, skipping load of {panelId}");
@@ -864,6 +873,18 @@ namespace VoiceStudio.App.Controls
         catch (Exception ex)
         {
           System.Diagnostics.Debug.WriteLine($"[PanelHost] Error creating panel {panelId}: {ex.Message}");
+#if DEBUG
+          try
+          {
+            var diagDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoiceStudio", "crashes");
+            System.IO.Directory.CreateDirectory(diagDir);
+            var path = System.IO.Path.Combine(diagDir, "startup_diag.txt");
+            System.IO.File.AppendAllText(path, $"[{DateTime.UtcNow:O}] PanelHost.CreatePanel failed: panelId={panelId}, ex={ex}\n");
+          }
+          // ALLOWED: empty catch - best-effort diagnostic write must not propagate
+          catch { }
+#endif
+          ShowOfflineOverlayIfApplicable();
           return null;
         }
 
@@ -921,12 +942,114 @@ namespace VoiceStudio.App.Controls
       catch (Exception ex)
       {
         System.Diagnostics.Debug.WriteLine($"[PanelHost] Error loading panel {panelId}: {ex.Message}");
+#if DEBUG
+        try
+        {
+          var diagDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoiceStudio", "crashes");
+          System.IO.Directory.CreateDirectory(diagDir);
+          var path = System.IO.Path.Combine(diagDir, "startup_diag.txt");
+          System.IO.File.AppendAllText(path, $"[{DateTime.UtcNow:O}] PanelHost.LoadPanelAsync failed: panelId={panelId}, ex={ex}\n");
+        }
+        // ALLOWED: empty catch - best-effort diagnostic write must not propagate
+        catch { }
+#endif
+        ShowOfflineOverlayIfApplicable();
         return null;
       }
       finally
       {
         IsLoading = false;
       }
+    }
+
+    private void ShowOfflineOverlayIfApplicable()
+    {
+      if (!ErrorPresentationService.IsBackendOffline)
+        return;
+
+      if (_offlineOverlay != null)
+      {
+        Content = _offlineOverlay;
+        return;
+      }
+
+      var icon = new FontIcon
+      {
+        Glyph = "\uE783",
+        FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe Fluent Icons"),
+        FontSize = 32,
+        Opacity = 0.6
+      };
+
+      var heading = new TextBlock
+      {
+        Text = "Backend is offline",
+        FontSize = 16,
+        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+        HorizontalAlignment = HorizontalAlignment.Center
+      };
+
+      var detail = new TextBlock
+      {
+        Text = "The backend server is not responding.\nIt will reconnect automatically, or you can retry manually.",
+        FontSize = 13,
+        Opacity = 0.7,
+        TextAlignment = Microsoft.UI.Xaml.TextAlignment.Center,
+        TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap
+      };
+
+      var retryButton = new Button
+      {
+        Content = "Retry",
+        HorizontalAlignment = HorizontalAlignment.Center,
+        Margin = new Thickness(0, 8, 0, 0)
+      };
+      retryButton.Click += async (_, _) =>
+      {
+        var monitor = BackendConnectionMonitor.Current;
+        if (monitor != null)
+          await monitor.ForceReconnectAsync();
+
+        if (_lastRequestedPanelId != null)
+          await LoadPanelAsync(_lastRequestedPanelId, _lastRequestedLegacyFactory);
+      };
+
+      var stack = new StackPanel
+      {
+        HorizontalAlignment = HorizontalAlignment.Center,
+        VerticalAlignment = VerticalAlignment.Center,
+        Spacing = 8
+      };
+      stack.Children.Add(icon);
+      stack.Children.Add(heading);
+      stack.Children.Add(detail);
+      stack.Children.Add(retryButton);
+
+      _offlineOverlay = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
+      _offlineOverlay.Children.Add(stack);
+      Content = _offlineOverlay;
+    }
+
+    private void EnsureReachabilitySubscription()
+    {
+      if (_subscribedToReachability)
+        return;
+      _subscribedToReachability = true;
+      ErrorPresentationService.BackendReachabilityChanged += OnBackendReachabilityChanged;
+    }
+
+    private void OnBackendReachabilityChanged(object? sender, bool reachable)
+    {
+      if (!reachable || _lastRequestedPanelId == null)
+        return;
+
+      if (Content != _offlineOverlay)
+        return;
+
+      DispatcherQueue?.TryEnqueue(() =>
+      {
+        _ = LoadPanelAsync(_lastRequestedPanelId, _lastRequestedLegacyFactory);
+      });
     }
 
     /// <summary>

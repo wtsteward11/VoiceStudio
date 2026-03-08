@@ -11,6 +11,7 @@ using Windows.System;
 using Windows.Storage;
 using Windows.Foundation;
 using Windows.UI;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System;
@@ -267,6 +268,14 @@ namespace VoiceStudio.App
                 profiler.Checkpoint("ToastNotificationService Initialized");
             }
 
+            // Start backend health monitoring (must come after toast service)
+            if (AppServices.TryGetErrorPresentationService() is ErrorPresentationService eps)
+            {
+                eps.StartBackendMonitoring();
+                ErrorPresentationService.BackendReachabilityChanged += OnBackendReachabilityChanged;
+                profiler.Checkpoint("BackendConnectionMonitor Started");
+            }
+
             RegisterKeyboardShortcuts();
             profiler.Checkpoint("Keyboard Shortcuts Registered");
 
@@ -450,6 +459,17 @@ namespace VoiceStudio.App
                 }
             }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
 
+            if (IsSafeStartupMode())
+                Debug.WriteLine("[Startup] SAFE_STARTUP enabled -- skipping welcome/overlays");
+
+            var globalSearchOverlay = FindNameOnContent("GlobalSearchOverlay") as FrameworkElement;
+            var collaborationPanel = FindNameOnContent("CollaborationPanel") as FrameworkElement;
+            if (globalSearchOverlay != null)
+                globalSearchOverlay.Visibility = Visibility.Collapsed;
+            if (collaborationPanel != null)
+                collaborationPanel.Visibility = Visibility.Collapsed;
+            Debug.WriteLine($"[Startup] GlobalSearchOverlay={globalSearchOverlay?.Visibility ?? Visibility.Collapsed}, CollaborationPanel={collaborationPanel?.Visibility ?? Visibility.Collapsed}");
+
             profiler.Checkpoint("MainWindow Construction Complete");
 
             Debug.WriteLine(profiler.GetReport());
@@ -470,6 +490,13 @@ namespace VoiceStudio.App
         /// </summary>
         private async Task ExecuteNavCommandAsync(string commandId, string fallbackPanelId, PanelRegion fallbackRegion, string buttonName)
         {
+            if (IsSafeStartupMode())
+            {
+                if (await OpenPanelByIdAsync(fallbackPanelId, fallbackRegion))
+                    SetActiveNavButton(buttonName);
+                return;
+            }
+
             if (_commandRouter != null)
             {
                 var success = await _commandRouter.ExecuteSafeAsync(commandId);
@@ -804,6 +831,9 @@ namespace VoiceStudio.App
             if (!(FindNameOnContent("StatusText") is TextBlock statusText))
                 return;
 
+            if (ErrorPresentationService.IsBackendOffline)
+                return;
+
             statusText.Text = status.ProcessingStatus switch
             {
                 ProcessingStatus.Processing => $"Processing ({status.ActiveJobCount} job(s))",
@@ -811,6 +841,17 @@ namespace VoiceStudio.App
                 ProcessingStatus.Error => "Error",
                 _ => "Ready"
             };
+        }
+
+        private void OnBackendReachabilityChanged(object? sender, bool reachable)
+        {
+            DispatcherQueue?.TryEnqueue(() =>
+            {
+                UpdateNetworkIndicator(reachable ? NetworkStatus.Connected : NetworkStatus.Disconnected);
+
+                if (FindNameOnContent("StatusText") is TextBlock statusText)
+                    statusText.Text = reachable ? "Ready" : "Backend offline \u2014 reconnecting\u2026";
+            });
         }
 
         #endregion Status Bar Activity Indicators (IDEA 19)
@@ -1194,6 +1235,12 @@ namespace VoiceStudio.App
             if (e.WindowActivationState != WindowActivationState.CodeActivated)
                 return;
 
+            if (IsSafeStartupMode())
+            {
+                _welcomeDialogShown = true;
+                return;
+            }
+
             // Check if we should show welcome dialog (only once per session)
             // NOTE: ApplicationData.Current.LocalSettings is not available in unpackaged apps,
             // so we use UnpackagedSettingsHelper for file-based settings storage.
@@ -1207,11 +1254,33 @@ namespace VoiceStudio.App
                 _welcomeDialogShown = true; // Prevent showing again on re-activation
                 var welcomeDialog = new WelcomeView();
                 welcomeDialog.XamlRoot = this.Content.XamlRoot;
-                var result = await welcomeDialog.ShowAsync();
-
-                // Save preference
-                Helpers.UnpackagedSettingsHelper.SetValue(ShowWelcomeKey, welcomeDialog.ShowOnStartup);
+                try
+                {
+                    var showTask = welcomeDialog.ShowAsync();
+                    var timeoutTask = Task.Delay(5000);
+                    var completed = await Task.WhenAny(showTask.AsTask(), timeoutTask);
+                    if (completed == timeoutTask)
+                    {
+                        Debug.WriteLine("[Startup] Welcome dialog ShowAsync timed out after 5s; continuing");
+                        welcomeDialog.Hide();
+                    }
+                    else
+                    {
+                        var result = await showTask;
+                        Helpers.UnpackagedSettingsHelper.SetValue(ShowWelcomeKey, welcomeDialog.ShowOnStartup);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Startup] Welcome dialog failed: {ex.Message}");
+                }
             }
+        }
+
+        private static bool IsSafeStartupMode()
+        {
+            var v = Environment.GetEnvironmentVariable("VOICESTUDIO_SAFE_STARTUP");
+            return string.Equals(v, "1", StringComparison.Ordinal) || string.Equals(v, "true", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsGateCSmokeMode()

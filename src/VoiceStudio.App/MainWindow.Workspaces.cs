@@ -128,7 +128,13 @@ namespace VoiceStudio.App
                         var activePanelId = regionState.ActivePanelId;
                         if (!string.IsNullOrEmpty(activePanelId))
                         {
-                            var panel = await targetHost.LoadPanelAsync(activePanelId, legacyFactory: null);
+                            Func<UserControl>? legacyFactory = null;
+                            if (_legacyPanelRegistry.TryGetValue(activePanelId, out var legacyEntry))
+                            {
+                                legacyFactory = legacyEntry.Factory;
+                                Debug.WriteLine($"[MainWindow] Restore using legacy factory for '{activePanelId}'");
+                            }
+                            var panel = await targetHost.LoadPanelAsync(activePanelId, legacyFactory);
                             if (panel != null)
                             {
                                 targetHost.PanelTitle = GetPanelTitle(activePanelId);

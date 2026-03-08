@@ -35,6 +35,14 @@ namespace VoiceStudio.App
             catch (Exception ex)
             {
                 Debug.WriteLine($"[MainWindow] Reset to Studio failed: {ex.Message}");
+                var toastService = ServiceProvider.TryGetToastNotificationService();
+                toastService?.ShowError(
+                    $"Reset to Studio failed: {ex.Message}",
+                    "Reset Failed");
+                await OpenPanelByIdAsync("Profiles", PanelRegion.Left);
+                await OpenPanelByIdAsync("Timeline", PanelRegion.Center);
+                await OpenPanelByIdAsync("EffectsMixer", PanelRegion.Right);
+                await OpenPanelByIdAsync("Macro", PanelRegion.Bottom);
             }
             finally
             {

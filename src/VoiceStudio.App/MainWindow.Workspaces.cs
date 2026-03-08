@@ -342,42 +342,37 @@ namespace VoiceStudio.App
             if (_isResettingToStudio) return;
             var enqueued = DispatcherQueue.TryEnqueue(() =>
             {
-                _ = RestorePanelsFromLayoutAsync().ContinueWith(t =>
-          {
-                  if (t.IsFaulted)
-                  {
-                      Debug.WriteLine(
-                  $"[MainWindow] WorkspaceProfileChanged restore failed: {t.Exception?.GetBaseException()?.Message}");
-                      DispatcherQueue.TryEnqueue(() =>
-                {
-                      var toastService = ServiceProvider.TryGetToastNotificationService();
-                      toastService?.ShowError(
-                  "Workspace restore failed — reset to Studio?",
-                  "Restore Failed",
-                  () => ResetToStudioWorkspace());
-                  });
-                  }
-                  else if (t.IsCompletedSuccessfully && ((!t.Result.restored && t.Result.hadRegions) || t.Result.failedItems.Count > 0))
-                  {
-                      var msg = FormatRestoreFailureMessage(t.Result.failedItems);
-                      var title = t.Result.restored ? "Partial Restore Failed" : "Restore Failed";
-                      DispatcherQueue.TryEnqueue(() =>
-                {
-                      var toastService = ServiceProvider.TryGetToastNotificationService();
-                      toastService?.ShowError(
-                  msg,
-                  title,
-                  () => ResetToStudioWorkspace());
-                  });
-                  }
-              }, TaskScheduler.Default);
+                _ = RestoreAfterProfileChangeAsync();
             });
-
             if (!enqueued)
             {
                 Debug.WriteLine(
-                  "[MainWindow] OnWorkspaceProfileChanged: DispatcherQueue.TryEnqueue returned false — " +
-                  "window may be closing. Restore skipped.");
+                    "[MainWindow] OnWorkspaceProfileChanged: DispatcherQueue.TryEnqueue returned false — " +
+                    "window may be closing. Restore skipped.");
+            }
+        }
+
+        private async Task RestoreAfterProfileChangeAsync()
+        {
+            try
+            {
+                var (restored, hadRegions, failedItems) = await RestorePanelsFromLayoutAsync();
+                if ((!restored && hadRegions) || failedItems.Count > 0)
+                {
+                    var msg = FormatRestoreFailureMessage(failedItems);
+                    var title = restored ? "Partial Restore Failed" : "Restore Failed";
+                    var toastService = ServiceProvider.TryGetToastNotificationService();
+                    toastService?.ShowError(msg, title, () => ResetToStudioWorkspace());
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindow] WorkspaceProfileChanged restore failed: {ex.Message}");
+                var toastService = ServiceProvider.TryGetToastNotificationService();
+                toastService?.ShowError(
+                    "Workspace restore failed — reset to Studio?",
+                    "Restore Failed",
+                    () => ResetToStudioWorkspace());
             }
         }
 

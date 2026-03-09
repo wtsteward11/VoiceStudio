@@ -68,7 +68,7 @@ jobs:
 
   nightly-golden-loop-real:
     name: Nightly Real-Mode Golden Loop
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, windows, x64]
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout code

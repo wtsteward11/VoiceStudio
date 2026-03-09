@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using VoiceStudio.App.Helpers;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.Controls;
@@ -20,8 +21,10 @@ namespace VoiceStudio.App.ViewModels
   public partial class SSMLControlViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IAudioPlayerService _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly UndoRedoService? _undoRedoService;
+    private readonly string _backendBaseUrl;
 
     public string PanelId => "ssml-control";
     public string DisplayName => ResourceHelper.GetString("Panel.SSMLControl.DisplayName", "SSML Editor");
@@ -113,10 +116,31 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    public SSMLControlViewModel(IViewModelContext context, IBackendClient backendClient)
+    public SSMLControlViewModel(IViewModelContext context, IBackendClient backendClient, IAudioPlayerService audioPlayer)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
+
+      _backendBaseUrl = "http://localhost:8000";
+      try
+      {
+        var backendJson = UnpackagedSettingsHelper.GetValue<string>("Settings.Backend", null);
+        if (!string.IsNullOrEmpty(backendJson))
+        {
+          using var doc = System.Text.Json.JsonDocument.Parse(backendJson);
+          if (doc.RootElement.TryGetProperty("ApiUrl", out var apiUrlElement))
+          {
+            var apiUrl = apiUrlElement.GetString();
+            if (!string.IsNullOrEmpty(apiUrl))
+              _backendBaseUrl = apiUrl;
+          }
+        }
+      }
+      catch
+      {
+        // ALLOWED: empty catch (best-effort settings parse)
+      }
 
       // Get services (may be null if not initialized)
       try
@@ -536,6 +560,14 @@ namespace VoiceStudio.App.ViewModels
         _toastNotificationService?.ShowSuccess(
             ResourceHelper.GetString("SSMLControl.PreviewSynthesized", "Preview synthesized"),
             ResourceHelper.GetString("Toast.Title.PreviewReady", "Preview Ready"));
+
+        if (response != null && !string.IsNullOrEmpty(response.AudioId))
+        {
+          await _audioPlayer.PlayBackendAudioIdAsync(response.AudioId, _backendBaseUrl, () =>
+          {
+            StatusMessage = ResourceHelper.GetString("SSMLControl.PreviewPlaybackComplete", "Preview playback complete");
+          });
+        }
       }
       catch (Exception ex)
       {
@@ -593,8 +625,9 @@ namespace VoiceStudio.App.ViewModels
       public string[] Warnings { get; set; } = Array.Empty<string>();
     }
 
-    private class SSMLPreviewResponse
+    public class SSMLPreviewResponse
     {
+      [System.Text.Json.Serialization.JsonPropertyName("audio_id")]
       public string AudioId { get; set; } = string.Empty;
       public double Duration { get; set; }
       public string Message { get; set; } = string.Empty;

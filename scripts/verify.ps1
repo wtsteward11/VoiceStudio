@@ -236,7 +236,7 @@ $proofLines = @(
     "StrictMypy:  $StrictMypy"
 )
 if ($Quick) {
-    $proofLines += "QuickCriticalGates: golden-loop, route-alignment"
+    $proofLines += "QuickCriticalGates: golden-loop, route-alignment, contract-drift"
 }
 $proofLines -join "`n" | Out-File -FilePath $proofStampPath -Encoding utf8
 
@@ -638,9 +638,14 @@ if (-not $stage2Passed -and -not $SkipPythonLint) {
 
 if ($Quick) {
     Invoke-Stage -Name "Quick Critical Gates" -Description "Golden-loop smoke, UI/backend route alignment, contract drift" -Action {
-        $env:VOICESTUDIO_TEST_MODE = "stub"
-        & python -m pytest tests/ci/test_golden_loop_smoke.py tests/ci/test_ui_backend_route_alignment.py tests/ci/test_contract_drift_gate.py -v --tb=short
-        return $LASTEXITCODE
+        $prev = $env:VOICESTUDIO_TEST_MODE
+        try {
+            $env:VOICESTUDIO_TEST_MODE = "stub"
+            & python -m pytest tests/ci/test_golden_loop_smoke.py tests/ci/test_ui_backend_route_alignment.py tests/ci/test_contract_drift_gate.py -v --tb=short
+            return $LASTEXITCODE
+        } finally {
+            if ($null -ne $prev) { $env:VOICESTUDIO_TEST_MODE = $prev } else { Remove-Item Env:VOICESTUDIO_TEST_MODE -ErrorAction SilentlyContinue }
+        }
     }
 }
 

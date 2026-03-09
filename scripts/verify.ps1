@@ -235,6 +235,9 @@ $proofLines = @(
     "RealUI:      $RealUI",
     "StrictMypy:  $StrictMypy"
 )
+if ($Quick) {
+    $proofLines += "QuickCriticalGates: golden-loop, route-alignment"
+}
 $proofLines -join "`n" | Out-File -FilePath $proofStampPath -Encoding utf8
 
 # Stage tracking
@@ -379,6 +382,9 @@ function Write-Report {
     $report += "**Date:** $dateStr" + $nl
     $report += "**Configuration:** $Configuration" + $nl
     $report += "**Quick Mode:** $Quick" + $nl
+    if ($Quick) {
+        $report += "**Quick critical gates:** golden-loop smoke, UI/backend route alignment, contract drift (3 critical gates)" + $nl
+    }
     $report += "**Real UI:** $RealUI" + $nl
     $report += "**Overall Status:** $overallStatus" + $nl
     $report += "**Total Duration:** $durStr seconds" + $nl + $nl
@@ -626,6 +632,19 @@ if (-not $stage2Passed -and -not $SkipPythonLint) {
 }
 
 # ============================================================================
+# STAGE 2.5: Quick Critical Gates (Quick mode only)
+# ============================================================================
+# In quick mode, run truthy critical gates: golden-loop smoke, UI/backend route alignment, contract drift.
+
+if ($Quick) {
+    Invoke-Stage -Name "Quick Critical Gates" -Description "Golden-loop smoke, UI/backend route alignment, contract drift" -Action {
+        $env:VOICESTUDIO_TEST_MODE = "stub"
+        & python -m pytest tests/ci/test_golden_loop_smoke.py tests/ci/test_ui_backend_route_alignment.py tests/ci/test_contract_drift_gate.py -v --tb=short
+        return $LASTEXITCODE
+    }
+}
+
+# ============================================================================
 # STAGE 3: C# Unit Tests
 # ============================================================================
 
@@ -737,16 +756,21 @@ if (-not $stage6Passed) {
 # STAGE 7: Backend Integration Tests
 # ============================================================================
 
-$stage7Passed = Invoke-Stage -Name "Backend Integration" -Description "Run backend integration tests - API endpoints, engine adapters" -Skip:$SkipIntegration -Action {
+$stage7Passed = Invoke-Stage -Name "Backend Integration" -Description "Golden-loop smoke + backend integration tests" -Skip:$SkipIntegration -Action {
+    # Golden-loop smoke: health + synthesize + stream (deterministic, in-process)
+    $env:VOICESTUDIO_TEST_MODE = "stub"
+    & python -m pytest tests/ci/test_golden_loop_smoke.py -v --tb=short
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Golden-loop smoke FAILED" -ForegroundColor Red
+        return $LASTEXITCODE
+    }
     $junitFile = Join-Path $TestResultsDir "integration_tests.xml"
-    
     & python -m pytest tests/integration `
         -v `
         --tb=short `
         -x `
         --junitxml=$junitFile `
         -m "not slow and not requires_gpu"
-    
     return $LASTEXITCODE
 }
 
@@ -799,7 +823,41 @@ if (-not $stage8Passed -and -not $SkipUI) {
 }
 
 # ============================================================================
-# STAGE 8: Gate/Ledger Validation
+# STAGE 8.5: UI Self-Test (app-level smoke)
+# ============================================================================
+
+$stage8_5Passed = Invoke-Stage -Name "UI Self-Test" -Description "Run app with --ui-self-test (Gate C smoke + backend health)" -Skip:$SkipUI -Action {
+    $exePath = Join-Path $RootDir ".buildlogs\x64\$Configuration\net8.0-windows10.0.19041.0\VoiceStudio.App.exe"
+    $reportDir = Join-Path $RootDir ".buildlogs\verify"
+    $reportPath = Join-Path $reportDir "ui_self_test.json"
+    New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
+    if (-not (Test-Path $exePath)) {
+        Write-Host "ERROR: Exe not found at $exePath" -ForegroundColor Red
+        cmd /c "exit 1"
+        return
+    }
+    $env:GIT_COMMIT = git rev-parse HEAD 2>$null
+    if (-not $env:GIT_COMMIT) { $env:GIT_COMMIT = "unknown" }
+    & $exePath --ui-self-test --out $reportPath
+    $exitCode = $LASTEXITCODE
+    if ($null -eq $exitCode) { $exitCode = 0 }
+    if ($exitCode -ne 0) {
+        Write-Host "UI Self-Test FAILED (exit code $exitCode)" -ForegroundColor Red
+    } else {
+        Write-Host "UI Self-Test PASSED" -ForegroundColor Green
+    }
+    cmd /c "exit $exitCode"
+}
+
+if (-not $stage8_5Passed -and -not $SkipUI) {
+    Write-Host ""
+    Write-Host "UI SELF-TEST FAILED - Stopping verification (fail-fast)" -ForegroundColor Red
+    Write-Report
+    exit 1
+}
+
+# ============================================================================
+# STAGE 9: Gate/Ledger Validation
 # ============================================================================
 
 $stage9Passed = Invoke-Stage -Name "Gate/Ledger Validation" -Description "Check gate status and validate quality ledger" -Skip:$SkipGates -Action {

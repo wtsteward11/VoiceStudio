@@ -89,6 +89,36 @@ async def test_golden_loop_real_health_synthesize_stream(client: AsyncClient) ->
     profile_id = profile_data.get("id") or profile_data.get("profile_id")
     assert profile_id, f"No profile id in response: {profile_data}"
 
+    # Acquire voice consent (same flow UI would use) before synthesis
+    req_resp = await client.post(
+        "/api/consent/request",
+        json={
+            "voice_id": profile_id,
+            "grantor_id": "ci-golden-loop",
+            "grantor_name": "CI",
+            "consent_type": "voice_usage",
+        },
+    )
+    if req_resp.status_code not in (200, 201):
+        pytest.fail(
+            f"Real-mode golden loop requires consent API. "
+            f"Consent request failed: {req_resp.status_code} - {req_resp.text[:200]}"
+        )
+    req_data = req_resp.json()
+    consent_id = req_data.get("consent_id")
+    assert consent_id, f"No consent_id in response: {req_data}"
+
+    grant_resp = await client.post(f"/api/consent/grant/{consent_id}")
+    if grant_resp.status_code not in (200, 201):
+        pytest.fail(
+            f"Real-mode golden loop requires consent grant. "
+            f"Consent grant failed: {grant_resp.status_code} - {grant_resp.text[:200]}"
+        )
+    grant_data = grant_resp.json()
+    assert grant_data.get("status") == "granted", (
+        f"Consent not granted: status={grant_data.get('status')}"
+    )
+
     synth_resp = await client.post(
         "/api/voice/synthesize",
         json={

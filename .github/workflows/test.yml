@@ -86,7 +86,6 @@ jobs:
           VOICESTUDIO_TEST_MODE: real
         run: |
           python -m pytest tests/ci/test_golden_loop_smoke_real.py -v -m nightly --tb=short
-        continue-on-error: true
 
   test-frontend:
     name: Test C# Frontend (${{ matrix.configuration }})

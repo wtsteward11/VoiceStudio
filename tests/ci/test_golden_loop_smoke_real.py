@@ -2,8 +2,8 @@
 CI gate: real-mode golden-loop smoke (nightly/workflow_dispatch only).
 
 Same flow as test_golden_loop_smoke.py but with VOICESTUDIO_TEST_MODE=real.
-Requires real engines/models; excluded from default CI. Skips when engines
-or consent are unavailable.
+Requires real engines/models and voice consent; excluded from default CI.
+Fails (no skip) when prerequisites are missing.
 
 Run: python -m pytest tests/ci/test_golden_loop_smoke_real.py -v -m nightly
 Excluded from default: pytest -m "not nightly"
@@ -69,7 +69,7 @@ async def test_golden_loop_real_health_synthesize_stream(client: AsyncClient) ->
     """
     Real-mode golden loop: health → profile → synthesize → stream.
 
-    Requires real piper engine and consent. Skips when unavailable.
+    Requires real piper engine and voice consent. Fails when missing.
     """
     resp = await client.get("/api/health")
     assert resp.status_code == 200, f"Health failed: {resp.status_code} - {resp.text}"
@@ -81,8 +81,9 @@ async def test_golden_loop_real_health_synthesize_stream(client: AsyncClient) ->
         json={"name": "golden-loop-real-smoke", "description": "Nightly real-mode smoke"},
     )
     if profile_resp.status_code not in (200, 201):
-        pytest.skip(
-            f"Profile creation failed (engines/consent may be unavailable): {profile_resp.status_code}"
+        pytest.fail(
+            f"Real-mode golden loop requires profile creation. Missing: backend healthy. "
+            f"Profile creation failed: {profile_resp.status_code} - {profile_resp.text[:200]}"
         )
     profile_data = profile_resp.json()
     profile_id = profile_data.get("id") or profile_data.get("profile_id")
@@ -98,8 +99,9 @@ async def test_golden_loop_real_health_synthesize_stream(client: AsyncClient) ->
         },
     )
     if synth_resp.status_code not in (200, 201, 202):
-        pytest.skip(
-            f"Synthesis failed (real engines/consent required): {synth_resp.status_code} - {synth_resp.text[:200]}"
+        pytest.fail(
+            f"Real-mode golden loop requires: piper engine, voice consent. "
+            f"Synthesis failed: {synth_resp.status_code} - {synth_resp.text[:200]}"
         )
     synth_data = synth_resp.json()
     audio_id = synth_data.get("audio_id")
@@ -121,7 +123,7 @@ async def test_golden_loop_real_upload_stream(client: AsyncClient) -> None:
     """
     Real-mode golden loop: upload WAV → stream.
 
-    Upload path does not require synthesis consent; skips only on upload failure.
+    Upload path requires backend healthy. Fails when missing.
     """
     wav_bytes = _make_wav_bytes()
     upload_resp = await client.post(
@@ -129,8 +131,9 @@ async def test_golden_loop_real_upload_stream(client: AsyncClient) -> None:
         files={"file": ("test.wav", io.BytesIO(wav_bytes), "audio/wav")},
     )
     if upload_resp.status_code not in (200, 201):
-        pytest.skip(
-            f"Upload failed (backend may be unavailable): {upload_resp.status_code}"
+        pytest.fail(
+            f"Real-mode golden loop requires backend upload endpoint. "
+            f"Upload failed: {upload_resp.status_code} - {upload_resp.text[:200]}"
         )
     upload_data = upload_resp.json()
     audio_id = upload_data.get("id")

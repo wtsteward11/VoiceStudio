@@ -49,6 +49,9 @@ namespace VoiceStudio.App.Services
     // Track the current file path for loop restart
     private string? _currentFilePath;
 
+    // Temp file created by PlayUrlAsync; deleted on Stop/Dispose/completion
+    private string? _currentTempPlaybackPath;
+
     public double Volume
     {
       get => _volume;
@@ -68,6 +71,11 @@ namespace VoiceStudio.App.Services
 
     public async Task PlayFileAsync(string filePath, Action? onPlaybackComplete = null)
     {
+      await PlayFileAsyncCore(filePath, onPlaybackComplete, tempPathToTrack: null).ConfigureAwait(false);
+    }
+
+    private async Task PlayFileAsyncCore(string filePath, Action? onPlaybackComplete, string? tempPathToTrack)
+    {
       if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
       {
         throw new FileNotFoundException("Audio file not found", filePath);
@@ -79,6 +87,9 @@ namespace VoiceStudio.App.Services
         {
           // Stop any current playback
           Stop();
+
+          // Track temp path for cleanup (set after Stop so we don't delete the file we're about to play)
+          _currentTempPlaybackPath = tempPathToTrack;
 
           // Create audio file reader
           _audioFileReader = new NAudio.Wave.AudioFileReader(filePath);
@@ -110,6 +121,9 @@ namespace VoiceStudio.App.Services
                   IsPaused = false;
                   IsPlayingChanged?.Invoke(this, false);
                   PlaybackCompleted?.Invoke(this, EventArgs.Empty);
+                  _audioFileReader?.Dispose();
+                  _audioFileReader = null;
+                  _currentFilePath = null;
                   onPlaybackComplete?.Invoke();
                 };
 
@@ -242,27 +256,34 @@ namespace VoiceStudio.App.Services
             ext = "." + urlExt;
         }
 
-        var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
         tempPath = Path.Combine(Path.GetTempPath(), $"voicestudio_{Guid.NewGuid():N}{ext}");
-        await File.WriteAllBytesAsync(tempPath, bytes).ConfigureAwait(false);
+        await using (var fileStream = File.Create(tempPath))
+        {
+          await response.Content.CopyToAsync(fileStream).ConfigureAwait(false);
+        }
 
         var pathToPlay = tempPath;
-        await PlayFileAsync(pathToPlay, () =>
+        try
         {
-          try
+          await PlayFileAsyncCore(pathToPlay, () =>
           {
-            if (File.Exists(pathToPlay))
-              File.Delete(pathToPlay);
-          }
-          catch (Exception ex)
-          {
-            ErrorLogger.LogWarning($"Best effort cleanup failed: {ex.Message}", "AudioPlayerService.PlayUrlAsync");
-          }
-          onPlaybackComplete?.Invoke();
-        }).ConfigureAwait(false);
+            var p = _currentTempPlaybackPath;
+            _currentTempPlaybackPath = null;
+            TryDeleteTempFile(p);
+            onPlaybackComplete?.Invoke();
+          }, tempPathToTrack: pathToPlay).ConfigureAwait(false);
+        }
+        catch
+        {
+          TryDeleteTempFile(tempPath);
+          _currentTempPlaybackPath = null;
+          throw;
+        }
       }
       catch (Exception ex)
       {
+        TryDeleteTempFile(tempPath);
+        _currentTempPlaybackPath = null;
         if (_hasShownPlaybackErrorThisSession)
         {
           ErrorLogger.LogError($"Failed to play audio: {ex.Message}", "AudioPlayerService.PlayUrlAsync");
@@ -292,6 +313,11 @@ namespace VoiceStudio.App.Services
     {
       try
       {
+        var tempToDelete = _currentTempPlaybackPath;
+        _currentTempPlaybackPath = null;
+        var fileToDelete = _currentFilePath;
+        _currentFilePath = null;
+
         _waveOut?.Stop();
         _audioFileReader?.Dispose();
         _rawStream?.Dispose();
@@ -303,6 +329,10 @@ namespace VoiceStudio.App.Services
         IsPlaying = false;
         IsPaused = false;
         IsPlayingChanged?.Invoke(this, false);
+
+        TryDeleteTempFile(tempToDelete);
+        if (fileToDelete != null && IsOurTempFile(fileToDelete))
+          TryDeleteTempFile(fileToDelete);
       }
       catch (Exception ex)
       {
@@ -459,6 +489,29 @@ namespace VoiceStudio.App.Services
         StopPreview();
         _disposed = true;
       }
+    }
+
+    private static void TryDeleteTempFile(string? path)
+    {
+      if (string.IsNullOrEmpty(path)) return;
+      try
+      {
+        if (File.Exists(path))
+          File.Delete(path);
+      }
+      catch
+      {
+        // Best-effort, no throw
+      }
+    }
+
+    private static bool IsOurTempFile(string path)
+    {
+      if (string.IsNullOrEmpty(path)) return false;
+      var tempDir = Path.GetTempPath();
+      var name = Path.GetFileName(path);
+      return path.StartsWith(tempDir, StringComparison.OrdinalIgnoreCase)
+        && name.StartsWith("voicestudio_", StringComparison.Ordinal);
     }
 
     #region Inter-Panel Workflow

@@ -66,6 +66,28 @@ jobs:
           name: backend-coverage
         continue-on-error: true
 
+  nightly-golden-loop-real:
+    name: Nightly Real-Mode Golden Loop
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,extras]"
+      - name: Run real-mode golden loop smoke
+        env:
+          VOICESTUDIO_TEST_MODE: real
+        run: |
+          python -m pytest tests/ci/test_golden_loop_smoke_real.py -v -m nightly --tb=short
+        continue-on-error: true
+
   test-frontend:
     name: Test C# Frontend (${{ matrix.configuration }})
     runs-on: windows-latest

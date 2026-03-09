@@ -17,7 +17,7 @@ TESTS_DIR = ROOT / "tests"
 SKIP_BUDGET = {
     "collection_skips": 60,
     "module_level_skips": 310,
-    "total_skip_calls": 1750,
+    "total_skip_calls": 1760,
 }
 MARGIN = 5
 

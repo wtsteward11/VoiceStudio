@@ -762,21 +762,27 @@ if (-not $stage6Passed) {
 # ============================================================================
 
 $stage7Passed = Invoke-Stage -Name "Backend Integration" -Description "Golden-loop smoke + backend integration tests" -Skip:$SkipIntegration -Action {
-    # Golden-loop smoke: health + synthesize + stream (deterministic, in-process)
-    $env:VOICESTUDIO_TEST_MODE = "stub"
-    & python -m pytest tests/ci/test_golden_loop_smoke.py -v --tb=short
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Golden-loop smoke FAILED" -ForegroundColor Red
+    $prev = $env:VOICESTUDIO_TEST_MODE
+    try {
+        $env:VOICESTUDIO_TEST_MODE = "stub"
+        # Golden-loop smoke: health + synthesize + stream (deterministic, in-process)
+        & python -m pytest tests/ci/test_golden_loop_smoke.py -v --tb=short
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Golden-loop smoke FAILED" -ForegroundColor Red
+            return $LASTEXITCODE
+        }
+        $junitFile = Join-Path $TestResultsDir "integration_tests.xml"
+        & python -m pytest tests/integration `
+            -v `
+            --tb=short `
+            -x `
+            --junitxml=$junitFile `
+            -m "not slow and not requires_gpu"
         return $LASTEXITCODE
+    } finally {
+        if ($null -ne $prev) { $env:VOICESTUDIO_TEST_MODE = $prev }
+        else { Remove-Item Env:VOICESTUDIO_TEST_MODE -ErrorAction SilentlyContinue }
     }
-    $junitFile = Join-Path $TestResultsDir "integration_tests.xml"
-    & python -m pytest tests/integration `
-        -v `
-        --tb=short `
-        -x `
-        --junitxml=$junitFile `
-        -m "not slow and not requires_gpu"
-    return $LASTEXITCODE
 }
 
 if (-not $stage7Passed -and -not $SkipIntegration) {

@@ -122,25 +122,8 @@ namespace VoiceStudio.App.ViewModels
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
-      _backendBaseUrl = "http://localhost:8000";
-      try
-      {
-        var backendJson = UnpackagedSettingsHelper.GetValue<string>("Settings.Backend", null);
-        if (!string.IsNullOrEmpty(backendJson))
-        {
-          using var doc = System.Text.Json.JsonDocument.Parse(backendJson);
-          if (doc.RootElement.TryGetProperty("ApiUrl", out var apiUrlElement))
-          {
-            var apiUrl = apiUrlElement.GetString();
-            if (!string.IsNullOrEmpty(apiUrl))
-              _backendBaseUrl = apiUrl;
-          }
-        }
-      }
-      catch
-      {
-        // ALLOWED: empty catch (best-effort settings parse)
-      }
+      _backendBaseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+          ?? "http://localhost:8000";
 
       // Get services (may be null if not initialized)
       try

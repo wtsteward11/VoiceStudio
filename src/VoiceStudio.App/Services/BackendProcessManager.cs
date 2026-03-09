@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Logging;
@@ -45,7 +46,7 @@ public sealed class BackendProcessManager : IDisposable
     /// </summary>
     public bool IsStarting => _isStarting;
 
-    public BackendProcessManager(string backendUrl = "http://localhost:8001")
+    public BackendProcessManager(string backendUrl = "http://localhost:8000")
     {
         _backendUrl = backendUrl;
         _httpClient = new HttpClient
@@ -110,6 +111,22 @@ public sealed class BackendProcessManager : IDisposable
         _isStarting = true;
         try
         {
+            // Detect port 8000 in use before starting to avoid double-bind
+            if (await IsPort8000InUseAsync(cancellationToken))
+            {
+                if (await IsBackendHealthyAsync(cancellationToken))
+                {
+                    Debug.WriteLine("[BackendProcessManager] Port 8000 in use and backend healthy");
+                    BackendStarted?.Invoke(this, EventArgs.Empty);
+                    return true;
+                }
+
+                var error = "Port 8000 is in use by another process. Stop the other process or set VOICESTUDIO_API_PORT to use a different port.";
+                Debug.WriteLine($"[BackendProcessManager] {error}");
+                BackendStartFailed?.Invoke(this, error);
+                return false;
+            }
+
             // Find the venv Python executable
             var repoRoot = FindRepoRoot();
             if (repoRoot == null)
@@ -146,7 +163,7 @@ public sealed class BackendProcessManager : IDisposable
             var psi = new ProcessStartInfo
             {
                 FileName = venvPython,
-                Arguments = "-m uvicorn backend.api.main:app --host 127.0.0.1 --port 8001",
+                Arguments = "-m uvicorn backend.api.main:app --host 127.0.0.1 --port 8000",
                 WorkingDirectory = repoRoot,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -272,6 +289,27 @@ public sealed class BackendProcessManager : IDisposable
             return response.IsSuccessStatusCode;
         }
         catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Checks if port 8000 is in use (TCP connect).
+    /// </summary>
+    private static async Task<bool> IsPort8000InUseAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync("127.0.0.1", 8000, cancellationToken);
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
+        catch (ObjectDisposedException)
         {
             return false;
         }

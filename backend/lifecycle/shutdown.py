@@ -236,6 +236,10 @@ class GracefulShutdownOrchestrator:
 
         return self._results
 
+    async def shutdown(self) -> list[ShutdownResult]:
+        """Alias for execute_shutdown (API compatibility)."""
+        return await self.execute_shutdown()
+
     async def _execute_phase_handlers(self, phase: ShutdownPhase) -> None:
         """Execute all handlers for a phase."""
         phase_handlers = [h for h in self._handlers if h.phase == phase]

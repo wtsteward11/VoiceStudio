@@ -309,7 +309,15 @@
              Severity="Error"
              Title="Synthesis Error"
              Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, FallbackValue='An error occurred', TargetNullValue='An error occurred'}"
-             IsClosable="True"/>
+             IsClosable="True"
+             Closed="ErrorInfoBar_Closed">
+      <InfoBar.ActionButton>
+        <Button Content="Copy details"
+                AutomationProperties.AutomationId="VoiceSynthesisView_CopyErrorButton"
+                Command="{x:Bind ViewModel.CopyLastErrorCommand}"
+                ToolTipService.ToolTip="Copy error details to clipboard"/>
+      </InfoBar.ActionButton>
+    </InfoBar>
     
     <!-- Help Overlay -->
     <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed" d:Visibility="Collapsed" Grid.RowSpan="6"/>

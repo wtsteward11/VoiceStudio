@@ -22,6 +22,17 @@ using QualityRecommendation = VoiceStudio.Core.Models.QualityRecommendation;
 
 namespace VoiceStudio.App.Views.Panels
 {
+  /// <summary>Explicit workflow states for upload -> synthesize -> playback.</summary>
+  public enum SynthesisWorkflowState
+  {
+    Idle,
+    Uploading,
+    ReadyToSynthesize,
+    Synthesizing,
+    AudioReady,
+    Error
+  }
+
   // GAP-005: Updated to inherit from BaseViewModel for standardized error handling
   public partial class VoiceSynthesisViewModel : BaseViewModel, IPanelView
   {
@@ -94,6 +105,12 @@ namespace VoiceStudio.App.Views.Panels
     private bool hasError;
 
     [ObservableProperty]
+    private SynthesisWorkflowState workflowState = SynthesisWorkflowState.Idle;
+
+    /// <summary>Copy-friendly error text for clipboard (e.g. "Copy details" affordance).</summary>
+    public string? LastError => HasError ? ErrorMessage : null;
+
+    [ObservableProperty]
     private QualityMetrics? qualityMetrics;
 
     [ObservableProperty]
@@ -121,8 +138,8 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private string? lastSynthesizedAudioId;
 
-    [ObservableProperty]
-    private bool canPlayAudio;
+    /// <summary>Play enabled when workflow state is AudioReady (audio asset exists).</summary>
+    public bool CanPlayAudio => WorkflowState == SynthesisWorkflowState.AudioReady && !IsLoading;
 
     [ObservableProperty]
     private TimeSpan lastSynthesizedDuration;
@@ -141,7 +158,7 @@ namespace VoiceStudio.App.Views.Panels
     private ObservableCollection<string> selectedEngines = new();
 
     [ObservableProperty]
-    private ObservableCollection<string> availableEngines = new() { "xtts_v2", "chatterbox", "tortoise" };
+    private ObservableCollection<string> availableEngines = new();
 
     [ObservableProperty]
     private string ensembleSelectionMode = "voting"; // voting, hybrid, fusion
@@ -207,7 +224,7 @@ namespace VoiceStudio.App.Views.Panels
 
       // Get backend base URL - try to get from local settings, otherwise use default
       // This matches the default in ServiceProvider and BackendClientConfig
-      _backendBaseUrl = "http://localhost:8001";
+      _backendBaseUrl = "http://localhost:8000";
       try
       {
         // Use UnpackagedSettingsHelper for file-based settings (works for both packaged and unpackaged apps)
@@ -286,9 +303,12 @@ namespace VoiceStudio.App.Views.Panels
       {
         using var profiler = PerformanceProfiler.Start("Command: PlayAudio", PerformanceBudgets.CommandExecutionMs);
         await PlayAudioAsync(ct);
-      }, () => CanPlayAudio && !IsLoading);
+      }, () => CanPlayAudio);
 
       StopAudioCommand = new RelayCommand(StopAudio, () => _audioPlayer.IsPlaying);
+
+      CopyLastErrorCommand = new RelayCommand(CopyLastErrorToClipboard, () => !string.IsNullOrEmpty(LastError));
+      ClearErrorCommand = new RelayCommand(ClearError, () => HasError);
 
       // Add to Timeline command (Audit X-6: Synthesis -> Timeline)
       // GAP-B04: Disabled when busy or no synthesis output
@@ -351,12 +371,17 @@ namespace VoiceStudio.App.Views.Panels
         await CheckEnsembleStatusAsync(ct);
       }, () => !string.IsNullOrEmpty(EnsembleJobId) && !IsEnsembleProcessing);
 
-      // Load profiles on initialization
+      // Load profiles and engines on initialization
       var loadCt = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
       _ = LoadProfilesAsync(loadCt).ContinueWith(t =>
       {
         if (t.IsFaulted)
           _errorLoggingService?.LogError(t.Exception?.InnerException ?? new Exception("LoadProfiles failed"), "LoadProfiles");
+      }, TaskScheduler.Default);
+      _ = LoadEnginesAsync(loadCt).ContinueWith(t =>
+      {
+        if (t.IsFaulted)
+          _errorLoggingService?.LogError(t.Exception?.InnerException ?? new Exception("LoadEngines failed"), "LoadEngines");
       }, TaskScheduler.Default);
 
       // Load pipelines when engine changes
@@ -394,6 +419,8 @@ namespace VoiceStudio.App.Views.Panels
     public EnhancedAsyncRelayCommand LoadProfilesCommand { get; }
     public EnhancedAsyncRelayCommand PlayAudioCommand { get; }
     public IRelayCommand StopAudioCommand { get; }
+    public IRelayCommand CopyLastErrorCommand { get; }
+    public IRelayCommand ClearErrorCommand { get; }
     public IRelayCommand AddToTimelineCommand { get; }
     public EnhancedAsyncRelayCommand StartStreamingCommand { get; }
     public IRelayCommand StopStreamingCommand { get; }
@@ -459,6 +486,7 @@ namespace VoiceStudio.App.Views.Panels
       IsLoading = true;
       ErrorMessage = null;
       HasError = false;
+      WorkflowState = SynthesisWorkflowState.Uploading;
 
       try
       {
@@ -496,6 +524,52 @@ namespace VoiceStudio.App.Views.Panels
       finally
       {
         IsLoading = false;
+        UpdateWorkflowStateFromInputs();
+      }
+    }
+
+    private void UpdateWorkflowStateFromInputs()
+    {
+      if (HasError)
+      {
+        WorkflowState = SynthesisWorkflowState.Error;
+        return;
+      }
+      if (!string.IsNullOrEmpty(LastSynthesizedAudioId) || !string.IsNullOrEmpty(LastSynthesizedAudioUrl))
+      {
+        WorkflowState = SynthesisWorkflowState.AudioReady;
+        return;
+      }
+      if (SelectedProfile != null && !string.IsNullOrWhiteSpace(Text))
+      {
+        WorkflowState = SynthesisWorkflowState.ReadyToSynthesize;
+        return;
+      }
+      WorkflowState = SynthesisWorkflowState.Idle;
+    }
+
+    private async Task LoadEnginesAsync(CancellationToken cancellationToken)
+    {
+      try
+      {
+        var engines = await _backendClient.GetEnginesAsync(cancellationToken);
+        AvailableEngines.Clear();
+        foreach (var engine in engines)
+        {
+          AvailableEngines.Add(engine);
+        }
+        if (AvailableEngines.Count > 0 && string.IsNullOrEmpty(SelectedEngine))
+        {
+          SelectedEngine = AvailableEngines[0];
+        }
+      }
+      catch (OperationCanceledException)
+      {
+        return;
+      }
+      catch (Exception ex)
+      {
+        _errorLoggingService?.LogError(ex, "LoadEngines");
       }
     }
 
@@ -515,6 +589,7 @@ namespace VoiceStudio.App.Views.Panels
       ErrorMessage = null;
       HasError = false;
       HasQualityMetrics = false;
+      WorkflowState = SynthesisWorkflowState.Synthesizing;
       StatusMessage = ResourceHelper.GetString("Status.Synthesizing", "Synthesizing voice...");
 
       try
@@ -527,6 +602,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           ErrorMessage = textValidation.ErrorMessage;
           HasError = true;
+          WorkflowState = SynthesisWorkflowState.Error;
           StatusMessage = string.Empty;
           return;
         }
@@ -604,7 +680,9 @@ namespace VoiceStudio.App.Views.Panels
         LastSynthesizedAudioUrl = response.AudioUrl;
         LastSynthesizedAudioId = response.AudioId;
         LastSynthesizedDuration = TimeSpan.FromSeconds(response.Duration);
-        CanPlayAudio = !string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl);
+        WorkflowState = !string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl)
+            ? SynthesisWorkflowState.AudioReady
+            : WorkflowState;
         PlayAudioCommand.NotifyCanExecuteChanged();
         AddToTimelineCommand.NotifyCanExecuteChanged();
 
@@ -658,6 +736,7 @@ namespace VoiceStudio.App.Views.Panels
         var errorMsg = ErrorHandler.GetUserFriendlyMessage(ex);
         ErrorMessage = $"Synthesis failed: {errorMsg}";
         HasError = true;
+        WorkflowState = SynthesisWorkflowState.Error;
         StatusMessage = string.Empty;
 
         _errorService?.ShowError(ex, ResourceHelper.GetString("Timeline.SynthesisFailed", "Failed to synthesize voice"));
@@ -669,6 +748,11 @@ namespace VoiceStudio.App.Views.Panels
       finally
       {
         IsLoading = false;
+        if (WorkflowState != SynthesisWorkflowState.AudioReady && WorkflowState != SynthesisWorkflowState.Error)
+        {
+          UpdateWorkflowStateFromInputs();
+        }
+        PlayAudioCommand.NotifyCanExecuteChanged();
       }
     }
 
@@ -788,22 +872,69 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnSelectedProfileChanged(VoiceProfile? value)
     {
       SynthesizeCommand.NotifyCanExecuteChanged();
+      if (!IsLoading && WorkflowState != SynthesisWorkflowState.Synthesizing)
+        UpdateWorkflowStateFromInputs();
     }
 
     partial void OnTextChanged(string value)
     {
       SynthesizeCommand.NotifyCanExecuteChanged();
+      if (!IsLoading && WorkflowState != SynthesisWorkflowState.Synthesizing)
+        UpdateWorkflowStateFromInputs();
     }
 
     partial void OnIsLoadingChanged(bool value)
     {
       SynthesizeCommand.NotifyCanExecuteChanged();
       AddToTimelineCommand.NotifyCanExecuteChanged(); // GAP-B04
+      OnPropertyChanged(nameof(CanPlayAudio));
+      PlayAudioCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnWorkflowStateChanged(SynthesisWorkflowState value)
+    {
+      OnPropertyChanged(nameof(CanPlayAudio));
+      PlayAudioCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnHasErrorChanged(bool value)
+    {
+      OnPropertyChanged(nameof(LastError));
+      CopyLastErrorCommand.NotifyCanExecuteChanged();
+      ClearErrorCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnErrorMessageChanged(string? value)
+    {
+      OnPropertyChanged(nameof(LastError));
+      CopyLastErrorCommand.NotifyCanExecuteChanged();
+    }
+
+    private void CopyLastErrorToClipboard()
+    {
+      var text = LastError;
+      if (string.IsNullOrEmpty(text))
+        return;
+      var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+      dataPackage.SetText(text);
+      Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+      _toastNotificationService?.ShowSuccess(
+          ResourceHelper.GetString("VoiceSynthesis.ErrorCopied", "Copied"),
+          ResourceHelper.GetString("VoiceSynthesis.ErrorDetailsCopied", "Error details copied to clipboard"));
+    }
+
+    private void ClearError()
+    {
+      ErrorMessage = null;
+      HasError = false;
+      UpdateWorkflowStateFromInputs();
     }
 
     partial void OnSelectedEngineChanged(string value)
     {
       OnPropertyChanged(nameof(IsEmotionSupported));
+      if (!IsLoading && WorkflowState != SynthesisWorkflowState.Synthesizing)
+        UpdateWorkflowStateFromInputs();
       // Reset emotion if not supported
       if (!IsEmotionSupported)
       {
@@ -927,6 +1058,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       ErrorMessage = e.Message;
       HasError = true;
+      WorkflowState = SynthesisWorkflowState.Error;
       StreamingStatus = $"Error: {e.Message}";
       _errorLoggingService?.LogError(e.Exception ?? new Exception(e.Message), "Streaming");
     }
@@ -1168,8 +1300,9 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        // Get available engines (typically xtts, chatterbox, tortoise)
-        var availableEngines = new List<string> { "xtts", "chatterbox", "tortoise" };
+        var availableEngines = AvailableEngines.Count > 0
+            ? AvailableEngines.ToList()
+            : await _backendClient.GetEnginesAsync(cancellationToken);
 
         QualityRecommendation = await _backendClient.GetQualityRecommendationAsync(
             Text,
@@ -1332,8 +1465,9 @@ namespace VoiceStudio.App.Views.Panels
           // If completed, update audio URL and quality metrics
           if (status.Status == "completed" && !string.IsNullOrEmpty(status.EnsembleAudioId))
           {
+            LastSynthesizedAudioId = status.EnsembleAudioId;
             LastSynthesizedAudioUrl = $"/api/audio/{status.EnsembleAudioId}";
-            CanPlayAudio = true;
+            WorkflowState = SynthesisWorkflowState.AudioReady;
 
             // Convert ensemble quality to QualityMetrics if available
             if (status.EnsembleQuality != null)
@@ -1354,6 +1488,7 @@ namespace VoiceStudio.App.Views.Panels
             }
 
             var qualityScore = QualityMetrics?.MosScore ?? 0.0;
+            PlayAudioCommand.NotifyCanExecuteChanged();
             _toastNotificationService?.ShowSuccess(
                 "Ensemble Complete",
                 $"Best engine selected. MOS Score: {qualityScore:F2}"
@@ -1363,6 +1498,7 @@ namespace VoiceStudio.App.Views.Panels
           {
             ErrorMessage = status.Error ?? "Ensemble synthesis failed";
             HasError = true;
+            WorkflowState = SynthesisWorkflowState.Error;
             _toastNotificationService?.ShowError(
                 "Ensemble Failed",
                 status.Error ?? "Ensemble synthesis failed"
@@ -1539,7 +1675,7 @@ namespace VoiceStudio.App.Views.Panels
           {
             LastSynthesizedAudioId = PipelinePreview.EnhancedAudioId;
             LastSynthesizedAudioUrl = $"/api/audio/{PipelinePreview.EnhancedAudioId}";
-            CanPlayAudio = true;
+            WorkflowState = SynthesisWorkflowState.AudioReady;
             PlayAudioCommand.NotifyCanExecuteChanged();
           }
 

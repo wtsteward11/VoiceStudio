@@ -849,6 +849,7 @@ $stage8_5Passed = Invoke-Stage -Name "UI Self-Test" -Description "Run app with -
     }
     $env:GIT_COMMIT = git rev-parse HEAD 2>$null
     if (-not $env:GIT_COMMIT) { $env:GIT_COMMIT = "unknown" }
+    $env:VOICESTUDIO_TEST_MODE = "stub"
     & $exePath --ui-self-test --out $reportPath
     $exitCode = $LASTEXITCODE
     if ($null -eq $exitCode) { $exitCode = 0 }
@@ -856,6 +857,14 @@ $stage8_5Passed = Invoke-Stage -Name "UI Self-Test" -Description "Run app with -
         Write-Host "UI Self-Test FAILED (exit code $exitCode)" -ForegroundColor Red
     } else {
         Write-Host "UI Self-Test PASSED" -ForegroundColor Green
+    }
+    # Copy proof artifact to docs/reports/verification for daily-driver smoke
+    $proofDir = Join-Path $RootDir "docs\reports\verification"
+    $proofName = "UI_DAILY_DRIVER_SMOKE_" + (Get-Date -Format "yyyy-MM-dd") + ".json"
+    $proofPath = Join-Path $proofDir $proofName
+    if (Test-Path $reportPath) {
+        New-Item -ItemType Directory -Force -Path $proofDir | Out-Null
+        Copy-Item $reportPath $proofPath -Force
     }
     cmd /c "exit $exitCode"
 }

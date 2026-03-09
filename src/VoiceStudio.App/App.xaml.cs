@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -296,11 +297,14 @@ namespace VoiceStudio.App
                 BindingLogPath = _bindingFailureLogPath ?? Path.Combine(crashDir, "binding_failures_latest.log"),
                 NavSteps = [],
                 BindingFailures = [],
+                SynthesisStepRan = false,
+                PlaybackInvoked = false,
+                Failures = [],
               };
             }
 
-            WriteGateCUiSmokeSummary(crashDir, result);
-            Environment.Exit(result.ExitCode);
+            var exitCode = WriteGateCUiSmokeSummary(crashDir, result);
+            Environment.Exit(exitCode);
           });
           return;
         }
@@ -324,10 +328,13 @@ namespace VoiceStudio.App
             BindingLogPath = _bindingFailureLogPath ?? Path.Combine(crashDir, "binding_failures_latest.log"),
             NavSteps = [],
             BindingFailures = [],
+            SynthesisStepRan = false,
+            PlaybackInvoked = false,
+            Failures = [],
           };
 
-          WriteGateCUiSmokeSummary(crashDir, result);
-          Environment.Exit(result.ExitCode);
+          var exitCode = WriteGateCUiSmokeSummary(crashDir, result);
+          Environment.Exit(exitCode);
           return;
         }
       }
@@ -695,6 +702,9 @@ namespace VoiceStudio.App
       public string[] NavSteps { get; init; } = [];
       public string BindingLogPath { get; init; } = string.Empty;
       public string[] BindingFailures { get; init; } = [];
+      public bool SynthesisStepRan { get; init; }
+      public bool PlaybackInvoked { get; init; }
+      public (string Step, string Error)[] Failures { get; init; } = [];
     }
 
     private static async Task<GateCUiSmokeResult> RunGateCUiSmokeAsync(Window window, string crashDir)
@@ -715,7 +725,7 @@ namespace VoiceStudio.App
           return result with { ExitCode = 2 };
         }
 
-        var (steps, timedOut, timedOutStep) = await mainWindow.RunGateCUiSmokeNavigationAsync(crashDir).ConfigureAwait(false);
+        var (steps, timedOut, timedOutStep, synthesisStepRan, playbackInvoked, synthesisFailures) = await mainWindow.RunGateCUiSmokeNavigationAsync(crashDir).ConfigureAwait(false);
 
         if (timedOut)
         {
@@ -762,6 +772,9 @@ namespace VoiceStudio.App
           NavSteps = steps,
           BindingLogPath = result.BindingLogPath,
           BindingFailures = failures,
+          SynthesisStepRan = synthesisStepRan,
+          PlaybackInvoked = playbackInvoked,
+          Failures = synthesisFailures.ToArray(),
         };
       }
       catch (Exception ex)
@@ -780,32 +793,113 @@ namespace VoiceStudio.App
       }
     }
 
-    private static void WriteGateCUiSmokeSummary(string crashDir, GateCUiSmokeResult result)
+    private static int WriteGateCUiSmokeSummary(string crashDir, GateCUiSmokeResult result)
     {
+      var effectiveExitCode = result.ExitCode;
       try
       {
         Directory.CreateDirectory(crashDir);
         var summaryPath = Path.Combine(crashDir, "ui_smoke_summary.json");
 
-        var payload = new
+        bool? backendReachable = null;
+        string? gitCommit = null;
+        var isUiSelfTest = IsUiSelfTestRequested();
+
+        if (isUiSelfTest)
         {
-          timestamp_utc = DateTime.UtcNow.ToString("o"),
-          exe = result.ExePath,
-          exit_code = result.ExitCode,
-          nav_steps = result.NavSteps,
-          binding_log = result.BindingLogPath,
-          binding_failure_count = result.BindingFailures.Length,
-          binding_failures = result.BindingFailures,
-        };
+          var baseUrl = GetBackendBaseUrl();
+          backendReachable = BackendClient.TryCheckHealthAsync(baseUrl).GetAwaiter().GetResult();
+          gitCommit = Environment.GetEnvironmentVariable("GIT_COMMIT")
+              ?? Environment.GetEnvironmentVariable("VOICESTUDIO_GIT_COMMIT")
+              ?? "unknown";
+
+          if (RequireBackendForSelfTest() && backendReachable == false)
+          {
+            effectiveExitCode = 4;
+          }
+        }
+
+        object payload;
+        var status = effectiveExitCode == 0 ? "PASS" : "FAIL";
+        if (isUiSelfTest)
+        {
+          payload = new
+          {
+            status,
+            timestamp_utc = DateTime.UtcNow.ToString("o"),
+            exe = result.ExePath,
+            exit_code = effectiveExitCode,
+            nav_steps_completed = result.NavSteps.Length,
+            nav_steps = result.NavSteps,
+            synthesis_step_ran = result.SynthesisStepRan,
+            playback_invoked = result.PlaybackInvoked,
+            failures = result.Failures.Select(f => new { step = f.Step, error = f.Error }).ToArray(),
+            binding_log = result.BindingLogPath,
+            binding_failure_count = result.BindingFailures.Length,
+            binding_failures = result.BindingFailures,
+            backend_reachable = backendReachable,
+            git_commit = gitCommit,
+            mode = "ui-self-test",
+          };
+        }
+        else
+        {
+          payload = new
+          {
+            status,
+            timestamp_utc = DateTime.UtcNow.ToString("o"),
+            exe = result.ExePath,
+            exit_code = result.ExitCode,
+            nav_steps = result.NavSteps,
+            binding_log = result.BindingLogPath,
+            binding_failure_count = result.BindingFailures.Length,
+            binding_failures = result.BindingFailures,
+          };
+        }
 
         var json = System.Text.Json.JsonSerializer.Serialize(payload, _jsonOptions);
 
         File.WriteAllText(summaryPath, json, Encoding.UTF8);
+
+        var outPath = Environment.GetEnvironmentVariable("VOICE_STUDIO_UI_SELF_TEST_OUT");
+        if (isUiSelfTest && !string.IsNullOrWhiteSpace(outPath))
+        {
+          try
+          {
+            Directory.CreateDirectory(Path.GetDirectoryName(outPath) ?? crashDir);
+            File.WriteAllText(outPath, json, Encoding.UTF8);
+          }
+          catch (Exception ex)
+          {
+            ErrorLogger.LogWarning($"Failed to copy UI self-test report to {outPath}: {ex.Message}", "detailed.WriteGateCUiSmokeSummary");
+          }
+        }
       }
       catch (Exception ex)
       {
         ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.WriteGateCUiSmokeSummary");
       }
+
+      return effectiveExitCode;
+    }
+
+    private static bool IsUiSelfTestRequested()
+    {
+      var env = Environment.GetEnvironmentVariable("VOICE_STUDIO_UI_SELF_TEST");
+      return !string.IsNullOrWhiteSpace(env) && (env.Equals("1", StringComparison.OrdinalIgnoreCase) || env.Equals("true", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool RequireBackendForSelfTest()
+    {
+      var env = Environment.GetEnvironmentVariable("VOICE_STUDIO_UI_SELF_TEST_REQUIRE_BACKEND");
+      return !string.IsNullOrWhiteSpace(env) && (env.Equals("1", StringComparison.OrdinalIgnoreCase) || env.Equals("true", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string GetBackendBaseUrl()
+    {
+      var host = Environment.GetEnvironmentVariable("VOICESTUDIO_API_HOST") ?? "localhost";
+      var port = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT") ?? "8000";
+      return $"http://{host}:{port}";
     }
 
     // WinUI 3 doesn't have OnSuspending - cleanup happens on app exit

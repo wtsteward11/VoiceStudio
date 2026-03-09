@@ -4,13 +4,14 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using VoiceStudio.App.Controls;
 using VoiceStudio.App.Logging;
+using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Panels;
 
 namespace VoiceStudio.App
 {
     public sealed partial class MainWindow
     {
-        internal async Task<(string[] Steps, bool TimedOut, string? TimedOutStep)> RunGateCUiSmokeNavigationAsync(string crashDir)
+        internal async Task<(string[] Steps, bool TimedOut, string? TimedOutStep, bool SynthesisStepRan, bool PlaybackInvoked, List<(string Step, string Error)> Failures)> RunGateCUiSmokeNavigationAsync(string crashDir)
         {
             // Deterministic Gate C UI smoke: exercise primary nav buttons to surface binding failures.
             var executed = new List<string>();
@@ -132,7 +133,7 @@ namespace VoiceStudio.App
             if (warmupCompleted != warmupTask)
             {
                 AppendStepLog($"WARMUP_TIMEOUT\ttimeout_sec={(int)warmupTimeout.TotalSeconds}");
-                return (executed.ToArray(), true, "Warmup");
+                return (executed.ToArray(), true, "Warmup", false, false, new List<(string, string)>());
             }
 
             try
@@ -146,6 +147,10 @@ namespace VoiceStudio.App
             }
 
             AppendStepLog("WARMUP_DONE");
+
+            var synthesisStepRan = false;
+            var playbackInvoked = false;
+            var synthesisFailures = new List<(string Step, string Error)>();
 
             async Task AssertPanelOpened(string panelId, PanelRegion region)
             {
@@ -167,6 +172,7 @@ namespace VoiceStudio.App
 
         // Core synthesis panels (4 steps)
         ("PanelVoiceSynthesis", () => AssertPanelOpened("VoiceSynthesis", PanelRegion.Center)),
+        ("SynthesisAndPlayback", () => RunSynthesisAndPlaybackAsync(AppendStepLog)),
         ("PanelEnsembleSynthesis", () => AssertPanelOpened("EnsembleSynthesis", PanelRegion.Center)),
         ("PanelBatchProcessing", () => AssertPanelOpened("BatchProcessing", PanelRegion.Center)),
         ("PanelTextSpeechEditor", () => AssertPanelOpened("TextSpeechEditor", PanelRegion.Center)),
@@ -203,16 +209,26 @@ namespace VoiceStudio.App
                 if (completed != stepTask)
                 {
                     AppendStepLog($"STEP_TIMEOUT\t{step.Name}\ttimeout_sec={(int)perStepTimeout.TotalSeconds}");
-                    return (executed.ToArray(), true, step.Name);
+                    return (executed.ToArray(), true, step.Name, synthesisStepRan, playbackInvoked, synthesisFailures);
                 }
 
                 try
                 {
                     await stepTask.ConfigureAwait(false);
+                    if (step.Name == "SynthesisAndPlayback")
+                    {
+                        synthesisStepRan = true;
+                        playbackInvoked = true;
+                    }
                 }
                 catch (Exception ex)
                 {
                     AppendStepLog($"STEP_EXCEPTION\t{step.Name}\t{ex.GetType().Name}\t{ex.Message}");
+                    if (step.Name == "SynthesisAndPlayback")
+                    {
+                        synthesisFailures.Add((step.Name, $"{ex.GetType().Name}: {ex.Message}"));
+                        return (executed.ToArray(), false, null, false, false, synthesisFailures);
+                    }
                     throw;
                 }
 
@@ -265,7 +281,7 @@ namespace VoiceStudio.App
                         if (assertCompleted != assertTask)
                         {
                             AppendStepLog($"STEP_TIMEOUT\tAssert_{wsStep.Name}\ttimeout_sec={(int)perStepTimeout.TotalSeconds}");
-                            return (executed.ToArray(), true, $"Assert_{wsStep.Name}");
+                            return (executed.ToArray(), true, $"Assert_{wsStep.Name}", synthesisStepRan, playbackInvoked, synthesisFailures);
                         }
 
                         await assertTask.ConfigureAwait(false);
@@ -285,7 +301,67 @@ namespace VoiceStudio.App
                 await Task.Delay(250).ConfigureAwait(false);
             }
 
-            return (executed.ToArray(), false, null);
+            return (executed.ToArray(), false, null, synthesisStepRan, playbackInvoked, synthesisFailures);
+        }
+
+        private async Task RunSynthesisAndPlaybackAsync(Action<string> appendStepLog)
+        {
+            // Allow backend to be ready (app starts it on launch)
+            await Task.Delay(2000).ConfigureAwait(false);
+
+            var centerHost = FindNameOnContent("CenterPanelHost") as PanelHost;
+            if (centerHost?.Content is not VoiceSynthesisView synthView)
+            {
+                appendStepLog("SYNTHESIS_SKIP\tVoiceSynthesisView not in center panel");
+                throw new InvalidOperationException("VoiceSynthesisView not in center panel");
+            }
+
+            var vm = synthView.ViewModel;
+            appendStepLog("SYNTHESIS_BEGIN\tLoading profiles");
+
+            if (vm.LoadProfilesCommand.CanExecute(null))
+            {
+                await vm.LoadProfilesCommand.ExecuteAsync(null).ConfigureAwait(false);
+            }
+            await Task.Delay(1500).ConfigureAwait(false);
+
+            if (vm.Profiles.Count == 0)
+            {
+                appendStepLog("SYNTHESIS_SKIP\tNo profiles loaded (backend may not be ready)");
+                throw new InvalidOperationException("No profiles loaded - backend may not be ready");
+            }
+
+            vm.SelectedProfile = vm.Profiles[0];
+            vm.Text = "Daily-driver smoke test.";
+            await Task.Delay(300).ConfigureAwait(false);
+
+            if (!vm.SynthesizeCommand.CanExecute(null))
+            {
+                appendStepLog("SYNTHESIS_SKIP\tSynthesizeCommand not executable");
+                throw new InvalidOperationException("SynthesizeCommand not executable");
+            }
+
+            appendStepLog("SYNTHESIS_RUN\tExecuting synthesize");
+            await vm.SynthesizeCommand.ExecuteAsync(null).ConfigureAwait(false);
+
+            var waitStart = DateTime.UtcNow;
+            while (vm.WorkflowState != SynthesisWorkflowState.AudioReady && (DateTime.UtcNow - waitStart).TotalSeconds < 15)
+            {
+                await Task.Delay(200).ConfigureAwait(false);
+            }
+
+            if (vm.WorkflowState != SynthesisWorkflowState.AudioReady)
+            {
+                appendStepLog($"SYNTHESIS_FAIL\tWorkflowState={vm.WorkflowState}");
+                throw new InvalidOperationException($"Synthesis did not reach AudioReady (state={vm.WorkflowState})");
+            }
+
+            appendStepLog("PLAYBACK_RUN\tExecuting play");
+            if (vm.PlayAudioCommand.CanExecute(null))
+            {
+                await vm.PlayAudioCommand.ExecuteAsync(null).ConfigureAwait(false);
+            }
+            appendStepLog("PLAYBACK_DONE");
         }
     }
 }

@@ -495,9 +495,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         client_host = request.client.host if request.client else ""
-        if client_host in self._LOOPBACK_HOSTS and (
-            path.startswith("/api/profiles") or path.startswith("/api/health")
-            or path.startswith("/api/v1/profiles") or path.startswith("/api/v1/health")
+        try:
+            from backend.core.settings import settings
+
+            localhost_exempt = getattr(settings, "rate_limit_localhost_exempt", True)
+        except ImportError:
+            localhost_exempt = True
+        # Localhost desktop mode: exempt read-only startup paths (Step 2 - request storm fix)
+        _EXEMPT_PREFIXES = (
+            "/api/profiles", "/api/v1/profiles",
+            "/api/health", "/api/v1/health",
+            "/api/engines", "/api/v1/engines",
+            "/api/library", "/api/v1/library",
+            "/api/plugins", "/api/v1/plugins",
+        )
+        if localhost_exempt and client_host in self._LOOPBACK_HOSTS and any(
+            path.startswith(p) for p in _EXEMPT_PREFIXES
         ):
             return await call_next(request)
 

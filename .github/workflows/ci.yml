@@ -54,6 +54,19 @@ jobs:
         run: |
           python -m pytest tests/ci/test_ui_command_surface.py -v
 
+      - name: UI Backend Route Alignment gate
+        run: |
+          python scripts/scan_ui_api_calls.py
+          python -m pytest tests/ci/test_ui_backend_route_alignment.py tests/ci/test_no_hardcoded_engine_lists.py -v
+
+      - name: Contract drift gate
+        run: |
+          python -m pytest tests/ci/test_contract_drift_gate.py -v
+
+      - name: Panel wiring catalog gate
+        run: |
+          python -m pytest tests/ci/test_event_catalog_completeness.py tests/ci/test_settings_catalog_coverage.py -v
+
       - name: Support Bundle gate
         run: |
           python -m pytest tests/ci/test_support_bundle_surface.py -v

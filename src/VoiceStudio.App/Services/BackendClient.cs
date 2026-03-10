@@ -228,6 +228,13 @@ namespace VoiceStudio.App.Services
     private DateTime _lastConnectionCheck = DateTime.MinValue;
     private const int ConnectionCheckIntervalSeconds = 5;
 
+    // Profiles fetch: single-flight + TTL cache (8s) to prevent request storms
+    private readonly System.Threading.SemaphoreSlim _profilesLock = new(1, 1);
+    private Task<List<VoiceProfile>>? _profilesTask;
+    private List<VoiceProfile>? _profilesCache;
+    private DateTime _profilesCacheUtc = DateTime.MinValue;
+    private static readonly TimeSpan ProfilesTtl = TimeSpan.FromSeconds(8);
+
     public IWebSocketService? WebSocketService { get; }
 
     /// <summary>
@@ -766,6 +773,51 @@ namespace VoiceStudio.App.Services
 
     public async Task<List<VoiceProfile>> GetProfilesAsync(CancellationToken cancellationToken = default)
     {
+      Task<List<VoiceProfile>>? toAwait;
+      await _profilesLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+      try
+      {
+        var now = DateTime.UtcNow;
+        if (_profilesCache != null && (now - _profilesCacheUtc) < ProfilesTtl)
+          return _profilesCache;
+
+        if (_profilesTask != null && !_profilesTask.IsCompleted)
+        {
+          toAwait = _profilesTask;
+        }
+        else
+        {
+          if (_profilesTask?.IsFaulted == true)
+            _profilesTask = null;
+          _profilesTask = GetProfilesCoreAsync(cancellationToken);
+          toAwait = _profilesTask;
+        }
+      }
+      finally
+      {
+        _profilesLock.Release();
+      }
+
+      var list = await toAwait.ConfigureAwait(false);
+
+      await _profilesLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+      try
+      {
+        if (toAwait == _profilesTask)
+        {
+          _profilesCache = list ?? new List<VoiceProfile>();
+          _profilesCacheUtc = DateTime.UtcNow;
+        }
+        return list ?? new List<VoiceProfile>();
+      }
+      finally
+      {
+        _profilesLock.Release();
+      }
+    }
+
+    private async Task<List<VoiceProfile>> GetProfilesCoreAsync(CancellationToken cancellationToken)
+    {
       return await ExecuteWithRetryAsync(async () =>
       {
         var response = await _httpClient.GetAsync("/api/profiles", cancellationToken);
@@ -775,11 +827,8 @@ namespace VoiceStudio.App.Services
           throw await CreateExceptionFromResponseAsync(response);
         }
 
-        // Backend returns paginated response: {"items": [...], "pagination": {...}}
-        // Extract the items array from the wrapper
         var jsonString = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        // Detect HTML responses (backend returning error page instead of JSON)
         if (string.IsNullOrWhiteSpace(jsonString))
         {
           throw new BackendDeserializationException(
@@ -803,7 +852,6 @@ namespace VoiceStudio.App.Services
                       ?? new List<VoiceProfile>();
           }
 
-          // Fallback: try parsing as direct array for backward compatibility
           return System.Text.Json.JsonSerializer.Deserialize<List<VoiceProfile>>(jsonString, _jsonOptions)
                     ?? new List<VoiceProfile>();
         }

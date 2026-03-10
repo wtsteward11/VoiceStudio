@@ -485,10 +485,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.skip_paths = skip_paths or ["/health", "/api/health", "/", "/docs", "/openapi.json"]
         self.rate_limiter = _enhanced_rate_limiter
 
+    # Loopback hosts (localhost desktop mode) - exempt for high-frequency paths
+    _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
     async def dispatch(self, request: Request, call_next):
         """Process request with rate limiting."""
-        # Skip rate limiting for certain paths
-        if request.url.path in self.skip_paths:
+        path = request.url.path
+        if path in self.skip_paths:
+            return await call_next(request)
+
+        client_host = request.client.host if request.client else ""
+        if client_host in self._LOOPBACK_HOSTS and (
+            path.startswith("/api/profiles") or path.startswith("/api/health")
+            or path.startswith("/api/v1/profiles") or path.startswith("/api/v1/health")
+        ):
             return await call_next(request)
 
         # Check rate limit

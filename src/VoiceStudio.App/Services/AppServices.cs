@@ -81,6 +81,9 @@ namespace VoiceStudio.App.Services
       // Use cases
       services.AddSingleton<IProfilesUseCase, ProfilesUseCase>();
 
+      // Panel ViewModels (transient; PanelRegistry creates via ViewModelFactory)
+      services.AddTransient<VoiceStudio.App.Views.Panels.ProfilesViewModel>();
+
       // ViewModel context (factory: dispatcher may be null at startup; fallback when resolved)
       services.AddSingleton<IViewModelContext>(_ =>
       {
@@ -98,7 +101,6 @@ namespace VoiceStudio.App.Services
         return new DialogService(window);
       });
       services.AddSingleton<ISettingsService, SettingsService>();
-      services.AddSingleton<IUpdateService, UpdateService>();
       services.AddSingleton<IPanelRegistry, PanelRegistry>();
       services.AddSingleton<PanelStateService>();
       services.AddSingleton<INavigationService, NavigationService>();
@@ -108,7 +110,13 @@ namespace VoiceStudio.App.Services
         sp.GetRequiredService<ICorrelationIdProvider>()));
       services.AddSingleton<IAuditLoggingService>(sp => new AuditLoggingService(sp.GetRequiredService<IErrorLoggingService>()));
       services.AddSingleton<IHelpOverlayService, HelpOverlayService>();
-      services.AddSingleton<HttpClient>(_ => new HttpClient());
+      services.AddSingleton<HttpClient>(_ =>
+      {
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        client.DefaultRequestHeaders.Add("User-Agent", "VoiceStudio-Quantum-Plus/1.0");
+        return client;
+      });
+      services.AddSingleton<IUpdateService>(sp => new UpdateService(sp.GetRequiredService<HttpClient>()));
       services.AddSingleton<IAudioPlayerService>(sp => new AudioPlayerService(sp.GetRequiredService<HttpClient>()));
       services.AddSingleton<OperationQueueService>();
       services.AddSingleton<StatePersistenceService>();

@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml;
 using VoiceStudio.App.Services;
+using VoiceStudio.App.Controls;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -11,13 +12,19 @@ using Windows.Foundation;
 using Windows.System;
 using Windows.ApplicationModel.DataTransfer;
 using System;
+using System.ComponentModel;
+using System.Threading.Tasks;
 using SelectionChangedEventArgsAlias = Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs;
+using MultiSelectSelectionChangedEventArgs = VoiceStudio.App.Services.SelectionChangedEventArgs;
 
 namespace VoiceStudio.App.Views.Panels
 {
   public sealed partial class ProfilesView : UserControl
   {
-    public ProfilesViewModel ViewModel { get; }
+    /// <summary>
+    /// ViewModel is set by PanelRegistry via DataContext (DI path). Do not construct in View.
+    /// </summary>
+    public ProfilesViewModel ViewModel => (ProfilesViewModel)(DataContext ?? throw new InvalidOperationException("ProfilesView DataContext must be set by PanelRegistry."));
 
     private VoiceProfile? _lastSelectedProfile;
     private VoiceProfile? _draggedProfile;
@@ -25,60 +32,101 @@ namespace VoiceStudio.App.Views.Panels
     private VoiceStudio.Core.Services.IDragDropService? _panelDragDropService;
     private ToastNotificationService? _toastService;
     private IErrorLoggingService? _errorLoggingService;
+    private MultiSelectService? _multiSelectService;
 
     public ProfilesView()
     {
       this.InitializeComponent();
-      // Wire DataContext with BackendClient and AudioPlayerService
-      ViewModel = new ProfilesViewModel(
-          AppServices.GetBackendClient(),
-          AppServices.GetProfilesUseCase(),
-          AppServices.GetAudioPlayerService(),
-          AppServices.GetMultiSelectService(),
-          AppServices.TryGetToastNotificationService(),
-          AppServices.TryGetUndoRedoService(),
-          AppServices.TryGetErrorPresentationService(),
-          AppServices.TryGetErrorLoggingService()
-      );
-      this.DataContext = ViewModel;
 
-      // Initialize services
+      // Initialize services (no ViewModel access in constructor)
       _dragDropService = AppServices.GetDragDropVisualFeedbackService();
       _panelDragDropService = AppServices.TryGetDragDropService();
       _toastService = AppServices.TryGetToastNotificationService();
       _errorLoggingService = AppServices.TryGetErrorLoggingService();
+      _multiSelectService = AppServices.GetMultiSelectService();
 
-      // Subscribe to selection changes to update UI
-      var multiSelectService = AppServices.GetMultiSelectService();
-      multiSelectService.SelectionChanged += (_, e) =>
-      {
-        if (e.PanelId == ViewModel.PanelId)
-        {
-          UpdateSelectionVisuals();
-        }
-      };
-
-      // Handle keyboard shortcuts
+      _multiSelectService.SelectionChanged += OnMultiSelectSelectionChanged;
+      this.Unloaded += ProfilesView_Unloaded;
       this.KeyDown += ProfilesView_KeyDown;
+      this.Loaded += ProfilesView_Loaded;
 
-      // Setup keyboard navigation
-      this.Loaded += ProfilesView_KeyboardNavigation_Loaded;
+      KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () => { });
+    }
 
-      // Setup Escape key to close help overlay
-      KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
+    private void ProfilesView_Loaded(object sender, RoutedEventArgs e)
+    {
+      // DataContext is set by PanelRegistry.CreatePanel; wire View-specific callback and subscriptions
+      var vm = ViewModel;
+      vm.GetProfileNameFromUser = ShowCreateProfileDialogAsync;
+      vm.PropertyChanged += OnViewModelPropertyChanged;
+
+      ProfilesView_KeyboardNavigation_Loaded(sender, e);
+      EnsureEmptyStateControl();
+      UpdateEmptyStateVisibility();
+    }
+
+    private Controls.EmptyState? _profilesEmptyState;
+
+    private void OnMultiSelectSelectionChanged(object? sender, MultiSelectSelectionChangedEventArgs e)
+    {
+      if (e.PanelId == ViewModel.PanelId)
+        UpdateSelectionVisuals();
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+      if (e.PropertyName == nameof(ProfilesViewModel.Profiles) ||
+          e.PropertyName == nameof(ProfilesViewModel.SelectedCount))
       {
-        // Close any open dialogs or overlays
-      });
-
-      // Update visuals when profiles change
-      ViewModel.PropertyChanged += (_, e) =>
+        UpdateSelectionVisuals();
+      }
+      if (e.PropertyName is nameof(ProfilesViewModel.FilteredCount) or nameof(ProfilesViewModel.IsLoading) or nameof(ProfilesViewModel.ErrorMessage))
       {
-        if (e.PropertyName == nameof(ProfilesViewModel.Profiles) ||
-                  e.PropertyName == nameof(ProfilesViewModel.SelectedCount))
-        {
-          UpdateSelectionVisuals();
-        }
+        UpdateEmptyStateVisibility();
+      }
+    }
+
+    private void ProfilesView_Unloaded(object sender, RoutedEventArgs e)
+    {
+      this.Unloaded -= ProfilesView_Unloaded;
+      if (_multiSelectService != null)
+      {
+        _multiSelectService.SelectionChanged -= OnMultiSelectSelectionChanged;
+        _multiSelectService = null;
+      }
+      if (ViewModel != null)
+        ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+    }
+
+    private void EnsureEmptyStateControl()
+    {
+      if (_profilesEmptyState != null || ProfilesEmptyStateOverlay == null)
+        return;
+      ProfilesEmptyStateOverlay.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["VSQ.Panel.Background"];
+      _profilesEmptyState = new Controls.EmptyState
+      {
+        Icon = "\uE77B",
+        Title = ViewModel.EmptyStateTitle,
+        Message = ViewModel.EmptyStateMessage,
+        ActionText = ViewModel.EmptyStateActionText,
+        ActionCommand = ViewModel.CreateProfileFromEmptyStateCommand
       };
+      ProfilesEmptyStateOverlay.Children.Clear();
+      ProfilesEmptyStateOverlay.Children.Add(_profilesEmptyState);
+    }
+
+    private void UpdateEmptyStateVisibility()
+    {
+      if (ProfilesEmptyStateOverlay == null)
+        return;
+      EnsureEmptyStateControl();
+      ProfilesEmptyStateOverlay.Visibility = ViewModel.ShowEmptyState ? Visibility.Visible : Visibility.Collapsed;
+      if (_profilesEmptyState != null)
+      {
+        _profilesEmptyState.Title = ViewModel.EmptyStateTitle;
+        _profilesEmptyState.Message = ViewModel.EmptyStateMessage;
+        _profilesEmptyState.ActionText = ViewModel.EmptyStateActionText;
+      }
     }
 
     private void HelpButton_Click(object _, RoutedEventArgs __)
@@ -111,34 +159,37 @@ namespace VoiceStudio.App.Views.Panels
     {
       try
       {
-        // Show a dialog to get the profile name
-        var dialog = new ContentDialog
-        {
-          Title = "Create New Profile",
-          PrimaryButtonText = "Create",
-          CloseButtonText = "Cancel",
-          DefaultButton = ContentDialogButton.Primary,
-          XamlRoot = this.XamlRoot
-        };
-
-        var nameBox = new TextBox
-        {
-          PlaceholderText = "Enter profile name...",
-          Width = 300
-        };
-        dialog.Content = nameBox;
-
-        var result = await dialog.ShowAsync();
-        if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(nameBox.Text))
-        {
-          await ViewModel.CreateProfileCommand.ExecuteAsync(nameBox.Text);
-        }
+        var name = await ShowCreateProfileDialogAsync();
+        if (!string.IsNullOrWhiteSpace(name))
+          await ViewModel.CreateProfileCommand.ExecuteAsync(name);
       }
       catch (Exception ex)
       {
         System.Diagnostics.Debug.WriteLine($"Error creating profile: {ex.Message}");
         _errorLoggingService?.LogError(ex, "CreateProfileButton_Click");
       }
+    }
+
+    private async Task<string?> ShowCreateProfileDialogAsync()
+    {
+      var dialog = new ContentDialog
+      {
+        Title = "Create New Profile",
+        PrimaryButtonText = "Create",
+        CloseButtonText = "Cancel",
+        DefaultButton = ContentDialogButton.Primary,
+        XamlRoot = this.XamlRoot
+      };
+
+      var nameBox = new TextBox
+      {
+        PlaceholderText = "Enter profile name...",
+        Width = 300
+      };
+      dialog.Content = nameBox;
+
+      var result = await dialog.ShowAsync();
+      return result == ContentDialogResult.Primary ? nameBox.Text?.Trim() : null;
     }
 
     private void ProfileCard_RightTapped(object sender, RightTappedRoutedEventArgs e)
@@ -433,16 +484,6 @@ namespace VoiceStudio.App.Views.Panels
       }
 
       return null;
-    }
-
-    private void ProfileSearchBox_TextChanged(object sender, Microsoft.UI.Xaml.Controls.TextChangedEventArgs e)
-    {
-      // Search filtering is handled by the ViewModel's FilteredProfiles binding
-      // This handler can be used for debounced search or additional UI updates
-      if (sender is Microsoft.UI.Xaml.Controls.TextBox textBox)
-      {
-        System.Diagnostics.Debug.WriteLine($"Profile search: {textBox.Text}");
-      }
     }
 
     private void EditProfileButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)

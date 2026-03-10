@@ -24,9 +24,10 @@ namespace VoiceStudio.App.Views.Panels
 {
   // GAP-005: Updated to inherit from BaseViewModel for standardized error handling
   // Backend-Frontend Integration Plan - Phase 2: Implements state persistence.
-  public partial class ProfilesViewModel : BaseViewModel, IPanelView, IPanelStatePersistable
+  public partial class ProfilesViewModel : BaseViewModel, IPanelView, IPanelStatePersistable, IPanelLifecycle
   {
     private readonly IBackendClient _backendClient;
+    private ISubscriptionToken? _profileCreatedToken;
     private readonly IProfilesUseCase _profilesUseCase;
     private readonly IAudioPlayerService _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
@@ -35,7 +36,13 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IErrorLoggingService? _logService;
     private readonly IEventAggregator? _eventAggregator;
     private readonly IContextManager? _contextManager;
-    private readonly Func<Task<string?>>? _getProfileNameFromUser;
+    private CancellationTokenSource? _filterDebounceCts;
+
+    /// <summary>
+    /// Callback for CreateProfileFromEmptyState; set by the View in Loaded (DI cannot provide View-specific dialog).
+    /// </summary>
+    public Func<Task<string?>>? GetProfileNameFromUser { get; set; }
+    private const int FilterDebounceMs = 300;
 
     public string PanelId => "profiles";
     public string DisplayName => ResourceHelper.GetString("Panel.Profiles.DisplayName", "Profiles");
@@ -53,6 +60,13 @@ namespace VoiceStudio.App.Views.Panels
     // Search and filter properties
     [ObservableProperty]
     private string? searchQuery;
+
+    [ObservableProperty]
+    private string selectedFilterTab = "All";
+
+    public bool IsFilterAllChecked => SelectedFilterTab == "All";
+    public bool IsFilterFavoritesChecked => SelectedFilterTab == "Favorites";
+    public bool IsFilterRecentChecked => SelectedFilterTab == "Recent";
 
     [ObservableProperty]
     private string? selectedLanguage;
@@ -227,8 +241,7 @@ namespace VoiceStudio.App.Views.Panels
       ToastNotificationService? toastNotificationService = null,
       UndoRedoService? undoRedoService = null,
       IErrorPresentationService? errorService = null,
-      IErrorLoggingService? logService = null,
-      Func<Task<string?>>? getProfileNameFromUser = null)
+      IErrorLoggingService? logService = null)
         : base(AppServices.GetViewModelContext())
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
@@ -242,7 +255,6 @@ namespace VoiceStudio.App.Views.Panels
 
       _errorService = errorService;
       _logService = logService;
-      _getProfileNameFromUser = getProfileNameFromUser;
       _eventAggregator = AppServices.TryGetEventAggregator();
       _contextManager = AppServices.TryGetContextManager();
 
@@ -255,12 +267,12 @@ namespace VoiceStudio.App.Views.Panels
 
       CreateProfileFromEmptyStateCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
-        if (_getProfileNameFromUser == null)
+        if (GetProfileNameFromUser == null)
           return;
-        var name = await _getProfileNameFromUser();
+        var name = await GetProfileNameFromUser();
         if (!string.IsNullOrWhiteSpace(name))
           await CreateProfileCommand.ExecuteAsync(name);
-      }, () => _getProfileNameFromUser != null && !IsLoading);
+      }, () => GetProfileNameFromUser != null && !IsLoading);
 
       LoadProfilesCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -311,6 +323,10 @@ namespace VoiceStudio.App.Views.Panels
       // Initialize filtered profiles
       FilteredProfiles = new ObservableCollection<VoiceProfile>();
       ClearSelectionCommand = new RelayCommand(ClearSelection);
+
+      SetFilterAllCommand = new RelayCommand(() => SetFilterTab("All"));
+      SetFilterFavoritesCommand = new RelayCommand(() => SetFilterTab("Favorites"));
+      SetFilterRecentCommand = new RelayCommand(() => SetFilterTab("Recent"));
 
       DeleteSelectedCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -381,7 +397,7 @@ namespace VoiceStudio.App.Views.Panels
 
       // GAP-B05: Subscribe to ProfileCreatedEvent to refresh list when new profiles
       // are created in other panels (e.g., TrainingView, VoiceCloningWizard)
-      _eventAggregator?.Subscribe<ProfileCreatedEvent>(OnProfileCreatedRefresh);
+      _profileCreatedToken = _eventAggregator?.Subscribe<ProfileCreatedEvent>(OnProfileCreatedRefresh);
 
       // Update ShowEmptyState when FilteredCount or ErrorMessage changes
       PropertyChanged += (_, e) =>
@@ -390,6 +406,22 @@ namespace VoiceStudio.App.Views.Panels
           OnPropertyChanged(nameof(ShowEmptyState));
       };
     }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    /// <summary>Unsubscribe from EventAggregator to prevent memory leaks (GAP-W3).</summary>
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _profileCreatedToken?.Dispose();
+      _profileCreatedToken = null;
+      return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public async Task RefreshAsync(CancellationToken cancellationToken = default) =>
+        await LoadProfilesAsync(cancellationToken);
 
     /// <summary>
     /// Handles ProfileCreatedEvent by refreshing the profiles list.
@@ -427,6 +459,9 @@ namespace VoiceStudio.App.Views.Panels
     // Multi-select commands
     public IRelayCommand SelectAllCommand { get; }
     public IRelayCommand ClearSelectionCommand { get; }
+    public IRelayCommand SetFilterAllCommand { get; }
+    public IRelayCommand SetFilterFavoritesCommand { get; }
+    public IRelayCommand SetFilterRecentCommand { get; }
     public EnhancedAsyncRelayCommand DeleteSelectedCommand { get; }
     // GAP-B18: Added ExportSelectedCommand for command binding pattern
     public EnhancedAsyncRelayCommand ExportSelectedCommand { get; }
@@ -457,6 +492,11 @@ namespace VoiceStudio.App.Views.Panels
         var picker = new FileOpenPicker();
         picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
         picker.FileTypeFilter.Add(".json");
+        if (App.MainWindowInstance != null)
+        {
+          var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindowInstance);
+          WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+        }
 
         var file = await picker.PickSingleFileAsync();
         if (file == null)
@@ -580,6 +620,11 @@ namespace VoiceStudio.App.Views.Panels
         picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
         picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
         picker.SuggestedFileName = SanitizeFilename($"voice_profile_{profile.Name}_{DateTime.Now:yyyyMMdd}");
+        if (App.MainWindowInstance != null)
+        {
+          var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindowInstance);
+          WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+        }
 
         var file = await picker.PickSaveFileAsync();
         if (file == null)
@@ -648,6 +693,11 @@ namespace VoiceStudio.App.Views.Panels
         picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
         picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
         picker.SuggestedFileName = SanitizeFilename($"voice_profiles_export_{DateTime.Now:yyyyMMdd}");
+        if (App.MainWindowInstance != null)
+        {
+          var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindowInstance);
+          WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+        }
 
         var file = await picker.PickSaveFileAsync();
         if (file == null)
@@ -1430,8 +1480,10 @@ namespace VoiceStudio.App.Views.Panels
 
         if (!string.IsNullOrWhiteSpace(audioUrl))
         {
-          // Download and play preview audio
-          using var httpClient = new System.Net.Http.HttpClient();
+          // Download and play preview audio (Phase 4: use shared HttpClient)
+          var httpClient = AppServices.GetService<System.Net.Http.HttpClient>();
+          if (httpClient == null)
+            throw new InvalidOperationException("HttpClient not available");
           var audioBytes = await httpClient.GetByteArrayAsync(audioUrl);
 
           // Save to temporary file
@@ -1685,6 +1737,15 @@ namespace VoiceStudio.App.Views.Panels
 
       var filtered = Profiles.Where(profile =>
       {
+        // Filter tab (All / Favorites / Recent)
+        if (SelectedFilterTab == "Favorites")
+        {
+          var isFavorite = profile.Tags?.Any(t => string.Equals(t, "favorite", StringComparison.OrdinalIgnoreCase)) ?? false;
+          if (!isFavorite)
+            return false;
+        }
+        // Recent: would filter by RecentProfileIds from state - for now shows all
+
         // Search query filter
         if (!string.IsNullOrEmpty(query))
         {
@@ -1755,7 +1816,34 @@ namespace VoiceStudio.App.Views.Panels
 
     partial void OnSearchQueryChanged(string? value)
     {
+      _filterDebounceCts?.Cancel();
+      _filterDebounceCts = new CancellationTokenSource();
+      var cts = _filterDebounceCts;
+      _ = Task.Run(async () =>
+      {
+        try
+        {
+          await Task.Delay(FilterDebounceMs, cts.Token);
+          Dispatcher.TryEnqueue(ApplyFilters);
+        }
+        catch (OperationCanceledException)
+        {
+          // Debounce cancelled by new keystroke
+        }
+      });
+    }
+
+    partial void OnSelectedFilterTabChanged(string value)
+    {
+      OnPropertyChanged(nameof(IsFilterAllChecked));
+      OnPropertyChanged(nameof(IsFilterFavoritesChecked));
+      OnPropertyChanged(nameof(IsFilterRecentChecked));
       ApplyFilters();
+    }
+
+    private void SetFilterTab(string tab)
+    {
+      SelectedFilterTab = tab;
     }
 
     partial void OnSelectedLanguageChanged(string? value)

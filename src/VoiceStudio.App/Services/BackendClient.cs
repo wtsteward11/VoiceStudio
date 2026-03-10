@@ -243,17 +243,20 @@ namespace VoiceStudio.App.Services
     /// </summary>
     /// <param name="config">Backend client configuration.</param>
     /// <param name="correlationProvider">Optional provider for correlation context.</param>
-    public BackendClient(BackendClientConfig config, ICorrelationIdProvider? correlationProvider)
+    /// <param name="requestMetrics">Optional service for per-endpoint request counting.</param>
+    public BackendClient(BackendClientConfig config, ICorrelationIdProvider? correlationProvider, IRequestMetricsService? requestMetrics = null)
     {
       _config = config ?? throw new ArgumentNullException(nameof(config));
 
-      // Use CorrelationIdHandler to add X-Correlation-Id headers to all requests
-      // This enables distributed tracing per Phase 5.1.2
-      // GAP-I12: Pass correlation provider for response header extraction
-      var handler = correlationProvider != null
-        ? new CorrelationIdHandler(correlationProvider)
-        : new CorrelationIdHandler();
-      _httpClient = new HttpClient(handler)
+      // Handler chain: RequestMetricsHandler (outer) -> CorrelationIdHandler -> HttpClientHandler (inner)
+      var httpHandler = new HttpClientHandler();
+      var correlationHandler = correlationProvider != null
+        ? new CorrelationIdHandler(httpHandler, correlationProvider)
+        : new CorrelationIdHandler(httpHandler);
+      var rootHandler = requestMetrics != null
+        ? new RequestMetricsHandler(requestMetrics, correlationHandler)
+        : (HttpMessageHandler)correlationHandler;
+      _httpClient = new HttpClient(rootHandler)
       {
         BaseAddress = new Uri(config.BaseUrl),
         Timeout = config.RequestTimeout
@@ -442,7 +445,7 @@ namespace VoiceStudio.App.Services
     /// <summary>
     /// Static health probe for UI self-test. Does not require a BackendClient instance.
     /// </summary>
-    /// <param name="baseUrl">Backend base URL (e.g. http://localhost:8001).</param>
+    /// <param name="baseUrl">Backend base URL (e.g. http://localhost:8000).</param>
     /// <param name="timeoutMs">Timeout in milliseconds. Default 3000.</param>
     /// <returns>True if GET /api/health returns success.</returns>
     public static async Task<bool> TryCheckHealthAsync(string baseUrl, int timeoutMs = 3000)

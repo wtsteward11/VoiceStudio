@@ -21,7 +21,8 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new VoiceBrowserViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient()
+          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IAudioPlayerService>()
       );
       DataContext = ViewModel;
 
@@ -96,6 +97,10 @@ namespace VoiceStudio.App.Views.Panels
             previewItem.Click += async (_, _) => await HandleVoiceMenuClick("Preview", voice);
             menu.Items.Add(previewItem);
 
+            var playItem = new MenuFlyoutItem { Text = "Play" };
+            playItem.Click += async (_, _) => await HandleVoiceMenuClick("Play", voice);
+            menu.Items.Add(playItem);
+
             var useItem = new MenuFlyoutItem { Text = "Use for Synthesis" };
             useItem.Click += async (_, _) => await HandleVoiceMenuClick("Use", voice);
             menu.Items.Add(useItem);
@@ -126,6 +131,13 @@ namespace VoiceStudio.App.Views.Panels
           case "preview":
             ViewModel.SelectedVoice = (VoiceProfileSummaryItem)voice;
             _toastService?.ShowToast(ToastType.Info, "Preview Voice", "Previewing voice");
+            break;
+          case "play":
+            ViewModel.SelectedVoice = (VoiceProfileSummaryItem)voice;
+            if (ViewModel.PlayCommand.CanExecute(null))
+              await ViewModel.PlayCommand.ExecuteAsync(null);
+            else
+              _toastService?.ShowToast(ToastType.Warning, "Play", "No preview audio available for this voice");
             break;
           case "use":
             ViewModel.SelectedVoice = (VoiceProfileSummaryItem)voice;

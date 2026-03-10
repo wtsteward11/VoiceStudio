@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using VoiceStudio.App.Services;
 using VoiceStudio.App.Utilities;
 
 namespace VoiceStudio.App.ViewModels
@@ -17,6 +18,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class VoiceBrowserViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IAudioPlayerService _audioPlayer;
 
     public string PanelId => "voice-browser";
     public string DisplayName => ResourceHelper.GetString("Panel.VoiceBrowser.DisplayName", "Voice Browser");
@@ -58,10 +60,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private int pageSize = 50;
 
-    public VoiceBrowserViewModel(IViewModelContext context, IBackendClient backendClient)
+    public VoiceBrowserViewModel(IViewModelContext context, IBackendClient backendClient, IAudioPlayerService audioPlayer)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
       SearchCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -93,6 +96,17 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("PreviousPage");
         await PreviousPageAsync(ct);
       }, () => !IsLoading && CurrentPage > 0);
+      PlayCommand = new EnhancedAsyncRelayCommand(async (ct) =>
+      {
+        using var profiler = PerformanceProfiler.StartCommand("Play");
+        await PlayPreviewAsync(ct);
+      }, () => SelectedVoice != null && !string.IsNullOrEmpty(SelectedVoice.PreviewAudioId) && !IsLoading);
+
+      PropertyChanged += (_, e) =>
+      {
+        if (e.PropertyName is nameof(SelectedVoice) or nameof(IsLoading))
+          PlayCommand.NotifyCanExecuteChanged();
+      };
 
       // Load initial data
       _ = LoadLanguagesAsync(CancellationToken.None);
@@ -106,6 +120,16 @@ namespace VoiceStudio.App.ViewModels
     public IAsyncRelayCommand RefreshCommand { get; }
     public IAsyncRelayCommand NextPageCommand { get; }
     public IAsyncRelayCommand PreviousPageCommand { get; }
+    public IAsyncRelayCommand PlayCommand { get; }
+
+    private async Task PlayPreviewAsync(CancellationToken cancellationToken)
+    {
+      var voice = SelectedVoice;
+      if (voice == null || string.IsNullOrEmpty(voice.PreviewAudioId))
+        return;
+      var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? "http://localhost:8000";
+      await _audioPlayer.PlayBackendAudioIdAsync(voice.PreviewAudioId, baseUrl);
+    }
 
     private async Task SearchVoicesAsync(CancellationToken cancellationToken)
     {

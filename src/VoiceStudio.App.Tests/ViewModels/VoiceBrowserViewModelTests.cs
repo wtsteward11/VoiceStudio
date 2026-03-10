@@ -16,6 +16,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public class VoiceBrowserViewModelTests
     {
         private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IAudioPlayerService>? _mockAudioPlayer;
         private static IViewModelContext? _sharedContext;
         private VoiceBrowserViewModel? _viewModel;
 
@@ -23,11 +24,13 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Setup()
         {
             _mockBackendClient = new Mock<IBackendClient>();
+            _mockAudioPlayer = new Mock<IAudioPlayerService>();
+            _mockAudioPlayer.Setup(x => x.PlayBackendAudioIdAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Action?>())).Returns(Task.CompletedTask);
             _sharedContext ??= CreateTestViewModelContext();
             SetupVoiceSearchResponse(Array.Empty<VoiceProfileSummary>(), 0);
             SetupLanguagesResponse(Array.Empty<string>());
             SetupTagsResponse(Array.Empty<string>());
-            _viewModel = new VoiceBrowserViewModel(_sharedContext, _mockBackendClient.Object);
+            _viewModel = new VoiceBrowserViewModel(_sharedContext, _mockBackendClient.Object, _mockAudioPlayer.Object);
         }
 
         [TestCleanup]
@@ -77,7 +80,14 @@ namespace VoiceStudio.App.Tests.ViewModels
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
         {
-            _ = new VoiceBrowserViewModel(_sharedContext!, null!);
+            _ = new VoiceBrowserViewModel(_sharedContext!, null!, _mockAudioPlayer!.Object);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
+        public void Constructor_WithNullAudioPlayer_ThrowsArgumentNullException()
+        {
+            _ = new VoiceBrowserViewModel(_sharedContext!, _mockBackendClient!.Object, null!);
         }
 
         [TestMethod]
@@ -114,6 +124,33 @@ namespace VoiceStudio.App.Tests.ViewModels
             Assert.IsNotNull(_viewModel.RefreshCommand);
             Assert.IsNotNull(_viewModel.NextPageCommand);
             Assert.IsNotNull(_viewModel.PreviousPageCommand);
+            Assert.IsNotNull(_viewModel.PlayCommand);
+        }
+
+        [TestMethod]
+        public void PlayCommand_WhenSelectedVoiceHasPreviewAudioId_CanExecute()
+        {
+            var voice = new VoiceProfileSummaryItem(new VoiceProfileSummary
+            {
+                Id = "v1",
+                Name = "Test",
+                PreviewAudioId = "audio_123",
+            });
+            _viewModel!.SelectedVoice = voice;
+            Assert.IsTrue(_viewModel.PlayCommand.CanExecute(null));
+        }
+
+        [TestMethod]
+        public void PlayCommand_WhenSelectedVoiceHasNoPreviewAudioId_CannotExecute()
+        {
+            var voice = new VoiceProfileSummaryItem(new VoiceProfileSummary
+            {
+                Id = "v1",
+                Name = "Test",
+                PreviewAudioId = null,
+            });
+            _viewModel!.SelectedVoice = voice;
+            Assert.IsFalse(_viewModel.PlayCommand.CanExecute(null));
         }
 
         [TestMethod]

@@ -37,6 +37,8 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IEventAggregator? _eventAggregator;
     private readonly IContextManager? _contextManager;
     private CancellationTokenSource? _filterDebounceCts;
+    private Task? _loadProfilesTask;
+    private readonly object _loadProfilesLock = new();
 
     /// <summary>
     /// Callback for CreateProfileFromEmptyState; set by the View in Loaded (DI cannot provide View-specific dialog).
@@ -263,7 +265,7 @@ namespace VoiceStudio.App.Views.Panels
       {
         using var profiler = PerformanceProfiler.StartCommand("CreateProfile");
         await CreateProfileAsync(name, ct);
-      });
+      }, _ => !IsLoading);
 
       CreateProfileFromEmptyStateCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -1118,6 +1120,24 @@ namespace VoiceStudio.App.Views.Panels
     }
 
     private async Task LoadProfilesAsync(CancellationToken cancellationToken)
+    {
+      Task? taskToAwait;
+      lock (_loadProfilesLock)
+      {
+        if (_loadProfilesTask != null && !_loadProfilesTask.IsCompleted)
+        {
+          taskToAwait = _loadProfilesTask;
+        }
+        else
+        {
+          _loadProfilesTask = LoadProfilesCoreAsync(cancellationToken);
+          taskToAwait = _loadProfilesTask;
+        }
+      }
+      await taskToAwait;
+    }
+
+    private async Task LoadProfilesCoreAsync(CancellationToken cancellationToken)
     {
       IsLoading = true;
       ErrorMessage = null;

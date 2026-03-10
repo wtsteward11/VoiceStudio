@@ -84,6 +84,23 @@ namespace VoiceStudio.App.Utilities
     }
 
     /// <summary>
+    /// Returns true when the exception indicates HTTP 429 (rate limit).
+    /// Used to show non-blocking toast instead of modal.
+    /// </summary>
+    public static bool IsRateLimitException(Exception? ex)
+    {
+      if (ex == null)
+        return false;
+      if (ex is BackendServerException bex && bex.StatusCode == 429)
+        return true;
+      if (ex is HttpRequestException httpEx && httpEx.Data.Contains("StatusCode") && httpEx.Data["StatusCode"]?.ToString() == "429")
+        return true;
+      if (ex is BackendException be && be.StatusCode == 429)
+        return true;
+      return false;
+    }
+
+    /// <summary>
     /// Determines if an exception represents a transient error that might succeed on retry.
     /// </summary>
     public static bool IsTransientError(Exception ex)

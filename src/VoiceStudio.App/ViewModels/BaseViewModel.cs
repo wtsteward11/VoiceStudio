@@ -135,16 +135,22 @@ namespace VoiceStudio.App.ViewModels
 
     /// <summary>
     /// Handles an exception with logging and user notification.
+    /// 429 (rate limit) always uses toast, never modal, so user is never blocked.
     /// </summary>
     protected async Task HandleErrorAsync(Exception exception, string context = "", bool showDialog = true)
     {
       if (exception == null)
         return;
 
-      // Log the error
       ErrorLoggingService?.LogError(exception, context);
 
-      // Show error dialog if requested
+      if (ErrorHandler.IsRateLimitException(exception))
+      {
+        var toast = AppServices.TryGetToastNotificationService();
+        toast?.ShowWarning(ErrorHandler.GetUserFriendlyMessage(exception), "Rate Limited");
+        return;
+      }
+
       if (showDialog && ErrorDialogService != null)
       {
         await ErrorDialogService.ShowErrorAsync(exception, context: context);

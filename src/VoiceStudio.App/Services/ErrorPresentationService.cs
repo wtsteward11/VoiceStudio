@@ -106,6 +106,12 @@ namespace VoiceStudio.App.Services
 
       _errorLoggingService?.LogError(exception, context);
 
+      if (VoiceStudio.App.Utilities.ErrorHandler.IsRateLimitException(exception))
+      {
+        ShowErrorToast(exception, context);
+        return;
+      }
+
       if (type == ErrorPresentationType.Toast)
         type = DeterminePresentationType(exception);
 
@@ -153,6 +159,8 @@ namespace VoiceStudio.App.Services
 
     private ErrorPresentationType DeterminePresentationType(Exception exception)
     {
+      if (VoiceStudio.App.Utilities.ErrorHandler.IsRateLimitException(exception))
+        return ErrorPresentationType.Toast;
       if (IsCriticalError(exception))
         return ErrorPresentationType.Dialog;
       if (IsTransientError(exception))
@@ -171,6 +179,10 @@ namespace VoiceStudio.App.Services
 
     private static bool IsTransientError(Exception exception)
     {
+      if (exception is VoiceStudio.Core.Exceptions.BackendServerException bex && bex.StatusCode == 429)
+        return true;
+      if (exception is VoiceStudio.Core.Exceptions.BackendException be && be.StatusCode == 429)
+        return true;
       return exception is
           System.Net.Http.HttpRequestException or
           System.TimeoutException or

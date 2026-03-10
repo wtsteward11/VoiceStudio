@@ -1,7 +1,9 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Models;
@@ -138,6 +140,102 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsNotNull(panelView, "ProfilesViewModel should implement IPanelView");
       Assert.AreEqual("profiles", panelView.PanelId, "Panel ID should match");
       Assert.IsNotNull(panelView.DisplayName, "Display name should not be null");
+    }
+
+    /// <summary>
+    /// Verifies that CreateProfile does not trigger quality analytics endpoints.
+    /// Quality calls are gated behind explicit user actions (Analyze, LoadQualityHistory, etc.).
+    /// </summary>
+    [TestMethod]
+    public async Task CreateProfile_DoesNotCallQualityEndpoints()
+    {
+      // Arrange: use Moq to track backend calls
+      var mockBackend = CreateMockBackendClient();
+      var newProfile = new VoiceProfile { Id = "test-profile-1", Name = "Test Profile" };
+      mockBackend
+          .Setup(x => x.CreateProfileAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<List<string>?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(newProfile);
+
+      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(mockBackend.Object);
+      var audioPlayer = new AudioPlayerService(new System.Net.Http.HttpClient());
+      var multiSelectService = new MultiSelectService();
+      var undoRedoService = new UndoRedoService();
+      var vm = new ProfilesViewModel(
+          mockBackend.Object,
+          profilesUseCase,
+          audioPlayer,
+          multiSelectService,
+          toastNotificationService: null,
+          undoRedoService: undoRedoService,
+          errorService: null,
+          logService: null);
+
+      // Act: create profile (sets SelectedProfile, which previously triggered quality calls)
+      await vm.CreateProfileCommand.ExecuteAsync("Test Profile");
+      await WaitForAsyncOperation(150);
+
+      // Assert: quality endpoints must not be called on CreateProfile/selection change
+      mockBackend.Verify(
+          x => x.GetQualityHistoryAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+          Times.Never);
+      mockBackend.Verify(
+          x => x.GetQualityTrendsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+          Times.Never);
+      mockBackend.Verify(
+          x => x.GetQualityDegradationAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<double>(), It.IsAny<double>(), It.IsAny<CancellationToken>()),
+          Times.Never);
+      mockBackend.Verify(
+          x => x.GetQualityBaselineAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+          Times.Never);
+    }
+
+    /// <summary>
+    /// Verifies that rapid profile switching does not stack quality analytics requests.
+    /// Quality calls are gated behind explicit user actions; selection change only clears data.
+    /// </summary>
+    [TestMethod]
+    public void RapidProfileSwitching_DoesNotCallQualityEndpoints()
+    {
+      var mockBackend = CreateMockBackendClient();
+      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(mockBackend.Object);
+      var audioPlayer = new AudioPlayerService(new System.Net.Http.HttpClient());
+      var multiSelectService = new MultiSelectService();
+      var undoRedoService = new UndoRedoService();
+      var vm = new ProfilesViewModel(
+          mockBackend.Object,
+          profilesUseCase,
+          audioPlayer,
+          multiSelectService,
+          toastNotificationService: null,
+          undoRedoService: undoRedoService,
+          errorService: null,
+          logService: null);
+
+      var p1 = new VoiceProfile { Id = "p1", Name = "Profile 1" };
+      var p2 = new VoiceProfile { Id = "p2", Name = "Profile 2" };
+      var p3 = new VoiceProfile { Id = "p3", Name = "Profile 3" };
+      vm.Profiles.Add(p1);
+      vm.Profiles.Add(p2);
+      vm.Profiles.Add(p3);
+
+      vm.SelectedProfile = p1;
+      vm.SelectedProfile = p2;
+      vm.SelectedProfile = p3;
+      vm.SelectedProfile = p1;
+      vm.SelectedProfile = p2;
+
+      mockBackend.Verify(
+          x => x.GetQualityHistoryAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+          Times.Never);
+      mockBackend.Verify(
+          x => x.GetQualityTrendsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+          Times.Never);
+      mockBackend.Verify(
+          x => x.GetQualityDegradationAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<double>(), It.IsAny<double>(), It.IsAny<CancellationToken>()),
+          Times.Never);
+      mockBackend.Verify(
+          x => x.GetQualityBaselineAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+          Times.Never);
     }
   }
 }

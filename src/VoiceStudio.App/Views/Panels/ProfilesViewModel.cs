@@ -35,6 +35,7 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IErrorLoggingService? _logService;
     private readonly IEventAggregator? _eventAggregator;
     private readonly IContextManager? _contextManager;
+    private readonly Func<Task<string?>>? _getProfileNameFromUser;
 
     public string PanelId => "profiles";
     public string DisplayName => ResourceHelper.GetString("Panel.Profiles.DisplayName", "Profiles");
@@ -179,6 +180,9 @@ namespace VoiceStudio.App.Views.Panels
     // Cancellation token source for profile change async operations
     private CancellationTokenSource? _profileChangeCts;
 
+    // Max 2 in-flight quality analytics calls; cancel on selection change
+    private readonly SemaphoreSlim _qualityLoadSemaphore = new(2, 2);
+
     // GAP-I15: Disposal token for fire-and-forget operations
     private readonly CancellationTokenSource _disposalCts = new();
 
@@ -223,7 +227,8 @@ namespace VoiceStudio.App.Views.Panels
       ToastNotificationService? toastNotificationService = null,
       UndoRedoService? undoRedoService = null,
       IErrorPresentationService? errorService = null,
-      IErrorLoggingService? logService = null)
+      IErrorLoggingService? logService = null,
+      Func<Task<string?>>? getProfileNameFromUser = null)
         : base(AppServices.GetViewModelContext())
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
@@ -237,20 +242,30 @@ namespace VoiceStudio.App.Views.Panels
 
       _errorService = errorService;
       _logService = logService;
+      _getProfileNameFromUser = getProfileNameFromUser;
       _eventAggregator = AppServices.TryGetEventAggregator();
       _contextManager = AppServices.TryGetContextManager();
+
+      // GAP-I15: Propagate cancellation token from command (assign before CreateProfileFromEmptyStateCommand)
+      CreateProfileCommand = new EnhancedAsyncRelayCommand<string>(async (name, ct) =>
+      {
+        using var profiler = PerformanceProfiler.StartCommand("CreateProfile");
+        await CreateProfileAsync(name, ct);
+      });
+
+      CreateProfileFromEmptyStateCommand = new EnhancedAsyncRelayCommand(async (ct) =>
+      {
+        if (_getProfileNameFromUser == null)
+          return;
+        var name = await _getProfileNameFromUser();
+        if (!string.IsNullOrWhiteSpace(name))
+          await CreateProfileCommand.ExecuteAsync(name);
+      }, () => _getProfileNameFromUser != null && !IsLoading);
 
       LoadProfilesCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("LoadProfiles");
         await LoadProfilesAsync(ct);
-      });
-
-      // GAP-I15: Propagate cancellation token from command
-      CreateProfileCommand = new EnhancedAsyncRelayCommand<string>(async (name, ct) =>
-      {
-        using var profiler = PerformanceProfiler.StartCommand("CreateProfile");
-        await CreateProfileAsync(name, ct);
       });
 
       // GAP-I15: Propagate cancellation token from command
@@ -311,30 +326,46 @@ namespace VoiceStudio.App.Views.Panels
         await ExportSelectedProfilesAsync();
       }, () => SelectedCount > 0);
 
-      // Quality history commands
+      // Quality history commands - max 2 in-flight, cancel on selection change
       LoadQualityHistoryCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("LoadQualityHistory");
-        await LoadQualityHistoryAsync(ct);
+        var linkToken = _profileChangeCts?.Token ?? CancellationToken.None;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, linkToken);
+        await _qualityLoadSemaphore.WaitAsync(linked.Token);
+        try { await LoadQualityHistoryAsync(linked.Token); }
+        finally { _qualityLoadSemaphore.Release(); }
       }, () => SelectedProfile != null && !IsLoadingQualityHistory);
 
       LoadQualityTrendsCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("LoadQualityTrends");
-        await LoadQualityTrendsAsync(ct);
+        var linkToken = _profileChangeCts?.Token ?? CancellationToken.None;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, linkToken);
+        await _qualityLoadSemaphore.WaitAsync(linked.Token);
+        try { await LoadQualityTrendsAsync(linked.Token); }
+        finally { _qualityLoadSemaphore.Release(); }
       }, () => SelectedProfile != null && !IsLoadingQualityHistory);
 
-      // Quality degradation detection commands (IDEA 56)
+      // Quality degradation detection commands (IDEA 56) - max 2 in-flight, cancel on selection change
       CheckQualityDegradationCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("CheckQualityDegradation");
-        await CheckQualityDegradationAsync(ct);
+        var linkToken = _profileChangeCts?.Token ?? CancellationToken.None;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, linkToken);
+        await _qualityLoadSemaphore.WaitAsync(linked.Token);
+        try { await CheckQualityDegradationAsync(linked.Token); }
+        finally { _qualityLoadSemaphore.Release(); }
       }, () => SelectedProfile != null && !IsLoadingDegradation);
 
       LoadQualityBaselineCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("LoadQualityBaseline");
-        await LoadQualityBaselineAsync(ct);
+        var linkToken = _profileChangeCts?.Token ?? CancellationToken.None;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, linkToken);
+        await _qualityLoadSemaphore.WaitAsync(linked.Token);
+        try { await LoadQualityBaselineAsync(linked.Token); }
+        finally { _qualityLoadSemaphore.Release(); }
       }, () => SelectedProfile != null && !IsLoadingDegradation);
 
       // Subscribe to selection changes
@@ -351,6 +382,13 @@ namespace VoiceStudio.App.Views.Panels
       // GAP-B05: Subscribe to ProfileCreatedEvent to refresh list when new profiles
       // are created in other panels (e.g., TrainingView, VoiceCloningWizard)
       _eventAggregator?.Subscribe<ProfileCreatedEvent>(OnProfileCreatedRefresh);
+
+      // Update ShowEmptyState when FilteredCount or ErrorMessage changes
+      PropertyChanged += (_, e) =>
+      {
+        if (e.PropertyName is nameof(FilteredCount) or nameof(ErrorMessage))
+          OnPropertyChanged(nameof(ShowEmptyState));
+      };
     }
 
     /// <summary>
@@ -374,6 +412,7 @@ namespace VoiceStudio.App.Views.Panels
     }
 
     public EnhancedAsyncRelayCommand LoadProfilesCommand { get; }
+    public EnhancedAsyncRelayCommand CreateProfileFromEmptyStateCommand { get; }
     public EnhancedAsyncRelayCommand<string> CreateProfileCommand { get; }
     public EnhancedAsyncRelayCommand<string> DeleteProfileCommand { get; }
     public EnhancedAsyncRelayCommand<string> PreviewProfileCommand { get; }
@@ -391,6 +430,13 @@ namespace VoiceStudio.App.Views.Panels
     public EnhancedAsyncRelayCommand DeleteSelectedCommand { get; }
     // GAP-B18: Added ExportSelectedCommand for command binding pattern
     public EnhancedAsyncRelayCommand ExportSelectedCommand { get; }
+
+    /// <summary>True when profiles list is empty, not loading, and no error (show empty state CTA).</summary>
+    public bool ShowEmptyState => FilteredCount == 0 && !IsLoading && string.IsNullOrEmpty(ErrorMessage);
+
+    public string EmptyStateTitle => ResourceHelper.GetString("ProfilesView_EmptyState.Title", "No Voice Profiles");
+    public string EmptyStateMessage => ResourceHelper.GetString("ProfilesView_EmptyState.Message", "Get started by creating your first voice profile.");
+    public string EmptyStateActionText => ResourceHelper.GetString("ProfilesView_EmptyState.ActionText", "Create Profile");
 
     // Quality degradation detection commands (IDEA 56)
     public EnhancedAsyncRelayCommand CheckQualityDegradationCommand { get; }
@@ -778,9 +824,14 @@ namespace VoiceStudio.App.Views.Panels
       }
 
       SelectedProfile = profile;
-      await LoadQualityHistoryAsync(cancellationToken);
-      await LoadQualityTrendsAsync(cancellationToken);
-      await CheckQualityDegradationAsync(cancellationToken);
+      var linkToken = _profileChangeCts?.Token ?? CancellationToken.None;
+      using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, linkToken);
+      await _qualityLoadSemaphore.WaitAsync(linked.Token);
+      try { await LoadQualityHistoryAsync(linked.Token); } finally { _qualityLoadSemaphore.Release(); }
+      await _qualityLoadSemaphore.WaitAsync(linked.Token);
+      try { await LoadQualityTrendsAsync(linked.Token); } finally { _qualityLoadSemaphore.Release(); }
+      await _qualityLoadSemaphore.WaitAsync(linked.Token);
+      try { await CheckQualityDegradationAsync(linked.Token); } finally { _qualityLoadSemaphore.Release(); }
 
       var message = string.Format(
           ResourceHelper.GetString("Profile.AnalyzeSuccess", "Analysis completed for {0}"),
@@ -1265,31 +1316,17 @@ namespace VoiceStudio.App.Views.Panels
         PreviewQualityScore = null;
       }
 
-      // Load quality history when profile is selected (IDEA 30)
+      // Quality analytics are gated behind explicit user intent (Analyze, LoadQualityHistory, etc.).
+      // Do NOT auto-trigger on selection change to avoid request storm (Create Profile, rapid switching).
       if (value != null)
       {
-        var ct = _profileChangeCts.Token;
-        _ = LoadQualityHistoryAsync(ct).ContinueWith(t =>
-        {
-          if (t.IsFaulted && t.Exception?.InnerException is not OperationCanceledException)
-            _logService?.LogError(t.Exception?.InnerException ?? new Exception("LoadQualityHistory failed"), "LoadQualityHistory");
-        }, TaskScheduler.Default);
-        _ = LoadQualityTrendsAsync(ct).ContinueWith(t =>
-        {
-          if (t.IsFaulted && t.Exception?.InnerException is not OperationCanceledException)
-            _logService?.LogError(t.Exception?.InnerException ?? new Exception("LoadQualityTrends failed"), "LoadQualityTrends");
-        }, TaskScheduler.Default);
-        // Also check for degradation (IDEA 56)
-        _ = CheckQualityDegradationAsync(ct).ContinueWith(t =>
-        {
-          if (t.IsFaulted && t.Exception?.InnerException is not OperationCanceledException)
-            _logService?.LogError(t.Exception?.InnerException ?? new Exception("CheckQualityDegradation failed"), "CheckQualityDegradation");
-        }, TaskScheduler.Default);
-        _ = LoadQualityBaselineAsync(ct).ContinueWith(t =>
-        {
-          if (t.IsFaulted && t.Exception?.InnerException is not OperationCanceledException)
-            _logService?.LogError(t.Exception?.InnerException ?? new Exception("LoadQualityBaseline failed"), "LoadQualityBaseline");
-        }, TaskScheduler.Default);
+        QualityHistory.Clear();
+        QualityTrends = null;
+        HasQualityHistory = false;
+        QualityDegradation = null;
+        QualityDegradationAlerts.Clear();
+        QualityBaseline = null;
+        HasQualityDegradation = false;
       }
       else
       {
@@ -1305,6 +1342,8 @@ namespace VoiceStudio.App.Views.Panels
 
     partial void OnIsLoadingChanged(bool value)
     {
+      CreateProfileFromEmptyStateCommand.NotifyCanExecuteChanged();
+      OnPropertyChanged(nameof(ShowEmptyState));
       PreviewProfileCommand.NotifyCanExecuteChanged();
     }
 
@@ -1692,6 +1731,7 @@ namespace VoiceStudio.App.Views.Panels
       TotalProfiles = Profiles.Count;
       FilteredCount = FilteredProfiles.Count;
       OnPropertyChanged(nameof(HasProfiles));
+      OnPropertyChanged(nameof(ShowEmptyState));
     }
 
     private void UpdateAvailableFilters()
@@ -1986,15 +2026,8 @@ namespace VoiceStudio.App.Views.Panels
 
     partial void OnSelectedTimeRangeChanged(string value)
     {
-      if (SelectedProfile != null)
-      {
-        var ct = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
-        _ = LoadQualityTrendsAsync(ct).ContinueWith(t =>
-        {
-          if (t.IsFaulted)
-            _logService?.LogError(t.Exception?.InnerException ?? new Exception("LoadQualityTrends failed"), "LoadQualityTrends");
-        }, TaskScheduler.Default);
-      }
+      // Quality analytics are gated behind explicit user intent. Changing time range does NOT
+      // auto-trigger LoadQualityTrendsAsync. User must click LoadQualityTrends or Analyze to refresh.
     }
 
     // Quality Degradation Detection Methods (IDEA 56)

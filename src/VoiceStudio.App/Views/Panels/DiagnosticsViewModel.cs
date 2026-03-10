@@ -916,6 +916,15 @@ namespace VoiceStudio.App.Views.Panels
       EnvironmentInfo.Add(new EnvironmentInfoItem { Key = ResourceHelper.GetString("Diagnostics.EnvUserName", "User Name"), Value = System.Environment.UserName });
       EnvironmentInfo.Add(new EnvironmentInfoItem { Key = ResourceHelper.GetString("Diagnostics.EnvWorkingSet", "Working Set"), Value = $"{System.Environment.WorkingSet / (1024 * 1024)} MB" });
       EnvironmentInfo.Add(new EnvironmentInfoItem { Key = ResourceHelper.GetString("Diagnostics.EnvProcessorCount", "Processor Count"), Value = System.Environment.ProcessorCount.ToString() });
+
+      // Request counts (per minute) from HTTP client layer
+      var metrics = AppServices.TryGetRequestMetricsService();
+      if (metrics != null)
+      {
+        var counts = metrics.GetCountsPerMinute();
+        foreach (var kv in counts.OrderBy(x => x.Key))
+          EnvironmentInfo.Add(new EnvironmentInfoItem { Key = $"Requests/min: {kv.Key}", Value = kv.Value.ToString() });
+      }
     }
 
     private void LoadErrorLogs()

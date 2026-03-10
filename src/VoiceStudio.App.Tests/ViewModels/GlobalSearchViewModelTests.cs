@@ -84,10 +84,10 @@ namespace VoiceStudio.App.Tests.ViewModels
       // Act
       await _viewModel.SearchAsync();
 
-      // Assert
+      // Assert - explicit SearchAsync() yields 1 backend call; debounce would add another if Dispatcher ran
       Assert.AreEqual(1, _viewModel.Results.Count);
       Assert.AreEqual(1, _viewModel.TotalResults);
-      Assert.AreEqual(2, _mockBackendClient.SearchCallCount);
+      Assert.AreEqual(1, _mockBackendClient.SearchCallCount);
       Assert.AreEqual("test", _mockBackendClient.LastSearchQuery);
     }
 
@@ -223,7 +223,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     }
 
     [TestMethod]
-    public async Task OnSearchQueryChanged_TriggersSearch()
+    public async Task OnSearchQueryChanged_DebouncesSearch()
     {
       // Arrange
       _mockBackendClient!.SearchResponse = new SearchResponse
@@ -233,14 +233,12 @@ namespace VoiceStudio.App.Tests.ViewModels
         ResultsByType = new Dictionary<string, int>()
       };
 
-      // Act
+      // Act: set SearchQuery (triggers 300ms debounce)
       _viewModel!.SearchQuery = "test";
 
-      // Wait for async operation
-      await Task.Delay(200);
-
-      // Assert
-      Assert.IsTrue(_mockBackendClient.SearchCallCount > 0);
+      // Assert: within 100ms, debounce has not fired yet (no backend call)
+      await Task.Delay(100);
+      Assert.AreEqual(0, _mockBackendClient.SearchCallCount, "Debounce should delay search; no call within 100ms");
     }
 
   }

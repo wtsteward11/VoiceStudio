@@ -93,7 +93,7 @@ Repo code + ADRs + CI results win. Update CLAUDE.md when policy changes; do not 
     app/core/runtime/            — Engine subprocess orchestration
     engines/*.json               — Engine manifests (v3 schema); count derived from manifest scan, not hand-maintained
     shared/                      — JSON schema contracts (C# ↔ Python boundary)
-    docs/architecture/decisions/ — ADR set; count derived from directory. Known issue: duplicate ADR-045 numbering; registry hygiene needed.
+    docs/architecture/decisions/ — ADR set; count derived from directory.
     scripts/verify.ps1           — SINGLE SOURCE OF TRUTH for CI green/red
     .cursor/rules/               — Governance rules; active count derived from rule metadata, not hand-maintained
   </directory_map>
@@ -493,7 +493,7 @@ If a document states a hard number without a derivation command, treat it as sus
 
 ## KNOWN GOVERNANCE DEBT (As of 2026-03-10)
 
-- **ADR numbering:** Duplicate ADR-045 (orchestrator vs mcp-integration). Registry hygiene required.
+- **ADR numbering:** Resolved 2026-03-11 — MCP Integration renumbered to ADR-049.
 - **IPC claim:** Prior CLAUDE.md claimed "named pipes for engine IPC"; ADR-018 replaced with HTTP.
 - **Metric counts:** ADR, rule, engine, panel, test counts in this file may be stale; regenerate before trusting.
 - **Empty catches:** Policy is "no untracked empty catch blocks," not "there are none." Some exceptions are tracked.
@@ -615,7 +615,7 @@ When facing any technical decision on VoiceStudio, apply this sequence:
 |----------|---------|
 | `.cursor/STATE.md` | Current session state, active task, proof index |
 | `AGENTS.md` | Build commands, active rules, architecture boundaries |
-| `docs/architecture/decisions/` | ADR set; count derived from directory. Known issue: duplicate ADR-045 |
+| `docs/architecture/decisions/` | ADR set; count derived from directory |
 | `docs/design/GUARDRAILS.md` | Panel system and MVVM absolute rules |
 | `docs/governance/DEFERRED_V1_2.md` | Intentionally deferred scope |
 | `docs/developer/AUTOMATION_ID_REGISTRY.md` | Stable UI AutomationIds for testing |

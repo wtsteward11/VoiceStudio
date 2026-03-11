@@ -27,5 +27,5 @@ The PDF Unlocker client enables:
 
 ## References
 
-- ADR-045: MCP Integration Strategy
+- ADR-049: MCP Integration Strategy
 - FUTURE_WORK.md: MCP integration roadmap

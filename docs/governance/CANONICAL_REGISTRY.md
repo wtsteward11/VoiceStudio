@@ -90,9 +90,11 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Dual Plugin Loader ADR** | `docs/architecture/decisions/ADR-040-dual-plugin-loader.md` | 2026-02-18 | Documents dual loader architecture (PluginLoader vs PluginService) and usage guidelines |
 | **Model Lifecycle Strategy ADR** | `docs/architecture/decisions/ADR-043-model-lifecycle-strategy.md` | 2026-02-21 | Model registry, baselines, rollback, A/B testing integration |
 | **Supply-Chain Integrity ADR** | `docs/architecture/decisions/ADR-044-supply-chain-integrity.md` | 2026-02-21 | Full-app SBOM, dependency hashes, installer provenance (Phase 12 WS2) |
-| **MCP Integration Strategy ADR** | `docs/architecture/decisions/ADR-045-mcp-integration-strategy.md` | 2026-02-21 | MCP POC status, planned capabilities, roadmap (Arch Review 1.6) |
+| **Intelligent Engine Orchestrator ADR** | `docs/architecture/decisions/ADR-045-orchestrator-architecture.md` | 2026-02-25 | OrchestrationService, quality-driven retry, backend/orchestrator/ |
+| **Delete Mediator/CQRS Layer ADR** | `docs/architecture/decisions/ADR-046-delete-mediator-cqrs-layer.md` | 2026-03-03 | backend/application/ removed; routes call services directly |
 | **WinUI 3 XamlRoot Deferral ADR** | `docs/architecture/decisions/ADR-047-winui-xamlroot-deferral-pattern.md` | 2026-03-10 | Defer panel/overlay init to Loaded; never fire-and-forget XamlRoot-using async from Window constructor |
 | **Centralized Request Coordination ADR** | `docs/architecture/decisions/ADR-048-centralized-request-coordination.md` | 2026-03-11 | IRequestCoordinator for single-flight, TTL, invalidation; BackendClient delegates; ProfilesViewModel simplified |
+| **MCP Integration Strategy ADR** | `docs/architecture/decisions/ADR-049-mcp-integration-strategy.md` | 2026-02-21 | MCP POC status, planned capabilities, roadmap (Arch Review 1.6) |
 
 ## Planning and Roadmaps
 

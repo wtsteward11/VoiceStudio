@@ -1,4 +1,4 @@
-# ADR-045: MCP Integration Strategy
+# ADR-049: MCP Integration Strategy
 
 **Status:** Proposed
 **Date:** 2026-02-21

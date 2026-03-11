@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.IO;
@@ -61,7 +62,7 @@ namespace VoiceStudio.App.ViewModels
     private string? selectedQualityMode = "standard";
 
     [ObservableProperty]
-    private ObservableCollection<string> availableEngines = new() { "xtts", "chatterbox", "tortoise" };
+    private ObservableCollection<string> availableEngines = new();
 
     [ObservableProperty]
     private ObservableCollection<string> qualityModes = new() { "fast", "standard", "high", "ultra" };
@@ -152,6 +153,8 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("CancelWizard");
         await CancelWizardAsync(ct);
       });
+
+      _ = LoadEnginesAsync(new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token);
     }
 
     public IAsyncRelayCommand BrowseAudioCommand { get; }
@@ -245,6 +248,21 @@ namespace VoiceStudio.App.ViewModels
     private void AudioValidations_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
       NextStepCommand.NotifyCanExecuteChanged();
+    }
+
+    private async Task LoadEnginesAsync(CancellationToken cancellationToken)
+    {
+      try
+      {
+        var engines = await _backendClient.GetEnginesAsync(cancellationToken);
+        AvailableEngines.Clear();
+        foreach (var eng in engines)
+          AvailableEngines.Add(eng);
+        if (AvailableEngines.Count > 0 && string.IsNullOrEmpty(SelectedEngine))
+          SelectedEngine = AvailableEngines[0];
+      }
+      catch (OperationCanceledException) { Debug.WriteLine("VoiceCloningWizardViewModel: LoadEnginesAsync cancelled"); }
+      catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "VoiceCloningWizardViewModel.LoadEnginesAsync"); }
     }
 
     private async Task BrowseAudioAsync(CancellationToken cancellationToken)

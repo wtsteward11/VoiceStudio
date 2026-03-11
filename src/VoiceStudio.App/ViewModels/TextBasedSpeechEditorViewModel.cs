@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.App.Logging;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
@@ -76,7 +78,7 @@ namespace VoiceStudio.App.ViewModels
     private string? selectedQualityMode = "standard";
 
     [ObservableProperty]
-    private ObservableCollection<string> availableEngines = new() { "xtts", "chatterbox", "tortoise" };
+    private ObservableCollection<string> availableEngines = new();
 
     [ObservableProperty]
     private ObservableCollection<string> qualityModes = new() { "fast", "standard", "high", "ultra" };
@@ -148,6 +150,8 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
+
+      _ = LoadEnginesAsync(new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token);
     }
 
     public IAsyncRelayCommand LoadAudioCommand { get; }
@@ -591,10 +595,24 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
+    private async Task LoadEnginesAsync(CancellationToken cancellationToken)
+    {
+      try
+      {
+        var engines = await _backendClient.GetEnginesAsync(cancellationToken);
+        AvailableEngines.Clear();
+        foreach (var eng in engines)
+          AvailableEngines.Add(eng);
+      }
+      catch (OperationCanceledException) { Debug.WriteLine("TextBasedSpeechEditorViewModel: LoadEnginesAsync cancelled"); }
+      catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "TextBasedSpeechEditorViewModel.LoadEnginesAsync"); }
+    }
+
     private async Task RefreshAsync(CancellationToken cancellationToken)
     {
       try
       {
+        await LoadEnginesAsync(cancellationToken);
         await LoadProfilesAsync(cancellationToken);
         StatusMessage = ResourceHelper.GetString("TextBasedSpeechEditor.Refreshed", "Refreshed");
       }

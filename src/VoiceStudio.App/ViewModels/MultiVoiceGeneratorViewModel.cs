@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -7,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.App.Logging;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
@@ -52,7 +54,7 @@ namespace VoiceStudio.App.ViewModels
     private string? newItemEmotion;
 
     [ObservableProperty]
-    private ObservableCollection<string> availableEngines = new() { "xtts", "chatterbox", "tortoise" };
+    private ObservableCollection<string> availableEngines = new();
 
     [ObservableProperty]
     private ObservableCollection<string> qualityModes = new() { "fast", "standard", "high", "ultra" };
@@ -62,6 +64,8 @@ namespace VoiceStudio.App.ViewModels
 
     [ObservableProperty]
     private string? currentJobName;
+
+    private CancellationTokenSource? _pollingCts;
 
     [ObservableProperty]
     private float jobProgress;
@@ -133,6 +137,8 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       });
+
+      _ = LoadEnginesAsync(new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token);
     }
 
     public IAsyncRelayCommand AddToQueueCommand { get; }
@@ -432,8 +438,11 @@ namespace VoiceStudio.App.ViewModels
           JobStatus = response.Status;
           StatusMessage = ResourceHelper.GetString("MultiVoiceGenerator.GenerationStarted", "Generation started");
 
-          // Start polling for status
-          _ = PollJobStatusAsync(CancellationToken.None);
+          // Start polling for status (Phase 3: use CTS for cancellation on job complete/navigate)
+          _pollingCts?.Cancel();
+          _pollingCts?.Dispose();
+          _pollingCts = new CancellationTokenSource();
+          _ = PollJobStatusAsync(_pollingCts.Token);
         }
       }
       catch (Exception ex)
@@ -487,12 +496,14 @@ namespace VoiceStudio.App.ViewModels
 
             if (status.Status == "completed")
             {
+              StopPolling();
               await LoadResultsAsync(cancellationToken);
               StatusMessage = ResourceHelper.GetString("MultiVoiceGenerator.GenerationCompleted", "Generation completed");
               break;
             }
             else if (status.Status == "failed")
             {
+              StopPolling();
               ErrorMessage = ResourceHelper.GetString("MultiVoiceGenerator.GenerationFailed", "Generation failed");
               break;
             }
@@ -506,9 +517,17 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (Exception ex)
       {
+        StopPolling();
         ErrorMessage = ResourceHelper.FormatString("MultiVoiceGenerator.PollJobStatusFailed", ex.Message);
         await HandleErrorAsync(ex, "PollJobStatus");
       }
+    }
+
+    private void StopPolling()
+    {
+      _pollingCts?.Cancel();
+      _pollingCts?.Dispose();
+      _pollingCts = null;
     }
 
     private async Task LoadJobStatusAsync(CancellationToken cancellationToken)
@@ -637,8 +656,22 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
+    private async Task LoadEnginesAsync(CancellationToken cancellationToken)
+    {
+      try
+      {
+        var engines = await _backendClient.GetEnginesAsync(cancellationToken);
+        AvailableEngines.Clear();
+        foreach (var eng in engines)
+          AvailableEngines.Add(eng);
+      }
+      catch (OperationCanceledException) { Debug.WriteLine("MultiVoiceGeneratorViewModel: LoadEnginesAsync cancelled"); }
+      catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "MultiVoiceGeneratorViewModel.LoadEnginesAsync"); }
+    }
+
     private async Task RefreshAsync(CancellationToken cancellationToken)
     {
+      await LoadEnginesAsync(cancellationToken);
       if (!string.IsNullOrWhiteSpace(CurrentJobId))
       {
         await LoadJobStatusAsync(cancellationToken);

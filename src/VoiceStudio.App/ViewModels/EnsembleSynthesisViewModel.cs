@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -58,7 +59,7 @@ namespace VoiceStudio.App.ViewModels
     private ObservableCollection<string> availableProfiles = new();
 
     [ObservableProperty]
-    private ObservableCollection<string> availableEngines = new() { "xtts", "chatterbox", "tortoise" };
+    private ObservableCollection<string> availableEngines = new();
 
     [ObservableProperty]
     private ObservableCollection<string> availableMixModes = new() { "sequential", "parallel", "layered" };
@@ -150,6 +151,9 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("DeleteSelectedJobs");
         await DeleteSelectedJobsAsync(ct);
       }, () => SelectedJobCount > 0 && !IsLoading);
+
+      // Load engines on init
+      _ = LoadEnginesAsync(new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token);
 
       // Subscribe to selection changes
       _multiSelectService.SelectionChanged += (_, e) =>
@@ -381,10 +385,24 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
+    private async Task LoadEnginesAsync(CancellationToken cancellationToken)
+    {
+      try
+      {
+        var engines = await _backendClient.GetEnginesAsync(cancellationToken);
+        AvailableEngines.Clear();
+        foreach (var e in engines)
+          AvailableEngines.Add(e);
+      }
+      catch (OperationCanceledException) { Debug.WriteLine("EnsembleSynthesisViewModel: LoadEnginesAsync cancelled"); }
+      catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "EnsembleSynthesisViewModel.LoadEnginesAsync"); }
+    }
+
     private async Task RefreshAsync(CancellationToken cancellationToken)
     {
       try
       {
+        await LoadEnginesAsync(cancellationToken);
         await LoadJobsAsync(cancellationToken);
         StatusMessage = ResourceHelper.GetString("EnsembleSynthesis.JobsRefreshed", "Jobs refreshed");
         _toastNotificationService?.ShowSuccess(

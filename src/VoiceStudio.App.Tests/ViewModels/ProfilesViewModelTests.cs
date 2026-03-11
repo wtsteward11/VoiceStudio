@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Views.Panels;
+using VoiceStudio.App.UseCases;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
@@ -236,6 +237,83 @@ namespace VoiceStudio.App.Tests.ViewModels
       mockBackend.Verify(
           x => x.GetQualityBaselineAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
           Times.Never);
+    }
+
+    /// <summary>
+    /// Verifies that concurrent LoadProfilesAsync calls coalesce to a single backend request.
+    /// </summary>
+    [TestMethod]
+    public async Task LoadProfilesAsync_ConcurrentCalls_CoalescesToSingleRequest()
+    {
+      var listCallCount = 0;
+      var mockUseCase = new Mock<IProfilesUseCase>();
+      // Delay completion so the second concurrent caller can join the coalesced load
+      // before the first completes (otherwise first clears _loadProfilesTask before second enters lock).
+      mockUseCase
+          .Setup(x => x.ListAsync(It.IsAny<CancellationToken>()))
+          .Callback(() => Interlocked.Increment(ref listCallCount))
+          .Returns(async () =>
+          {
+            await Task.Delay(100).ConfigureAwait(false);
+            return (IReadOnlyList<VoiceProfile>)new List<VoiceProfile>();
+          });
+
+      var mockBackend = CreateMockBackendClient();
+      var audioPlayer = new AudioPlayerService(new System.Net.Http.HttpClient());
+      var multiSelectService = new MultiSelectService();
+      var undoRedoService = new UndoRedoService();
+      var vm = new ProfilesViewModel(
+          mockBackend.Object,
+          mockUseCase.Object,
+          audioPlayer,
+          multiSelectService,
+          toastNotificationService: null,
+          undoRedoService: undoRedoService,
+          errorService: null,
+          logService: null);
+
+      await Task.WhenAll(
+          vm.LoadProfilesCommand.ExecuteAsync(null),
+          vm.LoadProfilesCommand.ExecuteAsync(null)).ConfigureAwait(false);
+
+      Assert.AreEqual(1, listCallCount, "ListAsync should be called exactly once when LoadProfiles is invoked concurrently");
+    }
+
+    /// <summary>
+    /// Verifies that CreateProfileCommand cannot run twice concurrently (reentrancy guard).
+    /// </summary>
+    [TestMethod]
+    public async Task CreateProfileCommand_ConcurrentInvocations_ExecutesOnlyOnce()
+    {
+      var createCallCount = 0;
+      var createBlocker = new TaskCompletionSource<bool>();
+      var mockUseCase = new Mock<IProfilesUseCase>();
+      mockUseCase
+          .Setup(x => x.CreateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .Callback(() => Interlocked.Increment(ref createCallCount))
+          .Returns(() => createBlocker.Task.ContinueWith(_ => new VoiceProfile { Id = "test-1", Name = "Test" }));
+
+      var mockBackend = CreateMockBackendClient();
+      var audioPlayer = new AudioPlayerService(new System.Net.Http.HttpClient());
+      var multiSelectService = new MultiSelectService();
+      var undoRedoService = new UndoRedoService();
+      var vm = new ProfilesViewModel(
+          mockBackend.Object,
+          mockUseCase.Object,
+          audioPlayer,
+          multiSelectService,
+          toastNotificationService: null,
+          undoRedoService: undoRedoService,
+          errorService: null,
+          logService: null);
+
+      var t1 = vm.CreateProfileCommand.ExecuteAsync("Profile 1");
+      var t2 = vm.CreateProfileCommand.ExecuteAsync("Profile 2");
+      createBlocker.TrySetResult(true);
+      await Task.WhenAll(t1, t2);
+      await WaitForAsyncOperation(50);
+
+      Assert.AreEqual(1, createCallCount, "CreateAsync should be called exactly once when CreateProfile is invoked concurrently");
     }
   }
 }

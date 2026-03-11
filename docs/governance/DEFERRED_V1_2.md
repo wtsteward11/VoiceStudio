@@ -20,6 +20,6 @@ Items deferred from v1.1.0 ship. Non-blocking for v1.1.0 release.
 
 - ~~**Bandit B614 torch.load exemption**~~ — **DONE (2026-03-11):** Documented in `docs/governance/CVE_EXCEPTIONS.md` § Bandit B614. CI uses `--skip B614`; prefer `weights_only=True` or safetensors when feasible.
 
-- **OpenAPI drift check dep alignment** — Ensure Sentinel (or any workflow running OpenAPI drift) uses the same dependency set as backend runtime; avoid minimal deps that cause route import failures.
+- ~~**OpenAPI drift check dep alignment**~~ — **DONE (2026-03-11):** Documented in `docs/developer/OPENAPI_CI_ALIGNMENT.md`. All workflows that run export/validate use requirements.txt; schema-only tests (drift gate, contract tests) do not import backend.
 
 - **Sentinel smoke backend startup** — Backend cold-start in CI (Ubuntu, requirements.txt only) can exceed 2min; sentinel-smoke is continue-on-error for v1.1.0. Investigate startup time, dependency gaps, or increase wait budget.

@@ -3,7 +3,7 @@
 This registry is the single source of truth for all canonical documents in VoiceStudio.
 Before creating a new document, check this registry to ensure the topic isn't already covered.
 
-> **Last Updated**: 2026-03-05 (Feature Catalog Master adoption)
+> **Last Updated**: 2026-03-11 (CI Suppression Policy)
 
 ---
 
@@ -203,6 +203,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Workspace manual test steps** | `docs/testing/WORKSPACE_MANUAL_TEST_STEPS.md` | 2026-02-12 | Manual verification steps for workspace dropdown and profile switching; optional Gate C note |
 | **Sentinel Testing Guide** | `docs/developer/SENTINEL_TESTING_GUIDE.md` | 2026-02-12 | Sentinel workflow usage, configuration, test writing, debugging with repro packets |
 | **UI Automation Guide** | `docs/developer/UI_AUTOMATION_GUIDE.md` | 2026-02-13 | **NEW** — WinAppDriver + Page Object Model, AutomationId standards, smoke tests, CI integration |
+| **CI Suppression Policy** | `docs/developer/CI_SUPPRESSION_POLICY.md` | 2026-03-11 | When CI steps may use non-blocking patterns (e.g. continue-on-error); advisory vs gate distinction; inventory |
 | **Architecture Foundations Guide** | `docs/developer/ARCHITECTURE_FOUNDATIONS_GUIDE.md` | 2026-02-14 | DI system, API versioning, caching layer, message queue, database migrations |
 | **Scalability & Resilience Guide** | `docs/developer/SCALABILITY_RESILIENCE_GUIDE.md` | 2026-02-14 | Circuit breakers, rate limiting, retry logic, timeout config, horizontal scaling |
 | **Production Readiness Guide** | `docs/operations/PRODUCTION_READINESS_GUIDE.md` | 2026-02-14 | Installer system, crash recovery, error handling, performance optimization, deployment checklist |

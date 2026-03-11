@@ -16,7 +16,7 @@ Items deferred from v1.1.0 ship. Non-blocking for v1.1.0 release.
 
 - **Workflow consolidation** — Reduce duplication across Build, CI, Tests, Sentinel workflows; align job structure and caching.
 
-- **CI suppression policy perfection** — Tighten rules around `|| echo "::warning::..."` and other non-blocking patterns; document when suppression is acceptable.
+- ~~**CI suppression policy perfection**~~ — **DONE (2026-03-11):** Documented in `docs/developer/CI_SUPPRESSION_POLICY.md`. Allowed vs prohibited patterns, inventory of non-blocking steps, quarterly review process.
 
 - ~~**Bandit B614 torch.load exemption**~~ — **DONE (2026-03-11):** Documented in `docs/governance/CVE_EXCEPTIONS.md` § Bandit B614. CI uses `--skip B614`; prefer `weights_only=True` or safetensors when feasible.
 

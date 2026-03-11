@@ -65,11 +65,13 @@ namespace VoiceStudio.App.Services
       var wsUrl = $"ws://{apiHost}:{apiPort}/ws/realtime";
       services.AddSingleton(new BackendClientConfig { BaseUrl = baseUrl, WebSocketUrl = wsUrl });
       services.AddSingleton<IRequestMetricsService, RequestMetricsService>();
+      services.AddSingleton<IRequestCoordinator, RequestCoordinator>();
       // GAP-I12: Inject correlation provider into BackendClient
       services.AddSingleton<IBackendClient>(sp => new BackendClient(
         sp.GetRequiredService<BackendClientConfig>(),
         sp.GetRequiredService<ICorrelationIdProvider>(),
-        sp.GetRequiredService<IRequestMetricsService>()));
+        sp.GetRequiredService<IRequestMetricsService>(),
+        sp.GetRequiredService<IRequestCoordinator>()));
 
       // GAP-CS-001: WebSocket services for real-time streaming support
       services.AddSingleton<IWebSocketService>(sp => new WebSocketService(

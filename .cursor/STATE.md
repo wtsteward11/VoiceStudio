@@ -45,11 +45,33 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## Active Task
 
+- **ID**: CENTRALIZED-REQUEST-COORDINATION
+- **Title**: Centralized Request Coordination Plan
+- **Status**: **COMPLETE** (2026-03-11)
+- **Deliverables**:
+  - IRequestCoordinator + RequestCoordinator; BackendClient delegates profiles/engines
+  - ProfilesViewModel simplified (no local coalescing)
+  - ADR-048; RequestCoordinatorIntegrationTests (GetSnapshot + full-stack coalescing)
+- **Verification**: Build 0 errors; LoadProfilesAsync_ConcurrentCalls_CoalescesToSingleRequest passes; 3 RequestCoordinatorIntegrationTests pass
+
+## Previous Active Task
+
 - **ID**: ARCHITECT-HARDENING
 - **Title**: Architect Hardening Plan — Execution Complete
 - **Status**: **COMPLETE** (2026-03-08)
 - **Completed**: All phases. Empty catch violations fixed (5 markers added). verify.ps1 -Quick exits 0. EngineService returns 62 engines; Jobs workflow tests pass; RenameWorkspace_MovesProfileFile passes; mypy 69/110 budget.
 - **Remaining**: None. See DEFERRED_V1_2.md for v1.2 scope.
+
+## Previous Active Task
+
+- **ID**: P0-XAMLROOT-REQUEST-STORM
+- **Title**: P0 XamlRoot and Request Storm Remediation Plan
+- **Status**: **COMPLETE** (2026-03-10)
+- **Deliverables**:
+  - Commit 1: DialogService.GetXamlRoot(), ConfirmationDialog safe root, ProfilesView → DialogService (no raw ContentDialog)
+  - Commit 2: BackendClient engines cache (single-flight + 60s TTL), RequestMetricsService.GetSnapshot(), ErrorPresentationService 429 dedupe
+  - Commit 3: BackendClient.InvalidateProfilesCache() on create/update/delete; ProfilesViewModel.OnProfileCreatedRefresh skip when profile already in collection
+- **Verification**: Build 0 errors; 72 pytest passed; 999 C# tests passed (host crash pre-existing)
 
 ## Previous Active Task
 
@@ -1273,6 +1295,7 @@ _Previous:_
 
 | Date       | Task                                   | Artifact                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Type                   | Verified |
 | ---------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | -------- |
+| 2026-03-10 | P0-XAMLROOT-REQUEST-STORM               | DialogService.GetXamlRoot/ShowProfileEditAsync; ConfirmationDialog safe root; ProfilesView DialogService; BackendClient engines cache + InvalidateProfilesCache; ProfilesViewModel OnProfileCreatedRefresh skip                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Implementation         | Verified |
 | 2026-03-10 | GAP-012                                 | tools/context/core/allocator.py (memory sliding window); tests/tools/test_context_allocator.py::test_allocator_memory_sliding_window_keeps_recent                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Implementation        | Verified |
 | 2026-03-10 | GAP-015                                 | docs/developer/COMMAND_PALETTE_GUIDE.md (aligned with IUnifiedCommandRegistry, CommandPaletteService)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Documentation         | Verified |
 | 2026-03-10 | GAP-008                                 | backend/services/circuit_breaker_facade.py; rvc, health, voice, video_gen, image_gen, settings routes use service layer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Architecture          | Verified |

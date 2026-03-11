@@ -100,6 +100,8 @@ What becomes easier or more difficult to do because of this change?
 | [ADR-042](ADR-042-plugin-installer-consolidation.md) | Plugin Installer Consolidation | Accepted | 2026-02 |
 | [ADR-043](ADR-043-model-lifecycle-strategy.md) | Model Lifecycle Strategy | Accepted | 2026-02-21 |
 | [ADR-046](ADR-046-delete-mediator-cqrs-layer.md) | Delete Mediator/CQRS Layer (B-DELETE) | Accepted | 2026-03-03 |
+| [ADR-047](ADR-047-winui-xamlroot-deferral-pattern.md) | WinUI 3 XamlRoot Deferral Pattern | Accepted | 2026-03-10 |
+| [ADR-048](ADR-048-centralized-request-coordination.md) | Centralized Request Coordination | Accepted | 2026-03-11 |
 
 ## Status Legend
 

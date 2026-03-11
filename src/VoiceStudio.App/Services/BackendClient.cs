@@ -228,12 +228,7 @@ namespace VoiceStudio.App.Services
     private DateTime _lastConnectionCheck = DateTime.MinValue;
     private const int ConnectionCheckIntervalSeconds = 5;
 
-    // Profiles fetch: single-flight + TTL cache (8s) to prevent request storms
-    private readonly System.Threading.SemaphoreSlim _profilesLock = new(1, 1);
-    private Task<List<VoiceProfile>>? _profilesTask;
-    private List<VoiceProfile>? _profilesCache;
-    private DateTime _profilesCacheUtc = DateTime.MinValue;
-    private static readonly TimeSpan ProfilesTtl = TimeSpan.FromSeconds(8);
+    private readonly IRequestCoordinator _requestCoordinator;
 
     public IWebSocketService? WebSocketService { get; }
 
@@ -251,12 +246,15 @@ namespace VoiceStudio.App.Services
     /// <param name="config">Backend client configuration.</param>
     /// <param name="correlationProvider">Optional provider for correlation context.</param>
     /// <param name="requestMetrics">Optional service for per-endpoint request counting.</param>
-    public BackendClient(BackendClientConfig config, ICorrelationIdProvider? correlationProvider, IRequestMetricsService? requestMetrics = null)
+    /// <param name="requestCoordinator">Shared request coordinator for profiles/engines (required when created via DI).</param>
+    /// <param name="innerHandler">Optional inner HTTP handler for testing; when null, uses HttpClientHandler.</param>
+    public BackendClient(BackendClientConfig config, ICorrelationIdProvider? correlationProvider, IRequestMetricsService? requestMetrics = null, IRequestCoordinator? requestCoordinator = null, HttpMessageHandler? innerHandler = null)
     {
       _config = config ?? throw new ArgumentNullException(nameof(config));
+      _requestCoordinator = requestCoordinator ?? new RequestCoordinator();
 
-      // Handler chain: RequestMetricsHandler (outer) -> CorrelationIdHandler -> HttpClientHandler (inner)
-      var httpHandler = new HttpClientHandler();
+      // Handler chain: RequestMetricsHandler (outer) -> CorrelationIdHandler -> innerHandler (inner)
+      var httpHandler = innerHandler ?? new HttpClientHandler();
       var correlationHandler = correlationProvider != null
         ? new CorrelationIdHandler(httpHandler, correlationProvider)
         : new CorrelationIdHandler(httpHandler);
@@ -463,7 +461,9 @@ namespace VoiceStudio.App.Services
       try
       {
         using var cts = new CancellationTokenSource(timeoutMs);
-        using var client = new HttpClient();
+        var client = AppServices.GetService<HttpClient>();
+        if (client == null)
+          return false;
         var response = await client.GetAsync(url, cts.Token);
         return response.IsSuccessStatusCode;
       }
@@ -773,47 +773,12 @@ namespace VoiceStudio.App.Services
 
     public async Task<List<VoiceProfile>> GetProfilesAsync(CancellationToken cancellationToken = default)
     {
-      Task<List<VoiceProfile>>? toAwait;
-      await _profilesLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-      try
-      {
-        var now = DateTime.UtcNow;
-        if (_profilesCache != null && (now - _profilesCacheUtc) < ProfilesTtl)
-          return _profilesCache;
-
-        if (_profilesTask != null && !_profilesTask.IsCompleted)
-        {
-          toAwait = _profilesTask;
-        }
-        else
-        {
-          if (_profilesTask?.IsFaulted == true)
-            _profilesTask = null;
-          _profilesTask = GetProfilesCoreAsync(cancellationToken);
-          toAwait = _profilesTask;
-        }
-      }
-      finally
-      {
-        _profilesLock.Release();
-      }
-
-      var list = await toAwait.ConfigureAwait(false);
-
-      await _profilesLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-      try
-      {
-        if (toAwait == _profilesTask)
-        {
-          _profilesCache = list ?? new List<VoiceProfile>();
-          _profilesCacheUtc = DateTime.UtcNow;
-        }
-        return list ?? new List<VoiceProfile>();
-      }
-      finally
-      {
-        _profilesLock.Release();
-      }
+      var list = await _requestCoordinator.GetOrCreateAsync(
+        "profiles:list",
+        async ct => await GetProfilesCoreAsync(ct).ConfigureAwait(false),
+        TimeSpan.FromSeconds(30),
+        cancellationToken).ConfigureAwait(false);
+      return list ?? new List<VoiceProfile>();
     }
 
     private async Task<List<VoiceProfile>> GetProfilesCoreAsync(CancellationToken cancellationToken)
@@ -864,6 +829,11 @@ namespace VoiceStudio.App.Services
       });
     }
 
+    private void InvalidateProfilesCache()
+    {
+      _requestCoordinator.Invalidate("profiles:list");
+    }
+
     public async Task<VoiceProfile> GetProfileAsync(string profileId, CancellationToken cancellationToken = default)
     {
       return await ExecuteWithRetryAsync(async () =>
@@ -887,7 +857,7 @@ namespace VoiceStudio.App.Services
         List<string>? tags = null,
         CancellationToken cancellationToken = default)
     {
-      return await ExecuteWithRetryAsync(async () =>
+      var result = await ExecuteWithRetryAsync(async () =>
       {
         var request = new
         {
@@ -907,6 +877,8 @@ namespace VoiceStudio.App.Services
         return await response.Content.ReadFromJsonAsync<VoiceProfile>(_jsonOptions, cancellationToken)
                   ?? throw new BackendDeserializationException("Failed to deserialize profile");
       });
+      InvalidateProfilesCache();
+      return result;
     }
 
     public async Task<VoiceProfile> UpdateProfileAsync(
@@ -917,7 +889,7 @@ namespace VoiceStudio.App.Services
         List<string>? tags = null,
         CancellationToken cancellationToken = default)
     {
-      return await ExecuteWithRetryAsync(async () =>
+      var result = await ExecuteWithRetryAsync(async () =>
       {
         var request = new Dictionary<string, object?>();
         if (name != null) request["name"] = name;
@@ -939,15 +911,20 @@ namespace VoiceStudio.App.Services
         return await response.Content.ReadFromJsonAsync<VoiceProfile>(_jsonOptions, cancellationToken)
                   ?? throw new BackendDeserializationException("Failed to deserialize profile");
       });
+      InvalidateProfilesCache();
+      return result;
     }
 
     public async Task<bool> DeleteProfileAsync(string profileId, CancellationToken cancellationToken = default)
     {
-      return await ExecuteWithRetryAsync(async () =>
+      var result = await ExecuteWithRetryAsync(async () =>
       {
         var response = await _httpClient.DeleteAsync($"/api/profiles/{profileId}", cancellationToken);
         return response.IsSuccessStatusCode;
       });
+      if (result)
+        InvalidateProfilesCache();
+      return result;
     }
 
     public async Task<List<Project>> GetProjectsAsync(CancellationToken cancellationToken = default)
@@ -3851,6 +3828,16 @@ namespace VoiceStudio.App.Services
     }
 
     public async Task<List<string>> GetEnginesAsync(CancellationToken cancellationToken = default)
+    {
+      var list = await _requestCoordinator.GetOrCreateAsync(
+        "engines:list",
+        async ct => await GetEnginesCoreAsync(ct).ConfigureAwait(false),
+        TimeSpan.FromSeconds(60),
+        cancellationToken).ConfigureAwait(false);
+      return list ?? new List<string>();
+    }
+
+    private async Task<List<string>> GetEnginesCoreAsync(CancellationToken cancellationToken)
     {
       return await ExecuteWithRetryAsync(async () =>
       {

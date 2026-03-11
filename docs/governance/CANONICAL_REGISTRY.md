@@ -91,6 +91,8 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Model Lifecycle Strategy ADR** | `docs/architecture/decisions/ADR-043-model-lifecycle-strategy.md` | 2026-02-21 | Model registry, baselines, rollback, A/B testing integration |
 | **Supply-Chain Integrity ADR** | `docs/architecture/decisions/ADR-044-supply-chain-integrity.md` | 2026-02-21 | Full-app SBOM, dependency hashes, installer provenance (Phase 12 WS2) |
 | **MCP Integration Strategy ADR** | `docs/architecture/decisions/ADR-045-mcp-integration-strategy.md` | 2026-02-21 | MCP POC status, planned capabilities, roadmap (Arch Review 1.6) |
+| **WinUI 3 XamlRoot Deferral ADR** | `docs/architecture/decisions/ADR-047-winui-xamlroot-deferral-pattern.md` | 2026-03-10 | Defer panel/overlay init to Loaded; never fire-and-forget XamlRoot-using async from Window constructor |
+| **Centralized Request Coordination ADR** | `docs/architecture/decisions/ADR-048-centralized-request-coordination.md` | 2026-03-11 | IRequestCoordinator for single-flight, TTL, invalidation; BackendClient delegates; ProfilesViewModel simplified |
 
 ## Planning and Roadmaps
 
@@ -191,10 +193,10 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **UI Hardening Guidelines** | `docs/developer/UI_HARDENING_GUIDELINES.md` | 2026-02-04 | XAML stability best practices; UserControl extraction, ResourceDictionary organization, binding anti-patterns |
 | **Phase 6 Developer Guide** | `docs/developer/PHASE6_DEVELOPER_GUIDE.md` | 2026-02-18 | Wasm plugins, AI quality, compliance, ecosystem, incubator features |
 | **Plugin Privacy Guide** | `docs/developer/PLUGIN_PRIVACY_GUIDE.md` | 2026-02-18 | GDPR-inspired privacy framework; data categories, consent management, user rights |
-| **Error Handling Guide** | `docs/developer/ERROR_HANDLING_GUIDE.md` | 2026-02-04 | Unified error envelope, error codes, severity levels, propagation patterns (GAP-010) |
-| **WebSocket Guide** | `docs/developer/WEBSOCKET_GUIDE.md` | 2026-02-04 | WebSocket architecture, topics, message format, connection management (GAP-013) |
+| **Error Handling Guide** | `docs/developer/ERROR_HANDLING_GUIDE.md` | 2026-03-10 | Unified error envelope, error codes, severity levels, propagation patterns; schema: `shared/schemas/error-envelope.schema.json` (GAP-010 complete) |
+| **WebSocket Guide** | `docs/developer/WEBSOCKET_GUIDE.md` | 2026-03-06 | WebSocket architecture, topics, message format, connection management; see `docs/REFERENCE/WEBSOCKET_TOPICS_REFERENCE.md` for topic reference (GAP-013 complete) |
 | **UI Virtualization Guide** | `docs/developer/UI_VIRTUALIZATION_GUIDE.md` | 2026-02-04 | List virtualization patterns, incremental loading, performance guidelines (GAP-014) |
-| **Command Palette Guide** | `docs/developer/COMMAND_PALETTE_GUIDE.md` | 2026-02-04 | Command registry, keyboard shortcuts, search algorithm (GAP-015) |
+| **Command Palette Guide** | `docs/developer/COMMAND_PALETTE_GUIDE.md` | 2026-03-10 | IUnifiedCommandRegistry, CommandPaletteService, Ctrl+P, action types; GAP-015 complete |
 | **Schema Sync Workflow** | `docs/developer/SCHEMA_SYNC.md` | 2026-02-11 | Schema ownership, validation, and synchronization workflow; shared/schemas/ governance |
 | **Workspace manual test steps** | `docs/testing/WORKSPACE_MANUAL_TEST_STEPS.md` | 2026-02-12 | Manual verification steps for workspace dropdown and profile switching; optional Gate C note |
 | **Sentinel Testing Guide** | `docs/developer/SENTINEL_TESTING_GUIDE.md` | 2026-02-12 | Sentinel workflow usage, configuration, test writing, debugging with repro packets |
@@ -210,6 +212,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Topic | Canonical Source | Last Updated | Notes |
 | --- | --- | --- | --- |
 | **Sentinel Contract Schemas** | `docs/REFERENCE/SENTINEL_CONTRACT_SCHEMAS.md` | 2026-02-12 | JSON Schema contracts for sentinel workflow; versioning policy, validation examples |
+| **WebSocket Topics** | `docs/REFERENCE/WEBSOCKET_TOPICS_REFERENCE.md` | 2026-03-06 | Canonical topic reference for /ws/realtime; payloads, broadcast APIs; GAP-013 complete |
 
 ## Build and Diagnostic Tools
 
@@ -259,6 +262,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Production Build | `docs/governance/VoiceStudio_Production_Build_Plan.md` | 2026-01-25 | Production build plan |
 | **Deterministic Sentinel Implementation Plan** | `docs/design/DETERMINISTIC_SENTINEL_IMPLEMENTATION_PLAN.md` | 2026-02-13 | 6-phase implementation plan for sentinel workflow, API hardening, UI automation, security/stability, architecture foundations, scalability |
 | **Phase F Anti-Theater Hardening Plan** | `docs/design/PHASE_F_ANTI_THEATER_HARDENING_PLAN.md` | 2026-03-04 | Sprint plan: Gate C nav_steps, stub/real proof non-fakeability, STATE canonical, god-object budgets, schema/fingerprint alignment |
+| **Dialog Architecture Bulletproof Plan** | `docs/design/DIALOG_ARCHITECTURE_BULLETPROOF_PLAN.md` | 2026-03-10 | Centralize ContentDialog/XamlRoot; IProfileDialogService, IXamlRootProvider; CI guard; Profiles-first template |
 
 ## Security
 

@@ -18,7 +18,7 @@ Items deferred from v1.1.0 ship. Non-blocking for v1.1.0 release.
 
 - **CI suppression policy perfection** — Tighten rules around `|| echo "::warning::..."` and other non-blocking patterns; document when suppression is acceptable.
 
-- **Bandit B614 torch.load exemption** — Document and formalize exemption for `torch.load` in ML/engine code; ensure `weights_only` or equivalent when feasible.
+- ~~**Bandit B614 torch.load exemption**~~ — **DONE (2026-03-11):** Documented in `docs/governance/CVE_EXCEPTIONS.md` § Bandit B614. CI uses `--skip B614`; prefer `weights_only=True` or safetensors when feasible.
 
 - **OpenAPI drift check dep alignment** — Ensure Sentinel (or any workflow running OpenAPI drift) uses the same dependency set as backend runtime; avoid minimal deps that cause route import failures.
 

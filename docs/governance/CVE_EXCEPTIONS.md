@@ -2,7 +2,7 @@
 
 **Owner:** Build & Tooling Engineer (Role 2)
 **Created:** 2026-02-21 (Phase 12 WS1)
-**Last Updated:** 2026-02-23
+**Last Updated:** 2026-03-11
 
 ## Purpose
 
@@ -43,8 +43,26 @@ The following CVEs were remediated during Phase 12 Strategic Hardening:
 4. Document exceptions here with full rationale
 5. Review exceptions quarterly or on each major release
 
+## Bandit B614 — torch.load Exemption (2026-03-11)
+
+**Finding:** Bandit B614 flags `torch.load()` as unsafe (arbitrary code execution via pickle deserialization).
+
+**Scope:** ML/engine code in `app/core/engines/`, `app/core/training/`, `backend/voice/rvc/` loads PyTorch checkpoints. Many engine checkpoints use custom classes or legacy formats that require `weights_only=False`.
+
+**Decision:** Exemption documented. CI uses `bandit --skip B614` (see `.github/workflows/ci.yml`).
+
+**Rationale:**
+- Checkpoints are loaded from local paths only (user-selected or manifest-configured); no untrusted input.
+- `weights_only=True` is used where feasible (e.g., `backend/voice/rvc/engine.py` uses `weights_only=False` only when required).
+- Migration to `safetensors` or `weights_only=True` is tracked per-engine; not a v1.1.0 gate.
+
+**Mitigation:** Prefer `safetensors.torch.load_file()` for new code. Use `weights_only=True` when checkpoint format allows. Document any `weights_only=False` with inline comment.
+
+**Review:** Quarterly or on major release. See DEFERRED_V1_2.md.
+
 ## Related
 
 - ADR-044: Supply-Chain Integrity
 - ADR-041: Python 3.11 Runtime
 - VS-0046: pip-audit CVE remediation (DONE)
+- DEFERRED_V1_2.md: Bandit B614 formalization (complete)

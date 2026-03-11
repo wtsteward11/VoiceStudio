@@ -14,6 +14,7 @@ Usage:
 If no files are provided, checks all C# and Python files in the repository.
 """
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -164,13 +165,23 @@ def is_viewmodel_file(path: Path) -> bool:
     return 'ViewModel' in path.name and path.suffix.lower() == '.cs'
 
 
+def _walk_error(err: OSError) -> None:
+    """Log and continue on walk errors (e.g. permission denied on Windows)."""
+    print(f"Warning: Skipping {getattr(err, 'filename', '?')}: {err}", file=sys.stderr)
+
+
 def get_all_files(root: Path, extensions: set[str]) -> list[Path]:
     """Get all files with the given extensions, respecting skip dirs."""
     files = []
-    for path in root.rglob('*'):
-        if path.is_file() and path.suffix.lower() in extensions:
-            if not should_skip_path(path):
-                files.append(path)
+    try:
+        for dirpath, dirnames, filenames in os.walk(root, topdown=True, onerror=_walk_error):
+            dirnames[:] = [d for d in dirnames if not should_skip_path(Path(dirpath) / d)]
+            for name in filenames:
+                path = Path(dirpath) / name
+                if path.suffix.lower() in extensions and not should_skip_path(path):
+                    files.append(path)
+    except OSError as e:
+        print(f"Warning: Walk failed at {root}: {e}", file=sys.stderr)
     return files
 
 

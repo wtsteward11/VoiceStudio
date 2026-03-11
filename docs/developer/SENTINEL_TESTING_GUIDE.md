@@ -44,6 +44,8 @@ The sentinel workflow runs automatically via `.github/workflows/sentinel_backend
 - Push to `main`, `develop`, `release/*`
 - Pull requests to `main`, `develop`
 
+**Backend cold-start in CI:** On Ubuntu with `requirements.txt` only, backend cold-start can take 2–3 minutes (first import of FastAPI, routes, engines). The workflow waits up to 90 attempts × 2s = 3 min for `/api/health/simple` before failing. If startup exceeds this, increase the loop count in the "Start backend server" step or investigate dependency/import bottlenecks. See DEFERRED_V1_2.md.
+
 ## Architecture
 
 ### 7-Step Workflow

@@ -22,4 +22,4 @@ Items deferred from v1.1.0 ship. Non-blocking for v1.1.0 release.
 
 - ~~**OpenAPI drift check dep alignment**~~ — **DONE (2026-03-11):** Documented in `docs/developer/OPENAPI_CI_ALIGNMENT.md`. All workflows that run export/validate use requirements.txt; schema-only tests (drift gate, contract tests) do not import backend.
 
-- **Sentinel smoke backend startup** — Backend cold-start in CI (Ubuntu, requirements.txt only) can exceed 2min; sentinel-smoke is continue-on-error for v1.1.0. Investigate startup time, dependency gaps, or increase wait budget.
+- ~~**Sentinel smoke backend startup**~~ — **DONE (2026-03-11):** Increased wait from 60×2s (2min) to 90×2s (3min) in sentinel_backend_smoke.yml. Documented in SENTINEL_TESTING_GUIDE.md. sentinel-smoke remains continue-on-error until proven stable; remove when CI consistently passes.

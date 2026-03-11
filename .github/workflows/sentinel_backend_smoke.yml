@@ -143,8 +143,9 @@ jobs:
           echo $! > /tmp/backend.pid
           
           # Wait for server to be ready using the simple health endpoint
+          # Cold-start in CI (Ubuntu, requirements.txt) can exceed 2min; budget 3min (90×2s)
           echo "Waiting for backend to start..."
-          for i in {1..60}; do
+          for i in {1..90}; do
             if curl -s -f http://127.0.0.1:8000/api/health/simple > /dev/null 2>&1; then
               echo "Backend is ready!"
               break

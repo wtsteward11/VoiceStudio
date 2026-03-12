@@ -26,7 +26,7 @@ try:
         ReviewSeverity,
     )
 except ImportError:
-    pytestmark = pytest.mark.skip(reason="Phase 6B code_review not implemented")
+    pytestmark = pytest.mark.skipif(True, reason="Phase 6B code_review not implemented (SKIP_DEBT_CLEANUP_SUBPLAN § Product gaps)")
 
     # Create stubs for syntax validation
     class ReviewSeverity(IntEnum):

@@ -51,8 +51,8 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## Next 3 Steps
 
-1. **Phase 7–8** — COMPLETE (2026-03-11). 7B: IBackendClient creep in run_verification.py; 8A: Stale script refs (trace_audio_workflow, TASK-0040); 8B: STATE.md split.
-2. **Phase 9** — Skip debt and mypy slices as capacity allows.
+1. **Phase 5–9** — COMPLETE (2026-03-11). IEnginesClient through IQualityHistoryService; 7B creep in run_verification; 8A stale refs; 8B STATE split; 9A skip debt fifth batch; 9B mypy sixth slice (audio.py, streaming.py).
+2. **Future** — Additional domain seam extractions, skip debt burn-down, mypy slices as capacity allows.
 3. **Future** — Additional domain seam extractions as capacity allows.
 
 **Plan:** Phase 2 Post-Timeline Hardening — COMPLETE (2026-03-11). REQUEST_COORDINATION_AUDIT: Open Remediation Queue added; bounded-request test: TimelinePanelScenario_*; dialog baseline: 0; creep detection: active. TimelineTrackService, ProjectAudioClient, TimelineTranscriptionService: policy/null-normalization added.

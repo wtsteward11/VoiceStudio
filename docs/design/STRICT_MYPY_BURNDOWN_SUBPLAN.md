@@ -57,6 +57,11 @@ Run mypy with `--strict` and address findings incrementally. Target modules: `ba
 - `mypy backend/api/routes/voice/synthesis.py --strict --follow-imports=skip` passes.
 - Fixes: file-level `untyped-decorator` disable (SAFETY: FastAPI router decorators lack complete type stubs); return type `-> VoiceSynthesizeResponse` for `synthesize_with_style` and `synthesize_cross_lingual`.
 
+## Sixth Slice Complete (2026-03-11)
+
+- `mypy backend/api/routes/voice/audio.py backend/api/routes/voice/streaming.py --strict --follow-imports=skip` passes.
+- Fixes: file-level `untyped-decorator` disable (SAFETY: FastAPI router decorators lack complete type stubs); `NDArray[Any]` for `_send_audio_chunk`; return type `-> FileResponse` for `get_audio`; return type `-> None` for `synthesize_stream`.
+
 ## Proof Criteria
 
 - `mypy backend/api/routes/ --strict` passes (or documented exceptions)

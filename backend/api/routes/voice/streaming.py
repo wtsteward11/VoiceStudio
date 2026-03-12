@@ -1,3 +1,5 @@
+# mypy: disable-error-code="untyped-decorator"
+# SAFETY: FastAPI router decorators lack complete type stubs; route handlers are correctly typed.
 """Voice streaming routes - real-time streaming synthesis via WebSocket."""
 
 from __future__ import annotations
@@ -10,6 +12,7 @@ import os
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 
 from ...ws.protocol import (
@@ -56,7 +59,7 @@ def _get_engine_sample_rate(engine_instance: Any, engine_id: str) -> int:
 
 async def _send_audio_chunk(
     websocket: WebSocket,
-    audio_chunk: np.ndarray,
+    audio_chunk: NDArray[Any],
     chunk_index: int,
     sample_rate: int,
 ) -> None:
@@ -233,7 +236,7 @@ async def get_engine_streaming_capability(engine_id: str) -> dict[str, Any]:
 
 
 @router.websocket("/synthesize/stream")
-async def synthesize_stream(websocket: WebSocket):
+async def synthesize_stream(websocket: WebSocket) -> None:
     """
     Stream synthesis in real-time chunks.
 

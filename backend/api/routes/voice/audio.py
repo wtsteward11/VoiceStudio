@@ -1,3 +1,5 @@
+# mypy: disable-error-code="untyped-decorator"
+# SAFETY: FastAPI router decorators lack complete type stubs; route handlers are correctly typed.
 """Voice audio retrieval routes - serve synthesized audio files."""
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/audio/{audio_id}")
 @cache_response(ttl=300)  # Cache for 5 minutes (audio files are static once created)
-async def get_audio(audio_id: str):
+async def get_audio(audio_id: str) -> FileResponse:
     """
     Retrieve synthesized audio file.
 

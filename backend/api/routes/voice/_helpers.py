@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 from fastapi import HTTPException, WebSocket
 
 from backend.ml.models.engine_service import get_engine_service
@@ -45,7 +46,7 @@ from ._shared import (
 )
 
 
-def _log_context(**kwargs) -> dict[str, Any]:
+def _log_context(**kwargs: Any) -> dict[str, Any]:
     """
     Build structured logging context with correlation ID.
 
@@ -79,7 +80,7 @@ async def _download_url_to_file(url: str, timeout: float = 30.0) -> str | None:
 
 def _normalize_engine_id(engine_id: str) -> str:
     engine_norm = (engine_id or "").strip().lower()
-    return _ENGINE_ID_ALIASES.get(engine_norm, engine_norm)
+    return str(_ENGINE_ID_ALIASES.get(engine_norm, engine_norm))
 
 
 def _normalize_candidate_metrics(candidate_metrics: Any) -> list[dict[str, Any]]:
@@ -129,7 +130,7 @@ def _build_clone_response(
     )
 
 
-def _ensure_tts_assets(engine_id: str):
+def _ensure_tts_assets(engine_id: str) -> None:
     """
     Ensure required TTS assets exist (auto-download when allowed).
 
@@ -144,7 +145,7 @@ def _ensure_tts_assets(engine_id: str):
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 
 
-def _ensure_vc_assets(engine_id: str):
+def _ensure_vc_assets(engine_id: str) -> None:
     """
     Ensure VC assets (So-VITS) exist.
 
@@ -427,7 +428,7 @@ def _select_engine_with_fallback(
                     f"Engine '{original_engine_id}' not available, "
                     f"falling back to '{fallback_engine}'"
                 )
-                return engine_id
+                return str(fallback_engine)
 
         # No fallback available
         engines_str = ", ".join(valid_engines) if valid_engines else "none (engines not loaded)"
@@ -438,7 +439,7 @@ def _select_engine_with_fallback(
             ),
         )
 
-    return engine_id
+    return str(engine_id)
 
 
 async def _perform_synthesis_with_retry(
@@ -817,7 +818,7 @@ async def _stream_synthesis_chunks(
 
 async def _send_audio_chunk(
     websocket: WebSocket,
-    audio_chunk: np.ndarray,
+    audio_chunk: NDArray[Any],
     chunk_index: int,
     sample_rate: int,
 ) -> None:

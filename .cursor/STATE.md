@@ -52,8 +52,8 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## Next 3 Steps
 
 1. **Phase 5–9** — COMPLETE (2026-03-11). IEnginesClient through IQualityHistoryService; 7B creep; 8A stale refs; 8B STATE split; 9A skip debt fifth batch; 9B mypy sixth slice.
-2. **Mypy seventh slice** — COMPLETE (2026-03-11). cloning.py, processing.py strict pass.
-3. **Future** — Additional domain seam extractions, skip debt burn-down, mypy slices (voice/_shared, _helpers) as capacity allows.
+2. **Mypy seventh–eighth slice** — COMPLETE (2026-03-11). cloning.py, processing.py, _helpers.py, _shared.py strict pass.
+3. **Future** — Additional domain seam extractions, skip debt burn-down, mypy slices (backend/services) as capacity allows.
 
 **Plan:** Phase 2 Post-Timeline Hardening — COMPLETE (2026-03-11). REQUEST_COORDINATION_AUDIT: Open Remediation Queue added; bounded-request test: TimelinePanelScenario_*; dialog baseline: 0; creep detection: active. TimelineTrackService, ProjectAudioClient, TimelineTranscriptionService: policy/null-normalization added.
 

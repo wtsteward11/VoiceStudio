@@ -67,6 +67,11 @@ Run mypy with `--strict` and address findings incrementally. Target modules: `ba
 - `mypy backend/api/routes/voice/cloning.py backend/api/routes/voice/processing.py --strict --follow-imports=skip` passes.
 - Fixes: file-level `untyped-decorator` disable (SAFETY: FastAPI router decorators lack complete type stubs); `getattr(cv2, "VideoWriter_fourcc")` for opencv stub gap (no type: ignore).
 
+## Eighth Slice Complete (2026-03-11)
+
+- `mypy backend/api/routes/voice/_helpers.py backend/api/routes/voice/_shared.py --strict --follow-imports=skip` passes.
+- Fixes: `**kwargs: Any` for _log_context; return type `-> None` for _ensure_tts_assets, _ensure_vc_assets; `str()` for no-any-return in _normalize_engine_id and _select_engine_with_fallback; `NDArray[Any]` for _send_audio_chunk.
+
 ## Proof Criteria
 
 - `mypy backend/api/routes/ --strict` passes (or documented exceptions)

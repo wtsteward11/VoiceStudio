@@ -99,6 +99,21 @@ namespace VoiceStudio.App.Services
       // Voice synthesis panel facade (Phase 4 Post-Timeline 4A.2 Phase A)
       services.AddSingleton<IVoiceSynthesisService, VoiceSynthesisService>();
 
+      // Engines facade (Phase 5 Post-Timeline 5A)
+      services.AddSingleton<IEnginesClient, EnginesClient>();
+
+      // Quality pipeline facade (Phase 5 Post-Timeline 5B)
+      services.AddSingleton<IQualityPipelineService, QualityPipelineService>();
+
+      // Ensemble facade (Phase 5 Post-Timeline 5C)
+      services.AddSingleton<IEnsembleService, EnsembleService>();
+
+      // Text analysis facade (Phase 5 Post-Timeline 5D)
+      services.AddSingleton<ITextAnalysisService, TextAnalysisService>();
+
+      // Quality history facade (Phase 5 Post-Timeline 5D)
+      services.AddSingleton<IQualityHistoryService, QualityHistoryService>();
+
       // Project audio facade (Timeline hardening Phase 3)
       services.AddSingleton<IProjectAudioClient, ProjectAudioClient>();
 
@@ -388,6 +403,7 @@ namespace VoiceStudio.App.Services
     public static IBackendClient GetBackendClient() => GetRequiredService<IBackendClient>();
     public static IProjectsClient GetProjectsClient() => GetRequiredService<IProjectsClient>();
     public static IProfilesClient GetProfilesClient() => GetRequiredService<IProfilesClient>();
+    public static IEnginesClient GetEnginesClient() => GetRequiredService<IEnginesClient>();
     public static ITimelineClipService GetTimelineClipService() => GetRequiredService<ITimelineClipService>();
     public static ITimelineTrackService GetTimelineTrackService() => GetRequiredService<ITimelineTrackService>();
     public static ITimelineTranscriptionService GetTimelineTranscriptionService() => GetRequiredService<ITimelineTranscriptionService>();

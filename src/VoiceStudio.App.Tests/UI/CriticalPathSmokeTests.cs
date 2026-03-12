@@ -60,8 +60,19 @@ namespace VoiceStudio.App.Tests.UI
           logService: null,
           dialogService: null,
           previewService: null);
+      var voiceSynthesisService = new VoiceStudio.App.Services.VoiceSynthesisService(_mockBackendClient!);
+      var enginesClient = new VoiceStudio.App.Services.EnginesClient(_mockBackendClient!);
+      var qualityPipelineService = new VoiceStudio.App.Services.QualityPipelineService(_mockBackendClient!);
+      var ensembleService = new VoiceStudio.App.Services.EnsembleService(_mockBackendClient!);
+      var textAnalysisService = new VoiceStudio.App.Services.TextAnalysisService(_mockBackendClient!);
+      var qualityHistoryService = new VoiceStudio.App.Services.QualityHistoryService(_mockBackendClient!);
       var synthesisViewModel = new VoiceStudio.App.Views.Panels.VoiceSynthesisViewModel(
-          _mockBackendClient!,
+          voiceSynthesisService,
+          enginesClient,
+          qualityPipelineService,
+          ensembleService,
+          textAnalysisService,
+          qualityHistoryService,
           profilesClient,
           new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()));
 
@@ -135,8 +146,19 @@ namespace VoiceStudio.App.Tests.UI
           logService: null,
           dialogService: null,
           previewService: null);
+      var voiceSynthesisService = new VoiceStudio.App.Services.VoiceSynthesisService(_mockBackendClient!);
+      var enginesClient = new VoiceStudio.App.Services.EnginesClient(_mockBackendClient!);
+      var qualityPipelineService = new VoiceStudio.App.Services.QualityPipelineService(_mockBackendClient!);
+      var ensembleService = new VoiceStudio.App.Services.EnsembleService(_mockBackendClient!);
+      var textAnalysisService = new VoiceStudio.App.Services.TextAnalysisService(_mockBackendClient!);
+      var qualityHistoryService = new VoiceStudio.App.Services.QualityHistoryService(_mockBackendClient!);
       var synthesisViewModel = new VoiceStudio.App.Views.Panels.VoiceSynthesisViewModel(
-          _mockBackendClient!,
+          voiceSynthesisService,
+          enginesClient,
+          qualityPipelineService,
+          ensembleService,
+          textAnalysisService,
+          qualityHistoryService,
           profilesClient,
           new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()));
       var mockDialog = new Mock<IDialogService>();

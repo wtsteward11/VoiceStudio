@@ -76,7 +76,6 @@ src/VoiceStudio.App/Views/Panels/AudioMonitoringDashboardViewModel.cs:106 # Audi
 src/VoiceStudio.App/Views/Panels/BatchProcessingViewModel.cs:124 # BatchProcessingViewModel constructor
 src/VoiceStudio.App/Views/Panels/DiagnosticsViewModel.cs:269 # DiagnosticsViewModel constructor
 src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs:131 # EffectsMixerViewModel constructor
-src/VoiceStudio.App/Views/Panels/EmotionStylePresetEditorViewModel.cs:66 # EmotionStylePresetEditorViewModel constructor
 src/VoiceStudio.App/Views/Panels/EngineParameterTuningViewModel.cs:58 # EngineParameterTuningViewModel constructor
 src/VoiceStudio.App/Views/Panels/EngineRecommendationViewModel.cs:61 # EngineRecommendationViewModel constructor
 src/VoiceStudio.App/Views/Panels/ImageGenViewModel.cs:140 # ImageGenViewModel constructor
@@ -89,5 +88,5 @@ src/VoiceStudio.App/Views/Panels/SLODashboardViewModel.cs:88 # SLODashboardViewM
 src/VoiceStudio.App/Views/Panels/TagOrganizationViewModel.cs:41 # TagOrganizationViewModel constructor
 src/VoiceStudio.App/Views/Panels/TrainingViewModel.cs:220 # TrainingViewModel constructor
 src/VoiceStudio.App/Views/Panels/TranscribeViewModel.cs:86 # TranscribeViewModel constructor
-src/VoiceStudio.App/Views/Panels/VoiceSynthesisViewModel.cs:223 # VoiceSynthesisViewModel constructor
+src/VoiceStudio.App/Views/Panels/EmotionStylePresetEditorViewModel.cs:68 # EmotionStylePresetEditorViewModel (emotion presets CRUD; synthesis via IVoiceSynthesisService)
 src/VoiceStudio.App/Views/Panels/WorkflowAutomationViewModel.cs:56 # WorkflowAutomationViewModel constructor

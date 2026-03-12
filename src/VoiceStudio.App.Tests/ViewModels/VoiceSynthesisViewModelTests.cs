@@ -19,6 +19,12 @@ namespace VoiceStudio.App.Tests.ViewModels
   public class VoiceSynthesisViewModelTests
   {
     private Mock<IBackendClient> _mockBackendClient = null!;
+    private Mock<IVoiceSynthesisService> _mockVoiceSynthesisService = null!;
+    private Mock<IEnginesClient> _mockEnginesClient = null!;
+    private Mock<IQualityPipelineService> _mockQualityPipelineService = null!;
+    private Mock<IEnsembleService> _mockEnsembleService = null!;
+    private Mock<ITextAnalysisService> _mockTextAnalysisService = null!;
+    private Mock<IQualityHistoryService> _mockQualityHistoryService = null!;
     private Mock<IProfilesClient> _mockProfilesClient = null!;
     private Mock<IAudioPlayerService> _mockAudioPlayer = null!;
     private VoiceSynthesisViewModel _sut = null!;
@@ -27,6 +33,8 @@ namespace VoiceStudio.App.Tests.ViewModels
     public void Setup()
     {
       _mockBackendClient = new Mock<IBackendClient>();
+      _mockVoiceSynthesisService = new Mock<IVoiceSynthesisService>();
+      _mockEnginesClient = new Mock<IEnginesClient>();
       _mockProfilesClient = new Mock<IProfilesClient>();
       _mockAudioPlayer = new Mock<IAudioPlayerService>();
 
@@ -34,9 +42,20 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockProfilesClient
           .Setup(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()))
           .ReturnsAsync(new List<VoiceProfile>());
+      _mockEnginesClient
+          .Setup(x => x.GetEnginesAsync(It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<string>());
+      _mockQualityPipelineService
+          .Setup(x => x.ListQualityPipelinePresetsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<string>());
 
       _sut = new VoiceSynthesisViewModel(
-          _mockBackendClient.Object,
+          _mockVoiceSynthesisService.Object,
+          _mockEnginesClient.Object,
+          _mockQualityPipelineService.Object,
+          _mockEnsembleService.Object,
+          _mockTextAnalysisService.Object,
+          _mockQualityHistoryService.Object,
           _mockProfilesClient.Object,
           _mockAudioPlayer.Object
       );
@@ -63,18 +82,10 @@ namespace VoiceStudio.App.Tests.ViewModels
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
-    {
-      // Act
-      _ = new VoiceSynthesisViewModel(null!, _mockProfilesClient.Object, _mockAudioPlayer.Object);
-    }
-
-    [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
     public void Constructor_WithNullProfilesClient_ThrowsArgumentNullException()
     {
       // Act
-      _ = new VoiceSynthesisViewModel(_mockBackendClient.Object, null!, _mockAudioPlayer.Object);
+      _ = new VoiceSynthesisViewModel(_mockVoiceSynthesisService.Object, _mockEnginesClient.Object, _mockQualityPipelineService.Object, _mockEnsembleService.Object, _mockTextAnalysisService.Object, _mockQualityHistoryService.Object, null!, _mockAudioPlayer.Object);
     }
 
     [TestMethod]
@@ -82,7 +93,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public void Constructor_WithNullAudioPlayer_ThrowsArgumentNullException()
     {
       // Act
-      _ = new VoiceSynthesisViewModel(_mockBackendClient.Object, _mockProfilesClient.Object, null!);
+      _ = new VoiceSynthesisViewModel(_mockVoiceSynthesisService.Object, _mockEnginesClient.Object, _mockQualityPipelineService.Object, _mockEnsembleService.Object, _mockTextAnalysisService.Object, _mockQualityHistoryService.Object, _mockProfilesClient.Object, null!);
     }
 
     #endregion

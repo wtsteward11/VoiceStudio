@@ -39,8 +39,12 @@ namespace VoiceStudio.App.Views.Panels
     public string PanelId => "voice_synthesis";
     public string DisplayName => ResourceHelper.GetString("Panel.VoiceSynthesis.DisplayName", "Voice Synthesis");
     public PanelRegion Region => PanelRegion.Center;
-    private readonly IBackendClient _backendClient;
     private readonly IVoiceSynthesisService _voiceSynthesisService;
+    private readonly IEnginesClient _enginesClient;
+    private readonly IQualityPipelineService _qualityPipelineService;
+    private readonly IEnsembleService _ensembleService;
+    private readonly ITextAnalysisService _textAnalysisService;
+    private readonly IQualityHistoryService _qualityHistoryService;
     private readonly IProfilesClient _profilesClient;
     private readonly IAudioPlayerService _audioPlayer;
     private readonly RealTimeQualityService? _qualityService;
@@ -221,11 +225,15 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private double temperature = 0.35;
 
-    public VoiceSynthesisViewModel(IBackendClient backendClient, IVoiceSynthesisService voiceSynthesisService, IProfilesClient profilesClient, IAudioPlayerService audioPlayer)
+    public VoiceSynthesisViewModel(IVoiceSynthesisService voiceSynthesisService, IEnginesClient enginesClient, IQualityPipelineService qualityPipelineService, IEnsembleService ensembleService, ITextAnalysisService textAnalysisService, IQualityHistoryService qualityHistoryService, IProfilesClient profilesClient, IAudioPlayerService audioPlayer)
         : base(AppServices.GetViewModelContext())
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _voiceSynthesisService = voiceSynthesisService ?? throw new ArgumentNullException(nameof(voiceSynthesisService));
+      _enginesClient = enginesClient ?? throw new ArgumentNullException(nameof(enginesClient));
+      _qualityPipelineService = qualityPipelineService ?? throw new ArgumentNullException(nameof(qualityPipelineService));
+      _ensembleService = ensembleService ?? throw new ArgumentNullException(nameof(ensembleService));
+      _textAnalysisService = textAnalysisService ?? throw new ArgumentNullException(nameof(textAnalysisService));
+      _qualityHistoryService = qualityHistoryService ?? throw new ArgumentNullException(nameof(qualityHistoryService));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
@@ -545,7 +553,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       try
       {
-        var engines = await _backendClient.GetEnginesAsync(cancellationToken);
+        var engines = await _enginesClient.GetEnginesAsync(cancellationToken);
         AvailableEngines.Clear();
         foreach (var engine in engines)
         {
@@ -785,7 +793,7 @@ namespace VoiceStudio.App.Views.Panels
         };
 
         // Store via backend client
-        await _backendClient.StoreQualityHistoryAsync(request, cancellationToken);
+        await _qualityHistoryService.StoreQualityHistoryAsync(request, cancellationToken);
       }
       catch (OperationCanceledException)
       {
@@ -1328,7 +1336,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        TextAnalysis = await _backendClient.AnalyzeTextAsync(Text, Language, cancellationToken);
+        TextAnalysis = await _textAnalysisService.AnalyzeTextAsync(Text, Language, cancellationToken);
       }
       catch (OperationCanceledException)
       {
@@ -1366,9 +1374,9 @@ namespace VoiceStudio.App.Views.Panels
       {
         var availableEngines = AvailableEngines.Count > 0
             ? AvailableEngines.ToList()
-            : await _backendClient.GetEnginesAsync(cancellationToken);
+            : await _enginesClient.GetEnginesAsync(cancellationToken);
 
-        QualityRecommendation = await _backendClient.GetQualityRecommendationAsync(
+        QualityRecommendation = await _textAnalysisService.GetQualityRecommendationAsync(
             Text,
             Language,
             availableEngines,
@@ -1462,7 +1470,7 @@ namespace VoiceStudio.App.Views.Panels
           QualityThreshold = 0.85
         };
 
-        var response = await _backendClient.CreateMultiEngineEnsembleAsync(request, cancellationToken);
+        var response = await _ensembleService.CreateMultiEngineEnsembleAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -1519,7 +1527,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var status = await _backendClient.GetMultiEngineEnsembleStatusAsync(EnsembleJobId, cancellationToken);
+        var status = await _ensembleService.GetMultiEngineEnsembleStatusAsync(EnsembleJobId, cancellationToken);
 
         if (status != null)
         {
@@ -1636,7 +1644,7 @@ namespace VoiceStudio.App.Views.Panels
       try
       {
         // Get available preset names
-        var presetNames = await _backendClient.ListQualityPipelinePresetsAsync(SelectedEngine, cancellationToken);
+        var presetNames = await _qualityPipelineService.ListQualityPipelinePresetsAsync(SelectedEngine, cancellationToken);
 
         // Convert preset names to QualityPipeline objects by loading each configuration
         AvailablePipelines.Clear();
@@ -1646,7 +1654,7 @@ namespace VoiceStudio.App.Views.Panels
 
           try
           {
-            var config = await _backendClient.GetQualityPipelineAsync(SelectedEngine, presetName, cancellationToken);
+            var config = await _qualityPipelineService.GetQualityPipelineAsync(SelectedEngine, presetName, cancellationToken);
             if (config != null)
             {
               var pipeline = new QualityPipeline
@@ -1712,7 +1720,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           try
           {
-            config = await _backendClient.GetQualityPipelineAsync(SelectedEngine, presetName, cancellationToken);
+            config = await _qualityPipelineService.GetQualityPipelineAsync(SelectedEngine, presetName, cancellationToken);
           }
           catch (Exception ex)
       {
@@ -1724,7 +1732,7 @@ namespace VoiceStudio.App.Views.Panels
           config = SelectedPipelineConfig;
         }
 
-        PipelinePreview = await _backendClient.PreviewQualityPipelineAsync(
+        PipelinePreview = await _qualityPipelineService.PreviewQualityPipelineAsync(
             LastSynthesizedAudioId,
             SelectedEngine,
             presetName,
@@ -1780,7 +1788,7 @@ namespace VoiceStudio.App.Views.Panels
       {
         var presetName = SelectedPipelinePreset;
 
-        PipelineComparison = await _backendClient.CompareQualityPipelineAsync(
+        PipelineComparison = await _qualityPipelineService.CompareQualityPipelineAsync(
             LastSynthesizedAudioId,
             SelectedEngine,
             presetName,

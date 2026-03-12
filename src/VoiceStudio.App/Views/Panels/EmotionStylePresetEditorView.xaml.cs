@@ -18,7 +18,8 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       ViewModel = new EmotionStylePresetEditorViewModel(
-          ServiceProvider.GetBackendClient()
+          ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<IVoiceSynthesisService>()
       );
       this.DataContext = ViewModel;
 

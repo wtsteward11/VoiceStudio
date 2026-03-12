@@ -25,8 +25,12 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       ViewModel = new VoiceSynthesisViewModel(
-          ServiceProvider.GetBackendClient(),
           AppServices.GetRequiredService<IVoiceSynthesisService>(),
+          AppServices.GetEnginesClient(),
+          AppServices.GetRequiredService<IQualityPipelineService>(),
+          AppServices.GetRequiredService<IEnsembleService>(),
+          AppServices.GetRequiredService<ITextAnalysisService>(),
+          AppServices.GetRequiredService<IQualityHistoryService>(),
           ServiceProvider.GetProfilesClient(),
           ServiceProvider.GetAudioPlayerService()
       );

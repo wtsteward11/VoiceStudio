@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.App.Services;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 
@@ -17,6 +18,7 @@ namespace VoiceStudio.App.Views.Panels
   public partial class EmotionStylePresetEditorViewModel : ObservableObject
   {
     private readonly IBackendClient _backendClient;
+    private readonly IVoiceSynthesisService _voiceSynthesisService;
 
     [ObservableProperty]
     private ObservableCollection<EmotionStylePreset> presets = new();
@@ -63,9 +65,10 @@ namespace VoiceStudio.App.Views.Panels
             { "calm", new EmotionInfo { Name = "Calm", Description = "Peaceful, relaxed tone" } }
         };
 
-    public EmotionStylePresetEditorViewModel(IBackendClient backendClient)
+    public EmotionStylePresetEditorViewModel(IBackendClient backendClient, IVoiceSynthesisService voiceSynthesisService)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _voiceSynthesisService = voiceSynthesisService ?? throw new ArgumentNullException(nameof(voiceSynthesisService));
       CreatePresetCommand = new AsyncRelayCommand(CreatePresetAsync, () => !string.IsNullOrWhiteSpace(PresetName));
       SavePresetCommand = new AsyncRelayCommand(SavePresetAsync, () => SelectedPreset != null && !string.IsNullOrWhiteSpace(PresetName));
       DeletePresetCommand = new AsyncRelayCommand(DeletePresetAsync, () => SelectedPreset != null);
@@ -378,7 +381,7 @@ namespace VoiceStudio.App.Views.Panels
         };
 
         // Synthesize preview audio
-        var response = await _backendClient.SynthesizeVoiceAsync(request);
+        var response = await _voiceSynthesisService.SynthesizeVoiceAsync(request);
         
         if (response != null && !string.IsNullOrEmpty(response.AudioId))
         {

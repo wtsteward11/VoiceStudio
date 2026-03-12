@@ -93,8 +93,13 @@ def load_synthesize_baseline() -> set[str]:
 SYNTHESIZE_PATTERN = re.compile(r"SynthesizeVoiceAsync\s*\(")
 
 
+def is_synthesis_service_call(line: str) -> bool:
+    """True if SynthesizeVoiceAsync is called through IVoiceSynthesisService (allowed)."""
+    return bool(re.search(r"\w*[Vv]oice[Ss]ynthesis[Ss]ervice\s*\.\s*SynthesizeVoiceAsync", line))
+
+
 def scan_synthesize_file(path: Path) -> list[tuple[int, str]]:
-    """Return list of (line_no, line_text) for SynthesizeVoiceAsync calls."""
+    """Return list of (line_no, line_text) for SynthesizeVoiceAsync calls (excludes service calls)."""
     matches = []
     try:
         text = path.read_text(encoding="utf-8")
@@ -102,7 +107,7 @@ def scan_synthesize_file(path: Path) -> list[tuple[int, str]]:
         return matches
 
     for i, line in enumerate(text.splitlines(), 1):
-        if SYNTHESIZE_PATTERN.search(line):
+        if SYNTHESIZE_PATTERN.search(line) and not is_synthesis_service_call(line):
             matches.append((i, line.strip()))
     return matches
 

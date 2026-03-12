@@ -72,6 +72,91 @@ Run mypy with `--strict` and address findings incrementally. Target modules: `ba
 - `mypy backend/api/routes/voice/_helpers.py backend/api/routes/voice/_shared.py --strict --follow-imports=skip` passes.
 - Fixes: `**kwargs: Any` for _log_context; return type `-> None` for _ensure_tts_assets, _ensure_vc_assets; `str()` for no-any-return in _normalize_engine_id and _select_engine_with_fallback; `NDArray[Any]` for _send_audio_chunk.
 
+## Ninth Slice Complete (2026-03-11)
+
+- `mypy backend/api/routes/voice/ --strict --follow-imports=skip` passes (10 source files).
+- Fixes: Added `__all__` to `_shared.py` for no-implicit-reexport (EngineConfigServiceDep, EngineProcessingException, EngineServiceDep, EngineUnavailableException, EventType, HAS_*, InvalidEngineException, ProfileNotFoundException, STREAMING_ENGINES, get_config, get_engine_breaker, instrument_flow, logger, router).
+
+## Tenth Slice Complete (2026-03-11)
+
+- `mypy backend/services/{path_service,training_broadcaster,script_store,circuit_breaker}.py --strict --follow-imports=skip` passes.
+- Fixes: path_service: `cast(Path, get_path(...))` for no-any-return; training_broadcaster: `dict[str, Any]` for type-arg; script_store: `dict[str, Any]` return; circuit_breaker: `AsyncIterator[None]` for __call__, `*args: Any, **kwargs: Any` for execute, `cast(T, ...)` for async return.
+
+## Eleventh Slice Complete (2026-03-11)
+
+- `mypy backend/services/{emotion_service,track_store,error_tracker,telemetry,slo_monitor,usage_stats}.py --strict --follow-imports=skip` passes.
+- Fixes: emotion_service: `dict[str, Any]` params/return, `cast` for handler result; track_store: `str(track_id)`, `cast` for json.load; error_tracker: `dict[str, Any]` for params/headers; telemetry: `result: dict[str, Any] = {}`; slo_monitor: `deque[MetricSample]`; usage_stats: `cast(Path, ...)`, `dict[str, Any]`, `cast` for json.load.
+
+## Twelfth Slice Complete (2026-03-11)
+
+- `mypy backend/services/{project_service,training_quality}.py --strict --follow-imports=skip` passes.
+- Fixes: project_service: return type `ProjectStoreService` via TYPE_CHECKING; training_quality: `list[dict[str, Any]]` and `dict[str, Any]` for all quality_history params and returns.
+
+## Thirteenth Slice Complete (2026-03-11)
+
+- `mypy backend/services/{api_key_store,profile_store,quality_consistency_service,audio_download_service}.py --strict --follow-imports=skip` passes.
+- Fixes: api_key_store: `cast(dict[str, dict[str, Any]], data.get("keys", {}))` for no-any-return; profile_store: `cast(dict[str, Any], json.load(f))`, `str(profile_id)`; quality_consistency_service: `float(variance**0.5)`; audio_download_service: `cast(Path, cache_path)` for both return paths.
+
+## Fourteenth Slice Complete (2026-03-11)
+
+- `mypy backend/services/JobStateStore.py --strict --follow-imports=skip` passes.
+- Fixes: `cast(Path, get_path("jobs"))` for _resolve_jobs_root; `cast(dict[str, Any], json.loads(...))` for get().
+
+## Fifteenth Slice Complete (2026-03-11)
+
+- `mypy backend/services/workload_balancer.py --strict --follow-imports=skip` passes.
+- Fixes: `asyncio.Task[None]` for type-arg; `cast(int, psutil.virtual_memory().total)`, `cast(int, torch.cuda.device_count())`; `int(len(...))` for nvidia-smi; `int(torch.cuda.get_device_properties(...).total_memory)`; `dict[str, Any]` for get_stats return.
+
+## Sixteenth Slice Complete (2026-03-11)
+
+- `mypy backend/services/request_queue.py --strict --follow-imports=skip` passes.
+- Fixes: `QueuedRequest[T]` for __lt__ param; conditional `engine_sem` when `request.engine_type is not None`; `dict[str, Any]` for get_stats; `RequestQueue[Any]` for global and return type.
+
+## Seventeenth Slice Complete (2026-03-11)
+
+- `mypy backend/services/edit_history.py --strict --follow-imports=skip` passes.
+- Fixes: `track_store: Any` and `-> None` for AddClipCommand, RemoveClipCommand, MoveClipCommand __init__.
+
+## Eighteenth Slice Complete (2026-03-11)
+
+- `mypy backend/services/voice_presets.py backend/services/llm_provider_service.py --strict --follow-imports=skip` passes.
+- Fixes: voice_presets: `list[Callable[[VoicePreset], None]]` for _load_callbacks; llm_provider_service: `list[str] | None` for ProviderInfo.models, `-> None` for __post_init__ and __init__, assert cache before .values()/.get(), to_dict uses `self.models if self.models is not None else []`.
+
+## Nineteenth Slice Complete (2026-03-11)
+
+- `mypy backend/services/ab_testing.py --strict --follow-imports=skip` passes.
+- Fixes: None required; ab_testing already strict-compliant.
+
+## Twentieth Slice Complete (2026-03-11)
+
+- `mypy backend/services/diagnostics.py --strict --follow-imports=skip` passes.
+- Fixes: `dict[str, Any]` for DiagnosticCheck.details, DiagnosticReport.environment, _add_check details param, _collect_environment return and env_info, get_quick_status return; `from typing import Any`.
+
+## Twenty-First Slice Complete (2026-03-11)
+
+- `mypy backend/services/json_file_store.py --strict --follow-imports=skip` passes.
+- Fixes: `-> None` for _ensure_loaded, _write_to_disk, _delete_from_disk, _evict_if_needed, clear; `Callable[[dict[str, Any]], bool]` for search predicate; `_SequenceOfDict` alias to avoid `list` method shadowing; `List[str]` for list_ids; `builtins.list` for list()/list_ids()/clear() return values; `Sequence` for list/search return types.
+
+## Twenty-Second Slice Complete (2026-03-11)
+
+- `mypy backend/services/audit_logger.py --strict --follow-imports=skip` passes.
+- Fixes: `Queue[Any]`, `Task[None]` for type params; `masked: dict[str, Any]` and `nested if nested is not None else value` for _mask_sensitive; `**kwargs: Any` for log_create, log_update, log_delete, log_login; `results: list[AuditEntry] = []` for query.
+
+## Twenty-Third Slice Complete (2026-03-11)
+
+- `mypy backend/services/collaboration_service.py --strict --follow-imports=skip` passes.
+- Fixes: `-> None` for leave_project, update_cursor, subscribe, unsubscribe, _export_vstudio, _export_zip, _export_json; `cast(dict[str, Any], json.loads(...))` in _import_archive; `cast(dict[str, Any], json.load(f))` in _import_json; `from typing import cast`.
+
+## Reassessment (2026-03-11)
+
+- **Decision:** Continue one trivial slice, then pivot to architecture.
+- **Ranked list:** (1) audio_artifacts/usage.py — 1 error, trivial; (2) marketplace_service.py — 1 error; (3) persistent_store.py — 3 errors.
+
+## Twenty-Fourth Slice Complete (2026-03-11)
+
+- `mypy backend/services/audio_artifacts/usage.py --strict --follow-imports=skip` passes.
+- Fixes: `metadata: dict | None` → `metadata: dict[str, Any] | None`; `from typing import Any`.
+
 ## Proof Criteria
 
 - `mypy backend/api/routes/ --strict` passes (or documented exceptions)

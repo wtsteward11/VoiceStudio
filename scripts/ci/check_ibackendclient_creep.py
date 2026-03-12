@@ -34,6 +34,13 @@ SCAN_DIRS = [
     APP / "ViewModels",
 ]
 
+# ViewModels that have a domain seam and MUST NOT take IBackendClient.
+# If they do, fail regardless of baseline (anti-backslide). Add when migrating.
+MIGRATED_NO_IBACKENDCLIENT = [
+    "EmotionStyleControlViewModel",
+    "EmotionControlViewModel",
+]
+
 # Match IBackendClient as constructor parameter (exclude field declarations with readonly)
 IBACKENDCLIENT_PATTERN = re.compile(r"IBackendClient\s+\w+")
 READONLY_PATTERN = re.compile(r"readonly\s+IBackendClient|private\s+readonly\s+IBackendClient")
@@ -122,10 +129,14 @@ def main() -> int:
         if not scan_dir.exists():
             continue
         for path in scan_dir.rglob("*.cs"):
+            stem = path.stem
             for line_no, line_text in scan_file(path):
                 rel = path.relative_to(ROOT)
                 key = f"{rel.as_posix()}:{line_no}"
-                if key not in baseline:
+                # Anti-backslide: migrated domains must not take IBackendClient
+                if stem in MIGRATED_NO_IBACKENDCLIENT:
+                    violations.append((path, line_no, line_text, "IBackendClient"))
+                elif key not in baseline:
                     violations.append((path, line_no, line_text, "IBackendClient"))
 
     # 2. SynthesizeVoiceAsync ownership: no direct calls in panels/ViewModels (unless in baseline)

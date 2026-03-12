@@ -1,5 +1,11 @@
 # VoiceStudio Session State
 
+**Role:** Session state oracle — phase, active task, Next 3 Steps, proof index. Not an archive or dashboard.
+
+**Control doc roles:** `.cursor/STATE.md` (this file) = session context. `AGENTS.md` = rules + truth hierarchy. `CLAUDE.md` = architect prompt. `openmemory.md` = memory-first workflow; not architectural truth. Precedence when docs conflict: code → ADRs → CI → STATE → CLAUDE → conversation.
+
+---
+
 ## Baseline Protection
 
 - **Baseline Tag**: `v1.0.0-baseline`
@@ -51,19 +57,19 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## Next 3 Steps
 
-1. **Phase 5–9** — COMPLETE (2026-03-11). IEnginesClient through IQualityHistoryService; 7B creep; 8A stale refs; 8B STATE split; 9A skip debt fifth batch; 9B mypy sixth slice.
-2. **Mypy seventh–eighth slice** — COMPLETE (2026-03-11). cloning.py, processing.py, _helpers.py, _shared.py strict pass.
-3. **Future** — Additional domain seam extractions, skip debt burn-down, mypy slices (backend/services) as capacity allows.
+1. **Mypy Reassess and Architecture Pivot Plan** — COMPLETE (2026-03-11). Mypy 24; EmotionControlViewModel hardened; thin-wrapper audit; creep baseline shrunk; repo hygiene (STATE role + control doc clarity).
+2. **Future** — Next mypy slice (marketplace_service, persistent_store) or next panel hardening.
+3. **Future** — Drift prevention pass; next architecture target.
 
-**Plan:** Phase 2 Post-Timeline Hardening — COMPLETE (2026-03-11). REQUEST_COORDINATION_AUDIT: Open Remediation Queue added; bounded-request test: TimelinePanelScenario_*; dialog baseline: 0; creep detection: active. TimelineTrackService, ProjectAudioClient, TimelineTranscriptionService: policy/null-normalization added.
+**Plan:** Mypy Reassess and Architecture Pivot — COMPLETE (2026-03-11). IEmotionControlClient added; EmotionControlViewModel migrated; MIGRATED_NO_IBACKENDCLIENT includes EmotionControlViewModel; baseline reduced.
 
-## Last Milestone (PHASE-5-6-VOICESYNTHESIS-CLOSURE)
+## Last Milestone (MYPY-REASSESS-ARCH-PIVOT)
 
-- **ID**: PHASE-5-6-VOICESYNTHESIS-CLOSURE
-- **Title**: Phase 5–6 VoiceSynthesis Closure
+- **ID**: MYPY-REASSESS-ARCH-PIVOT
+- **Title**: Mypy Reassess and Architecture Pivot Plan
 - **Status**: **COMPLETE** (2026-03-11)
-- **Completed**: 5A (IEnginesClient), 5B (IQualityPipelineService), 5C (IEnsembleService), 5D (ITextAnalysisService, IQualityHistoryService), 5E (remove IBackendClient from VoiceSynthesisViewModel), 6 (EmotionStylePresetEditorViewModel → IVoiceSynthesisService)
-- **Verification**: check_ibackendclient_creep.py OK; ibackendclient_baseline.txt and synthesizevoice_baseline.txt shrunk; all gates PASS
+- **Completed**: Mypy twenty-fourth slice (audio_artifacts/usage); EmotionControlViewModel hardened via IEmotionControlClient; thin-wrapper audit extended; creep baseline shrunk (EmotionControlViewModel removed, added to MIGRATED_NO_IBACKENDCLIENT).
+- **Verification**: dotnet build, dotnet test EmotionControlModelTests, python scripts/ci/check_ibackendclient_creep.py
 
 ---
 

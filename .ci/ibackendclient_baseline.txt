@@ -12,8 +12,6 @@ src/VoiceStudio.App/ViewModels/BackupRestoreViewModel.cs:71 # BackupRestoreViewM
 src/VoiceStudio.App/ViewModels/DatasetQAViewModel.cs:65 # DatasetQAViewModel constructor
 src/VoiceStudio.App/ViewModels/DeepfakeCreatorViewModel.cs:71 # DeepfakeCreatorViewModel constructor
 src/VoiceStudio.App/ViewModels/EmbeddingExplorerViewModel.cs:91 # EmbeddingExplorerViewModel constructor
-src/VoiceStudio.App/ViewModels/EmotionControlViewModel.cs:80 # EmotionControlViewModel constructor
-src/VoiceStudio.App/ViewModels/EmotionStyleControlViewModel.cs:61 # EmotionStyleControlViewModel constructor
 src/VoiceStudio.App/ViewModels/EnsembleSynthesisViewModel.cs:84 # EnsembleSynthesisViewModel constructor
 src/VoiceStudio.App/ViewModels/GPUStatusViewModel.cs:49 # GPUStatusViewModel constructor
 src/VoiceStudio.App/ViewModels/GlobalSearchViewModel.cs:55 # GlobalSearchViewModel constructor

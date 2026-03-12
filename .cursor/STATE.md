@@ -51,19 +51,19 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## Next 3 Steps
 
-1. **Phase 4** — COMPLETE. 4A.1 (IABTestService), 4A.2 Phase A (IVoiceSynthesisService), 4B (synthesis.py mypy), 4C (script dedup), 4D (skip-debt), creep review done.
-2. **1D.1** — N/A. TimelineView paste/duplicate flow through ViewModel commands; no GetBackendClient() in current code.
-3. **Future** — VoiceSynthesisViewModel Phase B/C (IEnginesClient, IQualityPipelineService, IEnsembleService) to remove remaining IBackendClient.
+1. **Phase 5–6** — COMPLETE (2026-03-11). IEnginesClient, IQualityPipelineService, IEnsembleService, ITextAnalysisService, IQualityHistoryService; IBackendClient removed from VoiceSynthesisViewModel; EmotionStylePresetEditorViewModel migrated to IVoiceSynthesisService.
+2. **Phase 7–9** — Optional guardrails (7A baseline shrink done; 7B/8/9 deferred).
+3. **Future** — Additional domain seam extractions as capacity allows.
 
 **Plan:** Phase 2 Post-Timeline Hardening — COMPLETE (2026-03-11). REQUEST_COORDINATION_AUDIT: Open Remediation Queue added; bounded-request test: TimelinePanelScenario_*; dialog baseline: 0; creep detection: active. TimelineTrackService, ProjectAudioClient, TimelineTranscriptionService: policy/null-normalization added.
 
-## Last Milestone (PHASE-4-POST-TIMELINE-CONTINUATION)
+## Last Milestone (PHASE-5-6-VOICESYNTHESIS-CLOSURE)
 
-- **ID**: PHASE-4-POST-TIMELINE-CONTINUATION
-- **Title**: Phase 4 Post-Timeline Continuation
+- **ID**: PHASE-5-6-VOICESYNTHESIS-CLOSURE
+- **Title**: Phase 5–6 VoiceSynthesis Closure
 - **Status**: **COMPLETE** (2026-03-11)
-- **Completed**: 1D.1 (N/A doc), 4A.1 (IABTestService, ABTestingViewModel), 4A.2 Phase A (IVoiceSynthesisService, VoiceSynthesisViewModel synthesis+playback), 4B (voice/synthesis.py mypy strict), 4C (script deduplication), 4D (skip-debt infrastructure refs), creep baseline review
-- **Verification**: check_ibackendclient_creep.py OK; ABTestServiceTests 5 passed; mypy synthesis.py strict passes; synthesizevoice_baseline reduced (VoiceSynthesisViewModel removed)
+- **Completed**: 5A (IEnginesClient), 5B (IQualityPipelineService), 5C (IEnsembleService), 5D (ITextAnalysisService, IQualityHistoryService), 5E (remove IBackendClient from VoiceSynthesisViewModel), 6 (EmotionStylePresetEditorViewModel → IVoiceSynthesisService)
+- **Verification**: check_ibackendclient_creep.py OK; ibackendclient_baseline.txt and synthesizevoice_baseline.txt shrunk; all gates PASS
 
 ## Previous Milestone (PHASE-2-POST-TIMELINE-HARDENING)
 

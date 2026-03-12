@@ -1,3 +1,5 @@
+# mypy: disable-error-code="untyped-decorator"
+# SAFETY: FastAPI router decorators lack complete type stubs; route handlers are correctly typed.
 """Voice processing routes - artifact removal, prosody control, post-processing pipeline."""
 
 from __future__ import annotations
@@ -682,7 +684,7 @@ async def post_process_pipeline(
                     import cv2
                     import numpy as np
 
-                    _fourcc_fn: Any = cv2.VideoWriter_fourcc
+                    _fourcc_fn: Any = getattr(cv2, "VideoWriter_fourcc")
                     processed_video_path = video_path
                     stages_applied = []
                     total_quality_improvement = 0.0

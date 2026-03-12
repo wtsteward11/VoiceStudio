@@ -1,3 +1,5 @@
+# mypy: disable-error-code="untyped-decorator"
+# SAFETY: FastAPI router decorators lack complete type stubs; route handlers are correctly typed.
 """Voice cloning routes - clone voice from reference audio."""
 
 from __future__ import annotations

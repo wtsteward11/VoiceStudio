@@ -138,6 +138,14 @@ def main():
             "command": f"{sys.executable} -m tools.overseer.verification.completion_guard"
         })
 
+    # IBackendClient creep + SynthesizeVoiceAsync ownership (Phase 7B)
+    creep_script = project_root / "scripts" / "ci" / "check_ibackendclient_creep.py"
+    if creep_script.exists():
+        checks.append({
+            "name": "ibackendclient_creep",
+            "command": f"{sys.executable} {creep_script}"
+        })
+
     # Quality checks (WS-1, WS-4) - can be skipped with --skip-quality
     if not skip_quality:
         # Empty catch block check (WS-1) - needs longer timeout due to large codebase scan

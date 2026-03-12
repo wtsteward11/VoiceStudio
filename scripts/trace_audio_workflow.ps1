@@ -105,7 +105,7 @@ if ($AudioPath) {
         $setupArgs += "-SkipLFS"
     }
     
-    $setupScript = Join-Path $ProjectRoot "scripts\setup_test_audio.ps1"
+    $setupScript = Join-Path $ProjectRoot "scripts\setup\setup_test_audio.ps1"
     if (Test-Path $setupScript) {
         try {
             & $setupScript @setupArgs

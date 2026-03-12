@@ -26,7 +26,10 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new TextSpeechEditorViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient()
+          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
+          AppServices.GetProjectsClient(),
+          ServiceProvider.GetProfilesClient(),
+          VoiceStudio.App.Services.ServiceProvider.GetAudioPlayerService()
       );
       DataContext = ViewModel;
 
@@ -341,6 +344,13 @@ namespace VoiceStudio.App.Views.Panels
           picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary;
           picker.FileTypeChoices.Add("JSON", new[] { ".json" });
           picker.SuggestedFileName = $"{sessionItem.Title}_export";
+
+          var window = Microsoft.UI.Xaml.Window.Current;
+          if (window != null)
+          {
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+          }
 
           var file = await picker.PickSaveFileAsync();
           if (file != null)

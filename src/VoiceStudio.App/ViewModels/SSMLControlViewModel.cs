@@ -63,6 +63,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string statusMessage = string.Empty;
 
+    // CRIT-2: Last preview AudioId for PlayCommand (replay without re-synthesizing)
+    [ObservableProperty]
+    private string? previewAudioId;
+
     public ObservableCollection<SSMLError> ValidationErrorsFormatted
     {
       get
@@ -173,9 +177,21 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
+      PlayCommand = new EnhancedAsyncRelayCommand(async (ct) =>
+      {
+        using var profiler = PerformanceProfiler.StartCommand("Play");
+        await PlayPreviewAsync(ct);
+      }, () => !string.IsNullOrEmpty(PreviewAudioId) && !IsLoading);
 
       // Initialize with default SSML template
       SSMLContent = "<speak>\n  <p>Hello, this is a test.</p>\n</speak>";
+
+      // Notify PlayCommand when IsLoading changes
+      PropertyChanged += (_, e) =>
+      {
+        if (e.PropertyName == nameof(IsLoading))
+          PlayCommand.NotifyCanExecuteChanged();
+      };
 
       // Load initial data
       _ = LoadDocumentsAsync(CancellationToken.None);
@@ -187,6 +203,7 @@ namespace VoiceStudio.App.ViewModels
     public IAsyncRelayCommand<SSMLDocumentItem> DeleteDocumentCommand { get; }
     public IAsyncRelayCommand ValidateCommand { get; }
     public IAsyncRelayCommand PreviewCommand { get; }
+    public IAsyncRelayCommand PlayCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
 
     // Compatibility alias for code expecting SSMLContent (uppercase acronym)
@@ -546,6 +563,8 @@ namespace VoiceStudio.App.ViewModels
 
         if (response != null && !string.IsNullOrEmpty(response.AudioId))
         {
+          PreviewAudioId = response.AudioId;
+          PlayCommand.NotifyCanExecuteChanged();
           await _audioPlayer.PlayBackendAudioIdAsync(response.AudioId, _backendBaseUrl, () =>
           {
             StatusMessage = ResourceHelper.GetString("SSMLControl.PreviewPlaybackComplete", "Preview playback complete");
@@ -562,6 +581,24 @@ namespace VoiceStudio.App.ViewModels
       finally
       {
         IsLoading = false;
+      }
+    }
+
+    private async Task PlayPreviewAsync(CancellationToken cancellationToken)
+    {
+      if (string.IsNullOrEmpty(PreviewAudioId))
+        return;
+
+      try
+      {
+        await _audioPlayer.PlayBackendAudioIdAsync(PreviewAudioId, _backendBaseUrl, () =>
+        {
+          StatusMessage = ResourceHelper.GetString("SSMLControl.PreviewPlaybackComplete", "Preview playback complete");
+        });
+      }
+      catch (Exception ex)
+      {
+        ErrorMessage = ResourceHelper.FormatString("SSMLControl.PreviewFailed", ex.Message);
       }
     }
 
@@ -598,6 +635,11 @@ namespace VoiceStudio.App.ViewModels
     partial void OnSelectedProfileIdChanged(string? value)
     {
       _ = LoadDocumentsAsync(CancellationToken.None);
+    }
+
+    partial void OnPreviewAudioIdChanged(string? value)
+    {
+      PlayCommand.NotifyCanExecuteChanged();
     }
 
     // Response models

@@ -58,6 +58,7 @@ namespace VoiceStudio.App.Tests.Services
       {
         await playTask;
       }
+      // ALLOWED: empty catch - test teardown, playback may throw when stopped
       catch
       {
         // Ignore - playback may throw when stopped
@@ -99,6 +100,7 @@ namespace VoiceStudio.App.Tests.Services
       {
         Environment.SetEnvironmentVariable("TMP", oldTmp ?? string.Empty);
         Environment.SetEnvironmentVariable("TEMP", oldTemp ?? string.Empty);
+        // ALLOWED: empty catch - test cleanup best effort
         try { Directory.Delete(testTemp, true); } catch { /* best effort */ }
       }
     }
@@ -120,6 +122,7 @@ namespace VoiceStudio.App.Tests.Services
       {
         await playTask;
       }
+      // ALLOWED: empty catch - test teardown, playback may throw on Dispose
       catch
       {
         // Ignore

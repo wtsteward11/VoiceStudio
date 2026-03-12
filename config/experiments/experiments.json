@@ -1,0 +1,35 @@
+{
+  "experiments": [
+    {
+      "id": "td043-test",
+      "name": "Test",
+      "description": "",
+      "status": "archived",
+      "variants": [
+        {
+          "id": "a",
+          "name": "A",
+          "description": "",
+          "weight": 50,
+          "config": {}
+        },
+        {
+          "id": "b",
+          "name": "B",
+          "description": "",
+          "weight": 50,
+          "config": {}
+        }
+      ],
+      "created_at": "2026-03-11T03:05:50.619008",
+      "updated_at": "2026-03-11T03:05:50.636333",
+      "start_date": "2026-03-11T03:05:50.623919",
+      "end_date": null,
+      "target_sample_size": 0,
+      "current_sample_size": 0,
+      "metrics": [],
+      "tags": []
+    }
+  ],
+  "updated_at": "2026-03-11T03:05:50.636333"
+}

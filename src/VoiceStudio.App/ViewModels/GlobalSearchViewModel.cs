@@ -10,6 +10,7 @@ using Microsoft.UI.Xaml;
 using VoiceStudio.App.Services;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.ViewModels
 {
@@ -21,6 +22,7 @@ namespace VoiceStudio.App.ViewModels
     private readonly IBackendClient _backendClient;
     private readonly SemaphoreSlim _searchSemaphore = new(1, 1);
     private int _activeSearchCount;
+    private CancellationTokenSource? _searchDebounceCts;
 
     [ObservableProperty]
     private string searchQuery = string.Empty;
@@ -124,7 +126,21 @@ namespace VoiceStudio.App.ViewModels
     partial void OnSearchQueryChanged(string value)
     {
       OnPropertyChanged(nameof(CanSearch));
-      _ = SearchAsync();
+      _searchDebounceCts?.Cancel();
+      _searchDebounceCts = new CancellationTokenSource();
+      var cts = _searchDebounceCts;
+      _ = Task.Run(async () =>
+      {
+        try
+        {
+          await Task.Delay(300, cts.Token);
+          Dispatcher.TryEnqueue(() => _ = SearchAsync());
+        }
+        catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "GlobalSearchViewModel.OnSearchQueryChanged");
+      }
+      });
     }
 
     partial void OnIsLoadingChanged(bool value)

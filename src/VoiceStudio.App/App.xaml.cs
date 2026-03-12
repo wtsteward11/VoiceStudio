@@ -199,22 +199,8 @@ namespace VoiceStudio.App
         ClearBindingFailures();
       }
 
-      // Load plugins in background (non-blocking)
-      if (!isSmokeMode)
-      {
-        _ = Task.Run(async () =>
-        {
-          try
-          {
-            var pluginManager = ServiceProvider.GetPluginManager();
-            await pluginManager.LoadPluginsAsync();
-          }
-          catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.OnLaunched");
-      }
-        });
-      }
+      // Plugin loading is deferred to DeferredServiceInitializer (runs ~500ms after MainWindow)
+      // to avoid duplicate/race with PluginDiscovery and improve startup time.
 
       if (uiSmoke)
       {
@@ -704,6 +690,14 @@ namespace VoiceStudio.App
       public string[] BindingFailures { get; init; } = [];
       public bool SynthesisStepRan { get; init; }
       public bool PlaybackInvoked { get; init; }
+      public string? AudioId { get; init; }
+      public bool StreamCheckPassed { get; init; }
+      public bool TempFileCreated { get; init; }
+      public bool PlaybackStarted { get; init; }
+      public double PlaybackPositionAdvancedMs { get; init; }
+      public bool LibraryTempFileCreated { get; init; }
+      public bool LibraryPlaybackStarted { get; init; }
+      public double LibraryPlaybackPositionAdvancedMs { get; init; }
       public (string Step, string Error)[] Failures { get; init; } = [];
     }
 
@@ -725,7 +719,7 @@ namespace VoiceStudio.App
           return result with { ExitCode = 2 };
         }
 
-        var (steps, timedOut, timedOutStep, synthesisStepRan, playbackInvoked, synthesisFailures) = await mainWindow.RunGateCUiSmokeNavigationAsync(crashDir).ConfigureAwait(false);
+        var (steps, timedOut, timedOutStep, synthesisStepRan, playbackInvoked, audioId, streamCheckPassed, tempFileCreated, playbackStarted, playbackPositionAdvancedMs, libraryTempFileCreated, libraryPlaybackStarted, libraryPlaybackPositionAdvancedMs, synthesisFailures) = await mainWindow.RunGateCUiSmokeNavigationAsync(crashDir).ConfigureAwait(false);
 
         if (timedOut)
         {
@@ -774,6 +768,14 @@ namespace VoiceStudio.App
           BindingFailures = failures,
           SynthesisStepRan = synthesisStepRan,
           PlaybackInvoked = playbackInvoked,
+          AudioId = audioId,
+          StreamCheckPassed = streamCheckPassed,
+          TempFileCreated = tempFileCreated,
+          PlaybackStarted = playbackStarted,
+          PlaybackPositionAdvancedMs = playbackPositionAdvancedMs,
+          LibraryTempFileCreated = libraryTempFileCreated,
+          LibraryPlaybackStarted = libraryPlaybackStarted,
+          LibraryPlaybackPositionAdvancedMs = libraryPlaybackPositionAdvancedMs,
           Failures = synthesisFailures.ToArray(),
         };
       }
@@ -833,6 +835,14 @@ namespace VoiceStudio.App
             nav_steps = result.NavSteps,
             synthesis_step_ran = result.SynthesisStepRan,
             playback_invoked = result.PlaybackInvoked,
+            audio_id = result.AudioId,
+            stream_check_passed = result.StreamCheckPassed,
+            temp_file_created = result.TempFileCreated,
+            playback_started = result.PlaybackStarted,
+            playback_position_advanced_ms = result.PlaybackPositionAdvancedMs,
+            library_temp_file_created = result.LibraryTempFileCreated,
+            library_playback_started = result.LibraryPlaybackStarted,
+            library_playback_position_advanced_ms = result.LibraryPlaybackPositionAdvancedMs,
             failures = result.Failures.Select(f => new { step = f.Step, error = f.Error }).ToArray(),
             binding_log = result.BindingLogPath,
             binding_failure_count = result.BindingFailures.Length,

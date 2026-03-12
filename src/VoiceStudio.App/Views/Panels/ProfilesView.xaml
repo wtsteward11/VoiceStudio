@@ -110,17 +110,29 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <!-- Search and Tabs -->
+                <!-- Empty state overlay (populated in code-behind) -->
+                <Grid x:Name="ProfilesEmptyStateOverlay" Grid.Row="0" Grid.RowSpan="2" Visibility="Collapsed" />
+
+                <!-- Search and Tabs (Phase 2: wired to ViewModel) -->
                 <StackPanel Grid.Row="0" Margin="8,4,8,4" Spacing="8">
                     <TextBox x:Name="ProfileSearchBox"
                              PlaceholderText="Search profiles..."
+                             Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              AutomationProperties.AutomationId="ProfilesView_SearchBox"
-                             TextChanged="ProfileSearchBox_TextChanged"
                              Height="32" />
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                        <Button Content="All" FontSize="11" Padding="8,2" MinHeight="24" />
-                        <Button Content="Favorites" FontSize="11" Padding="8,2" MinHeight="24" Background="Transparent" />
-                        <Button Content="Recent" FontSize="11" Padding="8,2" MinHeight="24" Background="Transparent" />
+                        <ToggleButton Content="All" FontSize="11" Padding="8,2" MinHeight="24"
+                                      IsChecked="{x:Bind ViewModel.IsFilterAllChecked, Mode=OneWay}"
+                                      Command="{x:Bind ViewModel.SetFilterAllCommand}"
+                                      AutomationProperties.AutomationId="ProfilesView_FilterAll" />
+                        <ToggleButton Content="Favorites" FontSize="11" Padding="8,2" MinHeight="24"
+                                      IsChecked="{x:Bind ViewModel.IsFilterFavoritesChecked, Mode=OneWay}"
+                                      Command="{x:Bind ViewModel.SetFilterFavoritesCommand}"
+                                      AutomationProperties.AutomationId="ProfilesView_FilterFavorites" />
+                        <ToggleButton Content="Recent" FontSize="11" Padding="8,2" MinHeight="24"
+                                      IsChecked="{x:Bind ViewModel.IsFilterRecentChecked, Mode=OneWay}"
+                                      Command="{x:Bind ViewModel.SetFilterRecentCommand}"
+                                      AutomationProperties.AutomationId="ProfilesView_FilterRecent" />
                     </StackPanel>
                 </StackPanel>
 

@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using VoiceStudio.Core.Messaging;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Services.Messaging
 {
@@ -104,10 +105,9 @@ namespace VoiceStudio.App.Services.Messaging
           {
             await handler(message, cancellationToken);
           }
-          // ALLOWED: empty catch - cancellation is intentional, not an error
           catch (OperationCanceledException)
           {
-            // Expected when cancelled
+            System.Diagnostics.Debug.WriteLine("MessengerExtensions: RegisterAsync cancelled");
           }
           catch (Exception ex)
           {

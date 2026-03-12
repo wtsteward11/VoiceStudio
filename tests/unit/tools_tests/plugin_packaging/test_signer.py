@@ -83,7 +83,7 @@ class TestSignatureInfo:
         assert parsed["signer_id"] == "json-test"
 
 
-@pytest.mark.skipif(not HAS_CRYPTOGRAPHY, reason="cryptography library required")
+@pytest.mark.skipif(not HAS_CRYPTOGRAPHY, reason="cryptography library required (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 class TestPluginSigner:
     """Tests for PluginSigner class."""
 

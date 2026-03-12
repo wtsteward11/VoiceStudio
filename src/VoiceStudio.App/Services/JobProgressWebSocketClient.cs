@@ -110,21 +110,24 @@ namespace VoiceStudio.App.Services
       if (message.Topic != "batch" && message.Topic != "training")
         return;
 
+      if (message.Payload == null)
+        return;
+
       try
       {
         var payloadJson = JsonSerializer.Serialize(message.Payload, _jsonOptions);
         using var doc = JsonDocument.Parse(payloadJson);
         var root = doc.RootElement;
 
-        // Determine message type
-        var messageType = root.TryGetProperty("type", out var typeProp)
-            ? typeProp.GetString()
-            : null;
-
+        // Use top-level message.Type first (backend sends type at envelope level)
+        var messageType = !string.IsNullOrWhiteSpace(message.Type)
+            ? message.Type
+            : (root.TryGetProperty("type", out var typeProp) ? typeProp.GetString() : null);
         messageType = string.IsNullOrWhiteSpace(messageType) ? "progress" : messageType;
 
         switch (messageType.ToLowerInvariant())
         {
+          case "update":
           case "progress":
             HandleProgressUpdate(root);
             break;
@@ -141,7 +144,6 @@ namespace VoiceStudio.App.Services
       }
       catch (Exception ex)
       {
-        // Log error but don't throw
         System.Diagnostics.Debug.WriteLine($"Failed to process job progress message: {ex.Message}");
       }
     }

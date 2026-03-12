@@ -9,8 +9,8 @@ Identifies ViewModels using static ServiceProvider calls and
 suggests migration to IViewModelContext.
 
 Usage:
-    python scripts/migrate_di.py
-    python scripts/migrate_di.py --fix  # Apply fixes
+    python scripts/migrate/migrate_di.py
+    python scripts/migrate/migrate_di.py --fix  # Apply fixes
 """
 
 import re

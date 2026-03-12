@@ -32,13 +32,13 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from backend.config.path_config import get_models_path
-from backend.core.circuit_breaker import (
+from backend.ml.models.engine_service import get_engine_service
+from backend.ml.models.model_preflight import PreflightError, ensure_sovits
+from backend.services.circuit_breaker_facade import (
     CircuitBreakerOpenError,
     get_engine_breaker,
 )
-from backend.ml.models.engine_service import get_engine_service
-from backend.ml.models.model_preflight import PreflightError, ensure_sovits
+from backend.services.path_service import PathService
 
 from ..middleware.auth_middleware import require_auth_if_enabled
 from ..models import ApiOk
@@ -409,7 +409,7 @@ async def get_models():
         List of available RVC models
     """
     try:
-        model_cache_dir = os.path.join(str(get_models_path()), "rvc")
+        model_cache_dir = str(PathService.get_models_dir() / "rvc")
 
         models = []
         if os.path.exists(model_cache_dir):
@@ -449,7 +449,7 @@ async def upload_model(model_file: UploadFile = File(...), model_name: str | Non
         Upload result with model_id
     """
     try:
-        model_cache_dir = os.path.join(str(get_models_path()), "rvc")
+        model_cache_dir = str(PathService.get_models_dir() / "rvc")
         os.makedirs(model_cache_dir, exist_ok=True)
 
         # Generate model ID

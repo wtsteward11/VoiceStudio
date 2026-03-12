@@ -24,15 +24,19 @@ namespace VoiceStudio.App.ViewModels
   /// Backend-Frontend Integration Plan - Phase 2: Implements state persistence.
   /// Panel Workflow Integration: Uses WorkflowCoordinatorService for multi-panel workflows.
   /// </summary>
-  public partial class LibraryViewModel : BaseViewModel, IPanelView, IPanelStatePersistable
+  public partial class LibraryViewModel : BaseViewModel, IPanelView, IPanelStatePersistable, IPanelLifecycle
   {
     private readonly IBackendClient _backendClient;
+    private readonly IDialogService _dialogService;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly UndoRedoService? _undoRedoService;
     private readonly IEventAggregator? _eventAggregator;
     private readonly IContextManager? _contextManager;
     private readonly IWorkflowCoordinatorService? _workflowCoordinator;
     private ISubscriptionToken? _profileSelectedToken;
+    private ISubscriptionToken? _assetAddedToken;
+    private ISubscriptionToken? _profileCreatedToken;
+    private ISubscriptionToken? _synthesisCompletedToken;
 
     public string PanelId => "library";
     public string DisplayName => ResourceHelper.GetString("Panel.Library.DisplayName", "Library");
@@ -77,10 +81,17 @@ namespace VoiceStudio.App.ViewModels
 
     public bool IsAssetSelected(string assetId) => _multiSelectState?.SelectedIds.Contains(assetId) ?? false;
 
-    public LibraryViewModel(IViewModelContext context, IBackendClient backendClient)
+    private readonly Action? _triggerImport;
+
+    private CancellationTokenSource? _searchDebounceCts;
+    private const int SearchDebounceMs = 300;
+
+    public LibraryViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService, Action? triggerImport = null)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+      _triggerImport = triggerImport;
       var multiSelectService = AppServices.TryGetMultiSelectService();
       _multiSelectService = multiSelectService ?? throw new InvalidOperationException("MultiSelectService is required but not registered");
       _multiSelectState = _multiSelectService.GetState(PanelId);
@@ -120,6 +131,14 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       });
+      ImportFromEmptyStateCommand = new RelayCommand(
+        () => _triggerImport?.Invoke(),
+        () => _triggerImport != null && !IsLoading);
+      RetryOnErrorCommand = new EnhancedAsyncRelayCommand(async (ct) =>
+      {
+        ErrorMessage = null;
+        await LoadAssetsAsync(ct);
+      }, () => !string.IsNullOrEmpty(ErrorMessage) && !IsLoading);
       LoadAssetTypesCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("LoadAssetTypes");
@@ -157,20 +176,27 @@ namespace VoiceStudio.App.ViewModels
       if (_eventAggregator != null)
       {
         _profileSelectedToken = _eventAggregator.Subscribe<ProfileSelectedEvent>(OnProfileSelected);
-
-        // Subscribe to AssetAddedEvent to auto-refresh when audio is imported
-        // (Audit remediation X-1: imported audio visible in Library)
-        _eventAggregator.Subscribe<AssetAddedEvent>(OnAssetAdded);
-
-        // Subscribe to ProfileCreatedEvent to show cloned voice in Library
-        // (Audit remediation X-2: cloned voice output visible in Library)
-        _eventAggregator.Subscribe<ProfileCreatedEvent>(OnProfileCreatedRefresh);
+        _assetAddedToken = _eventAggregator.Subscribe<AssetAddedEvent>(OnAssetAdded);
+        _profileCreatedToken = _eventAggregator.Subscribe<ProfileCreatedEvent>(OnProfileCreatedRefresh);
+        _synthesisCompletedToken = _eventAggregator.Subscribe<SynthesisCompletedEvent>(OnSynthesisCompleted);
       }
 
       // Load initial data
       _ = LoadAssetTypesAsync(CancellationToken.None);
       _ = LoadFoldersAsync(CancellationToken.None);
       _ = LoadAssetsAsync(CancellationToken.None);
+
+      // Update ShowEmptyState when Assets, IsLoading, or ErrorMessage changes
+      Assets.CollectionChanged += (_, __) => OnPropertyChanged(nameof(ShowEmptyState));
+      PropertyChanged += (_, e) =>
+      {
+        if (e.PropertyName is nameof(IsLoading) or nameof(ErrorMessage))
+        {
+          OnPropertyChanged(nameof(ShowEmptyState));
+          ImportFromEmptyStateCommand.NotifyCanExecuteChanged();
+          RetryOnErrorCommand.NotifyCanExecuteChanged();
+        }
+      };
     }
 
     /// <summary>
@@ -206,6 +232,19 @@ namespace VoiceStudio.App.ViewModels
       _ = LoadAssetsAsync(CancellationToken.None);
     }
 
+    /// <summary>
+    /// Auto-refresh library when synthesis completes (Feature synthesis path).
+    /// GAP-W1: SynthesisCompletedEvent from SynthesisViewModel; AssetAddedEvent covers VoiceSynthesis path.
+    /// </summary>
+    private void OnSynthesisCompleted(SynthesisCompletedEvent e)
+    {
+      System.Diagnostics.Debug.WriteLine(
+          $"LibraryViewModel: Synthesis completed - {e.AudioId} from {e.SourcePanelId}");
+      _ = LoadAssetsAsync(CancellationToken.None);
+    }
+
+    public IRelayCommand ImportFromEmptyStateCommand { get; }
+    public IAsyncRelayCommand RetryOnErrorCommand { get; }
     public IAsyncRelayCommand LoadFoldersCommand { get; }
     public IAsyncRelayCommand LoadAssetsCommand { get; }
     public IAsyncRelayCommand SearchAssetsCommand { get; }
@@ -219,10 +258,35 @@ namespace VoiceStudio.App.ViewModels
     public IRelayCommand ClearAssetSelectionCommand { get; }
     public IAsyncRelayCommand DeleteSelectedAssetsCommand { get; }
 
+    /// <summary>True when assets list is empty, not loading, and no error (show empty state CTA).</summary>
+    public bool ShowEmptyState => (Assets?.Count ?? 0) == 0 && !IsLoading && string.IsNullOrEmpty(ErrorMessage);
+
+    public string EmptyStateTitle => ResourceHelper.GetString("LibraryView_EmptyState.Title", "No Assets");
+    public string EmptyStateMessage => ResourceHelper.GetString("LibraryView_EmptyState.Message", "Import audio files or drag-and-drop to add to library.");
+    public string EmptyStateActionText => ResourceHelper.GetString("LibraryView_EmptyState.ActionText", "Import");
+
     // Context menu commands (Audit remediation C.2)
     public IRelayCommand<LibraryAsset> UseAsCloneReferenceCommand { get; }
     public IRelayCommand<LibraryAsset> UseSynthesisVoiceCommand { get; }
     public IRelayCommand<LibraryAsset> PlayAssetCommand { get; }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    /// <summary>Unsubscribe from EventAggregator to prevent memory leaks (GAP-W3).</summary>
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _profileSelectedToken?.Dispose();
+      _profileSelectedToken = null;
+      _assetAddedToken?.Dispose();
+      _assetAddedToken = null;
+      _profileCreatedToken?.Dispose();
+      _profileCreatedToken = null;
+      _synthesisCompletedToken?.Dispose();
+      _synthesisCompletedToken = null;
+      return Task.CompletedTask;
+    }
 
     private async Task LoadFoldersAsync(CancellationToken cancellationToken)
     {
@@ -462,7 +526,8 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
       await LoadFoldersAsync(cancellationToken);
       await LoadAssetsAsync(cancellationToken);
@@ -507,7 +572,21 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSearchQueryChanged(string? value)
     {
-      _ = SearchAssetsAsync(CancellationToken.None);
+      _searchDebounceCts?.Cancel();
+      _searchDebounceCts = new CancellationTokenSource();
+      var cts = _searchDebounceCts;
+      _ = Task.Run(async () =>
+      {
+        try
+        {
+          await Task.Delay(SearchDebounceMs, cts.Token);
+          Dispatcher.TryEnqueue(() => _ = SearchAssetsAsync(cts.Token));
+        }
+        catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "LibraryViewModel.OnSearchQueryChanged");
+      }
+      });
     }
 
     partial void OnSelectedAssetTypeChanged(string? value)
@@ -544,56 +623,24 @@ namespace VoiceStudio.App.ViewModels
 
     private async Task<string?> ShowFolderNameDialogAsync()
     {
-      var textBox = new TextBox
-      {
-        PlaceholderText = ResourceHelper.GetString("Library.EnterFolderName", "Enter folder name"),
-        Text = ResourceHelper.GetString("Library.NewFolder", "New Folder"),
-        Margin = new Microsoft.UI.Xaml.Thickness(0, 12, 0, 0),
-        HorizontalAlignment = HorizontalAlignment.Stretch
-      };
+      var name = await _dialogService.ShowInputAsync(
+          ResourceHelper.GetString("Library.CreateNewFolder", "Create New Folder"),
+          ResourceHelper.GetString("Library.EnterFolderName", "Enter folder name"),
+          ResourceHelper.GetString("Library.NewFolder", "New Folder"),
+          ResourceHelper.GetString("Library.EnterFolderName", "Enter folder name"));
 
-      var dialog = new ContentDialog
-      {
-        Title = ResourceHelper.GetString("Library.CreateNewFolder", "Create New Folder"),
-        Content = textBox,
-        PrimaryButtonText = ResourceHelper.GetString("Library.Create", "Create"),
-        CloseButtonText = ResourceHelper.GetString("Library.Cancel", "Cancel"),
-        DefaultButton = ContentDialogButton.Primary,
-        XamlRoot = GetXamlRoot()
-      };
+      if (string.IsNullOrWhiteSpace(name))
+        return null;
 
-      // Select all text when dialog opens
-      textBox.Loaded += (_, e) =>
+      name = name.Trim();
+      var invalidChars = System.IO.Path.GetInvalidFileNameChars();
+      if (name.IndexOfAny(invalidChars) >= 0)
       {
-        textBox.SelectAll();
-        textBox.Focus(FocusState.Programmatic);
-      };
-
-      var result = await dialog.ShowAsync();
-      if (result == ContentDialogResult.Primary)
-      {
-        var name = textBox.Text?.Trim();
-        if (!string.IsNullOrWhiteSpace(name))
-        {
-          // Validate folder name (no invalid characters)
-          var invalidChars = System.IO.Path.GetInvalidFileNameChars();
-          if (name.IndexOfAny(invalidChars) >= 0)
-          {
-            ErrorMessage = ResourceHelper.GetString("Library.FolderNameInvalidChars", "Folder name contains invalid characters");
-            return null;
-          }
-          return name;
-        }
+        ErrorMessage = ResourceHelper.GetString("Library.FolderNameInvalidChars", "Folder name contains invalid characters");
+        return null;
       }
 
-      return null;
-    }
-
-    private Microsoft.UI.Xaml.XamlRoot? GetXamlRoot()
-    {
-      // Use the XamlRoot set by the View (MVVM-compliant)
-      // Falls back to null if not set
-      return XamlRoot;
+      return name;
     }
 
     #region Context Menu Commands (Audit remediation C.2)
@@ -805,11 +852,14 @@ namespace VoiceStudio.App.ViewModels
 
       var selectedIds = new List<string>(_multiSelectState.SelectedIds);
 
-      // Show confirmation dialog
-      var confirmed = await ConfirmationDialog.ShowDeleteConfirmationAsync(
-          $"{selectedIds.Count} asset(s)",
-          "assets"
-      );
+      // Show confirmation dialog (Panel Hardening: IDialogService per PANEL_HARDENING_PATTERN)
+      var confirmed = await _dialogService.ShowConfirmationAsync(
+          ResourceHelper.GetString("Library.DeleteAssets", "Delete assets?"),
+          string.Format(
+              ResourceHelper.GetString("Library.DeleteAssetsConfirm", "Are you sure you want to delete '{0}'? This action cannot be undone."),
+              $"{selectedIds.Count} asset(s)"),
+          confirmText: ResourceHelper.GetString("Library.Delete", "Delete"),
+          cancelText: ResourceHelper.GetString("Library.Cancel", "Cancel"));
 
       if (!confirmed)
         return;

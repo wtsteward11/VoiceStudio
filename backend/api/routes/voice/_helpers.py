@@ -17,7 +17,6 @@ from typing import Any
 import numpy as np
 from fastapi import HTTPException, WebSocket
 
-from backend.core.circuit_breaker import get_engine_breaker
 from backend.ml.models.engine_service import get_engine_service
 from backend.ml.models.model_preflight import (
     PreflightError,
@@ -31,6 +30,7 @@ from backend.services.audio_artifacts.use_cases import (
     create_audio_artifact_from_wav_array,
 )
 from backend.services.audio_download_service import download_audio_to_temp
+from backend.services.circuit_breaker_facade import get_engine_breaker
 
 from ...exceptions import InvalidEngineException
 from ...middleware.correlation_id import get_correlation_id, get_span_id, get_trace_id

@@ -31,7 +31,8 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new BatchProcessingViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient()
+          ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<IDialogService>()
       );
       this.DataContext = ViewModel;
 

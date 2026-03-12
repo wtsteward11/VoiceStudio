@@ -1,0 +1,29 @@
+# Reusable Python setup + pip cache (WORKFLOW_CONSOLIDATION_SUBPLAN)
+# Canonical cache key: requirements mode hashes requirements*.txt; editable mode hashes pyproject.toml.
+# Use for jobs that install from requirements.txt or editable install; caller runs pip install after this.
+name: Setup Python with pip cache
+description: Canonical Python setup and pip dependency cache for CI
+inputs:
+  python-version:
+    description: Python version (e.g. 3.11)
+    required: false
+    default: '3.11'
+  cache-mode:
+    description: 'requirements (hash requirements*.txt) or editable (hash pyproject.toml)'
+    required: false
+    default: 'requirements'
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ inputs.python-version }}-${{ inputs.cache-mode == 'editable' && hashFiles('pyproject.toml') || hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ inputs.python-version }}-

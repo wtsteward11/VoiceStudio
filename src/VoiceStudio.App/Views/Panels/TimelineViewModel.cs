@@ -21,9 +21,22 @@ using VoiceStudio.Core.Events;
 namespace VoiceStudio.App.Views.Panels
 {
   // GAP-005: Updated to inherit from BaseViewModel for standardized error handling
-  public partial class TimelineViewModel : BaseViewModel, IPanelView
+  public partial class TimelineViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ITimelineSynthesisService _synthesisService;
+    private readonly ITimelineClipService _clipService;
+    private readonly ITimelineTrackService _trackService;
+    private readonly ITimelineTranscriptionService _transcriptionService;
+    private readonly IProjectAudioClient _projectAudioClient;
+    private readonly IAudioVisualizationService _audioVisualizationService;
+    private readonly IProjectsClient _projectsClient;
+    private readonly IProfilesClient _profilesClient;
+    private readonly IDialogService _dialogService;
+    private IEventAggregator? _eventAggregator;
+    private ISubscriptionToken? _navigateToken;
+    private ISubscriptionToken? _addToTimelineToken;
+    private ISubscriptionToken? _transcriptionCompletedToken;
+    private ISubscriptionToken? _synthesisCompletedToken;
     private readonly IAudioPlayerService _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly UndoRedoService? _undoRedoService;
@@ -130,6 +143,16 @@ namespace VoiceStudio.App.Views.Panels
     private const double PIXELS_PER_SECOND = 100.0;
 
     /// <summary>
+    /// Total timeline duration in seconds (for ruler). Computed from tracks or default 60.
+    /// </summary>
+    public double TotalDuration => ComputeTotalDuration();
+
+    /// <summary>
+    /// Pixels per second for timeline ruler and clip positioning.
+    /// </summary>
+    public double PixelsPerSecond => PIXELS_PER_SECOND * TimelineZoom;
+
+    /// <summary>
     /// Playhead position in pixels for visual rendering.
     /// </summary>
     public double PlayheadPosition => CurrentPlaybackPosition * PIXELS_PER_SECOND * TimelineZoom;
@@ -164,6 +187,27 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnTimelineZoomChanged(double value)
     {
       OnPropertyChanged(nameof(ZoomLevelDisplay));
+      OnPropertyChanged(nameof(PixelsPerSecond));
+    }
+
+    private double ComputeTotalDuration()
+    {
+      double max = 60.0;
+      foreach (var track in Tracks)
+      {
+        foreach (var clip in track.Clips ?? new List<AudioClip>())
+        {
+          var end = clip.StartTime + clip.Duration.TotalSeconds;
+          if (end > max)
+            max = end;
+        }
+      }
+      return Math.Max(60, max + 10);
+    }
+
+    private void NotifyTotalDurationChanged()
+    {
+      OnPropertyChanged(nameof(TotalDuration));
     }
 
     [ObservableProperty]
@@ -250,7 +294,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       try
       {
-        var response = await _backendClient.GetTranscriptionAsync(transcriptionId, ct);
+        var response = await _transcriptionService.GetTranscriptionAsync(transcriptionId, ct);
         if (response != null && response.Segments != null)
         {
           TranscriptSegments.Clear();
@@ -299,9 +343,17 @@ namespace VoiceStudio.App.Views.Panels
     }
 
     public TimelineViewModel(
-      IBackendClient backendClient,
+      ITimelineSynthesisService synthesisService,
+      ITimelineClipService clipService,
+      ITimelineTrackService trackService,
+      ITimelineTranscriptionService transcriptionService,
+      IProjectAudioClient projectAudioClient,
+      IAudioVisualizationService audioVisualizationService,
+      IProjectsClient projectsClient,
+      IProfilesClient profilesClient,
       IAudioPlayerService audioPlayer,
       MultiSelectService multiSelectService,
+      IDialogService dialogService,
       ToastNotificationService? toastNotificationService = null,
       UndoRedoService? undoRedoService = null,
       IErrorPresentationService? errorService = null,
@@ -310,9 +362,17 @@ namespace VoiceStudio.App.Views.Panels
       RecentProjectsService? recentProjectsService = null)
         : base(AppServices.GetViewModelContext())
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _synthesisService = synthesisService ?? throw new ArgumentNullException(nameof(synthesisService));
+      _clipService = clipService ?? throw new ArgumentNullException(nameof(clipService));
+      _trackService = trackService ?? throw new ArgumentNullException(nameof(trackService));
+      _transcriptionService = transcriptionService ?? throw new ArgumentNullException(nameof(transcriptionService));
+      _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
+      _audioVisualizationService = audioVisualizationService ?? throw new ArgumentNullException(nameof(audioVisualizationService));
+      _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
       _multiSelectService = multiSelectService ?? throw new ArgumentNullException(nameof(multiSelectService));
+      _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
       _multiSelectState = _multiSelectService.GetState(PanelId);
 
       // Get optional services using helper (reduces code duplication)
@@ -397,6 +457,8 @@ namespace VoiceStudio.App.Views.Panels
       ZoomOutCommand = new RelayCommand(ZoomOut);
       SeekToPositionCommand = new RelayCommand<double>(SeekToPosition);
 
+      Tracks.CollectionChanged += (_, _) => NotifyTotalDurationChanged();
+
       // Multi-select commands
       SelectAllClipsCommand = new RelayCommand(SelectAllClips, () => GetAllClips().Any());
       ClearClipSelectionCommand = new RelayCommand(ClearClipSelection);
@@ -406,6 +468,20 @@ namespace VoiceStudio.App.Views.Panels
         using var profiler = PerformanceProfiler.StartCommand("DeleteSelectedClips");
         await DeleteSelectedClipsAsync(ct);
       }, () => SelectedClipCount > 0);
+
+      PasteClipCommand = new EnhancedAsyncRelayCommand<AudioClip?>(async (fromClipboard, ct) =>
+      {
+        using var profiler = PerformanceProfiler.StartCommand("PasteClip");
+        await PasteClipAsync(fromClipboard, ct);
+      }, (clip) => clip != null && SelectedTrack != null && SelectedProject != null);
+
+      DuplicateClipCommand = new EnhancedAsyncRelayCommand<AudioClip>(async (clip, ct) =>
+      {
+        if (clip == null)
+          return;
+        using var profiler = PerformanceProfiler.StartCommand("DuplicateClip");
+        await DuplicateClipAsync(clip, ct);
+      }, (clip) => clip != null && SelectedTrack != null && SelectedProject != null);
 
       // Subscribe to selection changes
       _multiSelectService.SelectionChanged += (s, e) =>
@@ -431,16 +507,14 @@ namespace VoiceStudio.App.Views.Panels
 
       _audioPlayer.PositionChanged += (s, position) => CurrentPlaybackPosition = position;
 
-      // Subscribe to NavigateToEvent to handle cross-panel actions
-      // (Audit X-3: Transcription -> Timeline, X-6: Synthesis -> Timeline)
-      var eventAggregator = AppServices.TryGetEventAggregator();
-      if (eventAggregator != null)
+      // Subscribe to cross-panel events (Audit X-3, X-6, C.3, C.4; GAP-W2)
+      _eventAggregator = AppServices.TryGetEventAggregator();
+      if (_eventAggregator != null)
       {
-        eventAggregator.Subscribe<NavigateToEvent>(OnNavigateToTimeline);
-        // C.3: Subscribe to AddToTimelineEvent from Synthesis panels
-        eventAggregator.Subscribe<AddToTimelineEvent>(OnAddToTimeline);
-        // C.4: Subscribe to TranscriptionCompletedEvent for subtitle track
-        eventAggregator.Subscribe<TranscriptionCompletedEvent>(OnTranscriptionCompleted);
+        _navigateToken = _eventAggregator.Subscribe<NavigateToEvent>(OnNavigateToTimeline);
+        _addToTimelineToken = _eventAggregator.Subscribe<AddToTimelineEvent>(OnAddToTimeline);
+        _transcriptionCompletedToken = _eventAggregator.Subscribe<TranscriptionCompletedEvent>(OnTranscriptionCompleted);
+        _synthesisCompletedToken = _eventAggregator.Subscribe<SynthesisCompletedEvent>(OnSynthesisCompleted);
       }
 
       // Load preview settings
@@ -514,6 +588,21 @@ namespace VoiceStudio.App.Views.Panels
     }
 
     /// <summary>
+    /// GAP-W2: Handle SynthesisCompletedEvent for auto-add to timeline when synthesis completes.
+    /// Converts to AddToTimelineEvent and reuses existing add logic.
+    /// </summary>
+    private void OnSynthesisCompleted(SynthesisCompletedEvent e)
+    {
+      var addEvent = new AddToTimelineEvent(
+          e.SourcePanelId,
+          e.AudioId,
+          e.AudioPath,
+          e.Duration,
+          clipName: $"Synthesis - {e.VoiceName ?? "Unknown"}");
+      OnAddToTimeline(addEvent);
+    }
+
+    /// <summary>
     /// C.4: Handle transcription completed event to display subtitles on timeline.
     /// </summary>
     private void OnTranscriptionCompleted(TranscriptionCompletedEvent e)
@@ -548,6 +637,28 @@ namespace VoiceStudio.App.Views.Panels
       _toastNotificationService?.ShowSuccess(
         "Subtitles Loaded",
         $"{e.Segments.Count} segments added to timeline");
+    }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public async Task RefreshAsync(CancellationToken cancellationToken = default) =>
+        await LoadProjectsAsync(cancellationToken);
+
+    /// <inheritdoc />
+    /// <summary>Unsubscribe from EventAggregator to prevent memory leaks (GAP-W3).</summary>
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _navigateToken?.Dispose();
+      _navigateToken = null;
+      _addToTimelineToken?.Dispose();
+      _addToTimelineToken = null;
+      _transcriptionCompletedToken?.Dispose();
+      _transcriptionCompletedToken = null;
+      _synthesisCompletedToken?.Dispose();
+      _synthesisCompletedToken = null;
+      return Task.CompletedTask;
     }
 
     private async Task AddTrackAndClipAsync(AddToTimelineEvent e)
@@ -592,7 +703,7 @@ namespace VoiceStudio.App.Views.Panels
         // Register undo action
         if (_undoRedoService != null)
         {
-          var action = new AddClipAction(Tracks, _backendClient, track, newClip);
+          var action = new AddClipAction(Tracks, track, newClip);
           _undoRedoService.RegisterAction(action);
         }
 
@@ -603,7 +714,7 @@ namespace VoiceStudio.App.Views.Panels
         // Save to backend asynchronously (best effort)
         if (SelectedProject != null)
         {
-          _ = _backendClient.CreateClipAsync(
+          _ = _clipService.CreateClipAsync(
               SelectedProject.Id,
               track.Id,
               newClip,
@@ -658,6 +769,197 @@ namespace VoiceStudio.App.Views.Panels
 
     // Multi-select commands
     public EnhancedAsyncRelayCommand DeleteSelectedClipsCommand { get; }
+    public EnhancedAsyncRelayCommand<AudioClip?> PasteClipCommand { get; }
+    public EnhancedAsyncRelayCommand<AudioClip> DuplicateClipCommand { get; }
+
+    /// <summary>
+    /// Paste a clip from clipboard. View reads clipboard and passes the clip. Panel hardening: no service locator.
+    /// </summary>
+    public async Task PasteClipAsync(AudioClip? fromClipboard, CancellationToken cancellationToken = default)
+    {
+      if (fromClipboard == null || SelectedTrack == null || SelectedProject == null)
+      {
+        _toastNotificationService?.ShowWarning(
+            ResourceHelper.GetString("Project.NoClipboardOrTrack", "No clip in clipboard or no track selected"),
+            ResourceHelper.GetString("Toast.Title.Paste", "Paste"));
+        return;
+      }
+
+      var pastedClip = new AudioClip
+      {
+        Id = Guid.NewGuid().ToString(),
+        Name = fromClipboard.Name + " (Copy)",
+        ProfileId = fromClipboard.ProfileId,
+        AudioId = fromClipboard.AudioId,
+        AudioUrl = fromClipboard.AudioUrl,
+        Duration = fromClipboard.Duration,
+        StartTime = SelectedTrack.Clips.Count > 0
+            ? SelectedTrack.Clips.Max(c => c.EndTime)
+            : 0.0,
+        Engine = fromClipboard.Engine,
+        QualityScore = fromClipboard.QualityScore,
+        WaveformSamples = fromClipboard.WaveformSamples
+      };
+
+      var track = SelectedTrack;
+      var project = SelectedProject;
+
+      _undoRedoService?.AddAction(
+          "Paste Clip",
+          () =>
+          {
+            track.Clips.Remove(pastedClip);
+            _ = _clipService.DeleteClipAsync(project.Id, track.Id, pastedClip.Id);
+          },
+          async () =>
+          {
+            track.Clips.Add(pastedClip);
+            try
+            {
+              await _clipService.CreateClipAsync(project.Id, track.Id, pastedClip, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+              ErrorLogger.LogWarning($"Redo paste sync failed: {ex.Message}", "TimelineViewModel");
+            }
+          });
+
+      try
+      {
+        pastedClip = await _clipService.CreateClipAsync(project.Id, track.Id, pastedClip, cancellationToken);
+      }
+      catch (Exception ex)
+      {
+        _toastNotificationService?.ShowWarning(
+            ResourceHelper.FormatString("Project.PasteBackendWarning", ex.Message),
+            ResourceHelper.GetString("Toast.Title.Paste", "Paste"));
+      }
+
+      track.Clips.Add(pastedClip);
+      _toastNotificationService?.ShowSuccess(
+          ResourceHelper.FormatString("Project.ClipPasted", pastedClip.Name),
+          ResourceHelper.GetString("Toast.Title.Pasted", "Pasted"));
+    }
+
+    /// <summary>
+    /// Duplicate a clip. Panel hardening: no service locator.
+    /// </summary>
+    public async Task DuplicateClipAsync(AudioClip clip, CancellationToken cancellationToken = default)
+    {
+      if (SelectedTrack == null || SelectedProject == null)
+      {
+        _toastNotificationService?.ShowWarning(
+            ResourceHelper.GetString("Project.NoTrackOrProject", "No track or project selected"),
+            ResourceHelper.GetString("Toast.Title.Duplicate", "Duplicate"));
+        return;
+      }
+
+      var duplicatedClip = new AudioClip
+      {
+        Id = Guid.NewGuid().ToString(),
+        Name = clip.Name + " (Copy)",
+        ProfileId = clip.ProfileId,
+        AudioId = clip.AudioId,
+        AudioUrl = clip.AudioUrl,
+        Duration = clip.Duration,
+        StartTime = clip.EndTime + 0.1,
+        Engine = clip.Engine,
+        QualityScore = clip.QualityScore,
+        WaveformSamples = clip.WaveformSamples
+      };
+
+      var track = SelectedTrack;
+      var project = SelectedProject;
+
+      _undoRedoService?.AddAction(
+          "Duplicate Clip",
+          () =>
+          {
+            track.Clips.Remove(duplicatedClip);
+            _ = _clipService.DeleteClipAsync(project.Id, track.Id, duplicatedClip.Id);
+          },
+          async () =>
+          {
+            track.Clips.Add(duplicatedClip);
+            try
+            {
+              await _clipService.CreateClipAsync(project.Id, track.Id, duplicatedClip, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+              ErrorLogger.LogWarning($"Redo duplicate sync failed: {ex.Message}", "TimelineViewModel");
+            }
+          });
+
+      try
+      {
+        duplicatedClip = await _clipService.CreateClipAsync(project.Id, track.Id, duplicatedClip, cancellationToken);
+      }
+      catch (Exception ex)
+      {
+        _toastNotificationService?.ShowWarning(
+            ResourceHelper.FormatString("Project.DuplicateBackendWarning", ex.Message),
+            ResourceHelper.GetString("Toast.Title.Duplicate", "Duplicate"));
+      }
+
+      track.Clips.Add(duplicatedClip);
+      _toastNotificationService?.ShowSuccess(
+          ResourceHelper.FormatString("Project.ClipDuplicated", duplicatedClip.Name),
+          ResourceHelper.GetString("Toast.Title.Duplicated", "Duplicated"));
+    }
+
+    /// <summary>
+    /// Delete a single clip (used by View context menu). Panel hardening: confirmation via IDialogService, backend via _clipService.
+    /// </summary>
+    public async Task DeleteClipAsync(AudioClip clip, bool showConfirmation = true)
+    {
+      if (SelectedTrack == null || SelectedProject == null)
+      {
+        _toastNotificationService?.ShowWarning(
+            ResourceHelper.GetString("Project.NoTrackOrProject", "No track or project selected"),
+            ResourceHelper.GetString("Toast.Title.Delete", "Delete"));
+        return;
+      }
+
+      if (showConfirmation)
+      {
+        var confirmed = await _dialogService.ShowConfirmationAsync(
+            ResourceHelper.GetString("Project.DeleteClipTitle", "Delete Clip"),
+            string.Format(ResourceHelper.GetString("Project.DeleteClipConfirm", "Are you sure you want to delete '{0}'? This action cannot be undone."), clip.Name),
+            ResourceHelper.GetString("Common.Delete", "Delete"),
+            ResourceHelper.GetString("Common.Cancel", "Cancel"));
+        if (!confirmed)
+          return;
+      }
+
+      var track = SelectedTrack;
+      var project = SelectedProject;
+
+      try
+      {
+        await _clipService.DeleteClipAsync(project.Id, track.Id, clip.Id);
+        track.Clips?.Remove(clip);
+
+        if (_undoRedoService != null)
+        {
+          var action = new DeleteClipsAction(Tracks, new[] { (track, clip) });
+          _undoRedoService.RegisterAction(action);
+        }
+
+        _toastNotificationService?.ShowSuccess(
+            ResourceHelper.GetString("Project.ClipDeleted", "Clip deleted"),
+            ResourceHelper.GetString("Toast.Title.ClipDeleted", "Clip Deleted"));
+      }
+      catch (Exception ex)
+      {
+        var errorMsg = ErrorHandler.GetUserFriendlyMessage(ex);
+        _errorService?.ShowError(ex, ResourceHelper.GetString("Error.DeleteClipFailed", "Failed to delete clip"));
+        _logService?.LogError(ex, "DeleteClip");
+        _toastNotificationService?.ShowError(
+            ResourceHelper.FormatString("Error.DeleteClipFailed", errorMsg),
+            ResourceHelper.GetString("Toast.Title.DeleteFailed", "Delete Failed"));
+      }
+    }
 
     private async Task LoadProjectsAsync(CancellationToken cancellationToken)
     {
@@ -666,7 +968,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var projectsList = await _backendClient.GetProjectsAsync(cancellationToken);
+        var projectsList = await _projectsClient.GetProjectsAsync(cancellationToken);
 
         Projects.Clear();
         foreach (var project in projectsList)
@@ -701,7 +1003,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var project = await _backendClient.CreateProjectAsync(name, cancellationToken: cancellationToken);
+        var project = await _projectsClient.CreateProjectAsync(name, cancellationToken: cancellationToken);
         Projects.Add(project);
         SelectedProject = project;
 
@@ -735,11 +1037,13 @@ namespace VoiceStudio.App.Views.Panels
       if (project == null)
         return;
 
-      // Show confirmation dialog
-      var confirmed = await Utilities.ConfirmationDialog.ShowDeleteConfirmationAsync(
-          project.Name ?? ResourceHelper.GetString("Project.Unnamed", "Unnamed Project"),
-          "project"
-      );
+      // Show confirmation dialog (Panel Hardening: IDialogService per PANEL_HARDENING_PATTERN)
+      var projectName = project.Name ?? ResourceHelper.GetString("Project.Unnamed", "Unnamed Project");
+      var confirmed = await _dialogService.ShowConfirmationAsync(
+          "Delete project?",
+          $"Are you sure you want to delete '{projectName}'? This action cannot be undone.",
+          "Delete",
+          "Cancel");
 
       if (!confirmed)
         return;
@@ -749,13 +1053,12 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var success = await _backendClient.DeleteProjectAsync(projectId, cancellationToken);
+        var success = await _projectsClient.DeleteProjectAsync(projectId, cancellationToken);
         if (success)
         {
           var projectToDelete = Projects.FirstOrDefault(p => p.Id == projectId);
           if (projectToDelete != null)
           {
-            var projectName = projectToDelete.Name ?? ResourceHelper.GetString("Project.Unnamed", "Unnamed Project");
             Projects.Remove(projectToDelete);
             if (SelectedProject?.Id == projectId)
             {
@@ -795,7 +1098,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       try
       {
-        var profilesList = await _backendClient.GetProfilesAsync(cancellationToken);
+        var profilesList = await _profilesClient.GetProfilesAsync(cancellationToken);
         AvailableProfiles.Clear();
         foreach (var profile in profilesList)
         {
@@ -825,63 +1128,36 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        SynthesizeCommand.ReportProgress(0);
+        var progress = new Progress<int>(p => SynthesizeCommand.ReportProgress(p));
+        var projectId = SelectedProject?.Id;
+        var result = await _synthesisService.SynthesizeAndSaveAsync(
+          SelectedEngine,
+          SelectedProfileId,
+          SynthesisText,
+          EnhanceQuality,
+          projectId,
+          progress,
+          cancellationToken).ConfigureAwait(true);
 
-        var request = new VoiceSynthesisRequest
-        {
-          Engine = SelectedEngine,
-          ProfileId = SelectedProfileId,
-          Text = SynthesisText,
-          Language = "en",
-          EnhanceQuality = EnhanceQuality
-        };
-
-        SynthesizeCommand.ReportProgress(25);
-        var response = await _backendClient.SynthesizeVoiceAsync(request, cancellationToken);
-
-        SynthesizeCommand.ReportProgress(75);
-        LastQualityScore = response.QualityScore;
-
-        // Store audio information for playback and timeline
-        LastSynthesizedAudioUrl = response.AudioUrl;
-        LastSynthesizedAudioId = response.AudioId;
-        LastSynthesizedDuration = response.Duration;
+        LastQualityScore = result.QualityScore;
+        LastSynthesizedAudioUrl = result.AudioUrl;
+        LastSynthesizedAudioId = result.AudioId;
+        LastSynthesizedDuration = result.Duration;
         CanPlayAudio = !string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl);
         PlayAudioCommand.NotifyCanExecuteChanged();
         AddClipToTrackCommand.NotifyCanExecuteChanged();
 
-        // Automatically save audio to project if project is selected
-        if (SelectedProject != null && !string.IsNullOrWhiteSpace(response.AudioId))
+        if (projectId != null && result.SavedFilename == null)
         {
-          try
-          {
-            // Generate filename from synthesis text
-            var filename = $"{SynthesisText.Substring(0, Math.Min(30, SynthesisText.Length)).Replace(" ", "_")}_{DateTime.Now:yyyyMMdd_HHmmss}.wav";
-            filename = System.Text.RegularExpressions.Regex.Replace(filename, @"[^\w\.-]", "");
-
-            await _backendClient.SaveAudioToProjectAsync(
-                SelectedProject.Id,
-                response.AudioId,
-                filename,
-                cancellationToken);
-          }
-          catch (Exception saveEx)
-          {
-            // Log but don't fail synthesis if save fails
-            var errorMsg = ErrorHandler.GetUserFriendlyMessage(saveEx);
-            ErrorMessage = ResourceHelper.FormatString("Project.SynthesisSaveWarning", errorMsg);
-            _logService?.LogError(saveEx, "SaveAudioToProject");
-          }
+          ErrorMessage = ResourceHelper.GetString("Project.SynthesisSaveWarning", "Audio saved to project but filename could not be recorded.");
         }
 
-        SynthesizeCommand.ReportProgress(100);
         _toastNotificationService?.ShowSuccess(
-            ResourceHelper.GetString("Timeline.SynthesisComplete", "Voice synthesis completed"),
-            ResourceHelper.GetString("VoiceSynthesis.SynthesisComplete", "Synthesis Complete"));
+          ResourceHelper.GetString("Timeline.SynthesisComplete", "Voice synthesis completed"),
+          ResourceHelper.GetString("VoiceSynthesis.SynthesisComplete", "Synthesis Complete"));
       }
       catch (OperationCanceledException)
       {
-        // User cancelled - expected
         return;
       }
       catch (Exception ex)
@@ -916,8 +1192,10 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        // Download audio file from URL
-        using var httpClient = new System.Net.Http.HttpClient();
+        // Download audio file from URL (Phase 4: use shared HttpClient)
+        var httpClient = AppServices.GetService<System.Net.Http.HttpClient>();
+        if (httpClient == null)
+          throw new InvalidOperationException("HttpClient not available");
         var audioBytes = await httpClient.GetByteArrayAsync(LastSynthesizedAudioUrl, cancellationToken);
 
         // Save to temporary file
@@ -1015,6 +1293,8 @@ namespace VoiceStudio.App.Views.Panels
       AddTrackCommand.NotifyCanExecuteChanged();
       LoadProjectAudioCommand.NotifyCanExecuteChanged();
       PlayProjectAudioCommand.NotifyCanExecuteChanged();
+      PasteClipCommand.NotifyCanExecuteChanged();
+      DuplicateClipCommand.NotifyCanExecuteChanged();
 
       if (value != null)
       {
@@ -1054,6 +1334,8 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnSelectedTrackChanged(AudioTrack? value)
     {
       AddClipToTrackCommand.NotifyCanExecuteChanged();
+      PasteClipCommand.NotifyCanExecuteChanged();
+      DuplicateClipCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnVisualizationModeChanged(string value)
@@ -1092,7 +1374,7 @@ namespace VoiceStudio.App.Views.Panels
       try
       {
         // Load tracks from backend
-        var tracksList = await _backendClient.GetTracksAsync(projectId, cancellationToken);
+        var tracksList = await _trackService.GetTracksAsync(projectId, cancellationToken);
 
         Tracks.Clear();
         foreach (var track in tracksList)
@@ -1103,7 +1385,7 @@ namespace VoiceStudio.App.Views.Panels
         // Create default track if none exist
         if (Tracks.Count == 0)
         {
-          var defaultTrack = await _backendClient.CreateTrackAsync(projectId, "Track 1", cancellationToken: cancellationToken);
+          var defaultTrack = await _trackService.CreateTrackAsync(projectId, "Track 1", cancellationToken: cancellationToken);
           Tracks.Add(defaultTrack);
           SelectedTrack = defaultTrack;
         }
@@ -1159,7 +1441,7 @@ namespace VoiceStudio.App.Views.Panels
             : 1;
 
         var trackName = $"Track {newTrackNumber}";
-        var newTrack = await _backendClient.CreateTrackAsync(SelectedProject.Id, trackName, null, cancellationToken);
+        var newTrack = await _trackService.CreateTrackAsync(SelectedProject.Id, trackName, null, cancellationToken);
 
         Tracks.Add(newTrack);
         SelectedTrack = newTrack;
@@ -1169,7 +1451,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           var action = new AddTrackAction(
               Tracks,
-              _backendClient,
+              _trackService,
               newTrack,
               onUndo: (t) =>
               {
@@ -1224,7 +1506,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           var action = new AddTrackAction(
               Tracks,
-              _backendClient,
+              _trackService,
               newTrack,
               onUndo: (t) =>
               {
@@ -1289,7 +1571,7 @@ namespace VoiceStudio.App.Views.Panels
         try
         {
           // Use the saved clip (with backend-assigned ID if different)
-          newClip = await _backendClient.CreateClipAsync(
+          newClip = await _clipService.CreateClipAsync(
               SelectedProject!.Id,
               SelectedTrack.Id,
               newClip,
@@ -1305,13 +1587,13 @@ namespace VoiceStudio.App.Views.Panels
         }
 
         SelectedTrack.Clips.Add(newClip);
+        NotifyTotalDurationChanged();
 
         // Register undo action
         if (_undoRedoService != null)
         {
           var action = new AddClipAction(
               Tracks,
-              _backendClient,
               SelectedTrack,
               newClip);
           _undoRedoService.RegisterAction(action);
@@ -1323,7 +1605,7 @@ namespace VoiceStudio.App.Views.Panels
           if (SelectedProject == null)
             return;
 
-          var savedFile = await _backendClient.SaveAudioToProjectAsync(
+          var savedFile = await _projectAudioClient.SaveAudioToProjectAsync(
               SelectedProject.Id,
               LastSynthesizedAudioId,
               $"{newClip.Id}.wav",
@@ -1386,7 +1668,7 @@ namespace VoiceStudio.App.Views.Panels
           return;
 
         // Fetch waveform data to get duration and prep visuals
-        var waveform = await _backendClient.GetWaveformDataAsync(audioFile.AudioId, cancellationToken: cancellationToken);
+        var waveform = await _audioVisualizationService.GetWaveformDataAsync(audioFile.AudioId, cancellationToken: cancellationToken);
 
         LastSynthesizedAudioId = audioFile.AudioId;
         LastSynthesizedAudioUrl = audioFile.Url;
@@ -1425,7 +1707,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var audioFiles = await _backendClient.ListProjectAudioAsync(SelectedProject.Id, cancellationToken);
+        var audioFiles = await _projectAudioClient.ListProjectAudioAsync(SelectedProject.Id, cancellationToken);
 
         ProjectAudioFiles.Clear();
         foreach (var file in audioFiles)
@@ -1467,7 +1749,7 @@ namespace VoiceStudio.App.Views.Panels
         }
 
         // Get audio stream from backend
-        await using var audioStream = await _backendClient.GetProjectAudioAsync(SelectedProject.Id, filename, cancellationToken);
+        await using var audioStream = await _projectAudioClient.GetProjectAudioAsync(SelectedProject.Id, filename, cancellationToken);
 
         if (audioStream != null)
         {
@@ -1517,7 +1799,7 @@ namespace VoiceStudio.App.Views.Panels
         // Load waveform data
         if (ShowWaveform)
         {
-          var waveformData = await _backendClient.GetWaveformDataAsync(audioIdOrFilename, width: 1024, mode: "peak", cancellationToken);
+          var waveformData = await _audioVisualizationService.GetWaveformDataAsync(audioIdOrFilename, width: 1024, mode: "peak", cancellationToken);
           if (waveformData?.Samples != null)
           {
             WaveformSamples = waveformData.Samples;
@@ -1527,7 +1809,7 @@ namespace VoiceStudio.App.Views.Panels
         // Load spectrogram data
         if (ShowSpectrogram)
         {
-          var spectrogramData = await _backendClient.GetSpectrogramDataAsync(audioIdOrFilename, width: 512, height: 256, cancellationToken);
+          var spectrogramData = await _audioVisualizationService.GetSpectrogramDataAsync(audioIdOrFilename, width: 512, height: 256, cancellationToken);
           if (spectrogramData?.Frames != null)
           {
             // Convert Core.Models.SpectrogramFrame to Controls.SpectrogramFrame
@@ -1563,7 +1845,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var waveformData = await _backendClient.GetWaveformDataAsync(clip.AudioId, width: 512, mode: "peak", cancellationToken);
+        var waveformData = await _audioVisualizationService.GetWaveformDataAsync(clip.AudioId, width: 512, mode: "peak", cancellationToken);
         if (waveformData?.Samples != null)
         {
           clip.WaveformSamples = waveformData.Samples;
@@ -1702,11 +1984,12 @@ namespace VoiceStudio.App.Views.Panels
 
       var selectedIds = new List<string>(_multiSelectState.SelectedIds);
 
-      // Show confirmation dialog
-      var confirmed = await Utilities.ConfirmationDialog.ShowDeleteConfirmationAsync(
-          $"{selectedIds.Count} clip(s)",
-          "clips"
-      );
+      // Show confirmation dialog (Panel Hardening: IDialogService per PANEL_HARDENING_PATTERN)
+      var confirmed = await _dialogService.ShowConfirmationAsync(
+          "Delete clips?",
+          $"Are you sure you want to delete '{selectedIds.Count} clip(s)'? This action cannot be undone.",
+          "Delete",
+          "Cancel");
 
       if (!confirmed)
         return;
@@ -1740,7 +2023,7 @@ namespace VoiceStudio.App.Views.Panels
             // Remove from backend if possible
             try
             {
-              await _backendClient.DeleteClipAsync(SelectedProject.Id, track.Id, clip.Id, cancellationToken);
+              await _clipService.DeleteClipAsync(SelectedProject.Id, track.Id, clip.Id, cancellationToken);
             }
             catch (Exception ex)
       {
@@ -1758,7 +2041,6 @@ namespace VoiceStudio.App.Views.Panels
         {
           var action = new DeleteClipsAction(
               Tracks,
-              _backendClient,
               clipsToDelete);
           _undoRedoService.RegisterAction(action);
         }

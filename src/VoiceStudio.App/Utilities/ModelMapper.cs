@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Utilities;
 
@@ -98,10 +99,10 @@ public static class ModelMapper
                     }
                 }
                 // ALLOWED: empty catch - Type conversion failures are expected during reflection-based property mapping
-                catch (Exception)
-                {
-                    // Intentionally empty - skip properties that can't be copied due to type mismatches
-                }
+                catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "ModelMapper.CopyProperties");
+      }
             }
         }
     }

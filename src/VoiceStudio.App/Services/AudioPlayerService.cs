@@ -42,6 +42,23 @@ namespace VoiceStudio.App.Services
 
     public bool IsPlaying { get; private set; }
     public bool IsPaused { get; private set; }
+
+    /// <summary>
+    /// Path of last temp file created for URL playback. Set when PlayFileAsyncCore receives tempPathToTrack.
+    /// Used by UI smoke to prove temp file creation (works in release/self-test).
+    /// </summary>
+    public string? LastTempPlaybackPath { get; private set; }
+
+    /// <summary>
+    /// Last playback error message. Set when PlaybackStopped receives an exception.
+    /// Cleared when playback starts successfully.
+    /// </summary>
+    public string? LastPlaybackError { get; private set; }
+
+    /// <summary>
+    /// Name of the output device used for playback. Set when playback starts.
+    /// </summary>
+    public string? LastOutputDeviceName { get; private set; }
     public bool IsLooping { get; set; }
     public double Position => _audioFileReader?.CurrentTime.TotalSeconds ?? 0.0;
     public double Duration => _audioFileReader?.TotalTime.TotalSeconds ?? 0.0;
@@ -90,6 +107,7 @@ namespace VoiceStudio.App.Services
 
           // Track temp path for cleanup (set after Stop so we don't delete the file we're about to play)
           _currentTempPlaybackPath = tempPathToTrack;
+          LastTempPlaybackPath = tempPathToTrack;
 
           // Create audio file reader
           _audioFileReader = new NAudio.Wave.AudioFileReader(filePath);
@@ -99,8 +117,36 @@ namespace VoiceStudio.App.Services
           // Create wave out device
           _waveOut = new NAudio.Wave.WaveOutEvent();
           _waveOut.Init(_audioFileReader);
+          LastPlaybackError = null;
+          try
+          {
+            var devNum = _waveOut.DeviceNumber;
+            if (devNum >= -1 && devNum < NAudio.Wave.WaveOut.DeviceCount)
+            {
+              var caps = NAudio.Wave.WaveOut.GetCapabilities(devNum);
+              LastOutputDeviceName = caps.ProductName?.Trim() ?? $"Device {devNum}";
+            }
+            else
+            {
+              LastOutputDeviceName = $"Device {devNum}";
+            }
+          }
+          catch
+          {
+            LastOutputDeviceName = "Unknown";
+          }
+
           _waveOut.PlaybackStopped += (_, args) =>
                 {
+                  if (args.Exception != null)
+                  {
+                    LastPlaybackError = args.Exception.Message;
+                    ErrorLogger.LogError($"Playback stopped with error: {args.Exception.Message}", "AudioPlayerService.PlaybackStopped");
+                    var toast = ServiceProvider.TryGetToastNotificationService();
+                    var device = LastOutputDeviceName ?? "Unknown device";
+                    toast?.ShowError("Playback Failed", $"{args.Exception.Message} (Output: {device})");
+                  }
+
                   // Loop: if IsLooping and playback ended naturally (no error, not user-stopped)
                   if (IsLooping && args.Exception == null && _audioFileReader != null && !_disposed)
                   {
@@ -124,6 +170,7 @@ namespace VoiceStudio.App.Services
                   _audioFileReader?.Dispose();
                   _audioFileReader = null;
                   _currentFilePath = null;
+                  LastTempPlaybackPath = null;
                   onPlaybackComplete?.Invoke();
                 };
 
@@ -186,8 +233,36 @@ namespace VoiceStudio.App.Services
           // Create wave out device
           _waveOut = new NAudio.Wave.WaveOutEvent();
           _waveOut.Init(_rawStream);
+          LastPlaybackError = null;
+          try
+          {
+            var devNum = _waveOut.DeviceNumber;
+            if (devNum >= -1 && devNum < NAudio.Wave.WaveOut.DeviceCount)
+            {
+              var caps = NAudio.Wave.WaveOut.GetCapabilities(devNum);
+              LastOutputDeviceName = caps.ProductName?.Trim() ?? $"Device {devNum}";
+            }
+            else
+            {
+              LastOutputDeviceName = $"Device {devNum}";
+            }
+          }
+          catch
+          {
+            LastOutputDeviceName = "Unknown";
+          }
+
           _waveOut.PlaybackStopped += (_, args) =>
                 {
+                  if (args.Exception != null)
+                  {
+                    LastPlaybackError = args.Exception.Message;
+                    ErrorLogger.LogError($"Playback stopped with error: {args.Exception.Message}", "AudioPlayerService.PlaybackStopped");
+                    var toast = ServiceProvider.TryGetToastNotificationService();
+                    var device = LastOutputDeviceName ?? "Unknown device";
+                    toast?.ShowError("Playback Failed", $"{args.Exception.Message} (Output: {device})");
+                  }
+
                   // Loop: restart from beginning if looping is enabled
                   if (IsLooping && args.Exception == null && _rawStream != null && !_disposed)
                   {
@@ -269,6 +344,7 @@ namespace VoiceStudio.App.Services
           {
             var p = _currentTempPlaybackPath;
             _currentTempPlaybackPath = null;
+            LastTempPlaybackPath = null;
             TryDeleteTempFile(p);
             onPlaybackComplete?.Invoke();
           }, tempPathToTrack: pathToPlay).ConfigureAwait(false);
@@ -277,6 +353,7 @@ namespace VoiceStudio.App.Services
         {
           TryDeleteTempFile(tempPath);
           _currentTempPlaybackPath = null;
+          LastTempPlaybackPath = null;
           throw;
         }
       }
@@ -284,6 +361,7 @@ namespace VoiceStudio.App.Services
       {
         TryDeleteTempFile(tempPath);
         _currentTempPlaybackPath = null;
+        LastTempPlaybackPath = null;
         if (_hasShownPlaybackErrorThisSession)
         {
           ErrorLogger.LogError($"Failed to play audio: {ex.Message}", "AudioPlayerService.PlayUrlAsync");
@@ -315,6 +393,7 @@ namespace VoiceStudio.App.Services
       {
         var tempToDelete = _currentTempPlaybackPath;
         _currentTempPlaybackPath = null;
+        LastTempPlaybackPath = null;
         var fileToDelete = _currentFilePath;
         _currentFilePath = null;
 
@@ -499,9 +578,9 @@ namespace VoiceStudio.App.Services
         if (File.Exists(path))
           File.Delete(path);
       }
-      catch
+      catch (Exception ex)
       {
-        // Best-effort, no throw
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "AudioPlayerService.TryDeleteTempFile");
       }
     }
 

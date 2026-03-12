@@ -19,6 +19,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class VoiceMorphingBlendingViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProfilesClient _profilesClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
     public string PanelId => "voice-morphing-blending";
@@ -90,10 +91,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? morphedAudioUrl;
 
-    public VoiceMorphingBlendingViewModel(IViewModelContext context, IBackendClient backendClient)
+    public VoiceMorphingBlendingViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
       // Get toast notification service (may be null if not initialized)
       try
@@ -178,7 +180,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var profiles = await _backendClient.GetProfilesAsync(cancellationToken);
+        var profiles = await _profilesClient.GetProfilesAsync(cancellationToken);
 
         AvailableVoiceProfiles.Clear();
         foreach (var profile in profiles)

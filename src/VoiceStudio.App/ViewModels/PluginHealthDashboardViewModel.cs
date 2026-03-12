@@ -460,10 +460,10 @@ namespace VoiceStudio.App.ViewModels
     /// </summary>
     public class PluginHealthItem : ObservableObject
     {
-        private static readonly SolidColorBrush HealthyBrush = new(Windows.UI.Color.FromArgb(255, 76, 175, 80));
-        private static readonly SolidColorBrush DegradedBrush = new(Windows.UI.Color.FromArgb(255, 255, 152, 0));
-        private static readonly SolidColorBrush UnhealthyBrush = new(Windows.UI.Color.FromArgb(255, 244, 67, 54));
-        private static readonly SolidColorBrush UnknownBrush = new(Windows.UI.Color.FromArgb(255, 158, 158, 158));
+        private static readonly SolidColorBrush HealthyBrush = new(Microsoft.UI.ColorHelper.FromArgb(255, 76, 175, 80));
+        private static readonly SolidColorBrush DegradedBrush = new(Microsoft.UI.ColorHelper.FromArgb(255, 255, 152, 0));
+        private static readonly SolidColorBrush UnhealthyBrush = new(Microsoft.UI.ColorHelper.FromArgb(255, 244, 67, 54));
+        private static readonly SolidColorBrush UnknownBrush = new(Microsoft.UI.ColorHelper.FromArgb(255, 158, 158, 158));
 
         public string PluginId { get; set; } = string.Empty;
         public PluginHealthStatus Status { get; set; } = PluginHealthStatus.Unknown;

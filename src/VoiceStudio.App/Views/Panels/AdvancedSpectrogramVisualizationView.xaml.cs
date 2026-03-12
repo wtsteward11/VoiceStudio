@@ -13,11 +13,10 @@ namespace VoiceStudio.App.Views.Panels
   {
     public AdvancedSpectrogramVisualizationView()
     {
+      InitializeComponent();
       // Build UI programmatically to avoid XAML compiler issues
-      var rootGrid = new Grid
-      {
-        Background = (Brush)Application.Current.Resources["VSQ.Panel.Background"]
-      };
+      var rootGrid = RootGrid;
+      rootGrid.Background = (Brush)Application.Current.Resources["VSQ.Panel.Background"];
       rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
       rootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
@@ -100,8 +99,6 @@ namespace VoiceStudio.App.Views.Panels
       contentGrid.Children.Add(contentStack);
       Grid.SetRow(contentGrid, 1);
       rootGrid.Children.Add(contentGrid);
-
-      Content = rootGrid;
     }
   }
 }

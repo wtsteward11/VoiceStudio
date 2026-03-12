@@ -17,6 +17,7 @@ namespace VoiceStudio.App.Services.Stores
   public partial class ProjectStore : ObservableObject
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProjectsClient _projectsClient;
     private readonly StateCacheService? _stateCacheService;
     private readonly IProjectRepository? _projectRepository;
 
@@ -52,10 +53,12 @@ namespace VoiceStudio.App.Services.Stores
 
     public ProjectStore(
         IBackendClient backendClient,
+        IProjectsClient projectsClient,
         StateCacheService? stateCacheService = null,
         IProjectRepository? projectRepository = null)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
       _stateCacheService = stateCacheService;
       _projectRepository = projectRepository;
     }
@@ -122,7 +125,7 @@ namespace VoiceStudio.App.Services.Stores
           }
         }
 
-        var projectsArray = await _backendClient.GetProjectsAsync();
+        var projectsArray = await _projectsClient.GetProjectsAsync();
 
         Projects.Clear();
         if (projectsArray != null)

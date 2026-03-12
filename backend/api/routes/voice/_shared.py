@@ -53,7 +53,6 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 
-from backend.core.circuit_breaker import get_engine_breaker
 from backend.core.security.file_validation import (
     FileCategory,
     FileValidationError,
@@ -68,6 +67,7 @@ from backend.ml.models.model_preflight import (
     ensure_xtts,
 )
 from backend.platform.config.unified_config import get_config
+from backend.services.circuit_breaker_facade import get_engine_breaker
 
 from ...deps import EngineConfigServiceDep, EngineServiceDep
 from ...exceptions import (

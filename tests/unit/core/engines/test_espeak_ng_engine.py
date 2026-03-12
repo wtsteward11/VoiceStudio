@@ -26,7 +26,11 @@ try:
     HAS_ESPEAK = True
 except ImportError:
     HAS_ESPEAK = False
-    pytestmark = pytest.mark.skip("eSpeak-NG engine not available")
+
+pytestmark = pytest.mark.skipif(
+    not HAS_ESPEAK,
+    reason="eSpeak-NG engine not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)",
+)
 
 
 @pytest.fixture

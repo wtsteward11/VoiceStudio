@@ -114,6 +114,7 @@ def main():
     # Define checks
     skip_guard = "--skip-guard" in sys.argv
     skip_quality = "--skip-quality" in sys.argv
+    skip_contract_diff = "--skip-contract-diff" in sys.argv
     checks = [
         {
             "name": "gate_status",
@@ -124,6 +125,13 @@ def main():
             "command": f"{sys.executable} -m tools.overseer.cli.main ledger validate"
         },
     ]
+    if not skip_contract_diff:
+        contract_diff_script = project_root / "scripts" / "contract_diff.py"
+        if contract_diff_script.exists():
+            checks.append({
+                "name": "contract_diff",
+                "command": f"{sys.executable} {contract_diff_script}"
+            })
     if not skip_guard:
         checks.append({
             "name": "completion_guard",
@@ -147,6 +155,14 @@ def main():
             checks.append({
                 "name": "xaml_safety_check",
                 "command": f"{sys.executable} {xaml_lint_script}"
+            })
+
+        # UI gap audit (ContentDialog XamlRoot, hidden panels, placeholders)
+        ui_audit_script = project_root / "scripts" / "audit_ui_gaps.py"
+        if ui_audit_script.exists():
+            checks.append({
+                "name": "ui_gap_audit",
+                "command": f"{sys.executable} {ui_audit_script}"
             })
 
     # Optionally add build check if --build flag

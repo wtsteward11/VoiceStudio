@@ -1,10 +1,13 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -17,17 +20,22 @@ namespace VoiceStudio.App.Tests.ViewModels
     public class AssistantViewModelTests : ViewModelTestBase
     {
         private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IProjectsClient>? _mockProjectsClient;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
             _mockBackendClient = new Mock<IBackendClient>();
+            _mockProjectsClient = new Mock<IProjectsClient>();
+            _mockProjectsClient
+                .Setup(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<Project>());
         }
 
         private AssistantViewModel CreateViewModel()
         {
-            return new AssistantViewModel(MockContext!, _mockBackendClient!.Object);
+            return new AssistantViewModel(MockContext!, _mockBackendClient!.Object, _mockProjectsClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -50,14 +58,14 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new AssistantViewModel(null!, _mockBackendClient!.Object));
+                new AssistantViewModel(null!, _mockBackendClient!.Object, _mockProjectsClient!.Object));
         }
 
         [TestMethod]
         public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new AssistantViewModel(MockContext!, null!));
+                new AssistantViewModel(MockContext!, null!, _mockProjectsClient!.Object));
         }
 
         [TestMethod]

@@ -140,8 +140,8 @@ def benchmark_engine(
         try:
             if engine_instance.is_initialized():
                 engine_instance.cleanup()
-        except:
-            ...
+        except Exception as e:
+            logger.debug("Engine cleanup failed: %s", e)
 
     return results
 

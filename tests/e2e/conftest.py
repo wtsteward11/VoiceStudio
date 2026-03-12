@@ -37,7 +37,7 @@ except ImportError:
 
 
 # Configuration
-BACKEND_URL = os.getenv("VOICESTUDIO_BACKEND_URL", "http://127.0.0.1:8001")
+BACKEND_URL = os.getenv("VOICESTUDIO_BACKEND_URL", "http://127.0.0.1:8000")
 WINAPPDRIVER_URL = "http://127.0.0.1:4723"
 OUTPUT_DIR = Path(os.getenv("VOICESTUDIO_OUTPUT_DIR", ".buildlogs/e2e"))
 SCREENSHOTS_ENABLED = os.getenv("VOICESTUDIO_SCREENSHOTS_ENABLED", "true").lower() == "true"

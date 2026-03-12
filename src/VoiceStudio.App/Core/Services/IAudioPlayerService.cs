@@ -60,6 +60,23 @@ namespace VoiceStudio.Core.Services
     void Resume();
 
     /// <summary>
+    /// Gets the path of the last temp file created for URL playback, if any.
+    /// Set when PlayUrlAsync creates a temp file; used by UI smoke to prove temp file creation.
+    /// </summary>
+    string? LastTempPlaybackPath { get; }
+
+    /// <summary>
+    /// Last playback error message, if any. Set when PlaybackStopped receives an exception.
+    /// Cleared when playback starts successfully.
+    /// </summary>
+    string? LastPlaybackError { get; }
+
+    /// <summary>
+    /// Name of the output device used for playback. Set when playback starts.
+    /// </summary>
+    string? LastOutputDeviceName { get; }
+
+    /// <summary>
     /// Gets whether audio is currently playing.
     /// </summary>
     bool IsPlaying { get; }

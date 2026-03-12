@@ -17,6 +17,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class AdvancedSpectrogramVisualizationViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProjectsClient _projectsClient;
 
     public string PanelId => "advanced-spectrogram-visualization";
     public string DisplayName => ResourceHelper.GetString("Panel.AdvancedSpectrogram.DisplayName", "Advanced Spectrogram");
@@ -79,10 +80,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string comparisonType = "difference";
 
-    public AdvancedSpectrogramVisualizationViewModel(IViewModelContext context, IBackendClient backendClient)
+    public AdvancedSpectrogramVisualizationViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
 
       LoadViewTypesCommand = new AsyncRelayCommand(() => LoadViewTypesAsync(CancellationToken.None));
       GenerateSpectrogramCommand = new AsyncRelayCommand(GenerateSpectrogramAsync);
@@ -246,7 +248,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var projects = await _backendClient.GetProjectsAsync(cancellationToken);
+        var projects = await _projectsClient.GetProjectsAsync(cancellationToken);
         var audioIds = new System.Collections.Generic.List<string>();
 
         foreach (var project in projects)

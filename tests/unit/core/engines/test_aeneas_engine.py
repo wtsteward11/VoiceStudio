@@ -25,7 +25,11 @@ try:
     HAS_AENEAS = True
 except ImportError:
     HAS_AENEAS = False
-    pytestmark = pytest.mark.skip("Aeneas engine not available")
+
+pytestmark = pytest.mark.skipif(
+    not HAS_AENEAS,
+    reason="Aeneas engine not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)",
+)
 
 
 @pytest.fixture

@@ -19,6 +19,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class MixAssistantViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProjectsClient _projectsClient;
 
     public string PanelId => "mix-assistant";
     public string DisplayName => ResourceHelper.GetString("Panel.MixAssistant.DisplayName", "AI Mix Assistant");
@@ -72,10 +73,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<string> availableGenres = new() { "pop", "rock", "jazz", "classical", "electronic", "hip-hop", "country" };
 
-    public MixAssistantViewModel(IViewModelContext context, IBackendClient backendClient)
+    public MixAssistantViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
 
       AnalyzeMixCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -466,7 +468,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var projects = await _backendClient.GetProjectsAsync(cancellationToken);
+        var projects = await _projectsClient.GetProjectsAsync(cancellationToken);
 
         AvailableProjects.Clear();
         foreach (var project in projects)

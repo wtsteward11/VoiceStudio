@@ -31,7 +31,11 @@ try:
     HAS_STREAMING = True
 except ImportError:
     HAS_STREAMING = False
-    pytestmark = pytest.mark.skip("Streaming engine not available")
+
+pytestmark = pytest.mark.skipif(
+    not HAS_STREAMING,
+    reason="Streaming engine not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)",
+)
 
 
 @pytest.fixture

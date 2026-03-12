@@ -13,7 +13,6 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateProfileAction : IUndoableAction
   {
     private readonly ObservableCollection<VoiceProfile> _profiles;
-    private readonly IBackendClient _backendClient;
     private readonly VoiceProfile _profile;
     private readonly Action<VoiceProfile>? _onUndo;
     private readonly Action<VoiceProfile>? _onRedo;
@@ -22,13 +21,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateProfileAction(
         ObservableCollection<VoiceProfile> profiles,
-        IBackendClient backendClient,
+        IProfilesClient profilesClient,
         VoiceProfile profile,
         Action<VoiceProfile>? onUndo = null,
         Action<VoiceProfile>? onRedo = null)
     {
       _profiles = profiles ?? throw new ArgumentNullException(nameof(profiles));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _ = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _profile = profile ?? throw new ArgumentNullException(nameof(profile));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -62,7 +61,6 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteProfileAction : IUndoableAction
   {
     private readonly ObservableCollection<VoiceProfile> _profiles;
-    private readonly IBackendClient _backendClient;
     private readonly VoiceProfile _profile;
     private readonly int _originalIndex;
     private readonly Action<VoiceProfile>? _onUndo;
@@ -72,13 +70,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteProfileAction(
         ObservableCollection<VoiceProfile> profiles,
-        IBackendClient backendClient,
+        IProfilesClient profilesClient,
         VoiceProfile profile,
         Action<VoiceProfile>? onUndo = null,
         Action<VoiceProfile>? onRedo = null)
     {
       _profiles = profiles ?? throw new ArgumentNullException(nameof(profiles));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _ = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _profile = profile ?? throw new ArgumentNullException(nameof(profile));
       _originalIndex = profiles.IndexOf(profile);
       _onUndo = onUndo;
@@ -120,7 +118,6 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class BatchDeleteProfilesAction : IUndoableAction
   {
     private readonly ObservableCollection<VoiceProfile> _profiles;
-    private readonly IBackendClient _backendClient;
     private readonly System.Collections.Generic.List<(VoiceProfile Profile, int Index)> _deletedProfiles;
     private readonly Action<System.Collections.Generic.IEnumerable<VoiceProfile>>? _onUndo;
     private readonly Action<System.Collections.Generic.IEnumerable<VoiceProfile>>? _onRedo;
@@ -129,13 +126,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public BatchDeleteProfilesAction(
         ObservableCollection<VoiceProfile> profiles,
-        IBackendClient backendClient,
+        IProfilesClient profilesClient,
         System.Collections.Generic.IEnumerable<VoiceProfile> profilesToDelete,
         Action<System.Collections.Generic.IEnumerable<VoiceProfile>>? onUndo = null,
         Action<System.Collections.Generic.IEnumerable<VoiceProfile>>? onRedo = null)
     {
       _profiles = profiles ?? throw new ArgumentNullException(nameof(profiles));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _ = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _deletedProfiles = profilesToDelete?.Select(p => (p, profiles.IndexOf(p))).ToList()
           ?? throw new ArgumentNullException(nameof(profilesToDelete));
       _onUndo = onUndo;

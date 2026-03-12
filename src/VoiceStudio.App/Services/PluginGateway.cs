@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.Core.Plugins;
 using VoiceStudio.Core.Plugins.Models;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Services
 {
@@ -20,7 +21,7 @@ namespace VoiceStudio.App.Services
         private DateTime _lastCatalogRefresh = DateTime.MinValue;
         private readonly TimeSpan _cacheExpiry = TimeSpan.FromMinutes(5);
 
-        public PluginGateway(HttpClient httpClient, string baseUrl = "http://localhost:8001")
+        public PluginGateway(HttpClient httpClient, string baseUrl = "http://localhost:8000")
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _baseUrl = baseUrl.TrimEnd('/');
@@ -58,10 +59,10 @@ namespace VoiceStudio.App.Services
                 }
             }
             // ALLOWED: empty catch - graceful degradation when backend unavailable
-            catch (HttpRequestException)
-            {
-                // Fallback to default categories if API unavailable
-            }
+            catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PluginGateway.Task");
+      }
 
             return GetDefaultCategories();
         }
@@ -84,10 +85,10 @@ namespace VoiceStudio.App.Services
                 }
             }
             // ALLOWED: empty catch - graceful degradation to local filtering
-            catch (HttpRequestException)
-            {
-                // Return empty result if API unavailable
-            }
+            catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PluginGateway.Task");
+      }
 
             // Fallback to local filtering if API unavailable
             return FilterLocalCatalog(criteria);
@@ -174,10 +175,10 @@ namespace VoiceStudio.App.Services
                 }
             }
             // ALLOWED: empty catch - graceful degradation to default version list
-            catch (HttpRequestException)
-            {
-                // Return empty list if API unavailable
-            }
+            catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PluginGateway.Task");
+      }
 
             return new List<PluginVersion>
             {
@@ -360,10 +361,10 @@ namespace VoiceStudio.App.Services
                 }
             }
             // ALLOWED: empty catch - graceful degradation to empty installed list
-            catch (HttpRequestException)
-            {
-                // Return empty list if API unavailable
-            }
+            catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PluginGateway.Task");
+      }
 
             return new List<PluginInfo>();
         }

@@ -160,6 +160,10 @@ namespace VoiceStudio.App.Services
       AddFlag("ExperimentalStyleTransfer", false, "Enable experimental style transfer features", FeatureFlagCategory.Experimental, rolloutPercentage: 5);
       AddFlag("ExperimentalRealtimeSynthesis", false, "Enable experimental real-time synthesis", FeatureFlagCategory.Experimental, rolloutPercentage: 0);
 
+      // Integration audit gates (F-01, F-09): Disabled until pipeline/RVC WebSocket wiring is complete
+      AddFlag("pipeline_streaming", false, "Enable pipeline streaming (requires /api/pipeline/stream wiring)", FeatureFlagCategory.Experimental);
+      AddFlag("rvc_realtime", false, "Enable RVC realtime conversion (requires direct WebSocket wiring)", FeatureFlagCategory.Experimental);
+
       // A/B test flags
       AddFlag("ABTest_NewOnboardingFlow", false, "A/B test: New onboarding flow", FeatureFlagCategory.ABTest, rolloutPercentage: 50, abTestId: "onboarding_v2");
       AddFlag("ABTest_SimplifiedWizard", false, "A/B test: Simplified voice cloning wizard", FeatureFlagCategory.ABTest, rolloutPercentage: 50, abTestId: "wizard_simple");

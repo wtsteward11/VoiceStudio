@@ -1,0 +1,5 @@
+# Dialog pattern baseline - known ConfirmationDialog/ContentDialog usages in ViewModels
+# Per PANEL_HARDENING_PATTERN: migrate to IDialogService; remove from baseline when fixed.
+# Format: path:line (one per line)
+# LibraryViewModel: fixed 2026-03-11 (ShowInputAsync)
+# PresetLibraryViewModel: fixed 2026-03-11 (ShowContentAsync)

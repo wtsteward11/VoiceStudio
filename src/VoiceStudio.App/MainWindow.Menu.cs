@@ -95,6 +95,7 @@ namespace VoiceStudio.App
             var item = new MenuBarItem { Title = "Modules" };
 
             var descriptors = UnifiedPanelRegistry.GetAllDescriptors()
+              .Where(d => d.IsVisible)
               .Where(d => d.Maturity != PanelMaturity.Deprecated)
               .Where(d => d.Maturity != PanelMaturity.Experimental || GetShowExperimentalPanels())
               .Where(d => !string.IsNullOrEmpty(d.MenuCategory))

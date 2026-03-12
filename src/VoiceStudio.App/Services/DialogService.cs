@@ -11,6 +11,7 @@ namespace VoiceStudio.App.Services
 {
   /// <summary>
   /// WinUI 3 implementation of the dialog service.
+  /// All ContentDialog creation routes through GetXamlRoot(); failures log and fail soft.
   /// </summary>
   public class DialogService : IDialogService
   {
@@ -21,14 +22,28 @@ namespace VoiceStudio.App.Services
       _window = window ?? throw new ArgumentNullException(nameof(window));
     }
 
+    /// <summary>
+    /// Returns XamlRoot from window content. Logs and returns null if unavailable; never throws.
+    /// </summary>
+    private XamlRoot? GetXamlRoot()
+    {
+      if (_window?.Content is FrameworkElement fe && fe.XamlRoot != null)
+        return fe.XamlRoot;
+      System.Diagnostics.Debug.WriteLine("[DialogService] GetXamlRoot: window content or XamlRoot is null");
+      return null;
+    }
+
     public async Task ShowMessageAsync(string title, string message)
     {
+      var root = GetXamlRoot();
+      if (root == null) return;
+
       var dialog = new ContentDialog
       {
         Title = title,
         Content = message,
         CloseButtonText = "OK",
-        XamlRoot = _window.Content.XamlRoot
+        XamlRoot = root
       };
 
       await dialog.ShowAsync();
@@ -36,6 +51,9 @@ namespace VoiceStudio.App.Services
 
     public async Task<bool> ShowConfirmationAsync(string title, string message, string confirmText = "Yes", string cancelText = "No")
     {
+      var root = GetXamlRoot();
+      if (root == null) return false;
+
       var dialog = new ContentDialog
       {
         Title = title,
@@ -43,7 +61,7 @@ namespace VoiceStudio.App.Services
         PrimaryButtonText = confirmText,
         CloseButtonText = cancelText,
         DefaultButton = ContentDialogButton.Primary,
-        XamlRoot = _window.Content.XamlRoot
+        XamlRoot = root
       };
 
       var result = await dialog.ShowAsync();
@@ -52,6 +70,9 @@ namespace VoiceStudio.App.Services
 
     public async Task<string?> ShowInputAsync(string title, string prompt, string? defaultValue = null, string? placeholder = null)
     {
+      var root = GetXamlRoot();
+      if (root == null) return null;
+
       var textBox = new TextBox
       {
         Text = defaultValue ?? "",
@@ -74,7 +95,7 @@ namespace VoiceStudio.App.Services
         PrimaryButtonText = "OK",
         CloseButtonText = "Cancel",
         DefaultButton = ContentDialogButton.Primary,
-        XamlRoot = _window.Content.XamlRoot
+        XamlRoot = root
       };
 
       var result = await dialog.ShowAsync();
@@ -191,6 +212,10 @@ namespace VoiceStudio.App.Services
 
     public Task<IProgressDialog> ShowProgressAsync(string title, string message, bool cancellable = true)
     {
+      var root = GetXamlRoot();
+      if (root == null)
+        return Task.FromResult<IProgressDialog>(new NoOpProgressDialog());
+
       var progressRing = new ProgressRing { IsActive = true };
       var messageText = new TextBlock { Text = message };
       
@@ -203,7 +228,7 @@ namespace VoiceStudio.App.Services
           Children = { progressRing, messageText }
         },
         CloseButtonText = cancellable ? "Cancel" : null,
-        XamlRoot = _window.Content.XamlRoot
+        XamlRoot = root
       };
 
       var progressDialog = new ProgressDialogImpl(dialog, progressRing, messageText);
@@ -216,6 +241,9 @@ namespace VoiceStudio.App.Services
 
     public async Task ShowErrorAsync(string title, string message, string? details = null)
     {
+      var root = GetXamlRoot();
+      if (root == null) return;
+
       var content = new StackPanel { Spacing = 8 };
       content.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
       
@@ -244,10 +272,65 @@ namespace VoiceStudio.App.Services
         Title = title,
         Content = content,
         CloseButtonText = "OK",
-        XamlRoot = _window.Content.XamlRoot
+        XamlRoot = root
       };
 
       await dialog.ShowAsync();
+    }
+
+    public async Task<bool> ShowContentAsync(string title, object content, string primaryText = "OK", string cancelText = "Cancel")
+    {
+      var root = GetXamlRoot();
+      if (root == null) return false;
+
+      var dialog = new ContentDialog
+      {
+        Title = title,
+        Content = content,
+        PrimaryButtonText = primaryText,
+        CloseButtonText = cancelText,
+        DefaultButton = ContentDialogButton.Primary,
+        XamlRoot = root
+      };
+
+      var result = await dialog.ShowAsync();
+      return result == ContentDialogResult.Primary;
+    }
+
+    /// <summary>
+    /// Shows a profile edit dialog with name, language, emotion, tags.
+    /// Returns (Name, Language, Emotion, Tags) if user confirmed, null if cancelled or root unavailable.
+    /// </summary>
+    public async Task<(string Name, string Language, string Emotion, string Tags)?> ShowProfileEditAsync(string name, string language, string emotion, string tags)
+    {
+      var root = GetXamlRoot();
+      if (root == null) return null;
+
+      var nameBox = new TextBox { Header = "Name", Text = name ?? string.Empty };
+      var languageBox = new TextBox { Header = "Language", Text = language ?? string.Empty };
+      var emotionBox = new TextBox { Header = "Emotion", Text = emotion ?? string.Empty };
+      var tagsBox = new TextBox { Header = "Tags (comma-separated)", Text = tags ?? string.Empty };
+
+      var editPanel = new StackPanel
+      {
+        Spacing = 8,
+        Children = { nameBox, languageBox, emotionBox, tagsBox }
+      };
+
+      var dialog = new ContentDialog
+      {
+        Title = "Edit Profile",
+        Content = editPanel,
+        PrimaryButtonText = "Save",
+        CloseButtonText = "Cancel",
+        DefaultButton = ContentDialogButton.Primary,
+        XamlRoot = root
+      };
+
+      var result = await dialog.ShowAsync();
+      if (result == ContentDialogResult.Primary)
+        return (nameBox.Text ?? string.Empty, languageBox.Text ?? string.Empty, emotionBox.Text ?? string.Empty, tagsBox.Text ?? string.Empty);
+      return null;
     }
 
     private void InitializePicker(object picker)
@@ -292,6 +375,14 @@ namespace VoiceStudio.App.Services
       {
         _dialog.Hide();
       }
+    }
+
+    private sealed class NoOpProgressDialog : IProgressDialog
+    {
+      public bool IsCancellationRequested => false;
+      public void SetProgress(double value) { }
+      public void SetMessage(string message) { }
+      public void Close() { }
     }
   }
 }

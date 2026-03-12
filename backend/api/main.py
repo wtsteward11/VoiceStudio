@@ -122,6 +122,7 @@ if os.environ.get("VOICESTUDIO_JSON_LOGGING", "").lower() in ("1", "true", "yes"
 from .error_handling import (
     general_exception_handler,
     http_exception_handler,
+    service_error_handler,
     validation_exception_handler,
 )
 from .lifecycle import on_shutdown, on_startup
@@ -309,4 +310,12 @@ register_observability_routes(app)
 # Note: VoiceStudioException is a subclass of HTTPException, so it's handled by http_exception_handler
 app.add_exception_handler(RequestValidationError, cast(Any, validation_exception_handler))
 app.add_exception_handler(StarletteHTTPException, cast(Any, http_exception_handler))
+# GAP-007: Service-layer exceptions - no FastAPI dependency in services
+from backend.core.exceptions import ServiceError
+from backend.ml.models.model_preflight import PreflightError as MLPreflightError
+from backend.services.model_preflight import PreflightError as ServicesPreflightError
+
+app.add_exception_handler(ServiceError, cast(Any, service_error_handler))
+app.add_exception_handler(MLPreflightError, cast(Any, service_error_handler))
+app.add_exception_handler(ServicesPreflightError, cast(Any, service_error_handler))
 app.add_exception_handler(Exception, general_exception_handler)

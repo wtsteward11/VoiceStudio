@@ -1,9 +1,12 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -15,7 +18,10 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class TextBasedSpeechEditorViewModelTests : ViewModelTestBase
     {
+        private static readonly List<string> ExpectedEngines = new() { "xtts", "chatterbox", "tortoise" };
+
         private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IProfilesClient>? _mockProfilesClient;
         private TextBasedSpeechEditorViewModel? _viewModel;
 
         [TestInitialize]
@@ -23,6 +29,13 @@ namespace VoiceStudio.App.Tests.ViewModels
         {
             base.TestInitialize();
             _mockBackendClient = new Mock<IBackendClient>();
+            _mockBackendClient
+                .Setup(x => x.GetEnginesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(ExpectedEngines);
+            _mockProfilesClient = new Mock<IProfilesClient>();
+            _mockProfilesClient
+                .Setup(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<VoiceProfile>());
             _viewModel = CreateViewModel();
         }
 
@@ -31,12 +44,13 @@ namespace VoiceStudio.App.Tests.ViewModels
         {
             _viewModel = null;
             _mockBackendClient = null;
+            _mockProfilesClient = null;
             base.TestCleanup();
         }
 
         private TextBasedSpeechEditorViewModel CreateViewModel()
         {
-            return new TextBasedSpeechEditorViewModel(MockContext!, _mockBackendClient!.Object);
+            return new TextBasedSpeechEditorViewModel(MockContext!, _mockBackendClient!.Object, _mockProfilesClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -54,14 +68,21 @@ namespace VoiceStudio.App.Tests.ViewModels
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
-            _ = new TextBasedSpeechEditorViewModel(null!, _mockBackendClient!.Object);
+            _ = new TextBasedSpeechEditorViewModel(null!, _mockBackendClient!.Object, _mockProfilesClient!.Object);
         }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
         {
-            _ = new TextBasedSpeechEditorViewModel(MockContext!, null!);
+            _ = new TextBasedSpeechEditorViewModel(MockContext!, null!, _mockProfilesClient!.Object);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
+        public void Constructor_WithNullProfilesClient_ThrowsArgumentNullException()
+        {
+            _ = new TextBasedSpeechEditorViewModel(MockContext!, _mockBackendClient!.Object, null!);
         }
 
         #endregion
@@ -116,9 +137,10 @@ namespace VoiceStudio.App.Tests.ViewModels
         }
 
         [TestMethod]
-        public void AvailableEngines_ContainsExpectedEngines()
+        public async Task AvailableEngines_ContainsExpectedEngines()
         {
-            Assert.IsTrue(_viewModel!.AvailableEngines.Contains("xtts"));
+            await _viewModel!.RefreshCommand.ExecuteAsync(null);
+            Assert.IsTrue(_viewModel.AvailableEngines.Contains("xtts"));
             Assert.IsTrue(_viewModel.AvailableEngines.Contains("chatterbox"));
             Assert.IsTrue(_viewModel.AvailableEngines.Contains("tortoise"));
         }

@@ -163,8 +163,8 @@ def check_path_references():
                         content = f.read()
                         if "C:\\VoiceStudio" in content or "C:/VoiceStudio" in content:
                             found_old_paths.append(str(file_path))
-                except:
-                    ...
+                except OSError:
+                    pass  # Skip unreadable files
 
     if found_old_paths:
         print(f"  ⚠ Found {len(found_old_paths)} files with C:\\VoiceStudio references:")

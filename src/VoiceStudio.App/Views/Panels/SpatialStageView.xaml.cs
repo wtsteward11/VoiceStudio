@@ -17,7 +17,8 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new SpatialStageViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient()
+          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
+          AppServices.GetProjectsClient()
       );
       DataContext = ViewModel;
 

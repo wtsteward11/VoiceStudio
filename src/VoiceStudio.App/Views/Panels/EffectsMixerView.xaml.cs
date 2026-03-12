@@ -6,10 +6,12 @@ using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.Core.Models;
 using System;
+using System.ComponentModel;
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using SelectionChangedEventArgsAlias = Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs;
+using MultiSelectSelectionChangedEventArgs = VoiceStudio.App.Services.SelectionChangedEventArgs;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -21,6 +23,7 @@ namespace VoiceStudio.App.Views.Panels
     private UndoRedoService? _undoRedoService;
     private DragDropVisualFeedbackService? _dragDropService;
     private Effect? _draggedEffect;
+    private MultiSelectService? _multiSelectService;
 
     public EffectsMixerView()
     {
@@ -37,25 +40,14 @@ namespace VoiceStudio.App.Views.Panels
       _undoRedoService = ServiceProvider.GetUndoRedoService();
       _dragDropService = ServiceProvider.GetDragDropVisualFeedbackService();
 
-      // Subscribe to selection changes to update UI (IDEA 12)
-      var multiSelectService = ServiceProvider.GetMultiSelectService();
-      multiSelectService.SelectionChanged += (s, e) =>
-      {
-        if (e.PanelId == ViewModel.PanelId)
-        {
-          UpdateChannelSelectionVisuals();
-        }
-      };
+      // Subscribe to selection changes to update UI (Phase 3: store ref for disposal)
+      _multiSelectService = ServiceProvider.GetMultiSelectService();
+      _multiSelectService.SelectionChanged += OnMultiSelectSelectionChanged;
 
-      // Update visuals when channels change
-      ViewModel.PropertyChanged += (s, e) =>
-      {
-        if (e.PropertyName == nameof(EffectsMixerViewModel.Channels) ||
-                  e.PropertyName == nameof(EffectsMixerViewModel.SelectedChannelCount))
-        {
-          UpdateChannelSelectionVisuals();
-        }
-      };
+      // Update visuals when channels change (Phase 3: named handler for disposal)
+      ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+      this.Unloaded += EffectsMixerView_Unloaded;
 
       // Add keyboard handler for multi-select
       this.KeyDown += EffectsMixerView_KeyDown;
@@ -68,6 +60,33 @@ namespace VoiceStudio.App.Views.Panels
       {
         // Close any open dialogs or overlays
       });
+    }
+
+    private void OnMultiSelectSelectionChanged(object? sender, MultiSelectSelectionChangedEventArgs e)
+    {
+      if (e.PanelId == ViewModel.PanelId)
+        UpdateChannelSelectionVisuals();
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+      if (e.PropertyName == nameof(EffectsMixerViewModel.Channels) ||
+          e.PropertyName == nameof(EffectsMixerViewModel.SelectedChannelCount))
+      {
+        UpdateChannelSelectionVisuals();
+      }
+    }
+
+    private void EffectsMixerView_Unloaded(object sender, RoutedEventArgs e)
+    {
+      this.Unloaded -= EffectsMixerView_Unloaded;
+      if (_multiSelectService != null)
+      {
+        _multiSelectService.SelectionChanged -= OnMultiSelectSelectionChanged;
+        _multiSelectService = null;
+      }
+      if (ViewModel != null)
+        ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
     }
 
     private void EffectsMixerView_KeyboardNavigation_Loaded(object sender, RoutedEventArgs e)

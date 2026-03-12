@@ -28,9 +28,11 @@ namespace VoiceStudio.App.Services
 
       lock (_lock)
       {
-        if (_cache.TryGetValue(key, out var cached) && cached.ExpiresAtUtc > DateTime.UtcNow)
+        if (_cache.TryGetValue(key, out var cached))
         {
-          return (T)cached.Value;
+          if (cached.ExpiresAtUtc > DateTime.UtcNow)
+            return (T)cached.Value;
+          _cache.Remove(key);
         }
 
         if (_inFlight.TryGetValue(key, out var sharedTask))
@@ -53,6 +55,7 @@ namespace VoiceStudio.App.Services
       lock (_lock)
       {
         _cache.Remove(key);
+        _inFlight.Remove(key);
       }
     }
 
@@ -64,6 +67,7 @@ namespace VoiceStudio.App.Services
         foreach (var key in keys)
         {
           _cache.Remove(key);
+          _inFlight.Remove(key);
         }
       }
     }

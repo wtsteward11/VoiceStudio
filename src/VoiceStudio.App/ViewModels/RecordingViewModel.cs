@@ -19,6 +19,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class RecordingViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IAudioPlayerService _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly IErrorPresentationService? _errorService;
     private readonly IErrorLoggingService? _logService;
@@ -96,10 +97,11 @@ namespace VoiceStudio.App.ViewModels
             24
         };
 
-    public RecordingViewModel(IViewModelContext context, IBackendClient backendClient)
+    public RecordingViewModel(IViewModelContext context, IBackendClient backendClient, IAudioPlayerService audioPlayer)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
       // Get services using helper (reduces code duplication)
       _toastNotificationService = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetToastNotificationService());
@@ -144,6 +146,18 @@ namespace VoiceStudio.App.ViewModels
         await LoadDevicesAsync(ct);
       });
 
+      PlayCommand = new EnhancedAsyncRelayCommand(async (ct) =>
+      {
+        using var profiler = PerformanceProfiler.StartCommand("Play");
+        await PlayRecordedAsync(ct);
+      }, () => (!string.IsNullOrEmpty(RecordedAudioId) || !string.IsNullOrEmpty(RecordedAudioUrl)) && !IsLoading);
+
+      PropertyChanged += (_, e) =>
+      {
+        if (e.PropertyName is nameof(RecordedAudioId) or nameof(RecordedAudioUrl) or nameof(IsLoading))
+          PlayCommand.NotifyCanExecuteChanged();
+      };
+
       // Load devices on initialization
       var loadCt = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
       _ = LoadDevicesAsync(loadCt).ContinueWith(t =>
@@ -157,6 +171,7 @@ namespace VoiceStudio.App.ViewModels
     public EnhancedAsyncRelayCommand StopRecordingCommand { get; }
     public EnhancedAsyncRelayCommand CancelRecordingCommand { get; }
     public EnhancedAsyncRelayCommand LoadDevicesCommand { get; }
+    public EnhancedAsyncRelayCommand PlayCommand { get; }
 
     private async Task StartRecordingAsync(CancellationToken cancellationToken)
     {
@@ -340,6 +355,41 @@ namespace VoiceStudio.App.ViewModels
       finally
       {
         IsLoading = false;
+      }
+    }
+
+    private async Task PlayRecordedAsync(CancellationToken cancellationToken)
+    {
+      if (string.IsNullOrEmpty(RecordedAudioId) && string.IsNullOrEmpty(RecordedAudioUrl))
+        return;
+
+      try
+      {
+        if (!string.IsNullOrEmpty(RecordedAudioId))
+        {
+          var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+              ?? "http://localhost:8000";
+          await _audioPlayer.PlayBackendAudioIdAsync(RecordedAudioId, baseUrl);
+        }
+        else if (!string.IsNullOrEmpty(RecordedAudioUrl))
+        {
+          if (RecordedAudioUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+              || RecordedAudioUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+          {
+            await _audioPlayer.PlayUrlAsync(RecordedAudioUrl);
+          }
+          else if (System.IO.File.Exists(RecordedAudioUrl))
+          {
+            await _audioPlayer.PlayFileAsync(RecordedAudioUrl);
+          }
+        }
+      }
+      catch (Exception ex)
+      {
+        _logService?.LogError(ex, "PlayRecorded");
+        _toastNotificationService?.ShowError(
+            ErrorHandler.GetUserFriendlyMessage(ex),
+            ResourceHelper.GetString("Toast.Title.PlaybackFailed", "Playback Failed"));
       }
     }
 

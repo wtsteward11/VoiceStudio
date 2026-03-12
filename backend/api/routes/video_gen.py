@@ -15,16 +15,16 @@ import uuid
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from backend.core.circuit_breaker import (
-    CircuitBreakerOpenError,
-    get_engine_breaker,
-)
 from backend.core.security.file_validation import (
     FileValidationError,
     validate_audio_file,
     validate_video_file,
 )
 from backend.ml.models.engine_service import get_engine_service
+from backend.services.circuit_breaker_facade import (
+    CircuitBreakerOpenError,
+    get_engine_breaker,
+)
 from backend.services.media_storage_service import get_video_storage
 
 from ..models_additional import (

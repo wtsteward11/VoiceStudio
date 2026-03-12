@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Dispatching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Services;
@@ -13,6 +14,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     {
         private IViewModelContext _context = null!;
         private Mock<IBackendClient> _mockBackendClient = null!;
+        private Mock<IDialogService> _mockDialogService = null!;
         private DispatcherQueueController? _dispatcherController;
         private LibraryViewModel _viewModel = null!;
 
@@ -24,7 +26,11 @@ namespace VoiceStudio.App.Tests.ViewModels
             var dispatcher = _dispatcherController.DispatcherQueue;
             _context = new ViewModelContext(NullLogger.Instance, dispatcher);
             _mockBackendClient = new Mock<IBackendClient>();
-            _viewModel = new LibraryViewModel(_context, _mockBackendClient.Object);
+            _mockDialogService = new Mock<IDialogService>();
+            _mockDialogService.Setup(d => d.ShowConfirmationAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .ReturnsAsync(true);
+            _viewModel = new LibraryViewModel(_context, _mockBackendClient.Object, _mockDialogService.Object);
         }
 
         [TestCleanup]

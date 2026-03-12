@@ -105,7 +105,35 @@ Resources must be merged in dependency order:
 
 ---
 
-## 3. Threading and Dispatcher
+## 3. XamlRoot and Constructor Async
+
+**Rule:** If code touches `XamlRoot`, Popup, ContentDialog, Flyout, or any compositor-hosted visual, it must run at or after `Loaded`. A constructor guard like `rootFE.XamlRoot != null` is always false during construction—dead code.
+
+WinUI 3 populates `XamlRoot` only after the Window's content is in the live compositor tree (after `Loaded` fires). Fire-and-forget async from a Window or Page constructor that eventually creates Popup/ContentDialog will throw `COMException` 0x8000FFFF ("Catastrophic failure — XamlRoot must be explicitly set for unparented popup").
+
+```csharp
+// ❌ WRONG - XamlRoot is null in constructor
+public MainWindow()
+{
+    _ = InitializePanelsAsync(...);  // Panels create popups → crash
+}
+
+// ✅ CORRECT - Defer to Loaded
+if (this.Content is FrameworkElement contentFE)
+{
+    contentFE.Loaded += async (s, e) =>
+    {
+        ErrorDialogService.Root = contentFE.XamlRoot;  // Now non-null
+        _ = InitializePanelsAsync(...);
+    };
+}
+```
+
+See [ADR-047: WinUI 3 XamlRoot Deferral Pattern](../architecture/decisions/ADR-047-winui-xamlroot-deferral-pattern.md).
+
+---
+
+## 4. Threading and Dispatcher
 
 ### DispatcherQueue vs Dispatcher
 
@@ -140,7 +168,7 @@ dispatcher.TryEnqueue(() =>
 
 ---
 
-## 4. Window Management
+## 5. Window Management
 
 ### No Window.Current
 
@@ -167,7 +195,7 @@ var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
 
 ---
 
-## 5. ContentDialog Best Practices
+## 6. ContentDialog Best Practices
 
 ### XamlRoot is Required
 
@@ -211,7 +239,7 @@ public async Task ShowDialogAsync(string message)
 
 ---
 
-## 6. XAML Compiler Limits
+## 7. XAML Compiler Limits
 
 ### Page Count Threshold
 
@@ -244,7 +272,7 @@ Get-Content "xaml_compiler_raw_*.log"
 
 ---
 
-## 7. Control Differences
+## 8. Control Differences
 
 ### Missing Controls
 
@@ -262,7 +290,7 @@ Get-Content "xaml_compiler_raw_*.log"
 
 ---
 
-## 8. App Lifecycle
+## 9. App Lifecycle
 
 ### Unpackaged App Bootstrap
 
@@ -288,7 +316,7 @@ if (!mainInstance.IsCurrent)
 
 ---
 
-## 9. Testing Considerations
+## 10. Testing Considerations
 
 ### UI Testing
 

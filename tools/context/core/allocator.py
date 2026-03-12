@@ -194,21 +194,31 @@ class ContextAllocator(AllocatorProtocol):
                     break
             bundle.rules = truncated
 
-        # Memory
+        # Memory (GAP-012: token-based sliding window — keep most recent items)
         if bundle.memory:
             mem_limit = budget.limit_for("memory")
+            # Sliding window: process from end (most recent) so we keep recent, drop older
+            reversed_items = list(reversed(bundle.memory))
             acc: list[MemoryItem] = []
-            remaining = mem_limit
-            for item in bundle.memory:
-                if remaining <= 0:
+            remaining_chars = mem_limit
+            for item in reversed_items:
+                if remaining_chars <= 0:
                     break
-                if len(item.content) <= remaining:
+                content_len = len(item.content)
+                if content_len <= remaining_chars:
                     acc.append(item)
-                    remaining -= len(item.content)
+                    remaining_chars -= content_len
                 else:
-                    acc.append(MemoryItem(content=_truncate_text(item.content, remaining) or "", source=item.source))
+                    # Truncate this item to fit; it's the oldest we're keeping
+                    acc.append(
+                        MemoryItem(
+                            content=_truncate_text(item.content, remaining_chars) or "",
+                            source=item.source,
+                        )
+                    )
                     break
-            bundle.memory = acc
+            # Restore chronological order (oldest of kept first)
+            bundle.memory = list(reversed(acc))
 
         # Git
         if bundle.git:

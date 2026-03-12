@@ -23,6 +23,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class QualityOptimizationWizardViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProfilesClient _profilesClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
     public string PanelId => "quality-optimization-wizard";
@@ -74,10 +75,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? testText = "Hello, this is a test of the voice profile quality.";
 
-    public QualityOptimizationWizardViewModel(IViewModelContext context, IBackendClient backendClient)
+    public QualityOptimizationWizardViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
       // Get toast notification service using helper (reduces code duplication)
       _toastNotificationService = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetToastNotificationService());
@@ -153,7 +155,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var profiles = await _backendClient.GetProfilesAsync(cancellationToken);
+        var profiles = await _profilesClient.GetProfilesAsync(cancellationToken);
 
         AvailableProfiles.Clear();
         foreach (var profile in profiles)

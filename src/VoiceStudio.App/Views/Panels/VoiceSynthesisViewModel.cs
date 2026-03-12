@@ -34,12 +34,14 @@ namespace VoiceStudio.App.Views.Panels
   }
 
   // GAP-005: Updated to inherit from BaseViewModel for standardized error handling
-  public partial class VoiceSynthesisViewModel : BaseViewModel, IPanelView
+  public partial class VoiceSynthesisViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
     public string PanelId => "voice_synthesis";
     public string DisplayName => ResourceHelper.GetString("Panel.VoiceSynthesis.DisplayName", "Voice Synthesis");
     public PanelRegion Region => PanelRegion.Center;
     private readonly IBackendClient _backendClient;
+    private readonly IVoiceSynthesisService _voiceSynthesisService;
+    private readonly IProfilesClient _profilesClient;
     private readonly IAudioPlayerService _audioPlayer;
     private readonly RealTimeQualityService? _qualityService;
     private readonly IErrorLoggingService? _errorLoggingService;
@@ -55,6 +57,9 @@ namespace VoiceStudio.App.Views.Panels
     private EventHandler? _playbackCompletedHandler;
     private EventHandler<QualityMetricsUpdatedEventArgs>? _qualityMetricsUpdatedHandler;
     private EventHandler<SynthesisCompletedEventArgs>? _synthesisCompletedHandler;
+
+    private readonly IEventAggregator? _eventAggregator;
+    private ISubscriptionToken? _profileSelectedToken;
 
     [ObservableProperty]
     private ObservableCollection<VoiceProfile> profiles = new();
@@ -216,36 +221,17 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private double temperature = 0.35;
 
-    public VoiceSynthesisViewModel(IBackendClient backendClient, IAudioPlayerService audioPlayer)
+    public VoiceSynthesisViewModel(IBackendClient backendClient, IVoiceSynthesisService voiceSynthesisService, IProfilesClient profilesClient, IAudioPlayerService audioPlayer)
         : base(AppServices.GetViewModelContext())
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _voiceSynthesisService = voiceSynthesisService ?? throw new ArgumentNullException(nameof(voiceSynthesisService));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
-      // Get backend base URL - try to get from local settings, otherwise use default
-      // This matches the default in ServiceProvider and BackendClientConfig
-      _backendBaseUrl = "http://localhost:8000";
-      try
-      {
-        // Use UnpackagedSettingsHelper for file-based settings (works for both packaged and unpackaged apps)
-        var backendJson = UnpackagedSettingsHelper.GetValue<string>("Settings.Backend", null);
-        if (!string.IsNullOrEmpty(backendJson))
-        {
-          using var doc = System.Text.Json.JsonDocument.Parse(backendJson);
-          if (doc.RootElement.TryGetProperty("ApiUrl", out var apiUrlElement))
-          {
-            var apiUrl = apiUrlElement.GetString();
-            if (!string.IsNullOrEmpty(apiUrl))
-            {
-              _backendBaseUrl = apiUrl;
-            }
-          }
-        }
-      }
-      catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "VoiceSynthesisViewModel.Unknown");
-      }
+      // Use BackendClientConfig as single source of truth (Phase 3: API URL alignment)
+      _backendBaseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+          ?? "http://localhost:8000";
 
       // Try to get quality service (may not be available)
       try
@@ -283,6 +269,11 @@ namespace VoiceStudio.App.Views.Panels
         // Service may not be initialized yet - that's okay
         _toastNotificationService = null;
       }
+
+      // Subscribe to ProfileSelectedEvent from Profiles panel (Panel Communication Matrix)
+      _eventAggregator = AppServices.TryGetEventAggregator();
+      if (_eventAggregator != null)
+        _profileSelectedToken = _eventAggregator.Subscribe<ProfileSelectedEvent>(OnProfileSelected);
 
       // Get error presentation service
       _errorService = ServiceProvider.TryGetErrorPresentationService();
@@ -490,13 +481,15 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var profilesList = await _backendClient.GetProfilesAsync(cancellationToken);
+        var profilesList = await _profilesClient.GetProfilesAsync(cancellationToken);
 
         Profiles.Clear();
         foreach (var profile in profilesList)
         {
           Profiles.Add(profile);
         }
+
+        await LoadEnginesAsync(cancellationToken);
 
         if (Profiles.Count > 0)
         {
@@ -631,7 +624,12 @@ namespace VoiceStudio.App.Views.Panels
           Text = Text!,
           Language = Language,
           Emotion = Emotion,
-          EnhanceQuality = EnhanceQuality
+          EnhanceQuality = EnhanceQuality,
+          Speed = (float)Speed,
+          Pitch = (float)Pitch,
+          Stability = (float)Stability,
+          Clarity = (float)Clarity,
+          Temperature = (float)Temperature
         };
 
         // Update progress estimate (synthesis starting)
@@ -641,7 +639,7 @@ namespace VoiceStudio.App.Views.Panels
         }
 
         SynthesizeCommand.ReportProgress(25);
-        var response = await _backendClient.SynthesizeVoiceAsync(request, cancellationToken);
+        var response = await _voiceSynthesisService.SynthesizeVoiceAsync(request, cancellationToken);
 
         SynthesizeCommand.ReportProgress(50);
 
@@ -876,6 +874,47 @@ namespace VoiceStudio.App.Views.Panels
         UpdateWorkflowStateFromInputs();
     }
 
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public async Task RefreshAsync(CancellationToken cancellationToken = default) =>
+        await LoadProfilesAsync(cancellationToken);
+
+    /// <inheritdoc />
+    /// <summary>Unsubscribe from EventAggregator to prevent memory leaks (GAP-W3).</summary>
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _profileSelectedToken?.Dispose();
+      _profileSelectedToken = null;
+      return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Handles ProfileSelectedEvent from Profiles panel. Updates synthesis target when user selects a profile elsewhere.
+    /// Panel Communication Matrix: ProfilesView publishes, VoiceSynthesisView subscribes.
+    /// </summary>
+    private void OnProfileSelected(ProfileSelectedEvent e)
+    {
+      var match = Profiles.FirstOrDefault(p => p.Id == e.ProfileId);
+      if (match != null)
+      {
+        Dispatcher.TryEnqueue(() => SelectedProfile = match);
+        System.Diagnostics.Debug.WriteLine($"VoiceSynthesisViewModel: Profile selected from {e.SourcePanelId} - {e.ProfileId}");
+        return;
+      }
+      // Profile not in list yet (e.g. just created or profiles not loaded) - reload and select
+      _ = LoadProfilesAsync(CancellationToken.None).ContinueWith(t =>
+      {
+        if (t.IsCompletedSuccessfully)
+        {
+          var found = Profiles.FirstOrDefault(p => p.Id == e.ProfileId);
+          if (found != null)
+            Dispatcher.TryEnqueue(() => SelectedProfile = found);
+        }
+      }, TaskScheduler.Default);
+    }
+
     partial void OnTextChanged(string value)
     {
       SynthesizeCommand.NotifyCanExecuteChanged();
@@ -1034,42 +1073,65 @@ namespace VoiceStudio.App.Views.Panels
 
     private void OnStreamingChunkReceived(object? sender, AudioChunkReceivedEventArgs e)
     {
-      StreamingReceivedChunks = e.ChunkIndex + 1;
-      StreamingBufferedChunks = _streamingPlayer?.BufferedChunks ?? 0;
-      StreamingStatus = $"Receiving: {StreamingReceivedChunks} chunks";
+      var chunkIndex = e.ChunkIndex;
+      var player = _streamingPlayer;
+      Dispatcher.TryEnqueue(() =>
+      {
+        StreamingReceivedChunks = chunkIndex + 1;
+        StreamingBufferedChunks = player?.BufferedChunks ?? 0;
+        StreamingStatus = $"Receiving: {StreamingReceivedChunks} chunks";
+      });
     }
 
     private void OnStreamingStarted(object? sender, EventArgs e)
     {
-      StreamingStatus = "Streaming audio...";
-      StartStreamingCommand.NotifyCanExecuteChanged();
-      StopStreamingCommand.NotifyCanExecuteChanged();
+      Dispatcher.TryEnqueue(() =>
+      {
+        StreamingStatus = "Streaming audio...";
+        StartStreamingCommand.NotifyCanExecuteChanged();
+        StopStreamingCommand.NotifyCanExecuteChanged();
+      });
     }
 
     private void OnStreamingStopped(object? sender, EventArgs e)
     {
-      IsStreaming = false;
-      StreamingStatus = "Stopped";
-      StartStreamingCommand.NotifyCanExecuteChanged();
-      StopStreamingCommand.NotifyCanExecuteChanged();
+      Dispatcher.TryEnqueue(() =>
+      {
+        IsStreaming = false;
+        StreamingStatus = "Stopped";
+        StartStreamingCommand.NotifyCanExecuteChanged();
+        StopStreamingCommand.NotifyCanExecuteChanged();
+      });
     }
 
     private void OnStreamingError(object? sender, StreamingErrorEventArgs e)
     {
-      ErrorMessage = e.Message;
-      HasError = true;
-      WorkflowState = SynthesisWorkflowState.Error;
-      StreamingStatus = $"Error: {e.Message}";
-      _errorLoggingService?.LogError(e.Exception ?? new Exception(e.Message), "Streaming");
+      var msg = e.Message;
+      var ex = e.Exception;
+      _errorLoggingService?.LogError(ex ?? new Exception(msg), "Streaming");
+      Dispatcher.TryEnqueue(() =>
+      {
+        ErrorMessage = msg;
+        HasError = true;
+        WorkflowState = SynthesisWorkflowState.Error;
+        StreamingStatus = $"Error: {msg}";
+      });
     }
 
     private void OnStreamingSynthesisComplete(object? sender, SynthesisCompleteEventArgs e)
     {
-      StreamingStatus = $"Complete: {e.TotalChunks} chunks, {e.DurationSeconds:F1}s";
-      _toastNotificationService?.ShowSuccess(
-        $"Synthesis complete ({e.DurationSeconds:F1}s)",
-        $"Engine: {e.Engine}"
-      );
+      var totalChunks = e.TotalChunks;
+      var duration = e.DurationSeconds;
+      var engine = e.Engine;
+      var toast = _toastNotificationService;
+      Dispatcher.TryEnqueue(() =>
+      {
+        StreamingStatus = $"Complete: {totalChunks} chunks, {duration:F1}s";
+        toast?.ShowSuccess(
+          $"Synthesis complete ({duration:F1}s)",
+          $"Engine: {engine}"
+        );
+      });
     }
 
     private async Task PlayAudioAsync(CancellationToken cancellationToken)
@@ -1090,7 +1152,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           try
           {
-            audioStream = await _backendClient.GetAudioStreamAsync(LastSynthesizedAudioId, cancellationToken);
+            audioStream = await _voiceSynthesisService.GetAudioStreamAsync(LastSynthesizedAudioId, cancellationToken);
           }
           catch
           {
@@ -1110,8 +1172,10 @@ namespace VoiceStudio.App.Views.Panels
             audioUrl = new Uri(baseUri, audioUrl).ToString();
           }
 
-          // Download audio file from URL
-          using var httpClient = new System.Net.Http.HttpClient();
+          // Download audio file from URL (Phase 4: use shared HttpClient)
+          var httpClient = AppServices.GetService<System.Net.Http.HttpClient>();
+          if (httpClient == null)
+            throw new InvalidOperationException("HttpClient not available");
           var audioBytes = await httpClient.GetByteArrayAsync(audioUrl, cancellationToken);
 
           // Save to temporary file
@@ -1758,7 +1822,9 @@ namespace VoiceStudio.App.Views.Panels
       {
         if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
-          using var client = new System.Net.Http.HttpClient();
+          var client = AppServices.GetService<System.Net.Http.HttpClient>();
+          if (client == null)
+            return null;
           var response = await client.GetAsync(uri);
           if (response.IsSuccessStatusCode)
           {

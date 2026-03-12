@@ -12,6 +12,8 @@
       <!-- Toolbar -->
       <RowDefinition Height="*" />
       <!-- Workspace -->
+      <RowDefinition Height="Auto" />
+      <!-- Degraded mode banner (rate-limit/backend stress) -->
       <RowDefinition Height="26" />
       <!-- Status bar -->
     </Grid.RowDefinitions>
@@ -34,8 +36,8 @@
         <ColumnDefinition Width="4" />
         <ColumnDefinition x:Name="RightColumn" Width="25*" />
       </Grid.ColumnDefinitions>
-      <!-- Nav rail -->
-      <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="0"
+      <!-- Nav rail - DataContext set to NavigationViewModel in code-behind -->
+      <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" x:Name="NavRailBorder"
         Background="{StaticResource VSQ.NavRail.BackgroundBrush}"
         CornerRadius="{StaticResource VSQ.CornerRadius.Panel}"
         Padding="{StaticResource VSQ.Spacing.Small}">
@@ -44,42 +46,48 @@
           <ToggleButton x:Name="NavStudio" ToolTipService.ToolTip="Studio" Width="44"
             Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
             AutomationProperties.AutomationId="NavStudio"
-            Click="NavStudio_Click"
+            Command="{Binding NavigateToStudioCommand}"
+            IsChecked="{Binding IsStudioActive, Mode=OneWay}"
             PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
             <FontIcon Glyph="&#xE80F;" FontSize="18" FontFamily="Segoe Fluent Icons" />
           </ToggleButton>
           <ToggleButton x:Name="NavProfiles" ToolTipService.ToolTip="Profiles" Width="44"
             Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
             AutomationProperties.AutomationId="NavProfiles"
-            Click="NavProfiles_Click"
+            Command="{Binding NavigateToProfilesCommand}"
+            IsChecked="{Binding IsProfilesActive, Mode=OneWay}"
             PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
             <FontIcon Glyph="&#xE77B;" FontSize="18" FontFamily="Segoe Fluent Icons" />
           </ToggleButton>
           <ToggleButton x:Name="NavLibrary" ToolTipService.ToolTip="Library" Width="44"
             Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
             AutomationProperties.AutomationId="NavLibrary"
-            Click="NavLibrary_Click"
+            Command="{Binding NavigateToLibraryCommand}"
+            IsChecked="{Binding IsLibraryActive, Mode=OneWay}"
             PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
             <FontIcon Glyph="&#xE8F1;" FontSize="18" FontFamily="Segoe Fluent Icons" />
           </ToggleButton>
           <ToggleButton x:Name="NavEffects" ToolTipService.ToolTip="Effects" Width="44"
             Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
             AutomationProperties.AutomationId="NavEffects"
-            Click="NavEffects_Click"
+            Command="{Binding NavigateToEffectsCommand}"
+            IsChecked="{Binding IsEffectsActive, Mode=OneWay}"
             PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
             <FontIcon Glyph="&#xE9D9;" FontSize="18" FontFamily="Segoe Fluent Icons" />
           </ToggleButton>
           <ToggleButton x:Name="NavTrain" ToolTipService.ToolTip="Train" Width="44"
             Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
             AutomationProperties.AutomationId="NavTrain"
-            Click="NavTrain_Click"
+            Command="{Binding NavigateToTrainCommand}"
+            IsChecked="{Binding IsTrainActive, Mode=OneWay}"
             PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
             <FontIcon Glyph="&#xE7BE;" FontSize="18" FontFamily="Segoe Fluent Icons" />
           </ToggleButton>
           <ToggleButton x:Name="NavAnalyze" ToolTipService.ToolTip="Analyze" Width="44"
             Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
             AutomationProperties.AutomationId="NavAnalyze"
-            Click="NavAnalyze_Click"
+            Command="{Binding NavigateToAnalyzeCommand}"
+            IsChecked="{Binding IsAnalyzeActive, Mode=OneWay}"
             PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
             <FontIcon Glyph="&#xE9D9;" FontSize="18" FontFamily="Segoe Fluent Icons" />
           </ToggleButton>
@@ -88,14 +96,16 @@
           <ToggleButton x:Name="NavSettings" ToolTipService.ToolTip="Settings" Width="44"
             Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
             AutomationProperties.AutomationId="NavSettings"
-            Click="NavSettings_Click"
+            Command="{Binding NavigateToSettingsCommand}"
+            IsChecked="{Binding IsSettingsActive, Mode=OneWay}"
             PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
             <FontIcon Glyph="&#xE713;" FontSize="18" FontFamily="Segoe Fluent Icons" />
           </ToggleButton>
           <ToggleButton x:Name="NavLogs" ToolTipService.ToolTip="Diagnostics" Width="44"
             Height="44" Style="{StaticResource VSQ.Button.NavToggle}"
             AutomationProperties.AutomationId="NavLogs"
-            Click="NavLogs_Click"
+            Command="{Binding NavigateToLogsCommand}"
+            IsChecked="{Binding IsLogsActive, Mode=OneWay}"
             PointerEntered="NavButton_PointerEntered" PointerExited="NavButton_PointerExited">
             <FontIcon Glyph="&#xE7BA;" FontSize="18" FontFamily="Segoe Fluent Icons" />
           </ToggleButton>
@@ -125,8 +135,12 @@
       <!-- Bottom PanelHost -->
       <controls:PanelHost Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="5" x:Name="BottomPanelHost" />
     </Grid>
+    <!-- Degraded mode banner (429/backend stress) -->
+    <InfoBar x:Name="DegradedModeBanner" Grid.Row="3" IsOpen="False" IsClosable="True"
+      Severity="Warning" Margin="8,4,8,0"
+      AutomationProperties.AutomationId="MainWindow_DegradedModeBanner" />
     <!-- Status bar -->
-    <Border Grid.Row="3" Height="26" Background="{StaticResource VSQ.StatusBar.BackgroundBrush}"
+    <Border Grid.Row="4" Height="26" Background="{StaticResource VSQ.StatusBar.BackgroundBrush}"
       BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="1,1,1,0">
       <Grid Margin="8,0,8,0">
         <Grid.ColumnDefinitions>

@@ -25,6 +25,7 @@ namespace VoiceStudio.App.Views.Panels
   public partial class MacroViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IDialogService _dialogService;
     private readonly UndoRedoService? _undoRedoService;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly MultiSelectService _multiSelectService;
@@ -124,10 +125,11 @@ namespace VoiceStudio.App.Views.Panels
         return ResourceHelper.FormatString("Macro.TimeRemainingSeconds", remaining.TotalSeconds);
     }
 
-    public MacroViewModel(IViewModelContext context, IBackendClient backendClient)
+    public MacroViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
       // Get optional services using helper (reduces code duplication)
       _undoRedoService = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetUndoRedoService());
@@ -355,11 +357,12 @@ namespace VoiceStudio.App.Views.Panels
       if (macro == null)
         return;
 
-      // Show confirmation dialog
-      var confirmed = await Utilities.ConfirmationDialog.ShowDeleteConfirmationAsync(
-          macro.Name ?? "Unnamed Macro",
-          "macro"
-      );
+      // Show confirmation dialog (Panel Hardening: IDialogService per PANEL_HARDENING_PATTERN)
+      var confirmed = await _dialogService.ShowConfirmationAsync(
+          "Delete macro?",
+          $"Are you sure you want to delete '{macro.Name ?? "Unnamed Macro"}'? This action cannot be undone.",
+          "Delete",
+          "Cancel");
 
       if (!confirmed)
         return;
@@ -676,11 +679,12 @@ namespace VoiceStudio.App.Views.Panels
       if (curve == null)
         return;
 
-      // Show confirmation dialog
-      var confirmed = await Utilities.ConfirmationDialog.ShowDeleteConfirmationAsync(
-          curve.Name ?? "Unnamed Curve",
-          "automation curve"
-      );
+      // Show confirmation dialog (Panel Hardening: IDialogService per PANEL_HARDENING_PATTERN)
+      var confirmed = await _dialogService.ShowConfirmationAsync(
+          "Delete automation curve?",
+          $"Are you sure you want to delete '{curve.Name ?? "Unnamed Curve"}'? This action cannot be undone.",
+          "Delete",
+          "Cancel");
 
       if (!confirmed)
         return;
@@ -824,11 +828,12 @@ namespace VoiceStudio.App.Views.Panels
 
       var selectedIds = _macroMultiSelectState.SelectedIds.ToList();
 
-      // Show confirmation dialog
-      var confirmed = await Utilities.ConfirmationDialog.ShowDeleteConfirmationAsync(
-          $"{selectedIds.Count} macro(s)",
-          "macros"
-      );
+      // Show confirmation dialog (Panel Hardening: IDialogService per PANEL_HARDENING_PATTERN)
+      var confirmed = await _dialogService.ShowConfirmationAsync(
+          "Delete macros?",
+          $"Are you sure you want to delete '{selectedIds.Count} macro(s)'? This action cannot be undone.",
+          "Delete",
+          "Cancel");
 
       if (!confirmed)
         return;
@@ -953,11 +958,12 @@ namespace VoiceStudio.App.Views.Panels
 
       var selectedIds = _automationCurveMultiSelectState.SelectedIds.ToList();
 
-      // Show confirmation dialog
-      var confirmed = await Utilities.ConfirmationDialog.ShowDeleteConfirmationAsync(
-          $"{selectedIds.Count} automation curve(s)",
-          "automation curves"
-      );
+      // Show confirmation dialog (Panel Hardening: IDialogService per PANEL_HARDENING_PATTERN)
+      var confirmed = await _dialogService.ShowConfirmationAsync(
+          "Delete automation curves?",
+          $"Are you sure you want to delete '{selectedIds.Count} automation curve(s)'? This action cannot be undone.",
+          "Delete",
+          "Cancel");
 
       if (!confirmed)
         return;

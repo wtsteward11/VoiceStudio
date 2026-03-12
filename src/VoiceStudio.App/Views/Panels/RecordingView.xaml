@@ -77,6 +77,7 @@
       </Button>
       <Button Command="{x:Bind ViewModel.StopRecordingCommand}" Width="100" Content="Stop"/>
       <Button Command="{x:Bind ViewModel.CancelRecordingCommand}" Width="100" Content="Cancel"/>
+      <Button Command="{x:Bind ViewModel.PlayCommand}" Width="100" Content="Play"/>
     </StackPanel>
 
     <InfoBar Grid.Row="4" IsOpen="{x:Bind ViewModel.IsRecording, Mode=OneWay}"

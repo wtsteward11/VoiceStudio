@@ -20,6 +20,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class MarkerManagerViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IDialogService _dialogService;
     private readonly UndoRedoService? _undoRedoService;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly MultiSelectService _multiSelectService;
@@ -65,10 +66,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? statusMessage;
 
-    public MarkerManagerViewModel(IViewModelContext context, IBackendClient backendClient)
+    public MarkerManagerViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
       // Get undo/redo service (may be null if not initialized)
       try
@@ -507,11 +509,12 @@ namespace VoiceStudio.App.ViewModels
 
       var selectedIds = new System.Collections.Generic.List<string>(_multiSelectState.SelectedIds);
 
-      // Show confirmation dialog
-      var confirmed = await VoiceStudio.App.Utilities.ConfirmationDialog.ShowDeleteConfirmationAsync(
-          $"{selectedIds.Count} marker(s)",
-          "markers"
-      );
+      // Show confirmation dialog (Panel Hardening: IDialogService per PANEL_HARDENING_PATTERN)
+      var confirmed = await _dialogService.ShowConfirmationAsync(
+          "Delete markers?",
+          $"Are you sure you want to delete '{selectedIds.Count} marker(s)'? This action cannot be undone.",
+          "Delete",
+          "Cancel");
 
       if (!confirmed)
         return;

@@ -1,4 +1,7 @@
 using System;
+using System.Diagnostics;
+using System.Net.WebSockets;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,14 +16,20 @@ namespace VoiceStudio.App.Services
   /// </summary>
   /// <remarks>
   /// GAP-009: Implements IPipelineStreamingClient for DI compatibility.
+  /// Phase 6: Direct connect to /api/pipeline/stream when backendBaseUrl is provided.
   /// </remarks>
   public class PipelineStreamingWebSocketClient : IPipelineStreamingClient
   {
-    private readonly IWebSocketService _webSocketService;
+    private readonly IWebSocketService? _webSocketService;
+    private readonly string? _directEndpoint;
+    private readonly bool _useDirectConnection;
     private readonly JsonSerializerOptions _jsonOptions;
     private bool _isSubscribed;
     private bool _disposed;
     private string? _currentSessionId;
+    private ClientWebSocket? _directSocket;
+    private CancellationTokenSource? _receiveCts;
+    private Task? _receiveTask;
 
     /// <summary>
     /// Event fired when a text token is received during streaming.
@@ -52,9 +61,13 @@ namespace VoiceStudio.App.Services
     /// </summary>
     public string? SessionId => _currentSessionId;
 
+    /// <summary>
+    /// Creates a client using the topic-based WebSocket service.
+    /// </summary>
     public PipelineStreamingWebSocketClient(IWebSocketService webSocketService)
     {
       _webSocketService = webSocketService ?? throw new ArgumentNullException(nameof(webSocketService));
+      _useDirectConnection = false;
       _jsonOptions = new JsonSerializerOptions
       {
         PropertyNameCaseInsensitive = true,
@@ -65,6 +78,25 @@ namespace VoiceStudio.App.Services
     }
 
     /// <summary>
+    /// Creates a client that connects directly to the pipeline stream WebSocket endpoint.
+    /// </summary>
+    /// <param name="backendBaseUrl">Base URL of the backend (e.g., http://localhost:8000)</param>
+    public PipelineStreamingWebSocketClient(string backendBaseUrl)
+    {
+      if (string.IsNullOrEmpty(backendBaseUrl))
+        throw new ArgumentNullException(nameof(backendBaseUrl));
+
+      var wsUrl = backendBaseUrl.Replace("http://", "ws://").Replace("https://", "wss://");
+      _directEndpoint = $"{wsUrl.TrimEnd('/')}/api/pipeline/stream";
+      _useDirectConnection = true;
+      _jsonOptions = new JsonSerializerOptions
+      {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+      };
+    }
+
+    /// <summary>
     /// Connects and subscribes to pipeline streaming updates.
     /// </summary>
     public async Task ConnectAsync(string? sessionId = null, CancellationToken cancellationToken = default)
@@ -72,18 +104,48 @@ namespace VoiceStudio.App.Services
       if (_disposed)
         throw new ObjectDisposedException(nameof(PipelineStreamingWebSocketClient));
 
-      if (!_webSocketService.IsConnected)
+      _currentSessionId = sessionId ?? Guid.NewGuid().ToString();
+
+      if (_useDirectConnection)
       {
-        await _webSocketService.ConnectAsync(new[] { "pipeline_stream" }, cancellationToken);
+        await ConnectDirectAsync(cancellationToken);
       }
+      else
+      {
+        await ConnectTopicBasedAsync(cancellationToken);
+      }
+    }
+
+    private async Task ConnectDirectAsync(CancellationToken cancellationToken)
+    {
+      _directSocket?.Dispose();
+      _directSocket = new ClientWebSocket();
+      await _directSocket.ConnectAsync(new Uri(_directEndpoint!), cancellationToken);
+      _isSubscribed = true;
+      _receiveCts = new CancellationTokenSource();
+      _receiveTask = Task.Run(() => ReceiveLoopAsync(_receiveCts.Token), _receiveCts.Token);
+
+      SessionStateChanged?.Invoke(this, new PipelineSessionState
+      {
+        SessionId = _currentSessionId,
+        State = "connected",
+        Timestamp = DateTime.UtcNow
+      });
+    }
+
+    private async Task ConnectTopicBasedAsync(CancellationToken cancellationToken)
+    {
+      if (_webSocketService == null)
+        return;
+
+      if (!_webSocketService.IsConnected)
+        await _webSocketService.ConnectAsync(new[] { "pipeline_stream" }, cancellationToken);
 
       if (!_isSubscribed)
       {
         await _webSocketService.SubscribeAsync("pipeline_stream");
         _isSubscribed = true;
       }
-
-      _currentSessionId = sessionId ?? Guid.NewGuid().ToString();
 
       await _webSocketService.SendMessageAsync(new
       {
@@ -104,23 +166,40 @@ namespace VoiceStudio.App.Services
     /// </summary>
     public async Task SendTextAsync(string text, PipelineStreamConfig? config = null, CancellationToken cancellationToken = default)
     {
-      if (_disposed || !_webSocketService.IsConnected)
+      if (_disposed)
+        throw new ObjectDisposedException(nameof(PipelineStreamingWebSocketClient));
+      if (!IsConnected)
         throw new InvalidOperationException("WebSocket is not connected");
 
-      await _webSocketService.SendMessageAsync(new
+      var msg = new
       {
-        type = "process_text",
-        session_id = _currentSessionId,
-        text = text,
-        mode = config?.Mode ?? "streaming",
-        llm_provider = config?.LlmProvider,
-        llm_model = config?.LlmModel,
-        tts_engine = config?.TtsEngine,
-        voice_profile_id = config?.VoiceProfileId,
-        language = config?.Language ?? "en",
-        enable_tts = config?.EnableTts ?? true,
-        timestamp = DateTime.UtcNow
-      });
+        type = "text",
+        content = text
+      };
+      var json = JsonSerializer.Serialize(msg, _jsonOptions);
+
+      if (_useDirectConnection && _directSocket != null)
+      {
+        var bytes = Encoding.UTF8.GetBytes(json);
+        await _directSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, cancellationToken);
+      }
+      else if (_webSocketService != null)
+      {
+        await _webSocketService.SendMessageAsync(new
+        {
+          type = "process_text",
+          session_id = _currentSessionId,
+          text = text,
+          mode = config?.Mode ?? "streaming",
+          llm_provider = config?.LlmProvider,
+          llm_model = config?.LlmModel,
+          tts_engine = config?.TtsEngine,
+          voice_profile_id = config?.VoiceProfileId,
+          language = config?.Language ?? "en",
+          enable_tts = config?.EnableTts ?? true,
+          timestamp = DateTime.UtcNow
+        });
+      }
     }
 
     /// <summary>
@@ -128,16 +207,19 @@ namespace VoiceStudio.App.Services
     /// </summary>
     public async Task SendAudioAsync(byte[] audioData, CancellationToken cancellationToken = default)
     {
-      if (_disposed || !_webSocketService.IsConnected)
+      if (_disposed || !IsConnected)
         throw new InvalidOperationException("WebSocket is not connected");
 
-      await _webSocketService.SendMessageAsync(new
+      if (_webSocketService != null)
       {
-        type = "process_audio",
-        session_id = _currentSessionId,
-        audio_data = Convert.ToBase64String(audioData),
-        timestamp = DateTime.UtcNow
-      });
+        await _webSocketService.SendMessageAsync(new
+        {
+          type = "process_audio",
+          session_id = _currentSessionId,
+          audio_data = Convert.ToBase64String(audioData),
+          timestamp = DateTime.UtcNow
+        });
+      }
     }
 
     /// <summary>
@@ -145,38 +227,72 @@ namespace VoiceStudio.App.Services
     /// </summary>
     public async Task StopStreamingAsync(CancellationToken cancellationToken = default)
     {
-      if (_disposed || !_webSocketService.IsConnected)
+      if (_disposed || !IsConnected)
         return;
 
-      await _webSocketService.SendMessageAsync(new
+      if (_useDirectConnection && _directSocket != null)
       {
-        type = "stop_streaming",
-        session_id = _currentSessionId,
-        timestamp = DateTime.UtcNow
-      });
+        var msg = JsonSerializer.Serialize(new { type = "reset" }, _jsonOptions);
+        var bytes = Encoding.UTF8.GetBytes(msg);
+        await _directSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, cancellationToken);
+      }
+      else if (_webSocketService != null)
+      {
+        await _webSocketService.SendMessageAsync(new
+        {
+          type = "stop_streaming",
+          session_id = _currentSessionId,
+          timestamp = DateTime.UtcNow
+        });
+      }
     }
 
     /// <summary>
     /// Gets whether the WebSocket client is connected and subscribed.
     /// </summary>
-    public bool IsConnected => _webSocketService.IsConnected && _isSubscribed;
+    public bool IsConnected =>
+      _useDirectConnection
+        ? (_directSocket?.State == System.Net.WebSockets.WebSocketState.Open && _isSubscribed)
+        : (_webSocketService?.IsConnected == true && _isSubscribed);
 
     /// <summary>
     /// Disconnects from the pipeline streaming service.
     /// </summary>
     public async Task DisconnectAsync()
     {
-      if (_isSubscribed)
+      if (_useDirectConnection)
       {
+        _receiveCts?.Cancel();
         try
         {
-          await _webSocketService.UnsubscribeAsync("pipeline_stream");
+          if (_receiveTask != null)
+            await _receiveTask;
         }
+        catch (OperationCanceledException) { Debug.WriteLine("PipelineStreamingWebSocketClient: Disconnect cancelled"); }
         catch (Exception ex)
         {
           ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PipelineStreamingWebSocketClient.DisconnectAsync");
         }
+        _directSocket?.Dispose();
+        _directSocket = null;
+        _receiveCts = null;
+        _receiveTask = null;
         _isSubscribed = false;
+      }
+      else if (_webSocketService != null)
+      {
+        if (_isSubscribed)
+        {
+          try
+          {
+            await _webSocketService.UnsubscribeAsync("pipeline_stream");
+          }
+          catch (Exception ex)
+          {
+            ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PipelineStreamingWebSocketClient.DisconnectAsync");
+          }
+          _isSubscribed = false;
+        }
       }
 
       SessionStateChanged?.Invoke(this, new PipelineSessionState
@@ -187,6 +303,86 @@ namespace VoiceStudio.App.Services
       });
 
       _currentSessionId = null;
+    }
+
+    private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
+    {
+      var buffer = new byte[8192];
+      var sb = new StringBuilder();
+
+      try
+      {
+        while (!cancellationToken.IsCancellationRequested && _directSocket?.State == System.Net.WebSockets.WebSocketState.Open)
+        {
+          var result = await _directSocket!.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
+
+          if (result.MessageType == WebSocketMessageType.Close)
+            break;
+
+          if (result.MessageType == WebSocketMessageType.Text)
+          {
+            sb.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+            if (result.EndOfMessage)
+            {
+              ProcessDirectMessage(sb.ToString());
+              sb.Clear();
+            }
+          }
+        }
+      }
+      catch (OperationCanceledException) { Debug.WriteLine("PipelineStreamingWebSocketClient: ReceiveLoop cancelled"); }
+      catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"WebSocket receive error: {ex.Message}", "PipelineStreamingWebSocketClient.ReceiveLoopAsync");
+        if (!_disposed)
+          ErrorOccurred?.Invoke(this, new PipelineErrorEvent { Error = ex.Message, Timestamp = DateTime.UtcNow });
+      }
+    }
+
+    private void ProcessDirectMessage(string message)
+    {
+      if (_disposed)
+        return;
+
+      try
+      {
+        using var doc = JsonDocument.Parse(message);
+        var root = doc.RootElement;
+
+        var outerType = root.TryGetProperty("type", out var t) ? t.GetString() : null;
+        var payload = root.TryGetProperty("payload", out var p) ? p : root;
+
+        var innerType = payload.TryGetProperty("type", out var it) ? it.GetString() : outerType;
+
+        if (string.IsNullOrWhiteSpace(innerType))
+          return;
+
+        switch (innerType.ToLowerInvariant())
+        {
+          case "token":
+            HandleToken(payload);
+            break;
+          case "ttft":
+            break;
+          case "audio":
+            HandleAudio(payload);
+            break;
+          case "complete":
+            HandleComplete(payload);
+            break;
+          case "error":
+            HandleError(payload);
+            break;
+          case "ack":
+            break;
+          default:
+            break;
+        }
+      }
+      catch (Exception ex)
+      {
+        System.Diagnostics.Debug.WriteLine($"Failed to process pipeline message: {ex.Message}");
+      }
     }
 
     private void OnWebSocketMessageReceived(object? sender, WebSocketMessage message)
@@ -239,11 +435,12 @@ namespace VoiceStudio.App.Services
     {
       try
       {
-        var tokenEvent = JsonSerializer.Deserialize<PipelineTokenEvent>(root.GetRawText(), _jsonOptions);
-        if (tokenEvent != null)
+        var content = root.TryGetProperty("content", out var c) ? c.GetString() ?? string.Empty : string.Empty;
+        TokenReceived?.Invoke(this, new PipelineTokenEvent
         {
-          TokenReceived?.Invoke(this, tokenEvent);
-        }
+          Token = content,
+          Timestamp = DateTime.UtcNow
+        });
       }
       catch (Exception ex)
       {
@@ -271,11 +468,14 @@ namespace VoiceStudio.App.Services
     {
       try
       {
-        var completeEvent = JsonSerializer.Deserialize<PipelineCompleteEvent>(root.GetRawText(), _jsonOptions);
-        if (completeEvent != null)
+        var content = root.TryGetProperty("content", out var c) ? c.GetString() ?? string.Empty : string.Empty;
+        var totalMs = root.TryGetProperty("total_ms", out var t) && t.TryGetDouble(out var ms) ? ms : 0.0;
+        StreamComplete?.Invoke(this, new PipelineCompleteEvent
         {
-          StreamComplete?.Invoke(this, completeEvent);
-        }
+          FullResponse = content,
+          TotalDurationMs = totalMs,
+          Timestamp = DateTime.UtcNow
+        });
       }
       catch (Exception ex)
       {
@@ -287,11 +487,15 @@ namespace VoiceStudio.App.Services
     {
       try
       {
-        var errorEvent = JsonSerializer.Deserialize<PipelineErrorEvent>(root.GetRawText(), _jsonOptions);
-        if (errorEvent != null)
+        var error = root.TryGetProperty("message", out var m) ? m.GetString() ?? string.Empty
+          : root.TryGetProperty("error", out var e) ? e.GetString() ?? string.Empty : string.Empty;
+        var code = root.TryGetProperty("code", out var co) ? co.GetString() : null;
+        ErrorOccurred?.Invoke(this, new PipelineErrorEvent
         {
-          ErrorOccurred?.Invoke(this, errorEvent);
-        }
+          Error = error,
+          Code = code,
+          Timestamp = DateTime.UtcNow
+        });
       }
       catch (Exception ex)
       {
@@ -320,7 +524,8 @@ namespace VoiceStudio.App.Services
       if (!_disposed)
       {
         _disposed = true;
-        _webSocketService.MessageReceived -= OnWebSocketMessageReceived;
+        if (_webSocketService != null)
+          _webSocketService.MessageReceived -= OnWebSocketMessageReceived;
         DisconnectAsync().GetAwaiter().GetResult();
       }
     }

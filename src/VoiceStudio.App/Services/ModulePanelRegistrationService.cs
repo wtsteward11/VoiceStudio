@@ -279,6 +279,7 @@ namespace VoiceStudio.App.Services
         Maturity = PanelMaturity.Stable
       });
 
+      // F-10: Hidden - /api/mcp-dashboard is archived
       RegisterIfNotExists(registry, new PanelDescriptor
       {
         PanelId = "MCPDashboard",
@@ -287,7 +288,8 @@ namespace VoiceStudio.App.Services
         ViewType = typeof(MCPDashboardView),
         ViewModelType = typeof(MCPDashboardViewModel),
         MenuCategory = "System",
-        Maturity = PanelMaturity.Beta
+        Maturity = PanelMaturity.Beta,
+        IsVisible = false
       });
     }
 

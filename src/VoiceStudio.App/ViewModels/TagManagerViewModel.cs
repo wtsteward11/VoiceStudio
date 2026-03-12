@@ -21,10 +21,13 @@ namespace VoiceStudio.App.ViewModels
   public partial class TagManagerViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IDialogService _dialogService;
     private readonly UndoRedoService? _undoRedoService;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly MultiSelectService _multiSelectService;
     private MultiSelectState? _multiSelectState;
+    private CancellationTokenSource? _searchDebounceCts;
+    private const int SearchDebounceMs = 300;
 
     public string PanelId => "tag_manager";
     public string DisplayName => ResourceHelper.GetString("Panel.TagManager.DisplayName", "Tag Manager");
@@ -69,10 +72,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? editingDescription;
 
-    public TagManagerViewModel(IViewModelContext context, IBackendClient backendClient)
+    public TagManagerViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
       // Get undo/redo service (may be null if not initialized)
       try
@@ -537,7 +541,21 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSearchQueryChanged(string? value)
     {
-      _ = SearchTagsAsync(CancellationToken.None);
+      _searchDebounceCts?.Cancel();
+      _searchDebounceCts = new CancellationTokenSource();
+      var cts = _searchDebounceCts;
+      _ = Task.Run(async () =>
+      {
+        try
+        {
+          await Task.Delay(SearchDebounceMs, cts.Token);
+          Dispatcher.TryEnqueue(() => _ = SearchTagsAsync(cts.Token));
+        }
+        catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "TagManagerViewModel.OnSearchQueryChanged");
+      }
+      });
     }
 
     public void ToggleTagSelection(string tagId, bool isCtrlPressed, bool isShiftPressed)
@@ -606,11 +624,12 @@ namespace VoiceStudio.App.ViewModels
 
       var selectedIds = new System.Collections.Generic.List<string>(_multiSelectState.SelectedIds);
 
-      // Show confirmation dialog
-      var confirmed = await VoiceStudio.App.Utilities.ConfirmationDialog.ShowDeleteConfirmationAsync(
-          $"{selectedIds.Count} tag(s)",
-          "tags"
-      );
+      // Show confirmation dialog (Panel Hardening: IDialogService per PANEL_HARDENING_PATTERN)
+      var confirmed = await _dialogService.ShowConfirmationAsync(
+          "Delete tags?",
+          $"Are you sure you want to delete '{selectedIds.Count} tag(s)'? This action cannot be undone.",
+          "Delete",
+          "Cancel");
 
       if (!confirmed)
         return;

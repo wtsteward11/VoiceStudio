@@ -17,6 +17,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class AdvancedWaveformVisualizationViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProjectsClient _projectsClient;
 
     public string PanelId => "advanced-waveform-visualization";
     public string DisplayName => ResourceHelper.GetString("Panel.AdvancedWaveform.DisplayName", "Advanced Waveform");
@@ -88,10 +89,11 @@ namespace VoiceStudio.App.ViewModels
       OnPropertyChanged(nameof(WaveformSamples));
     }
 
-    public AdvancedWaveformVisualizationViewModel(IViewModelContext context, IBackendClient backendClient)
+    public AdvancedWaveformVisualizationViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
 
       LoadAudioFilesCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -136,7 +138,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var projects = await _backendClient.GetProjectsAsync(cancellationToken);
+        var projects = await _projectsClient.GetProjectsAsync(cancellationToken);
         var audioIds = new System.Collections.Generic.List<string>();
 
         foreach (var project in projects)

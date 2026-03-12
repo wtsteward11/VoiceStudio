@@ -7,6 +7,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using VoiceStudio.Core.Models;
+using VoiceStudio.App.Services;
 using VoiceStudio.App.Utilities;
 using Windows.Storage.Pickers;
 using Windows.Storage;
@@ -19,6 +21,8 @@ namespace VoiceStudio.App.ViewModels
   public partial class PronunciationLexiconViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProfilesClient _profilesClient;
+    private readonly IAudioPlayerService _audioPlayer;
 
     public string PanelId => "pronunciation-lexicon";
     public string DisplayName => ResourceHelper.GetString("Panel.PronunciationLexicon.DisplayName", "Pronunciation Lexicon");
@@ -66,10 +70,12 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool isValid = true;
 
-    public PronunciationLexiconViewModel(IViewModelContext context, IBackendClient backendClient)
+    public PronunciationLexiconViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient, IAudioPlayerService audioPlayer)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
+      _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
       LoadEntriesCommand = new AsyncRelayCommand(LoadEntriesAsync);
       AddEntryCommand = new AsyncRelayCommand(AddEntryAsync, () => !string.IsNullOrWhiteSpace(NewWord) && !string.IsNullOrWhiteSpace(NewPronunciation) && IsValid);
@@ -82,6 +88,13 @@ namespace VoiceStudio.App.ViewModels
       ValidatePronunciationCommand = new RelayCommand(ValidatePronunciation, () => !string.IsNullOrWhiteSpace(NewPronunciation));
       ExportLexiconCommand = new AsyncRelayCommand(ExportLexiconAsync, () => Entries.Count > 0);
       ImportLexiconCommand = new AsyncRelayCommand(ImportLexiconAsync);
+      PlayCommand = new AsyncRelayCommand(PlayTestAudioAsync, () => (!string.IsNullOrEmpty(TestAudioId) || !string.IsNullOrEmpty(TestAudioUrl)) && !IsLoading);
+
+      PropertyChanged += (_, e) =>
+      {
+        if (e.PropertyName is nameof(TestAudioId) or nameof(TestAudioUrl) or nameof(IsLoading))
+          PlayCommand.NotifyCanExecuteChanged();
+      };
     }
 
     public IAsyncRelayCommand LoadEntriesCommand { get; }
@@ -95,6 +108,18 @@ namespace VoiceStudio.App.ViewModels
     public IRelayCommand ValidatePronunciationCommand { get; }
     public IAsyncRelayCommand ExportLexiconCommand { get; }
     public IAsyncRelayCommand ImportLexiconCommand { get; }
+    public IAsyncRelayCommand PlayCommand { get; }
+
+    private async Task PlayTestAudioAsync()
+    {
+      if (string.IsNullOrEmpty(TestAudioId) && string.IsNullOrEmpty(TestAudioUrl))
+        return;
+      var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? "http://localhost:8000";
+      if (!string.IsNullOrEmpty(TestAudioId))
+        await _audioPlayer.PlayBackendAudioIdAsync(TestAudioId, baseUrl);
+      else if (!string.IsNullOrEmpty(TestAudioUrl))
+        await _audioPlayer.PlayUrlAsync(TestAudioUrl.StartsWith("http") ? TestAudioUrl : $"{baseUrl}{TestAudioUrl}");
+    }
 
     partial void OnNewWordChanged(string? value)
     {
@@ -353,7 +378,7 @@ namespace VoiceStudio.App.ViewModels
         ErrorMessage = null;
 
         // Use voice synthesis to test pronunciation
-        var profiles = await _backendClient.GetProfilesAsync();
+        var profiles = await _profilesClient.GetProfilesAsync();
         if (profiles == null || profiles.Count == 0)
         {
           ErrorMessage = ResourceHelper.GetString("PronunciationLexicon.NoProfilesForTesting", "No voice profiles available for testing");
@@ -362,20 +387,23 @@ namespace VoiceStudio.App.ViewModels
 
         var profile = profiles.First();
 
-        // Test pronunciation using lexicon-aware synthesis
-        var testRequest = new
+        // Synthesize the word to test pronunciation (enables playback)
+        var synthRequest = new VoiceSynthesisRequest
         {
-          text = SelectedEntry.Word,
-          profile_id = profile.Id,
-          use_lexicon = true,
-          lexicon_id = SelectedEntry.Word
+          ProfileId = profile.Id,
+          Text = SelectedEntry.Word,
+          Language = SelectedLanguage ?? "en",
         };
-
-        var testResult = await _backendClient.SendRequestAsync<object, object>(
-            "/api/voice/test-pronunciation",
-            testRequest,
+        var synthResponse = await _backendClient.SendRequestAsync<VoiceSynthesisRequest, VoiceSynthesisResponse>(
+            "/api/voice/synthesize",
+            synthRequest,
             System.Net.Http.HttpMethod.Post
         );
+        if (synthResponse != null)
+        {
+          TestAudioId = synthResponse.AudioId;
+          TestAudioUrl = synthResponse.AudioUrl;
+        }
 
         StatusMessage = ResourceHelper.FormatString("PronunciationLexicon.PronunciationTested", SelectedEntry.Word);
       }

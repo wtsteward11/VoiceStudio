@@ -31,7 +31,8 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new EnsembleSynthesisViewModel(
           AppServices.GetRequiredService<IViewModelContext>(),
-          ServiceProvider.GetBackendClient()
+          ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<IDialogService>()
       );
       DataContext = ViewModel;
 

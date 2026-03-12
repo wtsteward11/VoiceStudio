@@ -3,6 +3,9 @@ Enhanced Health Check Routes
 
 Provides comprehensive health checking for the API and system components.
 """
+# SAFETY: FastAPI/Starlette router and cache_response decorators lack complete type stubs.
+# Per STRICT_MYPY_BURNDOWN_SUBPLAN first slice; runtime behavior is correct.
+# mypy: disable-error-code="untyped-decorator"
 
 from __future__ import annotations
 
@@ -10,23 +13,23 @@ import logging
 import os
 import shutil
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException
 
-from backend.config.path_config import get_models_path
-from backend.core.circuit_breaker import (
+from backend.ml.models.engine_service import get_engine_service
+from backend.services.circuit_breaker_facade import (
     get_engine_breaker_metrics,
     get_engine_breaker_stats,
     get_engine_breaker_summary,
     reset_engine_breaker,
 )
-from backend.ml.models.engine_service import get_engine_service
 from backend.services.health_facade import (
     HealthCheckResult,
     HealthStatus,
     get_health_checker,
 )
+from backend.services.path_service import PathService
 from backend.settings import config
 
 from ..optimization import cache_response
@@ -681,7 +684,7 @@ async def readiness_check() -> dict[str, Any]:
             if status == HealthStatus.HEALTHY:
                 return True
             value = getattr(status, "value", None)
-            return value == HealthStatus.HEALTHY.value
+            return bool(value == HealthStatus.HEALTHY.value)
         except Exception as e:
             logger.warning(f"Readiness health check evaluation failed: {e}")
             return False
@@ -713,7 +716,7 @@ async def readiness_check() -> dict[str, Any]:
 @router.get("/ready")
 async def ready_check() -> dict[str, Any]:
     """Alias for readiness check."""
-    return await readiness_check()
+    return cast(dict[str, Any], await readiness_check())
 
 
 @router.get("/liveness")
@@ -734,10 +737,10 @@ def liveness_check() -> dict[str, Any]:
 @router.get("/live")
 def live_check() -> dict[str, Any]:
     """Alias for liveness check."""
-    return liveness_check()
+    return cast(dict[str, Any], liveness_check())
 
 
-def get_performance_middleware():
+def get_performance_middleware() -> Any:
     """
     Wrapper for performance monitoring middleware lookup.
 
@@ -792,7 +795,7 @@ def preflight_check() -> dict[str, Any]:
 
     projects_root = str(get_project_store_service().projects_dir)
     cache_root = get_cache_dir()
-    model_root = str(get_models_path())
+    model_root = str(PathService.get_models_dir())
     audio_registry_path = str(get_registry_db_path())
     jobs_root = str(get_job_state_store("voice_cloning_wizard").jobs_root)
 

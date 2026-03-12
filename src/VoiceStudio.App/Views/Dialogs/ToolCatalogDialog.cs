@@ -112,6 +112,7 @@ namespace VoiceStudio.App.Views.Dialogs
     private void LoadDescriptors()
     {
       _allDescriptors = _registry.GetAllDescriptors()
+        .Where(d => d.IsVisible)
         .Where(d => d.Maturity != PanelMaturity.Deprecated)
         .OrderBy(d => d.MenuCategory ?? "Other")
         .ThenBy(d => d.DisplayName)

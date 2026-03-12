@@ -45,6 +45,44 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## Active Task
 
+- **ID**: None
+- **Title**: —
+- **Status**: Awaiting selection
+
+## Next 3 Steps
+
+1. **Phase 4** — COMPLETE. 4A.1 (IABTestService), 4A.2 Phase A (IVoiceSynthesisService), 4B (synthesis.py mypy), 4C (script dedup), 4D (skip-debt), creep review done.
+2. **1D.1** — N/A. TimelineView paste/duplicate flow through ViewModel commands; no GetBackendClient() in current code.
+3. **Future** — VoiceSynthesisViewModel Phase B/C (IEnginesClient, IQualityPipelineService, IEnsembleService) to remove remaining IBackendClient.
+
+**Plan:** Phase 2 Post-Timeline Hardening — COMPLETE (2026-03-11). REQUEST_COORDINATION_AUDIT: Open Remediation Queue added; bounded-request test: TimelinePanelScenario_*; dialog baseline: 0; creep detection: active. TimelineTrackService, ProjectAudioClient, TimelineTranscriptionService: policy/null-normalization added.
+
+## Last Milestone (PHASE-4-POST-TIMELINE-CONTINUATION)
+
+- **ID**: PHASE-4-POST-TIMELINE-CONTINUATION
+- **Title**: Phase 4 Post-Timeline Continuation
+- **Status**: **COMPLETE** (2026-03-11)
+- **Completed**: 1D.1 (N/A doc), 4A.1 (IABTestService, ABTestingViewModel), 4A.2 Phase A (IVoiceSynthesisService, VoiceSynthesisViewModel synthesis+playback), 4B (voice/synthesis.py mypy strict), 4C (script deduplication), 4D (skip-debt infrastructure refs), creep baseline review
+- **Verification**: check_ibackendclient_creep.py OK; ABTestServiceTests 5 passed; mypy synthesis.py strict passes; synthesizevoice_baseline reduced (VoiceSynthesisViewModel removed)
+
+## Previous Milestone (PHASE-2-POST-TIMELINE-HARDENING)
+
+- **ID**: PHASE-2-POST-TIMELINE-HARDENING
+- **Title**: Phase 2 Post-Timeline Hardening
+- **Status**: **COMPLETE** (2026-03-11)
+- **Completed**: 2A (bounded-request proof), 2B (ShowContentAsync, dialog baseline 0), 2C (Open Remediation Queue), 2D (IBackendClient creep detection), 5B (SynthesizeVoiceAsync ownership), 3A (TimelineTrackService policy), 3B (ProjectAudioClient policy), 3C (TimelineTranscriptionService null-normalization)
+- **Verification**: BoundedRequest tests pass; check_dialog_pattern.py exits 0; check_ibackendclient_creep.py in CI; TimelineTrackServiceTests, ProjectAudioClientTests, TimelineTranscriptionServiceTests pass
+
+## Previous Milestone (BLOCKS-9-12-CONTINUATION)
+
+- **ID**: BLOCKS-9-12-CONTINUATION
+- **Title**: Blocks 9–12 institutionalization
+- **Status**: **COMPLETE** (2026-03-11)
+- **Completed**: Task 9.3, 9.4, 10.1, 10.2, 10.3, 11.1, 11.2, 11.3, 12.1, 12.2, 12.3
+- **Verification**: Build 0 errors; run_verification.py PASS (completion_guard may fail if uncommitted); Timeline bounded-request proof; degraded-mode CI gate; v2/health mypy strict; ci.yml setup-python-pip; 6 engine test skipif policy compliance
+
+## Previous Active Task
+
 - **ID**: CENTRALIZED-REQUEST-COORDINATION
 - **Title**: Centralized Request Coordination Plan
 - **Status**: **COMPLETE** (2026-03-11)
@@ -1016,6 +1054,21 @@ Production Gap Resolution and Architecture Completion. Implemented by Senior Sof
 2. Tag v1.1.0-release at GREEN CI HEAD
 3. Post-release: DEFERRED_V1_2.md items (VS-0043 mypy strict, etc.)
 
+**CLAUDE.md Governance Remediation (2026-03-11):**
+- Plan f4de863d fully executed: IPC claim fixed, Truth Hierarchy, METRICS GENERATED ONLY, Known Governance Debt, Request Coordination (ADR-048), conflict resolution, softened over-absolute phrases. Commit bb886b26. run_verification.py PASS.
+
+**DEFERRED_V1_2 — Bandit B614 (2026-03-11):**
+- Bandit B614 torch.load exemption documented in CVE_EXCEPTIONS.md; DEFERRED_V1_2.md updated. Commit 8b8bfda6. skip_report.txt regenerated (46 skipped at collection).
+
+**DEFERRED_V1_2 — CI Suppression Policy (2026-03-11):**
+- CI_SUPPRESSION_POLICY.md created; allowed vs prohibited patterns; inventory of non-blocking steps. CANONICAL_REGISTRY updated.
+
+**DEFERRED_V1_2 — OpenAPI drift dep alignment (2026-03-11):**
+- OPENAPI_CI_ALIGNMENT.md created; scripts importing backend.api.main; workflow alignment verified; all use requirements.txt.
+
+**DEFERRED_V1_2 — Sentinel smoke backend startup (2026-03-11):**
+- Wait increased 60→90 attempts (2min→3min) in sentinel_backend_smoke.yml; cold-start documented in SENTINEL_TESTING_GUIDE.md.
+
 **GAP Remediation (2026-03-10):**
 - GAP-013 COMPLETE: WebSocket Topics reference doc created (`docs/REFERENCE/WEBSOCKET_TOPICS_REFERENCE.md`); WEBSOCKET_GUIDE.md updated with implemented topics.
 - GAP-008 COMPLETE: Routes import engine utilities moved to service layer — `backend/services/circuit_breaker_facade.py`; PathService for get_models_path; rvc, health, voice, video_gen, image_gen, settings updated.
@@ -1264,10 +1317,10 @@ _Previous:_
 
 ## Context Acknowledgment
 
-- **Acknowledged At**: 2026-03-06 (Overseer — Gate C / Gate H status)
-- **Acknowledged By**: Overseer (Role 0)
-- **Verification Run**: 2026-03-06
-  - `python scripts/run_verification.py`: **PASS** (gate_status, ledger_validate, completion_guard, empty_catch_check, xaml_safety_check)
+- **Acknowledged At**: 2026-03-11 (DEFERRED_V1_2 items: Bandit B614, CI suppression, OpenAPI alignment, Sentinel startup)
+- **Acknowledged By**: Agent (continue tasks)
+- **Verification Run**: 2026-03-11
+  - `python scripts/run_verification.py`: **PASS** (all gates)
   - Gate C 7/7 PASS, Gate H 1/1 PASS; Gate B 9/10 OPEN
   - Gate/Ledger checks: **PASS** (`gate_status`, `ledger_validate`, `empty_catch_check`, `xaml_safety_check`)
   - `python -m tools.overseer.cli.main gate status`: Gate B **OPEN** (9/10), C/D/E/F/H pass, A/G N/A
@@ -1295,6 +1348,8 @@ _Previous:_
 
 | Date       | Task                                   | Artifact                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Type                   | Verified |
 | ---------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | -------- |
+| 2026-03-11 | BLOCKS-9-12-CONTINUATION               | Tasks 11.2–12.3 complete; TIMELINE_BOUNDED_REQUEST_PROOF; TimelinePanelScenario test; v2/health mypy; ci.yml setup-python-pip editable; 6 engine skipif policy
+| 2026-03-11 | CLAUDE.md Governance Remediation       | CLAUDE.md (plan f4de863d): IPC fix, Truth Hierarchy, METRICS GENERATED ONLY, Known Governance Debt, Request Coordination, conflict resolution; run_verification.py PASS; commit bb886b26                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Documentation          | Verified |
 | 2026-03-10 | P0-XAMLROOT-REQUEST-STORM               | DialogService.GetXamlRoot/ShowProfileEditAsync; ConfirmationDialog safe root; ProfilesView DialogService; BackendClient engines cache + InvalidateProfilesCache; ProfilesViewModel OnProfileCreatedRefresh skip                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Implementation         | Verified |
 | 2026-03-10 | GAP-012                                 | tools/context/core/allocator.py (memory sliding window); tests/tools/test_context_allocator.py::test_allocator_memory_sliding_window_keeps_recent                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Implementation        | Verified |
 | 2026-03-10 | GAP-015                                 | docs/developer/COMMAND_PALETTE_GUIDE.md (aligned with IUnifiedCommandRegistry, CommandPaletteService)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Documentation         | Verified |

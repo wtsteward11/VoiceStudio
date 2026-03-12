@@ -143,7 +143,7 @@ namespace VoiceStudio.App.ViewModels
         // Backend will generate matplotlib/plotly charts and return image URLs
         // These endpoints will be created when visualization libraries are integrated
         var timeRangeDays = GetDaysFromTimeRange(SelectedTimeRange);
-        const string baseUrl = "http://localhost:8001"; // Default backend URL
+        const string baseUrl = "http://localhost:8000"; // Default backend URL
 
         // For trends visualization - construct URL for backend endpoint
         // Endpoint: /api/quality/trends/visualization?type={type}&days={days}

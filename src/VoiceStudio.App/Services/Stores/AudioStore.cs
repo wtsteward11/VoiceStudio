@@ -15,6 +15,7 @@ namespace VoiceStudio.App.Services.Stores
   public partial class AudioStore : ObservableObject
   {
     private readonly IBackendClient _backendClient;
+    private readonly ITimelineTrackService _trackService;
     private readonly StateCacheService? _stateCacheService;
 
     [ObservableProperty]
@@ -38,9 +39,10 @@ namespace VoiceStudio.App.Services.Stores
     [ObservableProperty]
     private DateTime? lastUpdated;
 
-    public AudioStore(IBackendClient backendClient, StateCacheService? stateCacheService = null)
+    public AudioStore(IBackendClient backendClient, ITimelineTrackService trackService, StateCacheService? stateCacheService = null)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _trackService = trackService ?? throw new ArgumentNullException(nameof(trackService));
       _stateCacheService = stateCacheService;
     }
 
@@ -88,7 +90,7 @@ namespace VoiceStudio.App.Services.Stores
       try
       {
         // Get tracks for the project, then get clips from each track
-        var tracks = await _backendClient.GetTracksAsync(projectId);
+        var tracks = await _trackService.GetTracksAsync(projectId);
 
         AudioClips.Clear();
         foreach (var track in tracks)

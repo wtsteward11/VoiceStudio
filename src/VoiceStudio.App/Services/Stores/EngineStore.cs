@@ -2,9 +2,11 @@ using System;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using VoiceStudio.Core.Services;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Services.Stores
 {
@@ -46,7 +48,7 @@ namespace VoiceStudio.App.Services.Stores
     /// <summary>
     /// Loads all available engines.
     /// </summary>
-    public async Task LoadEnginesAsync()
+    public async Task LoadEnginesAsync(CancellationToken cancellationToken = default)
     {
       try
       {
@@ -62,12 +64,16 @@ namespace VoiceStudio.App.Services.Stores
             AvailableEngines = cached;
             IsLoading = false;
             // Still fetch from backend in background to update
-            _ = RefreshEnginesAsync();
+            _ = RefreshEnginesAsync(cancellationToken);
             return;
           }
         }
 
-        await RefreshEnginesAsync();
+        await RefreshEnginesAsync(cancellationToken);
+      }
+      catch (OperationCanceledException)
+      {
+        System.Diagnostics.Debug.WriteLine("EngineStore: LoadEnginesAsync cancelled");
       }
       catch (Exception ex)
       {
@@ -82,7 +88,7 @@ namespace VoiceStudio.App.Services.Stores
     /// <summary>
     /// Refreshes engines from backend.
     /// </summary>
-    public async Task RefreshEnginesAsync()
+    public async Task RefreshEnginesAsync(CancellationToken cancellationToken = default)
     {
       try
       {
@@ -91,7 +97,7 @@ namespace VoiceStudio.App.Services.Stores
         if (_engineManager != null)
         {
           // Use EngineManager to discover engines
-          await _engineManager.InitializeAsync();
+          await _engineManager.InitializeAsync(cancellationToken);
           foreach (var engine in _engineManager.GetEngines())
           {
             var typeStr = "unknown";

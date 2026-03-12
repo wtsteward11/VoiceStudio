@@ -26,7 +26,11 @@ try:
     HAS_FESTIVAL = True
 except ImportError:
     HAS_FESTIVAL = False
-    pytestmark = pytest.mark.skip("Festival/Flite engine not available")
+
+pytestmark = pytest.mark.skipif(
+    not HAS_FESTIVAL,
+    reason="Festival/Flite engine not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)",
+)
 
 
 @pytest.fixture

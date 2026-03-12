@@ -193,7 +193,7 @@ def generate_large_audio(duration_seconds: float, sample_rate: int = 22050) -> n
 class TestMemoryBaseline:
     """Test baseline memory usage."""
 
-    @pytest.mark.skipif(not HAS_PSUTIL, reason="psutil required for accurate memory tests")
+    @pytest.mark.skipif(not HAS_PSUTIL, reason="psutil required for accurate memory tests (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
     def test_python_process_baseline(self):
         """Establish baseline memory usage for Python process."""
         profiler = MemoryProfiler()

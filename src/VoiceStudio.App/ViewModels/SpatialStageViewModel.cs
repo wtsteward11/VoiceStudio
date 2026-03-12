@@ -18,6 +18,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class SpatialStageViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProjectsClient _projectsClient;
 
     public string PanelId => "spatial-stage";
     public string DisplayName => ResourceHelper.GetString("Panel.SpatialStage.DisplayName", "Spatial Audio");
@@ -65,10 +66,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool enableHrtf = true;
 
-    public SpatialStageViewModel(IViewModelContext context, IBackendClient backendClient)
+    public SpatialStageViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
 
       LoadConfigsCommand = new AsyncRelayCommand(LoadConfigsAsync);
       CreateConfigCommand = new AsyncRelayCommand(CreateConfigAsync);
@@ -398,7 +400,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var projects = await _backendClient.GetProjectsAsync(cancellationToken);
+        var projects = await _projectsClient.GetProjectsAsync(cancellationToken);
         var audioIds = new System.Collections.Generic.List<string>();
 
         foreach (var project in projects)

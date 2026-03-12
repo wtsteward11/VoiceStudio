@@ -378,13 +378,20 @@
               <TextBlock Text="Backend Settings" Style="{StaticResource VSQ.Text.Heading}"
                 Margin="0,0,0,8" />
 
+              <InfoBar IsOpen="True"
+                Severity="Informational"
+                Title="Restart required"
+                Message="Changing the API URL requires restarting the app to take effect."
+                Margin="0,0,0,8"
+                AutomationProperties.AutomationId="SettingsView_ApiUrlRestartInfoBar" />
+
               <StackPanel Orientation="Horizontal"
                 Spacing="{StaticResource VSQ.Spacing.Value.Small}">
                 <TextBlock Text="API URL:" Width="150" Style="{StaticResource VSQ.Text.Body}"
                   VerticalAlignment="Center" />
                 <TextBox Text="{x:Bind ViewModel.ApiUrl, Mode=TwoWay}"
                   Width="300"
-                  PlaceholderText="http://localhost:8001" />
+                  PlaceholderText="http://localhost:8000" />
               </StackPanel>
 
               <StackPanel Orientation="Horizontal"

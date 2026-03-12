@@ -21,7 +21,8 @@ namespace VoiceStudio.App.Views.Panels
   /// </summary>
   public partial class ABTestingViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IABTestService _abTestService;
+    private readonly IProfilesClient _profilesClient;
     private readonly IAudioPlayerService _audioPlayer;
 
     public string PanelId => "ab_testing";
@@ -54,15 +55,6 @@ namespace VoiceStudio.App.Views.Panels
 
     [ObservableProperty]
     private bool enhanceQualityB = true;
-
-    [ObservableProperty]
-    private bool isLoading;
-
-    [ObservableProperty]
-    private string? errorMessage;
-
-    [ObservableProperty]
-    private bool hasError;
 
     [ObservableProperty]
     private ABTestResponse? testResults;
@@ -134,11 +126,18 @@ namespace VoiceStudio.App.Views.Panels
     public CommunityToolkit.Mvvm.Input.IRelayCommand PlaySampleACommand { get; }
     public CommunityToolkit.Mvvm.Input.IRelayCommand PlaySampleBCommand { get; }
 
-    public ABTestingViewModel(IViewModelContext context, IBackendClient backendClient, IAudioPlayerService audioPlayer)
+    public ABTestingViewModel(IViewModelContext context, IABTestService abTestService, IProfilesClient profilesClient, IAudioPlayerService audioPlayer)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _abTestService = abTestService ?? throw new ArgumentNullException(nameof(abTestService));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
+
+      PropertyChanged += (_, e) =>
+      {
+        if (e.PropertyName == nameof(HasError))
+          OnPropertyChanged(nameof(ErrorVisibility));
+      };
 
       RunTestCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -161,20 +160,14 @@ namespace VoiceStudio.App.Views.Panels
       OnPropertyChanged(nameof(ComparisonSummary));
     }
 
-    partial void OnHasErrorChanged(bool value)
-    {
-      OnPropertyChanged(nameof(ErrorVisibility));
-    }
-
     private async Task LoadProfilesAsync(CancellationToken cancellationToken)
     {
       IsLoading = true;
-      HasError = false;
       ErrorMessage = null;
 
       try
       {
-        var profileList = await _backendClient.GetProfilesAsync(cancellationToken);
+        var profileList = await _profilesClient.GetProfilesAsync(cancellationToken);
         Profiles.Clear();
         foreach (var profile in profileList)
         {
@@ -188,7 +181,6 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         ErrorMessage = $"Failed to load profiles: {ex.Message}";
-        HasError = true;
         await HandleErrorAsync(ex, "LoadProfiles");
       }
       finally
@@ -203,7 +195,6 @@ namespace VoiceStudio.App.Views.Panels
         return;
 
       IsLoading = true;
-      HasError = false;
       ErrorMessage = null;
 
       try
@@ -221,7 +212,7 @@ namespace VoiceStudio.App.Views.Panels
           EnhanceQualityB = EnhanceQualityB
         };
 
-        TestResults = await _backendClient.RunABTestAsync(request, cancellationToken);
+        TestResults = await _abTestService.RunABTestAsync(request, cancellationToken);
 
         // Notify property changes
         OnPropertyChanged(nameof(HasResults));
@@ -240,7 +231,6 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         ErrorMessage = $"A/B test failed: {ex.Message}";
-        HasError = true;
         await HandleErrorAsync(ex, "RunABTest");
       }
       finally
@@ -260,7 +250,7 @@ namespace VoiceStudio.App.Views.Panels
         // Stop any existing playback
         _audioPlayer.Stop();
         
-        var audioStream = await _backendClient.GetAudioStreamAsync(SampleA.AudioId);
+        var audioStream = await _abTestService.GetAudioStreamAsync(SampleA.AudioId);
         if (audioStream != null)
         {
           // Play audio using audio player service
@@ -270,7 +260,6 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         ErrorMessage = $"Failed to play sample A: {ex.Message}";
-        HasError = true;
       }
     }
 
@@ -284,7 +273,7 @@ namespace VoiceStudio.App.Views.Panels
         // Stop any existing playback
         _audioPlayer.Stop();
         
-        var audioStream = await _backendClient.GetAudioStreamAsync(SampleB.AudioId);
+        var audioStream = await _abTestService.GetAudioStreamAsync(SampleB.AudioId);
         if (audioStream != null)
         {
           // Play audio using audio player service
@@ -294,7 +283,6 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         ErrorMessage = $"Failed to play sample B: {ex.Message}";
-        HasError = true;
       }
     }
 

@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using VoiceStudio.App.Controls;
+using VoiceStudio.App.Logging;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Views.Dialogs;
 using VoiceStudio.Core.Models;
@@ -56,7 +57,9 @@ namespace VoiceStudio.App
           Controls.PanelHost? rightPanelHost,
           Controls.PanelHost? bottomPanelHost)
         {
-            var (restored, hadRegions, failedItems) = await RestorePanelsFromLayoutAsync();
+            try
+            {
+                var (restored, hadRegions, failedItems) = await RestorePanelsFromLayoutAsync();
             if (!restored)
             {
                 if (hadRegions)
@@ -70,22 +73,34 @@ namespace VoiceStudio.App
                 }
                 if (leftPanelHost != null)
                 {
-                    await OpenPanelByIdAsync("Profiles", PanelRegion.Left);
+                    var ok = await OpenPanelByIdAsync("Profiles", PanelRegion.Left);
+#if DEBUG
+                    Debug.WriteLine($"[Startup] OpenPanelByIdAsync(Profiles, Left) => {ok}");
+#endif
                     SetPanelHostMeta(leftPanelHost, "Voice Profiles", "👤");
                 }
                 if (centerPanelHost != null)
                 {
-                    await OpenPanelByIdAsync("Timeline", PanelRegion.Center);
+                    var ok = await OpenPanelByIdAsync("Timeline", PanelRegion.Center);
+#if DEBUG
+                    Debug.WriteLine($"[Startup] OpenPanelByIdAsync(Timeline, Center) => {ok}");
+#endif
                     SetPanelHostMeta(centerPanelHost, "Timeline", "🎬");
                 }
                 if (rightPanelHost != null)
                 {
-                    await OpenPanelByIdAsync("EffectsMixer", PanelRegion.Right);
+                    var ok = await OpenPanelByIdAsync("EffectsMixer", PanelRegion.Right);
+#if DEBUG
+                    Debug.WriteLine($"[Startup] OpenPanelByIdAsync(EffectsMixer, Right) => {ok}");
+#endif
                     SetPanelHostMeta(rightPanelHost, "Effects & Mixer", "🎚️");
                 }
                 if (bottomPanelHost != null)
                 {
-                    await OpenPanelByIdAsync("Macro", PanelRegion.Bottom);
+                    var ok = await OpenPanelByIdAsync("Macro", PanelRegion.Bottom);
+#if DEBUG
+                    Debug.WriteLine($"[Startup] OpenPanelByIdAsync(Macro, Bottom) => {ok}");
+#endif
                     SetPanelHostMeta(bottomPanelHost, "Macros", "⚡");
                 }
             }
@@ -99,6 +114,57 @@ namespace VoiceStudio.App
                   () => ResetToStudioWorkspace());
             }
             SetActiveNavButton("NavStudio");
+
+            var leftHasContent = leftPanelHost?.Content != null;
+            var centerHasContent = centerPanelHost?.Content != null;
+            var rightHasContent = rightPanelHost?.Content != null;
+            var bottomHasContent = bottomPanelHost?.Content != null;
+            var loadedCount = (leftHasContent ? 1 : 0) + (centerHasContent ? 1 : 0) + (rightHasContent ? 1 : 0) + (bottomHasContent ? 1 : 0);
+
+#if DEBUG
+            Debug.WriteLine($"[Startup] PanelHost Content after InitializePanels: Left={leftHasContent}, Center={centerHasContent}, Right={rightHasContent}, Bottom={bottomHasContent} (count={loadedCount})");
+#endif
+
+            if (loadedCount < 2)
+            {
+                var diagDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoiceStudio", "crashes");
+                try
+                {
+                    System.IO.Directory.CreateDirectory(diagDir);
+                    var path = System.IO.Path.Combine(diagDir, "startup_failure.txt");
+                    var msg = $"[{DateTime.UtcNow:O}] Zero-panel startup detected. LoadedCount={loadedCount}. Left={leftHasContent}, Center={centerHasContent}, Right={rightHasContent}, Bottom={bottomHasContent}. Restore result: restored={restored}, hadRegions={hadRegions}. Consider resetting workspace layout via Settings > Workspaces > Reset to Studio.\n";
+                    System.IO.File.WriteAllText(path, msg);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Startup] Failed to write startup_failure.txt: {ex.Message}");
+                }
+            }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Startup] InitializePanelsAsync failed: {ex.Message}");
+                ErrorLogger.LogWarning($"Panel initialization failed: {ex.Message}", "MainWindow.InitializePanels");
+                try
+                {
+                    ServiceProvider.TryGetToastNotificationService()?.ShowError($"Panel initialization failed: {ex.Message}", "Startup Error");
+                }
+                catch (Exception toastEx)
+                {
+                    Debug.WriteLine($"[Startup] Toast failed (non-fatal): {toastEx.Message}");
+                }
+                try
+                {
+                    await OpenPanelByIdAsync("Profiles", PanelRegion.Left);
+                    await OpenPanelByIdAsync("Timeline", PanelRegion.Center);
+                    await OpenPanelByIdAsync("EffectsMixer", PanelRegion.Right);
+                    await OpenPanelByIdAsync("Macro", PanelRegion.Bottom);
+                }
+                catch (Exception fallbackEx)
+                {
+                    Debug.WriteLine($"[Startup] Fallback panel open failed: {fallbackEx.Message}");
+                }
+            }
         }
 
         private async void ManageWorkspaces_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)

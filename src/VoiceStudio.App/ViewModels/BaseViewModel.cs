@@ -146,8 +146,7 @@ namespace VoiceStudio.App.ViewModels
 
       if (ErrorHandler.IsRateLimitException(exception))
       {
-        var toast = AppServices.TryGetToastNotificationService();
-        toast?.ShowWarning(ErrorHandler.GetUserFriendlyMessage(exception), "Rate Limited");
+        AppServices.TryGetErrorPresentationService()?.ShowError(exception, context);
         return;
       }
 

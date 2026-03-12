@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Media.Animation;
 using VoiceStudio.App.Core.ErrorHandling;
 using VoiceStudio.App.Logging;
 using VoiceStudio.App.Services;
+using MultiSelectSelectionChangedEventArgs = VoiceStudio.App.Services.SelectionChangedEventArgs;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -16,6 +17,7 @@ using Windows.ApplicationModel.DataTransfer;
 using Windows.UI.Core;
 using Windows.UI;
 using System;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -33,17 +35,27 @@ namespace VoiceStudio.App.Views.Panels
     private IDragDropService? _panelDragDropService;
     private ToastNotificationService? _toastService;
     private UndoRedoService? _undoRedoService;
+    private IDialogService? _dialogService;
     private AudioClip? _clipboardClip; // For cut/copy/paste
     private KeyboardShortcutService? _keyboardShortcutService;
+    private MultiSelectService? _multiSelectService;
 
     public TimelineView()
     {
       this.InitializeComponent();
-      // Wire DataContext with BackendClient and AudioPlayerService
+      // Wire DataContext with synthesis service and timeline services
       ViewModel = new TimelineViewModel(
-          AppServices.GetBackendClient(),
+          AppServices.GetTimelineSynthesisService(),
+          AppServices.GetTimelineClipService(),
+          AppServices.GetTimelineTrackService(),
+          AppServices.GetTimelineTranscriptionService(),
+          AppServices.GetRequiredService<IProjectAudioClient>(),
+          AppServices.GetRequiredService<IAudioVisualizationService>(),
+          AppServices.GetRequiredService<IProjectsClient>(),
+          AppServices.GetRequiredService<IProfilesClient>(),
           AppServices.GetAudioPlayerService(),
           AppServices.GetMultiSelectService(),
+          AppServices.GetRequiredService<IDialogService>(),
           AppServices.TryGetToastNotificationService(),
           AppServices.TryGetUndoRedoService(),
           AppServices.TryGetErrorPresentationService(),
@@ -59,6 +71,7 @@ namespace VoiceStudio.App.Views.Panels
       _toastService = AppServices.TryGetToastNotificationService();
       _undoRedoService = AppServices.TryGetUndoRedoService();
       _keyboardShortcutService = AppServices.TryGetKeyboardShortcutService();
+      _dialogService = AppServices.TryGetDialogService();
 
       // Register keyboard shortcuts
       if (_keyboardShortcutService != null)
@@ -80,36 +93,12 @@ namespace VoiceStudio.App.Views.Panels
         // Help overlay handling can be added if needed
       });
 
-      // Subscribe to preview state changes
-      ViewModel.PropertyChanged += (s, e) =>
-      {
-        if (e.PropertyName == nameof(TimelineViewModel.PlayheadPulsing))
-        {
-          if (ViewModel.PlayheadPulsing)
-          {
-            StartPlayheadPulse();
-          }
-          else
-          {
-            StopPlayheadPulse();
-          }
-        }
-        else if (e.PropertyName == nameof(TimelineViewModel.SelectedClipCount) ||
-                       e.PropertyName == nameof(TimelineViewModel.Tracks))
-        {
-          UpdateClipSelectionVisuals();
-        }
-      };
+      // Subscribe to preview state changes (Phase 3: named handlers for disposal)
+      ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
-      // Subscribe to selection changes
-      var multiSelectService = ServiceProvider.GetMultiSelectService();
-      multiSelectService.SelectionChanged += (s, e) =>
-      {
-        if (e.PanelId == ViewModel.PanelId)
-        {
-          UpdateClipSelectionVisuals();
-        }
-      };
+      // Subscribe to selection changes (Phase 3: store ref for disposal)
+      _multiSelectService = ServiceProvider.GetMultiSelectService();
+      _multiSelectService.SelectionChanged += OnMultiSelectSelectionChanged;
 
       // Handle keyboard shortcuts
       this.KeyDown += TimelineView_KeyDown;
@@ -132,10 +121,39 @@ namespace VoiceStudio.App.Views.Panels
           CanAcceptCrossPanelDrop);
     }
 
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+      if (e.PropertyName == nameof(TimelineViewModel.PlayheadPulsing))
+      {
+        if (ViewModel.PlayheadPulsing)
+          StartPlayheadPulse();
+        else
+          StopPlayheadPulse();
+      }
+      else if (e.PropertyName == nameof(TimelineViewModel.SelectedClipCount) ||
+               e.PropertyName == nameof(TimelineViewModel.Tracks))
+      {
+        UpdateClipSelectionVisuals();
+      }
+    }
+
+    private void OnMultiSelectSelectionChanged(object? sender, MultiSelectSelectionChangedEventArgs e)
+    {
+      if (e.PanelId == ViewModel.PanelId)
+        UpdateClipSelectionVisuals();
+    }
+
     private void TimelineView_Unloaded(object _, RoutedEventArgs __)
     {
-      // Unregister from drop target (Panel Architecture Phase 4)
+      this.Unloaded -= TimelineView_Unloaded;
       _panelDragDropService?.UnregisterDropTarget(ViewModel.PanelId);
+      if (_multiSelectService != null)
+      {
+        _multiSelectService.SelectionChanged -= OnMultiSelectSelectionChanged;
+        _multiSelectService = null;
+      }
+      if (ViewModel != null)
+        ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
     }
 
     /// <summary>
@@ -604,79 +622,20 @@ namespace VoiceStudio.App.Views.Panels
           }
         }
 
-        if (_clipboardClip == null || ViewModel.SelectedTrack == null || ViewModel.SelectedProject == null)
+        if (_clipboardClip == null)
         {
-          _toastService?.ShowToast(ToastType.Warning, "Paste", "No track or project selected");
+          _toastService?.ShowToast(ToastType.Warning, "Paste", "No clip in clipboard");
           return;
         }
 
-        // Create new clip with new ID
-        var pastedClip = new AudioClip
+        if (ViewModel.PasteClipCommand.CanExecute(_clipboardClip))
         {
-          Id = Guid.NewGuid().ToString(),
-          Name = _clipboardClip.Name + " (Copy)",
-          ProfileId = _clipboardClip.ProfileId,
-          AudioId = _clipboardClip.AudioId,
-          AudioUrl = _clipboardClip.AudioUrl,
-          Duration = _clipboardClip.Duration,
-          StartTime = ViewModel.SelectedTrack.Clips.Count > 0
-                ? ViewModel.SelectedTrack.Clips.Max(c => c.EndTime)
-                : 0.0,
-          Engine = _clipboardClip.Engine,
-          QualityScore = _clipboardClip.QualityScore,
-          WaveformSamples = _clipboardClip.WaveformSamples
-        };
-
-        // Add undo/redo action
-        _undoRedoService?.AddAction(
-            "Paste Clip",
-            () =>
-            {
-              // Undo: Remove the pasted clip
-              ViewModel.SelectedTrack.Clips.Remove(pastedClip);
-              if (ViewModel.SelectedProject != null)
-              {
-                var backendClient = ServiceProvider.GetBackendClient();
-                _ = backendClient.DeleteClipAsync(ViewModel.SelectedProject.Id, ViewModel.SelectedTrack.Id, pastedClip.Id);
-              }
-            },
-            async () =>
-            {
-              // Redo: Add the clip back
-              ViewModel.SelectedTrack.Clips.Add(pastedClip);
-              if (ViewModel.SelectedProject != null)
-              {
-                try
-                {
-                  var backendClient = ServiceProvider.GetBackendClient();
-                  await backendClient.CreateClipAsync(
-                              ViewModel.SelectedProject.Id,
-                              ViewModel.SelectedTrack.Id,
-                              pastedClip
-                          );
-                }
-                catch (Exception ex) { ErrorLogger.LogWarning($"Undo paste sync failed: {ex.Message}", "TimelineView"); }
-              }
-            }
-        );
-
-        // Save to backend
-        try
-        {
-          var backendClient = ServiceProvider.GetBackendClient();
-          pastedClip = await backendClient.CreateClipAsync(
-              ViewModel.SelectedProject.Id,
-              ViewModel.SelectedTrack.Id,
-              pastedClip
-          );
+          await ViewModel.PasteClipCommand.ExecuteAsync(_clipboardClip);
         }
-        catch (Exception ex)
+        else
         {
-          _toastService?.ShowToast(ToastType.Warning, "Paste Warning", $"Clip pasted locally. Backend save failed: {ex.Message}");
+          _toastService?.ShowToast(ToastType.Warning, "Paste", "No track or project selected");
         }
-
-        ViewModel.SelectedTrack.Clips.Add(pastedClip);
-        _toastService?.ShowToast(ToastType.Success, "Pasted", $"Pasted '{pastedClip.Name}'");
       }
       catch (Exception ex)
       {
@@ -688,77 +647,14 @@ namespace VoiceStudio.App.Views.Panels
     {
       try
       {
-        if (ViewModel.SelectedTrack == null || ViewModel.SelectedProject == null)
+        if (ViewModel.DuplicateClipCommand.CanExecute(clip))
+        {
+          await ViewModel.DuplicateClipCommand.ExecuteAsync(clip);
+        }
+        else
         {
           _toastService?.ShowToast(ToastType.Warning, "Duplicate", "No track selected");
-          return;
         }
-
-        // Create duplicate with new ID
-        var duplicatedClip = new AudioClip
-        {
-          Id = Guid.NewGuid().ToString(),
-          Name = clip.Name + " (Copy)",
-          ProfileId = clip.ProfileId,
-          AudioId = clip.AudioId,
-          AudioUrl = clip.AudioUrl,
-          Duration = clip.Duration,
-          StartTime = clip.EndTime + 0.1, // Place after original with small gap
-          Engine = clip.Engine,
-          QualityScore = clip.QualityScore,
-          WaveformSamples = clip.WaveformSamples
-        };
-
-        // Add undo/redo action
-        _undoRedoService?.AddAction(
-            "Duplicate Clip",
-            () =>
-            {
-              // Undo: Remove the duplicated clip
-              ViewModel.SelectedTrack.Clips.Remove(duplicatedClip);
-              if (ViewModel.SelectedProject != null)
-              {
-                var backendClient = ServiceProvider.GetBackendClient();
-                _ = backendClient.DeleteClipAsync(ViewModel.SelectedProject.Id, ViewModel.SelectedTrack.Id, duplicatedClip.Id);
-              }
-            },
-            async () =>
-            {
-              // Redo: Add the clip back
-              ViewModel.SelectedTrack.Clips.Add(duplicatedClip);
-              if (ViewModel.SelectedProject != null)
-              {
-                try
-                {
-                  var backendClient = ServiceProvider.GetBackendClient();
-                  await backendClient.CreateClipAsync(
-                              ViewModel.SelectedProject.Id,
-                              ViewModel.SelectedTrack.Id,
-                              duplicatedClip
-                          );
-                }
-                catch (Exception ex) { ErrorLogger.LogWarning($"Undo duplicate sync failed: {ex.Message}", "TimelineView"); }
-              }
-            }
-        );
-
-        // Save to backend
-        try
-        {
-          var backendClient = ServiceProvider.GetBackendClient();
-          duplicatedClip = await backendClient.CreateClipAsync(
-              ViewModel.SelectedProject.Id,
-              ViewModel.SelectedTrack.Id,
-              duplicatedClip
-          );
-        }
-        catch (Exception ex)
-        {
-          _toastService?.ShowToast(ToastType.Warning, "Duplicate Warning", $"Clip duplicated locally. Backend save failed: {ex.Message}");
-        }
-
-        ViewModel.SelectedTrack.Clips.Add(duplicatedClip);
-        _toastService?.ShowToast(ToastType.Success, "Duplicated", $"Duplicated '{clip.Name}'");
       }
       catch (Exception ex)
       {
@@ -766,19 +662,15 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    private void ShowClipProperties(AudioClip clip)
+    private async void ShowClipProperties(AudioClip clip)
     {
       try
       {
-        var dialog = new ContentDialog
-        {
-          Title = $"Properties: {clip.Name}",
-          Content = CreateClipPropertiesContent(clip),
-          CloseButtonText = "Close",
-          XamlRoot = this.XamlRoot
-        };
-
-        _ = dialog.ShowAsync();
+        var message = FormatClipPropertiesMessage(clip);
+        if (_dialogService != null)
+          await _dialogService.ShowMessageAsync($"Properties: {clip.Name}", message);
+        else
+          _toastService?.ShowToast(ToastType.Info, "Properties", message);
       }
       catch (Exception ex)
       {
@@ -786,138 +678,33 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    private UIElement CreateClipPropertiesContent(AudioClip clip)
+    private static string FormatClipPropertiesMessage(AudioClip clip)
     {
-      var stackPanel = new StackPanel { Spacing = 8 };
-
-      var properties = new[]
+      var props = new[]
       {
-                ("Name", clip.Name),
-                ("ID", clip.Id),
-                ("Profile ID", clip.ProfileId),
-                ("Audio ID", clip.AudioId),
-                ("Audio URL", clip.AudioUrl),
-                ("Duration", clip.Duration.ToString(@"hh\:mm\:ss\.fff")),
-                ("Start Time", $"{clip.StartTime:F2}s"),
-                ("End Time", $"{clip.EndTime:F2}s"),
-                ("Engine", clip.Engine ?? "N/A"),
-                ("Quality Score", clip.QualityScore?.ToString("F2") ?? "N/A")
-            };
-
-      foreach (var (label, value) in properties)
-      {
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
-
-        var labelText = new TextBlock
-        {
-          Text = $"{label}:",
-          FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-          Margin = new Microsoft.UI.Xaml.Thickness(0, 0, 8, 0)
-        };
-        Grid.SetColumn(labelText, 0);
-
-        var valueText = new TextBlock
-        {
-          Text = value ?? "N/A",
-          TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap
-        };
-        Grid.SetColumn(valueText, 1);
-
-        grid.Children.Add(labelText);
-        grid.Children.Add(valueText);
-        stackPanel.Children.Add(grid);
-      }
-
-      return new ScrollViewer
-      {
-        Content = stackPanel,
-        MaxHeight = 400
+        ("Name", clip.Name),
+        ("ID", clip.Id),
+        ("Profile ID", clip.ProfileId),
+        ("Audio ID", clip.AudioId),
+        ("Audio URL", clip.AudioUrl ?? "N/A"),
+        ("Duration", clip.Duration.ToString(@"hh\:mm\:ss\.fff")),
+        ("Start Time", $"{clip.StartTime:F2}s"),
+        ("End Time", $"{clip.EndTime:F2}s"),
+        ("Engine", clip.Engine ?? "N/A"),
+        ("Quality Score", clip.QualityScore?.ToString("F2") ?? "N/A")
       };
+      return string.Join("\n", props.Select(p => $"{p.Item1}: {p.Item2}"));
     }
 
     private async Task DeleteClipAsync(AudioClip clip, bool showToast = true)
     {
       try
       {
-        if (ViewModel.SelectedTrack == null || ViewModel.SelectedProject == null)
-        {
-          if (showToast)
-            _toastService?.ShowToast(ToastType.Warning, "Delete", "No track or project selected");
-          return;
-        }
-
-        // Confirm deletion
-        if (showToast)
-        {
-          var dialog = new ContentDialog
-          {
-            Title = "Delete Clip",
-            Content = $"Are you sure you want to delete '{clip.Name}'? This action cannot be undone.",
-            PrimaryButtonText = "Delete",
-            CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
-            XamlRoot = this.XamlRoot
-          };
-
-          var result = await dialog.ShowAsync();
-          if (result != ContentDialogResult.Primary)
-            return;
-        }
-
-        // Store clip for undo
-        var clipToDelete = clip;
-        var track = ViewModel.SelectedTrack;
-        var project = ViewModel.SelectedProject;
-
-        // Add undo/redo action
-        _undoRedoService?.AddAction(
-            "Delete Clip",
-            async () =>
-            {
-              // Undo: Add the clip back
-              track.Clips.Add(clipToDelete);
-              try
-              {
-                var backendClient = ServiceProvider.GetBackendClient();
-                await backendClient.CreateClipAsync(project.Id, track.Id, clipToDelete);
-              }
-              catch (Exception ex) { ErrorLogger.LogWarning($"Undo delete sync failed: {ex.Message}", "TimelineView"); }
-            },
-            async () =>
-            {
-              // Redo: Remove the clip again
-              track.Clips.Remove(clipToDelete);
-              try
-              {
-                var backendClient = ServiceProvider.GetBackendClient();
-                await backendClient.DeleteClipAsync(project.Id, track.Id, clipToDelete.Id);
-              }
-              catch (Exception ex) { ErrorLogger.LogWarning($"Redo delete sync failed: {ex.Message}", "TimelineView"); }
-            }
-        );
-
-        // Delete from backend
-        try
-        {
-          var backendClient = ServiceProvider.GetBackendClient();
-          await backendClient.DeleteClipAsync(project.Id, track.Id, clip.Id);
-        }
-        catch (Exception ex)
-        {
-          _toastService?.ShowToast(ToastType.Warning, "Delete Warning", $"Clip removed locally. Backend delete failed: {ex.Message}");
-        }
-
-        // Remove from track
-        track.Clips.Remove(clip);
-
-        if (showToast)
-          _toastService?.ShowToast(ToastType.Success, "Deleted", $"Deleted '{clip.Name}'");
+        await ViewModel.DeleteClipAsync(clip, showConfirmation: showToast);
       }
       catch (Exception ex)
       {
-        _toastService?.ShowToast(ToastType.Error, "Delete Error", $"Failed to delete clip: {ex.Message}");
+        _toastService?.ShowToast(ToastType.Error, "Delete", $"Failed to delete clip: {ex.Message}");
       }
     }
 

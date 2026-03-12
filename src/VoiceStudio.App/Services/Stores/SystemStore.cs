@@ -59,7 +59,7 @@ namespace VoiceStudio.App.Services.Stores
       // Initialize backend URL from client
       if (backendClient is BackendClient client)
       {
-        BackendUrl = client.BaseAddress?.ToString() ?? "http://localhost:8001";
+        BackendUrl = client.BaseAddress?.ToString() ?? "http://localhost:8000";
       }
     }
 

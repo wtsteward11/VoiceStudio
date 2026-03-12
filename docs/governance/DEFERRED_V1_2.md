@@ -12,9 +12,11 @@ Items deferred from v1.1.0 ship. Non-blocking for v1.1.0 release.
 
 ## Deferred
 
-- **Skip debt cleanup** — Remove or consolidate skip markers in tests; address when bandwidth allows. Realistic estimate: 2–3 days (312+ skipped tests). Target: reduce to fewer than 200 skips by v1.2 ship. Run `python -m pytest tests/ --co -q 2>&1 | rg "SKIP" > skip_report.txt` to regenerate skip report.
+- **Skip debt cleanup** — Subplan: [docs/design/SKIP_DEBT_CLEANUP_SUBPLAN.md](../design/SKIP_DEBT_CLEANUP_SUBPLAN.md). Scope, sequence, burn-down target (312 → 200), policy (allowed vs must-fix). Regenerate: `python -m pytest tests/ --co -q 2>&1 | grep "skipped" > skip_report.txt`.
 
-- **Workflow consolidation** — Reduce duplication across Build, CI, Tests, Sentinel workflows; align job structure and caching.
+- **Workflow consolidation** — Subplan: [docs/design/WORKFLOW_CONSOLIDATION_SUBPLAN.md](../design/WORKFLOW_CONSOLIDATION_SUBPLAN.md). Map Build, CI, Tests, Sentinel; identify duplication; propose consolidation with blast-radius notes.
+
+- **Strict mypy burn-down** — Subplan: [docs/design/STRICT_MYPY_BURNDOWN_SUBPLAN.md](../design/STRICT_MYPY_BURNDOWN_SUBPLAN.md). Target: `backend/api/routes/`, `backend/services/`; sequence, max ignores per folder, incremental execution.
 
 - ~~**CI suppression policy perfection**~~ — **DONE (2026-03-11):** Documented in `docs/developer/CI_SUPPRESSION_POLICY.md`. Allowed vs prohibited patterns, inventory of non-blocking steps, quarterly review process.
 

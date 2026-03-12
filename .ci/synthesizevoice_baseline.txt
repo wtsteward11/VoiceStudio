@@ -1,0 +1,4 @@
+# SynthesizeVoiceAsync direct calls in panels/ViewModels - migrate to ITimelineSynthesisService
+# Format: path:line # comment
+# Reduce baseline as ViewModels migrate to use synthesis service.
+src/VoiceStudio.App/Views/Panels/EmotionStylePresetEditorViewModel.cs:381 # deferred - needs synthesis service migration

@@ -12,6 +12,7 @@ using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.Utilities;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.ViewModels
 {
@@ -21,7 +22,10 @@ namespace VoiceStudio.App.ViewModels
   public partial class PresetLibraryViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IDialogService _dialogService;
     private readonly UndoRedoService? _undoRedoService;
+    private CancellationTokenSource? _searchDebounceCts;
+    private const int SearchDebounceMs = 300;
 
     public string PanelId => "preset_library";
     public string DisplayName => ResourceHelper.GetString("Panel.PresetLibrary.DisplayName", "Preset Library");
@@ -54,10 +58,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? targetId; // Project ID, track ID, etc. for applying presets
 
-    public PresetLibraryViewModel(IViewModelContext context, IBackendClient backendClient)
+    public PresetLibraryViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
       // Get undo/redo service (may be null if not initialized)
       try
@@ -511,7 +516,21 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSearchQueryChanged(string? value)
     {
-      _ = SearchPresetsAsync(CancellationToken.None);
+      _searchDebounceCts?.Cancel();
+      _searchDebounceCts = new CancellationTokenSource();
+      var cts = _searchDebounceCts;
+      _ = Task.Run(async () =>
+      {
+        try
+        {
+          await Task.Delay(SearchDebounceMs, cts.Token);
+          Dispatcher.TryEnqueue(() => _ = SearchPresetsAsync(cts.Token));
+        }
+        catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PresetLibraryViewModel.OnSearchQueryChanged");
+      }
+      });
     }
 
     private async Task<PresetDetails?> ShowPresetDialogAsync(CancellationToken cancellationToken)
@@ -567,16 +586,6 @@ namespace VoiceStudio.App.ViewModels
                 }
       };
 
-      var dialog = new ContentDialog
-      {
-        Title = "Create New Preset",
-        Content = stackPanel,
-        PrimaryButtonText = "Create",
-        CloseButtonText = "Cancel",
-        DefaultButton = ContentDialogButton.Primary,
-        XamlRoot = GetXamlRoot()
-      };
-
       // Select all text when dialog opens
       nameBox.Loaded += (_, e) =>
       {
@@ -585,9 +594,13 @@ namespace VoiceStudio.App.ViewModels
       };
 
       cancellationToken.ThrowIfCancellationRequested();
-      var result = await dialog.ShowAsync();
+      var confirmed = await _dialogService.ShowContentAsync(
+        ResourceHelper.GetString("PresetLibrary.CreateNewPreset", "Create New Preset"),
+        stackPanel,
+        ResourceHelper.GetString("PresetLibrary.Create", "Create"),
+        ResourceHelper.GetString("PresetLibrary.Cancel", "Cancel"));
       cancellationToken.ThrowIfCancellationRequested();
-      if (result == ContentDialogResult.Primary)
+      if (confirmed)
       {
         var name = nameBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(name))
@@ -614,13 +627,6 @@ namespace VoiceStudio.App.ViewModels
       }
 
       return null;
-    }
-
-    private Microsoft.UI.Xaml.XamlRoot? GetXamlRoot()
-    {
-      // Use the XamlRoot set by the View (MVVM-compliant)
-      // Falls back to null if not set
-      return XamlRoot;
     }
 
     private class PresetDetails

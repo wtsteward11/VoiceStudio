@@ -4,6 +4,10 @@
 **Last Updated:** 2025-01-27  
 **Purpose:** Clear criteria for when a feature or sprint is considered "Done" and ready for release.
 
+### Canonical Principle
+
+> **As long as there are placeholders, this project can never be considered complete.**
+
 ---
 
 ## ✅ Completion Criteria

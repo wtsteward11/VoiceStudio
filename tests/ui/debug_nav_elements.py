@@ -136,9 +136,8 @@ def main():
                 print(
                     f"  - AutomationId: {elem.get_attribute('AutomationId')}, Class: {elem.get_attribute('ClassName')}"
                 )
-            # ALLOWED: bare except - best effort, failure acceptable
-            except:
-                pass
+            except Exception:
+                pass  # Best effort, failure acceptable
     except Exception as e:
         print(f"By name failed: {e}")
 
@@ -171,9 +170,8 @@ def main():
     try:
         session.quit()
         print("App closed")
-    # ALLOWED: bare except - best effort, failure acceptable
-    except:
-        pass
+    except Exception:
+        pass  # Best effort, failure acceptable
 
     print("\n" + "=" * 60)
     print("Debug complete")

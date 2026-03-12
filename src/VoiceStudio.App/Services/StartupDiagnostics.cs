@@ -60,7 +60,7 @@ namespace VoiceStudio.App.Services
         public StartupDiagnostics()
         {
             _backendBaseUrl = Environment.GetEnvironmentVariable("VOICESTUDIO_BACKEND_URL")
-                ?? "http://localhost:8001";
+                ?? "http://localhost:8000";
             _jsonOptions = new JsonSerializerOptions
             {
                 WriteIndented = true,
@@ -255,7 +255,15 @@ namespace VoiceStudio.App.Services
 
             try
             {
-                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                var httpClient = AppServices.GetService<HttpClient>();
+                if (httpClient == null)
+                {
+                    check.Status = CheckStatus.Failed;
+                    check.Message = "HttpClient not available";
+                    check.Duration = stopwatch.Elapsed;
+                    AddCheck(check);
+                    return;
+                }
                 using var response = await httpClient.GetAsync(
                     $"{_backendBaseUrl}/health",
                     cancellationToken);
@@ -309,7 +317,15 @@ namespace VoiceStudio.App.Services
 
             try
             {
-                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                var httpClient = AppServices.GetService<HttpClient>();
+                if (httpClient == null)
+                {
+                    check.Status = CheckStatus.Failed;
+                    check.Message = "HttpClient not available";
+                    check.Duration = stopwatch.Elapsed;
+                    AddCheck(check);
+                    return;
+                }
                 using var response = await httpClient.GetAsync(
                     $"{_backendBaseUrl}/api/v1/engines",
                     cancellationToken);

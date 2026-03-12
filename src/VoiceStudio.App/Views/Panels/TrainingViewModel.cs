@@ -118,6 +118,18 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private bool isLoadingQualityHistory;
 
+    // MED-1: Simulation mode (backend returns when training runs in simulation)
+    [ObservableProperty]
+    private bool isSimulationMode;
+
+    [ObservableProperty]
+    private string? simulationReason;
+
+    /// <summary>Display message for simulation mode InfoBar (MED-1).</summary>
+    public string SimulationMessage => SimulationReason ?? ResourceHelper.GetString("Training.SimulationModeDefault", "Training is running in simulation mode.");
+
+    partial void OnSimulationReasonChanged(string? value) => OnPropertyChanged(nameof(SimulationMessage));
+
     [ObservableProperty]
     private bool hasQualityHistory;
 
@@ -394,12 +406,18 @@ namespace VoiceStudio.App.Views.Panels
         // Use disposal token for fire-and-forget operations
         _ = LoadLogsAsync(_disposalCts.Token);
         _ = LoadQualityHistoryAsync(_disposalCts.Token);
+
+        // MED-1: Show simulation mode InfoBar when training runs in simulation
+        IsSimulationMode = value.SimulationMode;
+        SimulationReason = value.SimulationReason;
       }
       else
       {
         TrainingLogs.Clear();
         QualityHistory.Clear();
         HasQualityHistory = false;
+        IsSimulationMode = false;
+        SimulationReason = null;
       }
 
       // Update quality-related property notifications

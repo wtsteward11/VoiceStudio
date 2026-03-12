@@ -1,4 +1,6 @@
 """Voice A/B testing routes - side-by-side synthesis comparison."""
+# SAFETY: FastAPI router decorator lacks complete type stubs. Per STRICT_MYPY_BURNDOWN_SUBPLAN.
+# mypy: disable-error-code="untyped-decorator"
 
 from __future__ import annotations
 

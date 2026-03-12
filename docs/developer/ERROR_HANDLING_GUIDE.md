@@ -10,21 +10,34 @@ VoiceStudio implements a unified error handling system across all layers (UI, Ba
 
 ## Unified Error Envelope
 
-All errors across the system use a standardized envelope format:
+All errors across the system use a standardized envelope format. The canonical schema is `shared/schemas/error-envelope.schema.json`. Backend implementation: `backend/api/v3/models.ErrorDetail`.
 
 ```json
 {
-  "error": {
-    "code": "E001",
-    "message": "Human-readable error message",
-    "details": {
-      "field": "additional context",
-      "timestamp": "2026-02-04T12:00:00Z"
-    },
-    "severity": "error",
-    "recoverable": true,
-    "suggested_action": "Retry the operation"
-  }
+  "code": "INVALID_INPUT",
+  "message": "Human-readable error message",
+  "field": "text",
+  "details": { "constraint": "min_length" },
+  "severity": "error",
+  "recovery_suggestion": "Retry the operation"
+}
+```
+
+Within v3 API responses, errors appear in the `errors` array of `StandardResponse`:
+
+```json
+{
+  "status": "error",
+  "message": "Validation failed",
+  "errors": [
+    {
+      "code": "REQUIRED_FIELD",
+      "message": "Name is required",
+      "field": "name",
+      "severity": "error"
+    }
+  ],
+  "meta": { "request_id": "...", "timestamp": "..." }
 }
 ```
 

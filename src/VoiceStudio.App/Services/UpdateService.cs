@@ -45,13 +45,11 @@ namespace VoiceStudio.App.Services
     public event EventHandler<DownloadProgressEventArgs>? DownloadProgressChanged;
     public event EventHandler<DownloadCompletedEventArgs>? DownloadCompleted;
 
-    public UpdateService()
+    public UpdateService(HttpClient? httpClient = null)
     {
-      _httpClient = new HttpClient
-      {
-        Timeout = TimeSpan.FromSeconds(30)
-      };
-      _httpClient.DefaultRequestHeaders.Add("User-Agent", "VoiceStudio-Quantum-Plus/1.0");
+      _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+      if (_httpClient.DefaultRequestHeaders.UserAgent.Count == 0)
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", "VoiceStudio-Quantum-Plus/1.0");
 
       _updateConfig = LoadUpdateConfig();
       _lastUpdateHistory = LoadUpdateHistory();
@@ -541,7 +539,7 @@ namespace VoiceStudio.App.Services
 
     public void Dispose()
     {
-      _httpClient?.Dispose();
+      // HttpClient is owned by DI; do not dispose
     }
   }
 

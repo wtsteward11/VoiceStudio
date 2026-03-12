@@ -1,4 +1,6 @@
 """Voice analysis routes - quality metrics, characteristics, and pronunciation testing."""
+# SAFETY: FastAPI router decorator lacks complete type stubs. Per STRICT_MYPY_BURNDOWN_SUBPLAN.
+# mypy: disable-error-code="untyped-decorator"
 
 from __future__ import annotations
 
@@ -254,7 +256,8 @@ async def analyze(
                                         cv = f0_std / f0_mean
                                         # Convert CV to stability (0-1, higher = stable)
                                         # Typical CV for stable voice: 0.1-0.2
-                                        pitch_stability = max(0.0, min(1.0, 1.0 - cv * 2.0))
+                                        raw_stability = 1.0 - float(cv) * 2.0
+                                        pitch_stability = float(max(0.0, min(1.0, raw_stability)))
                                         results["pitch_stability"] = pitch_stability
                     except Exception as e:
                         logger.debug(f"Pitch stability calculation failed: {e}")
@@ -452,7 +455,7 @@ async def analyze_voice_characteristics_endpoint(
 
 
 @router.post("/test-pronunciation")
-async def test_pronunciation(request: Request):
+async def test_pronunciation(request: Request) -> dict[str, Any]:
     """Test pronunciation of a word."""
     body = await request.json()
     word = body.get("word", "")

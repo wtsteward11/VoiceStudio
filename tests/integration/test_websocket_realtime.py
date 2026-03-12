@@ -39,7 +39,7 @@ def ws_url():
     return WS_BASE_URL
 
 
-@pytest.mark.skipif(not HAS_WEBSOCKETS, reason="websockets library not installed")
+@pytest.mark.skipif(not HAS_WEBSOCKETS, reason="websockets library not installed (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 class TestMeterWebSocket:
     """Tests for real-time audio meter WebSocket."""
 
@@ -105,7 +105,7 @@ class TestMeterWebSocket:
             pytest.skip("WebSocket server not available")
 
 
-@pytest.mark.skipif(not HAS_WEBSOCKETS, reason="websockets library not installed")
+@pytest.mark.skipif(not HAS_WEBSOCKETS, reason="websockets library not installed (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 class TestJobProgressWebSocket:
     """Tests for job progress streaming."""
 
@@ -185,7 +185,7 @@ class TestJobProgressWebSocket:
             pytest.skip("Job progress WebSocket not available")
 
 
-@pytest.mark.skipif(not HAS_WEBSOCKETS, reason="websockets library not installed")
+@pytest.mark.skipif(not HAS_WEBSOCKETS, reason="websockets library not installed (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 class TestRealTimeConverterWebSocket:
     """Tests for real-time voice converter feedback."""
 
@@ -246,7 +246,7 @@ class TestRealTimeConverterWebSocket:
             pytest.skip("Real-time converter WebSocket not available")
 
 
-@pytest.mark.skipif(not HAS_WEBSOCKETS, reason="websockets library not installed")
+@pytest.mark.skipif(not HAS_WEBSOCKETS, reason="websockets library not installed (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 class TestWebSocketErrorPropagation:
     """Tests for error propagation over WebSocket."""
 

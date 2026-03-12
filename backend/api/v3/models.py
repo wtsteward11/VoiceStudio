@@ -27,13 +27,35 @@ class ResponseStatus(str, Enum):
     PARTIAL = "partial"  # For batch operations with some failures
 
 
+class ErrorSeverity(str, Enum):
+    """Severity levels for error responses. Aligns with shared/schemas/error-envelope.schema.json."""
+
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+
 class ErrorDetail(BaseModel):
-    """Detailed error information for API responses."""
+    """
+    Unified error envelope for API responses.
+
+    Canonical format: code, message, details, severity.
+    Aligns with shared/schemas/error-envelope.schema.json and ERROR_HANDLING_GUIDE.
+    """
 
     code: str = Field(..., description="Machine-readable error code")
     message: str = Field(..., description="Human-readable error message")
     field: str | None = Field(None, description="Field that caused the error (for validation)")
     details: dict[str, Any] | None = Field(None, description="Additional error context")
+    severity: ErrorSeverity | str = Field(
+        default=ErrorSeverity.ERROR,
+        description="Error severity (info, warning, error, critical)",
+    )
+    recovery_suggestion: str | None = Field(
+        None,
+        description="Suggested action to resolve the error",
+    )
 
 
 class PaginationMeta(BaseModel):

@@ -1024,6 +1024,15 @@
   <data name="Library.AssetsDeletedSuccess" xml:space="preserve">
     <value>Deleted {0} asset(s)</value>
   </data>
+  <data name="LibraryView_EmptyState.Title" xml:space="preserve">
+    <value>No Assets</value>
+  </data>
+  <data name="LibraryView_EmptyState.Message" xml:space="preserve">
+    <value>Import audio files or drag-and-drop to add to library.</value>
+  </data>
+  <data name="LibraryView_EmptyState.ActionText" xml:space="preserve">
+    <value>Import</value>
+  </data>
   <data name="Library.AssetsDeletePartial" xml:space="preserve">
     <value>Some assets could not be deleted ({0}/{1} succeeded)</value>
   </data>

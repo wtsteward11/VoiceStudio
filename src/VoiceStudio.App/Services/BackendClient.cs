@@ -214,7 +214,7 @@ namespace VoiceStudio.App.Services
     }
   }
 
-  public class BackendClient : IBackendClient, IDisposable
+  public partial class BackendClient : IBackendClient, IDisposable
   {
     private readonly HttpClient _httpClient;
     private readonly BackendClientConfig _config;
@@ -247,20 +247,22 @@ namespace VoiceStudio.App.Services
     /// <param name="correlationProvider">Optional provider for correlation context.</param>
     /// <param name="requestMetrics">Optional service for per-endpoint request counting.</param>
     /// <param name="requestCoordinator">Shared request coordinator for profiles/engines (required when created via DI).</param>
+    /// <param name="gracefulDegradation">Optional service to clear degraded mode on successful responses.</param>
     /// <param name="innerHandler">Optional inner HTTP handler for testing; when null, uses HttpClientHandler.</param>
-    public BackendClient(BackendClientConfig config, ICorrelationIdProvider? correlationProvider, IRequestMetricsService? requestMetrics = null, IRequestCoordinator? requestCoordinator = null, HttpMessageHandler? innerHandler = null)
+    public BackendClient(BackendClientConfig config, ICorrelationIdProvider? correlationProvider, IRequestMetricsService? requestMetrics = null, IRequestCoordinator? requestCoordinator = null, GracefulDegradationService? gracefulDegradation = null, HttpMessageHandler? innerHandler = null)
     {
       _config = config ?? throw new ArgumentNullException(nameof(config));
       _requestCoordinator = requestCoordinator ?? new RequestCoordinator();
 
-      // Handler chain: RequestMetricsHandler (outer) -> CorrelationIdHandler -> innerHandler (inner)
+      // Handler chain: DegradedModeClearHandler (outer) -> RequestMetricsHandler -> CorrelationIdHandler -> innerHandler (inner)
       var httpHandler = innerHandler ?? new HttpClientHandler();
       var correlationHandler = correlationProvider != null
         ? new CorrelationIdHandler(httpHandler, correlationProvider)
         : new CorrelationIdHandler(httpHandler);
-      var rootHandler = requestMetrics != null
+      var metricsOrCorrelation = requestMetrics != null
         ? new RequestMetricsHandler(requestMetrics, correlationHandler)
         : (HttpMessageHandler)correlationHandler;
+      var rootHandler = new DegradedModeClearHandler(gracefulDegradation, metricsOrCorrelation);
       _httpClient = new HttpClient(rootHandler)
       {
         BaseAddress = new Uri(config.BaseUrl),
@@ -768,270 +770,6 @@ namespace VoiceStudio.App.Services
                     "The backend returned an invalid response format for voice cloning.",
                     ex);
         }
-      });
-    }
-
-    public async Task<List<VoiceProfile>> GetProfilesAsync(CancellationToken cancellationToken = default)
-    {
-      var list = await _requestCoordinator.GetOrCreateAsync(
-        "profiles:list",
-        async ct => await GetProfilesCoreAsync(ct).ConfigureAwait(false),
-        TimeSpan.FromSeconds(30),
-        cancellationToken).ConfigureAwait(false);
-      return list ?? new List<VoiceProfile>();
-    }
-
-    private async Task<List<VoiceProfile>> GetProfilesCoreAsync(CancellationToken cancellationToken)
-    {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        var response = await _httpClient.GetAsync("/api/profiles", cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        var jsonString = await response.Content.ReadAsStringAsync(cancellationToken);
-
-        if (string.IsNullOrWhiteSpace(jsonString))
-        {
-          throw new BackendDeserializationException(
-            "Backend returned empty response for profiles. Verify backend is running.");
-        }
-
-        if (jsonString.TrimStart().StartsWith("<"))
-        {
-          var preview = jsonString.Substring(0, Math.Min(200, jsonString.Length));
-          throw new BackendDeserializationException(
-            $"Backend returned HTML instead of JSON. This typically means the backend server is not running or returned an error page. Preview: {preview}");
-        }
-
-        try
-        {
-          using var doc = System.Text.Json.JsonDocument.Parse(jsonString);
-
-          if (doc.RootElement.TryGetProperty("items", out var itemsElement))
-          {
-            return System.Text.Json.JsonSerializer.Deserialize<List<VoiceProfile>>(itemsElement.GetRawText(), _jsonOptions)
-                      ?? new List<VoiceProfile>();
-          }
-
-          return System.Text.Json.JsonSerializer.Deserialize<List<VoiceProfile>>(jsonString, _jsonOptions)
-                    ?? new List<VoiceProfile>();
-        }
-        catch (System.Text.Json.JsonException ex)
-        {
-          var preview = jsonString.Substring(0, Math.Min(500, jsonString.Length));
-          throw new BackendDeserializationException(
-            $"Failed to parse profiles response. Ensure backend API is returning valid JSON. Content preview: {preview}", ex);
-        }
-      });
-    }
-
-    private void InvalidateProfilesCache()
-    {
-      _requestCoordinator.Invalidate("profiles:list");
-    }
-
-    public async Task<VoiceProfile> GetProfileAsync(string profileId, CancellationToken cancellationToken = default)
-    {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        var response = await _httpClient.GetAsync($"/api/profiles/{profileId}", cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        return await response.Content.ReadFromJsonAsync<VoiceProfile>(_jsonOptions, cancellationToken)
-                  ?? throw new BackendDeserializationException("Failed to deserialize profile");
-      });
-    }
-
-    public async Task<VoiceProfile> CreateProfileAsync(
-        string name,
-        string language = "en",
-        string? emotion = null,
-        List<string>? tags = null,
-        CancellationToken cancellationToken = default)
-    {
-      var result = await ExecuteWithRetryAsync(async () =>
-      {
-        var request = new
-        {
-          name,
-          language,
-          emotion,
-          tags = tags ?? new List<string>()
-        };
-
-        var response = await _httpClient.PostAsJsonAsync("/api/profiles", request, _jsonOptions, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        return await response.Content.ReadFromJsonAsync<VoiceProfile>(_jsonOptions, cancellationToken)
-                  ?? throw new BackendDeserializationException("Failed to deserialize profile");
-      });
-      InvalidateProfilesCache();
-      return result;
-    }
-
-    public async Task<VoiceProfile> UpdateProfileAsync(
-        string profileId,
-        string? name = null,
-        string? language = null,
-        string? emotion = null,
-        List<string>? tags = null,
-        CancellationToken cancellationToken = default)
-    {
-      var result = await ExecuteWithRetryAsync(async () =>
-      {
-        var request = new Dictionary<string, object?>();
-        if (name != null) request["name"] = name;
-        if (language != null) request["language"] = language;
-        if (emotion != null) request["emotion"] = emotion;
-        if (tags != null) request["tags"] = tags;
-
-        var response = await _httpClient.PutAsJsonAsync(
-                  $"/api/profiles/{profileId}",
-                  request,
-                  _jsonOptions,
-                  cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        return await response.Content.ReadFromJsonAsync<VoiceProfile>(_jsonOptions, cancellationToken)
-                  ?? throw new BackendDeserializationException("Failed to deserialize profile");
-      });
-      InvalidateProfilesCache();
-      return result;
-    }
-
-    public async Task<bool> DeleteProfileAsync(string profileId, CancellationToken cancellationToken = default)
-    {
-      var result = await ExecuteWithRetryAsync(async () =>
-      {
-        var response = await _httpClient.DeleteAsync($"/api/profiles/{profileId}", cancellationToken);
-        return response.IsSuccessStatusCode;
-      });
-      if (result)
-        InvalidateProfilesCache();
-      return result;
-    }
-
-    public async Task<List<Project>> GetProjectsAsync(CancellationToken cancellationToken = default)
-    {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        var response = await _httpClient.GetAsync("/api/projects", cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        // Backend returns paginated response: {"items": [...], "pagination": {...}}
-        // Extract the items array from the wrapper
-        var jsonString = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var doc = System.Text.Json.JsonDocument.Parse(jsonString);
-
-        if (doc.RootElement.TryGetProperty("items", out var itemsElement))
-        {
-          return System.Text.Json.JsonSerializer.Deserialize<List<Project>>(itemsElement.GetRawText(), _jsonOptions)
-                    ?? new List<Project>();
-        }
-
-        // Fallback: try parsing as direct array for backward compatibility
-        return System.Text.Json.JsonSerializer.Deserialize<List<Project>>(jsonString, _jsonOptions)
-                  ?? new List<Project>();
-      });
-    }
-
-    public async Task<Project> GetProjectAsync(string projectId, CancellationToken cancellationToken = default)
-    {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        var response = await _httpClient.GetAsync($"/api/projects/{projectId}", cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        return await response.Content.ReadFromJsonAsync<Project>(_jsonOptions, cancellationToken)
-                  ?? throw new BackendDeserializationException("Failed to deserialize project");
-      });
-    }
-
-    public async Task<Project> CreateProjectAsync(
-        string name,
-        string? description = null,
-        CancellationToken cancellationToken = default)
-    {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        var request = new
-        {
-          name,
-          description
-        };
-
-        var response = await _httpClient.PostAsJsonAsync("/api/projects", request, _jsonOptions, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        return await response.Content.ReadFromJsonAsync<Project>(_jsonOptions, cancellationToken)
-                  ?? throw new BackendDeserializationException("Failed to deserialize project");
-      });
-    }
-
-    public async Task<Project> UpdateProjectAsync(
-        string projectId,
-        string? name = null,
-        string? description = null,
-        List<string>? voiceProfileIds = null,
-        CancellationToken cancellationToken = default)
-    {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        var request = new Dictionary<string, object?>();
-        if (name != null) request["name"] = name;
-        if (description != null) request["description"] = description;
-        if (voiceProfileIds != null) request["voice_profile_ids"] = voiceProfileIds;
-
-        var response = await _httpClient.PutAsJsonAsync(
-                  $"/api/projects/{projectId}",
-                  request,
-                  _jsonOptions,
-                  cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        return await response.Content.ReadFromJsonAsync<Project>(_jsonOptions, cancellationToken)
-                  ?? throw new BackendDeserializationException("Failed to deserialize project");
-      });
-    }
-
-    public async Task<bool> DeleteProjectAsync(string projectId, CancellationToken cancellationToken = default)
-    {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        var response = await _httpClient.DeleteAsync($"/api/projects/{projectId}", cancellationToken);
-        return response.IsSuccessStatusCode;
       });
     }
 
@@ -3825,42 +3563,6 @@ namespace VoiceStudio.App.Services
     public async Task<QualityComparisonResponse> CompareQualityAsync(QualityComparisonRequest request, CancellationToken cancellationToken = default)
     {
       return await PostAsync<QualityComparisonRequest, QualityComparisonResponse>("/api/quality/compare", request, cancellationToken);
-    }
-
-    public async Task<List<string>> GetEnginesAsync(CancellationToken cancellationToken = default)
-    {
-      var list = await _requestCoordinator.GetOrCreateAsync(
-        "engines:list",
-        async ct => await GetEnginesCoreAsync(ct).ConfigureAwait(false),
-        TimeSpan.FromSeconds(60),
-        cancellationToken).ConfigureAwait(false);
-      return list ?? new List<string>();
-    }
-
-    private async Task<List<string>> GetEnginesCoreAsync(CancellationToken cancellationToken)
-    {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        var response = await _httpClient.GetAsync("/api/engines/list", cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        var result = await response.Content.ReadFromJsonAsync<EnginesListResponse>(_jsonOptions, cancellationToken)
-                  ?? throw new BackendDeserializationException("Failed to deserialize engines list");
-
-        return result.EngineIds;
-      });
-    }
-
-    public async Task<EngineRecommendationResponse> GetEngineRecommendationAsync(EngineRecommendationRequest request, CancellationToken cancellationToken = default)
-    {
-      // Use POST endpoint for engine recommendations
-      const string url = "/api/engines/recommend";
-      return await PostAsync<EngineRecommendationRequest, EngineRecommendationResponse>(url, request, cancellationToken)
-          ?? throw new BackendDeserializationException("Failed to deserialize engine recommendation");
     }
 
     public async Task<ABTestResponse> RunABTestAsync(ABTestRequest request, CancellationToken cancellationToken = default)

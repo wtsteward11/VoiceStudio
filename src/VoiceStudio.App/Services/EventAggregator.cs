@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Services;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Services
 {
@@ -309,9 +310,9 @@ namespace VoiceStudio.App.Services
         _telemetryCallback?.Invoke(telemetry);
       }
       // ALLOWED: empty catch - telemetry callback errors must not affect event aggregation
-      catch
+      catch (Exception ex)
       {
-        // Telemetry callbacks may throw; failures isolated to preserve event flow
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "EventAggregator.RecordTelemetry");
       }
     }
 

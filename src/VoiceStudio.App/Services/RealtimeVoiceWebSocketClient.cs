@@ -67,7 +67,7 @@ namespace VoiceStudio.App.Services
     /// <summary>
     /// Creates a client that connects directly to the RVC real-time WebSocket endpoint.
     /// </summary>
-    /// <param name="backendBaseUrl">Base URL of the backend (e.g., http://localhost:8001)</param>
+    /// <param name="backendBaseUrl">Base URL of the backend (e.g., http://localhost:8000)</param>
     public RealtimeVoiceWebSocketClient(string backendBaseUrl)
     {
       if (string.IsNullOrEmpty(backendBaseUrl))
@@ -172,10 +172,9 @@ namespace VoiceStudio.App.Services
           }
         }
       }
-      // ALLOWED: empty catch - OperationCanceledException is expected during shutdown
       catch (OperationCanceledException)
       {
-        // Intentionally empty - cancellation is normal during shutdown
+        System.Diagnostics.Debug.WriteLine("RealtimeVoiceWebSocketClient: ReceiveLoopAsync cancelled");
       }
       catch (Exception ex)
       {

@@ -172,24 +172,16 @@ namespace VoiceStudio.App.Views.Panels
 
     private async Task<string?> ShowCreateProfileDialogAsync()
     {
-      var dialog = new ContentDialog
-      {
-        Title = "Create New Profile",
-        PrimaryButtonText = "Create",
-        CloseButtonText = "Cancel",
-        DefaultButton = ContentDialogButton.Primary,
-        XamlRoot = this.XamlRoot
-      };
+      var dialogService = AppServices.TryGetDialogService();
+      if (dialogService == null)
+        return null;
 
-      var nameBox = new TextBox
-      {
-        PlaceholderText = "Enter profile name...",
-        Width = 300
-      };
-      dialog.Content = nameBox;
-
-      var result = await dialog.ShowAsync();
-      return result == ContentDialogResult.Primary ? nameBox.Text?.Trim() : null;
+      var name = await dialogService.ShowInputAsync(
+          "Create New Profile",
+          "Profile name",
+          defaultValue: null,
+          placeholder: "Enter profile name...");
+      return !string.IsNullOrWhiteSpace(name) ? name.Trim() : null;
     }
 
     private void ProfileCard_RightTapped(object sender, RightTappedRoutedEventArgs e)
@@ -242,27 +234,16 @@ namespace VoiceStudio.App.Views.Panels
         switch (action.ToLower())
         {
           case "new profile":
-            // Show create profile dialog
-            var dialog = new ContentDialog
             {
-              Title = "Create New Profile",
-              PrimaryButtonText = "Create",
-              SecondaryButtonText = "Cancel",
-              DefaultButton = ContentDialogButton.Primary,
-              XamlRoot = this.XamlRoot
-            };
+              var dialogService = AppServices.TryGetDialogService();
+              if (dialogService == null) break;
 
-            var textBox = new TextBox
-            {
-              PlaceholderText = "Profile name",
-              Margin = new Microsoft.UI.Xaml.Thickness(0, 8, 0, 0)
-            };
-            dialog.Content = textBox;
-
-            var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(textBox.Text))
-            {
-              await ViewModel.CreateProfileCommand.ExecuteAsync(textBox.Text);
+              var name = await dialogService.ShowInputAsync(
+                  "Create New Profile",
+                  "Profile name",
+                  placeholder: "Profile name");
+              if (!string.IsNullOrWhiteSpace(name))
+                await ViewModel.CreateProfileCommand.ExecuteAsync(name.Trim());
             }
             break;
           case "import profile":
@@ -274,57 +255,24 @@ namespace VoiceStudio.App.Views.Panels
             {
               ViewModel.SelectedProfile = profile;
               _errorLoggingService?.LogInfo($"Profile edit requested: {profile.Name}", "ProfilesView");
-              var editDialog = new ContentDialog
-              {
-                Title = "Edit Profile",
-                PrimaryButtonText = "Save",
-                SecondaryButtonText = "Cancel",
-                DefaultButton = ContentDialogButton.Primary,
-                XamlRoot = this.XamlRoot
-              };
 
-              var editPanel = new StackPanel
+              var dialogService = AppServices.TryGetDialogService();
+              if (dialogService is DialogService ds)
               {
-                Spacing = 8
-              };
-
-              var nameBox = new TextBox
-              {
-                Header = "Name",
-                Text = profile.Name ?? string.Empty
-              };
-              var languageBox = new TextBox
-              {
-                Header = "Language",
-                Text = profile.Language ?? string.Empty
-              };
-              var emotionBox = new TextBox
-              {
-                Header = "Emotion",
-                Text = profile.Emotion ?? string.Empty
-              };
-              var tagsBox = new TextBox
-              {
-                Header = "Tags (comma-separated)",
-                Text = profile.Tags != null ? string.Join(", ", profile.Tags) : string.Empty
-              };
-
-              editPanel.Children.Add(nameBox);
-              editPanel.Children.Add(languageBox);
-              editPanel.Children.Add(emotionBox);
-              editPanel.Children.Add(tagsBox);
-
-              editDialog.Content = editPanel;
-
-              var editResult = await editDialog.ShowAsync();
-              if (editResult == ContentDialogResult.Primary)
-              {
-                await ViewModel.UpdateProfileAsync(
-                    profile,
-                    nameBox.Text,
-                    languageBox.Text,
-                    emotionBox.Text,
-                    tagsBox.Text);
+                var editResult = await ds.ShowProfileEditAsync(
+                    profile.Name ?? string.Empty,
+                    profile.Language ?? string.Empty,
+                    profile.Emotion ?? string.Empty,
+                    profile.Tags != null ? string.Join(", ", profile.Tags) : string.Empty);
+                if (editResult.HasValue)
+                {
+                  await ViewModel.UpdateProfileAsync(
+                      profile,
+                      editResult.Value.Name,
+                      editResult.Value.Language,
+                      editResult.Value.Emotion,
+                      editResult.Value.Tags);
+                }
               }
             }
             break;

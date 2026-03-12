@@ -24,9 +24,39 @@ public interface IRequestMetricsService
     IReadOnlyDictionary<string, int> GetCountsPerMinute();
 
     /// <summary>
+    /// Returns a serializable snapshot for proof artifacts (endpoint -> count).
+    /// </summary>
+    IReadOnlyDictionary<string, int> GetSnapshot();
+
+    /// <summary>
     /// Resets all counters (e.g. for smoke test baseline).
     /// </summary>
     void Reset();
+}
+
+/// <summary>
+/// HTTP handler that clears degraded mode when a backend request succeeds (2xx).
+/// Placed outermost so it sees all responses.
+/// </summary>
+internal sealed class DegradedModeClearHandler : DelegatingHandler
+{
+    private readonly GracefulDegradationService? _degradationService;
+
+    public DegradedModeClearHandler(GracefulDegradationService? degradationService, HttpMessageHandler innerHandler)
+        : base(innerHandler)
+    {
+        _degradationService = degradationService;
+    }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        var response = await base.SendAsync(request, cancellationToken);
+        if (response.IsSuccessStatusCode && _degradationService != null && _degradationService.IsDegradedMode)
+            _degradationService.ExitDegradedMode();
+        return response;
+    }
 }
 
 /// <summary>
@@ -71,6 +101,8 @@ public sealed class RequestMetricsService : IRequestMetricsService
             return "/api/health";
         if (path.StartsWith("/api/engines", StringComparison.OrdinalIgnoreCase))
             return "/api/engines";
+        if (path.StartsWith("/api/audio/meters", StringComparison.OrdinalIgnoreCase))
+            return "/api/audio/meters";
         return path;
     }
 
@@ -92,20 +124,25 @@ public sealed class RequestMetricsService : IRequestMetricsService
 
     public IReadOnlyDictionary<string, int> GetCountsPerMinute()
     {
-        var unixNow = (DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
-        var cutoff = unixNow - WindowSeconds;
+      return GetSnapshot();
+    }
 
-        lock (_lock)
+    public IReadOnlyDictionary<string, int> GetSnapshot()
+    {
+      var unixNow = (DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
+      var cutoff = unixNow - WindowSeconds;
+
+      lock (_lock)
+      {
+        var result = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var kv in _timestampsByPath)
         {
-            var result = new Dictionary<string, int>(StringComparer.Ordinal);
-            foreach (var kv in _timestampsByPath)
-            {
-                var recent = kv.Value.Count(t => t > cutoff);
-                if (recent > 0)
-                    result[kv.Key] = recent;
-            }
-            return new ReadOnlyDictionary<string, int>(result);
+          var recent = kv.Value.Count(t => t > cutoff);
+          if (recent > 0)
+            result[kv.Key] = recent;
         }
+        return new ReadOnlyDictionary<string, int>(result);
+      }
     }
 
     public void Reset()

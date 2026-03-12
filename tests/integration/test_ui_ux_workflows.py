@@ -16,7 +16,7 @@ import time
 import httpx
 import pytest
 
-BASE_URL = "http://localhost:8001"
+BASE_URL = "http://localhost:8000"
 
 
 def retry_on_rate_limit(func, *args, max_retries=3, **kwargs):

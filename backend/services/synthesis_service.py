@@ -17,6 +17,7 @@ from typing import Any
 
 import numpy as np
 
+from backend.core.exceptions import ServiceError
 from backend.services.audio_artifacts.use_cases import (
     create_audio_artifact_from_file,
     create_audio_artifact_from_wav_array,
@@ -70,8 +71,6 @@ async def _resolve_profile_audio(
     profile_dir: str,
 ) -> str:
     """Resolve the reference audio path for a voice profile."""
-    from fastapi import HTTPException
-
     profile_audio_path = None
     reference_audio_url = getattr(profile, "reference_audio_url", None)
 
@@ -120,9 +119,9 @@ async def _resolve_profile_audio(
             authoritative_path,
             reference_audio_url or "(not set)",
         )
-        raise HTTPException(
-            status_code=400,
-            detail=(
+        raise ServiceError(
+            400,
+            (
                 f"Reference audio not found for profile '{profile_id}'. "
                 f"Expected at: {authoritative_path}. "
                 "Please upload reference audio or re-run the cloning wizard."
@@ -292,8 +291,6 @@ class SynthesisService:
         """
         Synthesize audio from text. Enforces policy, consent, provenance.
         """
-        from fastapi import HTTPException
-
         from backend.api.exceptions import (
             EngineProcessingException,
             EngineUnavailableException,
@@ -314,18 +311,12 @@ class SynthesisService:
 
         _policy = getattr(request.state, "voice_policy", None)
         if _policy and _policy.demo_mode:
-            raise HTTPException(
-                status_code=403,
-                detail="Voice synthesis is disabled in demo mode.",
-            )
+            raise ServiceError(403, "Voice synthesis is disabled in demo mode.")
 
         _consent_id = getattr(req, "consent_id", None)
         if check_consent_required(req.profile_id, request):
             if not _consent_id or not _consent_id.strip():
-                raise HTTPException(
-                    status_code=403,
-                    detail="consent_id is required for third-party voice profiles.",
-                )
+                raise ServiceError(403, "consent_id is required for third-party voice profiles.")
             try:
                 from backend.services.security_service import (
                     ConsentStatus,
@@ -335,17 +326,12 @@ class SynthesisService:
                 _svc = get_security_service()
                 _record = _svc.consent.get_consent_by_id(_consent_id.strip())
                 if not _record:
-                    raise HTTPException(status_code=403, detail="Consent record not found.")
+                    raise ServiceError(403, "Consent record not found.")
                 if _record.status != ConsentStatus.GRANTED:
-                    raise HTTPException(
-                        status_code=403,
-                        detail=f"Consent not granted (status={_record.status.value}).",
-                    )
+                    raise ServiceError(403, f"Consent not granted (status={_record.status.value}).")
                 if not _record.is_valid:
-                    raise HTTPException(
-                        status_code=403, detail="Consent expired or revoked."
-                    )
-            except HTTPException:
+                    raise ServiceError(403, "Consent expired or revoked.")
+            except ServiceError:
                 raise
             except Exception as _ce:
                 logger.warning("Consent check error: %s", _ce)
@@ -556,9 +542,9 @@ class SynthesisService:
                                         retry_after_seconds=engine_breaker.time_until_retry(),
                                     ),
                                 )
-                                raise HTTPException(
-                                    status_code=503,
-                                    detail=(
+                                raise ServiceError(
+                                    503,
+                                    (
                                         f"Engine '{engine_id}' is temporarily unavailable. "
                                         f"Retry in {int(engine_breaker.time_until_retry())} seconds."
                                     ),
@@ -665,10 +651,10 @@ class SynthesisService:
                                         )
                                     else:
                                         detail = f"Synthesis failed: {error_msg}"
-                                    raise HTTPException(status_code=500, detail=detail)
-                                raise HTTPException(
-                                    status_code=500,
-                                    detail="Synthesis failed - engine returned None. "
+                                    raise ServiceError(500, detail)
+                                raise ServiceError(
+                                    500,
+                                    "Synthesis failed - engine returned None. "
                                     "Check engine logs for details.",
                                 )
 
@@ -679,9 +665,9 @@ class SynthesisService:
 
                             file_written = os.path.exists(output_path)
                             if audio is None and not file_written:
-                                raise HTTPException(
-                                    status_code=500,
-                                    detail="Synthesis failed - engine returned None and did not write output.",
+                                raise ServiceError(
+                                    500,
+                                    "Synthesis failed - engine returned None and did not write output.",
                                 )
 
                             duration, quality_score, detailed_metrics = _extract_quality_metrics(
@@ -704,11 +690,11 @@ class SynthesisService:
                                     quality_score=quality_score,
                                     quality_metrics=detailed_metrics,
                                 )
-                            raise HTTPException(
-                                status_code=500,
-                                detail=f"Engine '{requested_engine}' does not support synthesis",
+                            raise ServiceError(
+                                500,
+                                f"Engine '{requested_engine}' does not support synthesis",
                             )
-                    except HTTPException:
+                    except ServiceError:
                         raise
                     except Exception as e:
                         logger.error("Engine synthesis error: %s", e, exc_info=True)
@@ -718,14 +704,14 @@ class SynthesisService:
                             error_message=str(e),
                         ) from e
 
-                raise HTTPException(
-                    status_code=503,
-                    detail=(
+                raise ServiceError(
+                    503,
+                    (
                         "Voice synthesis engines are not available. "
                         "Please ensure engines are properly installed and configured."
                     ),
                 )
-            except HTTPException:
+            except ServiceError:
                 raise
             except Exception as e:
                 logger.error(
@@ -740,4 +726,4 @@ class SynthesisService:
                         error_type=type(e).__name__,
                     ),
                 )
-                raise HTTPException(status_code=500, detail=f"Synthesis failed: {e!s}")
+                raise ServiceError(500, f"Synthesis failed: {e!s}")

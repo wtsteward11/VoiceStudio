@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using VoiceStudio.App.Services;
 
 namespace VoiceStudio.App.Utilities
 {
@@ -21,6 +22,13 @@ namespace VoiceStudio.App.Utilities
         ContentDialogPlacement placement = ContentDialogPlacement.Popup,
         XamlRoot? xamlRoot = null)
     {
+      var root = xamlRoot ?? GetXamlRoot();
+      if (root == null)
+      {
+        System.Diagnostics.Debug.WriteLine("[ConfirmationDialog] GetXamlRoot returned null; cannot show dialog (treating as cancelled)");
+        return false;
+      }
+
       var dialog = new ContentDialog
       {
         Title = title,
@@ -28,7 +36,7 @@ namespace VoiceStudio.App.Utilities
         PrimaryButtonText = primaryButtonText,
         CloseButtonText = closeButtonText,
         DefaultButton = ContentDialogButton.Close,
-        XamlRoot = xamlRoot ?? GetXamlRoot()
+        XamlRoot = root
       };
 
       var result = await dialog.ShowAsync(placement);
@@ -37,15 +45,10 @@ namespace VoiceStudio.App.Utilities
 
     private static XamlRoot? GetXamlRoot()
     {
-      // In WinUI 3, get XamlRoot from the active window
-      // Try to get it from Application.Current's window collection
-      var app = Microsoft.UI.Xaml.Application.Current;
-      if (app != null)
-      {
-        // Use reflection or try to access windows - in WinUI 3, we need to track windows ourselves
-        // For now, return null and let caller provide XamlRoot explicitly
-        return null;
-      }
+      if (ErrorDialogService.Root != null)
+        return ErrorDialogService.Root;
+      if (App.MainWindowInstance?.Content is Microsoft.UI.Xaml.FrameworkElement fe)
+        return fe.XamlRoot;
       return null;
     }
 

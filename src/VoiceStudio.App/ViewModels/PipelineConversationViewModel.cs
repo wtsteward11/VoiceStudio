@@ -69,7 +69,12 @@ namespace VoiceStudio.App.ViewModels
     private bool enableTts = true;
 
     [ObservableProperty]
-    private bool enableStreaming = true;
+    private bool enableStreaming;
+
+    /// <summary>
+    /// Whether pipeline streaming is enabled (F-01 gate). When false, streaming toggle is disabled.
+    /// </summary>
+    public bool IsPipelineStreamingEnabled { get; }
 
     [ObservableProperty]
     private ObservableCollection<PipelineProvider> availableLlmProviders = new();
@@ -95,6 +100,11 @@ namespace VoiceStudio.App.ViewModels
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _webSocketClientFactory = webSocketClientFactory;
+
+      // F-01 gate: pipeline_streaming disabled until /api/pipeline/stream wiring is complete
+      IsPipelineStreamingEnabled = AppServices.TryGetFeatureFlagsService()?.IsEnabled("pipeline_streaming") ?? false;
+      if (IsPipelineStreamingEnabled)
+        EnableStreaming = true;
 
       // Initialize streaming client via factory (GAP-009 remediation)
       if (_webSocketClientFactory != null)
@@ -233,7 +243,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        if (EnableStreaming && _streamingClient != null)
+        if (EnableStreaming && IsPipelineStreamingEnabled && _streamingClient != null)
         {
           await SendStreamingMessageAsync(userMessage, cancellationToken);
         }
@@ -362,50 +372,65 @@ namespace VoiceStudio.App.ViewModels
 
     private void OnTokenReceived(object? sender, PipelineTokenEvent e)
     {
-      if (Messages.Count > 0 && Messages[^1].IsStreaming)
+      var token = e.Token;
+      Dispatcher.TryEnqueue(() =>
       {
-        CurrentStreamingText += e.Token;
-        Messages[^1].Content = CurrentStreamingText ?? "";
-        OnPropertyChanged(nameof(Messages));
-      }
+        if (Messages.Count > 0 && Messages[^1].IsStreaming)
+        {
+          CurrentStreamingText += token;
+          Messages[^1].Content = CurrentStreamingText ?? "";
+          OnPropertyChanged(nameof(Messages));
+        }
+      });
     }
 
     private void OnAudioReceived(object? sender, PipelineAudioEvent e)
     {
-      if (Messages.Count > 0)
+      var audioData = e.AudioData;
+      Dispatcher.TryEnqueue(() =>
       {
-        // Accumulate audio chunks
-        var lastMessage = Messages[^1];
-        var existingAudio = lastMessage.AudioData ?? "";
-        lastMessage.AudioData = existingAudio + e.AudioData;
-      }
+        if (Messages.Count > 0)
+        {
+          var lastMessage = Messages[^1];
+          var existingAudio = lastMessage.AudioData ?? "";
+          lastMessage.AudioData = existingAudio + audioData;
+        }
+      });
     }
 
     private void OnStreamComplete(object? sender, PipelineCompleteEvent e)
     {
-      if (Messages.Count > 0 && Messages[^1].IsStreaming)
+      var fullResponse = e.FullResponse;
+      Dispatcher.TryEnqueue(() =>
       {
-        Messages[^1].Content = e.FullResponse;
-        Messages[^1].IsStreaming = false;
-      }
-      IsStreaming = false;
-      CurrentStreamingText = null;
+        if (Messages.Count > 0 && Messages[^1].IsStreaming)
+        {
+          Messages[^1].Content = fullResponse;
+          Messages[^1].IsStreaming = false;
+        }
+        IsStreaming = false;
+        CurrentStreamingText = null;
+      });
     }
 
     private void OnStreamError(object? sender, PipelineErrorEvent e)
     {
-      ErrorMessage = $"Streaming error: {e.Error}";
-      IsStreaming = false;
-      if (Messages.Count > 0 && Messages[^1].IsStreaming)
+      Dispatcher.TryEnqueue(() =>
       {
-        Messages[^1].IsStreaming = false;
-        Messages[^1].Content = $"[Error: {e.Error}]";
-      }
+        ErrorMessage = $"Streaming error: {e.Error}";
+        IsStreaming = false;
+        if (Messages.Count > 0 && Messages[^1].IsStreaming)
+        {
+          Messages[^1].IsStreaming = false;
+          Messages[^1].Content = $"[Error: {e.Error}]";
+        }
+      });
     }
 
     private void OnSessionStateChanged(object? sender, PipelineSessionState e)
     {
-      IsConnected = e.State == "connected" || e.State == "streaming";
+      var state = e.State;
+      Dispatcher.TryEnqueue(() => IsConnected = state == "connected" || state == "streaming");
     }
 
     private void HookMessagesCollection(ObservableCollection<ConversationMessageItem> collection)

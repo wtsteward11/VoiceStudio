@@ -151,7 +151,10 @@
                                                                    Storyboard.TargetProperty="BorderBrush">
                                         <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource VSQ.Accent.CyanBrush}" />
                                     </ObjectAnimationUsingKeyFrames>
-                                    <!-- VS-0040: Removed (TextElement.Foreground) animation - causes WinAppSDK 1.8 XAML compiler crash -->
+                                    <ObjectAnimationUsingKeyFrames Storyboard.TargetName="NavContent"
+                                                                   Storyboard.TargetProperty="Foreground">
+                                        <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource VSQ.Text.OnAccentBrush}" />
+                                    </ObjectAnimationUsingKeyFrames>
                                 </Storyboard>
                             </VisualState>
                         </VisualStateGroup>

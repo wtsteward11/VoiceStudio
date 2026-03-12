@@ -73,5 +73,11 @@ namespace VoiceStudio.Core.Panels
     /// Search/filter terms for Command Palette. Optional; null by default.
     /// </summary>
     public IReadOnlyList<string>? Keywords { get; init; }
+
+    /// <summary>
+    /// Whether the panel is visible in Modules menu and Command Palette.
+    /// When false, panel is hidden (F-10: dead-route panels).
+    /// </summary>
+    public bool IsVisible { get; init; } = true;
   }
 }

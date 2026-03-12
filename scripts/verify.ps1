@@ -881,7 +881,7 @@ if (-not $stage8_5Passed -and -not $SkipUI) {
 # ============================================================================
 
 $stage9Passed = Invoke-Stage -Name "Gate/Ledger Validation" -Description "Check gate status and validate quality ledger" -Skip:$SkipGates -Action {
-    & python scripts/run_verification.py --skip-guard --skip WS-1 --skip WS-4
+    & python scripts/run_verification.py --skip-guard
     return $LASTEXITCODE
 }
 

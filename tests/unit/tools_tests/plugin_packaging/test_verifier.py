@@ -261,7 +261,7 @@ class TestPluginVerifier:
         assert "signer2" in verifier._trusted_signers
 
 
-@pytest.mark.skipif(not HAS_CRYPTOGRAPHY, reason="cryptography library required")
+@pytest.mark.skipif(not HAS_CRYPTOGRAPHY, reason="cryptography library required (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 class TestPluginVerifierWithSigning:
     """Tests for verifier with signed packages."""
 

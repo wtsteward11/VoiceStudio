@@ -7,7 +7,7 @@
     "Default (Full App)": {
       "commandName": "Project",
       "environmentVariables": {
-        "VOICESTUDIO_BACKEND_URL": "http://localhost:8001",
+        "VOICESTUDIO_BACKEND_URL": "http://localhost:8000",
         "VOICESTUDIO_LOG_LEVEL": "INFO",
         "VOICESTUDIO_ENABLE_ANALYTICS": "false",
         "VOICESTUDIO_ENABLE_PERFORMANCE_PROFILING": "false"
@@ -16,7 +16,7 @@
     "Lightweight (Skip Heavy Panels)": {
       "commandName": "Project",
       "environmentVariables": {
-        "VOICESTUDIO_BACKEND_URL": "http://localhost:8001",
+        "VOICESTUDIO_BACKEND_URL": "http://localhost:8000",
         "VOICESTUDIO_LOG_LEVEL": "INFO",
         "VOICESTUDIO_SKIP_HEAVY_PANELS": "true",
         "VOICESTUDIO_ENABLE_ANALYTICS": "false",
@@ -26,7 +26,7 @@
     "Stress Test Mode": {
       "commandName": "Project",
       "environmentVariables": {
-        "VOICESTUDIO_BACKEND_URL": "http://localhost:8001",
+        "VOICESTUDIO_BACKEND_URL": "http://localhost:8000",
         "VOICESTUDIO_LOG_LEVEL": "DEBUG",
         "VOICESTUDIO_STRESS_TEST": "true",
         "VOICESTUDIO_ENABLE_ANALYTICS": "true",
@@ -36,7 +36,7 @@
     "Backend API Only": {
       "commandName": "Project",
       "environmentVariables": {
-        "VOICESTUDIO_BACKEND_URL": "http://localhost:8001",
+        "VOICESTUDIO_BACKEND_URL": "http://localhost:8000",
         "VOICESTUDIO_LOG_LEVEL": "DEBUG",
         "VOICESTUDIO_SKIP_FRONTEND": "true"
       }

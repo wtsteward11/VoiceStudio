@@ -18,6 +18,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Animation;
 using Windows.ApplicationModel.DataTransfer;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Controls
 {
@@ -101,6 +102,20 @@ namespace VoiceStudio.App.Controls
             typeof(PanelHost),
             new PropertyMetadata(false));
 
+    public static readonly DependencyProperty LoadErrorMessageProperty =
+        DependencyProperty.Register(
+            nameof(LoadErrorMessage),
+            typeof(string),
+            typeof(PanelHost),
+            new PropertyMetadata(string.Empty));
+
+    public static readonly DependencyProperty LoadErrorTitleProperty =
+        DependencyProperty.Register(
+            nameof(LoadErrorTitle),
+            typeof(string),
+            typeof(PanelHost),
+            new PropertyMetadata("Failed to load panel"));
+
     public new UIElement? Content
     {
       get => (UIElement?)GetValue(ContentProperty);
@@ -149,6 +164,18 @@ namespace VoiceStudio.App.Controls
       set => SetValue(ShowQualityBadgeProperty, value);
     }
 
+    public string LoadErrorMessage
+    {
+      get => (string)GetValue(LoadErrorMessageProperty);
+      set => SetValue(LoadErrorMessageProperty, value);
+    }
+
+    public string LoadErrorTitle
+    {
+      get => (string)GetValue(LoadErrorTitleProperty);
+      set => SetValue(LoadErrorTitleProperty, value);
+    }
+
     // XAML compiler stability: avoid bool->Visibility x:Bind.
     public Visibility QualityBadgeVisibility => ShowQualityBadge ? Visibility.Visible : Visibility.Collapsed;
 
@@ -161,6 +188,8 @@ namespace VoiceStudio.App.Controls
     public PanelHost()
     {
       this.InitializeComponent();
+      if (ErrorOverlay != null)
+        ErrorOverlay.RetryRequested += ErrorOverlay_RetryRequested;
       _panelStateService = ServiceProvider.GetPanelStateService();
       _dragDropService = ServiceProvider.TryGetDragDropVisualFeedbackService();
       _panelRegistry = AppServices.GetPanelRegistry();
@@ -244,7 +273,7 @@ namespace VoiceStudio.App.Controls
           foreach (var d in toDispose)
           {
             // ALLOWED: empty catch - panel teardown must not propagate exceptions to caller
-            try { d.Dispose(); } catch { /* don't break teardown */ }
+            try { d.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PanelHost.CleanupCacheAsync"); }
           }
         });
       }
@@ -254,7 +283,7 @@ namespace VoiceStudio.App.Controls
         foreach (var d in toDispose)
         {
           // ALLOWED: empty catch - panel teardown must not propagate exceptions to caller
-          try { d.Dispose(); } catch { /* don't break teardown */ }
+          try { d.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PanelHost.CleanupCacheAsync"); }
         }
       }
       else
@@ -262,7 +291,7 @@ namespace VoiceStudio.App.Controls
         foreach (var d in toDispose)
         {
           // ALLOWED: empty catch - panel teardown must not propagate exceptions to caller
-          try { d.Dispose(); } catch { /* don't break teardown */ }
+          try { d.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PanelHost.CleanupCacheAsync"); }
         }
       }
     }
@@ -293,10 +322,9 @@ namespace VoiceStudio.App.Controls
         // 6. Update context-sensitive action bar (IDEA 2)
         UpdateActionBar(newContent);
       }
-      // ALLOWED: empty catch - cancellation is intentional, not an error
       catch (OperationCanceledException)
       {
-        // Content change was cancelled, expected
+        System.Diagnostics.Debug.WriteLine("PanelHost: HandleContentChangeAsync cancelled");
       }
       catch (Exception ex)
       {
@@ -453,6 +481,7 @@ namespace VoiceStudio.App.Controls
       SwitchPanelSubMenu.Items.Clear();
 
       var descriptors = _panelRegistry.GetAllDescriptors()
+        .Where(d => d.IsVisible)
         .Where(d => d.Maturity != PanelMaturity.Deprecated)
         .Where(d => !string.IsNullOrEmpty(d.MenuCategory))
         .OrderBy(d => d.MenuCategory)
@@ -735,7 +764,7 @@ namespace VoiceStudio.App.Controls
         if (evicted is UserControl uc && uc.DataContext is IDisposable d)
         {
           // ALLOWED: empty catch - cache eviction must not break the UI eviction loop
-          try { d.Dispose(); } catch { /* don't break eviction */ }
+          try { d.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PanelHost.EvictIfOverCapacity"); }
         }
         System.Diagnostics.Debug.WriteLine($"[PanelHost] LRU evicted: {toEvict}");
       }
@@ -881,10 +910,12 @@ namespace VoiceStudio.App.Controls
             var path = System.IO.Path.Combine(diagDir, "startup_diag.txt");
             System.IO.File.AppendAllText(path, $"[{DateTime.UtcNow:O}] PanelHost.CreatePanel failed: panelId={panelId}, ex={ex}\n");
           }
-          // ALLOWED: empty catch - best-effort diagnostic write must not propagate
-          catch { }
+          catch (Exception diagEx) { System.Diagnostics.Debug.WriteLine($"[PanelHost] Diagnostic write failed (non-fatal): {diagEx.Message}"); }
 #endif
-          ShowOfflineOverlayIfApplicable();
+          if (ErrorPresentationService.IsBackendOffline)
+            ShowOfflineOverlayIfApplicable();
+          else
+            ShowLoadErrorOverlay($"Failed to create panel: {ex.Message}");
           return null;
         }
 
@@ -901,8 +932,8 @@ namespace VoiceStudio.App.Controls
           {
             if (panel is UserControl uc && uc.DataContext is IDisposable d)
             {
-              // ALLOWED: empty catch - unload teardown must not propagate
-              try { d.Dispose(); } catch { /* don't break teardown */ }
+              try { d.Dispose(); }
+              catch (Exception disposeEx) { System.Diagnostics.Debug.WriteLine($"[PanelHost] Dispose teardown failed (non-fatal): {disposeEx.Message}"); }
             }
             return null;
           }
@@ -913,10 +944,11 @@ namespace VoiceStudio.App.Controls
             System.Diagnostics.Debug.WriteLine($"[PanelHost] Duplicate load race for {panelId} — discarding newly created instance");
             if (panel is UserControl uc2 && uc2.DataContext is IDisposable d2)
             {
-              // ALLOWED: empty catch - duplicate race teardown must not propagate
-              try { d2.Dispose(); } catch { /* don't break teardown */ }
+              try { d2.Dispose(); }
+              catch (Exception disposeEx) { System.Diagnostics.Debug.WriteLine($"[PanelHost] Duplicate race teardown Dispose failed (non-fatal): {disposeEx.Message}"); }
             }
             TouchLru(panelId);
+            LoadErrorMessage = string.Empty;
             Content = existing;
             return existing;
           }
@@ -924,6 +956,7 @@ namespace VoiceStudio.App.Controls
           _loadedPanels[panelId] = panel;
           _lruOrder.Add(panelId);
           EvictIfOverCapacity(panelId);
+          LoadErrorMessage = string.Empty;
           Content = panel;
           var loadTime = DateTime.UtcNow - startTime;
           System.Diagnostics.Debug.WriteLine($"[PanelHost] Loaded panel {panelId} in {loadTime.TotalMilliseconds:F1}ms");
@@ -950,16 +983,32 @@ namespace VoiceStudio.App.Controls
           var path = System.IO.Path.Combine(diagDir, "startup_diag.txt");
           System.IO.File.AppendAllText(path, $"[{DateTime.UtcNow:O}] PanelHost.LoadPanelAsync failed: panelId={panelId}, ex={ex}\n");
         }
-        // ALLOWED: empty catch - best-effort diagnostic write must not propagate
-        catch { }
+        catch (Exception diagEx) { System.Diagnostics.Debug.WriteLine($"[PanelHost] Diagnostic write failed (non-fatal): {diagEx.Message}"); }
 #endif
-        ShowOfflineOverlayIfApplicable();
+        if (ErrorPresentationService.IsBackendOffline)
+          ShowOfflineOverlayIfApplicable();
+        else
+          ShowLoadErrorOverlay($"Failed to load panel: {ex.Message}");
         return null;
       }
       finally
       {
         IsLoading = false;
       }
+    }
+
+    private void ShowLoadErrorOverlay(string message)
+    {
+      LoadErrorMessage = message;
+      LoadErrorTitle = "Failed to load panel";
+      Content = null;
+    }
+
+    private async void ErrorOverlay_RetryRequested(object? sender, EventArgs e)
+    {
+      LoadErrorMessage = string.Empty;
+      if (_lastRequestedPanelId != null)
+        await LoadPanelAsync(_lastRequestedPanelId, _lastRequestedLegacyFactory);
     }
 
     private void ShowOfflineOverlayIfApplicable()
@@ -969,6 +1018,7 @@ namespace VoiceStudio.App.Controls
 
       if (_offlineOverlay != null)
       {
+        LoadErrorMessage = string.Empty;
         Content = _offlineOverlay;
         return;
       }
@@ -1027,6 +1077,7 @@ namespace VoiceStudio.App.Controls
 
       _offlineOverlay = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
       _offlineOverlay.Children.Add(stack);
+      LoadErrorMessage = string.Empty;
       Content = _offlineOverlay;
     }
 

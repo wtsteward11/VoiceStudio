@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.Core.Plugins;
 using VoiceStudio.Core.Panels;
@@ -21,6 +22,7 @@ namespace VoiceStudio.App.Services
     private readonly IBackendClient _backendClient;
     private readonly IErrorLoggingService? _errorLoggingService;
     private readonly string _pluginsDirectory;
+    private readonly SemaphoreSlim _loadLock = new(1, 1);
     private bool _initialized;
 
     public PluginManager(
@@ -64,45 +66,49 @@ namespace VoiceStudio.App.Services
 
     /// <summary>
     /// Load all plugins from the plugins directory.
+    /// Thread-safe: concurrent calls are serialized; second call no-ops if first completed.
     /// </summary>
     public async Task LoadPluginsAsync()
     {
-      if (_initialized)
+      await _loadLock.WaitAsync();
+      try
       {
-        return;
-      }
+        if (_initialized)
+          return;
 
-      if (!Directory.Exists(_pluginsDirectory))
-      {
-        Directory.CreateDirectory(_pluginsDirectory);
-        return;
-      }
-
-      foreach (var pluginDir in Directory.GetDirectories(_pluginsDirectory))
-      {
-        try
+        if (!Directory.Exists(_pluginsDirectory))
         {
-          await LoadPluginAsync(pluginDir);
+          Directory.CreateDirectory(_pluginsDirectory);
+          return;
         }
-        catch (Exception ex)
+
+        foreach (var pluginDir in Directory.GetDirectories(_pluginsDirectory))
         {
-          // Log error but continue loading other plugins
-          var errorMessage = $"Failed to load plugin from {pluginDir}: {ex.Message}";
-          System.Diagnostics.Debug.WriteLine(errorMessage);
-
-          _errorLoggingService?.LogError(
-              ex,
-              "Plugin Loading",
-              new Dictionary<string, object>
-              {
-                            { "PluginDirectory", pluginDir },
-                            { "Action", "LoadPlugin" }
-              }
-          );
+          try
+          {
+            await LoadPluginAsync(pluginDir);
+          }
+          catch (Exception ex)
+          {
+            var errorMessage = $"Failed to load plugin from {pluginDir}: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine(errorMessage);
+            _errorLoggingService?.LogError(
+                ex,
+                "Plugin Loading",
+                new Dictionary<string, object>
+                {
+                  { "PluginDirectory", pluginDir },
+                  { "Action", "LoadPlugin" }
+                });
+          }
         }
-      }
 
-      _initialized = true;
+        _initialized = true;
+      }
+      finally
+      {
+        _loadLock.Release();
+      }
     }
 
     /// <summary>

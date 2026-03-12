@@ -21,8 +21,9 @@ namespace VoiceStudio.App.Views.Panels
         {
             this.InitializeComponent();
 
-            // Create gateway and viewmodel
-            var httpClient = new System.Net.Http.HttpClient();
+            // Create gateway and viewmodel (Phase 4: use shared HttpClient)
+            var httpClient = AppServices.GetService<System.Net.Http.HttpClient>()
+              ?? throw new InvalidOperationException("HttpClient not available");
             var gateway = new PluginGateway(httpClient);
             var context = AppServices.GetRequiredService<IViewModelContext>();
             _viewModel = new PluginGalleryViewModel(context, gateway);

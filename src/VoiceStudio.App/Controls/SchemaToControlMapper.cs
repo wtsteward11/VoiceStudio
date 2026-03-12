@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using VoiceStudio.Core.Gateways;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Controls
 {
@@ -351,10 +352,10 @@ namespace VoiceStudio.App.Controls
             valueChanged(parameter.Name, parsed);
           }
           // ALLOWED: empty catch - invalid JSON is expected during typing
-          catch
-          {
-            // Invalid JSON - don't update
-          }
+          catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "SchemaToControlMapper.Unknown");
+      }
         };
       }
 
@@ -402,10 +403,10 @@ namespace VoiceStudio.App.Controls
             valueChanged(parameter.Name, parsed);
           }
           // ALLOWED: empty catch - invalid JSON is expected during typing
-          catch
-          {
-            // Invalid JSON - don't update
-          }
+          catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "SchemaToControlMapper.Unknown");
+      }
         };
       }
 

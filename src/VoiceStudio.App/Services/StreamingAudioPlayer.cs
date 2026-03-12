@@ -533,7 +533,11 @@ namespace VoiceStudio.App.Services
         {
             try
             {
-                using var httpClient = new System.Net.Http.HttpClient();
+                var httpClient = AppServices.GetService<System.Net.Http.HttpClient>();
+                if (httpClient == null)
+                {
+                    return new StreamingCapability { EngineId = engineId, SupportsStreaming = false, SupportsBatch = true, RecommendedMode = "batch", Error = "HttpClient not available" };
+                }
                 var response = await httpClient.GetAsync(
                     $"{baseUrl}/api/voice/streaming/capabilities/{engineId}",
                     cancellationToken);
@@ -587,7 +591,11 @@ namespace VoiceStudio.App.Services
         {
             try
             {
-                using var httpClient = new System.Net.Http.HttpClient();
+                var httpClient = AppServices.GetService<System.Net.Http.HttpClient>();
+                if (httpClient == null)
+                {
+                    return new StreamingCapabilities { WebSocketEndpoint = null };
+                }
                 var response = await httpClient.GetAsync(
                     $"{baseUrl}/api/voice/streaming/capabilities",
                     cancellationToken);

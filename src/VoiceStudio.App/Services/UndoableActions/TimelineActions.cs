@@ -13,7 +13,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class AddTrackAction : IUndoableAction
   {
     private readonly ObservableCollection<AudioTrack> _tracks;
-    private readonly IBackendClient _backendClient;
+    private readonly ITimelineTrackService _trackService;
     private readonly AudioTrack _track;
     private readonly Action<AudioTrack>? _onUndo;
     private readonly Action<AudioTrack>? _onRedo;
@@ -22,13 +22,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public AddTrackAction(
         ObservableCollection<AudioTrack> tracks,
-        IBackendClient backendClient,
+        ITimelineTrackService trackService,
         AudioTrack track,
         Action<AudioTrack>? onUndo = null,
         Action<AudioTrack>? onRedo = null)
     {
       _tracks = tracks ?? throw new ArgumentNullException(nameof(tracks));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _trackService = trackService ?? throw new ArgumentNullException(nameof(trackService));
       _track = track ?? throw new ArgumentNullException(nameof(track));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -62,7 +62,6 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class AddClipAction : IUndoableAction
   {
     private readonly ObservableCollection<AudioTrack> _tracks;
-    private readonly IBackendClient _backendClient;
     private readonly AudioTrack _track;
     private readonly AudioClip _clip;
     private readonly int _originalIndex;
@@ -73,14 +72,12 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public AddClipAction(
         ObservableCollection<AudioTrack> tracks,
-        IBackendClient backendClient,
         AudioTrack track,
         AudioClip clip,
         Action<AudioClip>? onUndo = null,
         Action<AudioClip>? onRedo = null)
     {
       _tracks = tracks ?? throw new ArgumentNullException(nameof(tracks));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _track = track ?? throw new ArgumentNullException(nameof(track));
       _clip = clip ?? throw new ArgumentNullException(nameof(clip));
       _originalIndex = track.Clips?.IndexOf(clip) ?? -1;
@@ -128,7 +125,6 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteClipsAction : IUndoableAction
   {
     private readonly ObservableCollection<AudioTrack> _tracks;
-    private readonly IBackendClient _backendClient;
     private readonly List<(AudioTrack Track, AudioClip Clip, int Index)> _deletedClips;
     private readonly Action<IEnumerable<AudioClip>>? _onUndo;
     private readonly Action<IEnumerable<AudioClip>>? _onRedo;
@@ -137,13 +133,11 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteClipsAction(
         ObservableCollection<AudioTrack> tracks,
-        IBackendClient backendClient,
         IEnumerable<(AudioTrack Track, AudioClip Clip)> clipsToDelete,
         Action<IEnumerable<AudioClip>>? onUndo = null,
         Action<IEnumerable<AudioClip>>? onRedo = null)
     {
       _tracks = tracks ?? throw new ArgumentNullException(nameof(tracks));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _deletedClips = clipsToDelete?.Select(c => (
           c.Track,
           c.Clip,

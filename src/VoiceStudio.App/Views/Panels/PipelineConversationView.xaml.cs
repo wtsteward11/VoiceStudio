@@ -25,7 +25,8 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new PipelineConversationViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient()
+          ServiceProvider.GetBackendClient(),
+          AppServices.TryGetWebSocketClientFactory()
       );
       DataContext = ViewModel;
 

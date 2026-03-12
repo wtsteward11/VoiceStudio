@@ -22,6 +22,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class TextHighlightingViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProjectsClient _projectsClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
     public string PanelId => "text-highlighting";
@@ -72,10 +73,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<string> availableHighlightTypes = new() { "word", "phrase", "sentence", "emphasis", "note", "error" };
 
-    public TextHighlightingViewModel(IViewModelContext context, IBackendClient backendClient)
+    public TextHighlightingViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
 
       // Get services using helper (reduces code duplication)
       _toastNotificationService = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetToastNotificationService());
@@ -111,7 +113,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var projects = await _backendClient.GetProjectsAsync(cancellationToken);
+        var projects = await _projectsClient.GetProjectsAsync(cancellationToken);
         var audioIds = new List<string>();
 
         foreach (var project in projects)

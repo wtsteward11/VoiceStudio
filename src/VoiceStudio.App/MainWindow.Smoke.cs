@@ -534,7 +534,12 @@ namespace VoiceStudio.App
 
             var streamCheckPassed = await Task.Run(async () =>
             {
-                using var httpClient = new HttpClient();
+                var httpClient = AppServices.GetService<HttpClient>();
+                if (httpClient == null)
+                {
+                    appendStepLog("STREAM_CHECK_FAIL\tHttpClient not available");
+                    throw new InvalidOperationException("HttpClient not available");
+                }
                 var streamUrl = $"{baseUrl}/api/audio/file/{Uri.EscapeDataString(proofAudioId)}";
                 var resp = await httpClient.GetAsync(streamUrl);
                 if (!resp.IsSuccessStatusCode)

@@ -16,6 +16,7 @@ using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Gateways;
 using VoiceStudio.Core.Services;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Features.Synthesis;
 
@@ -261,15 +262,15 @@ public partial class SynthesisViewModel : BaseViewModel
     public RelayCommand ClearHistoryCommand { get; }
     public RelayCommand AddToTimelineCommand { get; }
 
-    public async Task InitializeAsync()
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         IsLoading = true;
         StatusMessage = "Loading engines...";
 
         try
         {
-            await LoadEnginesAsync();
-            await LoadVoicesAsync();
+            await LoadEnginesAsync(cancellationToken);
+            await LoadVoicesAsync(cancellationToken);
             StatusMessage = "Ready";
         }
         catch (Exception ex)
@@ -282,14 +283,15 @@ public partial class SynthesisViewModel : BaseViewModel
         }
     }
 
-    private async Task LoadEnginesAsync()
+    private async Task LoadEnginesAsync(CancellationToken cancellationToken = default)
     {
         AvailableEngines.Clear();
         
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Get engines from backend via EngineGateway
-            var result = await _engineGateway.GetAllAsync();
+            var result = await _engineGateway.GetAllAsync(cancellationToken);
             
             if (result.Success && result.Data != null)
             {
@@ -341,6 +343,10 @@ public partial class SynthesisViewModel : BaseViewModel
                 SelectedEngine = AvailableEngines[0];
             }
         }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Failed to load engines from backend, using defaults");
@@ -360,14 +366,15 @@ public partial class SynthesisViewModel : BaseViewModel
         }
     }
 
-    private async Task LoadVoicesAsync()
+    private async Task LoadVoicesAsync(CancellationToken cancellationToken = default)
     {
         AvailableVoices.Clear();
         
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Get voices from backend via VoiceGateway
-            var result = await _voiceGateway.GetAvailableVoicesAsync(SelectedEngine?.Id);
+            var result = await _voiceGateway.GetAvailableVoicesAsync(SelectedEngine?.Id, cancellationToken);
             
             if (result.Success && result.Data != null)
             {
@@ -401,6 +408,10 @@ public partial class SynthesisViewModel : BaseViewModel
             {
                 SelectedVoice = AvailableVoices[0];
             }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
         }
         catch (Exception ex)
         {
@@ -527,7 +538,7 @@ public partial class SynthesisViewModel : BaseViewModel
 
     private bool CanPlay() => CurrentResult != null && !IsSynthesizing;
 
-    private async Task PlayAsync()
+    private async Task PlayAsync(CancellationToken cancellationToken = default)
     {
         if (CurrentResult == null)
         {
@@ -540,8 +551,12 @@ public partial class SynthesisViewModel : BaseViewModel
         try
         {
             // Simulate playback - in a real implementation, use IAudioPlayerService
-            await Task.Delay((int)CurrentResult.Duration.TotalMilliseconds);
+            await Task.Delay((int)CurrentResult.Duration.TotalMilliseconds, cancellationToken);
         }
+        catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "SynthesisViewModel.PlayAsync");
+      }
         finally
         {
             IsPlaying = false;

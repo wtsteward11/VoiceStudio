@@ -225,24 +225,29 @@ async def list_pipeline_providers():
     from backend.ml.models.llm_provider_service import get_llm_provider_service
 
     provider_service = get_llm_provider_service()
-    llm_providers = [
+    llm_raw = [
         {"name": p.name, "local": p.local, "available": p.available}
         for p in provider_service.get_available_providers()
     ]
 
+    stt_ids = ["whisper", "whisper_cpp"]
+    tts_ids = ["xtts_v2", "piper", "openai_tts"]
+
+    llm_providers = [
+        {"id": p.get("name", ""), "name": p.get("name", ""), "local": p.get("local", False)}
+        for p in llm_raw
+    ]
+    stt_providers = [{"id": e, "name": e} for e in stt_ids]
+    tts_providers = [{"id": e, "name": e} for e in tts_ids]
+
     return {
-        "stt": {
-            "available": ["whisper", "whisper_cpp"],
-            "default": "whisper",
-        },
-        "llm": {
-            "available": llm_providers,
-            "default": "ollama",
-        },
-        "tts": {
-            "available": ["xtts_v2", "piper", "openai_tts"],
-            "default": "xtts_v2",
-        },
+        "stt": {"available": stt_ids, "default": "whisper"},
+        "llm": {"available": llm_raw, "default": "ollama"},
+        "tts": {"available": tts_ids, "default": "xtts_v2"},
+        "llm_providers": llm_providers,
+        "stt_providers": stt_providers,
+        "tts_providers": tts_providers,
+        "s2s_providers": [],
     }
 
 

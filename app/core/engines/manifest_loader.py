@@ -36,12 +36,32 @@ def load_engine_manifest(manifest_path: str) -> dict[str, Any]:
     with open(manifest_file, encoding="utf-8") as f:
         manifest: dict[str, Any] = json.load(f)
 
-    # Validate required fields
-    required_fields = ["engine_id", "name", "type", "version", "entry_point", "dependencies"]
+    # Normalize legacy fields (engine_id/id, type/category)
+    engine_id = manifest.get("engine_id") or manifest.get("id")
+    if not engine_id:
+        raise ValueError("Manifest missing required field: engine_id or id")
+    manifest["engine_id"] = engine_id
 
-    for field in required_fields:
-        if field not in manifest:
-            raise ValueError(f"Manifest missing required field: {field}")
+    engine_type = manifest.get("type") or manifest.get("category")
+    if not engine_type:
+        raise ValueError("Manifest missing required field: type or category")
+    manifest["type"] = engine_type
+
+    if "name" not in manifest:
+        raise ValueError("Manifest missing required field: name")
+    if "version" not in manifest:
+        raise ValueError("Manifest missing required field: version")
+
+    # Normalize entry_point: support string or object {module, class_name}
+    if "entry_point" not in manifest:
+        raise ValueError("Manifest missing required field: entry_point")
+    manifest["entry_point"] = _normalize_entry_point(manifest["entry_point"])
+
+    # Normalize dependencies: support optional; use requirements.packages if present
+    if "dependencies" not in manifest:
+        reqs = manifest.get("requirements") or {}
+        packages = reqs.get("packages") if isinstance(reqs, dict) else []
+        manifest["dependencies"] = packages if isinstance(packages, list) else []
 
     # Expand environment variables in model paths
     if "model_paths" in manifest:
@@ -50,6 +70,19 @@ def load_engine_manifest(manifest_path: str) -> dict[str, Any]:
 
     logger.info(f"Loaded manifest: {manifest['engine_id']} v{manifest['version']}")
     return manifest
+
+
+def _normalize_entry_point(entry_point: Any) -> str:
+    """Normalize entry_point to module:class string format."""
+    if isinstance(entry_point, str) and entry_point.strip():
+        return entry_point
+    if isinstance(entry_point, dict):
+        module = entry_point.get("module")
+        class_name = entry_point.get("class_name")
+        if module and class_name:
+            return f"{module}:{class_name}"
+        raise ValueError("entry_point object must have module and class_name")
+    raise ValueError("entry_point must be string or object with module and class_name")
 
 
 def find_engine_manifests(engines_root: str = "engines") -> dict[str, str]:

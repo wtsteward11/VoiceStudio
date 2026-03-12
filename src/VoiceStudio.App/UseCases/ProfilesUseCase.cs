@@ -7,41 +7,42 @@ using VoiceStudio.Core.Services;
 namespace VoiceStudio.App.UseCases
 {
   /// <summary>
-  /// Use case implementation that delegates profile operations to the backend via IBackendClient.
+  /// Use case implementation that delegates profile operations to IProfilesClient.
+  /// ListAsync benefits from ProfilesClient's built-in single-flight + TTL caching for GetProfilesAsync.
   /// </summary>
   public sealed class ProfilesUseCase : IProfilesUseCase
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IProfilesClient _profilesClient;
 
-    public ProfilesUseCase(IBackendClient backendClient)
+    public ProfilesUseCase(IProfilesClient profilesClient)
     {
-      _backendClient = backendClient ?? throw new System.ArgumentNullException(nameof(backendClient));
+      _profilesClient = profilesClient ?? throw new System.ArgumentNullException(nameof(profilesClient));
     }
 
     public async Task<IReadOnlyList<VoiceProfile>> ListAsync(CancellationToken cancellationToken = default)
     {
-      var list = await _backendClient.GetProfilesAsync(cancellationToken).ConfigureAwait(false);
+      var list = await _profilesClient.GetProfilesAsync(cancellationToken).ConfigureAwait(false);
       return list ?? new List<VoiceProfile>();
     }
 
     public Task<VoiceProfile> CreateAsync(string name, CancellationToken cancellationToken = default)
     {
-      return _backendClient.CreateProfileAsync(name, "en", null, null, cancellationToken);
+      return _profilesClient.CreateProfileAsync(name, "en", null, null, cancellationToken);
     }
 
     public Task<VoiceProfile> CreateAsync(string name, string? language, string? emotion, List<string>? tags, CancellationToken cancellationToken = default)
     {
-      return _backendClient.CreateProfileAsync(name, language ?? "en", emotion, tags, cancellationToken);
+      return _profilesClient.CreateProfileAsync(name, language ?? "en", emotion, tags, cancellationToken);
     }
 
     public Task<VoiceProfile> UpdateAsync(string profileId, string? name, string? language, string? emotion, List<string>? tags, CancellationToken cancellationToken = default)
     {
-      return _backendClient.UpdateProfileAsync(profileId, name, language, emotion, tags, cancellationToken);
+      return _profilesClient.UpdateProfileAsync(profileId, name, language, emotion, tags, cancellationToken);
     }
 
     public Task<bool> DeleteAsync(string profileId, CancellationToken cancellationToken = default)
     {
-      return _backendClient.DeleteProfileAsync(profileId, cancellationToken);
+      return _profilesClient.DeleteProfileAsync(profileId, cancellationToken);
     }
   }
 }

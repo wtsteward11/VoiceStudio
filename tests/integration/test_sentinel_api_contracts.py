@@ -28,7 +28,7 @@ except ImportError:
 
 # Paths
 CONTRACTS_DIR = Path(__file__).parent.parent / "sentinel" / "contracts"
-BACKEND_URL = os.getenv("VOICESTUDIO_BACKEND_URL", "http://127.0.0.1:8001")
+BACKEND_URL = os.getenv("VOICESTUDIO_BACKEND_URL", "http://127.0.0.1:8000")
 
 pytestmark = [
     pytest.mark.integration,

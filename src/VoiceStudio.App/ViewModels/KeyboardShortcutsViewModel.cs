@@ -9,6 +9,7 @@ using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
 using KeyboardShortcut = VoiceStudio.App.ViewModels.KeyboardShortcutsShortcut;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.ViewModels
 {
@@ -18,6 +19,8 @@ namespace VoiceStudio.App.ViewModels
   public partial class KeyboardShortcutsViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private CancellationTokenSource? _searchDebounceCts;
+    private const int SearchDebounceMs = 300;
 
     public string PanelId => "keyboard_shortcuts";
     public string DisplayName => ResourceHelper.GetString("Panel.KeyboardShortcuts.DisplayName", "Keyboard Shortcuts");
@@ -475,7 +478,21 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSearchQueryChanged(string? value)
     {
-      _ = SearchShortcutsAsync(CancellationToken.None);
+      _searchDebounceCts?.Cancel();
+      _searchDebounceCts = new CancellationTokenSource();
+      var cts = _searchDebounceCts;
+      _ = Task.Run(async () =>
+      {
+        try
+        {
+          await Task.Delay(SearchDebounceMs, cts.Token);
+          Dispatcher.TryEnqueue(() => _ = SearchShortcutsAsync(cts.Token));
+        }
+        catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "KeyboardShortcutsViewModel.OnSearchQueryChanged");
+      }
+      });
     }
 
     // Response models

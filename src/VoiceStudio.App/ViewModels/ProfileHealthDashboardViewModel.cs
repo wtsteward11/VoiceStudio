@@ -23,6 +23,7 @@ namespace VoiceStudio.App.ViewModels
     public string DisplayName => ResourceHelper.GetString("Panel.ProfileHealthDashboard.DisplayName", "Profile Health Dashboard");
     public PanelRegion Region => PanelRegion.Center;
     private readonly IBackendClient _backendClient;
+    private readonly IProfilesClient _profilesClient;
 
     [ObservableProperty]
     private ObservableCollection<ProfileHealthItem> profiles = new();
@@ -51,10 +52,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private int criticalProfiles;
 
-    public ProfileHealthDashboardViewModel(IViewModelContext context, IBackendClient backendClient)
+    public ProfileHealthDashboardViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       RefreshCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("RefreshHealthData");
@@ -83,8 +85,8 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        // Load all profiles
-        var allProfiles = await _backendClient.GetProfilesAsync(cancellationToken);
+        // Load all profiles (canonical path via IProfilesClient)
+        var allProfiles = await _profilesClient.GetProfilesAsync(cancellationToken);
 
         cancellationToken.ThrowIfCancellationRequested();
 

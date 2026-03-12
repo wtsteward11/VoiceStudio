@@ -250,10 +250,36 @@ namespace VoiceStudio.App.Services
         using var doc = JsonDocument.Parse(messageJson);
         var root = doc.RootElement;
 
+        var messageType = root.TryGetProperty("type", out var typeProp) ? typeProp.GetString() ?? "update" : "update";
+
+        // Handle pong responses
+        if (messageType == "pong")
+        {
+          return;
+        }
+
+        // Handle heartbeat
+        if (messageType == "heartbeat")
+        {
+          return;
+        }
+
+        // Handle batch: backend sends multiple messages in one envelope; unwrap and emit each
+        if (messageType == "batch" && root.TryGetProperty("messages", out var messagesProp))
+        {
+          foreach (var msg in messagesProp.EnumerateArray())
+          {
+            var subMsg = CreateWebSocketMessage(msg, _jsonOptions);
+            if (subMsg != null)
+              MessageReceived?.Invoke(this, subMsg);
+          }
+          return;
+        }
+
         var message = new WebSocketMessage
         {
           Topic = root.TryGetProperty("topic", out var topicProp) ? topicProp.GetString() ?? "general" : "general",
-          Type = root.TryGetProperty("type", out var typeProp) ? typeProp.GetString() ?? "update" : "update",
+          Type = messageType,
           Payload = root.TryGetProperty("payload", out var payloadProp) ? JsonSerializer.Deserialize<object>(payloadProp.GetRawText(), _jsonOptions) : null,
           Timestamp = root.TryGetProperty("timestamp", out var timestampProp) && timestampProp.TryGetDateTime(out var timestamp)
                 ? timestamp
@@ -261,26 +287,39 @@ namespace VoiceStudio.App.Services
           RequestId = root.TryGetProperty("request_id", out var requestIdProp) ? requestIdProp.GetString() : null
         };
 
-        // Handle pong responses
-        if (message.Type == "pong")
-        {
-          // Connection is alive
-          return;
-        }
-
-        // Handle heartbeat
-        if (message.Type == "heartbeat")
-        {
-          // Connection is alive
-          return;
-        }
-
         MessageReceived?.Invoke(this, message);
       }
       catch (JsonException ex)
       {
         Error?.Invoke(this, new Exception($"Failed to parse WebSocket message: {ex.Message}", ex));
       }
+    }
+
+    private static WebSocketMessage? CreateWebSocketMessage(JsonElement root, JsonSerializerOptions jsonOptions)
+    {
+      var topic = root.TryGetProperty("topic", out var t) ? t.GetString() ?? "general" : "general";
+      var type = root.TryGetProperty("type", out var typeP) ? typeP.GetString() ?? "update" : "update";
+      object? payload = null;
+      if (root.TryGetProperty("payload", out var payloadProp))
+      {
+        try
+        {
+          payload = JsonSerializer.Deserialize<object>(payloadProp.GetRawText(), jsonOptions);
+        }
+        catch
+        {
+          return null;
+        }
+      }
+
+      return new WebSocketMessage
+      {
+        Topic = topic,
+        Type = type,
+        Payload = payload,
+        Timestamp = root.TryGetProperty("timestamp", out var ts) && ts.TryGetDateTime(out var dt) ? dt : DateTime.UtcNow,
+        RequestId = root.TryGetProperty("request_id", out var rid) ? rid.GetString() : null
+      };
     }
 
     public void Dispose()

@@ -243,13 +243,12 @@ namespace VoiceStudio.App.Views.Panels
         {
           if (!string.IsNullOrEmpty(generatedVideo.VideoUrl))
           {
-            // Download from URL
-            using (var client = new System.Net.Http.HttpClient())
-            {
-              var videoBytes = await client.GetByteArrayAsync(generatedVideo.VideoUrl);
-              await FileIO.WriteBytesAsync(file, videoBytes);
-              _toastService?.ShowToast(ToastType.Success, "Exported", $"Video saved to {file.Name}");
-            }
+            // Download from URL (Phase 4: use shared HttpClient)
+            var client = AppServices.GetService<System.Net.Http.HttpClient>()
+              ?? throw new InvalidOperationException("HttpClient not available");
+            var videoBytes = await client.GetByteArrayAsync(generatedVideo.VideoUrl);
+            await FileIO.WriteBytesAsync(file, videoBytes);
+            _toastService?.ShowToast(ToastType.Success, "Exported", $"Video saved to {file.Name}");
           }
           else
           {

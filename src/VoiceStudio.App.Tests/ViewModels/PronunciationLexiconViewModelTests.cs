@@ -3,8 +3,11 @@ using Moq;
 using System;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Threading;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -17,17 +20,24 @@ namespace VoiceStudio.App.Tests.ViewModels
     public class PronunciationLexiconViewModelTests : ViewModelTestBase
     {
         private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IProfilesClient>? _mockProfilesClient;
+        private IAudioPlayerService? _audioPlayerService;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
             _mockBackendClient = new Mock<IBackendClient>();
+            _mockProfilesClient = new Mock<IProfilesClient>();
+            _mockProfilesClient
+                .Setup(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<VoiceProfile>());
+            _audioPlayerService = new AudioPlayerService(new System.Net.Http.HttpClient());
         }
 
         private PronunciationLexiconViewModel CreateViewModel()
         {
-            return new PronunciationLexiconViewModel(MockContext!, _mockBackendClient!.Object);
+            return new PronunciationLexiconViewModel(MockContext!, _mockBackendClient!.Object, _mockProfilesClient!.Object, _audioPlayerService!);
         }
 
         #region Construction and Initialization Tests
@@ -49,14 +59,21 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new PronunciationLexiconViewModel(null!, _mockBackendClient!.Object));
+                new PronunciationLexiconViewModel(null!, _mockBackendClient!.Object, _mockProfilesClient!.Object, _audioPlayerService!));
         }
 
         [TestMethod]
         public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new PronunciationLexiconViewModel(MockContext!, null!));
+                new PronunciationLexiconViewModel(MockContext!, null!, _mockProfilesClient!.Object, _audioPlayerService!));
+        }
+
+        [TestMethod]
+        public void Constructor_WithNullProfilesClient_ThrowsArgumentNullException()
+        {
+            Assert.ThrowsException<ArgumentNullException>(() =>
+                new PronunciationLexiconViewModel(MockContext!, _mockBackendClient!.Object, null!, _audioPlayerService!));
         }
 
         [TestMethod]

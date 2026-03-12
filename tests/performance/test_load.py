@@ -211,7 +211,7 @@ class TestConcurrentSynthesis:
 class TestMemoryPressure:
     """Tests for memory pressure handling."""
 
-    @pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not installed")
+    @pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not installed (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
     def test_large_audio_processing(self, api_client):
         """Verify large audio processing doesn't cause memory issues."""
         process = psutil.Process()
@@ -237,7 +237,7 @@ class TestMemoryPressure:
             404,
         ], f"Excessive memory increase: {memory_increase:.0f}MB"
 
-    @pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not installed")
+    @pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not installed (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
     def test_batch_memory_management(self, api_client):
         """Verify batch processing manages memory properly."""
         process = psutil.Process()
@@ -511,7 +511,7 @@ class TestAPIThroughput:
 class TestResourceMonitoring:
     """Tests for resource monitoring during load."""
 
-    @pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not installed")
+    @pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not installed (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
     def test_cpu_usage_under_load(self, api_client):
         """Monitor CPU usage under load."""
         process = psutil.Process()
@@ -537,7 +537,7 @@ class TestResourceMonitoring:
         # CPU usage is informational
         print(f"\nCPU: Baseline={baseline_cpu:.1f}%, Under load={load_cpu:.1f}%")
 
-    @pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not installed")
+    @pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not installed (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
     def test_memory_stability_under_load(self, api_client):
         """Verify memory remains stable under load."""
         process = psutil.Process()

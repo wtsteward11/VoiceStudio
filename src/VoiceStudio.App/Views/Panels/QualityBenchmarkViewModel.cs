@@ -21,6 +21,7 @@ namespace VoiceStudio.App.Views.Panels
   public partial class QualityBenchmarkViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProfilesClient _profilesClient;
 
     public string PanelId => "quality_benchmark";
     public string DisplayName => ResourceHelper.GetString("Panel.QualityBenchmarking.DisplayName", "Quality Benchmarking");
@@ -78,10 +79,11 @@ namespace VoiceStudio.App.Views.Panels
 
     public IAsyncRelayCommand RunBenchmarkCommand { get; }
 
-    public QualityBenchmarkViewModel(IViewModelContext context, IBackendClient backendClient)
+    public QualityBenchmarkViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
       RunBenchmarkCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -100,7 +102,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var profileList = await _backendClient.GetProfilesAsync(cancellationToken);
+        var profileList = await _profilesClient.GetProfilesAsync(cancellationToken);
         Profiles.Clear();
         foreach (var profile in profileList)
         {

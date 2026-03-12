@@ -95,12 +95,14 @@ namespace VoiceStudio.App.Views.Panels
 
         /// <summary>
         /// Initializes a new instance of the <see cref="HealthCheckViewModel"/> class.
+        /// Phase 4: Uses shared HttpClient from AppServices.
         /// </summary>
         public HealthCheckViewModel()
         {
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            _httpClient = VoiceStudio.App.Services.AppServices.GetService<HttpClient>()
+                ?? throw new InvalidOperationException("HttpClient not available");
             _backendBaseUrl = Environment.GetEnvironmentVariable("VOICESTUDIO_BACKEND_URL")
-                ?? "http://localhost:8001";
+                ?? "http://localhost:8000";
 
             RefreshCommand = new AsyncRelayCommand(LoadHealthChecksAsync);
         }
@@ -126,31 +128,31 @@ namespace VoiceStudio.App.Views.Panels
                 await CheckEndpointAsync(
                     "Metrics Service",
                     "Prometheus-compatible metrics endpoint",
-                    $"{_backendBaseUrl}/metrics/health");
+                    $"{_backendBaseUrl}/api/metrics/health");
 
-                // Check WebSocket endpoint
+                // Check API Health (detailed)
                 await CheckEndpointAsync(
-                    "WebSocket Service",
-                    "Real-time event streaming",
-                    $"{_backendBaseUrl}/ws/health");
+                    "API Health",
+                    "Detailed API health with performance metrics",
+                    $"{_backendBaseUrl}/api/health");
 
                 // Check Engine Service
                 await CheckEndpointAsync(
                     "Engine Service",
                     "Voice synthesis engine orchestration",
-                    $"{_backendBaseUrl}/api/v1/engines/health");
+                    $"{_backendBaseUrl}/api/health/engines");
 
                 // Check SLO Monitor
                 await CheckEndpointAsync(
                     "SLO Monitor",
                     "Service level objective monitoring",
-                    $"{_backendBaseUrl}/api/v1/diagnostics/slo/health");
+                    $"{_backendBaseUrl}/api/slo/health");
 
-                // Check Trace Store
+                // Check Monitoring Service
                 await CheckEndpointAsync(
-                    "Trace Store",
-                    "Distributed tracing storage",
-                    $"{_backendBaseUrl}/api/v1/diagnostics/traces/health");
+                    "Monitoring Service",
+                    "Monitoring and diagnostics health",
+                    $"{_backendBaseUrl}/api/monitoring/health");
 
                 UpdateSummary();
                 LastCheckTimeText = $"Last updated: {DateTime.Now:HH:mm:ss}";

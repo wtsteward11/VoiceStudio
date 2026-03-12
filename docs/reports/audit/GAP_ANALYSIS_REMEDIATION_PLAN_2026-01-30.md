@@ -208,13 +208,13 @@ ViewModel = new ProfilesViewModel(
 
 | ID | Gap | Remediation | Effort |
 |----|-----|-------------|--------|
-| GAP-007 | FastAPI in services layer | Move HTTPException to routes | 2h |
-| GAP-008 | Routes import engine utilities | Move to service layer | 4h |
-| GAP-009 | Direct WebSocket client instantiation | Inject via DI | 2h |
-| GAP-010 | Unified Error Envelope not standardized | Create ErrorEnvelope class | 4h |
-| GAP-011 | HasError not in BaseViewModel | Add computed property | 1h |
-| GAP-012 | Short-term memory not implemented | Add sliding window | 4h |
-| GAP-013 | WebSocket Topics not documented | Create reference doc | 2h |
+| GAP-007 | FastAPI in services layer | Move HTTPException to routes | 2h | ✅ COMPLETE (ServiceError + PreflightError; service_error_handler; synthesis_service, transcription_service, voice_helpers no longer import FastAPI) |
+| GAP-008 | Routes import engine utilities | Move to service layer | 4h | ✅ COMPLETE (2026-03-10) — circuit_breaker_facade.py; PathService for get_models_path; rvc, health, voice, video_gen, image_gen, settings updated |
+| GAP-009 | Direct WebSocket client instantiation | Inject via DI | 2h | ✅ COMPLETE (PipelineConversationView, RealTimeVoiceConverterView pass IWebSocketClientFactory from AppServices; ViewModels use factory when provided) |
+| GAP-010 | Unified Error Envelope not standardized | Create ErrorEnvelope class | 4h | ✅ COMPLETE (ErrorDetail + severity + recovery_suggestion; shared/schemas/error-envelope.schema.json; ERROR_HANDLING_GUIDE updated) |
+| GAP-011 | HasError not in BaseViewModel | Add computed property | 1h | ✅ COMPLETE (BaseViewModel has HasError; ABTestingViewModel/EmbeddingExplorerViewModel refactored to use base) |
+| GAP-012 | Short-term memory not implemented | Add sliding window | 4h | ✅ COMPLETE (2026-03-10) — ContextAllocator memory keeps most recent items; test_context_allocator sliding window test |
+| GAP-013 | WebSocket Topics not documented | Create reference doc | 2h | ✅ COMPLETE (2026-03-06) — docs/REFERENCE/WEBSOCKET_TOPICS_REFERENCE.md; WEBSOCKET_GUIDE.md updated |
 
 ---
 
@@ -223,7 +223,7 @@ ViewModel = new ProfilesViewModel(
 | ID | Gap | Remediation | Effort |
 |----|-----|-------------|--------|
 | GAP-014 | UI Virtualization not universal | Audit ListView controls | 4h |
-| GAP-015 | Command Palette docs incomplete | Complete documentation | 2h |
+| GAP-015 | Command Palette docs incomplete | Complete documentation | 2h | ✅ COMPLETE (2026-03-10) — COMMAND_PALETTE_GUIDE.md aligned with IUnifiedCommandRegistry, CommandPaletteService, Ctrl+P |
 | GAP-016 | Contract validation not enforced | Add schema validation | 8h |
 | GAP-017 | Import linting rules not configured | Add pre-commit hooks | 2h |
 

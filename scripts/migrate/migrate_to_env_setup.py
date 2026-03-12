@@ -8,8 +8,8 @@ TD-019: Python Path Standardization Migration Script.
 Migrates scripts to use _env_setup.py for standardized path setup.
 
 Usage:
-    python scripts/migrate_to_env_setup.py         # Dry run
-    python scripts/migrate_to_env_setup.py --fix   # Apply fixes
+    python scripts/migrate/migrate_to_env_setup.py         # Dry run
+    python scripts/migrate/migrate_to_env_setup.py --fix   # Apply fixes
 """
 
 import re

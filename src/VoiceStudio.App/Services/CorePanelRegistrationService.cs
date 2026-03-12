@@ -367,6 +367,7 @@ namespace VoiceStudio.App.Services
         Keywords = new[] { "dataset", "QA", "quality", "review" }
       });
 
+      // F-10: Hidden - /api/script-editor is archived
       RegisterIfNotExists(registry, new PanelDescriptor
       {
         PanelId = "ScriptEditor",
@@ -376,7 +377,8 @@ namespace VoiceStudio.App.Services
         ViewModelType = typeof(ScriptEditorViewModel),
         MenuCategory = "Editing",
         Maturity = PanelMaturity.Stable,
-        Keywords = new[] { "script", "editor", "text", "dialogue" }
+        Keywords = new[] { "script", "editor", "text", "dialogue" },
+        IsVisible = false
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
@@ -453,7 +455,7 @@ namespace VoiceStudio.App.Services
         Keywords = new[] { "GPU", "CUDA", "hardware", "status" }
       });
 
-      // Todo panel
+      // F-10: Hidden - /api/todo-panel is archived
       RegisterIfNotExists(registry, new PanelDescriptor
       {
         PanelId = "TodoPanel",
@@ -463,7 +465,36 @@ namespace VoiceStudio.App.Services
         ViewModelType = typeof(TodoPanelViewModel),
         MenuCategory = "System",
         Maturity = PanelMaturity.Stable,
-        Keywords = new[] { "todo", "tasks", "notes", "checklist" }
+        Keywords = new[] { "todo", "tasks", "notes", "checklist" },
+        IsVisible = false
+      });
+
+      // F-10: Hidden - /api/text-highlighting is archived
+      RegisterIfNotExists(registry, new PanelDescriptor
+      {
+        PanelId = "TextHighlighting",
+        DisplayName = "Text Highlighting",
+        Region = PanelRegion.Center,
+        ViewType = typeof(TextHighlightingView),
+        ViewModelType = typeof(TextHighlightingViewModel),
+        MenuCategory = "Editing",
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "text", "highlight", "audio", "sync" },
+        IsVisible = false
+      });
+
+      // F-10: Hidden - /api/ultimate-dashboard is archived
+      RegisterIfNotExists(registry, new PanelDescriptor
+      {
+        PanelId = "UltimateDashboard",
+        DisplayName = "Ultimate Dashboard",
+        Region = PanelRegion.Center,
+        ViewType = typeof(UltimateDashboardView),
+        ViewModelType = typeof(UltimateDashboardViewModel),
+        MenuCategory = "System",
+        Maturity = PanelMaturity.Experimental,
+        Keywords = new[] { "dashboard", "overview", "summary" },
+        IsVisible = false
       });
     }
 

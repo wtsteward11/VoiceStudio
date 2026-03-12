@@ -113,6 +113,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Service Level Objectives | `docs/governance/SERVICE_LEVEL_OBJECTIVES.md` | 2026-01-25 | SLOs and telemetry-to-backlog integration |
 | Architecture Integration Phase 4 Backlog | `docs/design/ARCHITECTURE_INTEGRATION_BACKLOG.md` | 2026-01-28 | R10/R11 done; R12 (skills-as-MCP) backlog |
 | **Plugin Phase 3 Remediation Plan** | `docs/design/PLUGIN_PHASE3_REMEDIATION_PLAN.md` | 2026-02-16 | Findings and sprint plan from Phase 3 architectural review |
+| **Timeline Hardening and Next Tasks Plan** | `docs/design/TIMELINE_HARDENING_AND_NEXT_TASKS_PLAN_2026-03-11.md` | 2026-03-11 | Ruthless assessment; verification of 9.4/11.1; Task 10.1 partial status; next 8 tasks in order (Timeline 1A–1C, dialog baseline, audit, proof, mypy, workflow, skip-debt) |
 | **Cross-Role Escalation Matrix** | `docs/governance/CROSS_ROLE_ESCALATION_MATRIX.md` | 2026-01-29 | Decision tree and routing table for cross-role escalation; when to use Debug Agent vs other roles |
 | **Handoff Protocol** | `docs/governance/HANDOFF_PROTOCOL.md` | 2026-01-29 | Standardized protocol for issue escalation and cross-role handoffs; templates and examples |
 
@@ -193,6 +194,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Scaffolding Tools** | `tools/scaffolds/` | 2026-02-02 | CLI scaffolds: `generate_panel.py`, `generate_route.py`, `generate_engine.py` |
 | **XAML Change Protocol** | `docs/developer/XAML_CHANGE_PROTOCOL.md` | 2026-02-04 | Mandatory procedures for XAML changes; forbidden patterns, binlog analysis workflow, Views subfolder protection |
 | **UI Hardening Guidelines** | `docs/developer/UI_HARDENING_GUIDELINES.md` | 2026-02-04 | XAML stability best practices; UserControl extraction, ResourceDictionary organization, binding anti-patterns |
+| **Panel Hardening Pattern** | `docs/developer/PANEL_HARDENING_PATTERN.md` | 2026-03-11 | Request coordination, dialog handling, selection-change cancellation, cache invalidation; Profiles reference implementation |
 | **Phase 6 Developer Guide** | `docs/developer/PHASE6_DEVELOPER_GUIDE.md` | 2026-02-18 | Wasm plugins, AI quality, compliance, ecosystem, incubator features |
 | **Plugin Privacy Guide** | `docs/developer/PLUGIN_PRIVACY_GUIDE.md` | 2026-02-18 | GDPR-inspired privacy framework; data categories, consent management, user rights |
 | **Error Handling Guide** | `docs/developer/ERROR_HANDLING_GUIDE.md` | 2026-03-10 | Unified error envelope, error codes, severity levels, propagation patterns; schema: `shared/schemas/error-envelope.schema.json` (GAP-010 complete) |
@@ -267,6 +269,9 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Deterministic Sentinel Implementation Plan** | `docs/design/DETERMINISTIC_SENTINEL_IMPLEMENTATION_PLAN.md` | 2026-02-13 | 6-phase implementation plan for sentinel workflow, API hardening, UI automation, security/stability, architecture foundations, scalability |
 | **Phase F Anti-Theater Hardening Plan** | `docs/design/PHASE_F_ANTI_THEATER_HARDENING_PLAN.md` | 2026-03-04 | Sprint plan: Gate C nav_steps, stub/real proof non-fakeability, STATE canonical, god-object budgets, schema/fingerprint alignment |
 | **Dialog Architecture Bulletproof Plan** | `docs/design/DIALOG_ARCHITECTURE_BULLETPROOF_PLAN.md` | 2026-03-10 | Centralize ContentDialog/XamlRoot; IProfileDialogService, IXamlRootProvider; CI guard; Profiles-first template |
+| **Skip Debt Cleanup Subplan** | `docs/design/SKIP_DEBT_CLEANUP_SUBPLAN.md` | 2026-03-11 | v1.2 executable subplan; scope, sequence, burn-down 312→200, policy |
+| **Workflow Consolidation Subplan** | `docs/design/WORKFLOW_CONSOLIDATION_SUBPLAN.md` | 2026-03-11 | v1.2 executable subplan; Build/CI/Tests/Sentinel duplication, blast-radius |
+| **Strict Mypy Burn-Down Subplan** | `docs/design/STRICT_MYPY_BURNDOWN_SUBPLAN.md` | 2026-03-11 | v1.2 advisory subplan; routes + services, incremental strict mypy |
 
 ## Security
 

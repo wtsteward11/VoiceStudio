@@ -1,4 +1,5 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,7 +10,9 @@ using System.Threading.Tasks;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.UIA3;
+using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests;
+using VoiceStudio.Core.Models;
 
 namespace VoiceStudio.App.Tests.UI
 {
@@ -550,6 +553,51 @@ namespace VoiceStudio.App.Tests.UI
     /// Gets the list of all registered panel names.
     /// </summary>
     protected static IEnumerable<string> GetAllPanelNames() => PanelAutomationIds.Keys;
+
+    /// <summary>
+    /// Creates a mock IProfileQualityInsightsService for unit tests.
+    /// </summary>
+    protected static IProfileQualityInsightsService CreateMockProfileQualityInsightsService()
+    {
+      var mock = new Mock<IProfileQualityInsightsService>();
+      mock.Setup(x => x.LoadQualityHistoryAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<VoiceStudio.Core.Models.QualityHistoryEntry>());
+      mock.Setup(x => x.LoadQualityTrendsAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new VoiceStudio.Core.Models.QualityTrends());
+      mock.Setup(x => x.LoadQualityBaselineAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync((VoiceStudio.Core.Models.QualityBaseline?)null);
+      mock.Setup(x => x.GetQualityDegradationAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync((VoiceStudio.Core.Models.QualityDegradationResponse?)null);
+      return mock.Object;
+    }
+
+    /// <summary>
+    /// Creates a mock IProfileTransferService for unit tests.
+    /// </summary>
+    protected static IProfileTransferService CreateMockProfileTransferService()
+    {
+      var mock = new Mock<IProfileTransferService>();
+      mock.Setup(x => x.ParseImports(It.IsAny<string>()))
+        .Returns((new List<ProfileImportData>(), (string?)null));
+      mock.Setup(x => x.CreateProfilesFromImportDataAsync(It.IsAny<IReadOnlyList<ProfileImportData>>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<VoiceProfile>());
+      mock.Setup(x => x.BuildExportJson(It.IsAny<IEnumerable<VoiceProfile>>()))
+        .Returns("{}");
+      mock.Setup(x => x.SanitizeFilename(It.IsAny<string?>()))
+        .Returns((string? v) => string.IsNullOrWhiteSpace(v) ? "profile_export" : v);
+      return mock.Object;
+    }
+
+    /// <summary>
+    /// Creates a mock IProfileEnhancementService for unit tests.
+    /// </summary>
+    protected static IProfileEnhancementService CreateMockProfileEnhancementService()
+    {
+      var mock = new Mock<IProfileEnhancementService>();
+      mock.Setup(x => x.EnhanceAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<double>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync((VoiceStudio.Core.Models.ReferenceAudioPreprocessResponse?)null);
+      return mock.Object;
+    }
 
     /// <summary>
     /// Clears all simulated panel states.

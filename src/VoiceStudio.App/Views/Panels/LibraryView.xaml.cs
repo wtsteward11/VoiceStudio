@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using VoiceStudio.App.Services;
+using MultiSelectSelectionChangedEventArgs = VoiceStudio.App.Services.SelectionChangedEventArgs;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Panels;
@@ -13,6 +14,8 @@ using Windows.System;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
 using System;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -33,13 +36,20 @@ namespace VoiceStudio.App.Views.Panels
     private ToastNotificationService? _toastService;
     private UndoRedoService? _undoRedoService;
     private INavigationService? _navigationService;
+    private MultiSelectService? _multiSelectService;
 
     public LibraryView()
     {
       this.InitializeComponent();
       ViewModel = new LibraryViewModel(
           AppServices.GetRequiredService<IViewModelContext>(),
-          ServiceProvider.GetBackendClient()
+          ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<IDialogService>(),
+          triggerImport: () =>
+          {
+            if (App.MainWindowInstance is MainWindow mainWindow)
+              mainWindow.ImportAudioFile();
+          }
       );
       DataContext = ViewModel;
 
@@ -51,15 +61,11 @@ namespace VoiceStudio.App.Views.Panels
       _undoRedoService = ServiceProvider.GetUndoRedoService();
       _navigationService = ServiceProvider.TryGetNavigationService();
 
-      // Subscribe to selection changes to update UI
-      var multiSelectService = ServiceProvider.GetMultiSelectService();
-      multiSelectService.SelectionChanged += (_, e) =>
-      {
-        if (e.PanelId == ViewModel.PanelId)
-        {
-          UpdateAssetSelectionVisuals();
-        }
-      };
+      // Subscribe to selection changes to update UI (Phase 3: store ref for disposal)
+      _multiSelectService = ServiceProvider.GetMultiSelectService();
+      _multiSelectService.SelectionChanged += OnMultiSelectSelectionChanged;
+
+      this.Unloaded += LibraryView_Unloaded;
 
       // Handle keyboard shortcuts
       this.KeyDown += LibraryView_KeyDown;
@@ -76,15 +82,123 @@ namespace VoiceStudio.App.Views.Panels
         }
       });
 
-      // Update visuals when assets change
-      ViewModel.PropertyChanged += (_, e) =>
+      // Update visuals when assets change (Phase 3: named handlers for disposal)
+      ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+      ViewModel.Assets.CollectionChanged += OnAssetsCollectionChanged;
+      Loaded += (_, __) =>
       {
-        if (e.PropertyName == nameof(LibraryViewModel.Assets) ||
-                  e.PropertyName == nameof(LibraryViewModel.SelectedAssetCount))
-        {
-          UpdateAssetSelectionVisuals();
-        }
+        EnsureLibraryOverlayControls();
+        UpdateLibraryOverlays();
       };
+    }
+
+    private Controls.EmptyState? _libraryEmptyState;
+    private ProgressRing? _libraryLoadingRing;
+
+    private void EnsureLibraryOverlayControls()
+    {
+      if (LibraryEmptyStateOverlay == null)
+        return;
+      if (_libraryEmptyState == null)
+      {
+        LibraryEmptyStateOverlay.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["VSQ.Panel.Background"];
+        _libraryEmptyState = new Controls.EmptyState
+        {
+          Icon = "\uE8D6",
+          Title = ViewModel.EmptyStateTitle,
+          Message = ViewModel.EmptyStateMessage,
+          ActionText = ViewModel.EmptyStateActionText,
+          ActionCommand = ViewModel.ImportFromEmptyStateCommand
+        };
+        LibraryEmptyStateOverlay.Children.Clear();
+        LibraryEmptyStateOverlay.Children.Add(_libraryEmptyState);
+      }
+      if (LibraryLoadingOverlay != null && LibraryLoadingOverlay.Children.Count == 0)
+      {
+        LibraryLoadingOverlay.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["VSQ.Loading.BackgroundBrush"];
+        var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Spacing = 12 };
+        _libraryLoadingRing = new ProgressRing
+        {
+          Width = 40,
+          Height = 40,
+          Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["VSQ.Loading.ForegroundBrush"]
+        };
+        var text = new TextBlock
+        {
+          Text = "Loading library...",
+          Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["VSQ.Loading.TextBrush"],
+          FontSize = (double)Application.Current.Resources["VSQ.FontSize.Body"]
+        };
+        stack.Children.Add(_libraryLoadingRing);
+        stack.Children.Add(text);
+        LibraryLoadingOverlay.Children.Add(stack);
+      }
+    }
+
+    private void OnMultiSelectSelectionChanged(object? sender, MultiSelectSelectionChangedEventArgs e)
+    {
+      if (e.PanelId == ViewModel.PanelId)
+      {
+        UpdateAssetSelectionVisuals();
+      }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+      if (e.PropertyName == nameof(LibraryViewModel.Assets) ||
+          e.PropertyName == nameof(LibraryViewModel.SelectedAssetCount))
+      {
+        UpdateAssetSelectionVisuals();
+      }
+      if (e.PropertyName is nameof(LibraryViewModel.IsLoading) or nameof(LibraryViewModel.ErrorMessage))
+      {
+        UpdateLibraryOverlays();
+      }
+    }
+
+    private void OnAssetsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+      UpdateLibraryOverlays();
+    }
+
+    private void LibraryView_Unloaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+      this.Unloaded -= LibraryView_Unloaded;
+      if (_multiSelectService != null)
+      {
+        _multiSelectService.SelectionChanged -= OnMultiSelectSelectionChanged;
+        _multiSelectService = null;
+      }
+      if (ViewModel != null)
+      {
+        ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        ViewModel.Assets.CollectionChanged -= OnAssetsCollectionChanged;
+      }
+    }
+
+    private void UpdateLibraryOverlays()
+    {
+      if (LibraryEmptyStateOverlay == null)
+        return;
+      EnsureLibraryOverlayControls();
+      LibraryEmptyStateOverlay.Visibility = ViewModel.ShowEmptyState ? Visibility.Visible : Visibility.Collapsed;
+      if (_libraryEmptyState != null)
+      {
+        _libraryEmptyState.Title = ViewModel.EmptyStateTitle;
+        _libraryEmptyState.Message = ViewModel.EmptyStateMessage;
+        _libraryEmptyState.ActionText = ViewModel.EmptyStateActionText;
+      }
+      if (LibraryLoadingOverlay != null)
+      {
+        LibraryLoadingOverlay.Visibility = ViewModel.IsLoading ? Visibility.Visible : Visibility.Collapsed;
+        if (_libraryLoadingRing != null)
+          _libraryLoadingRing.IsActive = ViewModel.IsLoading;
+      }
+      if (LibraryErrorInfoBar != null)
+      {
+        LibraryErrorInfoBar.IsOpen = !string.IsNullOrEmpty(ViewModel.ErrorMessage);
+        LibraryErrorInfoBar.Message = ViewModel.ErrorMessage ?? "An error occurred";
+      }
     }
 
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)

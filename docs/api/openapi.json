@@ -3,7 +3,7 @@
   "info": {
     "title": "VoiceStudio Quantum+ Backend API",
     "description": "\n    VoiceStudio Quantum+ provides a comprehensive REST API for voice cloning, audio processing, and project management.\n\n    ## Features\n\n    - **Voice Cloning:** Multiple engines (XTTS v2, Chatterbox TTS, Tortoise TTS, OpenVoice, RVC, and more)\n    - **Audio Processing:** 17+ audio effects and processing tools\n    - **Project Management:** Projects, tracks, clips, and timeline management\n    - **Quality Metrics:** MOS score, similarity, naturalness, SNR, artifact detection\n    - **Training:** Custom voice model training with data optimization\n    - **Batch Processing:** Queue-based batch synthesis\n    - **Transcription:** Whisper-based speech-to-text\n    - **Real-time Updates:** WebSocket support for real-time updates\n\n    ## Error Handling\n\n    All errors follow a standardized format with error codes, recovery suggestions, and context.\n    See the error handling documentation for details.\n\n    ## Rate Limiting\n\n    API endpoints are rate-limited to ensure fair usage and system stability.\n    Rate limit information is provided in response headers.\n    See the rate limiting documentation for details.\n    ",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -1757,7 +1757,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/StylePreset"
+                    "$ref": "#/components/schemas/backend__api__routes__style_transfer__StylePreset"
                   },
                   "title": "Response List Style Presets Api Style Transfer Presets Get"
                 }
@@ -1840,7 +1840,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StylePreset"
+                  "$ref": "#/components/schemas/backend__api__routes__style_transfer__StylePreset"
                 }
               }
             }
@@ -5988,7 +5988,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/backend__api__routes__projects__ProjectCreateRequest"
+                "$ref": "#/components/schemas/ProjectCreateRequest"
               }
             }
           },
@@ -6841,6 +6841,47 @@
         }
       }
     },
+    "/api/audio/file/{audio_id}": {
+      "get": {
+        "tags": [
+          "audio"
+        ],
+        "summary": "Get Audio File",
+        "description": "Stream an audio file by ID (uploaded, synthesized, or project audio).",
+        "operationId": "get_audio_file_api_audio_file__audio_id__get",
+        "parameters": [
+          {
+            "name": "audio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Audio Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audio/waveform": {
       "get": {
         "tags": [
@@ -6961,7 +7002,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__audio__SpectrogramData"
+                  "$ref": "#/components/schemas/SpectrogramData"
                 }
               }
             }
@@ -7984,7 +8025,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/backend__api__routes__macros__AutomationCurveCreateRequest"
+                "$ref": "#/components/schemas/AutomationCurveCreateRequest"
               }
             }
           }
@@ -8037,7 +8078,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/backend__api__routes__macros__AutomationCurveUpdateRequest"
+                "$ref": "#/components/schemas/AutomationCurveUpdateRequest"
               }
             }
           }
@@ -8170,7 +8211,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/backend__api__routes__macros__AutomationCurveCreateRequest"
+                "$ref": "#/components/schemas/AutomationCurveCreateRequest"
               }
             }
           },
@@ -8224,7 +8265,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/backend__api__routes__macros__AutomationCurveUpdateRequest"
+                "$ref": "#/components/schemas/AutomationCurveUpdateRequest"
               }
             }
           }
@@ -10271,6 +10312,225 @@
         }
       }
     },
+    "/api/consent/voice/{voice_id}": {
+      "get": {
+        "tags": [
+          "consent"
+        ],
+        "summary": "List Consents For Voice",
+        "description": "List all consent records for a voice.",
+        "operationId": "list_consents_for_voice_api_consent_voice__voice_id__get",
+        "parameters": [
+          {
+            "name": "voice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Voice Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VoiceConsentRecord"
+                  },
+                  "title": "Response List Consents For Voice Api Consent Voice  Voice Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/consent/request": {
+      "post": {
+        "tags": [
+          "consent"
+        ],
+        "summary": "Request Consent",
+        "description": "Create a consent request (pending until granted).",
+        "operationId": "request_consent_api_consent_request_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceConsentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceConsentRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/consent/grant/{consent_id}": {
+      "post": {
+        "tags": [
+          "consent"
+        ],
+        "summary": "Grant Consent",
+        "description": "Grant a pending consent.",
+        "operationId": "grant_consent_api_consent_grant__consent_id__post",
+        "parameters": [
+          {
+            "name": "consent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Consent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceConsentRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/consent/revoke": {
+      "post": {
+        "tags": [
+          "consent"
+        ],
+        "summary": "Revoke Consent",
+        "description": "Revoke a granted consent.",
+        "operationId": "revoke_consent_api_consent_revoke_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceConsentRevoke"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Revoke Consent Api Consent Revoke Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/consent/{consent_id}": {
+      "get": {
+        "tags": [
+          "consent"
+        ],
+        "summary": "Get Consent",
+        "description": "Get a consent record by ID.",
+        "operationId": "get_consent_api_consent__consent_id__get",
+        "parameters": [
+          {
+            "name": "consent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Consent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceConsentRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/transcribe/languages": {
       "get": {
         "tags": [
@@ -10367,7 +10627,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TranscriptionResponse"
+                  "$ref": "#/components/schemas/backend__api__routes__transcribe__TranscriptionResponse"
                 }
               }
             }
@@ -10437,7 +10697,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/TranscriptionResponse"
+                    "$ref": "#/components/schemas/backend__api__routes__transcribe__TranscriptionResponse"
                   },
                   "title": "Response List Transcriptions Api Transcribe  Get"
                 }
@@ -10482,7 +10742,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TranscriptionResponse"
+                  "$ref": "#/components/schemas/backend__api__routes__transcribe__TranscriptionResponse"
                 }
               }
             }
@@ -10533,7 +10793,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TranscriptionResponse"
+                  "$ref": "#/components/schemas/backend__api__routes__transcribe__TranscriptionResponse"
                 }
               }
             }
@@ -14057,7 +14317,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__tracing__ExportResponse"
+                  "$ref": "#/components/schemas/ExportResponse"
                 }
               }
             }
@@ -15112,7 +15372,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExportResponse"
+                  "$ref": "#/components/schemas/backend__api__routes__errors__ExportResponse"
                 }
               }
             }
@@ -24793,7 +25053,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AutomationCurveCreateRequest"
+                "$ref": "#/components/schemas/backend__api__routes__automation__AutomationCurveCreateRequest"
               }
             }
           }
@@ -24907,7 +25167,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AutomationCurveUpdateRequest"
+                "$ref": "#/components/schemas/backend__api__routes__automation__AutomationCurveUpdateRequest"
               }
             }
           }
@@ -24999,7 +25259,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/backend__api__routes__automation__AutomationPoint"
+                "$ref": "#/components/schemas/AutomationPoint"
               }
             }
           }
@@ -29458,6 +29718,527 @@
         }
       }
     },
+    "/api/experiments": {
+      "post": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Create Experiment",
+        "description": "Create a new A/B test experiment.\n\nThe experiment starts in DRAFT status and must be explicitly started.",
+        "operationId": "create_experiment_api_experiments_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExperimentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "List Experiments",
+        "description": "List all experiments, optionally filtered by status or tag.",
+        "operationId": "list_experiments_api_experiments_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by status",
+              "title": "Status"
+            },
+            "description": "Filter by status"
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by tag",
+              "title": "Tag"
+            },
+            "description": "Filter by tag"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experiments/{experiment_id}": {
+      "get": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Get Experiment",
+        "description": "Get a specific experiment by ID.",
+        "operationId": "get_experiment_api_experiments__experiment_id__get",
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Update Experiment",
+        "description": "Update an existing experiment.\n\nOnly DRAFT experiments can have their variants modified.\nRUNNING experiments can only have metadata updated.",
+        "operationId": "update_experiment_api_experiments__experiment_id__put",
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateExperimentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Delete Experiment",
+        "description": "Delete an experiment.\n\nOnly DRAFT, COMPLETED, or ARCHIVED experiments can be deleted.",
+        "operationId": "delete_experiment_api_experiments__experiment_id__delete",
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experiments/{experiment_id}/start": {
+      "post": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Start Experiment",
+        "description": "Start an experiment (change status from DRAFT to RUNNING).",
+        "operationId": "start_experiment_api_experiments__experiment_id__start_post",
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experiments/{experiment_id}/pause": {
+      "post": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Pause Experiment",
+        "description": "Pause a running experiment.",
+        "operationId": "pause_experiment_api_experiments__experiment_id__pause_post",
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experiments/{experiment_id}/resume": {
+      "post": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Resume Experiment",
+        "description": "Resume a paused experiment.",
+        "operationId": "resume_experiment_api_experiments__experiment_id__resume_post",
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experiments/{experiment_id}/complete": {
+      "post": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Complete Experiment",
+        "description": "Mark an experiment as completed.",
+        "operationId": "complete_experiment_api_experiments__experiment_id__complete_post",
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experiments/{experiment_id}/stats": {
+      "get": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Get Experiment Stats",
+        "description": "Get statistics for an experiment.",
+        "operationId": "get_experiment_stats_api_experiments__experiment_id__stats_get",
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentStatsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experiments/{experiment_id}/events": {
+      "get": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Get Experiment Events",
+        "description": "Get events for an experiment.",
+        "operationId": "get_experiment_events_api_experiments__experiment_id__events_get",
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by event type",
+              "title": "Event Type"
+            },
+            "description": "Filter by event type"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/search": {
       "get": {
         "tags": [
@@ -30452,7 +31233,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SpectrogramData"
+                  "$ref": "#/components/schemas/backend__api__routes__spectrogram__SpectrogramData"
                 }
               }
             }
@@ -30901,7 +31682,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/backend__api__routes__emotion_style__StylePreset"
+                    "$ref": "#/components/schemas/StylePreset"
                   },
                   "type": "array",
                   "title": "Response Get Style Presets Api Emotion Style Styles Get"
@@ -31914,6 +32695,132 @@
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telemetry/metrics": {
+      "get": {
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "Get Metrics",
+        "description": "Get current telemetry metrics.\n\nReturns aggregated metrics from the TelemetryService including:\n- Request counts and latencies\n- Engine operation metrics\n- Custom application metrics",
+        "operationId": "get_metrics_api_telemetry_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telemetry/slos": {
+      "get": {
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "Get Slos",
+        "description": "Get current SLO status.\n\nReturns status of all defined Service Level Objectives including:\n- Voice synthesis latency (p95 < 2s)\n- Transcription accuracy (> 95%)\n- API availability (> 99.5%)",
+        "operationId": "get_slos_api_telemetry_slos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SLOResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telemetry/spans": {
+      "get": {
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "Get Recent Spans",
+        "description": "Get recent trace spans.\n\nReturns the most recent spans for debugging and analysis.",
+        "operationId": "get_recent_spans_api_telemetry_spans_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "operation",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by operation name",
+              "title": "Operation"
+            },
+            "description": "Filter by operation name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telemetry/reset": {
+      "post": {
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "Reset Metrics",
+        "description": "Reset telemetry metrics.\n\nClears all accumulated metrics. Useful for testing or after deployments.",
+        "operationId": "reset_metrics_api_telemetry_reset_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           }
@@ -32994,7 +33901,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProjectCreateRequest"
+                "$ref": "#/components/schemas/backend__api__routes__translation__ProjectCreateRequest"
               }
             }
           },
@@ -33059,7 +33966,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__translation__TranscriptionResponse"
+                  "$ref": "#/components/schemas/TranscriptionResponse"
                 }
               }
             }
@@ -33831,7 +34738,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EnhanceRequest"
+                "$ref": "#/components/schemas/backend__api__routes__ai_enhancement__EnhanceRequest"
               }
             }
           },
@@ -33843,7 +34750,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnhanceResponse"
+                  "$ref": "#/components/schemas/backend__api__routes__ai_enhancement__EnhanceResponse"
                 }
               }
             }
@@ -37533,7 +38440,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/backend__api__routes__video_enhance__EnhanceRequest"
+                "$ref": "#/components/schemas/EnhanceRequest"
               }
             }
           },
@@ -37545,7 +38452,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__video_enhance__EnhanceResponse"
+                  "$ref": "#/components/schemas/EnhanceResponse"
                 }
               }
             }
@@ -42471,7 +43378,7 @@
             "$ref": "#/components/schemas/SpectralAnalysis"
           },
           "temporal": {
-            "$ref": "#/components/schemas/TemporalAnalysis"
+            "$ref": "#/components/schemas/backend__api__routes__audio_analysis__TemporalAnalysis"
           },
           "perceptual": {
             "$ref": "#/components/schemas/PerceptualAnalysis"
@@ -43053,7 +43960,7 @@
           },
           "points": {
             "items": {
-              "$ref": "#/components/schemas/backend__api__routes__automation__AutomationPoint"
+              "$ref": "#/components/schemas/AutomationPoint"
             },
             "type": "array",
             "title": "Points",
@@ -43099,6 +44006,20 @@
             "type": "string",
             "title": "Track Id"
           },
+          "points": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/backend__api__routes__macros__AutomationPoint"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Points"
+          },
           "interpolation": {
             "type": "string",
             "title": "Interpolation",
@@ -43111,8 +44032,7 @@
           "parameter_id",
           "track_id"
         ],
-        "title": "AutomationCurveCreateRequest",
-        "description": "Request to create an automation curve."
+        "title": "AutomationCurveCreateRequest"
       },
       "AutomationCurveUpdateRequest": {
         "properties": {
@@ -43127,11 +44047,22 @@
             ],
             "title": "Name"
           },
+          "parameter_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter Id"
+          },
           "points": {
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/backend__api__routes__automation__AutomationPoint"
+                  "$ref": "#/components/schemas/backend__api__routes__macros__AutomationPoint"
                 },
                 "type": "array"
               },
@@ -43154,8 +44085,7 @@
           }
         },
         "type": "object",
-        "title": "AutomationCurveUpdateRequest",
-        "description": "Request to update an automation curve."
+        "title": "AutomationCurveUpdateRequest"
       },
       "AutomationPoint": {
         "properties": {
@@ -43217,7 +44147,8 @@
           "time",
           "value"
         ],
-        "title": "AutomationPoint"
+        "title": "AutomationPoint",
+        "description": "A point on an automation curve."
       },
       "BackendSettings": {
         "properties": {
@@ -45307,6 +46238,66 @@
         ],
         "title": "ConverterStartResponse",
         "description": "Response from starting a converter session."
+      },
+      "CreateExperimentRequest": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique experiment identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Experiment display name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Experiment description",
+            "default": ""
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/VariantRequest"
+            },
+            "type": "array",
+            "minItems": 2,
+            "title": "Variants",
+            "description": "At least 2 variants required"
+          },
+          "metrics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Metrics",
+            "description": "Metrics to track"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Experiment tags"
+          },
+          "target_sample_size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Target Sample Size",
+            "description": "Target sample size (0 = unlimited)",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "variants"
+        ],
+        "title": "CreateExperimentRequest",
+        "description": "Request model for creating a new experiment."
       },
       "CreateModelExperimentRequest": {
         "properties": {
@@ -48192,89 +49183,88 @@
         "properties": {
           "id": {
             "type": "string",
-            "title": "Id"
+            "title": "Id",
+            "description": "Engine identifier"
           },
           "name": {
             "type": "string",
-            "title": "Name"
-          },
-          "version": {
-            "type": "string",
-            "title": "Version"
+            "title": "Name",
+            "description": "Display name"
           },
           "type": {
             "type": "string",
-            "title": "Type"
+            "title": "Type",
+            "description": "Engine type (e.g., tts, vc, stt)",
+            "default": "tts"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Engine version"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Engine description"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "Whether engine is available",
+            "default": true
           },
           "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "capabilities": {
-            "items": {
-              "$ref": "#/components/schemas/EngineCapability"
-            },
-            "type": "array",
-            "title": "Capabilities",
-            "default": []
-          },
-          "memory_usage_mb": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Memory Usage Mb"
+            "title": "Status",
+            "description": "Current status"
           },
-          "gpu_usage_percent": {
+          "support_tier": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Gpu Usage Percent"
+            "title": "Support Tier",
+            "description": "Support tier: tier1_supported (wedge), tier2_best_effort, experimental"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "name",
-          "version",
-          "type",
-          "status"
+          "name"
         ],
         "title": "EngineInfo",
-        "description": "Engine information response.",
-        "example": {
-          "capabilities": [
-            {
-              "feature": "text_to_speech",
-              "supported": true
-            },
-            {
-              "feature": "voice_cloning",
-              "supported": true
-            }
-          ],
-          "id": "xtts_v2",
-          "memory_usage_mb": 2048.5,
-          "name": "XTTS v2",
-          "status": "ready",
-          "type": "synthesis",
-          "version": "2.0.0"
-        }
+        "description": "Information about a single engine."
       },
       "EngineListResponse": {
         "properties": {
           "engines": {
             "items": {
-              "$ref": "#/components/schemas/backend__api__routes__engines__EngineInfo"
+              "$ref": "#/components/schemas/EngineInfo"
             },
             "type": "array",
             "title": "Engines",
@@ -48793,26 +49783,25 @@
       },
       "EnhanceRequest": {
         "properties": {
-          "audio_id": {
+          "input_path": {
             "type": "string",
-            "title": "Audio Id",
-            "description": "Audio ID to enhance"
+            "title": "Input Path"
+          },
+          "output_path": {
+            "type": "string",
+            "title": "Output Path"
           },
           "mode": {
             "type": "string",
             "title": "Mode",
-            "description": "Enhancement mode: speech, music, balanced, podcast, broadcast",
-            "default": "balanced"
+            "default": "lip_sync"
           },
-          "strength": {
-            "type": "number",
-            "maximum": 1.0,
-            "minimum": 0.0,
-            "title": "Strength",
-            "description": "Enhancement strength (0.0-1.0)",
-            "default": 0.5
+          "quality": {
+            "type": "string",
+            "title": "Quality",
+            "default": "standard"
           },
-          "preset": {
+          "audio_path": {
             "anyOf": [
               {
                 "type": "string"
@@ -48821,48 +49810,40 @@
                 "type": "null"
               }
             ],
-            "title": "Preset",
-            "description": "Optional preset name"
+            "title": "Audio Path"
           }
         },
         "type": "object",
         "required": [
-          "audio_id"
+          "input_path",
+          "output_path"
         ],
         "title": "EnhanceRequest",
-        "description": "Request for audio enhancement."
+        "description": "Face enhancement request."
       },
       "EnhanceResponse": {
         "properties": {
-          "output_audio_id": {
+          "job_id": {
             "type": "string",
-            "title": "Output Audio Id"
+            "title": "Job Id"
           },
-          "mode": {
+          "status": {
             "type": "string",
-            "title": "Mode"
+            "title": "Status"
           },
-          "strength": {
-            "type": "number",
-            "title": "Strength"
-          },
-          "improvements": {
-            "additionalProperties": {
-              "type": "number"
-            },
-            "type": "object",
-            "title": "Improvements"
+          "message": {
+            "type": "string",
+            "title": "Message"
           }
         },
         "type": "object",
         "required": [
-          "output_audio_id",
-          "mode",
-          "strength",
-          "improvements"
+          "job_id",
+          "status",
+          "message"
         ],
         "title": "EnhanceResponse",
-        "description": "Response for audio enhancement."
+        "description": "Face enhancement response."
       },
       "EnhancementStageResult": {
         "properties": {
@@ -49280,6 +50261,176 @@
         "title": "ErrorSummaryResponse",
         "description": "Response model for error summary."
       },
+      "ExperimentListResponse": {
+        "properties": {
+          "experiments": {
+            "items": {
+              "$ref": "#/components/schemas/ExperimentResponse"
+            },
+            "type": "array",
+            "title": "Experiments"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "experiments",
+          "total"
+        ],
+        "title": "ExperimentListResponse",
+        "description": "Response model for experiment list."
+      },
+      "ExperimentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "variants": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Variants"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "target_sample_size": {
+            "type": "integer",
+            "title": "Target Sample Size",
+            "default": 0
+          },
+          "current_sample_size": {
+            "type": "integer",
+            "title": "Current Sample Size",
+            "default": 0
+          },
+          "metrics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Metrics",
+            "default": []
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "status",
+          "variants"
+        ],
+        "title": "ExperimentResponse",
+        "description": "Response model for experiment data."
+      },
+      "ExperimentStatsResponse": {
+        "properties": {
+          "experiment_id": {
+            "type": "string",
+            "title": "Experiment Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "total_exposures": {
+            "type": "integer",
+            "title": "Total Exposures",
+            "default": 0
+          },
+          "total_conversions": {
+            "type": "integer",
+            "title": "Total Conversions",
+            "default": 0
+          },
+          "conversion_rate": {
+            "type": "number",
+            "title": "Conversion Rate",
+            "default": 0.0
+          },
+          "variant_stats": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Variant Stats",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "experiment_id",
+          "status"
+        ],
+        "title": "ExperimentStatsResponse",
+        "description": "Response model for experiment statistics."
+      },
       "ExplainabilityRequest": {
         "properties": {
           "model_type": {
@@ -49437,6 +50588,14 @@
             "type": "string",
             "title": "Filepath"
           },
+          "trace_count": {
+            "type": "integer",
+            "title": "Trace Count"
+          },
+          "span_count": {
+            "type": "integer",
+            "title": "Span Count"
+          },
           "message": {
             "type": "string",
             "title": "Message"
@@ -49446,10 +50605,12 @@
         "required": [
           "success",
           "filepath",
+          "trace_count",
+          "span_count",
           "message"
         ],
         "title": "ExportResponse",
-        "description": "Response model for export operation."
+        "description": "Response for trace export."
       },
       "F0Method": {
         "type": "string",
@@ -58517,20 +59678,9 @@
         "properties": {
           "name": {
             "type": "string",
-            "title": "Name",
-            "description": "Project name"
+            "title": "Name"
           },
-          "audio_id": {
-            "type": "string",
-            "title": "Audio Id",
-            "description": "Source audio file ID"
-          },
-          "target_language": {
-            "type": "string",
-            "title": "Target Language",
-            "description": "Target language code"
-          },
-          "source_language": {
+          "description": {
             "anyOf": [
               {
                 "type": "string"
@@ -58539,30 +59689,14 @@
                 "type": "null"
               }
             ],
-            "title": "Source Language",
-            "description": "Source language (auto-detect if None)"
-          },
-          "transcription_model": {
-            "type": "string",
-            "title": "Transcription Model",
-            "description": "Whisper model",
-            "default": "base"
-          },
-          "translation_provider": {
-            "type": "string",
-            "title": "Translation Provider",
-            "description": "Translation provider",
-            "default": "local_nllb"
+            "title": "Description"
           }
         },
         "type": "object",
         "required": [
-          "name",
-          "audio_id",
-          "target_language"
+          "name"
         ],
-        "title": "ProjectCreateRequest",
-        "description": "Request to create a translation project."
+        "title": "ProjectCreateRequest"
       },
       "ProjectDetail": {
         "properties": {
@@ -61887,6 +63021,62 @@
         "title": "SLOOverviewResponse",
         "description": "Response model for SLO overview."
       },
+      "SLOResponse": {
+        "properties": {
+          "slos": {
+            "items": {
+              "$ref": "#/components/schemas/SLOStatus"
+            },
+            "type": "array",
+            "title": "Slos"
+          },
+          "overall_health": {
+            "type": "string",
+            "title": "Overall Health"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slos",
+          "overall_health"
+        ],
+        "title": "SLOResponse",
+        "description": "Response containing SLO statuses."
+      },
+      "SLOStatus": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "target": {
+            "type": "number",
+            "title": "Target"
+          },
+          "current": {
+            "type": "number",
+            "title": "Current"
+          },
+          "met": {
+            "type": "boolean",
+            "title": "Met"
+          },
+          "window_hours": {
+            "type": "integer",
+            "title": "Window Hours",
+            "default": 24
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "target",
+          "current",
+          "met"
+        ],
+        "title": "SLOStatus",
+        "description": "SLO status for a metric."
+      },
       "SLOStatusResponse": {
         "properties": {
           "slo_id": {
@@ -63880,49 +65070,45 @@
       },
       "SpectrogramData": {
         "properties": {
-          "audio_id": {
-            "type": "string",
-            "title": "Audio Id"
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/backend__api__routes__audio__SpectrogramFrame"
+            },
+            "type": "array",
+            "title": "Frames"
           },
           "sample_rate": {
             "type": "integer",
             "title": "Sample Rate"
           },
-          "duration": {
-            "type": "number",
-            "title": "Duration"
+          "fft_size": {
+            "type": "integer",
+            "title": "Fft Size"
           },
-          "frames": {
-            "items": {
-              "$ref": "#/components/schemas/SpectrogramFrame"
-            },
-            "type": "array",
-            "title": "Frames"
+          "hop_length": {
+            "type": "integer",
+            "title": "Hop Length"
           },
-          "frequency_resolution": {
-            "type": "number",
-            "title": "Frequency Resolution"
+          "width": {
+            "type": "integer",
+            "title": "Width"
           },
-          "time_resolution": {
-            "type": "number",
-            "title": "Time Resolution"
-          },
-          "config": {
-            "$ref": "#/components/schemas/SpectrogramConfig"
+          "height": {
+            "type": "integer",
+            "title": "Height"
           }
         },
         "type": "object",
         "required": [
-          "audio_id",
-          "sample_rate",
-          "duration",
           "frames",
-          "frequency_resolution",
-          "time_resolution",
-          "config"
+          "sample_rate",
+          "fft_size",
+          "hop_length",
+          "width",
+          "height"
         ],
         "title": "SpectrogramData",
-        "description": "Complete spectrogram data."
+        "description": "Spectrogram data for rendering."
       },
       "SpectrogramFrame": {
         "properties": {
@@ -64738,7 +65924,7 @@
           "data": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EngineInfo"
+                "$ref": "#/components/schemas/backend__api__v3__engines__EngineInfo"
               },
               {
                 "type": "null"
@@ -65327,7 +66513,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/EngineInfo"
+                  "$ref": "#/components/schemas/backend__api__v3__engines__EngineInfo"
                 },
                 "type": "array"
               },
@@ -65832,40 +67018,25 @@
       },
       "StylePreset": {
         "properties": {
-          "preset_id": {
+          "id": {
             "type": "string",
-            "title": "Preset Id"
+            "title": "Id"
           },
           "name": {
             "type": "string",
             "title": "Name"
           },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
+          "style": {
+            "type": "string",
+            "title": "Style"
           },
-          "voice_profile_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Voice Profile Id"
-          },
-          "style_characteristics": {
-            "additionalProperties": true,
+          "parameters": {
+            "additionalProperties": {
+              "type": "number"
+            },
             "type": "object",
-            "title": "Style Characteristics"
+            "title": "Parameters",
+            "default": {}
           },
           "created": {
             "type": "string",
@@ -65874,13 +67045,13 @@
         },
         "type": "object",
         "required": [
-          "preset_id",
+          "id",
           "name",
-          "style_characteristics",
+          "style",
           "created"
         ],
         "title": "StylePreset",
-        "description": "Voice style preset."
+        "description": "A style preset."
       },
       "StyleProfile": {
         "properties": {
@@ -66981,6 +68152,31 @@
           }
         }
       },
+      "TelemetryResponse": {
+        "properties": {
+          "metrics": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metrics"
+          },
+          "spans_recorded": {
+            "type": "integer",
+            "title": "Spans Recorded"
+          },
+          "uptime_seconds": {
+            "type": "number",
+            "title": "Uptime Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metrics",
+          "spans_recorded",
+          "uptime_seconds"
+        ],
+        "title": "TelemetryResponse",
+        "description": "Response containing telemetry metrics."
+      },
       "Template": {
         "properties": {
           "id": {
@@ -67267,63 +68463,42 @@
       },
       "TemporalAnalysis": {
         "properties": {
-          "rms": {
+          "frame_stability": {
             "type": "number",
-            "title": "Rms"
+            "title": "Frame Stability"
           },
-          "zero_crossing_rate": {
+          "motion_smoothness": {
             "type": "number",
-            "title": "Zero Crossing Rate"
+            "title": "Motion Smoothness"
           },
-          "attack_time": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Attack Time"
+          "flicker_score": {
+            "type": "number",
+            "title": "Flicker Score"
           },
-          "decay_time": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Decay Time"
+          "jitter_score": {
+            "type": "number",
+            "title": "Jitter Score"
           },
-          "sustain_level": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sustain Level"
+          "overall_consistency": {
+            "type": "number",
+            "title": "Overall Consistency"
           },
-          "release_time": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Release Time"
+          "artifacts_detected": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Artifacts Detected",
+            "default": []
           }
         },
         "type": "object",
         "required": [
-          "rms",
-          "zero_crossing_rate"
+          "frame_stability",
+          "motion_smoothness",
+          "flicker_score",
+          "jitter_score",
+          "overall_consistency"
         ],
         "title": "TemporalAnalysis",
         "description": "Temporal analysis results."
@@ -67399,12 +68574,12 @@
             "title": "Processed Video Url"
           },
           "original_analysis": {
-            "$ref": "#/components/schemas/backend__api__models_additional__TemporalAnalysis"
+            "$ref": "#/components/schemas/TemporalAnalysis"
           },
           "processed_analysis": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/backend__api__models_additional__TemporalAnalysis"
+                "$ref": "#/components/schemas/TemporalAnalysis"
               },
               {
                 "type": "null"
@@ -68834,64 +70009,35 @@
       },
       "TranscriptionResponse": {
         "properties": {
-          "id": {
+          "project_id": {
             "type": "string",
-            "title": "Id"
-          },
-          "audio_id": {
-            "type": "string",
-            "title": "Audio Id"
-          },
-          "text": {
-            "type": "string",
-            "title": "Text"
-          },
-          "language": {
-            "type": "string",
-            "title": "Language"
-          },
-          "duration": {
-            "type": "number",
-            "title": "Duration"
+            "title": "Project Id"
           },
           "segments": {
             "items": {
-              "$ref": "#/components/schemas/TranscriptionSegment"
+              "$ref": "#/components/schemas/backend__api__routes__translation__TranscriptionSegment"
             },
             "type": "array",
             "title": "Segments"
           },
-          "word_timestamps": {
-            "items": {
-              "$ref": "#/components/schemas/WordTimestamp"
-            },
-            "type": "array",
-            "title": "Word Timestamps"
-          },
-          "created": {
+          "detected_language": {
             "type": "string",
-            "format": "date-time",
-            "title": "Created"
+            "title": "Detected Language"
           },
-          "engine": {
-            "type": "string",
-            "title": "Engine"
+          "total_duration": {
+            "type": "number",
+            "title": "Total Duration"
           }
         },
         "type": "object",
         "required": [
-          "id",
-          "audio_id",
-          "text",
-          "language",
-          "duration",
+          "project_id",
           "segments",
-          "word_timestamps",
-          "created",
-          "engine"
+          "detected_language",
+          "total_duration"
         ],
         "title": "TranscriptionResponse",
-        "description": "Response from transcription."
+        "description": "Response for transcription."
       },
       "TranscriptionSegment": {
         "properties": {
@@ -69277,6 +70423,88 @@
         "title": "UpdateCheckResponse",
         "description": "Update check response."
       },
+      "UpdateExperimentRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "variants": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VariantRequest"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variants"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metrics"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "target_sample_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Sample Size"
+          }
+        },
+        "type": "object",
+        "title": "UpdateExperimentRequest",
+        "description": "Request model for updating an experiment."
+      },
       "UpdateProjectRequest": {
         "properties": {
           "name": {
@@ -69586,6 +70814,47 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VariantRequest": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique variant identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Variant display name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Variant description",
+            "default": ""
+          },
+          "weight": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Weight",
+            "description": "Traffic weight percentage",
+            "default": 50
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config",
+            "description": "Variant configuration"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "VariantRequest",
+        "description": "Request model for creating/updating a variant."
       },
       "VersionInfo": {
         "properties": {
@@ -70924,6 +72193,207 @@
           "processing_time": 1.23,
           "engine_used": "xtts_v2"
         }
+      },
+      "VoiceConsentCreate": {
+        "properties": {
+          "voice_id": {
+            "type": "string",
+            "title": "Voice Id",
+            "description": "Voice identifier"
+          },
+          "grantor_id": {
+            "type": "string",
+            "title": "Grantor Id",
+            "description": "Grantor identity"
+          },
+          "grantor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grantor Name"
+          },
+          "consent_type": {
+            "type": "string",
+            "title": "Consent Type",
+            "description": "Type of consent",
+            "default": "voice_cloning"
+          },
+          "reference_audio_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Audio Hash",
+            "description": "Hash of reference audio"
+          },
+          "expires_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires Days",
+            "description": "Consent validity in days"
+          },
+          "allowed_uses": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Uses"
+          }
+        },
+        "type": "object",
+        "required": [
+          "voice_id",
+          "grantor_id"
+        ],
+        "title": "VoiceConsentCreate",
+        "description": "Request to create or request consent."
+      },
+      "VoiceConsentRecord": {
+        "properties": {
+          "consent_id": {
+            "type": "string",
+            "title": "Consent Id",
+            "description": "Unique consent identifier"
+          },
+          "voice_id": {
+            "type": "string",
+            "title": "Voice Id",
+            "description": "Voice/subject identifier"
+          },
+          "grantor_id": {
+            "type": "string",
+            "title": "Grantor Id",
+            "description": "Identity of the consent grantor"
+          },
+          "grantor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grantor Name",
+            "description": "Display name of grantor"
+          },
+          "consent_type": {
+            "type": "string",
+            "title": "Consent Type",
+            "description": "Type: voice_cloning, voice_usage, etc."
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "pending, granted, denied, revoked, expired"
+          },
+          "granted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Granted At",
+            "description": "When consent was granted (ISO)"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At",
+            "description": "When consent expires (ISO)"
+          },
+          "reference_audio_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Audio Hash",
+            "description": "SHA256 hash of reference audio (proof of consent scope)"
+          },
+          "allowed_uses": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Uses",
+            "description": "Scope"
+          },
+          "signature": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature",
+            "description": "Consent signature"
+          }
+        },
+        "type": "object",
+        "required": [
+          "consent_id",
+          "voice_id",
+          "grantor_id",
+          "consent_type",
+          "status"
+        ],
+        "title": "VoiceConsentRecord",
+        "description": "Voice consent record for API responses."
+      },
+      "VoiceConsentRevoke": {
+        "properties": {
+          "consent_id": {
+            "type": "string",
+            "title": "Consent Id",
+            "description": "Consent to revoke"
+          }
+        },
+        "type": "object",
+        "required": [
+          "consent_id"
+        ],
+        "title": "VoiceConsentRevoke",
+        "description": "Request to revoke consent."
       },
       "VoiceEmbeddingRequest": {
         "properties": {
@@ -72753,48 +74223,6 @@
         "title": "ZeroShotCloneResponse",
         "description": "Response for zero-shot voice cloning."
       },
-      "backend__api__models_additional__TemporalAnalysis": {
-        "properties": {
-          "frame_stability": {
-            "type": "number",
-            "title": "Frame Stability"
-          },
-          "motion_smoothness": {
-            "type": "number",
-            "title": "Motion Smoothness"
-          },
-          "flicker_score": {
-            "type": "number",
-            "title": "Flicker Score"
-          },
-          "jitter_score": {
-            "type": "number",
-            "title": "Jitter Score"
-          },
-          "overall_consistency": {
-            "type": "number",
-            "title": "Overall Consistency"
-          },
-          "artifacts_detected": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Artifacts Detected",
-            "default": []
-          }
-        },
-        "type": "object",
-        "required": [
-          "frame_stability",
-          "motion_smoothness",
-          "flicker_score",
-          "jitter_score",
-          "overall_consistency"
-        ],
-        "title": "TemporalAnalysis",
-        "description": "Temporal analysis results."
-      },
       "backend__api__models_additional__VoiceProfile": {
         "properties": {
           "id": {
@@ -72865,47 +74293,78 @@
         "title": "VoiceProfile",
         "description": "Voice profile model with avatar support."
       },
-      "backend__api__routes__audio__SpectrogramData": {
+      "backend__api__routes__ai_enhancement__EnhanceRequest": {
         "properties": {
-          "frames": {
-            "items": {
-              "$ref": "#/components/schemas/backend__api__routes__audio__SpectrogramFrame"
-            },
-            "type": "array",
-            "title": "Frames"
+          "audio_id": {
+            "type": "string",
+            "title": "Audio Id",
+            "description": "Audio ID to enhance"
           },
-          "sample_rate": {
-            "type": "integer",
-            "title": "Sample Rate"
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "description": "Enhancement mode: speech, music, balanced, podcast, broadcast",
+            "default": "balanced"
           },
-          "fft_size": {
-            "type": "integer",
-            "title": "Fft Size"
+          "strength": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Strength",
+            "description": "Enhancement strength (0.0-1.0)",
+            "default": 0.5
           },
-          "hop_length": {
-            "type": "integer",
-            "title": "Hop Length"
-          },
-          "width": {
-            "type": "integer",
-            "title": "Width"
-          },
-          "height": {
-            "type": "integer",
-            "title": "Height"
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset",
+            "description": "Optional preset name"
           }
         },
         "type": "object",
         "required": [
-          "frames",
-          "sample_rate",
-          "fft_size",
-          "hop_length",
-          "width",
-          "height"
+          "audio_id"
         ],
-        "title": "SpectrogramData",
-        "description": "Spectrogram data for rendering."
+        "title": "EnhanceRequest",
+        "description": "Request for audio enhancement."
+      },
+      "backend__api__routes__ai_enhancement__EnhanceResponse": {
+        "properties": {
+          "output_audio_id": {
+            "type": "string",
+            "title": "Output Audio Id"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "strength": {
+            "type": "number",
+            "title": "Strength"
+          },
+          "improvements": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Improvements"
+          }
+        },
+        "type": "object",
+        "required": [
+          "output_audio_id",
+          "mode",
+          "strength",
+          "improvements"
+        ],
+        "title": "EnhanceResponse",
+        "description": "Response for audio enhancement."
       },
       "backend__api__routes__audio__SpectrogramFrame": {
         "properties": {
@@ -72971,7 +74430,242 @@
         "title": "WaveformData",
         "description": "Waveform data for rendering."
       },
-      "backend__api__routes__automation__AutomationPoint": {
+      "backend__api__routes__audio_analysis__TemporalAnalysis": {
+        "properties": {
+          "rms": {
+            "type": "number",
+            "title": "Rms"
+          },
+          "zero_crossing_rate": {
+            "type": "number",
+            "title": "Zero Crossing Rate"
+          },
+          "attack_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attack Time"
+          },
+          "decay_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decay Time"
+          },
+          "sustain_level": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sustain Level"
+          },
+          "release_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rms",
+          "zero_crossing_rate"
+        ],
+        "title": "TemporalAnalysis",
+        "description": "Temporal analysis results."
+      },
+      "backend__api__routes__automation__AutomationCurveCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "parameter_id": {
+            "type": "string",
+            "title": "Parameter Id"
+          },
+          "track_id": {
+            "type": "string",
+            "title": "Track Id"
+          },
+          "interpolation": {
+            "type": "string",
+            "title": "Interpolation",
+            "default": "linear"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "parameter_id",
+          "track_id"
+        ],
+        "title": "AutomationCurveCreateRequest",
+        "description": "Request to create an automation curve."
+      },
+      "backend__api__routes__automation__AutomationCurveUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "points": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AutomationPoint"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Points"
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interpolation"
+          }
+        },
+        "type": "object",
+        "title": "AutomationCurveUpdateRequest",
+        "description": "Request to update an automation curve."
+      },
+      "backend__api__routes__errors__ExportResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "filepath": {
+            "type": "string",
+            "title": "Filepath"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "filepath",
+          "message"
+        ],
+        "title": "ExportResponse",
+        "description": "Response model for export operation."
+      },
+      "backend__api__routes__help__KeyboardShortcut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "panel_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panel Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "description",
+          "category"
+        ],
+        "title": "KeyboardShortcut",
+        "description": "A keyboard shortcut."
+      },
+      "backend__api__routes__macros__AutomationCurve": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "parameter_id": {
+            "type": "string",
+            "title": "Parameter Id"
+          },
+          "track_id": {
+            "type": "string",
+            "title": "Track Id"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/backend__api__routes__macros__AutomationPoint"
+            },
+            "type": "array",
+            "title": "Points",
+            "default": []
+          },
+          "interpolation": {
+            "type": "string",
+            "title": "Interpolation",
+            "default": "linear"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "parameter_id",
+          "track_id"
+        ],
+        "title": "AutomationCurve"
+      },
+      "backend__api__routes__macros__AutomationPoint": {
         "properties": {
           "time": {
             "type": "number",
@@ -73031,321 +74725,7 @@
           "time",
           "value"
         ],
-        "title": "AutomationPoint",
-        "description": "A point on an automation curve."
-      },
-      "backend__api__routes__emotion_style__StylePreset": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "style": {
-            "type": "string",
-            "title": "Style"
-          },
-          "parameters": {
-            "additionalProperties": {
-              "type": "number"
-            },
-            "type": "object",
-            "title": "Parameters",
-            "default": {}
-          },
-          "created": {
-            "type": "string",
-            "title": "Created"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "style",
-          "created"
-        ],
-        "title": "StylePreset",
-        "description": "A style preset."
-      },
-      "backend__api__routes__engines__EngineInfo": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id",
-            "description": "Engine identifier"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "Display name"
-          },
-          "type": {
-            "type": "string",
-            "title": "Type",
-            "description": "Engine type (e.g., tts, vc, stt)",
-            "default": "tts"
-          },
-          "version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Version",
-            "description": "Engine version"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description",
-            "description": "Engine description"
-          },
-          "available": {
-            "type": "boolean",
-            "title": "Available",
-            "description": "Whether engine is available",
-            "default": true
-          },
-          "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Status",
-            "description": "Current status"
-          },
-          "support_tier": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Support Tier",
-            "description": "Support tier: tier1_supported (wedge), tier2_best_effort, experimental"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "EngineInfo",
-        "description": "Information about a single engine."
-      },
-      "backend__api__routes__help__KeyboardShortcut": {
-        "properties": {
-          "key": {
-            "type": "string",
-            "title": "Key"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description"
-          },
-          "category": {
-            "type": "string",
-            "title": "Category"
-          },
-          "panel_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Panel Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "key",
-          "description",
-          "category"
-        ],
-        "title": "KeyboardShortcut",
-        "description": "A keyboard shortcut."
-      },
-      "backend__api__routes__macros__AutomationCurve": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "parameter_id": {
-            "type": "string",
-            "title": "Parameter Id"
-          },
-          "track_id": {
-            "type": "string",
-            "title": "Track Id"
-          },
-          "points": {
-            "items": {
-              "$ref": "#/components/schemas/AutomationPoint"
-            },
-            "type": "array",
-            "title": "Points",
-            "default": []
-          },
-          "interpolation": {
-            "type": "string",
-            "title": "Interpolation",
-            "default": "linear"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "parameter_id",
-          "track_id"
-        ],
-        "title": "AutomationCurve"
-      },
-      "backend__api__routes__macros__AutomationCurveCreateRequest": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "parameter_id": {
-            "type": "string",
-            "title": "Parameter Id"
-          },
-          "track_id": {
-            "type": "string",
-            "title": "Track Id"
-          },
-          "points": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/AutomationPoint"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Points"
-          },
-          "interpolation": {
-            "type": "string",
-            "title": "Interpolation",
-            "default": "linear"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "parameter_id",
-          "track_id"
-        ],
-        "title": "AutomationCurveCreateRequest"
-      },
-      "backend__api__routes__macros__AutomationCurveUpdateRequest": {
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "parameter_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Parameter Id"
-          },
-          "points": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/AutomationPoint"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Points"
-          },
-          "interpolation": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Interpolation"
-          }
-        },
-        "type": "object",
-        "title": "AutomationCurveUpdateRequest"
-      },
-      "backend__api__routes__projects__ProjectCreateRequest": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "title": "ProjectCreateRequest"
+        "title": "AutomationPoint"
       },
       "backend__api__routes__settings__PerformanceSettings": {
         "properties": {
@@ -73397,6 +74777,104 @@
         "title": "ExportResponse",
         "description": "Response model for export operation."
       },
+      "backend__api__routes__spectrogram__SpectrogramData": {
+        "properties": {
+          "audio_id": {
+            "type": "string",
+            "title": "Audio Id"
+          },
+          "sample_rate": {
+            "type": "integer",
+            "title": "Sample Rate"
+          },
+          "duration": {
+            "type": "number",
+            "title": "Duration"
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/SpectrogramFrame"
+            },
+            "type": "array",
+            "title": "Frames"
+          },
+          "frequency_resolution": {
+            "type": "number",
+            "title": "Frequency Resolution"
+          },
+          "time_resolution": {
+            "type": "number",
+            "title": "Time Resolution"
+          },
+          "config": {
+            "$ref": "#/components/schemas/SpectrogramConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio_id",
+          "sample_rate",
+          "duration",
+          "frames",
+          "frequency_resolution",
+          "time_resolution",
+          "config"
+        ],
+        "title": "SpectrogramData",
+        "description": "Complete spectrogram data."
+      },
+      "backend__api__routes__style_transfer__StylePreset": {
+        "properties": {
+          "preset_id": {
+            "type": "string",
+            "title": "Preset Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "voice_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voice Profile Id"
+          },
+          "style_characteristics": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Style Characteristics"
+          },
+          "created": {
+            "type": "string",
+            "title": "Created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "preset_id",
+          "name",
+          "style_characteristics",
+          "created"
+        ],
+        "title": "StylePreset",
+        "description": "Voice style preset."
+      },
       "backend__api__routes__timeline__ExportResponse": {
         "properties": {
           "success": {
@@ -73421,39 +74899,117 @@
         "title": "ExportResponse",
         "description": "Response after export."
       },
-      "backend__api__routes__tracing__ExportResponse": {
+      "backend__api__routes__transcribe__TranscriptionResponse": {
         "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "filepath": {
+          "id": {
             "type": "string",
-            "title": "Filepath"
+            "title": "Id"
           },
-          "trace_count": {
-            "type": "integer",
-            "title": "Trace Count"
-          },
-          "span_count": {
-            "type": "integer",
-            "title": "Span Count"
-          },
-          "message": {
+          "audio_id": {
             "type": "string",
-            "title": "Message"
+            "title": "Audio Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "duration": {
+            "type": "number",
+            "title": "Duration"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/TranscriptionSegment"
+            },
+            "type": "array",
+            "title": "Segments"
+          },
+          "word_timestamps": {
+            "items": {
+              "$ref": "#/components/schemas/WordTimestamp"
+            },
+            "type": "array",
+            "title": "Word Timestamps"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
           }
         },
         "type": "object",
         "required": [
-          "success",
-          "filepath",
-          "trace_count",
-          "span_count",
-          "message"
+          "id",
+          "audio_id",
+          "text",
+          "language",
+          "duration",
+          "segments",
+          "word_timestamps",
+          "created",
+          "engine"
         ],
-        "title": "ExportResponse",
-        "description": "Response for trace export."
+        "title": "TranscriptionResponse",
+        "description": "Response from transcription."
+      },
+      "backend__api__routes__translation__ProjectCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Project name"
+          },
+          "audio_id": {
+            "type": "string",
+            "title": "Audio Id",
+            "description": "Source audio file ID"
+          },
+          "target_language": {
+            "type": "string",
+            "title": "Target Language",
+            "description": "Target language code"
+          },
+          "source_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Language",
+            "description": "Source language (auto-detect if None)"
+          },
+          "transcription_model": {
+            "type": "string",
+            "title": "Transcription Model",
+            "description": "Whisper model",
+            "default": "base"
+          },
+          "translation_provider": {
+            "type": "string",
+            "title": "Translation Provider",
+            "description": "Translation provider",
+            "default": "local_nllb"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "audio_id",
+          "target_language"
+        ],
+        "title": "ProjectCreateRequest",
+        "description": "Request to create a translation project."
       },
       "backend__api__routes__translation__ProjectInfo": {
         "properties": {
@@ -73505,38 +75061,6 @@
         ],
         "title": "ProjectInfo",
         "description": "Translation project information."
-      },
-      "backend__api__routes__translation__TranscriptionResponse": {
-        "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
-          "segments": {
-            "items": {
-              "$ref": "#/components/schemas/backend__api__routes__translation__TranscriptionSegment"
-            },
-            "type": "array",
-            "title": "Segments"
-          },
-          "detected_language": {
-            "type": "string",
-            "title": "Detected Language"
-          },
-          "total_duration": {
-            "type": "number",
-            "title": "Total Duration"
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_id",
-          "segments",
-          "detected_language",
-          "total_duration"
-        ],
-        "title": "TranscriptionResponse",
-        "description": "Response for transcription."
       },
       "backend__api__routes__translation__TranscriptionSegment": {
         "properties": {
@@ -73609,70 +75133,6 @@
         "title": "TranslationResponse",
         "description": "Response for translation."
       },
-      "backend__api__routes__video_enhance__EnhanceRequest": {
-        "properties": {
-          "input_path": {
-            "type": "string",
-            "title": "Input Path"
-          },
-          "output_path": {
-            "type": "string",
-            "title": "Output Path"
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode",
-            "default": "lip_sync"
-          },
-          "quality": {
-            "type": "string",
-            "title": "Quality",
-            "default": "standard"
-          },
-          "audio_path": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Audio Path"
-          }
-        },
-        "type": "object",
-        "required": [
-          "input_path",
-          "output_path"
-        ],
-        "title": "EnhanceRequest",
-        "description": "Face enhancement request."
-      },
-      "backend__api__routes__video_enhance__EnhanceResponse": {
-        "properties": {
-          "job_id": {
-            "type": "string",
-            "title": "Job Id"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          }
-        },
-        "type": "object",
-        "required": [
-          "job_id",
-          "status",
-          "message"
-        ],
-        "title": "EnhanceResponse",
-        "description": "Face enhancement response."
-      },
       "backend__api__routes__voice_effects__EffectPreset": {
         "properties": {
           "id": {
@@ -73707,6 +75167,88 @@
         ],
         "title": "EffectPreset",
         "description": "Voice effect preset."
+      },
+      "backend__api__v3__engines__EngineInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/EngineCapability"
+            },
+            "type": "array",
+            "title": "Capabilities",
+            "default": []
+          },
+          "memory_usage_mb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Usage Mb"
+          },
+          "gpu_usage_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Usage Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "version",
+          "type",
+          "status"
+        ],
+        "title": "EngineInfo",
+        "description": "Engine information response.",
+        "example": {
+          "capabilities": [
+            {
+              "feature": "text_to_speech",
+              "supported": true
+            },
+            {
+              "feature": "voice_cloning",
+              "supported": true
+            }
+          ],
+          "id": "xtts_v2",
+          "memory_usage_mb": 2048.5,
+          "name": "XTTS v2",
+          "status": "ready",
+          "type": "synthesis",
+          "version": "2.0.0"
+        }
       },
       "backend__api__v3__projects__ProjectInfo": {
         "properties": {

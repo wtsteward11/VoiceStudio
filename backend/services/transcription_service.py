@@ -19,6 +19,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from backend.core.circuit_breaker import get_engine_breaker
+from backend.core.exceptions import ServiceError
 from backend.data.repositories.transcription_repository import get_transcription_repository
 from backend.ml.models.engine_service import get_engine_service
 from backend.ml.models.model_preflight import PreflightError, ensure_whisper_cpp
@@ -216,10 +217,8 @@ async def transcribe_audio(
     Transcribe audio file using Whisper or other STT engines.
 
     Returns TranscriptionResult for programmatic use (dubbing, assistant_run) and route response construction.
-    Raises PreflightError, HTTPException (via fastapi), or generic Exception.
+    Raises PreflightError, ServiceError, or generic Exception.
     """
-    from fastapi import HTTPException
-
     transcription_id = str(uuid.uuid4())
 
     if request.engine == "whisper_cpp":
@@ -248,26 +247,23 @@ async def transcribe_audio(
             logger.info("Getting %s engine via EngineService", request.engine)
             stt_engine = engine_service.get_whisper_engine()
             if not stt_engine:
-                raise HTTPException(
-                    status_code=503,
-                    detail=f"Engine {request.engine} not available",
-                )
-        except HTTPException:
+                raise ServiceError(503, f"Engine {request.engine} not available")
+        except ServiceError:
             raise
         except Exception as e:
             logger.error("Whisper engine not available: %s", e)
-            raise HTTPException(
-                status_code=503,
-                detail=(
+            raise ServiceError(
+                503,
+                (
                     f"Transcription engine '{request.engine}' is not available. "
                     "Please ensure the engine is properly installed. "
                     "Install with: pip install faster-whisper==1.0.3"
                 ),
             )
     elif not stt_engine:
-        raise HTTPException(
-            status_code=503,
-            detail=(
+        raise ServiceError(
+            503,
+            (
                 f"Transcription engine '{request.engine}' is not available. "
                 "Please ensure the engine is properly installed and configured."
             ),
@@ -279,7 +275,7 @@ async def transcribe_audio(
         if project_id:
             error_msg += f"Checked project '{project_id}' audio directory. "
         error_msg += "Please ensure the audio has been synthesized or uploaded first."
-        raise HTTPException(status_code=404, detail=error_msg)
+        raise ServiceError(404, error_msg)
 
     logger.info("Transcribing audio: %s with engine: %s", audio_path, request.engine)
 
@@ -290,9 +286,9 @@ async def transcribe_audio(
             request.engine,
             engine_breaker.time_until_retry(),
         )
-        raise HTTPException(
-            status_code=503,
-            detail=(
+        raise ServiceError(
+            503,
+            (
                 f"Transcription engine '{request.engine}' is temporarily unavailable. "
                 f"Retry in {int(engine_breaker.time_until_retry())} seconds."
             ),
@@ -334,10 +330,7 @@ async def transcribe_audio(
 
     if result is None:
         engine_breaker.record_failure()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Transcription failed for engine '{request.engine}'",
-        )
+        raise ServiceError(500, f"Transcription failed for engine '{request.engine}'")
     if isinstance(result, str):
         result = {
             "text": result,

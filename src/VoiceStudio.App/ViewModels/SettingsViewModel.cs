@@ -89,7 +89,7 @@ namespace VoiceStudio.App.ViewModels
 
     // Backend Settings
     [ObservableProperty]
-    private string apiUrl = "http://localhost:8001";
+    private string apiUrl = "http://localhost:8000";
 
     [ObservableProperty]
     private int apiTimeout = 30; // seconds
@@ -474,7 +474,7 @@ namespace VoiceStudio.App.ViewModels
       GridInterval = settings.Timeline?.GridInterval ?? 1.0;
 
       // Backend
-      ApiUrl = settings.Backend?.ApiUrl ?? "http://localhost:8001";
+      ApiUrl = settings.Backend?.ApiUrl ?? "http://localhost:8000";
       ApiTimeout = settings.Backend?.Timeout ?? 30;
       ApiRetryCount = settings.Backend?.RetryCount ?? 3;
 
@@ -585,7 +585,7 @@ namespace VoiceStudio.App.ViewModels
       SnapInterval = 0.1;
       GridEnabled = true;
       GridInterval = 1.0;
-      ApiUrl = "http://localhost:8001";
+      ApiUrl = "http://localhost:8000";
       ApiTimeout = 30;
       ApiRetryCount = 3;
       CachingEnabled = true;
@@ -1032,7 +1032,7 @@ namespace VoiceStudio.App.ViewModels
 
   public class BackendSettings
   {
-    public string ApiUrl { get; set; } = "http://localhost:8001";
+    public string ApiUrl { get; set; } = "http://localhost:8000";
     public int Timeout { get; set; } = 30;
     public int RetryCount { get; set; } = 3;
   }

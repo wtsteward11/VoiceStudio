@@ -51,9 +51,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 # Settings file path (use path_config to avoid repo writes)
-from backend.config.path_config import get_path
+from backend.services.path_service import PathService
 
-SETTINGS_FILE = get_path("data") / "settings.json"
+SETTINGS_FILE = PathService.get_data_dir() / "settings.json"
 
 # Cache for settings to reduce file I/O
 _settings_cache: Optional[SettingsData] = None

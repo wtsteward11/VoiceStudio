@@ -1,3 +1,5 @@
+# mypy: disable-error-code="untyped-decorator"
+# SAFETY: FastAPI router decorators lack complete type stubs; route handlers are correctly typed.
 from __future__ import annotations
 
 import json
@@ -307,6 +309,16 @@ async def synthesize(
                             synthesis_kwargs["emotion"] = req.emotion
                         if quality_preset:
                             synthesis_kwargs["quality_preset"] = quality_preset
+                        if req.speed is not None:
+                            synthesis_kwargs["speed"] = req.speed
+                        if req.pitch is not None:
+                            synthesis_kwargs["pitch"] = req.pitch
+                        if req.stability is not None:
+                            synthesis_kwargs["stability"] = req.stability
+                        if req.clarity is not None:
+                            synthesis_kwargs["clarity"] = req.clarity
+                        if req.temperature is not None:
+                            synthesis_kwargs["temperature"] = req.temperature
 
                         # Attempt synthesis with circuit breaker + error recovery
                         result = None
@@ -775,7 +787,7 @@ async def synthesize_with_style(
     enhance_quality: bool = True,
     calculate_quality: bool = True,
     _policy: None = Depends(require_synthesis_clearance),
-):
+) -> VoiceSynthesizeResponse:
     """
     Synthesize with granular style control (OpenVoice).
 
@@ -912,7 +924,7 @@ async def synthesize_cross_lingual(
     enhance_quality: bool = True,
     calculate_quality: bool = True,
     _policy: None = Depends(require_synthesis_clearance),
-):
+) -> VoiceSynthesizeResponse:
     """
     Zero-shot cross-lingual voice cloning (OpenVoice).
 

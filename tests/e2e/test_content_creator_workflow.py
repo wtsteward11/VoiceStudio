@@ -26,7 +26,7 @@ sys.path.insert(0, str(project_root))
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-API_BASE = os.environ.get("VOICESTUDIO_API_URL", "http://127.0.0.1:8001").rstrip("/")
+API_BASE = os.environ.get("VOICESTUDIO_API_URL", "http://127.0.0.1:8000").rstrip("/")
 TIMEOUT = 90
 
 

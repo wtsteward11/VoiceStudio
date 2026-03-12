@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VoiceStudio.Core.Gateways;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Controls
 {
@@ -178,10 +179,9 @@ namespace VoiceStudio.App.Controls
 
         RenderParameters();
       }
-      // ALLOWED: empty catch - cancellation is intentional, not an error
       catch (OperationCanceledException)
       {
-        // Loading was cancelled
+        System.Diagnostics.Debug.WriteLine("DynamicParameterPanel: LoadSchemaAsync cancelled");
       }
       catch (Exception ex)
       {

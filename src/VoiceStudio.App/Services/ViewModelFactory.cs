@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using VoiceStudio.Core.Services;
 
@@ -20,7 +21,18 @@ namespace VoiceStudio.App.Services
     /// <inheritdoc />
     public TViewModel Create<TViewModel>() where TViewModel : class
     {
-      return _serviceProvider.GetRequiredService<TViewModel>();
+      var existing = _serviceProvider.GetService<TViewModel>();
+      if (existing != null)
+        return existing;
+      try
+      {
+        return ActivatorUtilities.CreateInstance<TViewModel>(_serviceProvider);
+      }
+      catch (Exception ex)
+      {
+        Debug.WriteLine($"[ViewModelFactory] Create failed for VM type {typeof(TViewModel).FullName}: {ex.Message}");
+        throw;
+      }
     }
 
     /// <inheritdoc />
@@ -31,7 +43,18 @@ namespace VoiceStudio.App.Services
         throw new ArgumentNullException(nameof(viewModelType));
       }
 
-      return _serviceProvider.GetRequiredService(viewModelType);
+      var existing = _serviceProvider.GetService(viewModelType);
+      if (existing != null)
+        return existing;
+      try
+      {
+        return ActivatorUtilities.CreateInstance(_serviceProvider, viewModelType);
+      }
+      catch (Exception ex)
+      {
+        Debug.WriteLine($"[ViewModelFactory] Create failed for VM type {viewModelType.FullName}: {ex.Message}");
+        throw;
+      }
     }
 
     /// <inheritdoc />

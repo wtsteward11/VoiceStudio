@@ -88,9 +88,9 @@ namespace VoiceStudio.App.Tests.ViewModels
         }
 
         [TestMethod]
-        public void ApiUrl_DefaultsToLocalhost8001()
+        public void ApiUrl_DefaultsToLocalhost8000()
         {
-            Assert.AreEqual("http://localhost:8001", _viewModel.ApiUrl);
+            Assert.AreEqual("http://localhost:8000", _viewModel.ApiUrl);
         }
 
         [TestMethod]

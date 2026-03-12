@@ -386,8 +386,8 @@ namespace VoiceStudio.App.Controls
       {
         var line = $"[{DateTime.Now:HH:mm:ss.fff}] {msg}";
         System.Diagnostics.Debug.WriteLine(line);
-        // ALLOWED: empty catch - Best effort debug logging, failure is acceptable
-        try { System.IO.File.AppendAllText(logPath, line + Environment.NewLine); } catch { }
+        try { System.IO.File.AppendAllText(logPath, line + Environment.NewLine); }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[Toolbar] File log write failed (non-fatal): {ex.Message}"); }
       }
       
       Log($"[Toolbar] HandleToolbarButtonClick called: {itemId}");

@@ -341,8 +341,8 @@ namespace VoiceStudio.App.Commands
         private static void FileLog(string msg)
         {
             var logPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoiceStudio", "import_debug.log");
-            // ALLOWED: empty catch - Best effort debug logging, failure is acceptable
-            try { System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] {msg}{Environment.NewLine}"); } catch { }
+            try { System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] {msg}{Environment.NewLine}"); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[FileOperationsHandler] File log write failed (non-fatal): {ex.Message}"); }
         }
 
         public async Task ImportAudioAsync(CancellationToken ct = default)

@@ -2,7 +2,6 @@ using System;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -26,7 +25,7 @@ namespace VoiceStudio.App.Views.Panels
   // Backend-Frontend Integration Plan - Phase 2: Implements state persistence.
   public partial class ProfilesViewModel : BaseViewModel, IPanelView, IPanelStatePersistable, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IProfilesClient _profilesClient;
     private ISubscriptionToken? _profileCreatedToken;
     private readonly IProfilesUseCase _profilesUseCase;
     private readonly IAudioPlayerService _audioPlayer;
@@ -34,11 +33,10 @@ namespace VoiceStudio.App.Views.Panels
     private readonly UndoRedoService? _undoRedoService;
     private readonly IErrorPresentationService? _errorService;
     private readonly IErrorLoggingService? _logService;
+    private readonly IDialogService? _dialogService;
     private readonly IEventAggregator? _eventAggregator;
     private readonly IContextManager? _contextManager;
     private CancellationTokenSource? _filterDebounceCts;
-    private Task? _loadProfilesTask;
-    private readonly object _loadProfilesLock = new();
 
     /// <summary>
     /// Callback for CreateProfileFromEmptyState; set by the View in Loaded (DI cannot provide View-specific dialog).
@@ -212,41 +210,28 @@ namespace VoiceStudio.App.Views.Panels
 
     public bool IsProfileSelected(string profileId) => _multiSelectState?.SelectedIds.Contains(profileId) ?? false;
 
-    // Default preview text for voice profiles
-    private const string DEFAULT_PREVIEW_TEXT = "Hello, this is a preview of this voice profile.";
-
-    // Cache for preview audio (profileId -> audioUrl)
-    private readonly Dictionary<string, string> _previewCache = new();
-    private readonly Dictionary<string, QualityMetrics?> _previewQualityCache = new();
-    private readonly Dictionary<string, double> _previewQualityScoreCache = new();
-
-    private sealed class ProfileImportData
-    {
-      public string? Name { get; set; }
-      public string? Language { get; set; }
-      public string? Emotion { get; set; }
-      public List<string>? Tags { get; set; }
-    }
-
-    private sealed class ProfileExportBundle
-    {
-      public string ExportedAt { get; set; } = string.Empty;
-      public string Version { get; set; } = "1.0";
-      public List<ProfileImportData> Profiles { get; set; } = new();
-    }
+    private readonly IProfilePreviewService? _previewService;
+    private readonly IProfileQualityInsightsService _qualityInsightsService;
+    private readonly IProfileTransferService _transferService;
+    private readonly IProfileEnhancementService _enhancementService;
 
     public ProfilesViewModel(
-      IBackendClient backendClient,
+      IProfilesClient profilesClient,
       IProfilesUseCase profilesUseCase,
       IAudioPlayerService audioPlayer,
       MultiSelectService multiSelectService,
+      IProfileQualityInsightsService qualityInsightsService,
+      IProfileTransferService transferService,
+      IProfileEnhancementService enhancementService,
       ToastNotificationService? toastNotificationService = null,
       UndoRedoService? undoRedoService = null,
       IErrorPresentationService? errorService = null,
-      IErrorLoggingService? logService = null)
+      IErrorLoggingService? logService = null,
+      IDialogService? dialogService = null,
+      IProfilePreviewService? previewService = null)
         : base(AppServices.GetViewModelContext())
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _profilesUseCase = profilesUseCase ?? throw new ArgumentNullException(nameof(profilesUseCase));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
       _multiSelectService = multiSelectService ?? throw new ArgumentNullException(nameof(multiSelectService));
@@ -257,6 +242,11 @@ namespace VoiceStudio.App.Views.Panels
 
       _errorService = errorService;
       _logService = logService;
+      _dialogService = dialogService;
+      _previewService = previewService;
+      _qualityInsightsService = qualityInsightsService ?? throw new ArgumentNullException(nameof(qualityInsightsService));
+      _transferService = transferService ?? throw new ArgumentNullException(nameof(transferService));
+      _enhancementService = enhancementService ?? throw new ArgumentNullException(nameof(enhancementService));
       _eventAggregator = AppServices.TryGetEventAggregator();
       _contextManager = AppServices.TryGetContextManager();
 
@@ -429,6 +419,7 @@ namespace VoiceStudio.App.Views.Panels
     /// Handles ProfileCreatedEvent by refreshing the profiles list.
     /// GAP-B05: Ensures newly trained/cloned profiles appear without manual refresh.
     /// </summary>
+    /// <param name="evt">The profile created event containing source panel and profile ID.</param>
     private void OnProfileCreatedRefresh(ProfileCreatedEvent evt)
     {
       // Skip if this panel published the event (we already updated)
@@ -438,11 +429,15 @@ namespace VoiceStudio.App.Views.Panels
       System.Diagnostics.Debug.WriteLine(
         $"[ProfilesViewModel] ProfileCreatedEvent received from {evt.SourcePanelId}: {evt.ProfileId}");
 
-      // GAP-I15: Refresh profile list on the UI thread using disposal token
-      Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()?.TryEnqueue(async () =>
+      // P0-C: Skip reload if profile already in local collection (prevents request storm)
+      if (Profiles.Any(p => p.Id == evt.ProfileId))
       {
-        await LoadProfilesAsync(_disposalCts.Token);
-      });
+        System.Diagnostics.Debug.WriteLine($"[ProfilesViewModel] Profile {evt.ProfileId} already in collection, skipping reload");
+        return;
+      }
+
+      // GAP-I15: Refresh profile list on the UI thread using disposal token
+      Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()?.TryEnqueue(async () => await LoadProfilesAsync(_disposalCts.Token));
     }
 
     public EnhancedAsyncRelayCommand LoadProfilesCommand { get; }
@@ -507,7 +502,7 @@ namespace VoiceStudio.App.Views.Panels
         }
 
         var json = await FileIO.ReadTextAsync(file);
-        var importProfiles = ParseProfileImports(json, out var parseError);
+        var (importProfiles, parseError) = _transferService.ParseImports(json);
         if (!string.IsNullOrWhiteSpace(parseError))
         {
           ErrorMessage = parseError;
@@ -523,30 +518,10 @@ namespace VoiceStudio.App.Views.Panels
           return;
         }
 
-        var createdProfiles = new List<VoiceProfile>();
-        foreach (var importProfile in importProfiles)
+        var createdProfiles = await _transferService.CreateProfilesFromImportDataAsync(importProfiles, cancellationToken);
+        foreach (var profile in createdProfiles)
         {
-          var name = importProfile.Name?.Trim();
-          if (string.IsNullOrWhiteSpace(name))
-          {
-            continue;
-          }
-
-          var language = string.IsNullOrWhiteSpace(importProfile.Language) ? "en" : importProfile.Language!.Trim();
-          var emotion = string.IsNullOrWhiteSpace(importProfile.Emotion) ? null : importProfile.Emotion!.Trim();
-          var tags = importProfile.Tags?.Where(tag => !string.IsNullOrWhiteSpace(tag)).Select(tag => tag.Trim()).ToList();
-
-          var profile = await _profilesUseCase.CreateAsync(
-              name,
-              language,
-              emotion,
-              tags,
-              cancellationToken);
-          if (profile != null)
-          {
-            Profiles.Add(profile);
-            createdProfiles.Add(profile);
-          }
+          Profiles.Add(profile);
         }
 
         UpdateAvailableFilters();
@@ -601,27 +576,12 @@ namespace VoiceStudio.App.Views.Panels
         IsLoading = true;
         ErrorMessage = null;
 
-        var exportBundle = new ProfileExportBundle
-        {
-          ExportedAt = DateTime.UtcNow.ToString("O"),
-          Profiles = new List<ProfileImportData>
-          {
-            new ProfileImportData
-            {
-              Name = profile.Name,
-              Language = profile.Language,
-              Emotion = profile.Emotion,
-              Tags = profile.Tags?.ToList()
-            }
-          }
-        };
-
-        var json = JsonSerializer.Serialize(exportBundle, new JsonSerializerOptions { WriteIndented = true });
+        var json = _transferService.BuildExportJson(new[] { profile });
 
         var picker = new FileSavePicker();
         picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
         picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
-        picker.SuggestedFileName = SanitizeFilename($"voice_profile_{profile.Name}_{DateTime.Now:yyyyMMdd}");
+        picker.SuggestedFileName = _transferService.SanitizeFilename($"voice_profile_{profile.Name}_{DateTime.Now:yyyyMMdd}");
         if (App.MainWindowInstance != null)
         {
           var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindowInstance);
@@ -677,24 +637,12 @@ namespace VoiceStudio.App.Views.Panels
         IsLoading = true;
         ErrorMessage = null;
 
-        var exportBundle = new ProfileExportBundle
-        {
-          ExportedAt = DateTime.UtcNow.ToString("O"),
-          Profiles = selectedProfiles.Select(profile => new ProfileImportData
-          {
-            Name = profile.Name,
-            Language = profile.Language,
-            Emotion = profile.Emotion,
-            Tags = profile.Tags?.ToList()
-          }).ToList()
-        };
-
-        var json = JsonSerializer.Serialize(exportBundle, new JsonSerializerOptions { WriteIndented = true });
+        var json = _transferService.BuildExportJson(selectedProfiles);
 
         var picker = new FileSavePicker();
         picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
         picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
-        picker.SuggestedFileName = SanitizeFilename($"voice_profiles_export_{DateTime.Now:yyyyMMdd}");
+        picker.SuggestedFileName = _transferService.SanitizeFilename($"voice_profiles_export_{DateTime.Now:yyyyMMdd}");
         if (App.MainWindowInstance != null)
         {
           var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindowInstance);
@@ -957,16 +905,6 @@ namespace VoiceStudio.App.Views.Panels
           .ToList();
     }
 
-    private static string SanitizeFilename(string? value)
-    {
-      var name = string.IsNullOrWhiteSpace(value) ? "profile_export" : value!;
-      foreach (var c in System.IO.Path.GetInvalidFileNameChars())
-      {
-        name = name.Replace(c, '_');
-      }
-      return name;
-    }
-
     private string GenerateDuplicateName(string? baseName)
     {
       var normalized = string.IsNullOrWhiteSpace(baseName)
@@ -974,11 +912,9 @@ namespace VoiceStudio.App.Views.Panels
           : baseName!.Trim();
 
       var candidate = $"{normalized} (Copy)";
-      var counter = 2;
-      while (Profiles.Any(profile => string.Equals(profile.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+      for (var counter = 2; Profiles.Any(profile => string.Equals(profile.Name, candidate, StringComparison.OrdinalIgnoreCase)); counter++)
       {
         candidate = $"{normalized} (Copy {counter})";
-        counter++;
       }
 
       return candidate;
@@ -1013,131 +949,7 @@ namespace VoiceStudio.App.Views.Panels
           .ToList();
     }
 
-    private static List<ProfileImportData> ParseProfileImports(string json, out string? errorMessage)
-    {
-      errorMessage = null;
-      try
-      {
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-
-        if (root.ValueKind == JsonValueKind.Array)
-        {
-          return ParseProfileArray(root);
-        }
-
-        if (root.ValueKind == JsonValueKind.Object)
-        {
-          if (TryGetProperty(root, "profiles", out var profilesElement) && profilesElement.ValueKind == JsonValueKind.Array)
-          {
-            return ParseProfileArray(profilesElement);
-          }
-
-          var single = ParseProfileObject(root);
-          return single != null ? new List<ProfileImportData> { single } : new List<ProfileImportData>();
-        }
-      }
-      catch (JsonException ex)
-      {
-        errorMessage = ResourceHelper.FormatString("Profile.ImportParseFailed", ex.Message);
-        return new List<ProfileImportData>();
-      }
-
-      errorMessage = ResourceHelper.GetString("Profile.ImportParseFailed", "Invalid profile import format.");
-      return new List<ProfileImportData>();
-    }
-
-    private static List<ProfileImportData> ParseProfileArray(JsonElement element)
-    {
-      var profiles = new List<ProfileImportData>();
-      foreach (var item in element.EnumerateArray())
-      {
-        if (item.ValueKind != JsonValueKind.Object)
-        {
-          continue;
-        }
-
-        var profile = ParseProfileObject(item);
-        if (profile != null)
-        {
-          profiles.Add(profile);
-        }
-      }
-      return profiles;
-    }
-
-    private static ProfileImportData? ParseProfileObject(JsonElement element)
-    {
-      var importData = new ProfileImportData();
-
-      if (TryGetProperty(element, "name", out var nameElement))
-      {
-        importData.Name = nameElement.GetString();
-      }
-
-      if (TryGetProperty(element, "language", out var languageElement))
-      {
-        importData.Language = languageElement.GetString();
-      }
-
-      if (TryGetProperty(element, "emotion", out var emotionElement))
-      {
-        importData.Emotion = emotionElement.GetString();
-      }
-
-      if (TryGetProperty(element, "tags", out var tagsElement))
-      {
-        if (tagsElement.ValueKind == JsonValueKind.Array)
-        {
-          importData.Tags = tagsElement.EnumerateArray()
-              .Select(tag => tag.GetString())
-              .Where(tag => !string.IsNullOrWhiteSpace(tag))
-              .Select(tag => tag!.Trim())
-              .ToList();
-        }
-        else if (tagsElement.ValueKind == JsonValueKind.String)
-        {
-          importData.Tags = ParseTags(tagsElement.GetString());
-        }
-      }
-
-      return importData;
-    }
-
-    private static bool TryGetProperty(JsonElement element, string name, out JsonElement value)
-    {
-      foreach (var property in element.EnumerateObject())
-      {
-        if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
-        {
-          value = property.Value;
-          return true;
-        }
-      }
-
-      value = default;
-      return false;
-    }
-
     private async Task LoadProfilesAsync(CancellationToken cancellationToken)
-    {
-      Task? taskToAwait;
-      lock (_loadProfilesLock)
-      {
-        if (_loadProfilesTask != null && !_loadProfilesTask.IsCompleted)
-        {
-          taskToAwait = _loadProfilesTask;
-        }
-        else
-        {
-          _loadProfilesTask = LoadProfilesCoreAsync(cancellationToken);
-          taskToAwait = _loadProfilesTask;
-        }
-      }
-      await taskToAwait;
-    }
-
-    private async Task LoadProfilesCoreAsync(CancellationToken cancellationToken)
     {
       IsLoading = true;
       ErrorMessage = null;
@@ -1145,22 +957,12 @@ namespace VoiceStudio.App.Views.Panels
       try
       {
         var profilesList = await _profilesUseCase.ListAsync(cancellationToken);
-
-        Profiles.Clear();
-        foreach (var profile in profilesList)
-        {
-          Profiles.Add(profile);
-        }
-
-        // Extract unique languages and emotions
+        ReplaceProfiles(profilesList);
         UpdateAvailableFilters();
-
-        // Apply filters after loading
         ApplyFilters();
       }
       catch (OperationCanceledException)
       {
-        // User cancelled - expected
         return;
       }
       catch (Exception ex)
@@ -1172,6 +974,15 @@ namespace VoiceStudio.App.Views.Panels
       finally
       {
         IsLoading = false;
+      }
+    }
+
+    private void ReplaceProfiles(IReadOnlyList<VoiceProfile> profilesList)
+    {
+      Profiles.Clear();
+      foreach (var profile in profilesList)
+      {
+        Profiles.Add(profile);
       }
     }
 
@@ -1200,7 +1011,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           var action = new CreateProfileAction(
               Profiles,
-              _backendClient,
+              _profilesClient,
               profile,
               onUndo: (p) =>
               {
@@ -1251,12 +1062,13 @@ namespace VoiceStudio.App.Views.Panels
       if (profile == null)
         return;
 
-      // Show confirmation dialog
-      // Note: XamlRoot should be passed from the View if available
-      var confirmed = await Utilities.ConfirmationDialog.ShowDeleteConfirmationAsync(
-          profile.Name ?? ResourceHelper.GetString("Profile.Unnamed", "Unnamed Profile"),
-          "profile"
-      );
+      var confirmed = _dialogService != null
+        ? await _dialogService.ShowConfirmationAsync(
+            "Delete profile?",
+            $"Are you sure you want to delete '{profile.Name ?? ResourceHelper.GetString("Profile.Unnamed", "Unnamed Profile")}'? This action cannot be undone.",
+            "Delete",
+            "Cancel")
+        : false;
 
       if (!confirmed)
         return;
@@ -1286,7 +1098,7 @@ namespace VoiceStudio.App.Views.Panels
             {
               var action = new DeleteProfileAction(
                   Profiles,
-                  _backendClient,
+                  _profilesClient,
                   profileToDelete,
                   onUndo: (p) => SelectedProfile = p,
                   onRedo: (p) =>
@@ -1372,12 +1184,12 @@ namespace VoiceStudio.App.Views.Panels
       }
       _profileChangeCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-      // Load cached quality metrics if available
-      if (value != null && _previewQualityCache.ContainsKey(value.Id))
+      // Load cached quality metrics if available (from ProfilePreviewService)
+      if (value != null && _previewService != null && _previewService.TryGetCachedQuality(value.Id, out var cachedMetrics, out var cachedScore))
       {
-        PreviewQualityMetrics = _previewQualityCache[value.Id];
-        HasPreviewQualityMetrics = PreviewQualityMetrics != null;
-        PreviewQualityScore = _previewQualityScoreCache.GetValueOrDefault(value.Id);
+        PreviewQualityMetrics = cachedMetrics;
+        HasPreviewQualityMetrics = cachedMetrics != null;
+        PreviewQualityScore = cachedScore;
       }
       else
       {
@@ -1425,7 +1237,7 @@ namespace VoiceStudio.App.Views.Panels
 
     private async Task PreviewProfileAsync(string? profileId, CancellationToken cancellationToken)
     {
-      if (string.IsNullOrWhiteSpace(profileId) || SelectedProfile == null)
+      if (string.IsNullOrWhiteSpace(profileId) || SelectedProfile == null || _previewService == null)
         return;
 
       try
@@ -1435,102 +1247,32 @@ namespace VoiceStudio.App.Views.Panels
         ErrorMessage = null;
         HasPreviewQualityMetrics = false;
 
-        string? audioUrl = null;
-        QualityMetrics? qualityMetrics = null;
-        double? qualityScore = null;
+        var result = await _previewService.GetOrCreatePreviewAsync(profileId, SelectedProfile, cancellationToken).ConfigureAwait(false);
 
-        // Check cache first
-        if (_previewCache.ContainsKey(profileId))
+        if (result != null)
         {
-          audioUrl = _previewCache[profileId];
-          qualityMetrics = _previewQualityCache.GetValueOrDefault(profileId);
-          qualityScore = _previewQualityScoreCache.GetValueOrDefault(profileId);
-        }
-        else
-        {
-          // Synthesize preview audio with default text
-          var request = new VoiceSynthesisRequest
+          if (result.QualityMetrics != null)
           {
-            Engine = "xtts", // Default engine for preview
-            ProfileId = profileId,
-            Text = DEFAULT_PREVIEW_TEXT,
-            Language = SelectedProfile.Language ?? "en",
-            Emotion = string.IsNullOrWhiteSpace(SelectedProfile.Emotion) ? null : SelectedProfile.Emotion,
-            EnhanceQuality = false // Fast preview, no quality enhancement
-          };
-
-          var response = await _backendClient.SynthesizeVoiceAsync(request, cancellationToken);
-          audioUrl = response.AudioUrl;
-          qualityMetrics = response.QualityMetrics;
-          qualityScore = response.QualityScore;
-
-          // Cache the results
-          if (!string.IsNullOrWhiteSpace(audioUrl))
-          {
-            _previewCache[profileId] = audioUrl;
-            if (qualityMetrics != null)
-              _previewQualityCache[profileId] = qualityMetrics;
-            if (qualityScore.HasValue)
-              _previewQualityScoreCache[profileId] = qualityScore.Value;
+            PreviewQualityMetrics = result.QualityMetrics;
+            HasPreviewQualityMetrics = true;
           }
-        }
+          PreviewQualityScore = result.QualityScore;
 
-        // Update quality metrics display
-        if (qualityMetrics != null)
-        {
-          PreviewQualityMetrics = qualityMetrics;
-          HasPreviewQualityMetrics = true;
-        }
-        PreviewQualityScore = qualityScore;
-
-        // Update profile's quality score if we have a new quality score from preview
-        // This provides real-time quality updates when previewing profiles
-        if (qualityScore.HasValue && SelectedProfile != null && SelectedProfile.Id == profileId)
-        {
-          // Update the profile's quality score (this will automatically update the badge via data binding)
-          var profile = Profiles.FirstOrDefault(p => p.Id == profileId);
-          if (profile != null)
+          if (result.QualityScore.HasValue && SelectedProfile != null && SelectedProfile.Id == profileId)
           {
-            profile.QualityScore = qualityScore.Value;
-            // Trigger property change notification for the badge to update
-            OnPropertyChanged(nameof(Profiles));
-            OnPropertyChanged(nameof(FilteredProfiles));
-          }
-        }
-
-        if (!string.IsNullOrWhiteSpace(audioUrl))
-        {
-          // Download and play preview audio (Phase 4: use shared HttpClient)
-          var httpClient = AppServices.GetService<System.Net.Http.HttpClient>();
-          if (httpClient == null)
-            throw new InvalidOperationException("HttpClient not available");
-          var audioBytes = await httpClient.GetByteArrayAsync(audioUrl);
-
-          // Save to temporary file
-          var tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"voicestudio_preview_{Guid.NewGuid()}.wav");
-          await System.IO.File.WriteAllBytesAsync(tempPath, audioBytes);
-
-          // Play preview
-          await _audioPlayer.PlayFileAsync(tempPath, () =>
-          {
-            // Cleanup and reset state after playback
-            try
+            var profile = Profiles.FirstOrDefault(p => p.Id == profileId);
+            if (profile != null)
             {
-              if (System.IO.File.Exists(tempPath))
-                System.IO.File.Delete(tempPath);
+              profile.QualityScore = result.QualityScore.Value;
+              OnPropertyChanged(nameof(Profiles));
+              OnPropertyChanged(nameof(FilteredProfiles));
             }
-            catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "ProfileExportBundle.Unknown"); }
-
-            IsPreviewing = false;
-            IsLoading = false;
-          });
+          }
         }
       }
       catch (OperationCanceledException)
       {
         // User cancelled - expected
-        IsPreviewing = false;
-        IsLoading = false;
         return;
       }
       catch (Exception ex)
@@ -1539,6 +1281,9 @@ namespace VoiceStudio.App.Views.Panels
         ErrorMessage = ResourceHelper.FormatString("Profile.PreviewFailed", errorMsg);
         _errorService?.ShowError(ex, ResourceHelper.GetString("Profile.PreviewFailed", "Failed to preview profile"));
         _logService?.LogError(ex, "PreviewProfile");
+      }
+      finally
+      {
         IsPreviewing = false;
         IsLoading = false;
       }
@@ -1548,7 +1293,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       try
       {
-        _audioPlayer.Stop();
+        _previewService?.StopPreview();
         IsPreviewing = false;
       }
       catch (Exception ex)
@@ -1623,11 +1368,13 @@ namespace VoiceStudio.App.Views.Panels
 
       var selectedIds = new List<string>(_multiSelectState.SelectedIds);
 
-      // Show confirmation dialog
-      var confirmed = await Utilities.ConfirmationDialog.ShowDeleteConfirmationAsync(
-          $"{selectedIds.Count} profile(s)",
-          "profiles"
-      );
+      var confirmed = _dialogService != null
+        ? await _dialogService.ShowConfirmationAsync(
+            "Delete profiles?",
+            $"Are you sure you want to delete '{selectedIds.Count} profile(s)'? This action cannot be undone.",
+            "Delete",
+            "Cancel")
+        : false;
 
       if (!confirmed)
         return;
@@ -1677,7 +1424,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           var action = new BatchDeleteProfilesAction(
               Profiles,
-              _backendClient,
+              _profilesClient,
               profilesToDelete,
               onUndo: (profiles) =>
               {
@@ -1846,10 +1593,10 @@ namespace VoiceStudio.App.Views.Panels
           await Task.Delay(FilterDebounceMs, cts.Token);
           Dispatcher.TryEnqueue(ApplyFilters);
         }
-        catch (OperationCanceledException)
-        {
-          // Debounce cancelled by new keystroke
-        }
+        catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "ProfileExportBundle.OnSearchQueryChanged");
+      }
       });
     }
 
@@ -1899,20 +1646,13 @@ namespace VoiceStudio.App.Views.Panels
         ErrorMessage = null;
         EnhanceReferenceAudioCommand.NotifyCanExecuteChanged();
 
-        var request = new ReferenceAudioPreprocessRequest
-        {
-          ProfileId = SelectedProfile.Id,
-          AutoEnhance = AutoEnhance,
-          SelectOptimalSegments = SelectOptimalSegments,
-          MinSegmentDuration = 1.0,
-          MaxSegments = 5
-        };
-
-        var response = await _backendClient.SendRequestAsync<ReferenceAudioPreprocessRequest, ReferenceAudioPreprocessResponse>(
-            $"/api/profiles/{SelectedProfile.Id}/preprocess-reference",
-            request,
-            cancellationToken
-        );
+        var response = await _enhancementService.EnhanceAsync(
+            SelectedProfile.Id,
+            AutoEnhance,
+            SelectOptimalSegments,
+            1.0,
+            5,
+            cancellationToken);
 
         if (response != null)
         {
@@ -1946,6 +1686,11 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    // Task 9.4: Preview/Apply ownership — KEEP in ViewModel.
+    // PreviewEnhancedAudioAsync: UI state (IsPlayingEnhanced) + player orchestration (_audioPlayer.PlayFileAsync).
+    // StopEnhancedPreview: Player stop + command refresh. No backend, no domain policy.
+    // ApplyEnhancedAudioAsync: Reload profiles + clear state + toast. Backend does not yet support reference_audio_url
+    // updates; when it does, apply logic should move to IProfileEnhancementService.ApplyAsync.
     private async Task PreviewEnhancedAudioAsync(CancellationToken cancellationToken)
     {
       if (EnhancementResult == null || string.IsNullOrEmpty(EnhancementResult.ProcessedAudioUrl))
@@ -2062,11 +1807,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var history = await _backendClient.GetQualityHistoryAsync(
-            SelectedProfile.Id,
-            limit: 50, // Load last 50 entries
-            cancellationToken: cancellationToken
-        );
+        var history = await _qualityInsightsService.LoadQualityHistoryAsync(SelectedProfile.Id, cancellationToken);
 
         QualityHistory.Clear();
         foreach (var entry in history)
@@ -2107,11 +1848,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        QualityTrends = await _backendClient.GetQualityTrendsAsync(
-            SelectedProfile.Id,
-            SelectedTimeRange,
-            cancellationToken
-        );
+        QualityTrends = await _qualityInsightsService.LoadQualityTrendsAsync(SelectedProfile.Id, SelectedTimeRange, cancellationToken);
       }
       catch (OperationCanceledException)
       {
@@ -2150,13 +1887,10 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var degradation = await _backendClient.GetQualityDegradationAsync(
+        var degradation = await _qualityInsightsService.GetQualityDegradationAsync(
             SelectedProfile.Id,
             DegradationTimeWindowDays,
-            degradationThresholdPercent: 10.0,
-            criticalThresholdPercent: 25.0,
-            cancellationToken
-        );
+            cancellationToken);
 
         QualityDegradation = degradation;
         HasQualityDegradation = degradation?.HasDegradation ?? false;
@@ -2224,11 +1958,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        QualityBaseline = await _backendClient.GetQualityBaselineAsync(
-            SelectedProfile.Id,
-            timePeriodDays: 30,
-            cancellationToken
-        );
+        QualityBaseline = await _qualityInsightsService.LoadQualityBaselineAsync(SelectedProfile.Id, cancellationToken);
       }
       catch (OperationCanceledException)
       {
@@ -2296,6 +2026,8 @@ namespace VoiceStudio.App.Views.Panels
     /// Restores panel state from persistence.
     /// Backend-Frontend Integration Plan - Phase 2.
     /// </summary>
+    /// <param name="state">The persisted panel state data to restore.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task RestoreStateAsync(PanelStateData state, CancellationToken cancellationToken = default)
     {
       if (state == null) return;

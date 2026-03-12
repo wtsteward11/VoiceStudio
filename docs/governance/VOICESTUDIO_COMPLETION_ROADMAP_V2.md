@@ -27,6 +27,8 @@ v1.0 roadmap: correct gaps, weak enforcement. ChatGPT critique: mostly valid on 
 
 100% complete means exactly one thing: `pytest tests/e2e/test_golden_path.py` exits 0 with real XTTS + STT engine loaded, real audio in, real synthesized audio out, proof artifact on disk with model hashes and git commit. Everything else is scaffolding.
 
+**Canonical:** As long as there are placeholders, this project can never be considered complete.
+
 ---
 
 ## Section 1: Ground Truth Gaps (Verified 2026-03-03)

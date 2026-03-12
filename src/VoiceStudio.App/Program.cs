@@ -78,6 +78,23 @@ namespace VoiceStudio.App
           Environment.SetEnvironmentVariable("VOICE_STUDIO_SMOKE_UI", "1");
         }
 
+        if (HasFlag(args, "--ui-self-test"))
+        {
+          Environment.SetEnvironmentVariable("VOICE_STUDIO_SMOKE_UI", "1");
+          Environment.SetEnvironmentVariable("VOICE_STUDIO_UI_SELF_TEST", "1");
+        }
+
+        if (HasFlag(args, "--require-backend"))
+        {
+          Environment.SetEnvironmentVariable("VOICE_STUDIO_UI_SELF_TEST_REQUIRE_BACKEND", "1");
+        }
+
+        var outIdx = Array.FindIndex(args, a => string.Equals(a, "--out", StringComparison.OrdinalIgnoreCase));
+        if (outIdx >= 0 && outIdx + 1 < args.Length)
+        {
+          Environment.SetEnvironmentVariable("VOICE_STUDIO_UI_SELF_TEST_OUT", args[outIdx + 1]);
+        }
+
         if (HasFlag(args, "--smoke-exit"))
         {
           Environment.SetEnvironmentVariable("VOICE_STUDIO_SMOKE_EXIT", "1");

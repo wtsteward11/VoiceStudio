@@ -1,9 +1,12 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -16,6 +19,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public class MixAssistantViewModelTests : ViewModelTestBase
     {
         private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IProjectsClient>? _mockProjectsClient;
         private MixAssistantViewModel? _viewModel;
 
         [TestInitialize]
@@ -23,6 +27,10 @@ namespace VoiceStudio.App.Tests.ViewModels
         {
             base.TestInitialize();
             _mockBackendClient = new Mock<IBackendClient>();
+            _mockProjectsClient = new Mock<IProjectsClient>();
+            _mockProjectsClient
+                .Setup(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<Project>());
             _viewModel = CreateViewModel();
         }
 
@@ -31,12 +39,13 @@ namespace VoiceStudio.App.Tests.ViewModels
         {
             _viewModel = null;
             _mockBackendClient = null;
+            _mockProjectsClient = null;
             base.TestCleanup();
         }
 
         private MixAssistantViewModel CreateViewModel()
         {
-            return new MixAssistantViewModel(MockContext!, _mockBackendClient!.Object);
+            return new MixAssistantViewModel(MockContext!, _mockBackendClient!.Object, _mockProjectsClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -55,14 +64,21 @@ namespace VoiceStudio.App.Tests.ViewModels
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
-            _ = new MixAssistantViewModel(null!, _mockBackendClient!.Object);
+            _ = new MixAssistantViewModel(null!, _mockBackendClient!.Object, _mockProjectsClient!.Object);
         }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
         {
-            _ = new MixAssistantViewModel(MockContext!, null!);
+            _ = new MixAssistantViewModel(MockContext!, null!, _mockProjectsClient!.Object);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
+        public void Constructor_WithNullProjectsClient_ThrowsArgumentNullException()
+        {
+            _ = new MixAssistantViewModel(MockContext!, _mockBackendClient!.Object, null!);
         }
 
         #endregion

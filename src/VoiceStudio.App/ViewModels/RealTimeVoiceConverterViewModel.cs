@@ -21,6 +21,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class RealTimeVoiceConverterViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProfilesClient _profilesClient;
     private readonly IWebSocketClientFactory? _webSocketClientFactory;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly RealtimeVoiceWebSocketClient? _webSocketClient;
@@ -86,6 +87,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string qualityMetricsDisplay = "No metrics available";
 
+    /// <summary>
+    /// Whether RVC realtime is enabled (F-09 gate). When false, start session is disabled.
+    /// </summary>
+    public bool IsRvcRealtimeEnabled { get; }
+
     // Monitoring
     private DispatcherQueueTimer? _monitoringTimer;
     private readonly List<double> _latencyHistory = new();
@@ -97,12 +103,17 @@ namespace VoiceStudio.App.ViewModels
     public RealTimeVoiceConverterViewModel(
         IViewModelContext context,
         IBackendClient backendClient,
+        IProfilesClient profilesClient,
         IWebSocketClientFactory? webSocketClientFactory = null)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _webSocketClientFactory = webSocketClientFactory;
       _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+
+      // F-09 gate: rvc_realtime disabled until direct WebSocket wiring is complete
+      IsRvcRealtimeEnabled = AppServices.TryGetFeatureFlagsService()?.IsEnabled("rvc_realtime") ?? false;
 
       // Get services (may be null if not initialized)
       try
@@ -141,7 +152,7 @@ namespace VoiceStudio.App.ViewModels
       {
         using var profiler = PerformanceProfiler.StartCommand("StartSession");
         await StartSessionAsync(ct);
-      }, () => !string.IsNullOrEmpty(SourceProfileId) && !string.IsNullOrEmpty(TargetProfileId) && !IsLoading);
+      }, () => IsRvcRealtimeEnabled && !string.IsNullOrEmpty(SourceProfileId) && !string.IsNullOrEmpty(TargetProfileId) && !IsLoading);
       StopSessionCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("StopSession");
@@ -487,7 +498,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var profiles = await _backendClient.GetProfilesAsync(cancellationToken);
+        var profiles = await _profilesClient.GetProfilesAsync(cancellationToken);
 
         AvailableProfiles.Clear();
         foreach (var profile in profiles)

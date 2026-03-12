@@ -10,7 +10,7 @@
   Press Ctrl+C to stop both processes.
 
 .PARAMETER Port
-  Backend port (default: value of VOICESTUDIO_API_PORT or 8001).
+  Backend port (default: value of VOICESTUDIO_API_PORT or 8000).
 
 .PARAMETER SkipBuild
   Launch the last build output without rebuilding.

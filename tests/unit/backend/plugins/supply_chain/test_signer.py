@@ -27,7 +27,7 @@ from backend.plugins.supply_chain.signer import (
 )
 
 # Skip all tests if cryptography is not available
-pytestmark = pytest.mark.skipif(not HAS_CRYPTOGRAPHY, reason="cryptography library not available")
+pytestmark = pytest.mark.skipif(not HAS_CRYPTOGRAPHY, reason="cryptography library not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
 
 # =============================================================================

@@ -219,6 +219,36 @@ class VoiceSynthesizeRequest(VoiceStudioBaseModel):
         description="Consent record ID required when synthesizing with a third-party voice profile",
         max_length=100,
     )
+    speed: float | None = Field(
+        default=None,
+        description="Speech speed (0.5-2.0, default 1.0)",
+        ge=0.5,
+        le=2.0,
+    )
+    pitch: float | None = Field(
+        default=None,
+        description="Pitch shift in semitones (-12 to 12)",
+        ge=-12.0,
+        le=12.0,
+    )
+    stability: float | None = Field(
+        default=None,
+        description="Voice stability (0-1)",
+        ge=0.0,
+        le=1.0,
+    )
+    clarity: float | None = Field(
+        default=None,
+        description="Voice clarity (0-1)",
+        ge=0.0,
+        le=1.0,
+    )
+    temperature: float | None = Field(
+        default=None,
+        description="Sampling temperature (0-1)",
+        ge=0.0,
+        le=1.0,
+    )
 
     @validator("engine")
     def validate_engine(cls, v):

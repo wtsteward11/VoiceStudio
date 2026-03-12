@@ -188,6 +188,64 @@ def validate_nested_semantics(
                     errors.append(
                         f"{_rel(path)}: ui_smoke.binding_failure_count must be {bfc}, got {actual}"
                     )
+            if nested.get("ui_smoke.synthesis_step_ran_must_be_true"):
+                if ui_smoke.get("synthesis_step_ran") is not True:
+                    errors.append(
+                        f"{_rel(path)}: ui_smoke.synthesis_step_ran must be true"
+                    )
+            if nested.get("ui_smoke.audio_id_required"):
+                aid = ui_smoke.get("audio_id")
+                if not aid or not isinstance(aid, str) or not aid.strip():
+                    errors.append(
+                        f"{_rel(path)}: ui_smoke.audio_id must be non-empty"
+                    )
+            if nested.get("ui_smoke.stream_check_passed_must_be_true"):
+                if ui_smoke.get("stream_check_passed") is not True:
+                    errors.append(
+                        f"{_rel(path)}: ui_smoke.stream_check_passed must be true"
+                    )
+            if nested.get("ui_smoke.temp_file_created_must_be_true"):
+                if ui_smoke.get("temp_file_created") is not True:
+                    errors.append(
+                        f"{_rel(path)}: ui_smoke.temp_file_created must be true"
+                    )
+            if nested.get("ui_smoke.playback_started_must_be_true"):
+                if ui_smoke.get("playback_started") is not True:
+                    errors.append(
+                        f"{_rel(path)}: ui_smoke.playback_started must be true"
+                    )
+            min_adv = nested.get("ui_smoke.playback_position_advanced_ms_min")
+            if min_adv is not None:
+                adv = ui_smoke.get("playback_position_advanced_ms")
+                if adv is None:
+                    errors.append(
+                        f"{_rel(path)}: ui_smoke.playback_position_advanced_ms is required"
+                    )
+                elif not isinstance(adv, (int, float)) or adv < min_adv:
+                    errors.append(
+                        f"{_rel(path)}: ui_smoke.playback_position_advanced_ms must be >= {min_adv}, got {adv}"
+                    )
+            if nested.get("ui_smoke.library_temp_file_created_must_be_true"):
+                if ui_smoke.get("library_temp_file_created") is not True:
+                    errors.append(
+                        f"{_rel(path)}: ui_smoke.library_temp_file_created must be true"
+                    )
+            if nested.get("ui_smoke.library_playback_started_must_be_true"):
+                if ui_smoke.get("library_playback_started") is not True:
+                    errors.append(
+                        f"{_rel(path)}: ui_smoke.library_playback_started must be true"
+                    )
+            lib_min_adv = nested.get("ui_smoke.library_playback_position_advanced_ms_min")
+            if lib_min_adv is not None:
+                lib_adv = ui_smoke.get("library_playback_position_advanced_ms")
+                if lib_adv is None:
+                    errors.append(
+                        f"{_rel(path)}: ui_smoke.library_playback_position_advanced_ms is required"
+                    )
+                elif not isinstance(lib_adv, (int, float)) or lib_adv < lib_min_adv:
+                    errors.append(
+                        f"{_rel(path)}: ui_smoke.library_playback_position_advanced_ms must be >= {lib_min_adv}, got {lib_adv}"
+                    )
             if nested.get("ui_smoke.summary_path_required"):
                 sp = ui_smoke.get("summary_path")
                 if not sp or not isinstance(sp, str):

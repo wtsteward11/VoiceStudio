@@ -53,6 +53,8 @@ namespace VoiceStudio.App.Services
 
     public void ShowError(string message, string? title = null, Action? viewDetailsAction = null)
     {
+      if (AppServices.GetService<GracefulDegradationService>()?.IsDegradedMode == true)
+        return;
       if (SuppressTransientBackendErrors && LooksLikeTransientBackendError(message))
         return;
       ShowToast(ToastType.Error, message, title, 0, viewDetailsAction);

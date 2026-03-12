@@ -21,6 +21,8 @@ namespace VoiceStudio.App.Services
     public static void Initialize() => AppServices.Initialize();
 
     public static IBackendClient GetBackendClient() => AppServices.GetBackendClient();
+    public static IProjectsClient GetProjectsClient() => AppServices.GetProjectsClient();
+    public static IProfilesClient GetProfilesClient() => AppServices.GetProfilesClient();
     public static IAudioPlayerService GetAudioPlayerService() => AppServices.GetAudioPlayerService();
     public static IErrorDialogService GetErrorDialogService() => AppServices.GetErrorDialogService();
     public static IErrorLoggingService GetErrorLoggingService() => AppServices.GetErrorLoggingService();

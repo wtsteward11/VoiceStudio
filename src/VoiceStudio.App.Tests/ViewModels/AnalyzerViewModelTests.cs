@@ -9,6 +9,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public class AnalyzerViewModelTests
     {
         private Mock<IBackendClient> _mockBackendClient = null!;
+        private Mock<IAudioVisualizationService> _mockAudioVisualizationService = null!;
         private Mock<IAudioPlayerService> _mockAudioPlayer = null!;
         private AnalyzerViewModel _viewModel = null!;
 
@@ -16,8 +17,9 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Setup()
         {
             _mockBackendClient = new Mock<IBackendClient>();
+            _mockAudioVisualizationService = new Mock<IAudioVisualizationService>();
             _mockAudioPlayer = new Mock<IAudioPlayerService>();
-            _viewModel = new AnalyzerViewModel(_mockBackendClient.Object, _mockAudioPlayer.Object);
+            _viewModel = new AnalyzerViewModel(_mockBackendClient.Object, _mockAudioVisualizationService.Object, _mockAudioPlayer.Object);
         }
 
         [TestMethod]

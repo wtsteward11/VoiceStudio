@@ -73,6 +73,10 @@ class VoiceStudioSettings(BaseSettings):
     # Rate limiting
     rate_limit_enabled: bool = Field(default=True, description="Enable API rate limiting")
     rate_limit_requests_per_minute: int = Field(default=60, description="Requests per minute limit")
+    rate_limit_localhost_exempt: bool = Field(
+        default=True,
+        description="Exempt 127.0.0.1/localhost from rate limits (desktop dev mode)",
+    )
 
     # Telemetry (opt-in only)
     telemetry_enabled: bool = Field(default=False, description="Enable telemetry (opt-in)")

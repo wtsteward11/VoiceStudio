@@ -21,6 +21,7 @@ namespace VoiceStudio.App.Tests.ViewModels
   {
     private IViewModelContext _context = null!;
     private Mock<IBackendClient> _mockBackendClient = null!;
+    private Mock<IAudioPlayerService> _mockAudioPlayer = null!;
     private DispatcherQueueController? _dispatcherController;
     private RecordingViewModel _sut = null!;
 
@@ -32,8 +33,15 @@ namespace VoiceStudio.App.Tests.ViewModels
       var dispatcher = _dispatcherController.DispatcherQueue;
       _context = new ViewModelContext(NullLogger.Instance, dispatcher);
       _mockBackendClient = new Mock<IBackendClient>();
+      _mockAudioPlayer = new Mock<IAudioPlayerService>();
+      _mockAudioPlayer.Setup(x => x.PlayBackendAudioIdAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Action>()))
+          .Returns(Task.CompletedTask);
+      _mockAudioPlayer.Setup(x => x.PlayFileAsync(It.IsAny<string>(), It.IsAny<Action>()))
+          .Returns(Task.CompletedTask);
+      _mockAudioPlayer.Setup(x => x.PlayUrlAsync(It.IsAny<string>(), It.IsAny<Action>()))
+          .Returns(Task.CompletedTask);
 
-      _sut = new RecordingViewModel(_context, _mockBackendClient.Object);
+      _sut = new RecordingViewModel(_context, _mockBackendClient.Object, _mockAudioPlayer.Object);
     }
 
     [TestCleanup]
@@ -68,13 +76,14 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsNotNull(_sut);
       Assert.IsNotNull(_sut.StartRecordingCommand);
       Assert.IsNotNull(_sut.StopRecordingCommand);
+      Assert.IsNotNull(_sut.PlayCommand);
     }
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
     {
-      _ = new RecordingViewModel(_context, null!);
+      _ = new RecordingViewModel(_context, null!, _mockAudioPlayer.Object);
     }
 
     #endregion

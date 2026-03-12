@@ -18,6 +18,7 @@ from .engines import router as engines_router
 from .models import (
     ErrorCode,
     ErrorDetail,
+    ErrorSeverity,
     PaginationMeta,
     RequestMeta,
     ResponseStatus,
@@ -42,6 +43,7 @@ router.include_router(projects_router)
 __all__ = [
     "ErrorCode",
     "ErrorDetail",
+    "ErrorSeverity",
     "PaginationMeta",
     "RequestMeta",
     "ResponseStatus",

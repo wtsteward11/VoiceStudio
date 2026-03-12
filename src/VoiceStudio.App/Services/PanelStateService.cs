@@ -622,7 +622,7 @@ namespace VoiceStudio.App.Services
           if (File.Exists(tempPath))
           {
             // ALLOWED: empty catch - best effort restore; failure is acceptable, not actionable
-            try { File.Move(tempPath, oldPath); } catch { /* best effort restore */ }
+            try { File.Move(tempPath, oldPath); } catch (Exception restoreEx) { ErrorLogger.LogWarning($"Best effort restore failed: {restoreEx.Message}", "PanelStateService.RenameWorkspaceProfileAsync"); }
           }
           return false;
         }

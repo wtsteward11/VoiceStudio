@@ -17,6 +17,7 @@ namespace VoiceStudio.App.Views.Panels
   public partial class TagOrganizationViewModel : ObservableObject
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProfilesClient _profilesClient;
 
     [ObservableProperty]
     private string viewMode = "Cloud"; // Cloud, Hierarchy, List
@@ -37,9 +38,10 @@ namespace VoiceStudio.App.Views.Panels
     public bool IsHierarchyView => ViewMode == "Hierarchy";
     public bool IsListView => ViewMode == "List";
 
-    public TagOrganizationViewModel(IBackendClient backendClient)
+    public TagOrganizationViewModel(IBackendClient backendClient, IProfilesClient profilesClient)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       RefreshCommand = new AsyncRelayCommand(RefreshAsync);
     }
 
@@ -88,7 +90,7 @@ namespace VoiceStudio.App.Views.Panels
       try
       {
         // Load all profiles to extract tags
-        var profiles = await _backendClient.GetProfilesAsync();
+        var profiles = await _profilesClient.GetProfilesAsync();
 
         // Extract and count tags
         var tagCounts = new Dictionary<string, int>();

@@ -30,7 +30,11 @@ try:
     HAS_ROUTER = True
 except ImportError:
     HAS_ROUTER = False
-    pytestmark = pytest.mark.skip("Engine router not available")
+
+pytestmark = pytest.mark.skipif(
+    not HAS_ROUTER,
+    reason="Engine router not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)",
+)
 
 
 @pytest.fixture

@@ -43,14 +43,33 @@
                             Margin="{StaticResource VSQ.Spacing.Small}"
                             AutomationProperties.AutomationId="LibraryView_SearchBox" />
             
-            <!-- Folders List (collapsible) -->
+            <!-- Folders List (collapsible) - TRAP 5: DataTemplate for folders -->
             <ListView x:Name="FoldersListView"
                       Grid.Row="1"
                       ItemsSource="{x:Bind ViewModel.Folders, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.SelectedFolder, Mode=TwoWay}"
                       Visibility="{x:Bind ViewModel.ShowFolders, Mode=OneWay}"
                       MaxHeight="150"
                       Background="{StaticResource VSQ.Panel.Background.DarkerBrush}"
-                      AutomationProperties.AutomationId="LibraryView_FoldersListView" />
+                      AutomationProperties.AutomationId="LibraryView_FoldersListView">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:LibraryFolder">
+                        <Grid Padding="8,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Grid.Column="0" Glyph="&#xE8B7;" FontSize="14" Margin="0,0,8,0"
+                                      Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                            <TextBlock Grid.Column="1" Text="{x:Bind Name}" VerticalAlignment="Center"
+                                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
+                            <TextBlock Grid.Column="2" Text="{x:Bind AssetCount}" VerticalAlignment="Center"
+                                       FontSize="12" Foreground="{StaticResource VSQ.Text.TertiaryBrush}" />
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
             
             <!-- Assets List with Context Menu -->
             <ListView x:Name="AssetsListView"
@@ -99,9 +118,22 @@
                 </ListView.ItemTemplate>
             </ListView>
             
+            <!-- Empty state overlay (populated in code-behind) -->
+            <Grid x:Name="LibraryEmptyStateOverlay" Grid.Row="0" Grid.RowSpan="3" Visibility="Collapsed" />
+
             <Canvas x:Name="DragDropCanvas" Grid.RowSpan="3" IsHitTestVisible="False" Background="Transparent"
                     AutomationProperties.AutomationId="LibraryView_DragDropCanvas" />
         </Grid>
+
+        <!-- Loading overlay (visibility set in code-behind) -->
+        <Grid x:Name="LibraryLoadingOverlay" Grid.RowSpan="2" Visibility="Collapsed" />
+
+        <!-- Error InfoBar (content set in code-behind, Retry via ActionButton) -->
+        <InfoBar x:Name="LibraryErrorInfoBar" Grid.Row="0" IsOpen="False" IsClosable="True" Margin="8" VerticalAlignment="Top">
+          <InfoBar.ActionButton>
+            <Button Content="Retry" Command="{x:Bind ViewModel.RetryOnErrorCommand, Mode=OneWay}"/>
+          </InfoBar.ActionButton>
+        </InfoBar>
 
         <!-- Help Overlay -->
         <controls:HelpOverlay x:Name="HelpOverlay" 

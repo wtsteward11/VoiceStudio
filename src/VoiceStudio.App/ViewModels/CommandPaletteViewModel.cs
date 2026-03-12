@@ -60,6 +60,7 @@ namespace VoiceStudio.App.ViewModels
     void LoadDefaultItems()
     {
       foreach (var d in _panelRegistry.GetAllDescriptors()
+        .Where(d => d.IsVisible)
         .Where(d => d.Maturity != PanelMaturity.Deprecated)
         .OrderBy(d => d.MenuCategory ?? d.Category.ToString())
         .ThenBy(d => d.DisplayName))

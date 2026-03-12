@@ -196,19 +196,13 @@ def to_v3_error_response(
     # Map legacy error code to v3 format
     v3_code = map_legacy_error_code(error_code)
 
-    # Build error details
+    # Build error details (ErrorEnvelope: code, message, details, severity, recovery_suggestion)
     error_detail = ErrorDetail(
         code=v3_code,
         message=message,
         field=field,
-        details=(
-            {
-                **(details or {}),
-                **({"recovery_suggestion": recovery_suggestion} if recovery_suggestion else {}),
-            }
-            if details or recovery_suggestion
-            else None
-        ),
+        details=details,
+        recovery_suggestion=recovery_suggestion,
     )
 
     # Build request metadata
@@ -544,6 +538,49 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
             else {"path": request.url.path}
         ),
         recovery_suggestion=recovery_suggestion,
+    )
+
+
+async def service_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Handle service-layer exceptions (ServiceError, PreflightError).
+
+    GAP-007: Services raise these instead of HTTPException; this handler
+    converts to v3 StandardResponse format. Keeps service layer independent of FastAPI.
+    """
+    status_code = getattr(exc, "status_code", 500)
+    detail = getattr(exc, "detail", str(exc))
+    request_id = getattr(request.state, "request_id", generate_request_id())
+
+    # Map status code to error code
+    status_to_code = {
+        400: ErrorCodes.INVALID_INPUT,
+        401: ErrorCodes.AUTHENTICATION_FAILED,
+        403: ErrorCodes.AUTHORIZATION_FAILED,
+        404: ErrorCodes.RESOURCE_NOT_FOUND,
+        409: ErrorCodes.RESOURCE_CONFLICT,
+        422: ErrorCodes.VALIDATION_ERROR,
+        429: ErrorCodes.RATE_LIMIT_EXCEEDED,
+        500: ErrorCodes.INTERNAL_SERVER_ERROR,
+        503: ErrorCodes.SERVICE_UNAVAILABLE,
+        504: ErrorCodes.TIMEOUT_ERROR,
+    }
+    error_code = status_to_code.get(status_code, ErrorCodes.INTERNAL_SERVER_ERROR)
+
+    logger.warning(
+        "Service error on %s: %s (%s)",
+        request.url.path,
+        detail,
+        status_code,
+        extra={"request_id": request_id},
+    )
+
+    return create_v3_error_json_response(
+        error_code=error_code,
+        message=str(detail),
+        status_code=status_code,
+        request_id=request_id,
+        details={"path": request.url.path},
     )
 
 

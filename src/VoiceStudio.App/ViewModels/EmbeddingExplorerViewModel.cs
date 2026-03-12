@@ -26,6 +26,8 @@ namespace VoiceStudio.App.ViewModels
   public partial class EmbeddingExplorerViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProjectsClient _projectsClient;
+    private readonly IProfilesClient _profilesClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
     public string PanelId => "embedding-explorer";
@@ -74,17 +76,6 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<EmbeddingClusterItem> clusters = new();
 
-    [ObservableProperty]
-    private bool isLoading;
-
-    [ObservableProperty]
-    private string? errorMessage;
-
-    [ObservableProperty]
-    private string? statusMessage;
-
-    // CS0108 fix: Intentionally hiding base HasError with local ErrorMessage binding
-    public new bool HasError => !string.IsNullOrEmpty(ErrorMessage);
     public IRelayCommand DeleteSelectedEmbeddingsCommand { get; }
 
     partial void OnEmbeddingsChanged(ObservableCollection<EmbeddingItem> value)
@@ -97,10 +88,12 @@ namespace VoiceStudio.App.ViewModels
       ExportVisualizationCommand.NotifyCanExecuteChanged();
     }
 
-    public EmbeddingExplorerViewModel(IViewModelContext context, IBackendClient backendClient)
+    public EmbeddingExplorerViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient, IProfilesClient profilesClient)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
       // Get toast notification service (may be null if not initialized)
       try
@@ -493,7 +486,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var projects = await _backendClient.GetProjectsAsync(cancellationToken);
+        var projects = await _projectsClient.GetProjectsAsync(cancellationToken);
         var audioIds = new System.Collections.Generic.List<string>();
 
         foreach (var project in projects)
@@ -533,7 +526,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var profiles = await _backendClient.GetProfilesAsync(cancellationToken);
+        var profiles = await _profilesClient.GetProfilesAsync(cancellationToken);
 
         AvailableVoiceProfiles.Clear();
         foreach (var profile in profiles)

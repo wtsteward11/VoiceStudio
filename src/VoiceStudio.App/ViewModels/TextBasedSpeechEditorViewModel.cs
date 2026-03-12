@@ -24,6 +24,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class TextBasedSpeechEditorViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProfilesClient _profilesClient;
 
     public string PanelId => "text-based-speech-editor";
     public string DisplayName => ResourceHelper.GetString("Panel.TextBasedSpeechEditor.DisplayName", "Text-Based Speech Editor");
@@ -95,10 +96,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? finalAudioUrl;
 
-    public TextBasedSpeechEditorViewModel(IViewModelContext context, IBackendClient backendClient)
+    public TextBasedSpeechEditorViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
       LoadAudioCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -578,7 +580,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var profiles = await _backendClient.GetProfilesAsync(cancellationToken);
+        var profiles = await _profilesClient.GetProfilesAsync(cancellationToken);
         AvailableProfiles.Clear();
         foreach (var profile in profiles)
         {

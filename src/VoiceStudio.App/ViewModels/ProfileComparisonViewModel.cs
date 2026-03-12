@@ -20,6 +20,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class ProfileComparisonViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProfilesClient _profilesClient;
     private readonly IAudioPlayerService _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
 
@@ -57,10 +58,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? audioUrlB;
 
-    public ProfileComparisonViewModel(IViewModelContext context, IBackendClient backendClient, IAudioPlayerService audioPlayer)
+    public ProfileComparisonViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient, IAudioPlayerService audioPlayer)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
       // Get toast notification service
@@ -154,7 +156,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var profiles = await _backendClient.GetProfilesAsync(cancellationToken);
+        var profiles = await _profilesClient.GetProfilesAsync(cancellationToken);
 
         AvailableProfiles.Clear();
         foreach (var profile in profiles)

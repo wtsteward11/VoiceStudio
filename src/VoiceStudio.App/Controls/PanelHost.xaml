@@ -103,6 +103,10 @@
                 <controls:LoadingOverlay x:Name="LoadingOverlay"
                     IsLoading="{x:Bind IsLoading, Mode=TwoWay}"
                     LoadingMessage="{x:Bind LoadingMessage, Mode=TwoWay}" />
+                <!-- Error Overlay (Phase 3: shown when panel load fails) -->
+                <controls:ErrorOverlay x:Name="ErrorOverlay"
+                    ErrorTitle="{x:Bind LoadErrorTitle, Mode=OneWay}"
+                    ErrorMessage="{x:Bind LoadErrorMessage, Mode=TwoWay}" />
             </Grid>
         </Border>
         <!-- Drop Zone Indicators (shown during drag) -->

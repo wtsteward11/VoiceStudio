@@ -5,7 +5,7 @@ Config Migration Script
 Migrates legacy JSON configuration files to the new unified YAML configuration system.
 
 Usage:
-    python scripts/migrate_config.py [--dry-run] [--backup]
+    python scripts/migrate/migrate_config.py [--dry-run] [--backup]
 
 Options:
     --dry-run   Show what would be migrated without making changes

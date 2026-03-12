@@ -25,6 +25,7 @@
     <UserControl.Resources>
         <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
+        <converters:DoubleToScaledHeightConverter x:Key="DoubleToScaledHeightConverter" />
         <converters:NullToBooleanConverter x:Key="NullToBooleanConverter" />
     </UserControl.Resources>
 
@@ -181,7 +182,7 @@
                                                     <Border Background="{StaticResource VSQ.Success.Brush}"
                                                             VerticalAlignment="Bottom"
                                                             CornerRadius="2"
-                                                            Height="{x:Bind PeakLevel, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=120}" />
+                                                            Height="{x:Bind PeakLevel, Mode=OneWay, Converter={StaticResource DoubleToScaledHeightConverter}, ConverterParameter=120}" />
                                                 </Grid>
                                             </Border>
                                         </Grid>

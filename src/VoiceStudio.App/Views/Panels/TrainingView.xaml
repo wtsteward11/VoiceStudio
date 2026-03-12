@@ -7,11 +7,25 @@
     <converters:NumberFormatConverter x:Key="PercentFormatConverter" Format="P0" />
   </UserControl.Resources>
   <Grid ColumnSpacing="12" RowSpacing="12" Padding="12" AutomationProperties.AutomationId="TrainingView_Root">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="2*" />
       <ColumnDefinition Width="3*" />
     </Grid.ColumnDefinitions>
-    <StackPanel Grid.Column="0" Spacing="10">
+
+    <!-- MED-1: Simulation mode InfoBar -->
+    <InfoBar Grid.Row="0" Grid.ColumnSpan="2"
+      IsOpen="{x:Bind ViewModel.IsSimulationMode, Mode=OneWay}"
+      Severity="Warning"
+      Title="Simulation Mode"
+      Message="{x:Bind ViewModel.SimulationMessage, Mode=OneWay}"
+      Margin="0,0,0,8"
+      AutomationProperties.AutomationId="TrainingView_SimulationModeInfoBar" />
+
+    <StackPanel Grid.Row="1" Grid.Column="0" Spacing="10">
       <TextBlock Text="Datasets" FontSize="16" FontWeight="SemiBold" />
       <ListView x:Name="DatasetsListView"
         AutomationProperties.AutomationId="TrainingView_DatasetsListView"
@@ -43,7 +57,7 @@
         AutomationProperties.AutomationId="TrainingView_CreateDatasetButton" />
     </StackPanel>
 
-    <StackPanel Grid.Column="1" Spacing="10">
+    <StackPanel Grid.Row="1" Grid.Column="1" Spacing="10">
       <TextBlock Text="Training Jobs" FontSize="16" FontWeight="SemiBold" />
       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
         <ComboBox x:Name="StatusFilter" MinWidth="100" SelectionChanged="StatusFilter_SelectionChanged"
@@ -82,6 +96,6 @@
     </StackPanel>
 
     <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed"
-      Grid.ColumnSpan="2" />
+      Grid.RowSpan="2" Grid.ColumnSpan="2" />
   </Grid>
 </UserControl>

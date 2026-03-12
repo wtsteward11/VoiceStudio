@@ -11,6 +11,7 @@ using VoiceStudio.Core.Plugins;
 using VoiceStudio.Core.Services;
 using VoiceStudio.Core.State;
 using VoiceStudio.App.Core.Commands;
+using VoiceStudio.App.Services.Stores;
 using VoiceStudio.App.UseCases;
 using VoiceStudio.App.Utilities;
 using VoiceStudio.App.ViewModels;
@@ -71,7 +72,38 @@ namespace VoiceStudio.App.Services
         sp.GetRequiredService<BackendClientConfig>(),
         sp.GetRequiredService<ICorrelationIdProvider>(),
         sp.GetRequiredService<IRequestMetricsService>(),
-        sp.GetRequiredService<IRequestCoordinator>()));
+        sp.GetRequiredService<IRequestCoordinator>(),
+        sp.GetService<GracefulDegradationService>()));
+
+      // Profiles domain facade (Block 4.3)
+      services.AddSingleton<IProfilesClient, ProfilesClient>();
+
+      // Projects domain facade (Block 8.2)
+      services.AddSingleton<IProjectsClient, ProjectsClient>();
+
+      // Timeline clip facade (Task 10.1 hardening)
+      services.AddSingleton<ITimelineClipService, TimelineClipService>();
+
+      // Timeline track facade (Timeline hardening Phase 1)
+      services.AddSingleton<ITimelineTrackService, TimelineTrackService>();
+
+      // Timeline transcription facade (Timeline hardening Phase 2)
+      services.AddSingleton<ITimelineTranscriptionService, TimelineTranscriptionService>();
+
+      // Timeline synthesis facade (Post-Timeline Hardening 1B)
+      services.AddSingleton<ITimelineSynthesisService, TimelineSynthesisService>();
+
+      // A/B test facade (Phase 4 Post-Timeline 4A.1)
+      services.AddSingleton<IABTestService, ABTestService>();
+
+      // Voice synthesis panel facade (Phase 4 Post-Timeline 4A.2 Phase A)
+      services.AddSingleton<IVoiceSynthesisService, VoiceSynthesisService>();
+
+      // Project audio facade (Timeline hardening Phase 3)
+      services.AddSingleton<IProjectAudioClient, ProjectAudioClient>();
+
+      // Audio visualization facade (Timeline hardening Phase 4)
+      services.AddSingleton<IAudioVisualizationService, AudioVisualizationService>();
 
       // GAP-CS-001: WebSocket services for real-time streaming support
       services.AddSingleton<IWebSocketService>(sp => new WebSocketService(
@@ -120,9 +152,17 @@ namespace VoiceStudio.App.Services
       });
       services.AddSingleton<IUpdateService>(sp => new UpdateService(sp.GetRequiredService<HttpClient>()));
       services.AddSingleton<IAudioPlayerService>(sp => new AudioPlayerService(sp.GetRequiredService<HttpClient>()));
+      services.AddSingleton<IProfilePreviewService, ProfilePreviewService>();
+      services.AddSingleton<IProfileQualityInsightsService, ProfileQualityInsightsService>();
+      services.AddSingleton<IProfileTransferService, ProfileTransferService>();
+      services.AddSingleton<IProfileEnhancementService, ProfileEnhancementService>();
       services.AddSingleton<OperationQueueService>();
       services.AddSingleton<StatePersistenceService>();
       services.AddSingleton<StateCacheService>();
+      services.AddSingleton<AudioStore>(sp => new AudioStore(
+          sp.GetRequiredService<IBackendClient>(),
+          sp.GetRequiredService<ITimelineTrackService>(),
+          sp.GetService<StateCacheService>()));
       services.AddSingleton<GracefulDegradationService>();
       services.AddSingleton<PluginManager>();
       // Plugin Bridge Service for frontend-backend plugin state synchronization (Phase 1)
@@ -346,6 +386,12 @@ namespace VoiceStudio.App.Services
 
     // Typed accessors (forward to GetService / GetRequiredService)
     public static IBackendClient GetBackendClient() => GetRequiredService<IBackendClient>();
+    public static IProjectsClient GetProjectsClient() => GetRequiredService<IProjectsClient>();
+    public static IProfilesClient GetProfilesClient() => GetRequiredService<IProfilesClient>();
+    public static ITimelineClipService GetTimelineClipService() => GetRequiredService<ITimelineClipService>();
+    public static ITimelineTrackService GetTimelineTrackService() => GetRequiredService<ITimelineTrackService>();
+    public static ITimelineTranscriptionService GetTimelineTranscriptionService() => GetRequiredService<ITimelineTranscriptionService>();
+    public static ITimelineSynthesisService GetTimelineSynthesisService() => GetRequiredService<ITimelineSynthesisService>();
     public static IRequestMetricsService? TryGetRequestMetricsService() => GetService<IRequestMetricsService>();
     public static IAudioPlayerService GetAudioPlayerService() => GetRequiredService<IAudioPlayerService>();
     public static IErrorDialogService GetErrorDialogService() => GetRequiredService<IErrorDialogService>();

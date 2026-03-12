@@ -19,31 +19,55 @@ namespace VoiceStudio.App.Tests.ViewModels
   [TestClass]
   public class TimelineViewModelTests
   {
-    private Mock<IBackendClient> _mockBackendClient = null!;
+    private Mock<ITimelineSynthesisService> _mockSynthesisService = null!;
+    private Mock<ITimelineClipService> _mockClipService = null!;
+    private Mock<ITimelineTrackService> _mockTrackService = null!;
+    private Mock<ITimelineTranscriptionService> _mockTranscriptionService = null!;
+    private Mock<IProjectAudioClient> _mockProjectAudioClient = null!;
+    private Mock<IAudioVisualizationService> _mockAudioVisualizationService = null!;
+    private Mock<IProjectsClient> _mockProjectsClient = null!;
+    private Mock<IProfilesClient> _mockProfilesClient = null!;
     private Mock<IAudioPlayerService> _mockAudioPlayer = null!;
     private Mock<MultiSelectService> _mockMultiSelectService = null!;
+    private Mock<IDialogService> _mockDialogService = null!;
     private TimelineViewModel _sut = null!;
 
     [TestInitialize]
     public void Setup()
     {
-      _mockBackendClient = new Mock<IBackendClient>();
-      _mockAudioPlayer = new Mock<IAudioPlayerService>();
-      _mockMultiSelectService = new Mock<MultiSelectService>();
-
-      // Setup default mock behavior
-      _mockBackendClient
+      _mockSynthesisService = new Mock<ITimelineSynthesisService>();
+      _mockClipService = new Mock<ITimelineClipService>();
+      _mockTrackService = new Mock<ITimelineTrackService>();
+      _mockTranscriptionService = new Mock<ITimelineTranscriptionService>();
+      _mockProjectAudioClient = new Mock<IProjectAudioClient>();
+      _mockAudioVisualizationService = new Mock<IAudioVisualizationService>();
+      _mockProjectsClient = new Mock<IProjectsClient>();
+      _mockProjectsClient
           .Setup(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()))
           .ReturnsAsync(new List<Project>());
-
-      _mockBackendClient
+      _mockProfilesClient = new Mock<IProfilesClient>();
+      _mockProfilesClient
           .Setup(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()))
           .ReturnsAsync(new List<VoiceProfile>());
+      _mockAudioPlayer = new Mock<IAudioPlayerService>();
+      _mockMultiSelectService = new Mock<MultiSelectService>();
+      _mockDialogService = new Mock<IDialogService>();
+      _mockDialogService
+          .Setup(x => x.ShowConfirmationAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+          .ReturnsAsync(true);
 
       _sut = new TimelineViewModel(
-          _mockBackendClient.Object, 
+          _mockSynthesisService.Object,
+          _mockClipService.Object,
+          _mockTrackService.Object,
+          _mockTranscriptionService.Object,
+          _mockProjectAudioClient.Object,
+          _mockAudioVisualizationService.Object,
+          _mockProjectsClient.Object,
+          _mockProfilesClient.Object,
           _mockAudioPlayer.Object,
-          _mockMultiSelectService.Object);
+          _mockMultiSelectService.Object,
+          _mockDialogService.Object);
     }
 
     [TestCleanup]
@@ -85,9 +109,9 @@ namespace VoiceStudio.App.Tests.ViewModels
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+    public void Constructor_WithNullSynthesisService_ThrowsArgumentNullException()
     {
-      _ = new TimelineViewModel(null!, _mockAudioPlayer.Object, _mockMultiSelectService.Object);
+      _ = new TimelineViewModel(null!, _mockClipService!.Object, _mockTrackService!.Object, _mockTranscriptionService!.Object, _mockProjectAudioClient!.Object, _mockAudioVisualizationService!.Object, _mockProjectsClient!.Object, _mockProfilesClient!.Object, _mockAudioPlayer.Object, _mockMultiSelectService.Object, _mockDialogService.Object);
     }
 
     #endregion
@@ -260,6 +284,89 @@ namespace VoiceStudio.App.Tests.ViewModels
     public void DeleteSelectedClipsCommand_IsNotNull()
     {
       Assert.IsNotNull(_sut.DeleteSelectedClipsCommand);
+    }
+
+    #endregion
+
+    #region Bounded Request Tests
+
+    /// <summary>
+    /// Bounded-request proof: Timeline load cycle makes exactly 1 call each to GetProjectsAsync,
+    /// GetProfilesAsync, GetTracksAsync, ListProjectAudioAsync, and zero calls to GetWaveformDataAsync during load.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("BoundedRequest")]
+    public async Task TimelineLoadCycle_BoundedRequestCounts_ExactlyOnePerStableRead_ZeroWaveformDuringLoad()
+    {
+      var project = new Project { Id = "proj-1", Name = "Test Project" };
+      var track = new AudioTrack { Id = "t1", Name = "Track 1", ProjectId = "proj-1" };
+
+      _mockProjectsClient.Reset();
+      _mockProfilesClient.Reset();
+      _mockTrackService.Reset();
+      _mockProjectAudioClient.Reset();
+      _mockAudioVisualizationService.Reset();
+
+      _mockProjectsClient.Setup(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<Project> { project });
+      _mockProfilesClient.Setup(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<VoiceProfile>());
+      _mockTrackService.Setup(x => x.GetTracksAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<AudioTrack> { track });
+      _mockProjectAudioClient.Setup(x => x.ListProjectAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<ProjectAudioFile>());
+
+      await _sut.LoadProjectsCommand.ExecuteAsync(null);
+      await _sut.LoadProfilesCommand.ExecuteAsync(null);
+
+      _sut.SelectedProject = project;
+
+      await Task.Delay(200);
+
+      _mockProjectsClient.Verify(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()), Times.Once);
+      _mockProfilesClient.Verify(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()), Times.Once);
+      _mockTrackService.Verify(x => x.GetTracksAsync("proj-1", It.IsAny<CancellationToken>()), Times.Once);
+      _mockProjectAudioClient.Verify(x => x.ListProjectAudioAsync("proj-1", It.IsAny<CancellationToken>()), Times.Once);
+      _mockAudioVisualizationService.Verify(
+          x => x.GetWaveformDataAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+          Times.Never);
+    }
+
+    /// <summary>
+    /// Bounded-request proof: One AddClipToTrack execution results in exactly 1 call to CreateClipAsync.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("BoundedRequest")]
+    public async Task AddClipToTrack_OneExecution_ExactlyOneCreateClipAsync()
+    {
+      var project = new Project { Id = "proj-1", Name = "Test Project" };
+      var track = new AudioTrack { Id = "t1", Name = "Track 1", ProjectId = "proj-1" };
+      var clip = new AudioClip { Id = "c1", Name = "Clip 1", ProfileId = "p1", AudioId = "a1", Duration = TimeSpan.FromSeconds(1), StartTime = 0 };
+      var savedFile = new ProjectAudioFile { Filename = "c1.wav", Url = "http://localhost/audio.wav" };
+
+      _mockClipService.Reset();
+      _mockProjectAudioClient.Reset();
+
+      _mockClipService.Setup(x => x.CreateClipAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AudioClip>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(clip);
+      _mockProjectAudioClient.Setup(x => x.SaveAudioToProjectAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(savedFile);
+
+      _sut.Projects.Add(project);
+      _sut.Tracks.Add(track);
+      _sut.SelectedProject = project;
+      _sut.SelectedTrack = track;
+      _sut.LastSynthesizedAudioId = "a1";
+      _sut.LastSynthesizedAudioUrl = "http://localhost/audio.wav";
+      _sut.LastSynthesizedDuration = 1.0;
+
+      await _sut.AddClipToTrackCommand.ExecuteAsync(null);
+
+      await Task.Delay(300);
+
+      _mockClipService.Verify(
+          x => x.CreateClipAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AudioClip>(), It.IsAny<CancellationToken>()),
+          Times.Once);
     }
 
     #endregion

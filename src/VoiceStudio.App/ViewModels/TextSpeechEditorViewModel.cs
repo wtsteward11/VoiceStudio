@@ -21,6 +21,9 @@ namespace VoiceStudio.App.ViewModels
   public partial class TextSpeechEditorViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProjectsClient _projectsClient;
+    private readonly IProfilesClient _profilesClient;
+    private readonly IAudioPlayerService _audioPlayer;
     private readonly UndoRedoService? _undoRedoService;
 
     public string PanelId => "text-speech-editor";
@@ -72,10 +75,13 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? previewAudioUrl;
 
-    public TextSpeechEditorViewModel(IViewModelContext context, IBackendClient backendClient)
+    public TextSpeechEditorViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient, IProfilesClient profilesClient, IAudioPlayerService audioPlayer)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
+      _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
       // Get undo/redo service using helper (reduces code duplication)
       _undoRedoService = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetUndoRedoService());
@@ -120,11 +126,22 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("PreviewSynthesis");
         await PreviewSynthesisAsync(ct);
       }, () => SsmlMode && !string.IsNullOrWhiteSpace(EditedTranscript) && !string.IsNullOrWhiteSpace(SelectedVoiceProfileId));
+      PlayCommand = new EnhancedAsyncRelayCommand(async (ct) =>
+      {
+        using var profiler = PerformanceProfiler.StartCommand("Play");
+        await PlayPreviewAsync(ct);
+      }, () => (!string.IsNullOrEmpty(PreviewAudioId) || !string.IsNullOrEmpty(PreviewAudioUrl)) && !IsLoading);
       RefreshCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       });
+
+      PropertyChanged += (_, e) =>
+      {
+        if (e.PropertyName is nameof(PreviewAudioId) or nameof(PreviewAudioUrl) or nameof(IsLoading))
+          PlayCommand.NotifyCanExecuteChanged();
+      };
 
       // Load initial data
       _ = LoadSessionsAsync(CancellationToken.None);
@@ -141,6 +158,7 @@ namespace VoiceStudio.App.ViewModels
     public IAsyncRelayCommand RemoveSegmentCommand { get; }
     public IAsyncRelayCommand SynthesizeSessionCommand { get; }
     public IAsyncRelayCommand PreviewSynthesisCommand { get; }
+    public IAsyncRelayCommand PlayCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
 
     partial void OnSelectedSessionChanged(EditorSessionItem? value)
@@ -578,6 +596,42 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
+    private async Task PlayPreviewAsync(CancellationToken cancellationToken)
+    {
+      if (string.IsNullOrEmpty(PreviewAudioId) && string.IsNullOrEmpty(PreviewAudioUrl))
+        return;
+
+      try
+      {
+        if (!string.IsNullOrEmpty(PreviewAudioId))
+        {
+          var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+              ?? "http://localhost:8000";
+          await _audioPlayer.PlayBackendAudioIdAsync(PreviewAudioId, baseUrl);
+        }
+        else if (!string.IsNullOrEmpty(PreviewAudioUrl))
+        {
+          if (PreviewAudioUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+              || PreviewAudioUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+          {
+            await _audioPlayer.PlayUrlAsync(PreviewAudioUrl);
+          }
+          else
+          {
+            var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+                ?? "http://localhost:8000";
+            var audioId = PreviewAudioUrl.TrimStart('/').Replace("api/audio/", "");
+            if (!string.IsNullOrEmpty(audioId))
+              await _audioPlayer.PlayBackendAudioIdAsync(audioId, baseUrl);
+          }
+        }
+      }
+      catch (Exception ex)
+      {
+        await HandleErrorAsync(ex, "PlayPreview");
+      }
+    }
+
     private async Task RefreshAsync(CancellationToken cancellationToken)
     {
       await LoadSessionsAsync(cancellationToken);
@@ -591,7 +645,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var projects = await _backendClient.GetProjectsAsync(cancellationToken);
+        var projects = await _projectsClient.GetProjectsAsync(cancellationToken);
         AvailableProjects.Clear();
         foreach (var project in projects)
         {
@@ -613,7 +667,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var profiles = await _backendClient.GetProfilesAsync(cancellationToken);
+        var profiles = await _profilesClient.GetProfilesAsync(cancellationToken);
         AvailableVoiceProfiles.Clear();
         foreach (var profile in profiles)
         {
@@ -643,13 +697,6 @@ namespace VoiceStudio.App.ViewModels
           AvailableEngines.Add(engine);
         }
 
-        // Fallback to default engines if none found
-        if (AvailableEngines.Count == 0)
-        {
-          AvailableEngines.Add("xtts");
-          AvailableEngines.Add("chatterbox");
-          AvailableEngines.Add("tortoise");
-        }
       }
       catch (OperationCanceledException)
       {
@@ -657,11 +704,6 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (Exception ex)
       {
-        // Fallback to default engines on error
-        AvailableEngines.Clear();
-        AvailableEngines.Add("xtts");
-        AvailableEngines.Add("chatterbox");
-        AvailableEngines.Add("tortoise");
         await HandleErrorAsync(ex, "LoadAvailableEngines");
       }
     }

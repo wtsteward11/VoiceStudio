@@ -501,13 +501,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             localhost_exempt = getattr(settings, "rate_limit_localhost_exempt", True)
         except ImportError:
             localhost_exempt = True
-        # Localhost desktop mode: exempt read-only startup paths (Step 2 - request storm fix)
+        # Localhost desktop mode: exempt read-only startup and quality analytics paths
         _EXEMPT_PREFIXES = (
             "/api/profiles", "/api/v1/profiles",
             "/api/health", "/api/v1/health",
             "/api/engines", "/api/v1/engines",
             "/api/library", "/api/v1/library",
             "/api/plugins", "/api/v1/plugins",
+            "/api/quality", "/api/v1/quality",
         )
         if localhost_exempt and client_host in self._LOOPBACK_HOSTS and any(
             path.startswith(p) for p in _EXEMPT_PREFIXES

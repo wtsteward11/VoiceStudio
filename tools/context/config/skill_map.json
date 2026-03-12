@@ -130,7 +130,7 @@
       "skills": ["audio-engine-specialist", "roles/engine-engineer", "quality-metrics"],
       "tools": [
         "scripts/install-engine-deps.ps1",
-        "scripts/setup_gpu_venv.ps1",
+        "scripts/setup/setup_gpu_venv.ps1",
         "scripts/setup/setup_xtts_venv.ps1",
         "scripts/start_xtts_service.ps1",
         "scripts/run-benchmarks.ps1",
@@ -248,7 +248,7 @@
       "skills": ["audio-engine-specialist", "quality-metrics"],
       "tools": [
         "scripts/trace_audio_workflow.ps1",
-        "scripts/setup_test_audio.ps1"
+        "scripts/setup/setup_test_audio.ps1"
       ],
       "files": [
         "src/VoiceStudio.App/Features/Waveform/",

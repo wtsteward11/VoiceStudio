@@ -20,6 +20,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class AssistantViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProjectsClient _projectsClient;
 
     public string PanelId => "assistant";
     public string DisplayName => ResourceHelper.GetString("Panel.Assistant.DisplayName", "AI Production Assistant");
@@ -61,10 +62,11 @@ namespace VoiceStudio.App.ViewModels
     // CS0108 fix: Intentionally hiding base HasError with local ErrorMessage binding
     public new bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
-    public AssistantViewModel(IViewModelContext context, IBackendClient backendClient)
+    public AssistantViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
 
       SendMessageCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -401,7 +403,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var projects = await _backendClient.GetProjectsAsync(cancellationToken);
+        var projects = await _projectsClient.GetProjectsAsync(cancellationToken);
 
         AvailableProjects.Clear();
         foreach (var project in projects)

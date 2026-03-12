@@ -41,7 +41,7 @@ except ImportError:
 
 
 # Test configuration
-BACKEND_URL = os.getenv("VOICESTUDIO_BACKEND_URL", "http://127.0.0.1:8001")
+BACKEND_URL = os.getenv("VOICESTUDIO_BACKEND_URL", "http://127.0.0.1:8000")
 WS_BASE_URL = BACKEND_URL.replace("http://", "ws://").replace("https://", "wss://")
 OUTPUT_DIR = Path(os.getenv("VOICESTUDIO_OUTPUT_DIR", ".buildlogs/validation"))
 TIMEOUT_SECONDS = 10

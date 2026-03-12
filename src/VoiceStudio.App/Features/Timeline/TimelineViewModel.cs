@@ -149,7 +149,7 @@ public partial class TimelineTrack : ObservableObject
 /// GAP-FE-001: Refactored to inherit from BaseViewModel and integrate with TimelineGateway.
 /// Backend-Frontend Integration Plan - Phase 2: Implements state persistence.
 /// </summary>
-public partial class TimelineViewModel : BaseViewModel, IPanelStatePersistable
+public partial class TimelineViewModel : BaseViewModel, IPanelStatePersistable, IPanelLifecycle
 {
     /// <summary>
     /// Panel ID for state persistence.
@@ -191,7 +191,7 @@ public partial class TimelineViewModel : BaseViewModel, IPanelStatePersistable
         DeleteSelectedCommand = new AsyncRelayCommand(DeleteSelectedAsync);
         SplitAtPlayheadCommand = new RelayCommand(SplitAtPlayhead);
         SaveTimelineCommand = new AsyncRelayCommand(SaveTimelineAsync);
-        RefreshCommand = new AsyncRelayCommand(RefreshAsync);
+        RefreshCommand = new AsyncRelayCommand(RefreshCoreAsync);
 
         // Initialize EventAggregator and subscribe to cross-panel events (Phase 4)
         _eventAggregator = AppServices.TryGetEventAggregator();
@@ -420,7 +420,25 @@ public partial class TimelineViewModel : BaseViewModel, IPanelStatePersistable
         }
     }
 
-    private async Task RefreshAsync()
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    /// <summary>Unsubscribe from EventAggregator to prevent memory leaks (GAP-W3).</summary>
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default)
+    {
+        _assetSelectedToken?.Dispose();
+        _assetSelectedToken = null;
+        _profileSelectedToken?.Dispose();
+        _profileSelectedToken = null;
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) =>
+        RefreshCoreAsync();
+
+    private async Task RefreshCoreAsync()
     {
         if (!string.IsNullOrEmpty(ProjectId))
         {

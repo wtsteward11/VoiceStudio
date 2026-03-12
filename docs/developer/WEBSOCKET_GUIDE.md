@@ -1,7 +1,7 @@
 # WebSocket Guide
 
-> **Version**: 1.0.0  
-> **Last Updated**: 2026-02-04  
+> **Version**: 1.1.0  
+> **Last Updated**: 2026-03-06  
 > **Status**: Active
 
 ## Overview
@@ -20,46 +20,27 @@ VoiceStudio uses WebSocket connections for real-time communication between the U
         │  to Topics                            │  from Services
         ▼                                       ▼
    ┌─────────┐                           ┌─────────────┐
-   │ Topics  │                           │ Event Bus   │
+   │ Topics  │                           │ realtime.py │
    └─────────┘                           └─────────────┘
 ```
 
-## Topics
+## Topics (Implemented)
 
-### Synthesis Topics
+**Canonical reference**: [WebSocket Topics Reference](../REFERENCE/WEBSOCKET_TOPICS_REFERENCE.md)
 
-| Topic | Direction | Description |
-|-------|-----------|-------------|
-| `synthesis/start` | Client→Server | Start synthesis job |
-| `synthesis/progress` | Server→Client | Progress updates (0-100%) |
-| `synthesis/complete` | Server→Client | Job completed with audio URL |
-| `synthesis/error` | Server→Client | Job failed with error |
-
-### Transcription Topics
+The `/ws/realtime` endpoint supports these topics:
 
 | Topic | Direction | Description |
 |-------|-----------|-------------|
-| `transcription/start` | Client→Server | Start transcription |
-| `transcription/progress` | Server→Client | Progress updates |
-| `transcription/segment` | Server→Client | Real-time segment |
-| `transcription/complete` | Server→Client | Full transcription |
+| `meters` | Server→Client | VU meter / audio level updates |
+| `training` | Server→Client | Voice model training progress |
+| `batch` | Server→Client | Batch processing job progress |
+| `general` | Server→Client | General events (engine status, alerts) |
+| `quality` | Server→Client | Real-time quality preview (IDEA 69) |
 
-### Engine Topics
+Connect with optional query: `?topics=meters,training,batch,general`
 
-| Topic | Direction | Description |
-|-------|-----------|-------------|
-| `engine/status` | Server→Client | Engine availability changes |
-| `engine/telemetry` | Server→Client | Performance metrics |
-| `engine/preflight` | Server→Client | Preflight check results |
-
-### Job Topics
-
-| Topic | Direction | Description |
-|-------|-----------|-------------|
-| `job/created` | Server→Client | New job queued |
-| `job/progress` | Server→Client | Job progress update |
-| `job/completed` | Server→Client | Job finished |
-| `job/failed` | Server→Client | Job failed |
+Client can subscribe/unsubscribe at runtime via `{"type":"subscribe","topic":"meters"}` and `{"type":"unsubscribe","topic":"meters"}`.
 
 ## Message Format
 
@@ -291,25 +272,20 @@ All WebSocket messages use the standardized protocol from `backend/api/ws/protoc
 | `INTERNAL_ERROR` | Server error |
 | `TIMEOUT` | Operation timeout |
 
-### Implemented Topics
-
-| Topic | Purpose | Update Rate |
-|-------|---------|-------------|
-| `general` | Default broadcast channel | As needed |
-| `meters` | Audio level metering | 30-60 Hz (batched) |
-| `training` | Training progress | Per-epoch |
-| `batch` | Batch job status | Per-item |
-| `heartbeat` | Keep-alive | Every 30s |
-
 ### WebSocket Endpoints
 
 | Endpoint | Purpose |
 |----------|---------|
-| `/api/pipeline/stream` | STT→LLM→TTS pipeline |
+| `/ws/realtime` | Topic-based real-time updates (meters, training, batch, general, quality) |
+| `/ws/events` | Legacy heartbeat only |
+| `/ws/plugins` | Plugin state synchronization |
+| `/api/pipeline/stream` | STT→LLM→TTS pipeline (streaming) |
 | `/api/voice/synthesize/stream` | TTS streaming |
 | `/api/rvc/convert/realtime` | Voice conversion |
 | `/api/realtime-converter/{id}/stream` | Format conversion |
 | `/api/realtime-visualizer/{id}/stream` | Audio visualization |
+
+See [WebSocket Topics Reference](../REFERENCE/WEBSOCKET_TOPICS_REFERENCE.md) for topic payloads and broadcast APIs.
 
 ## Best Practices
 
@@ -321,6 +297,6 @@ All WebSocket messages use the standardized protocol from `backend/api/ws/protoc
 
 ## Related Documentation
 
-- [WebSocket Events Reference](../api/WEBSOCKET_EVENTS.md)
-- [Real-time Architecture](../architecture/REALTIME_ARCHITECTURE.md)
+- [WebSocket Topics Reference](../REFERENCE/WEBSOCKET_TOPICS_REFERENCE.md) — Canonical topic reference
+- [API Conventions](../../backend/api/API_CONVENTIONS.md) — WebSocket message protocol
 - [Backend Services](SERVICE_ARCHITECTURE.md)

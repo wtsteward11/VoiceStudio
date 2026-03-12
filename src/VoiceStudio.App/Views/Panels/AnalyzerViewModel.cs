@@ -18,6 +18,7 @@ namespace VoiceStudio.App.Views.Panels
   public partial class AnalyzerViewModel : ObservableObject, IPanelView, IDisposable
   {
     private readonly IBackendClient _backendClient;
+    private readonly IAudioVisualizationService _audioVisualizationService;
     private readonly IAudioPlayerService? _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly IErrorLoggingService? _errorLoggingService;
@@ -88,9 +89,10 @@ namespace VoiceStudio.App.Views.Panels
     public Visibility IsOtherTab => SelectedTab != "Waveform" && SelectedTab != "Spectral" && SelectedTab != "Radar" && SelectedTab != "Loudness" && SelectedTab != "Phase" && SelectedTab != "AudioOrbs" ? Visibility.Visible : Visibility.Collapsed;
     public Visibility IsWaveformOrSpectralTab => (SelectedTab == "Waveform" || SelectedTab == "Spectral") ? Visibility.Visible : Visibility.Collapsed;
 
-    public AnalyzerViewModel(IBackendClient backendClient, IAudioPlayerService? audioPlayer = null)
+    public AnalyzerViewModel(IBackendClient backendClient, IAudioVisualizationService audioVisualizationService, IAudioPlayerService? audioPlayer = null)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _audioVisualizationService = audioVisualizationService ?? throw new ArgumentNullException(nameof(audioVisualizationService));
       _audioPlayer = audioPlayer;
 
       // Get services (may be null if not initialized)
@@ -269,7 +271,7 @@ namespace VoiceStudio.App.Views.Panels
         // Load waveform data for Waveform tab
         if (SelectedTab == "Waveform")
         {
-          var waveformData = await _backendClient.GetWaveformDataAsync(SelectedAudioId, width: 1024, mode: "peak", cancellationToken);
+          var waveformData = await _audioVisualizationService.GetWaveformDataAsync(SelectedAudioId, width: 1024, mode: "peak", cancellationToken);
           if (waveformData?.Samples != null)
           {
             // Replace the list so x:Bind targets update reliably.
@@ -280,7 +282,7 @@ namespace VoiceStudio.App.Views.Panels
         // Load spectrogram data for Spectral tab
         if (SelectedTab == "Spectral")
         {
-          var spectrogramData = await _backendClient.GetSpectrogramDataAsync(SelectedAudioId, width: 512, height: 256, cancellationToken);
+          var spectrogramData = await _audioVisualizationService.GetSpectrogramDataAsync(SelectedAudioId, width: 512, height: 256, cancellationToken);
           if (spectrogramData?.Frames != null)
           {
             SpectrogramFrames.Clear();
@@ -410,7 +412,7 @@ namespace VoiceStudio.App.Views.Panels
           try
           {
             // Get spectrogram data to derive frequency magnitudes
-            var spectrogramData = await _backendClient.GetSpectrogramDataAsync(SelectedAudioId, width: 512, height: 256, cancellationToken);
+            var spectrogramData = await _audioVisualizationService.GetSpectrogramDataAsync(SelectedAudioId, width: 512, height: 256, cancellationToken);
             if (spectrogramData?.Frames != null && spectrogramData.Frames.Count > 0)
             {
               // Use the first frame (or average of first few frames) for AudioOrbs

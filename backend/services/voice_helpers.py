@@ -49,8 +49,6 @@ def check_consent_required(profile_id: str, request: Any = None) -> bool:
 
 def ensure_tts_assets(engine_id: str) -> None:
     """Ensure required TTS assets exist (auto-download when allowed)."""
-    from fastapi import HTTPException
-
     from backend.ml.models.model_preflight import (
         PreflightError,
         ensure_piper,
@@ -62,5 +60,5 @@ def ensure_tts_assets(engine_id: str) -> None:
             ensure_xtts(auto_download=True)
         elif engine_id == "piper":
             ensure_piper(auto_download=True)
-    except PreflightError as e:
-        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    except PreflightError:
+        raise  # GAP-007: Let PreflightError propagate; global handler converts to HTTP

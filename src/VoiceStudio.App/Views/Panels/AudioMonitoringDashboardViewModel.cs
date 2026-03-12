@@ -168,7 +168,7 @@ namespace VoiceStudio.App.Views.Panels
         try
         {
           await LoadMetersAsync();
-          await Task.Delay(100, cancellationToken); // 10fps updates
+          await Task.Delay(500, cancellationToken); // Cap at 2 req/sec to avoid rate-limit
         }
         catch (TaskCanceledException)
         {
@@ -177,7 +177,7 @@ namespace VoiceStudio.App.Views.Panels
         catch (Exception ex)
         {
           System.Diagnostics.Debug.WriteLine($"Error polling meters: {ex.Message}");
-          await Task.Delay(1000, cancellationToken);
+          await Task.Delay(2000, cancellationToken);
         }
       }
     }

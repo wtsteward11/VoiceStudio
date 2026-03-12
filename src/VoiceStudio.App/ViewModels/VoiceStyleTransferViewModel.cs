@@ -19,6 +19,7 @@ namespace VoiceStudio.App.ViewModels
   public partial class VoiceStyleTransferViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IProfilesClient _profilesClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
     public string PanelId => "voice-style-transfer";
@@ -64,10 +65,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool showComparison;
 
-    public VoiceStyleTransferViewModel(IViewModelContext context, IBackendClient backendClient)
+    public VoiceStyleTransferViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
       // Get toast notification service using helper (reduces code duplication)
       _toastNotificationService = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetToastNotificationService());
@@ -261,7 +263,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var profiles = await _backendClient.GetProfilesAsync(cancellationToken);
+        var profiles = await _profilesClient.GetProfilesAsync(cancellationToken);
 
         AvailableVoiceProfiles.Clear();
         foreach (var profile in profiles)

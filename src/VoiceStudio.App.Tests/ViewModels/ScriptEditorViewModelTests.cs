@@ -22,6 +22,7 @@ namespace VoiceStudio.App.Tests.ViewModels
   {
     private IViewModelContext _context = null!;
     private Mock<IBackendClient> _mockBackendClient = null!;
+    private Mock<IDialogService> _mockDialogService = null!;
     private DispatcherQueueController? _dispatcherController;
     private ScriptEditorViewModel _sut = null!;
 
@@ -33,8 +34,12 @@ namespace VoiceStudio.App.Tests.ViewModels
       var dispatcher = _dispatcherController.DispatcherQueue;
       _context = new ViewModelContext(NullLogger.Instance, dispatcher);
       _mockBackendClient = new Mock<IBackendClient>();
+      _mockDialogService = new Mock<IDialogService>();
+      _mockDialogService
+          .Setup(x => x.ShowConfirmationAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+          .ReturnsAsync(true);
 
-      _sut = new ScriptEditorViewModel(_context, _mockBackendClient.Object);
+      _sut = new ScriptEditorViewModel(_context, _mockBackendClient.Object, _mockDialogService.Object);
     }
 
     [TestCleanup]
@@ -73,7 +78,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [ExpectedException(typeof(ArgumentNullException))]
     public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
     {
-      _ = new ScriptEditorViewModel(_context, null!);
+      _ = new ScriptEditorViewModel(_context, null!, _mockDialogService!.Object);
     }
 
     #endregion

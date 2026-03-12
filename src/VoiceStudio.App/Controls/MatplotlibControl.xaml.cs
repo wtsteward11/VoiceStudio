@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml;
 using System;
 using System.Threading.Tasks;
+using VoiceStudio.App.Services;
 
 namespace VoiceStudio.App.Controls
 {
@@ -97,8 +98,9 @@ namespace VoiceStudio.App.Controls
         }
         else
         {
-          // For relative URLs, construct full URL (assuming backend base URL)
-          const string baseUrl = "http://localhost:8001";
+          // For relative URLs, use BackendClientConfig as single source of truth
+          var baseUrl = AppServices.GetService<VoiceStudio.Core.Services.BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+              ?? "http://localhost:8000";
           var fullUrl = _imageUrl.StartsWith("/") ? baseUrl + _imageUrl : $"{baseUrl}/{_imageUrl}";
           if (Uri.TryCreate(fullUrl, UriKind.Absolute, out var fullUri))
           {

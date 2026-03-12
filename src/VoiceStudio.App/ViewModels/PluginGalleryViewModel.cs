@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using VoiceStudio.Core.Plugins;
 using VoiceStudio.Core.Services;
 using CoreModels = VoiceStudio.Core.Plugins.Models;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.ViewModels
 {
@@ -170,15 +171,21 @@ namespace VoiceStudio.App.ViewModels
 
         partial void OnSearchTextChanged(string value)
         {
-            // Debounce search
             _searchCts?.Cancel();
             _searchCts = new CancellationTokenSource();
-            
-            _ = Task.Delay(300, _searchCts.Token)
-                .ContinueWith(async _ => 
+            var cts = _searchCts;
+            _ = Task.Run(async () =>
+            {
+                try
                 {
-                    await SearchAsync();
-                }, TaskContinuationOptions.OnlyOnRanToCompletion);
+                    await Task.Delay(300, cts.Token);
+                    Dispatcher.TryEnqueue(() => _ = SearchAsync());
+                }
+                catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PluginGalleryViewModel.OnSearchTextChanged");
+      }
+            });
         }
 
         partial void OnSelectedCategoryChanged(CoreModels.PluginCategory? value)

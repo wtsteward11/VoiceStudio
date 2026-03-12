@@ -20,7 +20,8 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new AssistantViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient()
+          ServiceProvider.GetBackendClient(),
+          ServiceProvider.GetProjectsClient()
       );
       DataContext = ViewModel;
 

@@ -52,16 +52,27 @@ public sealed class BackendConnectionMonitor : IDisposable
   public int ConsecutiveFailures => _consecutiveFailures;
   public DateTime LastSuccessfulPing => _lastSuccessfulPing;
 
-  public BackendConnectionMonitor(IBackendClient backendClient)
+  private readonly bool _ownsHttpClient;
+
+  public BackendConnectionMonitor(IBackendClient backendClient, HttpClient? httpClient = null)
   {
     _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
     Current = this;
 
-    _httpClient = new HttpClient
+    if (httpClient != null)
     {
-      BaseAddress = backendClient.BaseAddress,
-      Timeout = TimeSpan.FromSeconds(5)
-    };
+      _httpClient = httpClient;
+      _ownsHttpClient = false;
+    }
+    else
+    {
+      _httpClient = new HttpClient
+      {
+        BaseAddress = backendClient.BaseAddress,
+        Timeout = TimeSpan.FromSeconds(5)
+      };
+      _ownsHttpClient = true;
+    }
   }
 
   /// <summary>
@@ -129,11 +140,18 @@ public sealed class BackendConnectionMonitor : IDisposable
     }
   }
 
+  private Uri GetHealthUrl()
+  {
+    var baseAddr = _backendClient.BaseAddress;
+    return baseAddr != null ? new Uri(baseAddr, "/api/health") : new Uri("http://localhost:8000/api/health");
+  }
+
   private async Task<bool> CheckHealthAsync(CancellationToken cancellationToken)
   {
     try
     {
-      var response = await _httpClient.GetAsync("/api/health", cancellationToken);
+      var url = GetHealthUrl();
+      var response = await _httpClient.GetAsync(url, cancellationToken);
       if (response.IsSuccessStatusCode)
       {
         LastError = null;
@@ -261,7 +279,8 @@ public sealed class BackendConnectionMonitor : IDisposable
     if (Current == this) Current = null;
     StopMonitoring();
     _cts.Dispose();
-    _httpClient.Dispose();
+    if (_ownsHttpClient)
+      _httpClient.Dispose();
     _reconnectLock.Dispose();
   }
 }

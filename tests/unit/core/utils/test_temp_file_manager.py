@@ -28,7 +28,11 @@ try:
     HAS_TEMP_FILE_MANAGER = True
 except ImportError:
     HAS_TEMP_FILE_MANAGER = False
-    pytestmark = pytest.mark.skip("Temp file manager not available")
+
+pytestmark = pytest.mark.skipif(
+    not HAS_TEMP_FILE_MANAGER,
+    reason="Temp file manager not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)",
+)
 
 
 @pytest.fixture

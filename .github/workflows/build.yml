@@ -402,18 +402,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Python with pip cache
+        uses: ./.github/actions/setup-python-pip
         with:
           python-version: "3.11"
-
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
@@ -432,13 +424,15 @@ jobs:
             echo "No committed proofs found. Skipping proof verification."
           fi
 
-      - name: CI guardrails (route boundaries + route size + service boundaries + service size + repo payloads)
+      - name: CI guardrails (route boundaries + route size + service boundaries + service size + repo payloads + dialog pattern + IBackendClient creep)
         run: |
           python scripts/ci/check_route_boundaries.py
           python scripts/ci/check_route_size.py
           python scripts/ci/check_service_boundaries.py
           python scripts/ci/check_service_size.py
           python scripts/ci/check_repo_payloads.py
+          python scripts/ci/check_dialog_pattern.py
+          python scripts/ci/check_ibackendclient_creep.py
 
       - name: Artifact spine compliance
         run: |

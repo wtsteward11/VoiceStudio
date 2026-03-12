@@ -153,7 +153,7 @@ Run the script to update after adding or modifying tools.
 | `serve` | No description available | `tools/chatgpt-localfiles/src/serve.py` |
 | `setup-git-hooks` | VoiceStudio Git Hooks Setup Script Installs pre-commit and c... | `tools/setup-git-hooks.ps1` |
 | `setup_cython` | Setup script for compiling Cython modules. | `scripts/setup/setup_cython.py` |
-| `setup_gpu_venv` | .SYNOPSIS | `scripts/setup_gpu_venv.ps1` |
+| `setup_gpu_venv` | .SYNOPSIS | `scripts/setup/setup_gpu_venv.ps1` |
 | `setup_huggingface_token` | VoiceStudio HuggingFace Token Setup Script Run this script t... | `scripts/hf/setup_huggingface_token.ps1` |
 | `setup_xtts_venv` | XTTS Isolated Virtual Environment Setup Creates a separate v... | `scripts/setup/setup_xtts_venv.ps1` |
 | `show_role_budgets` | Show role-specific context budget allocation. | `scripts/show_role_budgets.py` |
@@ -1094,7 +1094,7 @@ Run the script to update after adding or modifying tools.
 | `registry` | No description available | `tools/context/core/registry.py` |
 | `rules_adapter` | No description available | `tools/context/sources/rules_adapter.py` |
 | `services` | Domain services for debug workflows. | `tools/overseer/domain/services.py` |
-| `setup_openmemory` | .SYNOPSIS | `scripts/setup_openmemory.ps1` |
+| `setup_openmemory` | .SYNOPSIS | `scripts/setup/setup_openmemory.ps1` |
 | `state_adapter` | No description available | `tools/context/sources/state_adapter.py` |
 | `task_adapter` | No description available | `tools/context/sources/task_adapter.py` |
 | `task_classifier` | Task Classifier for VoiceStudio. | `tools/context/classifier/task_classifier.py` |
@@ -1113,11 +1113,11 @@ Run the script to update after adding or modifying tools.
 | `VS_MigrateToE` | VS_MigrateToE.ps1 | `tools/VS_MigrateToE.ps1` |
 | `export_openapi_schema` | Export OpenAPI Schema Script | `scripts/export_openapi_schema.py` |
 | `generate_schemas` | Generate JSON schemas from Pydantic models. | `scripts/generate_schemas.py` |
-| `migrate_config` | Config Migration Script | `scripts/migrate_config.py` |
-| `migrate_di` | DI Migration Audit Script. | `scripts/migrate_di.py` |
+| `migrate_config` | Config Migration Script | `scripts/migrate/migrate_config.py` |
+| `migrate_di` | DI Migration Audit Script. | `scripts/migrate/migrate_di.py` |
 | `migrate_manifests_v2` | Engine Manifest v1 to v2 Migration Script | `scripts/engines/migrate_manifests_v2.py` |
 | `migrate_panel` | Panel Migration Helper - Migrate panels from VoiceStudio.App... | `scripts/migrate_panel.py` |
-| `migrate_to_env_setup` | TD-019: Python Path Standardization Migration Script. | `scripts/migrate_to_env_setup.py` |
+| `migrate_to_env_setup` | TD-019: Python Path Standardization Migration Script. | `scripts/migrate/migrate_to_env_setup.py` |
 | `schema_validator` | Schema Validator - Validates OpenAPI schemas against project... | `tools/contracts/schema_validator.py` |
 | `seed_data` | Seed Data Script | `scripts/seed_data.py` |
 | `seed_data_http` | HTTP Seed Data Script | `scripts/seed_data_http.py` |
@@ -1176,7 +1176,7 @@ Run the script to update after adding or modifying tools.
 | `fix_mock_tests` | Skip tests that mock non-existent module attributes. | `scripts/fix_mock_tests.py` |
 | `fix_router_tests` | Fix router prefix test assertions to be more flexible. | `scripts/fix_router_tests.py` |
 | `fix_status_code_tests` | Fix status code assertions in tests. | `scripts/fix_status_code_tests.py` |
-| `generate_sentinel_fixture` | Generate Synthetic Sentinel Audio Fixture | `scripts/generate_sentinel_fixture.py` |
+| `generate_sentinel_fixture` | Generate Synthetic Sentinel Audio Fixture | `scripts/generate/generate_sentinel_fixture.py` |
 | `generate_viewmodel_tests` | ViewModel Test Generator | `scripts/generate_viewmodel_tests.py` |
 | `inspect_assemblies` | No description available | `scripts/inspect_assemblies.ps1` |
 | `run-test-pipeline` | .SYNOPSIS | `scripts/run-test-pipeline.ps1` |

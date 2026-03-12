@@ -246,13 +246,12 @@ namespace VoiceStudio.App.Views.Panels
           }
           else if (!string.IsNullOrEmpty(generatedImage.ImageUrl))
           {
-            // Download from URL
-            using (var client = new System.Net.Http.HttpClient())
-            {
-              var imageBytes = await client.GetByteArrayAsync(generatedImage.ImageUrl);
-              await FileIO.WriteBytesAsync(file, imageBytes);
-              _toastService?.ShowToast(ToastType.Success, "Exported", $"Image saved to {file.Name}");
-            }
+            // Download from URL (Phase 4: use shared HttpClient)
+            var client = AppServices.GetService<System.Net.Http.HttpClient>()
+              ?? throw new InvalidOperationException("HttpClient not available");
+            var imageBytes = await client.GetByteArrayAsync(generatedImage.ImageUrl);
+            await FileIO.WriteBytesAsync(file, imageBytes);
+            _toastService?.ShowToast(ToastType.Success, "Exported", $"Image saved to {file.Name}");
           }
           else
           {

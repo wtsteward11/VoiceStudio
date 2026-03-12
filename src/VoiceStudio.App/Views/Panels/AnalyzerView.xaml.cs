@@ -2,6 +2,7 @@ using System;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Services;
 using Microsoft.UI.Xaml;
 using Windows.ApplicationModel.DataTransfer;
 
@@ -19,6 +20,7 @@ namespace VoiceStudio.App.Views.Panels
       // Wire DataContext with BackendClient and AudioPlayerService
       ViewModel = new AnalyzerViewModel(
           ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<IAudioVisualizationService>(),
           ServiceProvider.GetAudioPlayerService()
       );
       this.DataContext = ViewModel;

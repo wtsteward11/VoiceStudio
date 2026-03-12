@@ -76,7 +76,11 @@ namespace VoiceStudio.App.Controls
         _popup.VerticalOffset = point.Y - 8;
       }
 
-      _popup.XamlRoot = targetElement.XamlRoot;
+      var xamlRoot = targetElement.XamlRoot ?? (App.MainWindowInstance?.Content as FrameworkElement)?.XamlRoot;
+      if (xamlRoot == null)
+        return;
+
+      _popup.XamlRoot = xamlRoot;
       _popup.IsOpen = true;
 
       // Animate in using Storyboard

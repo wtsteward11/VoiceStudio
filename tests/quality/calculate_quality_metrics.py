@@ -29,8 +29,8 @@ def count_lines_of_code(directory: Path, extensions: list[str]) -> dict[str, int
                     with open(file_path, encoding="utf-8", errors="ignore") as f:
                         lines = f.readlines()
                         counts[ext] += len([l for l in lines if l.strip()])
-                except:
-                    ...
+                except OSError:
+                    pass  # Skip unreadable files
 
     return counts
 

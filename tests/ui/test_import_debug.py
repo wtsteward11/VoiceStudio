@@ -133,9 +133,8 @@ def main():
                     )
                     if find_resp.status_code == 200:
                         print(f"Found dialog element: '{elem_name}'")
-                # ALLOWED: bare except - best effort, failure acceptable
-                except:
-                    pass
+                except Exception:
+                    pass  # Best effort, failure acceptable
 
             # Take screenshot
             screenshot_dir = Path(r"E:\VoiceStudio\.buildlogs\ui_tests\screenshots")
@@ -231,9 +230,8 @@ def main():
                             )
                             if find_resp.status_code == 200:
                                 print(f"Found dialog element: '{elem_name}'")
-                        # ALLOWED: bare except - best effort, failure acceptable
-                        except:
-                            pass
+                        except Exception:
+                            pass  # Best effort, failure acceptable
 
                     # Take screenshot
                     screenshot_dir = Path(r"E:\VoiceStudio\.buildlogs\ui_tests\screenshots")

@@ -1,5 +1,11 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
+using VoiceStudio.App.Services;
+using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Services;
 using VoiceStudio.App.Tests.ViewModels;
 
 namespace VoiceStudio.App.Tests.UI
@@ -35,18 +41,28 @@ namespace VoiceStudio.App.Tests.UI
       // In a real implementation, this would test the full workflow:
       // 1. Create profile → 2. Synthesize → 3. Apply effect → 4. Export
 
-      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(_mockBackendClient!);
+      var profilesClient = new ProfilesClient(_mockBackendClient!, new RequestCoordinator());
+      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(profilesClient);
+      var qualityInsights = CreateMockProfileQualityInsightsService();
+      var transferService = CreateMockProfileTransferService();
+      var enhancementService = CreateMockProfileEnhancementService();
       var profilesViewModel = new VoiceStudio.App.Views.Panels.ProfilesViewModel(
-          _mockBackendClient!,
+          profilesClient,
           profilesUseCase,
           new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()),
           new VoiceStudio.App.Services.MultiSelectService(),
+          qualityInsights,
+          transferService,
+          enhancementService,
           toastNotificationService: null,
           undoRedoService: new VoiceStudio.App.Services.UndoRedoService(),
           errorService: null,
-          logService: null);
+          logService: null,
+          dialogService: null,
+          previewService: null);
       var synthesisViewModel = new VoiceStudio.App.Views.Panels.VoiceSynthesisViewModel(
           _mockBackendClient!,
+          profilesClient,
           new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()));
 
       // Act
@@ -64,16 +80,25 @@ namespace VoiceStudio.App.Tests.UI
     public void Workflow_CommandsAreInitialized()
     {
       // Arrange
-      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(_mockBackendClient!);
+      var profilesClient = new ProfilesClient(_mockBackendClient!, new RequestCoordinator());
+      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(profilesClient);
+      var qualityInsights = CreateMockProfileQualityInsightsService();
+      var transferService = CreateMockProfileTransferService();
+      var enhancementService = CreateMockProfileEnhancementService();
       var profilesViewModel = new VoiceStudio.App.Views.Panels.ProfilesViewModel(
-          _mockBackendClient!,
+          profilesClient,
           profilesUseCase,
           new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()),
           new VoiceStudio.App.Services.MultiSelectService(),
+          qualityInsights,
+          transferService,
+          enhancementService,
           toastNotificationService: null,
           undoRedoService: new VoiceStudio.App.Services.UndoRedoService(),
           errorService: null,
-          logService: null);
+          logService: null,
+          dialogService: null,
+          previewService: null);
 
       // Act & Assert
       // Verify that commands needed for the workflow are properly initialized
@@ -91,23 +116,55 @@ namespace VoiceStudio.App.Tests.UI
       // Arrange & Act
       // Verify all ViewModels in the critical path can be instantiated
 
-      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(_mockBackendClient!);
+      var profilesClient = new ProfilesClient(_mockBackendClient!, new RequestCoordinator());
+      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(profilesClient);
+      var qualityInsights = CreateMockProfileQualityInsightsService();
+      var transferService = CreateMockProfileTransferService();
+      var enhancementService = CreateMockProfileEnhancementService();
       var profilesViewModel = new VoiceStudio.App.Views.Panels.ProfilesViewModel(
-          _mockBackendClient!,
+          profilesClient,
           profilesUseCase,
           new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()),
           new VoiceStudio.App.Services.MultiSelectService(),
+          qualityInsights,
+          transferService,
+          enhancementService,
           toastNotificationService: null,
           undoRedoService: new VoiceStudio.App.Services.UndoRedoService(),
           errorService: null,
-          logService: null);
+          logService: null,
+          dialogService: null,
+          previewService: null);
       var synthesisViewModel = new VoiceStudio.App.Views.Panels.VoiceSynthesisViewModel(
           _mockBackendClient!,
+          profilesClient,
           new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()));
+      var mockDialog = new Mock<IDialogService>();
+      mockDialog
+          .Setup(x => x.ShowConfirmationAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+          .ReturnsAsync(true);
+      var mockProjectsClient = new Mock<IProjectsClient>();
+      mockProjectsClient
+          .Setup(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<Project>());
+      var mockClipService = new Mock<ITimelineClipService>();
+      var mockTrackService = new Mock<ITimelineTrackService>();
+      var mockTranscriptionService = new Mock<ITimelineTranscriptionService>();
+      var mockProjectAudioClient = new Mock<IProjectAudioClient>();
+      var mockAudioVisualizationService = new Mock<IAudioVisualizationService>();
+      var synthesisService = new TimelineSynthesisService(_mockBackendClient!, mockProjectAudioClient.Object);
       var timelineViewModel = new VoiceStudio.App.Views.Panels.TimelineViewModel(
-          _mockBackendClient!,
+          synthesisService,
+          mockClipService.Object,
+          mockTrackService.Object,
+          mockTranscriptionService.Object,
+          mockProjectAudioClient.Object,
+          mockAudioVisualizationService.Object,
+          mockProjectsClient.Object,
+          profilesClient,
           new VoiceStudio.App.Services.AudioPlayerService(new System.Net.Http.HttpClient()),
           new VoiceStudio.App.Services.MultiSelectService(),
+          mockDialog.Object,
           toastNotificationService: null,
           undoRedoService: new VoiceStudio.App.Services.UndoRedoService(),
           errorService: null,

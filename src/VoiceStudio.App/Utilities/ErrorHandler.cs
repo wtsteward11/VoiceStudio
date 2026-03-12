@@ -84,6 +84,32 @@ namespace VoiceStudio.App.Utilities
     }
 
     /// <summary>
+    /// Returns true when the exception indicates backend stress (429, 502, 503, 504,
+    /// BackendUnavailableException, BackendTimeoutException, timeouts).
+    /// Used to enter degraded mode and show persistent banner instead of toast spray.
+    /// </summary>
+    public static bool IsBackendStressException(Exception? ex)
+    {
+      if (ex == null)
+        return false;
+      if (ex is BackendServerException bex && (bex.StatusCode == 429 || bex.StatusCode == 502 || bex.StatusCode == 503 || bex.StatusCode == 504))
+        return true;
+      if (ex is BackendException be && be.StatusCode is 429 or 502 or 503 or 504)
+        return true;
+      if (ex is HttpRequestException httpEx && httpEx.Data.Contains("StatusCode"))
+      {
+        var code = httpEx.Data["StatusCode"]?.ToString();
+        if (code is "429" or "502" or "503" or "504")
+          return true;
+      }
+      return ex is
+          BackendUnavailableException or
+          BackendTimeoutException or
+          TimeoutException or
+          TaskCanceledException;
+    }
+
+    /// <summary>
     /// Returns true when the exception indicates HTTP 429 (rate limit).
     /// Used to show non-blocking toast instead of modal.
     /// </summary>
@@ -153,8 +179,6 @@ namespace VoiceStudio.App.Utilities
 
       return $"{message}\n\nSuggestion: {suggestion}";
     }
-
-    // IsTransientError is already defined above (line 89) - duplicate removed
 
     /// <summary>
     /// Logs an error with full context for debugging.

@@ -654,7 +654,7 @@
                                     <TextBlock Grid.Row="0" Text="Backend API:" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
                                     <TextBlock Grid.Row="0" Grid.Column="1" x:Name="BackendStatusText" Text="Connected" Foreground="Green"/>
                                     <TextBlock Grid.Row="1" Text="Base URL:" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="BaseUrlText" Text="http://localhost:8001" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="BaseUrlText" Text="http://localhost:8000" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
                                     <TextBlock Grid.Row="2" Text="Last Ping:" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
                                     <TextBlock Grid.Row="2" Grid.Column="1" x:Name="LastPingText" Text="--" Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
                                 </Grid>

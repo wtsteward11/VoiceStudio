@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using VoiceStudio.Core.State;
 using VoiceStudio.Core.State.Commands;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Services
 {
@@ -338,10 +339,10 @@ namespace VoiceStudio.App.Services
           sub.Handler(newState);
         }
         // ALLOWED: empty catch - subscriber handler errors must not propagate to state store
-        catch
-        {
-          // Subscriber handlers may throw; isolate failures to preserve other subscribers
-        }
+        catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "AppStateStore.NotifyStateChanged");
+      }
       }
     }
 

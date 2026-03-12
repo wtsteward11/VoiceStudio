@@ -10,6 +10,11 @@ namespace VoiceStudio.Core.Models
     public string Language { get; set; } = "en";
     public string? Emotion { get; set; }
     public bool EnhanceQuality { get; set; }  // Enable quality enhancement pipeline
+    public float Speed { get; set; } = 1.0f;
+    public float Pitch { get; set; } = 0f;
+    public float Stability { get; set; } = 0.72f;
+    public float Clarity { get; set; } = 0.58f;
+    public float Temperature { get; set; } = 0.35f;
   }
 
   public class VoiceSynthesisResponse

@@ -8,7 +8,7 @@ namespace VoiceStudio.App.Config
     /// Environment Variables:
     ///     VOICESTUDIO_API_HOST: API host (default: localhost)
     ///     VOICESTUDIO_API_PORT: API port (default: 8000)
-    ///     VOICESTUDIO_WS_PORT: WebSocket port (default: 8001)
+    ///     VOICESTUDIO_WS_PORT: WebSocket port (default: 8000, same as API)
     ///     VOICESTUDIO_HEALTH_CHECK_INTERVAL: Health check interval in ms (default: 5000)
     ///     VOICESTUDIO_RECONNECT_DELAY: Reconnect delay in ms (default: 3000)
     ///     VOICESTUDIO_REQUEST_TIMEOUT: Request timeout in ms (default: 30000)
@@ -34,7 +34,7 @@ namespace VoiceStudio.App.Config
         /// Get the WebSocket port.
         /// </summary>
         public static int WebSocketPort =>
-            GetEnvInt("VOICESTUDIO_WS_PORT", 8001);
+            GetEnvInt("VOICESTUDIO_WS_PORT", 8000);
 
         /// <summary>
         /// Get the full API base URL.

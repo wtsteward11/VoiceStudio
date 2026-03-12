@@ -30,7 +30,11 @@ try:
     HAS_RESPONSE_CACHE = True
 except ImportError:
     HAS_RESPONSE_CACHE = False
-    pytestmark = pytest.mark.skip("Response cache not available")
+
+pytestmark = pytest.mark.skipif(
+    not HAS_RESPONSE_CACHE,
+    reason="Response cache not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)",
+)
 
 
 @pytest.fixture

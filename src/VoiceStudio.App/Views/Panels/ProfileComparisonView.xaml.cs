@@ -19,6 +19,7 @@ namespace VoiceStudio.App.Views.Panels
       ViewModel = new ProfileComparisonViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
           ServiceProvider.GetBackendClient(),
+          ServiceProvider.GetProfilesClient(),
           ServiceProvider.GetAudioPlayerService()
       );
       this.DataContext = ViewModel;

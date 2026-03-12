@@ -3,6 +3,9 @@ API v2 Health Check Routes
 
 Provides enhanced health checking with versioning support.
 """
+# SAFETY: FastAPI router decorators lack complete type stubs.
+# Per STRICT_MYPY_BURNDOWN_SUBPLAN; runtime behavior is correct.
+# mypy: disable-error-code="untyped-decorator"
 
 import logging
 from datetime import datetime

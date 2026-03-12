@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Threading;
 using VoiceStudio.App.Logging;
+using VoiceStudio.App.Utilities;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Services
@@ -8,14 +12,20 @@ namespace VoiceStudio.App.Services
   /// Implementation of error presentation service that decides the best way to present errors.
   /// Also owns the <see cref="BackendConnectionMonitor"/> and centralises all
   /// backend-connectivity toast suppression so that at most ONE offline toast appears per session.
+  /// For 429/backend stress: enters degraded mode and shows persistent banner instead of toast spray.
   /// </summary>
   public class ErrorPresentationService : IErrorPresentationService
   {
+    private const int DegradedModeCooldownSeconds = 60;
+
     private readonly IErrorDialogService? _errorDialogService;
     private readonly IErrorLoggingService? _errorLoggingService;
 
     private bool _backendOfflineToastShown;
     private BackendConnectionMonitor? _monitor;
+
+    private Timer? _degradedModeCooldownTimer;
+    private readonly object _degradedModeTimerLock = new();
 
     private ToastNotificationService? ToastNotificationService => AppServices.TryGetToastNotificationService();
 
@@ -55,7 +65,8 @@ namespace VoiceStudio.App.Services
       if (toast != null)
         toast.SuppressTransientBackendErrors = true;
 
-      _monitor = new BackendConnectionMonitor(client);
+      var httpClient = AppServices.GetService<HttpClient>();
+      _monitor = new BackendConnectionMonitor(client, httpClient);
       _monitor.Connected += OnBackendConnected;
       _monitor.Disconnected += OnBackendDisconnected;
       _monitor.StartMonitoring();
@@ -199,8 +210,51 @@ namespace VoiceStudio.App.Services
           return;
         _backendOfflineToastShown = true;
       }
-      var userMessage = GetUserFriendlyMessage(exception);
-      ToastNotificationService?.ShowError(userMessage, GetErrorTitle(exception));
+
+      // Backend stress (429, 502, 503, timeouts): enter degraded mode, show persistent banner, skip toast
+      if (ErrorHandler.IsBackendStressException(exception))
+      {
+        var degradationService = AppServices.GetService<GracefulDegradationService>();
+        if (degradationService != null)
+        {
+          var message = ErrorHandler.IsRateLimitException(exception)
+            ? "Too many requests. Please wait before trying again."
+            : "Backend temporarily unavailable. Retrying…";
+          degradationService.EnterDegradedMode(message);
+          ResetDegradedModeCooldownTimer(degradationService);
+        }
+        return;
+      }
+
+      // When already in degraded mode, suppress additional toasts (banner is the surface)
+      var svc = AppServices.GetService<GracefulDegradationService>();
+      if (svc != null && svc.IsDegradedMode)
+        return;
+
+      var userMessage = ErrorHandler.GetUserFriendlyMessage(exception);
+      var title = GetErrorTitle(exception);
+      ToastNotificationService?.ShowError(userMessage, title);
+    }
+
+    private void ResetDegradedModeCooldownTimer(GracefulDegradationService degradationService)
+    {
+      lock (_degradedModeTimerLock)
+      {
+        _degradedModeCooldownTimer?.Dispose();
+        _degradedModeCooldownTimer = new Timer(
+          _ =>
+          {
+            degradationService.ExitDegradedMode();
+            lock (_degradedModeTimerLock)
+            {
+              _degradedModeCooldownTimer?.Dispose();
+              _degradedModeCooldownTimer = null;
+            }
+          },
+          null,
+          TimeSpan.FromSeconds(DegradedModeCooldownSeconds),
+          Timeout.InfiniteTimeSpan);
+      }
     }
 
     private static bool IsBackendConnectivityError(Exception exception)
@@ -240,22 +294,6 @@ namespace VoiceStudio.App.Services
     private void ShowErrorDialog(Exception exception, string context)
     {
       _ = _errorDialogService?.ShowErrorAsync(exception, GetErrorTitle(exception), context);
-    }
-
-    private static string GetUserFriendlyMessage(Exception exception)
-    {
-      return exception switch
-      {
-        VoiceStudio.Core.Exceptions.BackendUnavailableException => "Unable to connect to the backend. Please check your connection and try again.",
-        VoiceStudio.Core.Exceptions.BackendTimeoutException => "The request timed out. Please try again.",
-        VoiceStudio.Core.Exceptions.BackendAuthenticationException => "Authentication failed. Please check your credentials.",
-        VoiceStudio.Core.Exceptions.BackendNotFoundException => "The requested resource was not found.",
-        VoiceStudio.Core.Exceptions.BackendValidationException => "Validation failed. Please check your input.",
-        System.Net.Http.HttpRequestException => "Network error occurred. Please check your connection.",
-        System.TimeoutException => "The operation timed out. Please try again.",
-        OutOfMemoryException => "Insufficient memory. Please close other applications and try again.",
-        _ => exception.Message
-      };
     }
 
     private static string GetErrorTitle(Exception exception)

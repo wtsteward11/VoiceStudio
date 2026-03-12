@@ -31,11 +31,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Python with pip cache
+        uses: ./.github/actions/setup-python-pip
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
+          cache-mode: editable
       
       - name: Install dependencies
         run: |
@@ -125,6 +125,12 @@ jobs:
       
       - name: Run tests
         run: dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Release -p:Platform=x64 --verbosity normal
+      
+      - name: Bounded request proof (Timeline load/clip)
+        run: dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Release -p:Platform=x64 --filter "TestCategory=BoundedRequest" --verbosity normal
+      
+      - name: 429 degraded mode gate
+        run: dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Release -p:Platform=x64 --filter "TestCategory=DegradedMode|FullyQualifiedName~RateLimitToastDedupeTests" --verbosity normal
       
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

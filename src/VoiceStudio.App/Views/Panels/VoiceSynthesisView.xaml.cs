@@ -26,6 +26,8 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new VoiceSynthesisViewModel(
           ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<IVoiceSynthesisService>(),
+          ServiceProvider.GetProfilesClient(),
           ServiceProvider.GetAudioPlayerService()
       );
       this.DataContext = ViewModel;

@@ -9,10 +9,15 @@ namespace VoiceStudio.App.Services
 {
   /// <summary>
   /// Implementation of IErrorDialogService for displaying user-friendly error dialogs.
+  /// XamlRoot must be set at app startup (MainWindow Loaded) for modal dialogs to work.
+  /// When XamlRoot is null, degrades to toast to avoid "XamlRoot must be explicitly set for unparented popup".
   /// </summary>
   public class ErrorDialogService : IErrorDialogService
   {
     private readonly IErrorLoggingService? _errorLoggingService;
+
+    /// <summary>Canonical XamlRoot for dialogs. Set by MainWindow in Loaded.</summary>
+    public static Microsoft.UI.Xaml.XamlRoot? Root { get; set; }
 
     public ErrorDialogService(IErrorLoggingService? errorLoggingService = null)
     {
@@ -23,6 +28,14 @@ namespace VoiceStudio.App.Services
     {
       if (exception == null)
         return;
+
+      // 429 rate limit: route through ErrorPresentationService for deduplication
+      if (ErrorHandler.IsRateLimitException(exception))
+      {
+        _errorLoggingService?.LogError(exception, context ?? string.Empty);
+        AppServices.TryGetErrorPresentationService()?.ShowError(exception, context ?? string.Empty);
+        return;
+      }
 
       // Log the error
       _errorLoggingService?.LogError(exception, context ?? string.Empty);
@@ -51,12 +64,19 @@ namespace VoiceStudio.App.Services
 
       _errorLoggingService?.LogWarning(message);
 
+      var root = GetXamlRoot();
+      if (root == null)
+      {
+        AppServices.TryGetToastNotificationService()?.ShowWarning(message, title ?? "Warning");
+        return;
+      }
+
       var dialog = new ContentDialog
       {
         Title = title ?? "Warning",
         Content = message,
         PrimaryButtonText = "OK",
-        XamlRoot = GetXamlRoot()
+        XamlRoot = root
       };
 
       await dialog.ShowAsync();
@@ -67,12 +87,19 @@ namespace VoiceStudio.App.Services
       if (string.IsNullOrWhiteSpace(message))
         return;
 
+      var root = GetXamlRoot();
+      if (root == null)
+      {
+        AppServices.TryGetToastNotificationService()?.ShowInfo(message, title ?? "Information");
+        return;
+      }
+
       var dialog = new ContentDialog
       {
         Title = title ?? "Information",
         Content = message,
         PrimaryButtonText = "OK",
-        XamlRoot = GetXamlRoot()
+        XamlRoot = root
       };
 
       await dialog.ShowAsync();
@@ -146,12 +173,20 @@ namespace VoiceStudio.App.Services
         stackPanel.Children.Add(suggestionContainer);
       }
 
+      var root = GetXamlRoot();
+      if (root == null)
+      {
+        _errorLoggingService?.LogError(new InvalidOperationException($"XamlRoot not set; cannot show modal. Title: {title}, Message: {message}"), "ErrorDialog");
+        AppServices.TryGetToastNotificationService()?.ShowError(message, title);
+        return;
+      }
+
       var dialog = new ContentDialog
       {
         Title = title,
         Content = stackPanel,
         PrimaryButtonText = "OK",
-        XamlRoot = GetXamlRoot(),
+        XamlRoot = root,
         DefaultButton = ContentDialogButton.Primary
       };
 
@@ -189,11 +224,10 @@ namespace VoiceStudio.App.Services
 
     private XamlRoot? GetXamlRoot()
     {
-      // Try to get the XamlRoot from the main window
-      if (App.MainWindowInstance != null)
-      {
-        return App.MainWindowInstance.Content?.XamlRoot;
-      }
+      if (Root != null)
+        return Root;
+      if (App.MainWindowInstance?.Content is FrameworkElement fe)
+        return fe.XamlRoot;
       return null;
     }
   }

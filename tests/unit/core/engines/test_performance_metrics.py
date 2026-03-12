@@ -28,7 +28,11 @@ try:
     HAS_PERFORMANCE_METRICS = True
 except ImportError:
     HAS_PERFORMANCE_METRICS = False
-    pytestmark = pytest.mark.skip("Performance metrics not available")
+
+pytestmark = pytest.mark.skipif(
+    not HAS_PERFORMANCE_METRICS,
+    reason="Performance metrics not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)",
+)
 
 
 @pytest.fixture

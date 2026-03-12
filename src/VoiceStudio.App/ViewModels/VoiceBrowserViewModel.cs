@@ -9,6 +9,7 @@ using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Utilities;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.ViewModels
 {
@@ -19,6 +20,8 @@ namespace VoiceStudio.App.ViewModels
   {
     private readonly IBackendClient _backendClient;
     private readonly IAudioPlayerService _audioPlayer;
+    private CancellationTokenSource? _searchDebounceCts;
+    private const int SearchDebounceMs = 300;
 
     public string PanelId => "voice-browser";
     public string DisplayName => ResourceHelper.GetString("Panel.VoiceBrowser.DisplayName", "Voice Browser");
@@ -292,7 +295,21 @@ namespace VoiceStudio.App.ViewModels
     partial void OnSearchQueryChanged(string value)
     {
       CurrentPage = 0;
-      _ = SearchVoicesAsync(CancellationToken.None);
+      _searchDebounceCts?.Cancel();
+      _searchDebounceCts = new CancellationTokenSource();
+      var cts = _searchDebounceCts;
+      _ = Task.Run(async () =>
+      {
+        try
+        {
+          await Task.Delay(SearchDebounceMs, cts.Token);
+          Dispatcher.TryEnqueue(() => _ = SearchVoicesAsync(cts.Token));
+        }
+        catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "VoiceBrowserViewModel.OnSearchQueryChanged");
+      }
+      });
     }
 
     partial void OnSelectedLanguageChanged(string? value)

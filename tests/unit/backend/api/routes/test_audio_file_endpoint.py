@@ -40,6 +40,7 @@ def _make_wav_bytes(num_samples: int = 4000, sample_rate: int = 22050) -> bytes:
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from backend.api.main import app
 
     return TestClient(app)

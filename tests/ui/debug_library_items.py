@@ -215,7 +215,7 @@ def main():
                         try:
                             name = item.get_attribute("Name")
                             print(f"      [{i}] Name: {name[:50] if name else 'N/A'}")
-                        except:
+                        except Exception:
                             print(f"      [{i}] (could not read)")
             except Exception as e:
                 print(f"   {desc}: Error - {e}")

@@ -276,6 +276,13 @@ namespace VoiceStudio.App
                 profiler.Checkpoint("BackendConnectionMonitor Started");
             }
 
+            // Degraded mode banner (429/backend stress)
+            if (AppServices.GetService<GracefulDegradationService>() is GracefulDegradationService gds)
+            {
+                gds.DegradedModeChanged += OnDegradedModeChanged;
+                profiler.Checkpoint("DegradedModeBanner Subscribed");
+            }
+
             RegisterKeyboardShortcuts();
             profiler.Checkpoint("Keyboard Shortcuts Registered");
 
@@ -306,6 +313,9 @@ namespace VoiceStudio.App
             {
                 contentFE.Loaded += async (s, e) =>
                 {
+                    // Initialize canonical XamlRoot for dialogs (prevents "XamlRoot must be explicitly set for unparented popup")
+                    ErrorDialogService.Root = contentFE.XamlRoot;
+
                     // Initialize theme service with root element
                     try
                     {
@@ -362,10 +372,25 @@ namespace VoiceStudio.App
                     }),
               true); // handledEventsToo = true
 #endif
+                // FIX: Defer panel initialization to the Loaded event.
+                // XamlRoot is guaranteed non-null here; it is still null during the constructor,
+                // so any popup/dialog created during panel init previously threw
+                // COMException "Catastrophic failure — XamlRoot must be explicitly set for unparented popup."
+                _ = InitializePanelsAsync(
+                    FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
+                    FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
+                    FindNameOnContent("RightPanelHost") as Controls.PanelHost,
+                    FindNameOnContent("BottomPanelHost") as Controls.PanelHost);
                 };
             }
 
             // Set PanelRegion for each PanelHost
+            var navRailBorder = FindInContent<FrameworkElement>("NavRailBorder");
+            if (navRailBorder != null)
+            {
+                navRailBorder.DataContext = new Views.Shell.NavigationViewModel();
+            }
+
             var leftPanelHost = FindNameOnContent("LeftPanelHost") as Controls.PanelHost;
             var centerPanelHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
             var rightPanelHost = FindNameOnContent("RightPanelHost") as Controls.PanelHost;
@@ -408,9 +433,7 @@ namespace VoiceStudio.App
             }
             profiler.Checkpoint("NavigationService Subscription");
 
-            // Phase 5.1.6: Panel assignment using PanelRegistry
-            // If workspace layout has saved panels, restore them via registry; otherwise use defaults
-            _ = InitializePanelsAsync(leftPanelHost, centerPanelHost, rightPanelHost, bottomPanelHost);
+            // Panel initialization deferred to contentFE.Loaded (above) — XamlRoot is null here in the constructor.
 
             // Start status bar metrics timer
             StartStatusBarTimer();
@@ -513,62 +536,6 @@ namespace VoiceStudio.App
                 SetActiveNavButton(buttonName);
         }
 
-        private void NavStudio_Click(object _, RoutedEventArgs __)
-        {
-            Debug.WriteLine("[DEBUG] NavStudio_Click fired");
-            try
-            {
-                ExecuteNavCommand("nav.studio", "Timeline", PanelRegion.Center, "NavStudio");
-                Debug.WriteLine("[DEBUG] NavStudio_Click completed");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[DEBUG] NavStudio_Click EXCEPTION: {ex}");
-#if DEBUG
-                var diagPath = Path.Combine(
-                  Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                  "VoiceStudio", "crashes", "click_diag.txt");
-                // ALLOWED: empty catch - diagnostic file write is best-effort
-                try { File.AppendAllText(diagPath, $"[{DateTime.UtcNow:O}] NavStudio_Click EXCEPTION: {ex}\n"); } catch (Exception diagEx) { System.Diagnostics.Debug.WriteLine($"Click diagnostic write failed: {diagEx.Message}"); }
-#endif
-            }
-        }
-
-        private void NavProfiles_Click(object _, RoutedEventArgs __)
-        {
-            ExecuteNavCommand("nav.profiles", "Profiles", PanelRegion.Left, "NavProfiles");
-        }
-
-        private void NavLibrary_Click(object _, RoutedEventArgs __)
-        {
-            ExecuteNavCommand("nav.library", "Library", PanelRegion.Left, "NavLibrary");
-        }
-
-        private void NavEffects_Click(object _, RoutedEventArgs __)
-        {
-            ExecuteNavCommand("nav.effects", "EffectsMixer", PanelRegion.Right, "NavEffects");
-        }
-
-        private void NavTrain_Click(object _, RoutedEventArgs __)
-        {
-            ExecuteNavCommand("nav.train", "Training", PanelRegion.Left, "NavTrain");
-        }
-
-        private void NavAnalyze_Click(object _, RoutedEventArgs __)
-        {
-            ExecuteNavCommand("nav.analyze", "Analyzer", PanelRegion.Right, "NavAnalyze");
-        }
-
-        private void NavSettings_Click(object _, RoutedEventArgs __)
-        {
-            ExecuteNavCommand("nav.settings", "Settings", PanelRegion.Right, "NavSettings");
-        }
-
-        private void NavLogs_Click(object _, RoutedEventArgs __)
-        {
-            ExecuteNavCommand("nav.logs", "Diagnostics", PanelRegion.Bottom, "NavLogs");
-        }
-
         #endregion Navigation Button Click Handlers
 
         #region Command-Driven Navigation
@@ -612,20 +579,7 @@ namespace VoiceStudio.App
 
                 if (await OpenPanelByIdAsync(canonicalId))
                 {
-                    var navButton = canonicalId switch
-                    {
-                        "Timeline" => "NavStudio",
-                        "Profiles" => "NavProfiles",
-                        "Library" => "NavLibrary",
-                        "EffectsMixer" => "NavEffects",
-                        "Training" => "NavTrain",
-                        "Analyzer" => "NavAnalyze",
-                        "Settings" => "NavSettings",
-                        "Diagnostics" => "NavLogs",
-                        _ => string.Empty,
-                    };
-                    if (!string.IsNullOrEmpty(navButton))
-                        SetActiveNavButton(navButton);
+                    // Nav button state updated via NavigationViewModel bindings
                 }
                 else
                 {
@@ -851,6 +805,19 @@ namespace VoiceStudio.App
 
                 if (FindNameOnContent("StatusText") is TextBlock statusText)
                     statusText.Text = reachable ? "Ready" : "Backend offline \u2014 reconnecting\u2026";
+            });
+        }
+
+        private void OnDegradedModeChanged(object? sender, bool isDegraded)
+        {
+            DispatcherQueue?.TryEnqueue(() =>
+            {
+                var banner = FindInContent<Microsoft.UI.Xaml.Controls.InfoBar>("DegradedModeBanner");
+                if (banner == null)
+                    return;
+                banner.IsOpen = isDegraded;
+                if (isDegraded && sender is GracefulDegradationService gds)
+                    banner.Message = gds.DegradationReason ?? "Backend temporarily unavailable.";
             });
         }
 
@@ -1210,20 +1177,16 @@ namespace VoiceStudio.App
 
         private async void MainWindow_Activated(object sender, WindowActivatedEventArgs e)
         {
-            if (IsGateCSmokeMode())
-            {
-                // Smoke runs must not touch WinUI state that may already be closing/closed
-                // (e.g., --smoke-exit closes the window quickly). Keep this handler no-op.
-                return;
-            }
-
-            // Attach keyboard handler to root content (only once).
-            // Guard against COMException if the window is closing during activation.
             try
             {
+                if (IsGateCSmokeMode())
+                {
+                    return;
+                }
+
                 if (this.Content is UIElement root)
                 {
-                    root.KeyDown -= MainWindow_KeyDown; // Remove first to avoid duplicates
+                    root.KeyDown -= MainWindow_KeyDown;
                     root.KeyDown += MainWindow_KeyDown;
                 }
             }
@@ -1241,39 +1204,43 @@ namespace VoiceStudio.App
                 return;
             }
 
-            // Check if we should show welcome dialog (only once per session)
-            // NOTE: ApplicationData.Current.LocalSettings is not available in unpackaged apps,
-            // so we use UnpackagedSettingsHelper for file-based settings storage.
             if (_welcomeDialogShown)
                 return;
 
             var showWelcome = Helpers.UnpackagedSettingsHelper.GetValue<bool>(ShowWelcomeKey, true);
 
-            if (showWelcome && this.Content?.XamlRoot is not null)
+            try
             {
-                _welcomeDialogShown = true; // Prevent showing again on re-activation
-                var welcomeDialog = new WelcomeView();
-                welcomeDialog.XamlRoot = this.Content.XamlRoot;
-                try
+                if (showWelcome && this.Content?.XamlRoot is not null)
                 {
-                    var showTask = welcomeDialog.ShowAsync();
-                    var timeoutTask = Task.Delay(5000);
-                    var completed = await Task.WhenAny(showTask.AsTask(), timeoutTask);
-                    if (completed == timeoutTask)
+                    _welcomeDialogShown = true;
+                    var welcomeDialog = new WelcomeView();
+                    welcomeDialog.XamlRoot = this.Content.XamlRoot;
+                    try
                     {
-                        Debug.WriteLine("[Startup] Welcome dialog ShowAsync timed out after 5s; continuing");
-                        welcomeDialog.Hide();
+                        var showTask = welcomeDialog.ShowAsync();
+                        var timeoutTask = Task.Delay(5000);
+                        var completed = await Task.WhenAny(showTask.AsTask(), timeoutTask);
+                        if (completed == timeoutTask)
+                        {
+                            Debug.WriteLine("[Startup] Welcome dialog ShowAsync timed out after 5s; continuing");
+                            welcomeDialog.Hide();
+                        }
+                        else
+                        {
+                            var result = await showTask;
+                            Helpers.UnpackagedSettingsHelper.SetValue(ShowWelcomeKey, welcomeDialog.ShowOnStartup);
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        var result = await showTask;
-                        Helpers.UnpackagedSettingsHelper.SetValue(ShowWelcomeKey, welcomeDialog.ShowOnStartup);
+                        Debug.WriteLine($"[Startup] Welcome dialog failed: {ex.Message}");
                     }
                 }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[Startup] Welcome dialog failed: {ex.Message}");
-                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Activated handler failed: {ex.Message}", "MainWindow.MainWindow_Activated");
             }
         }
 
@@ -1859,6 +1826,7 @@ namespace VoiceStudio.App
             try
             {
                 var dialog = new ToolbarCustomizationDialog();
+                dialog.XamlRoot = this.Content?.XamlRoot;
                 await dialog.ShowAsync();
 
                 // Toolbar will automatically refresh via ConfigurationChanged event
@@ -2080,8 +2048,8 @@ namespace VoiceStudio.App
                 var line = $"[{DateTime.Now:HH:mm:ss.fff}] {msg}";
                 Debug.WriteLine(line);
 #if DEBUG
-                // ALLOWED: empty catch - Best effort debug logging, failure is acceptable
-                try { System.IO.File.AppendAllText(logPath, line + Environment.NewLine); } catch { }
+                try { System.IO.File.AppendAllText(logPath, line + Environment.NewLine); }
+                catch (Exception ex) { Debug.WriteLine($"[MainWindow] File log write failed (non-fatal): {ex.Message}"); }
 #endif
             }
 

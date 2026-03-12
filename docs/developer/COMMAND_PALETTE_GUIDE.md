@@ -1,362 +1,181 @@
 # Command Palette Guide
 
-> **Version**: 1.0.0  
-> **Last Updated**: 2026-02-04  
+> **Version**: 1.1.0  
+> **Last Updated**: 2026-03-10  
 > **Status**: Active
 
 ## Overview
 
-VoiceStudio includes a command palette (Ctrl+Shift+P) for quick access to commands, actions, and navigation. This guide documents the command system architecture and how to add new commands.
+VoiceStudio includes a command palette (**Ctrl+P**) for quick access to commands, panels, themes, and navigation. This guide documents the command system architecture and how to add new commands.
+
+## Activation
+
+- **Keyboard:** `Ctrl+P` (global shortcut, registered in MainWindow)
+- **Placeholder:** Search box shows "Search commands and panels (Ctrl+P)"
 
 ## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                   Command Palette UI                      │
+│              CommandPaletteWindow / CommandPaletteView    │
 │  ┌────────────────────────────────────────────────────┐  │
-│  │  🔍 Search commands...                              │  │
+│  │  🔍 Search commands and panels (Ctrl+P)            │  │
 │  └────────────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────────────┐  │
-│  │  > New Project           Ctrl+N                    │  │
-│  │  > Open Project          Ctrl+O                    │  │
-│  │  > Toggle Panel          Ctrl+B                    │  │
+│  │  > Open Voice Synthesis        [panel]              │  │
+│  │  > Theme: Dark                 [theme]             │  │
+│  │  > New Project                 Ctrl+N  [registry]  │  │
 │  └────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────┘
                            │
                            ▼
                ┌─────────────────────┐
-               │  CommandRegistry    │
-               │  (ICommandRegistry) │
+               │ CommandPaletteService│
+               │ + CommandPaletteVM   │
                └─────────────────────┘
                            │
             ┌──────────────┴──────────────┐
             ▼                             ▼
-    ┌───────────────┐             ┌───────────────┐
-    │ Built-in      │             │ Plugin        │
-    │ Commands      │             │ Commands      │
-    └───────────────┘             └───────────────┘
+    ┌───────────────┐             ┌───────────────────────┐
+    │ IPanelRegistry│             │ IUnifiedCommandRegistry│
+    │ (panels)      │             │ (file, profile, etc.)   │
+    └───────────────┘             └───────────────────────┘
 ```
 
-## Command Registry
+## Command Sources
 
-### ICommandRegistry Interface
+The palette aggregates two sources:
+
+1. **Panel Registry** — All visible panels from `IPanelRegistry.GetAllDescriptors()`. Each becomes an `open:<panelId>` item.
+2. **Unified Command Registry** — Commands registered via `IUnifiedCommandRegistry` (file, profile, playback, settings, etc.).
+
+Built-in actions (theme, density, help) are hardcoded in `CommandPaletteViewModel.LoadDefaultItems()`.
+
+## IUnifiedCommandRegistry
 
 ```csharp
-public interface ICommandRegistry
+public interface IUnifiedCommandRegistry
 {
-    void Register(CommandDefinition command);
-    void Unregister(string commandId);
-    IEnumerable<CommandDefinition> GetAll();
-    IEnumerable<CommandDefinition> Search(string query);
-    Task ExecuteAsync(string commandId, object? parameter = null);
+    void Register(CommandDescriptor descriptor, ISyncCommandHandler handler);
+    void Register(CommandDescriptor descriptor, IAsyncCommandHandler handler);
+    void Register(CommandDescriptor descriptor, Action<object?> execute, Func<object?, bool>? canExecute = null);
+    bool Unregister(string commandId);
+    Task ExecuteAsync(string commandId, object? parameter = null, CancellationToken ct = default);
+    bool CanExecute(string commandId, object? parameter = null);
+    ICommand? GetCommand(string commandId);
+    CommandDescriptor? GetDescriptor(string commandId);
+    IReadOnlyList<CommandDescriptor> GetAllCommands();
+    IReadOnlyList<CommandDescriptor> GetCommandsByCategory(string category);
+    IReadOnlyList<string> GetCategories();
+    bool IsRegistered(string commandId);
+    // ... status tracking, events
 }
 ```
 
-### CommandDefinition
+## CommandDescriptor
 
 ```csharp
-public record CommandDefinition
+public sealed class CommandDescriptor
 {
-    public string Id { get; init; }
-    public string Name { get; init; }
-    public string Description { get; init; }
-    public string Category { get; init; }
-    public string? Shortcut { get; init; }
-    public string? IconGlyph { get; init; }
-    public Func<object?, Task> ExecuteAsync { get; init; }
-    public Func<bool>? CanExecute { get; init; }
+    public required string Id { get; init; }
+    public required string Title { get; init; }
+    public string? Description { get; init; }
+    public string Category { get; init; } = "General";
+    public string? Icon { get; init; }
+    public string? KeyboardShortcut { get; init; }
+    public bool IsEnabled { get; init; } = true;
+    public bool BypassBusy { get; init; } = false;
 }
 ```
 
 ## Registering Commands
 
-### Built-in Commands
+### Via Command Handlers (Bootstrapper)
 
-Built-in commands are registered at startup:
+Commands are registered in `CommandHandlerBootstrapper` via handlers:
 
-```csharp
-public class BuiltInCommandsProvider
-{
-    private readonly ICommandRegistry _registry;
-    private readonly INavigationService _navigation;
-    
-    public void RegisterCommands()
-    {
-        _registry.Register(new CommandDefinition
-        {
-            Id = "file.new",
-            Name = "New Project",
-            Description = "Create a new project",
-            Category = "File",
-            Shortcut = "Ctrl+N",
-            IconGlyph = "\uE8E5",
-            ExecuteAsync = async _ => await _navigation.NavigateAsync("NewProject")
-        });
-        
-        _registry.Register(new CommandDefinition
-        {
-            Id = "view.togglePanel",
-            Name = "Toggle Panel",
-            Description = "Show or hide the selected panel",
-            Category = "View",
-            Shortcut = "Ctrl+B",
-            ExecuteAsync = async _ => await TogglePanelAsync()
-        });
-    }
-}
-```
+- **FileOperationsHandler** — file.new, file.open, file.save, etc.
+- **ProfileOperationsHandler** — profile.create, profile.duplicate, etc.
+- **PlaybackOperationsHandler** — playback.play, playback.pause, etc.
+- **SettingsOperationsHandler** — settings.open
+- **NavigationHandler** — nav.* commands
 
-### Plugin Commands
-
-Plugins can register commands via the plugin API:
+Example:
 
 ```csharp
-public class MyPlugin : IPlugin
-{
-    public void Initialize(IPluginContext context)
+_registry.Register(
+    new CommandDescriptor
     {
-        context.CommandRegistry.Register(new CommandDefinition
-        {
-            Id = "myplugin.customAction",
-            Name = "My Custom Action",
-            Category = "Plugins",
-            ExecuteAsync = async _ => await DoCustomActionAsync()
-        });
-    }
-}
+        Id = "file.new",
+        Title = "New Project",
+        Description = "Create a new project",
+        Category = "file",
+        KeyboardShortcut = "Ctrl+N"
+    },
+    async (_, ct) => await _fileOps.NewProjectAsync(ct)
+);
 ```
+
+### Adding a Panel to the Palette
+
+Panels appear automatically if registered in `IPanelRegistry` with `IsVisible=true` and `Maturity != Deprecated`. Use `Keywords` on `PanelDescriptor` for search.
 
 ## Command Categories
 
 | Category | Description | Examples |
 |----------|-------------|----------|
 | File | File operations | New, Open, Save, Export |
-| Edit | Editing operations | Undo, Redo, Cut, Copy, Paste |
-| View | View toggles | Panels, Zoom, Fullscreen |
-| Synthesis | Synthesis actions | Generate, Stop, Queue |
-| Audio | Audio operations | Play, Pause, Record |
-| Tools | Utility functions | Settings, Preferences |
-| Navigate | Navigation | Go to Panel, Go to Timeline |
-| Plugins | Plugin commands | Custom plugin actions |
+| Profile | Profile operations | Create, Duplicate, Switch |
+| Playback | Playback controls | Play, Pause, Stop |
+| Settings | Settings and preferences | Open Settings |
+| Navigation | Navigation | Panel switching, Tool Catalog |
+| Theme | Theme and density | Dark, Light, Sci-Fi, Compact, Comfort |
+| System | System actions | Show keybindings |
 
-## Command Palette UI
+## Action Types
 
-### XAML Template
+Commands use `Id` prefixes for routing:
 
-```xml
-<Grid x:Name="CommandPalette" 
-      Visibility="Collapsed"
-      Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}">
-    
-    <StackPanel Width="500" Margin="0,100,0,0" VerticalAlignment="Top">
-        <TextBox x:Name="SearchBox"
-                 PlaceholderText="Search commands..."
-                 TextChanged="OnSearchTextChanged"/>
-        
-        <ListView x:Name="CommandList"
-                  ItemsSource="{x:Bind ViewModel.FilteredCommands}"
-                  SelectionChanged="OnCommandSelected">
-            <ListView.ItemTemplate>
-                <DataTemplate x:DataType="local:CommandDefinition">
-                    <Grid Padding="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <FontIcon Glyph="{x:Bind IconGlyph}" 
-                                  FontSize="16" 
-                                  Margin="0,0,8,0"/>
-                        
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="{x:Bind Name}" 
-                                       Style="{StaticResource BodyTextBlockStyle}"/>
-                            <TextBlock Text="{x:Bind Description}" 
-                                       Style="{StaticResource CaptionTextBlockStyle}"
-                                       Opacity="0.7"/>
-                        </StackPanel>
-                        
-                        <TextBlock Grid.Column="2" 
-                                   Text="{x:Bind Shortcut}"
-                                   Opacity="0.5"/>
-                    </Grid>
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
-    </StackPanel>
-</Grid>
-```
+| Prefix | Action | Example |
+|--------|--------|---------|
+| `open:` | Open panel | `open:voice_synthesis` |
+| `theme:` | Apply theme | `theme:Dark` |
+| `density:` | Apply layout density | `density:Compact` |
+| `help:` | Show help view | `help:keymap` |
+| (registry) | Execute via IUnifiedCommandRegistry | `file.new` |
 
-### ViewModel
+## Implementation Files
 
-```csharp
-public partial class CommandPaletteViewModel : ObservableObject
-{
-    private readonly ICommandRegistry _registry;
-    
-    [ObservableProperty]
-    private string _searchText = "";
-    
-    public ObservableCollection<CommandDefinition> FilteredCommands { get; } = new();
-    
-    partial void OnSearchTextChanged(string value)
-    {
-        FilteredCommands.Clear();
-        
-        var matches = _registry.Search(value)
-            .Take(10)
-            .ToList();
-            
-        foreach (var cmd in matches)
-        {
-            FilteredCommands.Add(cmd);
-        }
-    }
-    
-    public async Task ExecuteSelectedAsync()
-    {
-        if (SelectedCommand is not null)
-        {
-            await _registry.ExecuteAsync(SelectedCommand.Id);
-        }
-    }
-}
-```
-
-## Keyboard Shortcuts
-
-### Global Shortcuts
-
-```csharp
-public class ShortcutManager
-{
-    private readonly ICommandRegistry _registry;
-    
-    public void RegisterGlobalShortcuts(KeyboardAcceleratorCollection accelerators)
-    {
-        foreach (var command in _registry.GetAll().Where(c => c.Shortcut != null))
-        {
-            var accelerator = ParseShortcut(command.Shortcut);
-            accelerator.Invoked += async (s, e) =>
-            {
-                await _registry.ExecuteAsync(command.Id);
-                e.Handled = true;
-            };
-            accelerators.Add(accelerator);
-        }
-    }
-}
-```
-
-### Shortcut Parsing
-
-```csharp
-private KeyboardAccelerator ParseShortcut(string shortcut)
-{
-    var parts = shortcut.Split('+');
-    var key = Enum.Parse<VirtualKey>(parts[^1]);
-    
-    var modifiers = VirtualKeyModifiers.None;
-    if (parts.Contains("Ctrl")) modifiers |= VirtualKeyModifiers.Control;
-    if (parts.Contains("Shift")) modifiers |= VirtualKeyModifiers.Shift;
-    if (parts.Contains("Alt")) modifiers |= VirtualKeyModifiers.Menu;
-    
-    return new KeyboardAccelerator { Key = key, Modifiers = modifiers };
-}
-```
+| File | Purpose |
+|------|---------|
+| `CommandPaletteService.cs` | Shows palette window, handles PanelOpenRequested, HelpViewRequested, theme/density |
+| `CommandPaletteViewModel.cs` | Loads items from PanelRegistry + UnifiedCommandRegistry, applies filter |
+| `CommandPaletteView.xaml` | Search box + results list |
+| `CommandPaletteWindow.xaml` | Host window |
+| `UnifiedCommandRegistry.cs` | Command registration and execution |
+| `CommandHandlerBootstrapper.cs` | Wires handlers to registry at startup |
 
 ## Search Algorithm
 
-The command palette uses fuzzy matching:
+`CommandPaletteViewModel` filters by `FilterText` against `CommandItem.SearchText` (which includes `Title` and `Keywords`). Filtering is case-insensitive substring matching.
 
-```csharp
-public IEnumerable<CommandDefinition> Search(string query)
-{
-    if (string.IsNullOrWhiteSpace(query))
-    {
-        return _commands.OrderBy(c => c.Category).ThenBy(c => c.Name);
-    }
-    
-    return _commands
-        .Select(c => new { Command = c, Score = CalculateScore(c, query) })
-        .Where(x => x.Score > 0)
-        .OrderByDescending(x => x.Score)
-        .Select(x => x.Command);
-}
+## Keyboard Shortcuts
 
-private int CalculateScore(CommandDefinition cmd, string query)
-{
-    var score = 0;
-    
-    // Exact match
-    if (cmd.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
-        score += 100;
-    
-    // Prefix match
-    if (cmd.Name.StartsWith(query, StringComparison.OrdinalIgnoreCase))
-        score += 50;
-    
-    // Word match
-    var words = cmd.Name.Split(' ');
-    if (words.Any(w => w.StartsWith(query, StringComparison.OrdinalIgnoreCase)))
-        score += 25;
-    
-    // Category match
-    if (cmd.Category.Contains(query, StringComparison.OrdinalIgnoreCase))
-        score += 10;
-    
-    return score;
-}
-```
+- **Ctrl+P** — Open command palette (MainWindow)
+- **Escape** — Close palette
+- **Up/Down** — Navigate results
+- **Enter** — Execute selected command
 
 ## Best Practices
 
-1. **Use descriptive names** - Commands should be self-explanatory
-2. **Provide shortcuts** - Common commands should have keyboard shortcuts
-3. **Include descriptions** - Help users understand what the command does
-4. **Categorize properly** - Group related commands together
-5. **Handle errors** - Commands should handle exceptions gracefully
-
-## Testing
-
-```csharp
-[TestClass]
-public class CommandRegistryTests
-{
-    [TestMethod]
-    public void Register_AddsCommand()
-    {
-        var registry = new CommandRegistry();
-        var command = new CommandDefinition
-        {
-            Id = "test.command",
-            Name = "Test Command",
-            ExecuteAsync = _ => Task.CompletedTask
-        };
-        
-        registry.Register(command);
-        
-        Assert.IsTrue(registry.GetAll().Any(c => c.Id == "test.command"));
-    }
-    
-    [TestMethod]
-    public void Search_ReturnsMatchingCommands()
-    {
-        var registry = new CommandRegistry();
-        registry.Register(new CommandDefinition { Id = "file.new", Name = "New Project" });
-        registry.Register(new CommandDefinition { Id = "file.open", Name = "Open Project" });
-        
-        var results = registry.Search("new").ToList();
-        
-        Assert.AreEqual(1, results.Count);
-        Assert.AreEqual("file.new", results[0].Id);
-    }
-}
-```
+1. **Use descriptive titles** — Commands should be self-explanatory
+2. **Provide shortcuts** — Common commands should have `KeyboardShortcut` set
+3. **Include descriptions** — Help users understand what the command does
+4. **Categorize properly** — Use `file`, `profile`, `playback`, `settings`, `nav` for registry commands
+5. **Handle errors** — Commands should handle exceptions gracefully
 
 ## Related Documentation
 
 - [Command Palette Usage](../design/COMMAND_PALETTE_USAGE.md)
-- [Keyboard Shortcuts Reference](../REFERENCE/KEYBOARD_SHORTCUTS.md)
-- [Plugin Development Guide](../plugins/PLUGIN_DEVELOPMENT_GUIDE.md)
+- [Keyboard Shortcuts](../user/KEYBOARD_SHORTCUTS.md)
+- [Unified Command Architecture ADR](../architecture/decisions/ADR-028-unified-command-architecture.md)

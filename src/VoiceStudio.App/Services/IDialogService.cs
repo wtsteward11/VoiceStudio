@@ -53,6 +53,12 @@ namespace VoiceStudio.App.Services
     /// Show an error dialog with optional details.
     /// </summary>
     Task ShowErrorAsync(string title, string message, string? details = null);
+
+    /// <summary>
+    /// Show a dialog with arbitrary XAML content. Returns true if user confirmed (Primary), false if cancelled.
+    /// Caller builds content (e.g. StackPanel with controls) and reads values from controls after true.
+    /// </summary>
+    Task<bool> ShowContentAsync(string title, object content, string primaryText = "OK", string cancelText = "Cancel");
   }
 
   /// <summary>

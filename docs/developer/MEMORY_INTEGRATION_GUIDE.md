@@ -486,7 +486,7 @@ pytest tests/integration/tools/test_mcp_integration.py -v
 **Symptom**: Warning "OpenMemory MCP unavailable"
 
 **Resolution**:
-1. Run `scripts/setup_openmemory.ps1` to verify dependencies
+1. Run `scripts/setup/setup_openmemory.ps1` to verify dependencies
 2. Check if MCP server is running
 3. Verify `cursor.mcp.json` configuration
 4. Set `memory.mcp_enabled: false` in `context-sources.json` to disable MCP queries

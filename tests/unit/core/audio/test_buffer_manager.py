@@ -23,7 +23,11 @@ try:
     HAS_BUFFER_MANAGER = True
 except ImportError:
     HAS_BUFFER_MANAGER = False
-    pytestmark = pytest.mark.skip("Buffer manager not available")
+
+pytestmark = pytest.mark.skipif(
+    not HAS_BUFFER_MANAGER,
+    reason="Buffer manager not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)",
+)
 
 
 @pytest.fixture

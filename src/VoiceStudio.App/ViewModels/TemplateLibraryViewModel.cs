@@ -10,6 +10,7 @@ using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.Utilities;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.ViewModels
 {
@@ -20,6 +21,8 @@ namespace VoiceStudio.App.ViewModels
   {
     private readonly IBackendClient _backendClient;
     private readonly UndoRedoService? _undoRedoService;
+    private CancellationTokenSource? _searchDebounceCts;
+    private const int SearchDebounceMs = 300;
 
     public string PanelId => "template_library";
     public string DisplayName => ResourceHelper.GetString("Panel.TemplateLibrary.DisplayName", "Template Library");
@@ -471,7 +474,21 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSearchQueryChanged(string? value)
     {
-      _ = SearchTemplatesAsync(CancellationToken.None);
+      _searchDebounceCts?.Cancel();
+      _searchDebounceCts = new CancellationTokenSource();
+      var cts = _searchDebounceCts;
+      _ = Task.Run(async () =>
+      {
+        try
+        {
+          await Task.Delay(SearchDebounceMs, cts.Token);
+          Dispatcher.TryEnqueue(() => _ = SearchTemplatesAsync(cts.Token));
+        }
+        catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "TemplateLibraryViewModel.OnSearchQueryChanged");
+      }
+      });
     }
 
     // Response models

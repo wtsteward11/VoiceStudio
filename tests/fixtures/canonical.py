@@ -185,7 +185,7 @@ def resolve_test_audio(
     if validate:
         raise CanonicalAudioError(
             f"Test audio not found: {target}\n"
-            "Run: scripts/setup_test_audio.ps1 or py tests/ui/fixtures/generate_test_audio.py --canonical"
+            "Run: scripts/setup/setup_test_audio.ps1 or py tests/ui/fixtures/generate_test_audio.py --canonical"
         )
     return target
 

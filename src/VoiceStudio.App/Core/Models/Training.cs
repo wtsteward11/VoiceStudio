@@ -55,6 +55,10 @@ namespace VoiceStudio.Core.Models
     public double? ValidationLoss { get; set; }
     public List<TrainingQualityAlert>? QualityAlerts { get; set; }
     public EarlyStoppingRecommendation? EarlyStoppingRecommendation { get; set; }
+
+    // Simulation mode (MED-1: backend returns when training runs in simulation)
+    public bool SimulationMode { get; set; }
+    public string? SimulationReason { get; set; }
   }
 
   /// <summary>

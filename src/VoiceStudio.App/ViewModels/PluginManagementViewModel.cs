@@ -10,6 +10,7 @@ using VoiceStudio.Core.Plugins;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
+using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.ViewModels
 {
@@ -21,6 +22,8 @@ namespace VoiceStudio.App.ViewModels
   {
     private readonly PluginManager? _pluginManager;
     private readonly PluginBridgeService? _pluginBridge;
+    private CancellationTokenSource? _filterDebounceCts;
+    private const int FilterDebounceMs = 300;
 
     public string PanelId => "pluginmanagement";
     public string DisplayName => ResourceHelper.GetString("Panel.PluginManagement.DisplayName", "Plugin Management");
@@ -320,7 +323,21 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSearchQueryChanged(string? value)
     {
-      ApplyFilters();
+      _filterDebounceCts?.Cancel();
+      _filterDebounceCts = new CancellationTokenSource();
+      var cts = _filterDebounceCts;
+      _ = Task.Run(async () =>
+      {
+        try
+        {
+          await Task.Delay(FilterDebounceMs, cts.Token);
+          Dispatcher.TryEnqueue(ApplyFilters);
+        }
+        catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PluginManagementViewModel.OnSearchQueryChanged");
+      }
+      });
     }
 
     partial void OnShowEnabledOnlyChanged(bool value)

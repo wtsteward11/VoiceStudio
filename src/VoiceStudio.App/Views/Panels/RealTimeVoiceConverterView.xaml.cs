@@ -23,7 +23,9 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new RealTimeVoiceConverterViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient()
+          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
+          ServiceProvider.GetProfilesClient(),
+          AppServices.TryGetWebSocketClientFactory()
       );
       DataContext = ViewModel;
 

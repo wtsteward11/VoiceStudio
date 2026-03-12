@@ -10,7 +10,7 @@ Output: fixtures/audio/sentinel_16k_mono.wav
 Format: 16kHz, 16-bit, mono WAV
 
 Usage:
-    python scripts/generate_sentinel_fixture.py
+    python scripts/generate/generate_sentinel_fixture.py
 """
 
 import math

@@ -25,6 +25,7 @@ namespace VoiceStudio.App.Views.Panels
   public partial class BatchProcessingViewModel : BaseViewModel, IPanelView
   {
     private readonly IBackendClient _backendClient;
+    private readonly IDialogService _dialogService;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly UndoRedoService? _undoRedoService;
     private readonly MultiSelectService _multiSelectService;
@@ -120,10 +121,11 @@ namespace VoiceStudio.App.Views.Panels
             "tortoise"
         };
 
-    public BatchProcessingViewModel(IViewModelContext context, IBackendClient backendClient)
+    public BatchProcessingViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService)
         : base(context)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
       // Get multi-select service
       var multiSelectService = AppServices.TryGetMultiSelectService();
@@ -642,11 +644,12 @@ namespace VoiceStudio.App.Views.Panels
       if (job == null)
         return;
 
-      // Show confirmation dialog
-      var confirmed = await Utilities.ConfirmationDialog.ShowDeleteConfirmationAsync(
-          job.Name ?? "Unnamed Batch Job",
-          "batch job"
-      );
+      // Show confirmation dialog (Panel Hardening: IDialogService per PANEL_HARDENING_PATTERN)
+      var confirmed = await _dialogService.ShowConfirmationAsync(
+          "Delete batch job?",
+          $"Are you sure you want to delete '{job.Name ?? "Unnamed Batch Job"}'? This action cannot be undone.",
+          "Delete",
+          "Cancel");
 
       if (!confirmed)
         return;

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using VoiceStudio.App.Core.Models;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.App.UseCases;
 using VoiceStudio.Core.Models;
@@ -27,18 +28,44 @@ namespace VoiceStudio.App.Tests.ViewModels
     {
       base.TestInitialize();
       _audioPlayerService = new AudioPlayerService(new System.Net.Http.HttpClient());
-      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(MockBackendClient!);
+      var coordinator = new RequestCoordinator();
+      var profilesClient = new ProfilesClient(MockBackendClient!, coordinator);
+      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(profilesClient);
       var multiSelectService = new MultiSelectService();
       var undoRedoService = new UndoRedoService();
+      var qualityInsightsService = new Mock<IProfileQualityInsightsService>();
+      qualityInsightsService.Setup(x => x.LoadQualityHistoryAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<QualityHistoryEntry>());
+      qualityInsightsService.Setup(x => x.LoadQualityTrendsAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new QualityTrends());
+      qualityInsightsService.Setup(x => x.LoadQualityBaselineAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync((QualityBaseline?)null);
+      qualityInsightsService.Setup(x => x.GetQualityDegradationAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync((QualityDegradationResponse?)null);
+
+      var transferService = new Mock<IProfileTransferService>();
+      transferService.Setup(x => x.ParseImports(It.IsAny<string>())).Returns((new List<ProfileImportData>(), (string?)null));
+      transferService.Setup(x => x.CreateProfilesFromImportDataAsync(It.IsAny<IReadOnlyList<ProfileImportData>>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<VoiceProfile>());
+      transferService.Setup(x => x.BuildExportJson(It.IsAny<IEnumerable<VoiceProfile>>())).Returns("{}");
+      transferService.Setup(x => x.SanitizeFilename(It.IsAny<string?>())).Returns((string? v) => string.IsNullOrWhiteSpace(v) ? "profile_export" : v!);
+
+      var enhancementService = CreateMockProfileEnhancementService();
+
       _viewModel = new ProfilesViewModel(
-          MockBackendClient!,
+          profilesClient,
           profilesUseCase,
           _audioPlayerService,
           multiSelectService,
+          qualityInsightsService.Object,
+          transferService.Object,
+          enhancementService,
           toastNotificationService: null,
           undoRedoService: undoRedoService,
           errorService: null,
-          logService: null);
+          logService: null,
+          dialogService: null,
+          previewService: null);
     }
 
     [TestCleanup]
@@ -157,19 +184,28 @@ namespace VoiceStudio.App.Tests.ViewModels
           .Setup(x => x.CreateProfileAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<List<string>?>(), It.IsAny<CancellationToken>()))
           .ReturnsAsync(newProfile);
 
-      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(mockBackend.Object);
+      var profilesClient = new ProfilesClient(mockBackend.Object, new RequestCoordinator());
+      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(profilesClient);
       var audioPlayer = new AudioPlayerService(new System.Net.Http.HttpClient());
       var multiSelectService = new MultiSelectService();
       var undoRedoService = new UndoRedoService();
+      var qualityInsights = CreateMockProfileQualityInsightsService();
+      var transferService = CreateMockProfileTransferService();
+      var enhancementService = CreateMockProfileEnhancementService();
       var vm = new ProfilesViewModel(
-          mockBackend.Object,
+          profilesClient,
           profilesUseCase,
           audioPlayer,
           multiSelectService,
+          qualityInsights,
+          transferService,
+          enhancementService,
           toastNotificationService: null,
           undoRedoService: undoRedoService,
           errorService: null,
-          logService: null);
+          logService: null,
+          dialogService: null,
+          previewService: null);
 
       // Act: create profile (sets SelectedProfile, which previously triggered quality calls)
       await vm.CreateProfileCommand.ExecuteAsync("Test Profile");
@@ -198,19 +234,28 @@ namespace VoiceStudio.App.Tests.ViewModels
     public void RapidProfileSwitching_DoesNotCallQualityEndpoints()
     {
       var mockBackend = CreateMockBackendClient();
-      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(mockBackend.Object);
+      var profilesClient = new ProfilesClient(mockBackend.Object, new RequestCoordinator());
+      var profilesUseCase = new VoiceStudio.App.UseCases.ProfilesUseCase(profilesClient);
       var audioPlayer = new AudioPlayerService(new System.Net.Http.HttpClient());
       var multiSelectService = new MultiSelectService();
       var undoRedoService = new UndoRedoService();
+      var qualityInsights = CreateMockProfileQualityInsightsService();
+      var transferService = CreateMockProfileTransferService();
+      var enhancementService = CreateMockProfileEnhancementService();
       var vm = new ProfilesViewModel(
-          mockBackend.Object,
+          profilesClient,
           profilesUseCase,
           audioPlayer,
           multiSelectService,
+          qualityInsights,
+          transferService,
+          enhancementService,
           toastNotificationService: null,
           undoRedoService: undoRedoService,
           errorService: null,
-          logService: null);
+          logService: null,
+          dialogService: null,
+          previewService: null);
 
       var p1 = new VoiceProfile { Id = "p1", Name = "Profile 1" };
       var p2 = new VoiceProfile { Id = "p2", Name = "Profile 2" };
@@ -241,42 +286,60 @@ namespace VoiceStudio.App.Tests.ViewModels
 
     /// <summary>
     /// Verifies that concurrent LoadProfilesAsync calls coalesce to a single backend request.
+    /// Coalescing is provided by IRequestCoordinator in BackendClient (not ProfilesViewModel).
     /// </summary>
     [TestMethod]
     public async Task LoadProfilesAsync_ConcurrentCalls_CoalescesToSingleRequest()
     {
-      var listCallCount = 0;
-      var mockUseCase = new Mock<IProfilesUseCase>();
-      // Delay completion so the second concurrent caller can join the coalesced load
-      // before the first completes (otherwise first clears _loadProfilesTask before second enters lock).
-      mockUseCase
-          .Setup(x => x.ListAsync(It.IsAny<CancellationToken>()))
-          .Callback(() => Interlocked.Increment(ref listCallCount))
-          .Returns(async () =>
+      var coordinator = new RequestCoordinator();
+      var backendCallCount = 0;
+      var mockBackend = CreateMockBackendClient();
+
+      // GetProfilesAsync delegates to coordinator so concurrent callers coalesce to one factory invocation
+      mockBackend
+          .Setup(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()))
+          .Returns(async (CancellationToken ct) =>
           {
-            await Task.Delay(100).ConfigureAwait(false);
-            return (IReadOnlyList<VoiceProfile>)new List<VoiceProfile>();
+            return await coordinator.GetOrCreateAsync(
+              "profiles:list",
+              async c =>
+              {
+                Interlocked.Increment(ref backendCallCount);
+                await Task.Delay(100, c).ConfigureAwait(false);
+                return new List<VoiceProfile>();
+              },
+              TimeSpan.FromSeconds(30),
+              ct).ConfigureAwait(false);
           });
 
-      var mockBackend = CreateMockBackendClient();
+      var profilesClient = new ProfilesClient(mockBackend.Object, new RequestCoordinator());
+      var profilesUseCase = new ProfilesUseCase(profilesClient);
       var audioPlayer = new AudioPlayerService(new System.Net.Http.HttpClient());
       var multiSelectService = new MultiSelectService();
       var undoRedoService = new UndoRedoService();
+      var qualityInsights = CreateMockProfileQualityInsightsService();
+      var transferService = CreateMockProfileTransferService();
+      var enhancementService = CreateMockProfileEnhancementService();
       var vm = new ProfilesViewModel(
-          mockBackend.Object,
-          mockUseCase.Object,
+          profilesClient,
+          profilesUseCase,
           audioPlayer,
           multiSelectService,
+          qualityInsights,
+          transferService,
+          enhancementService,
           toastNotificationService: null,
           undoRedoService: undoRedoService,
           errorService: null,
-          logService: null);
+          logService: null,
+          dialogService: null,
+          previewService: null);
 
       await Task.WhenAll(
           vm.LoadProfilesCommand.ExecuteAsync(null),
           vm.LoadProfilesCommand.ExecuteAsync(null)).ConfigureAwait(false);
 
-      Assert.AreEqual(1, listCallCount, "ListAsync should be called exactly once when LoadProfiles is invoked concurrently");
+      Assert.AreEqual(1, backendCallCount, "Backend GetProfilesAsync factory should run exactly once when LoadProfiles is invoked concurrently (coordinator coalesces)");
     }
 
     /// <summary>
@@ -293,19 +356,28 @@ namespace VoiceStudio.App.Tests.ViewModels
           .Callback(() => Interlocked.Increment(ref createCallCount))
           .Returns(() => createBlocker.Task.ContinueWith(_ => new VoiceProfile { Id = "test-1", Name = "Test" }));
 
+      var mockProfilesClient = new Mock<IProfilesClient>();
       var mockBackend = CreateMockBackendClient();
       var audioPlayer = new AudioPlayerService(new System.Net.Http.HttpClient());
       var multiSelectService = new MultiSelectService();
       var undoRedoService = new UndoRedoService();
+      var qualityInsights = CreateMockProfileQualityInsightsService();
+      var transferService = CreateMockProfileTransferService();
+      var enhancementService = CreateMockProfileEnhancementService();
       var vm = new ProfilesViewModel(
-          mockBackend.Object,
+          mockProfilesClient.Object,
           mockUseCase.Object,
           audioPlayer,
           multiSelectService,
+          qualityInsights,
+          transferService,
+          enhancementService,
           toastNotificationService: null,
           undoRedoService: undoRedoService,
           errorService: null,
-          logService: null);
+          logService: null,
+          dialogService: null,
+          previewService: null);
 
       var t1 = vm.CreateProfileCommand.ExecuteAsync("Profile 1");
       var t2 = vm.CreateProfileCommand.ExecuteAsync("Profile 2");
@@ -314,6 +386,39 @@ namespace VoiceStudio.App.Tests.ViewModels
       await WaitForAsyncOperation(50);
 
       Assert.AreEqual(1, createCallCount, "CreateAsync should be called exactly once when CreateProfile is invoked concurrently");
+    }
+
+    private static IProfileQualityInsightsService CreateMockProfileQualityInsightsService()
+    {
+      var mock = new Mock<IProfileQualityInsightsService>();
+      mock.Setup(x => x.LoadQualityHistoryAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<QualityHistoryEntry>());
+      mock.Setup(x => x.LoadQualityTrendsAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new QualityTrends());
+      mock.Setup(x => x.LoadQualityBaselineAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync((QualityBaseline?)null);
+      mock.Setup(x => x.GetQualityDegradationAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync((QualityDegradationResponse?)null);
+      return mock.Object;
+    }
+
+    private static IProfileTransferService CreateMockProfileTransferService()
+    {
+      var mock = new Mock<IProfileTransferService>();
+      mock.Setup(x => x.ParseImports(It.IsAny<string>())).Returns((new List<ProfileImportData>(), (string?)null));
+      mock.Setup(x => x.CreateProfilesFromImportDataAsync(It.IsAny<IReadOnlyList<ProfileImportData>>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<VoiceProfile>());
+      mock.Setup(x => x.BuildExportJson(It.IsAny<IEnumerable<VoiceProfile>>())).Returns("{}");
+      mock.Setup(x => x.SanitizeFilename(It.IsAny<string?>())).Returns((string? v) => string.IsNullOrWhiteSpace(v) ? "profile_export" : v!);
+      return mock.Object;
+    }
+
+    private static IProfileEnhancementService CreateMockProfileEnhancementService()
+    {
+      var mock = new Mock<IProfileEnhancementService>();
+      mock.Setup(x => x.EnhanceAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<double>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync((ReferenceAudioPreprocessResponse?)null);
+      return mock.Object;
     }
   }
 }

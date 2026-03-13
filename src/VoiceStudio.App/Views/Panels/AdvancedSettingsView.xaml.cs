@@ -15,7 +15,7 @@ namespace VoiceStudio.App.Views.Panels
       InitializeComponent();
       ViewModel = new AdvancedSettingsViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient()
+          AppServices.GetAdvancedSettingsClient()
       );
       DataContext = ViewModel;
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>

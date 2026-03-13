@@ -1,7 +1,7 @@
 src/VoiceStudio.App/ViewModels/AIMixingMasteringViewModel.cs:99 # AIMixingMasteringViewModel constructor
 src/VoiceStudio.App/ViewModels/AIProductionAssistantViewModel.cs:57 # AIProductionAssistantViewModel constructor
 # APIKeyManagerViewModel MIGRATED to IAPIKeyManagerClient (2026-03-13)
-src/VoiceStudio.App/ViewModels/AdvancedSettingsViewModel.cs:156 # AdvancedSettingsViewModel constructor
+# AdvancedSettingsViewModel MIGRATED to IAdvancedSettingsClient (2026-03-13)
 src/VoiceStudio.App/ViewModels/AdvancedSpectrogramVisualizationViewModel.cs:83 # AdvancedSpectrogramVisualizationViewModel constructor
 src/VoiceStudio.App/ViewModels/AdvancedWaveformVisualizationViewModel.cs:92 # AdvancedWaveformVisualizationViewModel constructor
 src/VoiceStudio.App/ViewModels/AnalyticsDashboardViewModel.cs:61 # AnalyticsDashboardViewModel constructor

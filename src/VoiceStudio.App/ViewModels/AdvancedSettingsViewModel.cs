@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
@@ -14,9 +15,9 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the AdvancedSettingsView panel - Comprehensive settings.
   /// </summary>
-  public partial class AdvancedSettingsViewModel : BaseViewModel, IPanelView
+  public partial class AdvancedSettingsViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IAdvancedSettingsClient _advancedSettingsClient;
 
     public string PanelId => "advanced-settings";
     public string DisplayName => ResourceHelper.GetString("Panel.AdvancedSettings.DisplayName", "Advanced Settings");
@@ -153,10 +154,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<string> availableCategories = new() { "UI", "Performance", "Audio Processing", "Engine", "System" };
 
-    public AdvancedSettingsViewModel(IViewModelContext context, IBackendClient backendClient)
+    public AdvancedSettingsViewModel(IViewModelContext context, IAdvancedSettingsClient advancedSettingsClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _advancedSettingsClient = advancedSettingsClient ?? throw new ArgumentNullException(nameof(advancedSettingsClient));
 
       LoadSettingsCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -178,22 +179,26 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadSettingsAsync(CancellationToken.None);
-      _ = LoadGpuDevicesAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      return RefreshAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) =>
+      RefreshAsyncInternal(cancellationToken);
 
     private async Task LoadGpuDevicesAsync(CancellationToken cancellationToken)
     {
       try
       {
-        var devices = await _backendClient.SendRequestAsync<object, List<GpuDeviceInfo>>(
-            "/api/gpu-status/devices",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var devices = await _advancedSettingsClient.GetGpuDevicesAsync(cancellationToken);
 
         if (devices != null)
         {
@@ -224,12 +229,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var settings = await _backendClient.SendRequestAsync<object, AdvancedSettingsData>(
-            "/api/advanced-settings",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var settings = await _advancedSettingsClient.GetSettingsAsync(cancellationToken);
 
         if (settings != null)
         {
@@ -356,12 +356,7 @@ namespace VoiceStudio.App.ViewModels
           }
         };
 
-        await _backendClient.SendRequestAsync<object, object>(
-            "/api/advanced-settings",
-            settings,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        await _advancedSettingsClient.SaveSettingsAsync(settings, cancellationToken);
 
         StatusMessage = ResourceHelper.GetString("AdvancedSettings.SettingsSaved", "Settings saved");
       }
@@ -386,12 +381,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.SendRequestAsync<object, object>(
-            "/api/advanced-settings/reset",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _advancedSettingsClient.ResetSettingsAsync(cancellationToken);
 
         await LoadSettingsAsync(cancellationToken);
         StatusMessage = ResourceHelper.GetString("AdvancedSettings.SettingsReset", "Settings reset to defaults");
@@ -410,7 +400,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task RefreshAsyncInternal(CancellationToken cancellationToken)
     {
       try
       {
@@ -428,76 +418,5 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Response models
-    private class AdvancedSettingsData
-    {
-      public UISettings? Ui { get; set; }
-      public PerformanceSettings? Performance { get; set; }
-      public AudioProcessingSettings? AudioProcessing { get; set; }
-      public EngineAdvancedSettings? Engine { get; set; }
-      public SystemIntegrationSettings? System { get; set; }
-    }
-
-    private class UISettings
-    {
-      public string Theme { get; set; } = string.Empty;
-      public string AccentColor { get; set; } = string.Empty;
-      public string FontSize { get; set; } = string.Empty;
-      public double UiScale { get; set; }
-      public bool AnimationEnabled { get; set; }
-      public bool TransparencyEnabled { get; set; }
-      public bool CompactMode { get; set; }
-    }
-
-    private class PerformanceSettings
-    {
-      public bool CacheEnabled { get; set; }
-      public int CacheSizeMb { get; set; }
-      public int MaxThreads { get; set; }
-      public bool GpuEnabled { get; set; }
-      public string? GpuDevice { get; set; }
-      public double MemoryLimitMb { get; set; }
-      public bool BackgroundProcessing { get; set; }
-      public bool PreloadEngines { get; set; }
-    }
-
-    private class AudioProcessingSettings
-    {
-      public int DefaultSampleRate { get; set; }
-      public int DefaultBitDepth { get; set; }
-      public bool DitherEnabled { get; set; }
-      public bool NormalizationEnabled { get; set; }
-      public bool AutoFadeIn { get; set; }
-      public bool AutoFadeOut { get; set; }
-      public int FadeDurationMs { get; set; }
-      public string ResamplingQuality { get; set; } = string.Empty;
-    }
-
-    private class EngineAdvancedSettings
-    {
-      public bool AutoFallback { get; set; }
-      public int TimeoutSeconds { get; set; }
-      public int RetryAttempts { get; set; }
-      public int BatchSize { get; set; }
-      public bool EnableQualityEnhancement { get; set; }
-      public double QualityThreshold { get; set; }
-      public bool ModelCacheEnabled { get; set; }
-    }
-
-    private class SystemIntegrationSettings
-    {
-      public bool ContextMenuEnabled { get; set; }
-      public bool AutoStart { get; set; }
-      public bool MinimizeToTray { get; set; }
-      public bool CheckForUpdates { get; set; }
-      public string UpdateChannel { get; set; } = string.Empty;
-    }
-
-    private class GpuDeviceInfo
-    {
-      public string DeviceId { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public string Vendor { get; set; } = string.Empty;
-    }
   }
 }

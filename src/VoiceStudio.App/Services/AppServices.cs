@@ -140,6 +140,85 @@ namespace VoiceStudio.App.Services
       // Training facade (TrainingViewModel hardening)
       services.AddSingleton<ITrainingClient, TrainingClient>();
 
+      // Training dataset editor facade (TrainingDatasetEditorViewModel hardening)
+      services.AddSingleton<ITrainingDatasetEditorClient, TrainingDatasetEditorClient>();
+
+      // Batch processing facade (BatchProcessingViewModel hardening)
+      services.AddSingleton<IBatchProcessingClient, BatchProcessingClient>();
+
+      // Voice cloning wizard facade (VoiceCloningWizardViewModel hardening)
+      services.AddSingleton<IVoiceCloningWizardClient, VoiceCloningWizardClient>();
+
+      // Library facade (LibraryViewModel hardening)
+      services.AddSingleton<ILibraryClient, LibraryClient>();
+
+      // Real-time voice converter facade (RealTimeVoiceConverterViewModel hardening)
+      services.AddSingleton<IRealTimeVoiceConverterClient, RealTimeVoiceConverterClient>();
+
+      // Embedding explorer facade (EmbeddingExplorerViewModel hardening)
+      services.AddSingleton<IEmbeddingExplorerClient, EmbeddingExplorerClient>();
+
+      // Text-based speech editor facade (TextBasedSpeechEditorViewModel hardening)
+      services.AddSingleton<ITextBasedSpeechEditorClient, TextBasedSpeechEditorClient>();
+
+      // Text speech editor facade (TextSpeechEditorViewModel hardening)
+      services.AddSingleton<ITextSpeechEditorClient, TextSpeechEditorClient>();
+
+      // Recording facade (RecordingViewModel hardening)
+      services.AddSingleton<IRecordingClient, RecordingClient>();
+
+      // Dataset QA facade (DatasetQAViewModel hardening)
+      services.AddSingleton<IDatasetQAClient, DatasetQAClient>();
+
+      // Diagnostics facade (DiagnosticsViewModel hardening)
+      services.AddSingleton<IDiagnosticsClient, DiagnosticsClient>();
+
+      // Analyzer facade (AnalyzerViewModel hardening)
+      services.AddSingleton<IAnalyzerClient, AnalyzerClient>();
+
+      // Settings facade (SettingsViewModel hardening)
+      services.AddSingleton<ISettingsClient, SettingsClient>();
+
+      // Macro facade (MacroViewModel hardening)
+      services.AddSingleton<IMacroClient, MacroClient>();
+
+      // Model manager facade (ModelManagerViewModel hardening)
+      services.AddSingleton<IModelManagerClient, ModelManagerClient>();
+
+      // Job progress API facade (JobProgressViewModel hardening)
+      services.AddSingleton<IJobProgressApiClient, JobProgressApiClient>();
+
+      // Multi-voice generator facade (MultiVoiceGeneratorViewModel migration)
+      services.AddSingleton<IMultiVoiceGeneratorClient, MultiVoiceGeneratorClient>();
+
+      // Ensemble synthesis facade (EnsembleSynthesisViewModel migration)
+      services.AddSingleton<IEnsembleSynthesisClient, EnsembleSynthesisClient>();
+
+      // Global search facade (GlobalSearchViewModel migration)
+      services.AddSingleton<ISearchClient, SearchClient>();
+
+      // Backup/restore facade (BackupRestoreViewModel migration)
+      services.AddSingleton<IBackupRestoreClient, BackupRestoreClient>();
+
+      // API key manager facade (APIKeyManagerViewModel migration)
+      services.AddSingleton<IAPIKeyManagerClient, APIKeyManagerClient>();
+
+      // Script editor facade (ScriptEditorViewModel migration)
+      services.AddSingleton<IScriptEditorClient, ScriptEditorClient>();
+
+      // Automation facade (AutomationViewModel migration)
+      services.AddSingleton<IAutomationClient, AutomationClient>();
+
+      // Scene builder facade (SceneBuilderViewModel migration)
+      services.AddSingleton<ISceneBuilderClient, SceneBuilderClient>();
+
+      // Mix assistant facade (MixAssistantViewModel migration)
+      services.AddSingleton<IMixAssistantClient, MixAssistantClient>();
+      services.AddSingleton<IAdvancedSettingsClient, AdvancedSettingsClient>();
+
+      // Assistant facade (AssistantViewModel migration)
+      services.AddSingleton<IAssistantClient, AssistantClient>();
+
       // Audio visualization facade (Timeline hardening Phase 4)
       services.AddSingleton<IAudioVisualizationService, AudioVisualizationService>();
 
@@ -427,6 +506,15 @@ namespace VoiceStudio.App.Services
     public static IProjectsClient GetProjectsClient() => GetRequiredService<IProjectsClient>();
     public static IProfilesClient GetProfilesClient() => GetRequiredService<IProfilesClient>();
     public static IEnginesClient GetEnginesClient() => GetRequiredService<IEnginesClient>();
+    public static ISearchClient GetSearchClient() => GetRequiredService<ISearchClient>();
+    public static IBackupRestoreClient GetBackupRestoreClient() => GetRequiredService<IBackupRestoreClient>();
+    public static IAPIKeyManagerClient GetAPIKeyManagerClient() => GetRequiredService<IAPIKeyManagerClient>();
+    public static IScriptEditorClient GetScriptEditorClient() => GetRequiredService<IScriptEditorClient>();
+    public static IAutomationClient GetAutomationClient() => GetRequiredService<IAutomationClient>();
+    public static ISceneBuilderClient GetSceneBuilderClient() => GetRequiredService<ISceneBuilderClient>();
+    public static IMixAssistantClient GetMixAssistantClient() => GetRequiredService<IMixAssistantClient>();
+    public static IAssistantClient GetAssistantClient() => GetRequiredService<IAssistantClient>();
+    public static IAdvancedSettingsClient GetAdvancedSettingsClient() => GetRequiredService<IAdvancedSettingsClient>();
     public static ITimelineClipService GetTimelineClipService() => GetRequiredService<ITimelineClipService>();
     public static ITimelineTrackService GetTimelineTrackService() => GetRequiredService<ITimelineTrackService>();
     public static ITimelineTranscriptionService GetTimelineTranscriptionService() => GetRequiredService<ITimelineTranscriptionService>();

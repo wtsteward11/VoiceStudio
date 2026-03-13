@@ -26,7 +26,7 @@
 | 1 | `Views/Panels/EffectsMixerViewModel.cs` | High | High (panel) | Yes | IEffectsMixerClient | Seam tests |
 | ~~2~~ | ~~`ViewModels/AssistantViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
 | ~~3~~ | ~~`ViewModels/MixAssistantViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
-| 4 | `ViewModels/AdvancedSettingsViewModel.cs` | Medium | Low | Yes | IAdvancedSettingsClient | Seam tests |
+| ~~4~~ | ~~`ViewModels/AdvancedSettingsViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
 | 5 | `ViewModels/UltimateDashboardViewModel.cs` | Medium | Medium | No | IUltimateDashboardClient | Seam tests |
 | 6 | `ViewModels/ImageSearchViewModel.cs` | Medium | Medium | Yes | IImageSearchClient | Seam tests |
 | 7 | `ViewModels/TemplateLibraryViewModel.cs` | Medium | Medium | Yes | ITemplateLibraryClient | Seam tests |
@@ -93,6 +93,14 @@
 
 ---
 
+### Rank 4: AdvancedSettingsViewModel — DONE (2026-03-13)
+
+**File:** `src/VoiceStudio.App/ViewModels/AdvancedSettingsViewModel.cs`
+
+**Status:** **MIGRATED** to `IAdvancedSettingsClient`. IPanelLifecycle implemented; OnActivatedAsync for initial load; constructor fire-and-forget removed. Seam tests in `AdvancedSettingsViewModelSeamTests.cs`.
+
+---
+
 ## Remaining Unresolved (Alphabetical)
 
 AIMixingMasteringViewModel, AIProductionAssistantViewModel, AdvancedSpectrogramVisualizationViewModel, AdvancedWaveformVisualizationViewModel, AnalyticsDashboardViewModel, AudioAnalysisViewModel, AudioMonitoringDashboardViewModel, DeepfakeCreatorViewModel, EmotionStylePresetEditorViewModel, GPUStatusViewModel, HelpViewModel, ImageVideoEnhancementPipelineViewModel, KeyboardShortcutsViewModel, MCPDashboardViewModel, MarkerManagerViewModel, MultilingualSupportViewModel, PipelineConversationViewModel, ProfileHealthDashboardViewModel, PronunciationLexiconViewModel, ProsodyViewModel, RealTimeAudioVisualizerViewModel, SLODashboardViewModel, SpatialStageViewModel, TagManagerViewModel, TagOrganizationViewModel, TextHighlightingViewModel, TrainingQualityVisualizationViewModel, VideoEditViewModel, VideoGenViewModel, VoiceBrowserViewModel, VoiceMorphingBlendingViewModel, VoiceQuickCloneViewModel, AdvancedRealTimeVisualizationViewModel, AdvancedSearchViewModel, WorkflowAutomationViewModel.
@@ -101,7 +109,7 @@ AIMixingMasteringViewModel, AIProductionAssistantViewModel, AdvancedSpectrogramV
 
 ## Next Migration Target
 
-**Recommended:** Rank 4 — `ViewModels/AdvancedSettingsViewModel.cs` (IAdvancedSettingsClient). EffectsMixer (Rank 1) deferred until lifecycle hardened. MixAssistant and Assistant migrated 2026-03-13.
+**Recommended:** Rank 5 — `ViewModels/UltimateDashboardViewModel.cs` (IUltimateDashboardClient). EffectsMixer (Rank 1) deferred until lifecycle hardened. MixAssistant, Assistant, AdvancedSettings migrated 2026-03-13.
 
 **Alternative:** Rank 1 — `Views/Panels/EffectsMixerViewModel.cs` (IEffectsMixerClient) after lifecycle hardening.
 

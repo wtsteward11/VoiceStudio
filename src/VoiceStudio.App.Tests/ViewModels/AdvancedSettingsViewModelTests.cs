@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -17,18 +18,24 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class AdvancedSettingsViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IAdvancedSettingsClient>? _mockAdvancedSettingsClient;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockAdvancedSettingsClient = new Mock<IAdvancedSettingsClient>();
+            _mockAdvancedSettingsClient
+                .Setup(x => x.GetSettingsAsync(It.IsAny<System.Threading.CancellationToken>()))
+                .ReturnsAsync((AdvancedSettingsData?)null);
+            _mockAdvancedSettingsClient
+                .Setup(x => x.GetGpuDevicesAsync(It.IsAny<System.Threading.CancellationToken>()))
+                .ReturnsAsync(new List<VoiceStudio.Core.Models.GpuDeviceInfo>());
         }
 
         private AdvancedSettingsViewModel CreateViewModel()
         {
-            return new AdvancedSettingsViewModel(MockContext!, _mockBackendClient!.Object);
+            return new AdvancedSettingsViewModel(MockContext!, _mockAdvancedSettingsClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -75,8 +82,14 @@ namespace VoiceStudio.App.Tests.ViewModels
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
-            // Arrange & Act
-            _ = new AdvancedSettingsViewModel(null!, _mockBackendClient!.Object);
+            _ = new AdvancedSettingsViewModel(null!, _mockAdvancedSettingsClient!.Object);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
+        public void Constructor_WithNullAdvancedSettingsClient_ThrowsArgumentNullException()
+        {
+            _ = new AdvancedSettingsViewModel(MockContext!, null!);
         }
 
         #endregion

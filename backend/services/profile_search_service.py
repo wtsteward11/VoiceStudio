@@ -6,13 +6,13 @@ Provides dict-like profile access for search without route-to-route imports.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Iterator, cast
 
 
 class _DictToObject:
     """Wrapper to make dict accessible via attribute access (for legacy code)."""
 
-    def __init__(self, data: dict) -> None:
+    def __init__(self, data: dict[str, Any]) -> None:
         object.__setattr__(self, "_data", data or {})
 
     def __getattr__(self, name: str) -> Any:
@@ -74,7 +74,7 @@ class _ProfilesProxy:
         self._store = None
 
     @property
-    def _profile_store(self):
+    def _profile_store(self) -> Any:
         if self._store is None:
             from backend.project.management.profile_store import get_profile_store
 
@@ -90,14 +90,14 @@ class _ProfilesProxy:
     def get(self, profile_id: str, default: Any = None) -> _DictToObject | None:
         result = self._profile_store.get(profile_id)
         if result is None:
-            return default
+            return cast(_DictToObject | None, default)
         return self._wrap(result)
 
     def __getitem__(self, profile_id: str) -> _DictToObject:
         result = self._profile_store.get(profile_id)
         if result is None:
             raise KeyError(profile_id)
-        return self._wrap(result)
+        return cast(_DictToObject, self._wrap(result))
 
     def __setitem__(self, profile_id: str, profile: object) -> None:
         if isinstance(profile, dict):
@@ -114,16 +114,16 @@ class _ProfilesProxy:
     def __contains__(self, profile_id: object) -> bool:
         return self._profile_store.get(str(profile_id)) is not None
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._profile_store.list_ids())
 
-    def keys(self):
-        return self._profile_store.list_ids()
+    def keys(self) -> list[str]:
+        return cast(list[str], self._profile_store.list_ids())
 
-    def values(self):
-        return [self._wrap(p) for p in self._profile_store.list_profiles()]
+    def values(self) -> list[_DictToObject]:
+        return [cast(_DictToObject, self._wrap(p)) for p in self._profile_store.list_profiles()]
 
-    def items(self):
+    def items(self) -> Iterator[tuple[str, _DictToObject | None]]:
         for pid in self._profile_store.list_ids():
             yield pid, self._wrap(self._profile_store.get(pid))
 
@@ -143,7 +143,7 @@ def get_profiles_proxy() -> _ProfilesProxy:
 _profile_timestamps_store = None
 
 
-def get_profile_timestamps_store():
+def get_profile_timestamps_store() -> Any:
     """Get profile timestamps PersistentStore (replaces _profile_timestamps import)."""
     global _profile_timestamps_store
     if _profile_timestamps_store is None:

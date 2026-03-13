@@ -60,7 +60,7 @@ class TestSQLInjectionPrevention:
     def test_sql_injection_in_search_query(self, api_client, backend_available):
         """Test SQL injection attempts in search endpoints."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         for payload in self.SQL_INJECTION_PAYLOADS[:3]:  # Test subset to avoid rate limiting
             # Test in query parameters (using validation endpoint which exists)
@@ -72,7 +72,7 @@ class TestSQLInjectionPrevention:
     def test_sql_injection_in_json_body(self, api_client, backend_available):
         """Test SQL injection in JSON request body."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         for payload in self.SQL_INJECTION_PAYLOADS[:2]:  # Test subset
             response = api_client.post("/api/cache/invalidate", json={"pattern": payload})
@@ -82,7 +82,7 @@ class TestSQLInjectionPrevention:
     def test_sql_injection_in_headers(self, api_client, backend_available):
         """Test SQL injection via HTTP headers."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         payload = "'; DROP TABLE users; --"
         response = api_client.get("/api/health", headers={"X-Custom-Header": payload})
@@ -103,7 +103,7 @@ class TestPathTraversalPrevention:
     def test_path_traversal_in_query_params(self, api_client, backend_available):
         """Test path traversal in query parameters."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         for payload in self.PATH_TRAVERSAL_PAYLOADS[:2]:  # Test subset
             response = api_client.get(f"/api/endpoints/metrics/{payload}")
@@ -119,7 +119,7 @@ class TestPathTraversalPrevention:
     def test_path_traversal_in_json_body(self, api_client, backend_available):
         """Test path traversal in JSON request body."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         response = api_client.post("/api/cache/invalidate", json={"path": "../../../etc/passwd"})
         # Should reject malicious paths or be rate limited
@@ -140,7 +140,7 @@ class TestXSSPrevention:
     def test_xss_in_query_params(self, api_client, backend_available):
         """Test XSS payloads in query parameters."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         for payload in self.XSS_PAYLOADS:
             response = api_client.get(f"/api/version?name={payload}")
@@ -153,7 +153,7 @@ class TestXSSPrevention:
     def test_xss_in_json_response(self, api_client, backend_available):
         """Test XSS in JSON response encoding."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         # Make a request and verify JSON escaping
         response = api_client.get("/api/version")
@@ -179,7 +179,7 @@ class TestCommandInjectionPrevention:
     def test_command_injection_in_params(self, api_client, backend_available):
         """Test command injection in parameters."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         for payload in self.COMMAND_INJECTION_PAYLOADS[:2]:  # Test subset
             response = api_client.get(f"/api/engines/metrics/{payload}")
@@ -194,7 +194,7 @@ class TestCommandInjectionPrevention:
     def test_command_injection_in_json(self, api_client, backend_available):
         """Test command injection in JSON body."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         response = api_client.post("/api/cache/invalidate", json={"command": "; rm -rf /"})
         # Should not execute shell commands
@@ -207,7 +207,7 @@ class TestOversizedRequestHandling:
     def test_oversized_json_body(self, api_client, backend_available):
         """Test handling of very large JSON body."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         # Create a large payload (1MB of data)
         large_data = {"data": "x" * (1024 * 1024)}
@@ -218,7 +218,7 @@ class TestOversizedRequestHandling:
     def test_oversized_array(self, api_client, backend_available):
         """Test handling of arrays with many elements."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         # Create array with many elements
         large_array = {"items": list(range(10000))}
@@ -229,7 +229,7 @@ class TestOversizedRequestHandling:
     def test_deeply_nested_json(self, api_client, backend_available):
         """Test handling of deeply nested JSON."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         # Create deeply nested structure
         nested = {"level": 0}
@@ -249,7 +249,7 @@ class TestMalformedInputHandling:
     def test_invalid_json(self, api_client, backend_available):
         """Test handling of invalid JSON."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         response = api_client.post(
             "/api/cache/invalidate",
@@ -263,7 +263,7 @@ class TestMalformedInputHandling:
     def test_missing_content_type(self, api_client, backend_available):
         """Test request without Content-Type header."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         response = api_client.post("/api/cache/invalidate", content=b'{"key": "value"}')
         # Should handle gracefully
@@ -272,7 +272,7 @@ class TestMalformedInputHandling:
     def test_wrong_content_type(self, api_client, backend_available):
         """Test request with wrong Content-Type."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         response = api_client.post(
             "/api/cache/invalidate",
@@ -285,7 +285,7 @@ class TestMalformedInputHandling:
     def test_null_bytes_in_input(self, api_client, backend_available):
         """Test handling of null bytes in input."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         response = api_client.post("/api/cache/invalidate", json={"key": "value\x00with\x00nulls"})
         # Should handle gracefully - either accept or reject
@@ -294,7 +294,7 @@ class TestMalformedInputHandling:
     def test_unicode_edge_cases(self, api_client, backend_available):
         """Test handling of Unicode edge cases."""
         if not backend_available:
-            pytest.skip("Backend not available")
+            pytest.skip("Backend not available (SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)")
 
         unicode_payloads = [
             "test\uffff",  # Max BMP character

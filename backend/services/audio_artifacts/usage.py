@@ -7,13 +7,15 @@ Does not import route modules.
 
 from __future__ import annotations
 
+from typing import Any
+
 
 def record_usage(
     duration_sec: float | None,
     *,
     created_by: str,
     kind: str = "audio",
-    metadata: dict | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     """
     Record usage minutes for an audio artifact.

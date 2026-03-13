@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
@@ -16,7 +17,7 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class EmotionStyleControlViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IEmotionStyleClient _emotionStyleClient;
 
     public string PanelId => "emotion-style-control";
     public string DisplayName => ResourceHelper.GetString("Panel.EmotionStyleControl.DisplayName", "Emotion & Style Control");
@@ -58,10 +59,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<string> availableStyles = new() { "formal", "casual", "narrative", "conversational", "dramatic", "whisper", "shout" };
 
-    public EmotionStyleControlViewModel(IViewModelContext context, IBackendClient backendClient)
+    public EmotionStyleControlViewModel(IViewModelContext context, IEmotionStyleClient emotionStyleClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _emotionStyleClient = emotionStyleClient ?? throw new ArgumentNullException(nameof(emotionStyleClient));
 
       LoadEmotionPresetsCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -83,10 +84,15 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
+    }
 
-      // Load initial data
-      _ = LoadEmotionPresetsAsync(CancellationToken.None);
-      _ = LoadStylePresetsAsync(CancellationToken.None);
+    /// <summary>
+    /// Initialize panel data. Call from view Loaded event (ADR-047).
+    /// </summary>
+    public async Task InitializeAsync(CancellationToken ct = default)
+    {
+      await LoadEmotionPresetsAsync(ct).ConfigureAwait(false);
+      await LoadStylePresetsAsync(ct).ConfigureAwait(false);
     }
 
     public IAsyncRelayCommand LoadEmotionPresetsCommand { get; }
@@ -101,20 +107,12 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var presets = await _backendClient.SendRequestAsync<object, EmotionPreset[]>(
-            "/api/emotion-style/emotions",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var presets = await _emotionStyleClient.GetEmotionPresetsAsync(cancellationToken).ConfigureAwait(false);
 
         EmotionPresets.Clear();
-        if (presets != null)
+        foreach (var preset in presets)
         {
-          foreach (var preset in presets)
-          {
-            EmotionPresets.Add(new EmotionStylePresetItem(preset));
-          }
+          EmotionPresets.Add(new EmotionStylePresetItem(preset));
         }
       }
       catch (OperationCanceledException)
@@ -138,20 +136,12 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var presets = await _backendClient.SendRequestAsync<object, StylePreset[]>(
-            "/api/emotion-style/styles",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var presets = await _emotionStyleClient.GetStylePresetsAsync(cancellationToken).ConfigureAwait(false);
 
         StylePresets.Clear();
-        if (presets != null)
+        foreach (var preset in presets)
         {
-          foreach (var preset in presets)
-          {
-            StylePresets.Add(new StylePresetItem(preset));
-          }
+          StylePresets.Add(new StylePresetItem(preset));
         }
       }
       catch (OperationCanceledException)
@@ -187,25 +177,20 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new EmotionStyleApplyRequest
         {
-          profile_id = SelectedProfileId,
-          text = Text,
-          emotion_preset_id = SelectedEmotionPreset?.Id,
-          style_preset_id = SelectedStylePreset?.Id,
-          emotion = CustomEmotion,
-          style = CustomStyle,
-          intensity = Intensity
+          ProfileId = SelectedProfileId ?? string.Empty,
+          Text = Text,
+          EmotionPresetId = SelectedEmotionPreset?.Id,
+          StylePresetId = SelectedStylePreset?.Id,
+          Emotion = CustomEmotion,
+          Style = CustomStyle,
+          Intensity = Intensity
         };
 
-        var response = await _backendClient.SendRequestAsync<object, EmotionStyleApplyResponse>(
-            "/api/emotion-style/apply",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _emotionStyleClient.ApplyEmotionStyleAsync(request, cancellationToken).ConfigureAwait(false);
 
-        StatusMessage = response?.Message ?? ResourceHelper.GetString("EmotionStyleControl.EmotionStyleApplied", "Emotion/style applied");
+        StatusMessage = response.Message;
       }
       catch (OperationCanceledException)
       {
@@ -228,16 +213,10 @@ namespace VoiceStudio.App.ViewModels
       StatusMessage = ResourceHelper.GetString("EmotionStyleControl.PresetsRefreshed", "Presets refreshed");
     }
 
-    // Response models
-    private class EmotionStyleApplyResponse
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public string Message { get; set; } = string.Empty;
-    }
   }
 
-  // Data models
-  public class EmotionPreset
+  // Display models for emotion/style presets (wrap API types for binding)
+  public class EmotionStylePresetItem : ObservableObject
   {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
@@ -245,27 +224,8 @@ namespace VoiceStudio.App.ViewModels
     public double Intensity { get; set; }
     public System.Collections.Generic.Dictionary<string, double> Parameters { get; set; } = new();
     public string Created { get; set; } = string.Empty;
-  }
 
-  public class StylePreset
-  {
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string Style { get; set; } = string.Empty;
-    public System.Collections.Generic.Dictionary<string, double> Parameters { get; set; } = new();
-    public string Created { get; set; } = string.Empty;
-  }
-
-  public class EmotionStylePresetItem : ObservableObject
-  {
-    public string Id { get; set; }
-    public string Name { get; set; }
-    public string Emotion { get; set; }
-    public double Intensity { get; set; }
-    public System.Collections.Generic.Dictionary<string, double> Parameters { get; set; }
-    public string Created { get; set; }
-
-    public EmotionStylePresetItem(EmotionPreset preset)
+    public EmotionStylePresetItem(EmotionStyleEmotionPreset preset)
     {
       Id = preset.Id;
       Name = preset.Name;
@@ -278,13 +238,13 @@ namespace VoiceStudio.App.ViewModels
 
   public class StylePresetItem : ObservableObject
   {
-    public string Id { get; set; }
-    public string Name { get; set; }
-    public string Style { get; set; }
-    public System.Collections.Generic.Dictionary<string, double> Parameters { get; set; }
-    public string Created { get; set; }
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Style { get; set; } = string.Empty;
+    public System.Collections.Generic.Dictionary<string, double> Parameters { get; set; } = new();
+    public string Created { get; set; } = string.Empty;
 
-    public StylePresetItem(StylePreset preset)
+    public StylePresetItem(EmotionStyleStylePreset preset)
     {
       Id = preset.Id;
       Name = preset.Name;

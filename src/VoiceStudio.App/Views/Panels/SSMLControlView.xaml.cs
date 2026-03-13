@@ -5,6 +5,7 @@ using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using System;
+using System.Threading;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -16,22 +17,21 @@ namespace VoiceStudio.App.Views.Panels
     public SSMLControlViewModel ViewModel { get; }
     private ContextMenuService? _contextMenuService;
     private ToastNotificationService? _toastService;
-    private UndoRedoService? _undoRedoService;
 
     public SSMLControlView()
     {
       this.InitializeComponent();
       ViewModel = new SSMLControlViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
-          AppServices.GetAudioPlayerService()
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.ISSMLClient>(),
+          AppServices.GetAudioPlayerService(),
+          AppServices.GetRequiredService<IDialogService>()
       );
       DataContext = ViewModel;
 
       // Initialize services
       _contextMenuService = ServiceProvider.GetContextMenuService();
       _toastService = ServiceProvider.GetToastNotificationService();
-      _undoRedoService = ServiceProvider.GetUndoRedoService();
 
       // Subscribe to ViewModel events for toast notifications
       ViewModel.PropertyChanged += (_, e) =>
@@ -46,8 +46,8 @@ namespace VoiceStudio.App.Views.Panels
         }
       };
 
-      // Setup keyboard navigation
-      this.Loaded += SSMLControlView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and initial data load (ADR-047)
+      this.Loaded += SSMLControlView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -59,9 +59,11 @@ namespace VoiceStudio.App.Views.Panels
       });
     }
 
-    private void SSMLControlView_KeyboardNavigation_Loaded(object _, RoutedEventArgs __)
+    private async void SSMLControlView_Loaded(object _, RoutedEventArgs __)
     {
+      this.Loaded -= SSMLControlView_Loaded;
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      await ViewModel.InitializeAsync(CancellationToken.None);
     }
 
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)
@@ -149,34 +151,9 @@ namespace VoiceStudio.App.Views.Panels
             DuplicateDocument(document);
             break;
           case "delete":
-            var dialog = new ContentDialog
+            if (document is SSMLDocumentItem delDoc)
             {
-              Title = "Delete Document",
-              Content = "Are you sure you want to delete this SSML document? This action cannot be undone.",
-              PrimaryButtonText = "Delete",
-              CloseButtonText = "Cancel",
-              DefaultButton = ContentDialogButton.Close,
-              XamlRoot = this.XamlRoot
-            };
-
-            var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Primary)
-            {
-              var documentToDelete = (SSMLDocumentItem)document;
-              var documentIndex = ViewModel.Documents.IndexOf(documentToDelete);
-
-              ViewModel.Documents.Remove(documentToDelete);
-
-              // Register undo action
-              if (_undoRedoService != null && documentIndex >= 0)
-              {
-                var actionObj = new SimpleAction(
-                    "Delete SSML Document",
-                    () => ViewModel.Documents.Insert(documentIndex, documentToDelete),
-                    () => ViewModel.Documents.Remove(documentToDelete));
-                _undoRedoService.RegisterAction(actionObj);
-              }
-
+              await ViewModel.DeleteDocumentWithConfirmationAsync(delDoc, CancellationToken.None);
               _toastService?.ShowToast(ToastType.Success, "Deleted", "Document deleted");
             }
             break;
@@ -225,7 +202,8 @@ namespace VoiceStudio.App.Views.Panels
         }
 
         // Register undo action
-        if (_undoRedoService != null)
+        var undoRedoService = ServiceProvider.GetUndoRedoService();
+        if (undoRedoService != null)
         {
           var actionObj = new SimpleAction(
               $"Duplicate Document: {sourceDoc.Name}",
@@ -246,7 +224,7 @@ namespace VoiceStudio.App.Views.Panels
                 }
                 _toastService?.ShowToast(ToastType.Info, "Redo", $"Restored duplicated document '{duplicatedItem.Name}'");
               });
-          _undoRedoService.RegisterAction(actionObj);
+          undoRedoService.RegisterAction(actionObj);
         }
 
         // Select the duplicated document

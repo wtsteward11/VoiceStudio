@@ -39,6 +39,16 @@ SCAN_DIRS = [
 MIGRATED_NO_IBACKENDCLIENT = [
     "EmotionStyleControlViewModel",
     "EmotionControlViewModel",
+    "PresetLibraryViewModel",
+    "SSMLControlViewModel",
+    "QualityControlViewModel",
+    "QualityDashboardViewModel",
+    "EngineRecommendationViewModel",
+    "QualityOptimizationWizardViewModel",
+    "QualityBenchmarkViewModel",
+    "TranscribeViewModel",
+    "ProfileComparisonViewModel",
+    "TrainingViewModel",
 ]
 
 # Match IBackendClient as constructor parameter (exclude field declarations with readonly)

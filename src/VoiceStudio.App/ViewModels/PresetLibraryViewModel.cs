@@ -21,10 +21,11 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class PresetLibraryViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IPresetLibraryClient _presetLibraryClient;
     private readonly IDialogService _dialogService;
     private readonly UndoRedoService? _undoRedoService;
     private CancellationTokenSource? _searchDebounceCts;
+    private bool _isInitialized;
     private const int SearchDebounceMs = 300;
 
     public string PanelId => "preset_library";
@@ -58,10 +59,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? targetId; // Project ID, track ID, etc. for applying presets
 
-    public PresetLibraryViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService)
+    public PresetLibraryViewModel(IViewModelContext context, IPresetLibraryClient presetLibraryClient, IDialogService dialogService)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _presetLibraryClient = presetLibraryClient ?? throw new ArgumentNullException(nameof(presetLibraryClient));
       _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
       // Get undo/redo service (may be null if not initialized)
@@ -69,9 +70,9 @@ namespace VoiceStudio.App.ViewModels
       {
         _undoRedoService = AppServices.TryGetUndoRedoService();
       }
-      catch
+      catch (Exception ex)
       {
-        // Service may not be initialized yet - that's okay
+        System.Diagnostics.Debug.WriteLine($"[PresetLibraryViewModel] UndoRedoService not available: {ex.Message}");
         _undoRedoService = null;
       }
 
@@ -120,10 +121,21 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("LoadCategories");
         await LoadCategoriesAsync(ct);
       }, () => !IsLoading);
+    }
 
-      // Load initial data
-      _ = LoadPresetTypesAsync(CancellationToken.None);
-      _ = LoadPresetsAsync(CancellationToken.None);
+    /// <summary>
+    /// Initialize panel data. Call from view Loaded event (ADR-047).
+    /// </summary>
+    public async Task InitializeAsync(CancellationToken ct = default)
+    {
+      if (_isInitialized)
+      {
+        return;
+      }
+
+      _isInitialized = true;
+      await LoadPresetTypesAsync(ct).ConfigureAwait(false);
+      await LoadPresetsAsync(ct).ConfigureAwait(false);
     }
 
     public IAsyncRelayCommand LoadPresetsCommand { get; }
@@ -159,30 +171,11 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (!string.IsNullOrEmpty(SearchQuery))
-          queryParams.Add("query", SearchQuery);
-        if (!string.IsNullOrEmpty(SelectedPresetType))
-          queryParams.Add("preset_type", SelectedPresetType);
-        if (!string.IsNullOrEmpty(SelectedCategory))
-          queryParams.Add("category", SelectedCategory);
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/presets";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var response = await _backendClient.SendRequestAsync<object, PresetSearchResponse>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _presetLibraryClient.SearchPresetsAsync(
+            SearchQuery,
+            SelectedPresetType,
+            SelectedCategory,
+            cancellationToken).ConfigureAwait(false);
 
         Presets.Clear();
         if (response?.Presets != null)
@@ -229,23 +222,18 @@ namespace VoiceStudio.App.ViewModels
         var category = presetDetails.Category;
         var description = presetDetails.Description;
 
-        var request = new
+        var request = new PresetCreateRequest
         {
-          name = name,
-          preset_type = presetType,
-          category = category,
-          description = description,
-          data = new { },
-          tags = new string[] { },
-          is_public = false
+          Name = name,
+          PresetType = presetType,
+          Category = category,
+          Description = description,
+          Data = new { },
+          Tags = Array.Empty<string>(),
+          IsPublic = false
         };
 
-        var createdPreset = await _backendClient.SendRequestAsync<object, Preset>(
-            "/api/presets",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var createdPreset = await _presetLibraryClient.CreatePresetAsync(request, cancellationToken).ConfigureAwait(false);
 
         if (createdPreset != null)
         {
@@ -257,7 +245,6 @@ namespace VoiceStudio.App.ViewModels
           {
             var action = new CreatePresetAction(
                 Presets,
-                _backendClient,
                 createdPreset,
                 onUndo: (p) =>
                 {
@@ -293,21 +280,16 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new PresetUpdateRequest
         {
-          name = preset.Name,
-          category = preset.Category,
-          description = preset.Description,
-          tags = preset.Tags,
-          is_public = preset.IsPublic
+          Name = preset.Name,
+          Category = preset.Category,
+          Description = preset.Description,
+          Tags = preset.Tags?.ToArray(),
+          IsPublic = preset.IsPublic
         };
 
-        await _backendClient.SendRequestAsync<object, Preset>(
-            $"/api/presets/{preset.Id}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        await _presetLibraryClient.UpdatePresetAsync(preset.Id, request, cancellationToken).ConfigureAwait(false);
 
         await LoadPresetsAsync(cancellationToken);
         StatusMessage = ResourceHelper.GetString("PresetLibrary.PresetUpdated", "Preset updated");
@@ -326,6 +308,23 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
+    /// <summary>
+    /// Shows confirmation dialog and deletes preset via backend if confirmed.
+    /// </summary>
+    public async Task DeletePresetWithConfirmationAsync(Preset preset, CancellationToken ct = default)
+    {
+      var confirmed = await _dialogService.ShowConfirmationAsync(
+          ResourceHelper.GetString("PresetLibrary.DeletePreset.Title", "Delete Preset"),
+          ResourceHelper.GetString("PresetLibrary.DeletePreset.Message", "Are you sure you want to delete this preset? This action cannot be undone."),
+          ResourceHelper.GetString("PresetLibrary.DeletePreset.Confirm", "Delete"),
+          ResourceHelper.GetString("PresetLibrary.DeletePreset.Cancel", "Cancel")).ConfigureAwait(false);
+
+      if (confirmed)
+      {
+        await DeletePresetAsync(preset, ct).ConfigureAwait(false);
+      }
+    }
+
     private async Task DeletePresetAsync(Preset? preset, CancellationToken cancellationToken)
     {
       if (preset == null)
@@ -336,6 +335,10 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
+        await _presetLibraryClient.DeletePresetAsync(preset.Id, cancellationToken).ConfigureAwait(false);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
         var originalIndex = Presets.IndexOf(preset);
         Presets.Remove(preset);
 
@@ -344,19 +347,11 @@ namespace VoiceStudio.App.ViewModels
           SelectedPreset = null;
         }
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/presets/{preset.Id}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
-
         // Register undo action
         if (_undoRedoService != null)
         {
           var action = new DeletePresetAction(
               Presets,
-              _backendClient,
               preset,
               originalIndex,
               onUndo: (p) => SelectedPreset = p,
@@ -396,17 +391,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          target_id = TargetId
-        };
-
-        await _backendClient.SendRequestAsync<object, PresetApplyResponse>(
-            $"/api/presets/{preset.Id}/apply",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _presetLibraryClient.ApplyPresetAsync(preset.Id, TargetId, cancellationToken).ConfigureAwait(false);
 
         StatusMessage = ResourceHelper.FormatString("PresetLibrary.PresetApplied", preset.Name);
       }
@@ -445,19 +430,14 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, PresetTypesResponse>(
-            "/api/presets/types",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var types = await _presetLibraryClient.GetPresetTypesAsync(cancellationToken).ConfigureAwait(false);
 
         AvailablePresetTypes.Clear();
-        if (response?.Types != null)
+        if (types != null)
         {
-          foreach (var type in response.Types)
+          foreach (var type in types)
           {
-            AvailablePresetTypes.Add(type.Id);
+            AvailablePresetTypes.Add(type);
           }
         }
       }
@@ -477,12 +457,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var categories = await _backendClient.SendRequestAsync<object, string[]>(
-            $"/api/presets/categories/{SelectedPresetType}",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var categories = await _presetLibraryClient.GetCategoriesAsync(SelectedPresetType ?? string.Empty, cancellationToken).ConfigureAwait(false);
 
         AvailableCategories.Clear();
         if (categories != null)
@@ -637,32 +612,6 @@ namespace VoiceStudio.App.ViewModels
       public string? Description { get; set; }
     }
 
-    // Response models
-    private class PresetSearchResponse
-    {
-      public Preset[] Presets { get; set; } = Array.Empty<Preset>();
-      public int Total { get; set; }
-      public int Limit { get; set; }
-      public int Offset { get; set; }
-    }
-
-    private class PresetTypesResponse
-    {
-      public PresetTypeInfo[] Types { get; set; } = Array.Empty<PresetTypeInfo>();
-    }
-
-    private class PresetTypeInfo
-    {
-      public string Id { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-    }
-
-    private class PresetApplyResponse
-    {
-      public bool Success { get; set; }
-      public string PresetId { get; set; } = string.Empty;
-      public string? TargetId { get; set; }
-    }
   }
 
   // Data models moved to separate file

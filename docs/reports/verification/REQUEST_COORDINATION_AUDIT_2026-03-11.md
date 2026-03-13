@@ -142,9 +142,11 @@ None. Engines are not yet behind a domain client; BackendClient.Engines is the s
 3. ~~Replace _backendClient.GetProfilesAsync with _profilesClient.GetProfilesAsync~~ — Complete.
 4. ~~Update DI registration and test mocks~~ — Complete.
 5. Timeline clip seam extraction (Task 10.1): ITimelineClipService introduced; TimelineViewModel uses _clipService for all clip CRUD. No direct _backendClient.CreateClipAsync/DeleteClipAsync in TimelineViewModel.
-6. Timeline hardening Phases 1–4 (2026-03-11): ITimelineTrackService, ITimelineTranscriptionService, IProjectAudioClient, IAudioVisualizationService extracted. TimelineViewModel uses focused seams for tracks, transcription, project audio, and visualization. Remaining _backendClient usage: SynthesizeVoiceAsync only.
+6. Timeline hardening Phases 1–4 (2026-03-11): ITimelineTrackService, ITimelineTranscriptionService, IProjectAudioClient, IAudioVisualizationService extracted. TimelineViewModel uses focused seams for tracks, transcription, project audio, and visualization.
+7. **Timeline 1A–1C verified (2026-03-11):** TimelineViewModel has zero direct IBackendClient usage. All transport flows through domain seams: _clipService, _trackService, _transcriptionService, _projectAudioClient, _audioVisualizationService, _synthesisService, _projectsClient, _profilesClient.
 
 ## Migration Progress (2026-03-11)
 
 - **Migrated:** All 16 profiles bypasses (Timeline, TagOrganization, ABTesting, VoiceSynthesis, QualityBenchmark, StyleTransfer, VoiceMorph, EmbeddingExplorer, RealTimeVoiceConverter, TextSpeechEditor, PronunciationLexicon, TextBasedSpeechEditor, VoiceMorphingBlending, QualityOptimizationWizard, VoiceStyleTransfer, ProfileComparison).
 - **Remaining:** 0 bypasses.
+- **TimelineViewModel:** Zero IBackendClient; all flows via domain clients (2026-03-11 verification).

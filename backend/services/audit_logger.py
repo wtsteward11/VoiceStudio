@@ -100,8 +100,8 @@ class AuditLogger:
 
         self._current_file: Path | None = None
         self._current_count = 0
-        self._write_queue: asyncio.Queue = asyncio.Queue()
-        self._writer_task: asyncio.Task | None = None
+        self._write_queue: asyncio.Queue[Any] = asyncio.Queue()
+        self._writer_task: asyncio.Task[None] | None = None
         self._lock = asyncio.Lock()
         self._running = False
 
@@ -156,12 +156,13 @@ class AuditLogger:
         if not data:
             return data
 
-        masked = {}
+        masked: dict[str, Any] = {}
         for key, value in data.items():
             if any(s in key.lower() for s in self.config.sensitive_fields):
                 masked[key] = "***MASKED***"
             elif isinstance(value, dict):
-                masked[key] = self._mask_sensitive(value)
+                nested = self._mask_sensitive(value)
+                masked[key] = nested if nested is not None else value
             else:
                 masked[key] = value
 
@@ -263,7 +264,7 @@ class AuditLogger:
         entity_type: str,
         entity_id: str,
         new_value: dict[str, Any],
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """Log a create action."""
         return await self.log(
@@ -280,7 +281,7 @@ class AuditLogger:
         entity_id: str,
         old_value: dict[str, Any],
         new_value: dict[str, Any],
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """Log an update action."""
         return await self.log(
@@ -297,7 +298,7 @@ class AuditLogger:
         entity_type: str,
         entity_id: str,
         old_value: dict[str, Any] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """Log a delete action."""
         return await self.log(
@@ -313,7 +314,7 @@ class AuditLogger:
         user_id: str,
         user_ip: str | None = None,
         success: bool = True,
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """Log a login attempt."""
         return await self.log(
@@ -352,7 +353,7 @@ class AuditLogger:
         Returns:
             List of matching audit entries
         """
-        results = []
+        results: list[AuditEntry] = []
 
         # Find relevant files
         files = sorted(self._storage_path.glob("audit_*.jsonl"), reverse=True)

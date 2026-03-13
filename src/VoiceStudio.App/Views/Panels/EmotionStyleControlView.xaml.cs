@@ -23,7 +23,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new EmotionStyleControlViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient()
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IEmotionStyleClient>()
       );
       DataContext = ViewModel;
 
@@ -45,8 +45,8 @@ namespace VoiceStudio.App.Views.Panels
         }
       };
 
-      // Setup keyboard navigation
-      this.Loaded += EmotionStyleControlView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and initial data load (ADR-047: no constructor fire-and-forget)
+      this.Loaded += EmotionStyleControlView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -58,9 +58,10 @@ namespace VoiceStudio.App.Views.Panels
       });
     }
 
-    private void EmotionStyleControlView_KeyboardNavigation_Loaded(object sender, RoutedEventArgs e)
+    private async void EmotionStyleControlView_Loaded(object sender, RoutedEventArgs e)
     {
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      await ViewModel.InitializeAsync(System.Threading.CancellationToken.None);
     }
 
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)

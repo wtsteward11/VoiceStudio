@@ -6,6 +6,7 @@ using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.Core.Models;
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.ApplicationModel.DataTransfer;
@@ -26,7 +27,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new TrainingViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient()
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.ITrainingClient>()
       );
       this.DataContext = ViewModel;
 
@@ -36,15 +37,11 @@ namespace VoiceStudio.App.Views.Panels
       _undoRedoService = ServiceProvider.GetUndoRedoService();
       _dragDropService = ServiceProvider.GetDragDropVisualFeedbackService();
 
-      // Load datasets on initialization
-      _ = ViewModel.LoadDatasetsCommand.ExecuteAsync(null);
-      _ = ViewModel.LoadTrainingJobsCommand.ExecuteAsync(null);
-
       // Add Enter key handling for form submission
       this.KeyDown += TrainingView_KeyDown;
 
-      // Setup keyboard navigation
-      this.Loaded += TrainingView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and initial data load (ADR-047)
+      this.Loaded += TrainingView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -211,10 +208,11 @@ namespace VoiceStudio.App.Views.Panels
       UpdateTrainingJobSelectionVisualsRecursive(this);
     }
 
-    private void TrainingView_KeyboardNavigation_Loaded(object _, RoutedEventArgs __)
+    private async void TrainingView_Loaded(object _, RoutedEventArgs __)
     {
-      // Setup Tab navigation order for this panel
+      this.Loaded -= TrainingView_Loaded;
       KeyboardNavigationHelper.SetupTabNavigation(this, 0);
+      await ViewModel.InitializeAsync(CancellationToken.None);
     }
 
     private void UpdateTrainingJobSelectionVisualsRecursive(DependencyObject element)

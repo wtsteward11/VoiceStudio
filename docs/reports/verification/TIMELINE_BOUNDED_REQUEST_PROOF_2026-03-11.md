@@ -8,7 +8,7 @@
 
 ## Context
 
-The Timeline panel loads projects (via IProjectsClient), profiles (via _backendClient — P2 bypass), and tracks (via _backendClient.GetTracksAsync) when the user refreshes or selects a project. Without coordination, concurrent or redundant calls could cause request storms.
+The Timeline panel loads projects (via IProjectsClient), profiles (via IProfilesClient), and tracks (via ITimelineTrackService) when the user refreshes or selects a project. Clip CRUD goes through ITimelineClipService. Without coordination, concurrent or redundant calls could cause request storms.
 
 ---
 
@@ -18,9 +18,9 @@ The Timeline panel loads projects (via IProjectsClient), profiles (via _backendC
 |-------|---------------|--------------|
 | OnActivatedAsync | None | N/A |
 | RefreshAsync | LoadProjectsAsync → IProjectsClient.GetProjectsAsync | Yes (single-flight + TTL) |
-| LoadProfilesCommand | LoadProfilesAsync → _backendClient.GetProfilesAsync | Yes (RequestCoordinator) |
+| LoadProfilesCommand | LoadProfilesAsync → _profilesClient.GetProfilesAsync | Yes (RequestCoordinator) |
 
-**Note:** OnActivatedAsync returns `Task.CompletedTask`; no automatic load on activation. Projects and profiles load only when the user triggers Refresh or LoadProfiles.
+**Note:** Timeline uses IProfilesClient (not IBackendClient) for profile loading; RequestCoordinator applies. OnActivatedAsync returns `Task.CompletedTask`; no automatic load on activation. Projects and profiles load only when the user triggers Refresh or LoadProfiles.
 
 ---
 
@@ -59,6 +59,7 @@ Project-specific endpoints (`/api/projects/{id}/tracks`, etc.) are not coalesced
 - [ ] Manual run (optional): Open Timeline → Refresh → Load Profiles → verify snapshot
 - [x] Scenario test: `TimelinePanelScenario_RefreshLoadProfiles_BoundedRequestCounts` (RequestCoordinatorIntegrationTests)
 - [x] Scenario test: `TimelinePanelScenario_LoadProjectsSelectProjectLoadTracksCreateClip_BoundedRequestCounts` — open Timeline, load projects, select project, load tracks, create clip; asserts bounded counts for /api/projects and tracks
+- [x] Scenario test: `TimelinePanelScenario_LoadProjectsSelectProjectLoadTracksDeleteClip_BoundedRequestCounts` — load projects, select project, load tracks, delete clip; asserts bounded counts and exactly 1 delete request (2026-03-11)
 
 ---
 
@@ -67,7 +68,12 @@ Project-specific endpoints (`/api/projects/{id}/tracks`, etc.) are not coalesced
 **CI-capable tests:**
 - `TimelinePanelScenario_RefreshLoadProfiles_BoundedRequestCounts` — simulates Timeline refresh flow: GetProjectsAsync + GetProfilesAsync. Asserts /api/projects ≤ 2, /api/profiles ≤ 2.
 - `TimelinePanelScenario_LoadProjectsSelectProjectLoadTracksCreateClip_BoundedRequestCounts` — simulates full flow: load projects, select project, load tracks, create clip. Asserts bounded counts for projects and tracks.
+- `TimelinePanelScenario_LoadProjectsSelectProjectLoadTracksDeleteClip_BoundedRequestCounts` — simulates flow with clip delete. Asserts bounded counts and exactly 1 DeleteClipAsync request.
 
 ```powershell
 dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --filter "FullyQualifiedName~TimelinePanelScenario"
 ```
+
+---
+
+**Last verified against code:** 2026-03-12

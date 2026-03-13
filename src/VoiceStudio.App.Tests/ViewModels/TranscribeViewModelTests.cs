@@ -10,12 +10,12 @@ using VoiceStudio.Core.Services;
 namespace VoiceStudio.App.Tests.ViewModels
 {
   /// <summary>
-  /// Comprehensive unit tests for TranscribeViewModel operations.
-  /// Tests cover transcription operations, language loading, and error handling.
-  /// Note: These tests focus on backend client interactions since TranscribeViewModel
-  /// has many infrastructure dependencies that are difficult to mock in unit tests.
+  /// Transport-mock tests for transcription backend contract.
+  /// Tests IBackendClient directly; does not instantiate TranscribeViewModel with ITranscriptionClient.
+  /// See docs/governance/TEST_CLASSIFICATION.md. Cannot support "TranscribeViewModel migration complete" claims.
   /// </summary>
   [TestClass]
+  [TestCategory("TransportMock")]
   public class TranscribeViewModelTests
   {
     private Mock<IBackendClient> _mockBackendClient = null!;

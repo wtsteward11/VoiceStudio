@@ -47,11 +47,23 @@ Remove or consolidate skip markers in pytest tests. Reduce skip count to fewer t
 - Converted 3 test_main.py skips to `skipif(True, reason="... § Flaky")`.
 - Result: Policy-compliant skipif with subplan section reference.
 
+## Sixth Execution Batch Complete (2026-03-11)
+
+- No additional bare `@pytest.mark.skip` decorators found; prior batches converted all.
+- Remaining skips are runtime `pytest.skip()` calls (conditional, in-test).
+- Mypy twelfth slice (project_service, training_quality) completed in same session.
+
+## Seventh Execution Batch Complete (2026-03-11)
+
+- Added `(SKIP_DEBT_CLEANUP_SUBPLAN § Infrastructure)` to runtime `pytest.skip("Backend not available")` in test_input_validation.py (17 calls).
+- Result: Policy compliance for security test infrastructure skips; skip behavior unchanged.
+
 ## Sequence
 
 1. **Regenerate skip report**
-   - `python -m pytest tests/ --co -q 2>&1 | Select-String "skipped" > skip_report.txt` (Windows)
-   - Or: `python -m pytest tests/ --co -q 2>&1 | grep "skipped" > skip_report.txt` (Unix)
+   - Output to `.buildlogs/skip_report.txt` (per [REPO_ROOT_CONVENTIONS.md](../governance/REPO_ROOT_CONVENTIONS.md))
+   - Windows: `python -m pytest tests/ --co -q 2>&1 | Select-String "skipped" > .buildlogs/skip_report.txt`
+   - Unix: `python -m pytest tests/ --co -q 2>&1 | grep "skipped" > .buildlogs/skip_report.txt`
    - Parse output for `N skipped` in session summary
 
 2. **Cluster skips by category**
@@ -72,7 +84,7 @@ Remove or consolidate skip markers in pytest tests. Reduce skip count to fewer t
 
 - Skip count ≤ 200 after execution
 - Each remaining skip has documented reason
-- `skip_report.txt` regenerated and committed with subplan completion
+- `.buildlogs/skip_report.txt` regenerated and committed with subplan completion
 
 ## Non-Goals
 

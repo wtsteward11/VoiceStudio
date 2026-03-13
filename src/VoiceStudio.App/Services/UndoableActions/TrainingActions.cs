@@ -12,7 +12,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateTrainingDatasetAction : IUndoableAction
   {
     private readonly ObservableCollection<TrainingDataset> _datasets;
-    private readonly IBackendClient _backendClient;
+    private readonly ITrainingClient _trainingClient;
     private readonly TrainingDataset _dataset;
     private readonly Action<TrainingDataset>? _onUndo;
     private readonly Action<TrainingDataset>? _onRedo;
@@ -21,13 +21,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateTrainingDatasetAction(
         ObservableCollection<TrainingDataset> datasets,
-        IBackendClient backendClient,
+        ITrainingClient trainingClient,
         TrainingDataset dataset,
         Action<TrainingDataset>? onUndo = null,
         Action<TrainingDataset>? onRedo = null)
     {
       _datasets = datasets ?? throw new ArgumentNullException(nameof(datasets));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _trainingClient = trainingClient ?? throw new ArgumentNullException(nameof(trainingClient));
       _dataset = dataset ?? throw new ArgumentNullException(nameof(dataset));
       _onUndo = onUndo;
       _onRedo = onRedo;

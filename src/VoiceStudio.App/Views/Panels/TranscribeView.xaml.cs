@@ -5,6 +5,7 @@ using VoiceStudio.App.Services;
 using VoiceStudio.Core.Models;
 using VoiceStudio.App.Services.UndoableActions;
 using System;
+using System.Threading;
 using Windows.ApplicationModel.DataTransfer;
 
 namespace VoiceStudio.App.Views.Panels
@@ -23,7 +24,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new TranscribeViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient()
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.ITranscriptionClient>()
       );
       this.DataContext = ViewModel;
 
@@ -33,17 +34,14 @@ namespace VoiceStudio.App.Views.Panels
       _undoRedoService = ServiceProvider.GetUndoRedoService();
       _dragDropService = ServiceProvider.GetDragDropVisualFeedbackService();
 
-      // Load languages on initialization
-      _ = ViewModel.LoadLanguagesCommand.ExecuteAsync(null);
-
       // Track collection changes to toggle empty state visibility
       ViewModel.Transcriptions.CollectionChanged += (s, e) => UpdateEmptyStateVisibility();
 
       // Add keyboard handler for multi-select
       this.KeyDown += TranscribeView_KeyDown;
 
-      // Setup keyboard navigation
-      this.Loaded += TranscribeView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and initial data load (ADR-047)
+      this.Loaded += TranscribeView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -372,10 +370,11 @@ namespace VoiceStudio.App.Views.Panels
       _dragDropService?.HideDropTargetIndicator();
     }
 
-    private void TranscribeView_KeyboardNavigation_Loaded(object _, RoutedEventArgs __)
+    private async void TranscribeView_Loaded(object _, RoutedEventArgs __)
     {
-      // Setup Tab navigation order for this panel
+      this.Loaded -= TranscribeView_Loaded;
       KeyboardNavigationHelper.SetupTabNavigation(this, 0);
+      await ViewModel.InitializeAsync(CancellationToken.None);
     }
 
     private DropPosition DetermineTranscriptionDropPosition(ListViewItem target, Windows.Foundation.Point position)

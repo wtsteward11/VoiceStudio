@@ -15,7 +15,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +100,7 @@ class WorkloadBalancer:
         self._devices: dict[ComputeDevice, DeviceMetrics] = {}
         self._device_locks: dict[ComputeDevice, asyncio.Lock] = {}
         self._running = False
-        self._metrics_task: asyncio.Task | None = None
+        self._metrics_task: asyncio.Task[None] | None = None
 
         # Initialize devices
         self._initialize_devices()
@@ -132,7 +132,7 @@ class WorkloadBalancer:
         try:
             import psutil
 
-            return psutil.virtual_memory().total
+            return cast(int, psutil.virtual_memory().total)
         except ImportError:
             return 16 * 1024 * 1024 * 1024  # Default 16GB
 
@@ -142,7 +142,7 @@ class WorkloadBalancer:
             import torch
 
             if torch.cuda.is_available():
-                return torch.cuda.device_count()
+                return cast(int, torch.cuda.device_count())
         except ImportError:
             # Gap Analysis Fix: Log when torch is not available for GPU detection
             logger.debug("PyTorch not available for GPU detection, trying nvidia-smi")
@@ -170,7 +170,7 @@ class WorkloadBalancer:
             import torch
 
             if torch.cuda.is_available():
-                return torch.cuda.get_device_properties(device_id).total_memory
+                return int(torch.cuda.get_device_properties(device_id).total_memory)
         except ImportError:
             # Gap Analysis Fix: Log when torch is not available for GPU memory query
             logger.debug(
@@ -380,7 +380,7 @@ class WorkloadBalancer:
             "last_updated": metrics.last_updated.isoformat(),
         }
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> dict[str, Any]:
         """Get balancer statistics."""
         return {
             "devices": {d.value: self.get_device_metrics(d) for d in self._devices},

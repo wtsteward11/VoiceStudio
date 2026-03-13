@@ -15,8 +15,14 @@
     Exit code 0 only if ALL stages pass. No exceptions.
     
     RULE: No changes allowed unless this script stays GREEN.
+    
+    VERIFICATION MODES:
+    - Full (default): All stages. Typical duration 10+ minutes.
+    - Quick (-Quick): Build, lint, Quick Critical Gates, Security Tests, Gate/Ledger. Skips C#/Python unit tests, contract, integration, UI. Typical duration 3-5 minutes depending on machine.
+    
+    SIDE EFFECTS: Creates artifacts/verify/{timestamp}/, updates artifacts/verify/latest symlink, prunes runs older than KeepCount (10).
 .PARAMETER Quick
-    Run quick verification (build + lint only, ~30 seconds).
+    Run reduced verification: build, lint, Quick Critical Gates, Security Tests, Gate/Ledger. Skips C#/Python unit tests, contract, integration, UI. Typical duration 3-5 minutes depending on machine.
 .PARAMETER Configuration
     Build configuration. Default: Debug
 .PARAMETER SkipBuild
@@ -35,6 +41,8 @@
     Skip UI smoke tests.
 .PARAMETER SkipGates
     Skip gate/ledger validation.
+.PARAMETER SkipSecurity
+    Skip security tests (injection, auth bypass, sandbox escape). Default: false. Use with -Quick for faster pre-commit when security is validated elsewhere.
 .PARAMETER RealUI
     Enable real UI automation (launches the app).
 .PARAMETER StrictMypy
@@ -60,6 +68,7 @@ param(
     [switch]$SkipIntegration,
     [switch]$SkipUI,
     [switch]$SkipGates,
+    [switch]$SkipSecurity,
     [switch]$RealUI,
     [switch]$StrictMypy,
     [switch]$ReleaseCandidate
@@ -741,7 +750,7 @@ if (-not $stage5Passed -and -not $SkipContractTests) {
 # STAGE 6: Security Tests
 # ============================================================================
 
-$stage6Passed = Invoke-Stage -Name "Security Tests" -Description "Run security tests - injection, auth bypass, sandbox escape" -Action {
+$stage6Passed = Invoke-Stage -Name "Security Tests" -Description "Run security tests - injection, auth bypass, sandbox escape" -Skip:$SkipSecurity -Action {
     $junitFile = Join-Path $TestResultsDir "security_tests.xml"
     & python -m pytest tests/security `
         -v `
@@ -750,7 +759,7 @@ $stage6Passed = Invoke-Stage -Name "Security Tests" -Description "Run security t
     return $LASTEXITCODE
 }
 
-if (-not $stage6Passed) {
+if (-not $stage6Passed -and -not $SkipSecurity) {
     Write-Host ""
     Write-Host "SECURITY TESTS FAILED - Stopping verification (fail-fast)" -ForegroundColor Red
     Write-Report

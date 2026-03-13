@@ -19,6 +19,7 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class TrainingDatasetEditorViewModel : BaseViewModel, IPanelView
   {
+    private readonly ITrainingClient _trainingClient;
     private readonly IBackendClient _backendClient;
     private readonly UndoRedoService? _undoRedoService;
     private readonly ToastNotificationService? _toastNotificationService;
@@ -54,9 +55,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<string> validationWarnings = new();
 
-    public TrainingDatasetEditorViewModel(IViewModelContext context, IBackendClient backendClient)
+    public TrainingDatasetEditorViewModel(IViewModelContext context, ITrainingClient trainingClient, IBackendClient backendClient)
         : base(context)
     {
+      _trainingClient = trainingClient ?? throw new ArgumentNullException(nameof(trainingClient));
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
 
       // Get undo/redo service (may be null if not initialized)
@@ -106,7 +108,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var datasets = await _backendClient.ListDatasetsAsync(cancellationToken);
+        var datasets = await _trainingClient.ListDatasetsAsync(cancellationToken);
 
         AvailableDatasets.Clear();
         foreach (var dataset in datasets)

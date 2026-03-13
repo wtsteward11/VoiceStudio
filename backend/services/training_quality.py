@@ -6,6 +6,7 @@ Provides quality metrics calculation, alert detection, and early stopping recomm
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 
 def calculate_quality_score_from_loss(
@@ -43,8 +44,8 @@ def calculate_quality_score_from_loss(
 
 
 def detect_quality_degradation(
-    quality_history: list[dict], current_epoch: int, threshold: float = 0.05
-) -> dict | None:
+    quality_history: list[dict[str, Any]], current_epoch: int, threshold: float = 0.05
+) -> dict[str, Any] | None:
     """
     Detect quality degradation in training.
 
@@ -92,11 +93,11 @@ def detect_quality_degradation(
 
 
 def detect_quality_plateau(
-    quality_history: list[dict],
+    quality_history: list[dict[str, Any]],
     current_epoch: int,
     plateau_epochs: int = 10,
     improvement_threshold: float = 0.01,
-) -> dict | None:
+) -> dict[str, Any] | None:
     """
     Detect quality plateau in training.
 
@@ -144,8 +145,8 @@ def detect_quality_plateau(
 
 
 def detect_overfitting(
-    quality_history: list[dict], current_epoch: int, check_epochs: int = 5
-) -> dict | None:
+    quality_history: list[dict[str, Any]], current_epoch: int, check_epochs: int = 5
+) -> dict[str, Any] | None:
     """
     Detect overfitting in training.
 
@@ -199,12 +200,12 @@ def detect_overfitting(
 
 
 def recommend_early_stopping(
-    quality_history: list[dict],
+    quality_history: list[dict[str, Any]],
     current_epoch: int,
     total_epochs: int,
     plateau_epochs: int = 15,
     improvement_threshold: float = 0.01,
-) -> dict:
+) -> dict[str, Any]:
     """
     Recommend early stopping based on quality metrics.
 

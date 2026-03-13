@@ -7,9 +7,13 @@ Provides ensure_project_dir and get_project_store without route-to-route imports
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.project.management.project_store_service import ProjectStoreService
 
 
-def get_project_store():
+def get_project_store() -> ProjectStoreService:
     """Get the project store service."""
     from backend.project.management.project_store_service import get_project_store_service
 

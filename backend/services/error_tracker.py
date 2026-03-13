@@ -25,6 +25,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +72,8 @@ class ErrorContext:
     user_id: str | None = None
     endpoint: str | None = None
     method: str | None = None
-    params: dict = field(default_factory=dict)
-    headers: dict = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
+    headers: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

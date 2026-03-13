@@ -8,7 +8,7 @@ backend.api.routes or backend.api.ws.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -16,7 +16,7 @@ class TrainingProgressBroadcaster(Protocol):
     """Protocol for broadcasting training progress to clients."""
 
     async def broadcast_training_progress(
-        self, training_id: str, progress_data: dict, batch: bool = True
+        self, training_id: str, progress_data: dict[str, Any], batch: bool = True
     ) -> None:
         """Broadcast training progress. No-op if no clients connected."""
         ...
@@ -26,7 +26,7 @@ class NoOpBroadcaster:
     """Default no-op implementation when WebSocket is unavailable."""
 
     async def broadcast_training_progress(
-        self, training_id: str, progress_data: dict, batch: bool = True
+        self, training_id: str, progress_data: dict[str, Any], batch: bool = True
     ) -> None:
         pass
 

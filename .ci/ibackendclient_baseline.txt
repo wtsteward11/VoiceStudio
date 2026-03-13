@@ -28,18 +28,12 @@ src/VoiceStudio.App/ViewModels/MultiVoiceGeneratorViewModel.cs:85 # MultiVoiceGe
 src/VoiceStudio.App/ViewModels/MultilingualSupportViewModel.cs:61 # MultilingualSupportViewModel constructor
 src/VoiceStudio.App/ViewModels/PipelineConversationViewModel.cs:97 # PipelineConversationViewModel constructor
 src/VoiceStudio.App/ViewModels/PluginHealthDashboardViewModel.cs:106 # PluginHealthDashboardViewModel constructor
-src/VoiceStudio.App/ViewModels/PresetLibraryViewModel.cs:61 # PresetLibraryViewModel constructor
-src/VoiceStudio.App/ViewModels/ProfileComparisonViewModel.cs:61 # ProfileComparisonViewModel constructor
 src/VoiceStudio.App/ViewModels/ProfileHealthDashboardViewModel.cs:55 # ProfileHealthDashboardViewModel constructor
 src/VoiceStudio.App/ViewModels/PronunciationLexiconViewModel.cs:73 # PronunciationLexiconViewModel constructor
 src/VoiceStudio.App/ViewModels/ProsodyViewModel.cs:69 # ProsodyViewModel constructor
-src/VoiceStudio.App/ViewModels/QualityControlViewModel.cs:135 # QualityControlViewModel constructor
-src/VoiceStudio.App/ViewModels/QualityDashboardViewModel.cs:69 # QualityDashboardViewModel constructor
-src/VoiceStudio.App/ViewModels/QualityOptimizationWizardViewModel.cs:78 # QualityOptimizationWizardViewModel constructor
 src/VoiceStudio.App/ViewModels/RealTimeAudioVisualizerViewModel.cs:61 # RealTimeAudioVisualizerViewModel constructor
 src/VoiceStudio.App/ViewModels/RealTimeVoiceConverterViewModel.cs:105 # RealTimeVoiceConverterViewModel constructor
 src/VoiceStudio.App/ViewModels/RecordingViewModel.cs:100 # RecordingViewModel constructor
-src/VoiceStudio.App/ViewModels/SSMLControlViewModel.cs:123 # SSMLControlViewModel constructor
 src/VoiceStudio.App/ViewModels/SceneBuilderViewModel.cs:46 # SceneBuilderViewModel constructor
 src/VoiceStudio.App/ViewModels/ScriptEditorViewModel.cs:68 # ScriptEditorViewModel constructor
 src/VoiceStudio.App/ViewModels/SettingsViewModel.cs:233 # SettingsViewModel constructor
@@ -54,7 +48,7 @@ src/VoiceStudio.App/ViewModels/TextBasedSpeechEditorViewModel.cs:99 # TextBasedS
 src/VoiceStudio.App/ViewModels/TextHighlightingViewModel.cs:76 # TextHighlightingViewModel constructor
 src/VoiceStudio.App/ViewModels/TextSpeechEditorViewModel.cs:78 # TextSpeechEditorViewModel constructor
 src/VoiceStudio.App/ViewModels/TodoPanelViewModel.cs:83 # TodoPanelViewModel constructor
-src/VoiceStudio.App/ViewModels/TrainingDatasetEditorViewModel.cs:57 # TrainingDatasetEditorViewModel constructor
+src/VoiceStudio.App/ViewModels/TrainingDatasetEditorViewModel.cs:58 # TrainingDatasetEditorViewModel (ListDatasetsAsync via ITrainingClient; dataset-editor endpoints via IBackendClient)
 src/VoiceStudio.App/ViewModels/TrainingQualityVisualizationViewModel.cs:67 # TrainingQualityVisualizationViewModel constructor
 src/VoiceStudio.App/ViewModels/UltimateDashboardViewModel.cs:37 # UltimateDashboardViewModel constructor
 src/VoiceStudio.App/ViewModels/UpscalingViewModel.cs:68 # UpscalingViewModel constructor
@@ -75,16 +69,12 @@ src/VoiceStudio.App/Views/Panels/BatchProcessingViewModel.cs:124 # BatchProcessi
 src/VoiceStudio.App/Views/Panels/DiagnosticsViewModel.cs:269 # DiagnosticsViewModel constructor
 src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs:131 # EffectsMixerViewModel constructor
 src/VoiceStudio.App/Views/Panels/EngineParameterTuningViewModel.cs:58 # EngineParameterTuningViewModel constructor
-src/VoiceStudio.App/Views/Panels/EngineRecommendationViewModel.cs:61 # EngineRecommendationViewModel constructor
 src/VoiceStudio.App/Views/Panels/ImageGenViewModel.cs:140 # ImageGenViewModel constructor
 src/VoiceStudio.App/Views/Panels/ImageVideoEnhancementPipelineViewModel.cs:61 # ImageVideoEnhancementPipelineViewModel constructor
 src/VoiceStudio.App/Views/Panels/MacroViewModel.cs:128 # MacroViewModel constructor
 src/VoiceStudio.App/Views/Panels/MiniTimelineViewModel.cs:81 # MiniTimelineViewModel constructor
 src/VoiceStudio.App/Views/Panels/ModelManagerViewModel.cs:72 # ModelManagerViewModel constructor
-src/VoiceStudio.App/Views/Panels/QualityBenchmarkViewModel.cs:82 # QualityBenchmarkViewModel constructor
 src/VoiceStudio.App/Views/Panels/SLODashboardViewModel.cs:88 # SLODashboardViewModel constructor
 src/VoiceStudio.App/Views/Panels/TagOrganizationViewModel.cs:41 # TagOrganizationViewModel constructor
-src/VoiceStudio.App/Views/Panels/TrainingViewModel.cs:220 # TrainingViewModel constructor
-src/VoiceStudio.App/Views/Panels/TranscribeViewModel.cs:86 # TranscribeViewModel constructor
 src/VoiceStudio.App/Views/Panels/EmotionStylePresetEditorViewModel.cs:68 # EmotionStylePresetEditorViewModel (emotion presets CRUD; synthesis via IVoiceSynthesisService)
 src/VoiceStudio.App/Views/Panels/WorkflowAutomationViewModel.cs:56 # WorkflowAutomationViewModel constructor

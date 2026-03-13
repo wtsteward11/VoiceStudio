@@ -6,14 +6,14 @@ Prosody route needs estimate_phonemes. Lexicon route registers its handler.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
-
-from pydantic import BaseModel
 
 _estimate_handler: Callable[..., Awaitable[Any]] | None = None
 
 
-class PhonemeEstimateRequest(BaseModel):
+@dataclass
+class PhonemeEstimateRequest:
     """Request to estimate phonemes."""
 
     word: str | None = None

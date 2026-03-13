@@ -106,7 +106,7 @@ class VoicePresetManager:
         self._presets: dict[str, VoicePreset] = {}
         self._active_preset: str | None = None
         self._model_cache: dict[str, Any] = {}
-        self._load_callbacks: list[Callable] = []
+        self._load_callbacks: list[Callable[[VoicePreset], None]] = []
 
         # Ensure directory exists
         self._presets_dir.mkdir(parents=True, exist_ok=True)

@@ -68,6 +68,42 @@ Reduce duplication across Build, CI, Tests, Sentinel workflows; align job struct
 - Removed: scripts/generate_sentinel_fixture.py, scripts/setup_test_audio.ps1, scripts/setup_openmemory.ps1, scripts/setup_gpu_venv.ps1, scripts/migrate_config.py, scripts/migrate_di.py, scripts/migrate_to_env_setup.py.
 - Updated references: TOOLS_REGISTRY.md, canonical.py, MEMORY_INTEGRATION_GUIDE.md, skill_map.json, TASK-0040.md, script docstrings.
 
+## Fifth Slice Complete (2026-03-11)
+
+- Migrated sentinel_backend_smoke.yml: schema-validation and sentinel-smoke jobs now use `./.github/actions/setup-python-pip` with cache-mode: requirements.
+- Replaced direct actions/setup-python + manual cache with composite; pip cache key aligned with other workflows.
+- Blast radius: 2 jobs; behavior identical.
+
+## Sixth Slice Complete (2026-03-11)
+
+- Migrated sbom.yml python-sbom job to use `./.github/actions/setup-python-pip` with cache-mode: requirements.
+- Blast radius: 1 job; pip cache now used for SBOM generation.
+
+## Seventh Slice Complete (2026-03-11)
+
+- Migrated release.yml: build-windows and publish-docs jobs now use `./.github/actions/setup-python-pip` with cache-mode: requirements.
+- Blast radius: 2 jobs; pip cache aligned with other workflows.
+
+## Eighth Slice Complete (2026-03-11)
+
+- Migrated security-monitor.yml: python-security-scan and aggregate-report jobs now use `./.github/actions/setup-python-pip` with cache-mode: requirements.
+- Blast radius: 2 jobs; pip cache aligned with other workflows.
+
+## Ninth Slice Complete (2026-03-11)
+
+- Migrated governance.yml: governance-tests and policy-validation jobs now use `./.github/actions/setup-python-pip` with cache-mode: requirements.
+- Blast radius: 2 jobs; pip cache aligned with other workflows.
+
+## Tenth Slice Complete (2026-03-11)
+
+- Migrated plugin-submission.yml: process-submission and approve-submission jobs now use `./.github/actions/setup-python-pip` with cache-mode: requirements.
+- Blast radius: 2 jobs; pip cache aligned with other workflows.
+
+## Eleventh Slice Complete (2026-03-11)
+
+- Migrated sentinel_ui_smoke_nightly.yml: ui-smoke and page-object-validation jobs now use `./.github/actions/setup-python-pip` with cache-mode: requirements.
+- Blast radius: 2 jobs; pip cache aligned with other workflows.
+
 ## Proof Criteria
 
 - Duplicate setup steps reduced (e.g. single source for Python/pip setup)

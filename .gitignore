@@ -117,6 +117,8 @@ unit_errors.txt
 build_cs*.txt
 
 # Root-level build artifacts and diagnostics (arch review 4.3, 4.8)
+/skip_report.txt
+/test_seed_*.log
 /api_test_output.txt
 /build_warnings.txt
 /build_errors.txt

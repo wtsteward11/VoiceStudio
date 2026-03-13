@@ -1,7 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
-using VoiceStudio.Core.Services;
 using VoiceStudio.App.ViewModels;
 
 namespace VoiceStudio.App.Services.UndoableActions
@@ -12,7 +11,6 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateEmotionPresetAction : IUndoableAction
   {
     private readonly ObservableCollection<EmotionControlPresetItem> _presets;
-    private readonly IBackendClient _backendClient;
     private readonly EmotionControlPresetItem _preset;
     private readonly Action<EmotionControlPresetItem>? _onUndo;
     private readonly Action<EmotionControlPresetItem>? _onRedo;
@@ -21,13 +19,11 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateEmotionPresetAction(
         ObservableCollection<EmotionControlPresetItem> presets,
-        IBackendClient backendClient,
         EmotionControlPresetItem preset,
         Action<EmotionControlPresetItem>? onUndo = null,
         Action<EmotionControlPresetItem>? onRedo = null)
     {
       _presets = presets ?? throw new ArgumentNullException(nameof(presets));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _preset = preset ?? throw new ArgumentNullException(nameof(preset));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -59,7 +55,6 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteEmotionPresetAction : IUndoableAction
   {
     private readonly ObservableCollection<EmotionControlPresetItem> _presets;
-    private readonly IBackendClient _backendClient;
     private readonly EmotionControlPresetItem _preset;
     private readonly int _originalIndex;
     private readonly Action<EmotionControlPresetItem>? _onUndo;
@@ -69,14 +64,12 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteEmotionPresetAction(
         ObservableCollection<EmotionControlPresetItem> presets,
-        IBackendClient backendClient,
         EmotionControlPresetItem preset,
         int originalIndex,
         Action<EmotionControlPresetItem>? onUndo = null,
         Action<EmotionControlPresetItem>? onRedo = null)
     {
       _presets = presets ?? throw new ArgumentNullException(nameof(presets));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _preset = preset ?? throw new ArgumentNullException(nameof(preset));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

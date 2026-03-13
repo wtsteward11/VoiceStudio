@@ -13,10 +13,12 @@ using VoiceStudio.Core.Services;
 namespace VoiceStudio.App.Tests.ViewModels
 {
   /// <summary>
-  /// Comprehensive unit tests for TrainingViewModel.
-  /// Tests cover training operations, status monitoring, and model management.
+  /// Transport-mock tests for training backend contract.
+  /// Tests IBackendClient directly; does not instantiate TrainingViewModel with ITrainingClient.
+  /// See docs/governance/TEST_CLASSIFICATION.md. Cannot support "TrainingViewModel migration complete" claims.
   /// </summary>
   [TestClass]
+  [TestCategory("TransportMock")]
   public class TrainingViewModelTests
   {
     private Mock<IBackendClient> _mockBackendClient = null!;

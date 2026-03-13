@@ -94,12 +94,12 @@ jobs:
           name: voicestudio-build
           path: src/VoiceStudio.App/bin/x64/Debug/
       
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Python with pip cache
+        uses: ./.github/actions/setup-python-pip
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-      
+          cache-mode: requirements
+
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
@@ -217,11 +217,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Python with pip cache
+        uses: ./.github/actions/setup-python-pip
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      
+          cache-mode: requirements
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

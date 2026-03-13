@@ -57,19 +57,25 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## Next 3 Steps
 
-1. **Mypy Reassess and Architecture Pivot Plan** — COMPLETE (2026-03-11). Mypy 24; EmotionControlViewModel hardened; thin-wrapper audit; creep baseline shrunk; repo hygiene (STATE role + control doc clarity).
-2. **Future** — Next mypy slice (marketplace_service, persistent_store) or next panel hardening.
-3. **Future** — Drift prevention pass; next architecture target.
+1. **Governance v3 follow-on** — Training lifecycle: LoadLogs/LoadQualityHistory gated (selection cancellation + staleness guard); Dispose cancels _disposalCts. Remaining fire-and-forget (ConnectWebSocket, LoadDatasets, LoadTrainingJobs, PollTrainingStatus, DisconnectWebSocket) retained per design doc.
+2. **Seam-aware tests** — TrainingViewModelSeamTests, TranscribeViewModelSeamTests, ProfileComparisonViewModelSeamTests added (12 tests). See [TEST_CLASSIFICATION.md](docs/governance/TEST_CLASSIFICATION.md).
+3. **Next lane** — Await selection: further lifecycle cleanup, new seam migrations, or other roadmap items.
 
-**Plan:** Mypy Reassess and Architecture Pivot — COMPLETE (2026-03-11). IEmotionControlClient added; EmotionControlViewModel migrated; MIGRATED_NO_IBACKENDCLIENT includes EmotionControlViewModel; baseline reduced.
+**Seam Migration Status:** All ranked targets complete per [SEAM_MATURITY_AUDIT.md](docs/design/SEAM_MATURITY_AUDIT.md) "Next Architecture Targets" (2026-03-12). Training selected-job loads gated; seam-aware tests added. When SEAM marks a target done, STATE must not advertise it as future; when STATE marks a task complete that touches seams, SEAM must be updated in the same change-set.
 
-## Last Milestone (MYPY-REASSESS-ARCH-PIVOT)
+## Last Milestone (GOVERNANCE-V3-CORRECTION)
 
-- **ID**: MYPY-REASSESS-ARCH-PIVOT
-- **Title**: Mypy Reassess and Architecture Pivot Plan
-- **Status**: **COMPLETE** (2026-03-11)
-- **Completed**: Mypy twenty-fourth slice (audio_artifacts/usage); EmotionControlViewModel hardened via IEmotionControlClient; thin-wrapper audit extended; creep baseline shrunk (EmotionControlViewModel removed, added to MIGRATED_NO_IBACKENDCLIENT).
-- **Verification**: dotnet build, dotnet test EmotionControlModelTests, python scripts/ci/check_ibackendclient_creep.py
+- **ID**: GOVERNANCE-V3-CORRECTION
+- **Title**: Governance v3 Truth Sync + Training Lifecycle + Seam-Aware Tests
+- **Status**: **COMPLETE** (2026-03-13)
+- **Completed**: STATE/SEAM truth sync; TrainingViewModel selected-job loads gated (selection cancellation, staleness guard, Dispose); seam-aware tests for Training, Transcribe, ProfileComparison (12 tests); build verified green.
+- **Verification**: dotnet build, dotnet test (SeamAware filter)
+
+**Previous:** QUALITYOPTIMIZATIONWIZARD-HARDENING (2026-03-12)
+
+---
+
+**Known Debt:** TrainingViewModel lifecycle fire-and-forget: LoadLogsAsync/LoadQualityHistoryAsync now gated (selection-specific cancellation + staleness guard); ConnectWebSocketAsync, LoadDatasetsAsync, LoadTrainingJobsAsync, PollTrainingStatusAsync, DisconnectWebSocketAsync retained. _disposalCts cancelled in Dispose. See [TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md](docs/design/TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md).
 
 ---
 

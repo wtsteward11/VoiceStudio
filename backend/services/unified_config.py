@@ -23,7 +23,7 @@ import threading
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 try:
     import yaml
@@ -221,7 +221,7 @@ def expand_env_vars(value: str) -> str:
 
     pattern = r"\$\{([^}:]+)(?::([^}]*))?\}"
 
-    def replacer(match: re.Match) -> str:
+    def replacer(match: re.Match[str]) -> str:
         var_name = match.group(1)
         default = match.group(2) or ""
         return os.environ.get(var_name, default)
@@ -289,7 +289,7 @@ class ConfigLoader:
                 return {}
 
             # Expand environment variables
-            return expand_env_vars_recursive(content)
+            return cast(dict[str, Any], expand_env_vars_recursive(content))
 
         except yaml.YAMLError as e:
             logger.error(f"Error parsing YAML file {filepath}: {e}")
@@ -305,7 +305,7 @@ class ConfigLoader:
             with open(filepath, encoding="utf-8") as f:
                 content = json.load(f)
 
-            return expand_env_vars_recursive(content)
+            return cast(dict[str, Any], expand_env_vars_recursive(content))
 
         except json.JSONDecodeError as e:
             logger.error(f"Error parsing JSON file {filepath}: {e}")
@@ -317,7 +317,7 @@ class ConfigLoader:
 
         with self._lock:
             if use_cache and cache_key in self._cache:
-                return self._cache[cache_key]
+                return cast(dict[str, Any], self._cache[cache_key])
 
             config = self._load_yaml("voicestudio.config.yaml")
             self._cache[cache_key] = config
@@ -329,7 +329,7 @@ class ConfigLoader:
 
         with self._lock:
             if use_cache and cache_key in self._cache:
-                return self._cache[cache_key]
+                return cast(dict[str, Any], self._cache[cache_key])
 
             config = self._load_yaml("engines.config.yaml")
             self._cache[cache_key] = config
@@ -341,7 +341,7 @@ class ConfigLoader:
 
         with self._lock:
             if use_cache and cache_key in self._cache:
-                return self._cache[cache_key]
+                return cast(dict[str, Any], self._cache[cache_key])
 
             config = self._load_yaml("deployment.config.yaml")
             self._cache[cache_key] = config
@@ -597,7 +597,7 @@ class UnifiedConfigService:
     def is_engine_enabled(self, engine_id: str) -> bool:
         """Check if an engine is enabled."""
         override = self.get_engine_override(engine_id)
-        return override.get("enabled", True)
+        return bool(override.get("enabled", True))
 
     def get_active_ab_experiments(self) -> list[ABExperiment]:
         """Get all active A/B testing experiments."""

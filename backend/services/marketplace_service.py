@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Generator, Optional
+from typing import Any, Generator, Optional, cast
 
 logger = logging.getLogger(__name__)
 
@@ -425,7 +425,7 @@ class MarketplaceService:
             from backend.plugins.gallery.ratings import rate_plugin
 
             r = rate_plugin(plugin_id, version, rating, review)
-            return r.to_dict()
+            return cast(dict[str, Any], r.to_dict())
         except Exception as e:
             logger.error("Failed to add review: %s", e)
             raise ValueError(str(e)) from e

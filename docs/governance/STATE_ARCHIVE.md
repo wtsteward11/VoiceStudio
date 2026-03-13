@@ -3,7 +3,17 @@
 > Historical milestones, proof index, and session log. Split from `.cursor/STATE.md` per Phase 8B.
 > **Live state**: `.cursor/STATE.md` (~70 lines)
 
+**STATE.md discipline** (closure protocol supplement): Keep working section ≤75 lines. When over limit, move completed milestones here. See [REPO_ROOT_CONVENTIONS.md](REPO_ROOT_CONVENTIONS.md).
+
 ---
+
+## Previous Milestone (PHASE-5-6-VOICESYNTHESIS-CLOSURE)
+
+- **ID**: PHASE-5-6-VOICESYNTHESIS-CLOSURE
+- **Title**: Phase 5–6 VoiceSynthesis Closure
+- **Status**: **COMPLETE** (2026-03-11)
+- **Completed**: 5A (IEnginesClient), 5B (IQualityPipelineService), 5C (IEnsembleService), 5D (ITextAnalysisService, IQualityHistoryService), 5E (remove IBackendClient from VoiceSynthesisViewModel), 6 (EmotionStylePresetEditorViewModel → IVoiceSynthesisService)
+- **Verification**: check_ibackendclient_creep.py OK; ibackendclient_baseline.txt and synthesizevoice_baseline.txt shrunk; all gates PASS
 
 ## Previous Milestone (PHASE-2-POST-TIMELINE-HARDENING)
 

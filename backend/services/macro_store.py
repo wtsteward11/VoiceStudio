@@ -8,7 +8,7 @@ storage to durable disk-backed JsonFileStore. Data persists across restarts.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 from .json_file_store import JsonFileStore
 
@@ -30,7 +30,7 @@ class MacroStore:
 
     def get(self, macro_id: str) -> dict[str, Any] | None:
         """Get a macro by ID."""
-        return self._store.get(macro_id)
+        return cast(dict[str, Any] | None, self._store.get(macro_id))
 
     def save(self, macro: dict[str, Any]) -> str:
         """
@@ -51,18 +51,18 @@ class MacroStore:
 
         self._store.put(macro_id, macro)
         logger.debug(f"MacroStore: Saved macro {macro_id}")
-        return macro_id
+        return str(macro_id)
 
     def delete(self, macro_id: str) -> bool:
         """Delete a macro."""
         result = self._store.delete(macro_id)
         if result:
             logger.debug(f"MacroStore: Deleted macro {macro_id}")
-        return result
+        return bool(result)
 
     def list_all(self) -> list[dict[str, Any]]:
         """List all macros."""
-        return self._store.list()
+        return list(self._store.list())
 
     def search(self, name: str | None = None, category: str | None = None) -> list[dict[str, Any]]:
         """Search macros by name or category."""
@@ -78,15 +78,15 @@ class MacroStore:
                     return False
             return True
 
-        return self._store.search(predicate)
+        return list(self._store.search(predicate))
 
     def count(self) -> int:
         """Get total number of macros."""
-        return self._store.count()
+        return int(self._store.count())
 
     def exists(self, macro_id: str) -> bool:
         """Check if a macro exists."""
-        return self._store.exists(macro_id)
+        return bool(self._store.exists(macro_id))
 
 
 class AutomationCurveStore:
@@ -122,7 +122,7 @@ class AutomationCurveStore:
 
     def get(self, curve_id: str) -> dict[str, Any] | None:
         """Get an automation curve by ID."""
-        return self._store.get(curve_id)
+        return cast(dict[str, Any] | None, self._store.get(curve_id))
 
     def save(self, curve: dict[str, Any]) -> str:
         """
@@ -154,7 +154,7 @@ class AutomationCurveStore:
                 self._project_index[project_id].append(curve_id)
 
         logger.debug(f"AutomationCurveStore: Saved curve {curve_id}")
-        return curve_id
+        return str(curve_id)
 
     def delete(self, curve_id: str) -> bool:
         """Delete an automation curve."""
@@ -175,7 +175,7 @@ class AutomationCurveStore:
                 del self._project_index[project_id]
 
         logger.debug(f"AutomationCurveStore: Deleted curve {curve_id}")
-        return result
+        return bool(result)
 
     def list_by_project(self, project_id: str) -> list[dict[str, Any]]:
         """List all curves for a project."""
@@ -189,15 +189,15 @@ class AutomationCurveStore:
 
     def list_all(self) -> list[dict[str, Any]]:
         """List all automation curves."""
-        return self._store.list()
+        return list(self._store.list())
 
     def count(self) -> int:
         """Get total number of curves."""
-        return self._store.count()
+        return int(self._store.count())
 
     def exists(self, curve_id: str) -> bool:
         """Check if a curve exists."""
-        return self._store.exists(curve_id)
+        return bool(self._store.exists(curve_id))
 
 
 class MacroExecutionStore:
@@ -217,7 +217,7 @@ class MacroExecutionStore:
         """Get execution status for a macro."""
         entry = self._store.get(macro_id)
         if entry:
-            return entry.get("status")
+            return cast(dict[str, Any] | None, entry.get("status"))
         return None
 
     def set_status(self, macro_id: str, status: dict[str, Any]) -> None:
@@ -230,7 +230,7 @@ class MacroExecutionStore:
         """Get schedule for a macro."""
         entry = self._store.get(macro_id)
         if entry:
-            return entry.get("schedule")
+            return cast(dict[str, Any] | None, entry.get("schedule"))
         return None
 
     def set_schedule(self, macro_id: str, schedule: dict[str, Any]) -> None:
@@ -251,7 +251,7 @@ class MacroExecutionStore:
 
     def delete(self, macro_id: str) -> bool:
         """Delete all execution data for a macro."""
-        return self._store.delete(macro_id)
+        return bool(self._store.delete(macro_id))
 
     def list_scheduled(self) -> list[dict[str, Any]]:
         """List all macros with schedules."""
@@ -259,7 +259,7 @@ class MacroExecutionStore:
         def has_schedule(entry: dict[str, Any]) -> bool:
             return "schedule" in entry
 
-        return self._store.search(has_schedule)
+        return list(self._store.search(has_schedule))
 
 
 # Singletons

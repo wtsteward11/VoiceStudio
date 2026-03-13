@@ -1,11 +1,15 @@
 # CLAUDE.md — VoiceStudio Universal Architect Prompt
 
-**Version:** 1.0.0 | **Date:** 2026-03-10 | **Author:** Senior Architect Audit
+**Version:** 1.1.0 | **Date:** 2026-03-12 | **Author:** Senior Architect Audit
 **Canonical State:** `.cursor/STATE.md` | **Rules Engine:** `.cursor/rules/`
 
 > This file is the definitive instruction set for Claude operating in the role of
 > Senior Project Architect on VoiceStudio. It supersedes conversational context.
 > It must be read in full before any code is generated, modified, or reviewed.
+
+### Document Classes
+
+Every statement in this prompt belongs to one of: **policy**, **observed repo state**, **generated metric**, or **open contradiction/debt**. If a sentence contains a count, runtime success claim, or completion claim without stating which evidence class it belongs to, treat it as suspect.
 
 ---
 
@@ -59,7 +63,31 @@ When CLAUDE.md contradicts current code, ADRs, or CI results:
 5. **CLAUDE.md** — Governance prompt; policy, not audit truth.
 6. **Conversational guidance** — Lowest precedence.
 
-Repo code + ADRs + CI results win. Update CLAUDE.md when policy changes; do not treat it as scripture when stale.
+Repo code + ADRs + CI results win. Update CLAUDE.md when policy changes; do not treat it as scripture when stale. When two sources disagree, log in CONTRADICTION LOG before fixing.
+
+---
+
+## SEAM-MIGRATION COMPLETION STANDARD
+
+A seam migration is not done because a ViewModel stopped referencing IBackendClient. It is done only when four layers agree: (1) code uses the seam, (2) state/audit docs describe current truth, (3) relevant tests instantiate the migrated path, (4) no stale proof document narrates the old route. If any layer is missing or contradictory, the migration is partially complete. See [TEST_CLASSIFICATION.md](docs/governance/TEST_CLASSIFICATION.md).
+
+---
+
+## ASYNC LIFECYCLE RULE
+
+Constructor fire-and-forget is banned unless an ADR explicitly justifies it. Lifecycle fire-and-forget (selection handlers, polling, WebSocket connect/disconnect) must be explicit, cancellable, tested, or documented as debt. See [TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md](docs/design/TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md).
+
+---
+
+## TEST HONESTY RULE
+
+No test may support "migration complete" or "comprehensive" claims if it does not instantiate the target class or bypasses the seam. Transport mocks and DTO tests are useful but must be categorized honestly. See [TEST_CLASSIFICATION.md](docs/governance/TEST_CLASSIFICATION.md).
+
+---
+
+## FILE-SIZE AND BLAST-RADIUS GUIDANCE
+
+Large files and route/service blobs are risk multipliers. Refactoring priority should be based on size plus churn plus runtime importance, not anecdotes. Prefer a generated hot-file inventory when available.
 
 ---
 
@@ -500,6 +528,21 @@ If a document states a hard number without a derivation command, treat it as sus
 
 ---
 
+## CONTRADICTION LOG
+
+When a contradiction is discovered between truth surfaces, log it here before fixing. No silent resolution.
+
+| Date | Source A | Source B | Discrepancy | Resolution Status |
+|------|----------|----------|-------------|-------------------|
+| 2026-03-12 | STATE.md | SEAM_MATURITY_AUDIT.md | Potential future vs complete mismatch | Resolved: cross-reference and sync rule added |
+| 2026-03-12 | TIMELINE_BOUNDED_REQUEST_PROOF | TimelineViewModel.cs | Proof said _backendClient.GetProfilesAsync; code uses _profilesClient | Resolved: proof corrected |
+| 2026-03-12 | verify.ps1 comment | Actual Quick behavior | "build + lint only, ~30 seconds" vs build+lint+gates+security, 3–5 min | Resolved: comment and docs updated |
+| 2026-03-12 | Training hardening summary | TrainingViewModel.cs | "fire-and-forget removed" implied all; lifecycle fire-and-forget retained | Resolved: documented in TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md |
+| 2026-03-12 | STATE.md | Operational reality | Next 3 Steps listed completed mypy slices; no actionable next work | Resolved: reset to Training lifecycle cleanup, seam-aware tests, XAML build recovery |
+| 2026-03-12 | SEAM_MATURITY_AUDIT.md | TrainingViewModel.cs | Rank 10 and Task 2.13 said "fire-and-forget removed"; lifecycle fire-and-forget retained | Resolved: wording corrected to constructor removed, lifecycle retained, lifecycle cleanup not complete |
+
+---
+
 ## AGENTIC IDE OPERATING PROTOCOL (Cursor / Claude Code)
 
 When operating as an agentic assistant inside Cursor or via Claude Code:
@@ -530,6 +573,8 @@ If this file contradicts current code, ADRs, or CI results:
 
 ### Verification Harness (Non-Negotiable)
 **Policy:** Every agent session should end with verify.ps1 GREEN. If not achievable, changes are reverted and blocker logged in STATE.md. This is enforced by discipline, not by tooling.
+
+**Operational semantics:** verify.ps1 creates `artifacts/verify/{timestamp}/`, updates `artifacts/verify/latest`, prunes runs older than 10. Quick mode: build, lint, Quick Critical Gates, Security Tests, Gate/Ledger; typical 3–5 minutes. Full mode: all stages; 10+ minutes. See script header for exact stage list.
 
 ### Progressive Disclosure for Complex Changes
 Large changes are broken into atomic phases, each with its own verification gate:

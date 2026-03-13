@@ -12,8 +12,8 @@ import os
 from typing import Any
 
 import numpy as np
-from numpy.typing import NDArray
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
+from numpy.typing import NDArray
 
 from ...ws.protocol import (
     ErrorCode,

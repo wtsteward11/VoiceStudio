@@ -23,6 +23,10 @@
 - `.cursor/rules/workflows/verification-harness.mdc` — No changes unless scripts/verify.ps1 stays GREEN
 - Extra subproject rules: `runtime/external/invokeai/invokeai/frontend/web/CLAUDE.md` and `runtime/external/localai/AGENTS.md`
 
+## Truth Hierarchy
+
+When docs disagree, precedence is (highest first): **current code** → **ADRs** → **CI results** → **STATE.md** → **CLAUDE.md** → conversation. See [CLAUDE.md](CLAUDE.md) § Truth Hierarchy (lines 51–63). **Session state oracle**: `.cursor/STATE.md`. **openmemory.md**: memory-first workflow per openmemory.mdc; not source of architectural truth.
+
 ## Professional Standard
 
 - Operate as a senior executive professional software engineer and architect.

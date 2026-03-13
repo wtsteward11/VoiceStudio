@@ -11,7 +11,7 @@ import logging
 import os
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from backend.config.path_config import get_path
 
@@ -40,7 +40,7 @@ class JobStateStore:
     def _resolve_jobs_root(jobs_dir: str | None) -> Path:
         if jobs_dir:
             return Path(jobs_dir)
-        return get_path("jobs")
+        return cast(Path, get_path("jobs"))
 
     def _job_path(self, job_id: str) -> Path:
         safe_id = job_id.replace(os.sep, "_")
@@ -70,7 +70,7 @@ class JobStateStore:
             if not path.exists():
                 return None
             try:
-                return json.loads(path.read_text(encoding="utf-8"))
+                return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
             except (json.JSONDecodeError, OSError) as e:
                 # Job file is corrupted or unreadable - treat as missing
                 logger.debug(f"Failed to read job state {job_id}: {e}")

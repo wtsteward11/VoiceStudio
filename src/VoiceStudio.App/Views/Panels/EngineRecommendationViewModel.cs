@@ -19,7 +19,7 @@ namespace VoiceStudio.App.Views.Panels
   /// </summary>
   public partial class EngineRecommendationViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IQualityControlClient _qualityClient;
 
     public string PanelId => "engine_recommendation";
     public string DisplayName => ResourceHelper.GetString("Panel.EngineRecommendations.DisplayName", "Engine Recommendations");
@@ -58,10 +58,10 @@ namespace VoiceStudio.App.Views.Panels
 
     public IAsyncRelayCommand GetRecommendationsCommand { get; }
 
-    public EngineRecommendationViewModel(IViewModelContext context, IBackendClient backendClient)
+    public EngineRecommendationViewModel(IViewModelContext context, IQualityControlClient qualityClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _qualityClient = qualityClient ?? throw new ArgumentNullException(nameof(qualityClient));
 
       GetRecommendationsCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -88,7 +88,7 @@ namespace VoiceStudio.App.Views.Panels
           QualityTier = QualityTier
         };
 
-        var response = await _backendClient.GetEngineRecommendationAsync(request, cancellationToken);
+        var response = await _qualityClient.GetEngineRecommendationAsync(request, cancellationToken);
 
         Recommendations.Clear();
         foreach (var recommendation in response.Recommendations)

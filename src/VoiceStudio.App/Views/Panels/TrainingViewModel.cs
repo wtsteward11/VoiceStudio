@@ -22,16 +22,20 @@ namespace VoiceStudio.App.Views.Panels
 {
   public partial class TrainingViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ITrainingClient _trainingClient;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly UndoRedoService? _undoRedoService;
     private readonly MultiSelectService _multiSelectService;
     private MultiSelectState? _multiSelectState;
     private CancellationTokenSource? _pollingCts;
     private bool _isPolling;
+    private bool _isInitialized;
 
     // GAP-I15: Disposal token for fire-and-forget operations
     private readonly CancellationTokenSource _disposalCts = new();
+
+    // Cancellation for selected-job loads; cancelled when selection changes to prevent stale data
+    private CancellationTokenSource? _selectedJobLoadCts;
 
     // Phase 3: WebSocket client for real-time training progress updates
     private readonly JobProgressWebSocketClient? _jobProgressClient;
@@ -217,10 +221,10 @@ namespace VoiceStudio.App.Views.Panels
             "coqui"
         };
 
-    public TrainingViewModel(IViewModelContext context, IBackendClient backendClient)
+    public TrainingViewModel(IViewModelContext context, ITrainingClient trainingClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _trainingClient = trainingClient ?? throw new ArgumentNullException(nameof(trainingClient));
 
       // Get multi-select service
       var multiSelectService = AppServices.TryGetMultiSelectService();
@@ -232,9 +236,9 @@ namespace VoiceStudio.App.Views.Panels
       {
         _toastNotificationService = AppServices.TryGetToastNotificationService();
       }
-      catch
+      catch (Exception ex)
       {
-        // Services may not be initialized yet - that's okay
+        System.Diagnostics.Debug.WriteLine($"TrainingViewModel: Toast service init failed - {ex.Message}");
         _toastNotificationService = null;
       }
 
@@ -243,9 +247,9 @@ namespace VoiceStudio.App.Views.Panels
       {
         _undoRedoService = AppServices.TryGetUndoRedoService();
       }
-      catch
+      catch (Exception ex)
       {
-        // Service may not be initialized yet - that's okay
+        System.Diagnostics.Debug.WriteLine($"TrainingViewModel: UndoRedo service init failed - {ex.Message}");
         _undoRedoService = null;
       }
 
@@ -263,9 +267,9 @@ namespace VoiceStudio.App.Views.Panels
           }
         }
       }
-      catch
+      catch (Exception ex)
       {
-        // WebSocket service may not be available - fall back to polling
+        System.Diagnostics.Debug.WriteLine($"TrainingViewModel: WebSocket init failed - {ex.Message}");
         _jobProgressClient = null;
       }
 
@@ -274,9 +278,9 @@ namespace VoiceStudio.App.Views.Panels
       {
         _eventAggregator = AppServices.TryGetEventAggregator();
       }
-      catch
+      catch (Exception ex)
       {
-        // EventAggregator service may not be available
+        System.Diagnostics.Debug.WriteLine($"TrainingViewModel: EventAggregator init failed - {ex.Message}");
         _eventAggregator = null;
       }
 
@@ -354,6 +358,15 @@ namespace VoiceStudio.App.Views.Panels
       };
     }
 
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+      if (_isInitialized)
+        return;
+      _isInitialized = true;
+      await LoadDatasetsAsync(cancellationToken);
+      await LoadTrainingJobsAsync(cancellationToken);
+    }
+
     public IAsyncRelayCommand LoadDatasetsCommand { get; }
     public IAsyncRelayCommand CreateDatasetCommand { get; }
     public IAsyncRelayCommand<TrainingDataset> DeleteDatasetCommand { get; }
@@ -400,12 +413,17 @@ namespace VoiceStudio.App.Views.Panels
 
     partial void OnSelectedTrainingJobChanged(TrainingStatus? value)
     {
+      // Cancel any in-flight load for the previous selection to prevent stale data overwrite
+      _selectedJobLoadCts?.Cancel();
+      _selectedJobLoadCts?.Dispose();
+      _selectedJobLoadCts = null;
+
       if (value != null)
       {
-        // GAP-I15: Auto-load logs and quality history when job is selected
-        // Use disposal token for fire-and-forget operations
-        _ = LoadLogsAsync(_disposalCts.Token);
-        _ = LoadQualityHistoryAsync(_disposalCts.Token);
+        _selectedJobLoadCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+        var token = _selectedJobLoadCts.Token;
+        _ = LoadLogsAsync(token);
+        _ = LoadQualityHistoryAsync(token);
 
         // MED-1: Show simulation mode InfoBar when training runs in simulation
         IsSimulationMode = value.SimulationMode;
@@ -465,7 +483,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var datasets = await _backendClient.ListDatasetsAsync(cancellationToken);
+        var datasets = await _trainingClient.ListDatasetsAsync(cancellationToken);
 
         Datasets.Clear();
         foreach (var dataset in datasets.OrderByDescending(d => d.Created))
@@ -509,7 +527,7 @@ namespace VoiceStudio.App.Views.Panels
             ? new List<string>()
             : AudioFilesText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
-        var dataset = await _backendClient.CreateDatasetAsync(DatasetName, DatasetDescription, audioFiles, cancellationToken);
+        var dataset = await _trainingClient.CreateDatasetAsync(DatasetName, DatasetDescription, audioFiles, cancellationToken);
 
         Datasets.Insert(0, dataset);
         SelectedDataset = dataset;
@@ -519,7 +537,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           var action = new CreateTrainingDatasetAction(
               Datasets,
-              _backendClient,
+              _trainingClient,
               dataset,
               onUndo: (d) =>
               {
@@ -566,7 +584,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        await _backendClient.DeleteDatasetAsync(dataset.Id, cancellationToken);
+        await _trainingClient.DeleteDatasetAsync(dataset.Id, cancellationToken);
 
         var datasetIndex = Datasets.IndexOf(dataset);
         Datasets.Remove(dataset);
@@ -627,7 +645,7 @@ namespace VoiceStudio.App.Views.Panels
           Gpu = UseGpu
         };
 
-        var status = await _backendClient.StartTrainingAsync(request, cancellationToken);
+        var status = await _trainingClient.StartTrainingAsync(request, cancellationToken);
 
         TrainingJobs.Insert(0, status);
         SelectedTrainingJob = status;
@@ -664,7 +682,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var jobs = await _backendClient.ListTrainingJobsAsync(SelectedProfileId, FilterStatus, cancellationToken);
+        var jobs = await _trainingClient.ListTrainingJobsAsync(SelectedProfileId, FilterStatus, cancellationToken);
 
         TrainingJobs.Clear();
         foreach (var job in jobs.OrderByDescending(j => j.Started ?? DateTime.MinValue))
@@ -712,7 +730,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        await _backendClient.CancelTrainingAsync(job.Id, cancellationToken);
+        await _trainingClient.CancelTrainingAsync(job.Id, cancellationToken);
 
         // Reload jobs to get updated status
         await LoadTrainingJobsAsync(cancellationToken);
@@ -746,7 +764,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        await _backendClient.DeleteTrainingJobAsync(job.Id, cancellationToken);
+        await _trainingClient.DeleteTrainingJobAsync(job.Id, cancellationToken);
 
         TrainingJobs.Remove(job);
 
@@ -777,7 +795,8 @@ namespace VoiceStudio.App.Views.Panels
 
     private async Task LoadLogsAsync(CancellationToken cancellationToken)
     {
-      if (SelectedTrainingJob == null)
+      var job = SelectedTrainingJob;
+      if (job == null)
         return;
 
       IsLoading = true;
@@ -785,7 +804,11 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var logs = await _backendClient.GetTrainingLogsAsync(SelectedTrainingJob.Id, limit: 100, cancellationToken);
+        var logs = await _trainingClient.GetTrainingLogsAsync(job.Id, limit: 100, cancellationToken);
+
+        // Staleness guard: selection may have changed during await
+        if (SelectedTrainingJob?.Id != job.Id)
+          return;
 
         TrainingLogs.Clear();
         foreach (var log in logs.OrderBy(l => l.Timestamp))
@@ -811,7 +834,8 @@ namespace VoiceStudio.App.Views.Panels
     // Quality monitoring methods (IDEA 54)
     private async Task LoadQualityHistoryAsync(CancellationToken cancellationToken)
     {
-      if (SelectedTrainingJob == null)
+      var job = SelectedTrainingJob;
+      if (job == null)
         return;
 
       IsLoadingQualityHistory = true;
@@ -819,7 +843,11 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var history = await _backendClient.GetTrainingQualityHistoryAsync(SelectedTrainingJob.Id, limit: 100, cancellationToken);
+        var history = await _trainingClient.GetTrainingQualityHistoryAsync(job.Id, limit: 100, cancellationToken);
+
+        // Staleness guard: selection may have changed during await
+        if (SelectedTrainingJob?.Id != job.Id)
+          return;
 
         QualityHistory.Clear();
         foreach (var metrics in history.OrderBy(m => m.Epoch))
@@ -1087,7 +1115,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           if (SelectedTrainingJob != null && (SelectedTrainingJob.Status == "running" || SelectedTrainingJob.Status == "pending"))
           {
-            var updatedStatus = await _backendClient.GetTrainingStatusAsync(SelectedTrainingJob.Id, cancellationToken);
+            var updatedStatus = await _trainingClient.GetTrainingStatusAsync(SelectedTrainingJob.Id, cancellationToken);
 
             // Update in collection
             var index = TrainingJobs.IndexOf(SelectedTrainingJob);
@@ -1364,5 +1392,18 @@ namespace VoiceStudio.App.Views.Panels
     }
 
     #endregion
+
+    protected override void Dispose(bool disposing)
+    {
+      if (disposing)
+      {
+        _disposalCts.Cancel();
+        _disposalCts.Dispose();
+        _selectedJobLoadCts?.Cancel();
+        _selectedJobLoadCts?.Dispose();
+        _selectedJobLoadCts = null;
+      }
+      base.Dispose(disposing);
+    }
   }
 }

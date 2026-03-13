@@ -2,9 +2,9 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml;
 using VoiceStudio.App.Services;
-using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.ViewModels;
 using System;
+using System.Threading;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -16,27 +16,26 @@ namespace VoiceStudio.App.Views.Panels
     public EmotionControlViewModel ViewModel { get; }
     private ContextMenuService? _contextMenuService;
     private ToastNotificationService? _toastService;
-    private UndoRedoService? _undoRedoService;
 
     public EmotionControlView()
     {
       this.InitializeComponent();
       ViewModel = new EmotionControlViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient()
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IEmotionControlClient>(),
+          AppServices.GetRequiredService<IDialogService>()
       );
       DataContext = ViewModel;
 
       // Initialize services
       _contextMenuService = ServiceProvider.GetContextMenuService();
       _toastService = ServiceProvider.GetToastNotificationService();
-      _undoRedoService = ServiceProvider.GetUndoRedoService();
 
       // Add keyboard navigation
       this.KeyDown += EmotionControlView_KeyDown;
 
-      // Setup keyboard navigation
-      this.Loaded += EmotionControlView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and initial data load (ADR-047: no constructor fire-and-forget)
+      this.Loaded += EmotionControlView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -206,43 +205,21 @@ namespace VoiceStudio.App.Views.Panels
         switch (action.ToLower())
         {
           case "load":
-            ViewModel.SelectedPreset = (preset as EmotionControlPresetItem);
+            ViewModel.SelectedPreset = preset as EmotionControlPresetItem;
+            ViewModel.LoadPresetCommand.Execute(null);
             _toastService?.ShowToast(ToastType.Info, "Load Preset", "Preset loaded");
             break;
           case "duplicate":
-            DuplicatePreset(preset);
+            if (preset is EmotionControlPresetItem dupPreset)
+            {
+              await ViewModel.DuplicatePresetAsync(dupPreset, CancellationToken.None);
+              _toastService?.ShowToast(ToastType.Success, "Duplicated", "Preset duplicated");
+            }
             break;
           case "delete":
-            var dialog = new ContentDialog
+            if (preset is EmotionControlPresetItem delPreset)
             {
-              Title = "Delete Preset",
-              Content = "Are you sure you want to delete this emotion preset? This action cannot be undone.",
-              PrimaryButtonText = "Delete",
-              CloseButtonText = "Cancel",
-              DefaultButton = ContentDialogButton.Close,
-              XamlRoot = this.XamlRoot
-            };
-
-            var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Primary)
-            {
-              var presetToDelete = preset as EmotionControlPresetItem;
-              if (presetToDelete == null) break;
-              
-              var presetIndex = ViewModel.Presets.IndexOf(presetToDelete);
-              ViewModel.Presets.Remove(presetToDelete);
-
-              // Register undo action
-              if (_undoRedoService != null && presetIndex >= 0)
-              {
-                var actionObj = new SimpleAction(
-                    "Delete Emotion Preset",
-                    () => ViewModel.Presets.Insert(presetIndex, presetToDelete),
-                    () => ViewModel.Presets.Remove(presetToDelete));
-                _undoRedoService.RegisterAction(actionObj);
-              }
-
-              _toastService?.ShowToast(ToastType.Success, "Deleted", "Emotion preset deleted");
+              await ViewModel.DeletePresetWithConfirmationAsync(delPreset, CancellationToken.None);
             }
             break;
         }
@@ -253,47 +230,11 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    private void DuplicatePreset(object preset)
+    private async void EmotionControlView_Loaded(object sender, RoutedEventArgs e)
     {
-      if (preset is EmotionControlPresetItem originalPreset)
-      {
-        try
-        {
-          // Set ViewModel properties to match original preset
-          ViewModel.SelectedPrimaryEmotion = originalPreset.PrimaryEmotion;
-          ViewModel.PrimaryIntensity = originalPreset.PrimaryIntensity;
-          ViewModel.SelectedSecondaryEmotion = originalPreset.SecondaryEmotion;
-          ViewModel.SecondaryIntensity = originalPreset.SecondaryIntensity;
-          ViewModel.EnableBlending = !string.IsNullOrEmpty(originalPreset.SecondaryEmotion);
-
-          // Create duplicate preset via ViewModel's SavePresetCommand with modified name
-          var originalName = ViewModel.NewPresetName;
-          var originalDesc = ViewModel.NewPresetDescription;
-          ViewModel.NewPresetName = $"{originalPreset.Name} (Copy)";
-          ViewModel.NewPresetDescription = originalPreset.Description;
-
-          if (ViewModel.SavePresetCommand.CanExecute(null))
-          {
-            ViewModel.SavePresetCommand.Execute(null);
-            _toastService?.ShowToast(ToastType.Success, "Duplicated", "Preset duplicated");
-          }
-          else
-          {
-            ViewModel.NewPresetName = originalName;
-            ViewModel.NewPresetDescription = originalDesc;
-            _toastService?.ShowToast(ToastType.Warning, "Duplicate", "Cannot duplicate preset - missing required fields");
-          }
-        }
-        catch (Exception ex)
-        {
-          _toastService?.ShowToast(ToastType.Error, "Duplicate Failed", ex.Message);
-        }
-      }
-    }
-
-    private void EmotionControlView_KeyboardNavigation_Loaded(object sender, RoutedEventArgs e)
-    {
+      this.Loaded -= EmotionControlView_Loaded;
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      await ViewModel.InitializeAsync(CancellationToken.None);
     }
   }
 }

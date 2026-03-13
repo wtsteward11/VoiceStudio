@@ -14,7 +14,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class TrackStore:
                 raise
 
         logger.debug(f"Track saved: {track_id} in project {project_id}")
-        return track_id
+        return str(track_id)
 
     def get_track(self, project_id: str, track_id: str) -> dict[str, Any] | None:
         """Get a track by ID from a project."""
@@ -74,7 +74,7 @@ class TrackStore:
 
         try:
             with open(track_file, encoding="utf-8") as f:
-                return json.load(f)
+                return cast(dict[str, Any], json.load(f))
         except (json.JSONDecodeError, OSError) as exc:
             logger.warning(f"Failed to load track {track_id}: {exc}")
             return None

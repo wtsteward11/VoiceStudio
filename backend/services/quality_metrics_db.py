@@ -132,7 +132,7 @@ class QualityMetricsDatabase:
             self._cleanup_if_needed(conn)
         finally:
             conn.close()
-        return entry_id
+        return str(entry_id)
 
     def _cleanup_if_needed(self, conn: sqlite3.Connection) -> None:
         """Enforce per-profile and total entry limits by removing oldest rows."""
@@ -284,7 +284,7 @@ class QualityMetricsDatabase:
 
     @staticmethod
     def _row_to_entry(
-        row: tuple,
+        row: tuple[Any, ...],
     ) -> dict[str, Any]:
         (
             id_,

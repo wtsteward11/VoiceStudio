@@ -117,6 +117,29 @@ namespace VoiceStudio.App.Services
       // Project audio facade (Timeline hardening Phase 3)
       services.AddSingleton<IProjectAudioClient, ProjectAudioClient>();
 
+      // Emotion/style control facade (Mid-Stage Architecture Compression Task 2.1)
+      services.AddSingleton<IEmotionStyleClient, EmotionStyleClient>();
+
+      // Emotion control facade (Mypy Reassess and Architecture Pivot Plan Phase 2)
+      services.AddSingleton<IEmotionControlClient, EmotionControlClient>();
+
+      // Preset library facade (PresetLibraryViewModel hardening)
+      services.AddSingleton<IPresetLibraryClient>(sp => new PresetLibraryClient(
+          sp.GetRequiredService<IBackendClient>(),
+          sp.GetService<IRequestCoordinator>()));
+
+      // SSML facade (SSMLControlViewModel hardening)
+      services.AddSingleton<ISSMLClient, SSMLClient>();
+
+      // Quality control facade (QualityControlViewModel hardening)
+      services.AddSingleton<IQualityControlClient, QualityControlClient>();
+
+      // Transcription facade (TranscribeViewModel hardening)
+      services.AddSingleton<ITranscriptionClient, TranscriptionClient>();
+
+      // Training facade (TrainingViewModel hardening)
+      services.AddSingleton<ITrainingClient, TrainingClient>();
+
       // Audio visualization facade (Timeline hardening Phase 4)
       services.AddSingleton<IAudioVisualizationService, AudioVisualizationService>();
 

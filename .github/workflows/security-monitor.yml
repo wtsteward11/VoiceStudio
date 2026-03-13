@@ -47,11 +47,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Set up Python with pip cache
+        uses: ./.github/actions/setup-python-pip
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          
+          cache-mode: requirements
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -161,11 +162,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Set up Python with pip cache
+        uses: ./.github/actions/setup-python-pip
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          
+          cache-mode: requirements
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

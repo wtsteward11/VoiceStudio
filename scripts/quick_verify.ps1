@@ -1,6 +1,9 @@
 # VoiceStudio Quick Verification Script
 # 30-second local verification before commit
 #
+# PREFER: .\scripts\verify.ps1 -Quick (canonical; includes gates)
+# This script is a lighter alternative when verify.ps1 is slow.
+#
 # Usage:
 #   .\scripts\quick_verify.ps1
 #   .\scripts\quick_verify.ps1 -SkipBuild

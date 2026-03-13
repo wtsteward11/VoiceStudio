@@ -20,8 +20,9 @@ namespace VoiceStudio.App.Views.Panels
   /// </summary>
   public partial class QualityBenchmarkViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IQualityControlClient _qualityClient;
     private readonly IProfilesClient _profilesClient;
+    private bool _isInitialized;
 
     public string PanelId => "quality_benchmark";
     public string DisplayName => ResourceHelper.GetString("Panel.QualityBenchmarking.DisplayName", "Quality Benchmarking");
@@ -79,10 +80,10 @@ namespace VoiceStudio.App.Views.Panels
 
     public IAsyncRelayCommand RunBenchmarkCommand { get; }
 
-    public QualityBenchmarkViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient)
+    public QualityBenchmarkViewModel(IViewModelContext context, IQualityControlClient qualityClient, IProfilesClient profilesClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _qualityClient = qualityClient ?? throw new ArgumentNullException(nameof(qualityClient));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
       RunBenchmarkCommand = new EnhancedAsyncRelayCommand(async (ct) =>
@@ -90,8 +91,14 @@ namespace VoiceStudio.App.Views.Panels
         using var profiler = PerformanceProfiler.StartCommand("RunBenchmark");
         await RunBenchmarkAsync(ct);
       }, () => CanRunBenchmark);
+    }
 
-      _ = LoadProfilesAsync(CancellationToken.None);
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+      if (_isInitialized)
+        return;
+      _isInitialized = true;
+      await LoadProfilesAsync(cancellationToken);
     }
 
     private async Task LoadProfilesAsync(CancellationToken cancellationToken)
@@ -150,7 +157,7 @@ namespace VoiceStudio.App.Views.Panels
           EnhanceQuality = EnhanceQuality
         };
 
-        var response = await _backendClient.RunBenchmarkAsync(request, cancellationToken);
+        var response = await _qualityClient.RunBenchmarkAsync(request, cancellationToken);
 
         BenchmarkResults.Clear();
         foreach (var result in response.Results)

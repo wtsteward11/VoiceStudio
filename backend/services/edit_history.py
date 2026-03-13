@@ -124,7 +124,7 @@ class EditHistory:
 class AddClipCommand(EditCommand):
     """Add a clip to a track."""
 
-    def __init__(self, track_store, project_id: str, track_id: str, clip_data: dict[str, Any]):
+    def __init__(self, track_store: Any, project_id: str, track_id: str, clip_data: dict[str, Any]) -> None:
         self._store = track_store
         self._project_id = project_id
         self._track_id = track_id
@@ -153,7 +153,7 @@ class AddClipCommand(EditCommand):
 class RemoveClipCommand(EditCommand):
     """Remove a clip from a track."""
 
-    def __init__(self, track_store, project_id: str, track_id: str, clip_id: str):
+    def __init__(self, track_store: Any, project_id: str, track_id: str, clip_id: str) -> None:
         self._store = track_store
         self._project_id = project_id
         self._track_id = track_id
@@ -185,7 +185,7 @@ class RemoveClipCommand(EditCommand):
 class MoveClipCommand(EditCommand):
     """Move a clip to a new position."""
 
-    def __init__(self, track_store, project_id: str, track_id: str, clip_id: str, new_start: float):
+    def __init__(self, track_store: Any, project_id: str, track_id: str, clip_id: str, new_start: float) -> None:
         self._store = track_store
         self._project_id = project_id
         self._track_id = track_id

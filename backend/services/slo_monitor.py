@@ -237,7 +237,7 @@ class SLOMonitor:
             alert_callback: Callback function for new alerts
         """
         self.slos: dict[str, SLODefinition] = {}
-        self._metric_samples: dict[str, deque] = {}
+        self._metric_samples: dict[str, deque[MetricSample]] = {}
         self._alerts: list[SLOAlert] = []
         self._alert_history: list[SLOAlert] = []
         self._lock = threading.Lock()

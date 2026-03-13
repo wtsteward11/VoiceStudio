@@ -21,7 +21,7 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class QualityDashboardViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IQualityControlClient _qualityClient;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly IErrorPresentationService? _errorService;
     private readonly IErrorLoggingService? _logService;
@@ -66,10 +66,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? distributionVisualizationImageUrl;
 
-    public QualityDashboardViewModel(IViewModelContext context, IBackendClient backendClient)
+    public QualityDashboardViewModel(IViewModelContext context, IQualityControlClient qualityClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _qualityClient = qualityClient ?? throw new ArgumentNullException(nameof(qualityClient));
 
       // Get toast notification service using helper (reduces code duplication)
       _toastNotificationService = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetToastNotificationService());
@@ -97,9 +97,21 @@ namespace VoiceStudio.App.ViewModels
         await RefreshAsync(ct);
       }, () => !IsLoading);
 
-      // Load initial data
-      _ = LoadPresetsAsync(CancellationToken.None);
-      _ = LoadOverviewAsync(CancellationToken.None);
+      // Initial data load deferred to InitializeAsync (ADR-047)
+    }
+
+    private bool _isInitialized;
+
+    /// <summary>
+    /// One-shot initialization. Call from View Loaded. Loads presets and overview.
+    /// </summary>
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+      if (_isInitialized)
+        return;
+      _isInitialized = true;
+      await LoadPresetsAsync(cancellationToken);
+      await LoadOverviewAsync(cancellationToken);
     }
 
     public EnhancedAsyncRelayCommand LoadOverviewCommand { get; }
@@ -109,7 +121,7 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSelectedPresetChanged(QualityPresetItem? value)
     {
-      if (value != null)
+      if (value != null && _isInitialized)
       {
         _ = LoadTrendsAsync(CancellationToken.None);
       }
@@ -117,13 +129,19 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSelectedVisualizationTypeChanged(string value)
     {
-      _ = LoadVisualizationsAsync(CancellationToken.None);
+      if (_isInitialized)
+      {
+        _ = LoadVisualizationsAsync(CancellationToken.None);
+      }
     }
 
     partial void OnSelectedTimeRangeChanged(string value)
     {
-      _ = LoadOverviewAsync(CancellationToken.None);
-      _ = LoadVisualizationsAsync(CancellationToken.None);
+      if (_isInitialized)
+      {
+        _ = LoadOverviewAsync(CancellationToken.None);
+        _ = LoadVisualizationsAsync(CancellationToken.None);
+      }
     }
 
     private Task LoadVisualizationsAsync(CancellationToken cancellationToken)
@@ -178,7 +196,7 @@ namespace VoiceStudio.App.ViewModels
         // Try to load dashboard data using the new GetQualityDashboardAsync method
         try
         {
-          var dashboard = await _backendClient.GetQualityDashboardAsync(
+          var dashboard = await _qualityClient.GetQualityDashboardAsync(
               projectId: null,
               days: GetDaysFromTimeRange(SelectedTimeRange),
               cancellationToken
@@ -191,10 +209,10 @@ namespace VoiceStudio.App.ViewModels
             DashboardStatusMessage = ResourceHelper.GetString("QualityDashboard.DataLoadedSuccessfully", "Quality dashboard data loaded successfully.");
           }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
           // Dashboard endpoint returns 501 - not fully implemented
-          // This is expected, so we'll show a message
+          _logService?.LogError(ex, "LoadOverview");
           DashboardAvailable = false;
           DashboardStatusMessage = ResourceHelper.GetString("QualityDashboard.FullDashboardRequiresDB", "Full quality dashboard requires database integration. Showing available quality metrics and presets.");
 
@@ -238,7 +256,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var presets = await _backendClient.GetQualityPresetsAsync(cancellationToken);
+        var presets = await _qualityClient.GetQualityPresetsAsync(cancellationToken);
 
         if (presets?.Count > 0)
         {

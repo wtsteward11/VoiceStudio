@@ -156,12 +156,12 @@ class PhraseEmotionService:
     # Default intensity when not specified
     DEFAULT_INTENSITY = 75.0
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._presets: dict[str, EmotionPreset] = {}
         self._init_default_presets()
         logger.info("PhraseEmotionService initialized")
 
-    def _init_default_presets(self):
+    def _init_default_presets(self) -> None:
         """Initialize default emotion presets."""
         default_presets = [
             EmotionPreset(

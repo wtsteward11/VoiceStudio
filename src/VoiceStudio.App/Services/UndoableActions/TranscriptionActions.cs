@@ -12,7 +12,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteTranscriptionAction : IUndoableAction
   {
     private readonly ObservableCollection<TranscriptionResponse> _transcriptions;
-    private readonly IBackendClient _backendClient;
+    private readonly ITranscriptionClient _transcriptionClient;
     private readonly TranscriptionResponse _transcription;
     private readonly int _originalIndex;
     private readonly Action<TranscriptionResponse>? _onUndo;
@@ -22,14 +22,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteTranscriptionAction(
         ObservableCollection<TranscriptionResponse> transcriptions,
-        IBackendClient backendClient,
+        ITranscriptionClient transcriptionClient,
         TranscriptionResponse transcription,
         int originalIndex,
         Action<TranscriptionResponse>? onUndo = null,
         Action<TranscriptionResponse>? onRedo = null)
     {
       _transcriptions = transcriptions ?? throw new ArgumentNullException(nameof(transcriptions));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _transcriptionClient = transcriptionClient ?? throw new ArgumentNullException(nameof(transcriptionClient));
       _transcription = transcription ?? throw new ArgumentNullException(nameof(transcription));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

@@ -154,15 +154,15 @@ class PersistentStore:
             conn.commit()
             return result
 
-    def keys(self):
+    def keys(self) -> list[str]:
         with self._lock:
             return list(self._cache.keys())
 
-    def values(self):
+    def values(self) -> list[Any]:
         with self._lock:
             return list(self._cache.values())
 
-    def items(self):
+    def items(self) -> list[tuple[str, Any]]:
         with self._lock:
             return list(self._cache.items())
 

@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -273,7 +273,7 @@ class CollaborationService:
         logger.info(f"User {user_id} joined project {project_id}")
         return project
 
-    async def leave_project(self, project_id: str, user_id: str):
+    async def leave_project(self, project_id: str, user_id: str) -> None:
         """Leave a shared project."""
         project = self._shared_projects.get(project_id)
         if not project:
@@ -326,7 +326,7 @@ class CollaborationService:
         project_id: str,
         user_id: str,
         cursor_position: dict[str, Any],
-    ):
+    ) -> None:
         """Update user cursor position for collaborative editing."""
         project = self._shared_projects.get(project_id)
         if not project or user_id not in project.collaborators:
@@ -342,11 +342,11 @@ class CollaborationService:
             {"user_id": user_id, "cursor": cursor_position},
         )
 
-    def subscribe(self, project_id: str, callback: EventCallback):
+    def subscribe(self, project_id: str, callback: EventCallback) -> None:
         """Subscribe to project events."""
         self._subscribers.setdefault(project_id, set()).add(callback)
 
-    def unsubscribe(self, project_id: str, callback: EventCallback):
+    def unsubscribe(self, project_id: str, callback: EventCallback) -> None:
         """Unsubscribe from project events."""
         if project_id in self._subscribers:
             self._subscribers[project_id].discard(callback)
@@ -458,7 +458,7 @@ class CollaborationService:
         output_path: Path,
         project_data: dict[str, Any],
         audio_files: list[Path],
-    ):
+    ) -> None:
         """Export to VoiceStudio format (ZIP with manifest)."""
         with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
             # Add manifest
@@ -482,7 +482,7 @@ class CollaborationService:
         output_path: Path,
         project_data: dict[str, Any],
         audio_files: list[Path],
-    ):
+    ) -> None:
         """Export to standard ZIP archive."""
         with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
             # Add project data
@@ -497,7 +497,7 @@ class CollaborationService:
         self,
         output_path: Path,
         project_data: dict[str, Any],
-    ):
+    ) -> None:
         """Export to JSON only."""
         with open(output_path, "w") as f:
             json.dump(project_data, f, indent=2)
@@ -529,7 +529,7 @@ class CollaborationService:
         with zipfile.ZipFile(file_path, "r") as zf:
             # Read project data
             project_json = zf.read("project.json")
-            project_data = json.loads(project_json)
+            project_data = cast(dict[str, Any], json.loads(project_json))
 
             # Extract audio files to temp directory
             # (In production, extract to proper location)
@@ -539,7 +539,7 @@ class CollaborationService:
     async def _import_json(self, file_path: Path) -> dict[str, Any]:
         """Import from JSON."""
         with open(file_path) as f:
-            return json.load(f)
+            return cast(dict[str, Any], json.load(f))
 
     # ===== Phase 14.3: Sharing =====
 

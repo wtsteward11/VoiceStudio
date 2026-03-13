@@ -1,5 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.Core.Models;
 
 namespace VoiceStudio.App.Tests.ViewModels
 {
@@ -11,35 +12,35 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionPresetCreateRequest_DefaultValues()
         {
-            var request = new EmotionControlViewModel.EmotionPresetCreateRequest();
+            var request = new EmotionPresetCreateRequest();
 
             Assert.AreEqual(string.Empty, request.Name);
             Assert.IsNull(request.Description);
             Assert.AreEqual(string.Empty, request.PrimaryEmotion);
-            Assert.AreEqual(0f, request.PrimaryIntensity);
+            Assert.AreEqual(0.0, request.PrimaryIntensity);
             Assert.IsNull(request.SecondaryEmotion);
-            Assert.AreEqual(0f, request.SecondaryIntensity);
+            Assert.AreEqual(0.0, request.SecondaryIntensity);
         }
 
         [TestMethod]
         public void EmotionPresetCreateRequest_PropertiesSetCorrectly()
         {
-            var request = new EmotionControlViewModel.EmotionPresetCreateRequest
+            var request = new EmotionPresetCreateRequest
             {
                 Name = "Happy Medium",
                 Description = "A moderately happy tone",
                 PrimaryEmotion = "happy",
-                PrimaryIntensity = 70f,
+                PrimaryIntensity = 70.0,
                 SecondaryEmotion = "excited",
-                SecondaryIntensity = 30f
+                SecondaryIntensity = 30.0
             };
 
             Assert.AreEqual("Happy Medium", request.Name);
             Assert.AreEqual("A moderately happy tone", request.Description);
             Assert.AreEqual("happy", request.PrimaryEmotion);
-            Assert.AreEqual(70f, request.PrimaryIntensity);
+            Assert.AreEqual(70.0, request.PrimaryIntensity);
             Assert.AreEqual("excited", request.SecondaryEmotion);
-            Assert.AreEqual(30f, request.SecondaryIntensity);
+            Assert.AreEqual(30.0, request.SecondaryIntensity);
         }
 
         #endregion
@@ -49,15 +50,15 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionPreset_DefaultValues()
         {
-            var preset = new EmotionControlViewModel.EmotionPreset();
+            var preset = new EmotionPreset();
 
             Assert.AreEqual(string.Empty, preset.PresetId);
             Assert.AreEqual(string.Empty, preset.Name);
             Assert.IsNull(preset.Description);
             Assert.AreEqual(string.Empty, preset.PrimaryEmotion);
-            Assert.AreEqual(0f, preset.PrimaryIntensity);
+            Assert.AreEqual(0.0, preset.PrimaryIntensity);
             Assert.IsNull(preset.SecondaryEmotion);
-            Assert.AreEqual(0f, preset.SecondaryIntensity);
+            Assert.AreEqual(0.0, preset.SecondaryIntensity);
             Assert.AreEqual(string.Empty, preset.CreatedAt);
             Assert.AreEqual(string.Empty, preset.UpdatedAt);
         }
@@ -65,15 +66,15 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionPreset_PropertiesSetCorrectly()
         {
-            var preset = new EmotionControlViewModel.EmotionPreset
+            var preset = new EmotionPreset
             {
                 PresetId = "preset123",
                 Name = "Sad Intense",
                 Description = "An intense sad tone",
                 PrimaryEmotion = "sad",
-                PrimaryIntensity = 90f,
+                PrimaryIntensity = 90.0,
                 SecondaryEmotion = "melancholy",
-                SecondaryIntensity = 40f,
+                SecondaryIntensity = 40.0,
                 CreatedAt = "2026-01-01T00:00:00Z",
                 UpdatedAt = "2026-01-02T00:00:00Z"
             };
@@ -82,9 +83,9 @@ namespace VoiceStudio.App.Tests.ViewModels
             Assert.AreEqual("Sad Intense", preset.Name);
             Assert.AreEqual("An intense sad tone", preset.Description);
             Assert.AreEqual("sad", preset.PrimaryEmotion);
-            Assert.AreEqual(90f, preset.PrimaryIntensity);
+            Assert.AreEqual(90.0, preset.PrimaryIntensity);
             Assert.AreEqual("melancholy", preset.SecondaryEmotion);
-            Assert.AreEqual(40f, preset.SecondaryIntensity);
+            Assert.AreEqual(40.0, preset.SecondaryIntensity);
             Assert.AreEqual("2026-01-01T00:00:00Z", preset.CreatedAt);
             Assert.AreEqual("2026-01-02T00:00:00Z", preset.UpdatedAt);
         }
@@ -96,15 +97,15 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionControlPresetItem_CreatedFromEmotionPreset()
         {
-            var preset = new EmotionControlViewModel.EmotionPreset
+            var preset = new EmotionPreset
             {
                 PresetId = "p1",
                 Name = "Test Preset",
                 Description = "Test description",
                 PrimaryEmotion = "anger",
-                PrimaryIntensity = 80f,
+                PrimaryIntensity = 80.0,
                 SecondaryEmotion = "frustration",
-                SecondaryIntensity = 20f,
+                SecondaryIntensity = 20.0,
                 CreatedAt = "2026-01-01",
                 UpdatedAt = "2026-01-02"
             };
@@ -125,7 +126,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionControlPresetItem_PrimaryEmotionDisplay_UpperCase()
         {
-            var preset = new EmotionControlViewModel.EmotionPreset
+            var preset = new EmotionPreset
             {
                 PrimaryEmotion = "happy"
             };
@@ -137,7 +138,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionControlPresetItem_PrimaryEmotionDisplay_MixedCase()
         {
-            var preset = new EmotionControlViewModel.EmotionPreset
+            var preset = new EmotionPreset
             {
                 PrimaryEmotion = "Excited"
             };
@@ -149,9 +150,9 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionControlPresetItem_PrimaryIntensityDisplay_FormatsAsPercent()
         {
-            var preset = new EmotionControlViewModel.EmotionPreset
+            var preset = new EmotionPreset
             {
-                PrimaryIntensity = 75f
+                PrimaryIntensity = 75.0
             };
             var item = new EmotionControlPresetItem(preset);
 
@@ -161,9 +162,9 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionControlPresetItem_PrimaryIntensityDisplay_Zero()
         {
-            var preset = new EmotionControlViewModel.EmotionPreset
+            var preset = new EmotionPreset
             {
-                PrimaryIntensity = 0f
+                PrimaryIntensity = 0.0
             };
             var item = new EmotionControlPresetItem(preset);
 
@@ -173,7 +174,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionControlPresetItem_SecondaryEmotionDisplay_WithSecondary()
         {
-            var preset = new EmotionControlViewModel.EmotionPreset
+            var preset = new EmotionPreset
             {
                 SecondaryEmotion = "calm"
             };
@@ -185,7 +186,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionControlPresetItem_SecondaryEmotionDisplay_NullShowsNone()
         {
-            var preset = new EmotionControlViewModel.EmotionPreset
+            var preset = new EmotionPreset
             {
                 SecondaryEmotion = null
             };
@@ -197,9 +198,9 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionControlPresetItem_SecondaryIntensityDisplay_WithIntensity()
         {
-            var preset = new EmotionControlViewModel.EmotionPreset
+            var preset = new EmotionPreset
             {
-                SecondaryIntensity = 50f
+                SecondaryIntensity = 50.0
             };
             var item = new EmotionControlPresetItem(preset);
 
@@ -209,9 +210,9 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionControlPresetItem_SecondaryIntensityDisplay_ZeroShowsZero()
         {
-            var preset = new EmotionControlViewModel.EmotionPreset
+            var preset = new EmotionPreset
             {
-                SecondaryIntensity = 0f
+                SecondaryIntensity = 0.0
             };
             var item = new EmotionControlPresetItem(preset);
 
@@ -221,7 +222,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionControlPresetItem_BlendingDisplay_WithSecondary()
         {
-            var preset = new EmotionControlViewModel.EmotionPreset
+            var preset = new EmotionPreset
             {
                 PrimaryEmotion = "happy",
                 SecondaryEmotion = "excited"
@@ -234,7 +235,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EmotionControlPresetItem_BlendingDisplay_WithoutSecondary()
         {
-            var preset = new EmotionControlViewModel.EmotionPreset
+            var preset = new EmotionPreset
             {
                 PrimaryEmotion = "sad",
                 SecondaryEmotion = null

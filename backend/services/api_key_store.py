@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def load_api_keys() -> dict[str, dict[str, Any]]:
 
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        return data.get("keys", {})
+        return cast(dict[str, dict[str, Any]], data.get("keys", {}))
     except (json.JSONDecodeError, OSError) as e:
         logger.warning("Failed to load API keys from %s: %s", path, e)
         return {}

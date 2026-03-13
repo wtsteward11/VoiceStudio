@@ -13,7 +13,7 @@ import logging
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 def _stats_path() -> Path:
     from backend.config.path_config import get_path
 
-    return get_path("data") / "usage_stats.json"
+    return cast(Path, get_path("data")) / "usage_stats.json"
 
 
 _LOCK = threading.Lock()
-_DEFAULT = {
+_DEFAULT: dict[str, Any] = {
     "synthesis_minutes": 0.0,
     "exports_completed": 0,
     "models_downloaded": 0,
@@ -34,14 +34,14 @@ _DEFAULT = {
 }
 
 
-def _load() -> dict:
+def _load() -> dict[str, Any]:
     path = _stats_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists():
         return _DEFAULT.copy()
     try:
         with open(path, encoding="utf-8") as f:
-            data = json.load(f)
+            data = cast(dict[str, Any], json.load(f))
         for k in _DEFAULT:
             if k not in data and k != "last_updated":
                 data[k] = _DEFAULT[k]
@@ -51,7 +51,7 @@ def _load() -> dict:
         return _DEFAULT.copy()
 
 
-def _save(data: dict) -> None:
+def _save(data: dict[str, Any]) -> None:
     data["last_updated"] = datetime.now(timezone.utc).isoformat()
     path = _stats_path()
     path.parent.mkdir(parents=True, exist_ok=True)

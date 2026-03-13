@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
@@ -19,8 +20,10 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class EmotionControlViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IEmotionControlClient _emotionControlClient;
+    private readonly IDialogService? _dialogService;
     private readonly UndoRedoService? _undoRedoService;
+    private bool _isInitialized;
 
     public string PanelId => "emotion-control";
     public string DisplayName => ResourceHelper.GetString("Panel.EmotionControl.DisplayName", "Emotion Control");
@@ -77,19 +80,20 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? statusMessage;
 
-    public EmotionControlViewModel(IViewModelContext context, IBackendClient backendClient)
+    public EmotionControlViewModel(IViewModelContext context, IEmotionControlClient emotionControlClient, IDialogService? dialogService = null)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _emotionControlClient = emotionControlClient ?? throw new ArgumentNullException(nameof(emotionControlClient));
+      _dialogService = dialogService ?? AppServices.GetService<IDialogService>();
 
       // Get undo/redo service (may be null if not initialized)
       try
       {
         _undoRedoService = AppServices.TryGetUndoRedoService();
       }
-      catch
+      catch (Exception ex)
       {
-        // Service may not be initialized yet - that's okay
+        System.Diagnostics.Debug.WriteLine($"[EmotionControlViewModel] UndoRedoService not available: {ex.Message}");
         _undoRedoService = null;
       }
 
@@ -133,10 +137,21 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = Profiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
+    }
 
-      // Load initial data
-      _ = LoadEmotionsAsync(CancellationToken.None);
-      _ = LoadPresetsAsync(CancellationToken.None);
+    /// <summary>
+    /// Initialize panel data. Call from view Loaded event (ADR-047).
+    /// </summary>
+    public async Task InitializeAsync(CancellationToken ct = default)
+    {
+      if (_isInitialized)
+      {
+        return;
+      }
+
+      _isInitialized = true;
+      await LoadEmotionsAsync(ct).ConfigureAwait(false);
+      await LoadPresetsAsync(ct).ConfigureAwait(false);
     }
 
     public IAsyncRelayCommand LoadEmotionsCommand { get; }
@@ -193,16 +208,11 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var emotions = await _backendClient.SendRequestAsync<object, string[]>(
-            "/api/emotion/list",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var emotions = await _emotionControlClient.GetAvailableEmotionsAsync(cancellationToken).ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (emotions != null)
+        if (emotions != null && emotions.Length > 0)
         {
           AvailableEmotions.Clear();
           foreach (var emotion in emotions)
@@ -240,19 +250,14 @@ namespace VoiceStudio.App.ViewModels
       {
         var request = new EmotionApplyExtendedRequest
         {
-          AudioId = TargetAudioId,
-          PrimaryEmotion = SelectedPrimaryEmotion,
+          AudioId = TargetAudioId ?? string.Empty,
+          PrimaryEmotion = SelectedPrimaryEmotion ?? string.Empty,
           PrimaryIntensity = (float)PrimaryIntensity,
           SecondaryEmotion = EnableBlending ? SelectedSecondaryEmotion : null,
           SecondaryIntensity = EnableBlending ? (float)SecondaryIntensity : 0.0f
         };
 
-        await _backendClient.SendRequestAsync<EmotionApplyExtendedRequest, object>(
-            "/api/emotion/apply-extended",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _emotionControlClient.ApplyEmotionAsync(request, cancellationToken).ConfigureAwait(false);
 
         StatusMessage = ResourceHelper.GetString("EmotionControl.EmotionApplied", "Emotion applied successfully");
       }
@@ -284,19 +289,14 @@ namespace VoiceStudio.App.ViewModels
       {
         var request = new EmotionApplyExtendedRequest
         {
-          AudioId = TargetAudioId,
-          PrimaryEmotion = SelectedPrimaryEmotion,
+          AudioId = TargetAudioId ?? string.Empty,
+          PrimaryEmotion = SelectedPrimaryEmotion ?? string.Empty,
           PrimaryIntensity = (float)PrimaryIntensity,
           SecondaryEmotion = EnableBlending ? SelectedSecondaryEmotion : null,
           SecondaryIntensity = EnableBlending ? (float)SecondaryIntensity : 0.0f
         };
 
-        var response = await _backendClient.SendRequestAsync<EmotionApplyExtendedRequest, EmotionPreviewResponse>(
-            "/api/emotion/preview",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _emotionControlClient.PreviewEmotionAsync(request, cancellationToken).ConfigureAwait(false);
 
         if (response != null)
         {
@@ -326,16 +326,11 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var presets = await _backendClient.SendRequestAsync<object, EmotionPreset[]>(
-            "/api/emotion/preset/list",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var presets = await _emotionControlClient.GetPresetsAsync(cancellationToken).ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (presets != null)
+        if (presets != null && presets.Length > 0)
         {
           Presets.Clear();
           foreach (var preset in presets)
@@ -373,20 +368,15 @@ namespace VoiceStudio.App.ViewModels
       {
         var request = new EmotionPresetCreateRequest
         {
-          Name = NewPresetName,
+          Name = NewPresetName ?? string.Empty,
           Description = NewPresetDescription,
-          PrimaryEmotion = SelectedPrimaryEmotion,
-          PrimaryIntensity = (float)PrimaryIntensity,
+          PrimaryEmotion = SelectedPrimaryEmotion ?? string.Empty,
+          PrimaryIntensity = PrimaryIntensity,
           SecondaryEmotion = EnableBlending ? SelectedSecondaryEmotion : null,
-          SecondaryIntensity = EnableBlending ? (float)SecondaryIntensity : 0.0f
+          SecondaryIntensity = EnableBlending ? SecondaryIntensity : 0.0
         };
 
-        var preset = await _backendClient.SendRequestAsync<EmotionPresetCreateRequest, EmotionPreset>(
-            "/api/emotion/preset/save",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var preset = await _emotionControlClient.CreatePresetAsync(request, cancellationToken).ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -400,7 +390,6 @@ namespace VoiceStudio.App.ViewModels
           {
             var action = new CreateEmotionPresetAction(
                 Presets,
-                _backendClient,
                 presetItem,
                 onUndo: (p) =>
                 {
@@ -473,6 +462,47 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
+    /// <summary>
+    /// Shows confirmation dialog and deletes preset via backend if confirmed.
+    /// </summary>
+    public async Task DeletePresetWithConfirmationAsync(EmotionControlPresetItem preset, CancellationToken ct = default)
+    {
+      if (_dialogService == null)
+      {
+        SelectedPreset = preset;
+        await DeletePresetAsync(ct).ConfigureAwait(false);
+        return;
+      }
+
+      var confirmed = await _dialogService.ShowConfirmationAsync(
+          ResourceHelper.GetString("EmotionControl.DeletePreset.Title", "Delete Preset"),
+          ResourceHelper.GetString("EmotionControl.DeletePreset.Message", "Are you sure you want to delete this emotion preset? This action cannot be undone."),
+          ResourceHelper.GetString("EmotionControl.DeletePreset.Confirm", "Delete"),
+          ResourceHelper.GetString("EmotionControl.DeletePreset.Cancel", "Cancel")).ConfigureAwait(false);
+
+      if (confirmed)
+      {
+        SelectedPreset = preset;
+        await DeletePresetAsync(ct).ConfigureAwait(false);
+      }
+    }
+
+    /// <summary>
+    /// Duplicates a preset by copying its values to the form and saving as a new preset.
+    /// </summary>
+    public async Task DuplicatePresetAsync(EmotionControlPresetItem preset, CancellationToken ct = default)
+    {
+      SelectedPrimaryEmotion = preset.PrimaryEmotion;
+      PrimaryIntensity = preset.PrimaryIntensity;
+      SelectedSecondaryEmotion = preset.SecondaryEmotion;
+      SecondaryIntensity = preset.SecondaryIntensity;
+      EnableBlending = !string.IsNullOrEmpty(preset.SecondaryEmotion);
+      NewPresetName = $"{preset.Name} (Copy)";
+      NewPresetDescription = preset.Description;
+
+      await SavePresetAsync(ct).ConfigureAwait(false);
+    }
+
     private async Task DeletePresetAsync(CancellationToken cancellationToken)
     {
       if (SelectedPreset == null)
@@ -485,12 +515,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/emotion/preset/{Uri.EscapeDataString(SelectedPreset.PresetId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _emotionControlClient.DeletePresetAsync(SelectedPreset.PresetId, cancellationToken).ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -504,7 +529,6 @@ namespace VoiceStudio.App.ViewModels
         {
           var action = new DeleteEmotionPresetAction(
               Presets,
-              _backendClient,
               presetToDelete,
               originalIndex,
               onUndo: (p) => SelectedPreset = p,
@@ -551,45 +575,6 @@ namespace VoiceStudio.App.ViewModels
         await HandleErrorAsync(ex, "Refresh");
       }
     }
-
-    // Request/Response models
-    private class EmotionApplyExtendedRequest
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public string PrimaryEmotion { get; set; } = string.Empty;
-      public float PrimaryIntensity { get; set; }
-      public string? SecondaryEmotion { get; set; }
-      public float SecondaryIntensity { get; set; }
-    }
-
-    public class EmotionPresetCreateRequest
-    {
-      public string Name { get; set; } = string.Empty;
-      public string? Description { get; set; }
-      public string PrimaryEmotion { get; set; } = string.Empty;
-      public float PrimaryIntensity { get; set; }
-      public string? SecondaryEmotion { get; set; }
-      public float SecondaryIntensity { get; set; }
-    }
-
-    public class EmotionPreset
-    {
-      public string PresetId { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public string? Description { get; set; }
-      public string PrimaryEmotion { get; set; } = string.Empty;
-      public float PrimaryIntensity { get; set; }
-      public string? SecondaryEmotion { get; set; }
-      public float SecondaryIntensity { get; set; }
-      public string CreatedAt { get; set; } = string.Empty;
-      public string UpdatedAt { get; set; } = string.Empty;
-    }
-
-    private class EmotionPreviewResponse
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public string Message { get; set; } = string.Empty;
-    }
   }
 
   // Data models
@@ -611,15 +596,15 @@ namespace VoiceStudio.App.ViewModels
     public string SecondaryIntensityDisplay => SecondaryIntensity > 0 ? $"{SecondaryIntensity:F0}%" : "0%";
     public string BlendingDisplay => SecondaryEmotion != null ? $"{PrimaryEmotionDisplay} + {SecondaryEmotionDisplay}" : PrimaryEmotionDisplay;
 
-    public EmotionControlPresetItem(EmotionControlViewModel.EmotionPreset preset)
+    public EmotionControlPresetItem(EmotionPreset preset)
     {
       PresetId = preset.PresetId;
       Name = preset.Name;
       Description = preset.Description;
       PrimaryEmotion = preset.PrimaryEmotion;
-      PrimaryIntensity = preset.PrimaryIntensity;
+      PrimaryIntensity = (float)preset.PrimaryIntensity;
       SecondaryEmotion = preset.SecondaryEmotion;
-      SecondaryIntensity = preset.SecondaryIntensity;
+      SecondaryIntensity = (float)preset.SecondaryIntensity;
       CreatedAt = preset.CreatedAt;
       UpdatedAt = preset.UpdatedAt;
     }

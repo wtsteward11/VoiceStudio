@@ -20,11 +20,13 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class SSMLControlViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ISSMLClient _ssmlClient;
+    private readonly IDialogService? _dialogService;
     private readonly IAudioPlayerService _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly UndoRedoService? _undoRedoService;
     private readonly string _backendBaseUrl;
+    private bool _isInitialized;
 
     public string PanelId => "ssml-control";
     public string DisplayName => ResourceHelper.GetString("Panel.SSMLControl.DisplayName", "SSML Editor");
@@ -120,11 +122,12 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    public SSMLControlViewModel(IViewModelContext context, IBackendClient backendClient, IAudioPlayerService audioPlayer)
+    public SSMLControlViewModel(IViewModelContext context, ISSMLClient ssmlClient, IAudioPlayerService audioPlayer, IDialogService? dialogService = null)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _ssmlClient = ssmlClient ?? throw new ArgumentNullException(nameof(ssmlClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
+      _dialogService = dialogService ?? AppServices.GetService<IDialogService>();
 
       _backendBaseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
           ?? "http://localhost:8000";
@@ -135,9 +138,9 @@ namespace VoiceStudio.App.ViewModels
         _toastNotificationService = AppServices.TryGetToastNotificationService();
         _undoRedoService = AppServices.TryGetUndoRedoService();
       }
-      catch
+      catch (Exception ex)
       {
-        // Services may not be initialized yet - that's okay
+        System.Diagnostics.Debug.WriteLine($"[SSMLControlViewModel] Services not available: {ex.Message}");
         _toastNotificationService = null;
         _undoRedoService = null;
       }
@@ -193,8 +196,20 @@ namespace VoiceStudio.App.ViewModels
           PlayCommand.NotifyCanExecuteChanged();
       };
 
-      // Load initial data
-      _ = LoadDocumentsAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Initialize panel data. Call from view Loaded event (ADR-047).
+    /// </summary>
+    public async Task InitializeAsync(CancellationToken ct = default)
+    {
+      if (_isInitialized)
+      {
+        return;
+      }
+
+      _isInitialized = true;
+      await LoadDocumentsAsync(ct).ConfigureAwait(false);
     }
 
     public IAsyncRelayCommand LoadDocumentsCommand { get; }
@@ -220,28 +235,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (!string.IsNullOrEmpty(SelectedProjectId))
-          queryParams.Add("project_id", SelectedProjectId);
-        if (!string.IsNullOrEmpty(SelectedProfileId))
-          queryParams.Add("profile_id", SelectedProfileId);
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/ssml";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var documents = await _backendClient.SendRequestAsync<object, SSMLDocument[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var documents = await _ssmlClient.GetDocumentsAsync(SelectedProjectId, SelectedProfileId, cancellationToken).ConfigureAwait(false);
 
         Documents.Clear();
         if (documents != null)
@@ -279,20 +273,15 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new SSMLCreateRequest
         {
-          name = ResourceHelper.GetString("SSMLControl.NewDocument", "New SSML Document"),
-          content = SSMLContent,
-          profile_id = SelectedProfileId,
-          project_id = SelectedProjectId
+          Name = ResourceHelper.GetString("SSMLControl.NewDocument", "New SSML Document"),
+          Content = SSMLContent,
+          ProfileId = SelectedProfileId,
+          ProjectId = SelectedProjectId
         };
 
-        var created = await _backendClient.SendRequestAsync<object, SSMLDocument>(
-            "/api/ssml",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var created = await _ssmlClient.CreateDocumentAsync(request, cancellationToken).ConfigureAwait(false);
 
         if (created != null)
         {
@@ -309,7 +298,6 @@ namespace VoiceStudio.App.ViewModels
           {
             var action = new CreateSSMLDocumentAction(
                 Documents,
-                _backendClient,
                 documentItem,
                 onUndo: (d) =>
                 {
@@ -350,19 +338,14 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new SSMLUpdateRequest
         {
-          name = document.Name,
-          content = SSMLContent,
-          profile_id = SelectedProfileId
+          Name = document.Name,
+          Content = SSMLContent,
+          ProfileId = SelectedProfileId
         };
 
-        var updated = await _backendClient.SendRequestAsync<object, SSMLDocument>(
-            $"/api/ssml/{document.Id}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var updated = await _ssmlClient.UpdateDocumentAsync(document.Id, request, cancellationToken).ConfigureAwait(false);
 
         if (updated != null)
         {
@@ -392,6 +375,29 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
+    /// <summary>
+    /// Shows confirmation dialog and deletes document via backend if confirmed.
+    /// </summary>
+    public async Task DeleteDocumentWithConfirmationAsync(SSMLDocumentItem document, CancellationToken ct = default)
+    {
+      if (_dialogService == null)
+      {
+        await DeleteDocumentAsync(document, ct).ConfigureAwait(false);
+        return;
+      }
+
+      var confirmed = await _dialogService.ShowConfirmationAsync(
+          ResourceHelper.GetString("SSMLControl.DeleteDocument.Title", "Delete Document"),
+          ResourceHelper.GetString("SSMLControl.DeleteDocument.Message", "Are you sure you want to delete this SSML document? This action cannot be undone."),
+          ResourceHelper.GetString("SSMLControl.DeleteDocument.Confirm", "Delete"),
+          ResourceHelper.GetString("SSMLControl.DeleteDocument.Cancel", "Cancel")).ConfigureAwait(false);
+
+      if (confirmed)
+      {
+        await DeleteDocumentAsync(document, ct).ConfigureAwait(false);
+      }
+    }
+
     private async Task DeleteDocumentAsync(SSMLDocumentItem? document, CancellationToken cancellationToken)
     {
       if (document == null)
@@ -402,12 +408,9 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/ssml/{document.Id}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _ssmlClient.DeleteDocumentAsync(document.Id, cancellationToken).ConfigureAwait(false);
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         var documentToDelete = document;
         var originalIndex = Documents.IndexOf(documentToDelete);
@@ -422,7 +425,6 @@ namespace VoiceStudio.App.ViewModels
         {
           var action = new DeleteSSMLDocumentAction(
               Documents,
-              _backendClient,
               documentToDelete,
               originalIndex,
               onUndo: (d) => SelectedDocument = d,
@@ -466,18 +468,10 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          name = ResourceHelper.GetString("SSMLControl.ValidationDocument", "Validation"),
-          content = SSMLContent
-        };
-
-        var response = await _backendClient.SendRequestAsync<object, SSMLValidateResponse>(
-            "/api/ssml/validate",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _ssmlClient.ValidateAsync(
+            SSMLContent,
+            ResourceHelper.GetString("SSMLControl.ValidationDocument", "Validation"),
+            cancellationToken).ConfigureAwait(false);
 
         if (response != null)
         {
@@ -485,14 +479,20 @@ namespace VoiceStudio.App.ViewModels
           ValidationErrors.Clear();
           ValidationWarnings.Clear();
 
-          foreach (var error in response.Errors)
+          if (response.Errors != null)
           {
-            ValidationErrors.Add(error);
+            foreach (var error in response.Errors)
+            {
+              ValidationErrors.Add(error);
+            }
           }
 
-          foreach (var warning in response.Warnings)
+          if (response.Warnings != null)
           {
-            ValidationWarnings.Add(warning);
+            foreach (var warning in response.Warnings)
+            {
+              ValidationWarnings.Add(warning);
+            }
           }
 
           StatusMessage = response.Valid
@@ -507,7 +507,7 @@ namespace VoiceStudio.App.ViewModels
           else
           {
             _toastNotificationService?.ShowWarning(
-                ResourceHelper.FormatString("SSMLControl.ValidationFailedDetail", response.Errors.Length),
+                ResourceHelper.FormatString("SSMLControl.ValidationFailedDetail", response.Errors?.Length ?? 0),
                 ResourceHelper.GetString("Toast.Title.ValidationFailed", "Validation Failed"));
           }
         }
@@ -542,19 +542,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
-        {
-          content = SSMLContent,
-          profile_id = SelectedProfileId,
-          engine = (string?)null
-        };
-
-        var response = await _backendClient.SendRequestAsync<object, SSMLPreviewResponse>(
-            "/api/ssml/preview",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _ssmlClient.PreviewAsync(SSMLContent, SelectedProfileId, null, cancellationToken).ConfigureAwait(false);
 
         StatusMessage = response?.Message ?? ResourceHelper.GetString("SSMLControl.PreviewSynthesized", "Preview synthesized");
         _toastNotificationService?.ShowSuccess(
@@ -642,21 +630,6 @@ namespace VoiceStudio.App.ViewModels
       PlayCommand.NotifyCanExecuteChanged();
     }
 
-    // Response models
-    private class SSMLValidateResponse
-    {
-      public bool Valid { get; set; }
-      public string[] Errors { get; set; } = Array.Empty<string>();
-      public string[] Warnings { get; set; } = Array.Empty<string>();
-    }
-
-    public class SSMLPreviewResponse
-    {
-      [System.Text.Json.Serialization.JsonPropertyName("audio_id")]
-      public string AudioId { get; set; } = string.Empty;
-      public double Duration { get; set; }
-      public string Message { get; set; } = string.Empty;
-    }
   }
 
   // Data models

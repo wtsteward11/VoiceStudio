@@ -11,6 +11,8 @@
 
 This guide documents the architectural foundation patterns implemented in VoiceStudio, covering dependency injection, API versioning, caching, message queuing, and database migrations.
 
+**Truth hierarchy**: When docs disagree, precedence is code → ADRs → CI → STATE.md → CLAUDE.md. See [AGENTS.md](../../AGENTS.md) § Truth Hierarchy and [CLAUDE.md](../../CLAUDE.md).
+
 ---
 
 ## 1. Dependency Injection System

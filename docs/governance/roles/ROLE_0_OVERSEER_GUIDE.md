@@ -3,7 +3,8 @@
 > **Version**: 1.2.0  
 > **Last Updated**: 2026-02-04  
 > **Role Number**: 0  
-> **Parent Document**: [ROLE_GUIDES_INDEX.md](../ROLE_GUIDES_INDEX.md)
+> **Parent Document**: [ROLE_GUIDES_INDEX.md](../ROLE_GUIDES_INDEX.md)  
+> **New Overseer?** Start with [OVERSEER_NEWCOMER_HANDOFF.md](../overseer/OVERSEER_NEWCOMER_HANDOFF.md) for Day 1 footing.
 
 ---
 
@@ -247,6 +248,7 @@ When reviewing a proof submission:
 - [ ] Expected vs actual documented
 - [ ] Regression prevention noted
 - [ ] Evidence paths valid
+- [ ] CONTRADICTION LOG (CLAUDE.md) reconciled: no unresolved discrepancies between STATE, SEAM_MATURITY_AUDIT, proof docs, or code
 
 ### Common Failure Modes
 
@@ -774,6 +776,7 @@ python tools/context/allocate.py --task $currentTask --preamble | Out-String | S
 - [ ] No S0 blockers remaining
 - [ ] PHASE_GATES_EVIDENCE_MAP.md updated
 - [ ] Next gate unblocked with clear entry criteria
+- [ ] CONTRADICTION LOG reconciled before accepting completion (see CLAUDE.md)
 
 ### Handoff Document Template
 

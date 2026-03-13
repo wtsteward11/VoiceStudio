@@ -1,18 +1,16 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
-using VoiceStudio.Core.Services;
 using VoiceStudio.App.ViewModels;
 
 namespace VoiceStudio.App.Services.UndoableActions
 {
   /// <summary>
-  /// Undoable action for creating an SSML document.
+  /// Undoable action for creating an SSML document. Undo/Redo are local-only (collection mutation).
   /// </summary>
   public class CreateSSMLDocumentAction : IUndoableAction
   {
     private readonly ObservableCollection<SSMLDocumentItem> _documents;
-    private readonly IBackendClient _backendClient;
     private readonly SSMLDocumentItem _document;
     private readonly Action<SSMLDocumentItem>? _onUndo;
     private readonly Action<SSMLDocumentItem>? _onRedo;
@@ -21,13 +19,11 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateSSMLDocumentAction(
         ObservableCollection<SSMLDocumentItem> documents,
-        IBackendClient backendClient,
         SSMLDocumentItem document,
         Action<SSMLDocumentItem>? onUndo = null,
         Action<SSMLDocumentItem>? onRedo = null)
     {
       _documents = documents ?? throw new ArgumentNullException(nameof(documents));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _document = document ?? throw new ArgumentNullException(nameof(document));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -54,12 +50,11 @@ namespace VoiceStudio.App.Services.UndoableActions
   }
 
   /// <summary>
-  /// Undoable action for deleting an SSML document.
+  /// Undoable action for deleting an SSML document. Undo/Redo are local-only (collection mutation).
   /// </summary>
   public class DeleteSSMLDocumentAction : IUndoableAction
   {
     private readonly ObservableCollection<SSMLDocumentItem> _documents;
-    private readonly IBackendClient _backendClient;
     private readonly SSMLDocumentItem _document;
     private readonly int _originalIndex;
     private readonly Action<SSMLDocumentItem>? _onUndo;
@@ -69,14 +64,12 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteSSMLDocumentAction(
         ObservableCollection<SSMLDocumentItem> documents,
-        IBackendClient backendClient,
         SSMLDocumentItem document,
         int originalIndex,
         Action<SSMLDocumentItem>? onUndo = null,
         Action<SSMLDocumentItem>? onRedo = null)
     {
       _documents = documents ?? throw new ArgumentNullException(nameof(documents));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _document = document ?? throw new ArgumentNullException(nameof(document));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

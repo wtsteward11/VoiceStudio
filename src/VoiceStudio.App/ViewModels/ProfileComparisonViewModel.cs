@@ -19,10 +19,11 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class ProfileComparisonViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IVoiceSynthesisService _voiceSynthesisService;
     private readonly IProfilesClient _profilesClient;
     private readonly IAudioPlayerService _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
+    private bool _isInitialized;
 
     public string PanelId => "profile-comparison";
     public string DisplayName => ResourceHelper.GetString("Panel.ProfileComparison.DisplayName", "Profile Comparison");
@@ -58,10 +59,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? audioUrlB;
 
-    public ProfileComparisonViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient, IAudioPlayerService audioPlayer)
+    public ProfileComparisonViewModel(IViewModelContext context, IVoiceSynthesisService voiceSynthesisService, IProfilesClient profilesClient, IAudioPlayerService audioPlayer)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _voiceSynthesisService = voiceSynthesisService ?? throw new ArgumentNullException(nameof(voiceSynthesisService));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
@@ -96,9 +97,14 @@ namespace VoiceStudio.App.ViewModels
         await PlayProfileBAsync(ct);
       }, () => SelectedProfileB != null && !string.IsNullOrEmpty(AudioUrlB) && !IsPlayingB && !IsLoading);
       StopPlaybackCommand = new RelayCommand(StopPlayback, () => IsPlayingA || IsPlayingB);
+    }
 
-      // Load initial data
-      _ = LoadProfilesAsync(CancellationToken.None);
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+      if (_isInitialized)
+        return;
+      _isInitialized = true;
+      await LoadProfilesAsync(cancellationToken);
     }
 
     public IAsyncRelayCommand LoadProfilesCommand { get; }
@@ -113,7 +119,7 @@ namespace VoiceStudio.App.ViewModels
       PlayProfileACommand.NotifyCanExecuteChanged();
       if (value != null && SelectedProfileB != null)
       {
-        _ = CompareProfilesAsync(CancellationToken.None);
+        _ = CompareProfilesAsync(CancellationToken.None); // Fire-and-forget: user-triggered auto-compare on selection change
       }
     }
 
@@ -123,7 +129,7 @@ namespace VoiceStudio.App.ViewModels
       PlayProfileBCommand.NotifyCanExecuteChanged();
       if (value != null && SelectedProfileA != null)
       {
-        _ = CompareProfilesAsync(CancellationToken.None);
+        _ = CompareProfilesAsync(CancellationToken.None); // Fire-and-forget: user-triggered auto-compare on selection change
       }
     }
 
@@ -206,12 +212,7 @@ namespace VoiceStudio.App.ViewModels
           Language = SelectedProfileA.Language ?? "en"
         };
 
-        var responseA = await _backendClient.SendRequestAsync<VoiceSynthesisRequest, VoiceSynthesisResponse>(
-            "/api/voice/synthesize",
-            requestA,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var responseA = await _voiceSynthesisService.SynthesizeVoiceAsync(requestA, cancellationToken);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -224,12 +225,7 @@ namespace VoiceStudio.App.ViewModels
           Language = SelectedProfileB.Language ?? "en"
         };
 
-        var responseB = await _backendClient.SendRequestAsync<VoiceSynthesisRequest, VoiceSynthesisResponse>(
-            "/api/voice/synthesize",
-            requestB,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var responseB = await _voiceSynthesisService.SynthesizeVoiceAsync(requestB, cancellationToken);
 
         AudioUrlA = responseA?.AudioUrl;
         AudioUrlB = responseB?.AudioUrl;

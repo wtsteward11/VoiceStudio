@@ -684,7 +684,7 @@ async def post_process_pipeline(
                     import cv2
                     import numpy as np
 
-                    _fourcc_fn: Any = getattr(cv2, "VideoWriter_fourcc")
+                    _fourcc_fn: Any = cv2.VideoWriter_fourcc
                     processed_video_path = video_path
                     stages_applied = []
                     total_quality_improvement = 0.0

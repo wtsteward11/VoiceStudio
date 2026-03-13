@@ -348,7 +348,7 @@ class TelemetryService:
     def get_metrics(self) -> dict[str, Any]:
         """Get all metrics as a dictionary."""
         with self._lock:
-            result = {}
+            result: dict[str, Any] = {}
             for name, label_values in self._metrics.items():
                 result[name] = {}
                 for label_key, value in label_values.items():

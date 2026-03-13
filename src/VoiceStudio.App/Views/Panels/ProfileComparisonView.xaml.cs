@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml.Controls;
+using System.Threading;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
 
@@ -18,7 +19,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new ProfileComparisonViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<IVoiceSynthesisService>(),
           ServiceProvider.GetProfilesClient(),
           ServiceProvider.GetAudioPlayerService()
       );
@@ -36,8 +37,8 @@ namespace VoiceStudio.App.Views.Panels
         }
       };
 
-      // Setup keyboard navigation
-      this.Loaded += ProfileComparisonView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and initial data load (ADR-047)
+      this.Loaded += ProfileComparisonView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -49,9 +50,11 @@ namespace VoiceStudio.App.Views.Panels
       });
     }
 
-    private void ProfileComparisonView_KeyboardNavigation_Loaded(object _, Microsoft.UI.Xaml.RoutedEventArgs __)
+    private async void ProfileComparisonView_Loaded(object _, Microsoft.UI.Xaml.RoutedEventArgs __)
     {
+      this.Loaded -= ProfileComparisonView_Loaded;
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      await ViewModel.InitializeAsync(CancellationToken.None);
     }
 
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)

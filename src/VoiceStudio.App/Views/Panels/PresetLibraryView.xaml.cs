@@ -3,8 +3,8 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
-using VoiceStudio.App.Services.UndoableActions;
 using System;
+using System.Threading;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -16,14 +16,13 @@ namespace VoiceStudio.App.Views.Panels
     public PresetLibraryViewModel ViewModel { get; }
     private ContextMenuService? _contextMenuService;
     private ToastNotificationService? _toastService;
-    private UndoRedoService? _undoRedoService;
 
     public PresetLibraryView()
     {
       this.InitializeComponent();
       ViewModel = new PresetLibraryViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IPresetLibraryClient>(),
           AppServices.GetRequiredService<IDialogService>()
       );
       DataContext = ViewModel;
@@ -31,7 +30,6 @@ namespace VoiceStudio.App.Views.Panels
       // Initialize services
       _contextMenuService = ServiceProvider.GetContextMenuService();
       _toastService = ServiceProvider.GetToastNotificationService();
-      _undoRedoService = ServiceProvider.GetUndoRedoService();
 
       // Subscribe to ViewModel events for toast notifications
       ViewModel.PropertyChanged += (_, e) =>
@@ -46,8 +44,8 @@ namespace VoiceStudio.App.Views.Panels
         }
       };
 
-      // Setup keyboard navigation
-      this.Loaded += PresetLibraryView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and initial data load (ADR-047)
+      this.Loaded += PresetLibraryView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -59,12 +57,12 @@ namespace VoiceStudio.App.Views.Panels
       });
     }
 
-    private void PresetLibraryView_KeyboardNavigation_Loaded(object _, RoutedEventArgs __)
+    private async void PresetLibraryView_Loaded(object _, RoutedEventArgs __)
     {
-      // Provide XamlRoot to ViewModel for MVVM-compliant dialog display
+      this.Loaded -= PresetLibraryView_Loaded;
       ViewModel.XamlRoot = this.XamlRoot;
-
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      await ViewModel.InitializeAsync(CancellationToken.None);
     }
 
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)
@@ -151,34 +149,9 @@ namespace VoiceStudio.App.Views.Panels
             await ExportPresetAsync(preset);
             break;
           case "delete":
-            var dialog = new ContentDialog
+            if (preset is Preset delPreset)
             {
-              Title = "Delete Preset",
-              Content = "Are you sure you want to delete this preset? This action cannot be undone.",
-              PrimaryButtonText = "Delete",
-              CloseButtonText = "Cancel",
-              DefaultButton = ContentDialogButton.Close,
-              XamlRoot = this.XamlRoot
-            };
-
-            var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Primary)
-            {
-              var presetToDelete = (Preset)preset;
-              var presetIndex = ViewModel.Presets.IndexOf(presetToDelete);
-
-              ViewModel.Presets.Remove(presetToDelete);
-
-              // Register undo action
-              if (_undoRedoService != null && presetIndex >= 0)
-              {
-                var actionObj = new SimpleAction(
-                    "Delete Preset",
-                    () => ViewModel.Presets.Insert(presetIndex, presetToDelete),
-                    () => ViewModel.Presets.Remove(presetToDelete));
-                _undoRedoService.RegisterAction(actionObj);
-              }
-
+              await ViewModel.DeletePresetWithConfirmationAsync(delPreset, CancellationToken.None);
               _toastService?.ShowToast(ToastType.Success, "Deleted", "Preset deleted");
             }
             break;

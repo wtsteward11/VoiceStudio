@@ -19,10 +19,14 @@ import json
 import logging
 import os
 import threading
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any
+from typing import Any, List, Sequence
 
 logger = logging.getLogger(__name__)
+
+# Type alias to avoid "list" name shadowing in JsonFileStore.list() return type
+_SequenceOfDict = Sequence[dict[str, Any]]
 
 # Default data directory
 _DATA_ROOT = os.environ.get(
@@ -53,7 +57,7 @@ class JsonFileStore:
         # Ensure directory exists
         os.makedirs(self._root, exist_ok=True)
 
-    def _ensure_loaded(self):
+    def _ensure_loaded(self) -> None:
         """Lazy-load all items from disk into cache on first access."""
         if self._loaded:
             return
@@ -79,7 +83,7 @@ class JsonFileStore:
                 logger.warning(f"Failed to list store directory {self._root}: {e}")
                 self._loaded = True
 
-    def _write_to_disk(self, item_id: str, data: dict[str, Any]):
+    def _write_to_disk(self, item_id: str, data: dict[str, Any]) -> None:
         """Write a single item to disk atomically."""
         filepath = os.path.join(self._root, f"{item_id}.json")
         tmp_path = filepath + ".tmp"
@@ -96,7 +100,7 @@ class JsonFileStore:
                 pass  # ALLOWED: bare except - best-effort cleanup of temp file
             raise
 
-    def _delete_from_disk(self, item_id: str):
+    def _delete_from_disk(self, item_id: str) -> None:
         """Delete a single item from disk."""
         filepath = os.path.join(self._root, f"{item_id}.json")
         try:
@@ -106,7 +110,7 @@ class JsonFileStore:
         except OSError as e:
             logger.warning(f"Failed to delete {filepath}: {e}")
 
-    def _evict_if_needed(self):
+    def _evict_if_needed(self) -> None:
         """Evict oldest items if max_items exceeded."""
         if len(self._cache) <= self._max_items:
             return
@@ -144,17 +148,17 @@ class JsonFileStore:
         with self._lock:
             return self._cache.get(item_id)
 
-    def list(self) -> list[dict[str, Any]]:
+    def list(self) -> _SequenceOfDict:
         """List all items."""
         self._ensure_loaded()
         with self._lock:
-            return list(self._cache.values())
+            return builtins.list(self._cache.values())
 
-    def list_ids(self) -> builtins.list[str]:
+    def list_ids(self) -> List[str]:
         """List all item IDs."""
         self._ensure_loaded()
         with self._lock:
-            return list(self._cache.keys())
+            return builtins.list(self._cache.keys())
 
     def delete(self, item_id: str) -> bool:
         """Delete an item. Returns True if existed."""
@@ -178,16 +182,16 @@ class JsonFileStore:
         with self._lock:
             return item_id in self._cache
 
-    def search(self, predicate) -> builtins.list[dict[str, Any]]:
+    def search(self, predicate: Callable[[dict[str, Any]], bool]) -> Sequence[dict[str, Any]]:
         """Search items matching a predicate function."""
         self._ensure_loaded()
         with self._lock:
             return [item for item in self._cache.values() if predicate(item)]
 
-    def clear(self):
+    def clear(self) -> None:
         """Delete all items."""
         self._ensure_loaded()
         with self._lock:
-            for item_id in list(self._cache.keys()):
+            for item_id in builtins.list(self._cache.keys()):
                 self._delete_from_disk(item_id)
             self._cache.clear()

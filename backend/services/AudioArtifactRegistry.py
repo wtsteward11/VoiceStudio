@@ -16,6 +16,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 from backend.config.path_config import get_path
 from backend.services.ContentAddressedAudioCache import get_audio_cache
@@ -59,13 +60,13 @@ class AudioArtifactRegistry:
             return Path(env_path)
 
         # Use centralized cache path
-        return get_path("cache") / DEFAULT_REGISTRY_FILENAME
+        return cast(Path, get_path("cache")) / DEFAULT_REGISTRY_FILENAME
 
     @property
     def registry_path(self) -> Path:
         return self._registry_path
 
-    def _atomic_write_json(self, path: Path, payload: dict) -> None:
+    def _atomic_write_json(self, path: Path, payload: dict[str, Any]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = path.with_suffix(path.suffix + ".tmp")
         data = json.dumps(payload, indent=2, ensure_ascii=False)

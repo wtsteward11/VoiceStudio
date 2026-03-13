@@ -535,5 +535,59 @@ namespace VoiceStudio.App.Tests.Services
       Assert.IsTrue(tracksCount <= 2,
         $"Timeline load tracks should be bounded; got {tracksPath}: {tracksCount}");
     }
+
+    /// <summary>
+    /// Scenario: open Timeline, load projects, select project, load tracks, perform one clip action (delete).
+    /// Asserts bounded request counts. Clip delete goes through BackendClient.DeleteClipAsync.
+    /// </summary>
+    [TestMethod]
+    public async Task TimelinePanelScenario_LoadProjectsSelectProjectLoadTracksDeleteClip_BoundedRequestCounts()
+    {
+      var mockHandler = new MockBackendHandler();
+      var metrics = new RequestMetricsService();
+      var coordinator = new RequestCoordinator();
+      var correlationProvider = new CorrelationIdProvider();
+
+      var config = new BackendClientConfig
+      {
+        BaseUrl = "http://localhost:8000",
+        WebSocketUrl = string.Empty,
+        RequestTimeout = TimeSpan.FromSeconds(30)
+      };
+
+      using var client = new BackendClient(
+        config,
+        correlationProvider,
+        metrics,
+        coordinator,
+        gracefulDegradation: null,
+        innerHandler: mockHandler);
+
+      var projects = await client.GetProjectsAsync().ConfigureAwait(false);
+      Assert.IsNotNull(projects);
+
+      var projectId = projects.Count > 0 ? projects[0].Id : "proj-1";
+      var tracks = await client.GetTracksAsync(projectId).ConfigureAwait(false);
+      Assert.IsNotNull(tracks);
+
+      var trackId = tracks.Count > 0 ? tracks[0].Id : "t1";
+      var clipId = "c1";
+
+      await client.DeleteClipAsync(projectId, trackId, clipId).ConfigureAwait(false);
+
+      var snapshot = metrics.GetSnapshot();
+      var projectsCount = snapshot.TryGetValue("/api/projects", out var pc) ? pc : 0;
+      var tracksPath = $"/api/projects/{projectId}/tracks";
+      var tracksCount = snapshot.TryGetValue(tracksPath, out var tc) ? tc : 0;
+      var deleteClipPath = $"/api/projects/{projectId}/tracks/{trackId}/clips/{clipId}";
+      var deleteClipCount = snapshot.TryGetValue(deleteClipPath, out var dc) ? dc : 0;
+
+      Assert.IsTrue(projectsCount <= 2,
+        $"Timeline load projects should be bounded; got /api/projects: {projectsCount}");
+      Assert.IsTrue(tracksCount <= 2,
+        $"Timeline load tracks should be bounded; got {tracksPath}: {tracksCount}");
+      Assert.AreEqual(1, deleteClipCount,
+        $"DeleteClipAsync should result in exactly 1 request; got {deleteClipPath}: {deleteClipCount}");
+    }
   }
 }

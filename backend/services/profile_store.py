@@ -13,7 +13,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class ProfileStore:
 
             try:
                 with open(profile_file, encoding="utf-8") as f:
-                    return json.load(f)
+                    return cast(dict[str, Any], json.load(f))
             except (json.JSONDecodeError, OSError) as exc:
                 logger.warning(f"Failed to load profile {profile_id}: {exc}")
                 return self._index.get(profile_id)
@@ -116,7 +116,7 @@ class ProfileStore:
             self._save_index()
 
         logger.info(f"Profile saved: {profile_id}")
-        return profile_id
+        return str(profile_id)
 
     def delete(self, profile_id: str) -> bool:
         """Delete a profile."""

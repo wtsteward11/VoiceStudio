@@ -19,8 +19,9 @@ namespace VoiceStudio.App.Views.Panels
 {
   public partial class TranscribeViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ITranscriptionClient _transcriptionClient;
     private readonly ToastNotificationService? _toastNotificationService;
+    private bool _isInitialized;
     private readonly UndoRedoService? _undoRedoService;
     private readonly MultiSelectService _multiSelectService;
     private MultiSelectState? _multiSelectState;
@@ -83,10 +84,10 @@ namespace VoiceStudio.App.Views.Panels
 
     public ObservableCollection<SupportedLanguage> Languages { get; } = new();
 
-    public TranscribeViewModel(IViewModelContext context, IBackendClient backendClient)
+    public TranscribeViewModel(IViewModelContext context, ITranscriptionClient transcriptionClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _transcriptionClient = transcriptionClient ?? throw new ArgumentNullException(nameof(transcriptionClient));
 
       // Get multi-select service
       var multiSelectService = AppServices.TryGetMultiSelectService();
@@ -154,6 +155,15 @@ namespace VoiceStudio.App.Views.Panels
       };
     }
 
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+      if (_isInitialized)
+        return;
+      _isInitialized = true;
+      await LoadLanguagesAsync(cancellationToken);
+      await LoadEnginesAsync(cancellationToken);
+    }
+
     public IAsyncRelayCommand LoadLanguagesCommand { get; }
     public IAsyncRelayCommand TranscribeCommand { get; }
     public IAsyncRelayCommand LoadTranscriptionsCommand { get; }
@@ -193,7 +203,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var languages = await _backendClient.GetSupportedLanguagesAsync(cancellationToken);
+        var languages = await _transcriptionClient.GetSupportedLanguagesAsync(cancellationToken);
         Languages.Clear();
         foreach (var lang in languages)
         {
@@ -234,7 +244,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var engines = await _backendClient.GetTranscriptionEnginesAsync(cancellationToken);
+        var engines = await _transcriptionClient.GetTranscriptionEnginesAsync(cancellationToken);
         
         Engines.Clear();
         foreach (var engine in engines)
@@ -300,7 +310,7 @@ namespace VoiceStudio.App.Views.Panels
           UseVad = UseVad
         };
 
-        var transcription = await _backendClient.TranscribeAudioAsync(request, SelectedProjectId, cancellationToken);
+        var transcription = await _transcriptionClient.TranscribeAudioAsync(request, SelectedProjectId, cancellationToken);
 
         // Add to collection
         Transcriptions.Insert(0, transcription);
@@ -348,7 +358,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var transcriptions = await _backendClient.ListTranscriptionsAsync(SelectedAudioId, SelectedProjectId, cancellationToken);
+        var transcriptions = await _transcriptionClient.ListTranscriptionsAsync(SelectedAudioId, SelectedProjectId, cancellationToken);
 
         Transcriptions.Clear();
         foreach (var transcription in transcriptions.OrderByDescending(t => t.Created))
@@ -386,7 +396,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        await _backendClient.DeleteTranscriptionAsync(transcription.Id, cancellationToken);
+        await _transcriptionClient.DeleteTranscriptionAsync(transcription.Id, cancellationToken);
 
         var transcriptionToDelete = transcription;
         var originalIndex = Transcriptions.IndexOf(transcription);
@@ -405,7 +415,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           var action = new DeleteTranscriptionAction(
               Transcriptions,
-              _backendClient,
+              _transcriptionClient,
               transcriptionToDelete,
               originalIndex,
               onUndo: (t) =>

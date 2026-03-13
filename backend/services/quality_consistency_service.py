@@ -211,7 +211,7 @@ class QualityConsistencyMonitor:
             return 0.0
         mean = sum(values) / len(values)
         variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
-        return variance**0.5
+        return float(variance**0.5)
 
     def _check_violations(
         self, metrics_list: list[dict[str, Any]], standard: dict[str, float]

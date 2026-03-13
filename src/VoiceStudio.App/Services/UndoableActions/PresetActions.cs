@@ -1,18 +1,16 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
-using VoiceStudio.Core.Services;
 using Preset = VoiceStudio.App.ViewModels.Preset;
 
 namespace VoiceStudio.App.Services.UndoableActions
 {
   /// <summary>
-  /// Undoable action for creating a preset.
+  /// Undoable action for creating a preset. Undo/Redo are local-only (collection mutation).
   /// </summary>
   public class CreatePresetAction : IUndoableAction
   {
     private readonly ObservableCollection<Preset> _presets;
-    private readonly IBackendClient _backendClient;
     private readonly Preset _preset;
     private readonly Action<Preset>? _onUndo;
     private readonly Action<Preset>? _onRedo;
@@ -21,13 +19,11 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreatePresetAction(
         ObservableCollection<Preset> presets,
-        IBackendClient backendClient,
         Preset preset,
         Action<Preset>? onUndo = null,
         Action<Preset>? onRedo = null)
     {
       _presets = presets ?? throw new ArgumentNullException(nameof(presets));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _preset = preset ?? throw new ArgumentNullException(nameof(preset));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -54,12 +50,11 @@ namespace VoiceStudio.App.Services.UndoableActions
   }
 
   /// <summary>
-  /// Undoable action for deleting a preset.
+  /// Undoable action for deleting a preset. Undo/Redo are local-only (collection mutation).
   /// </summary>
   public class DeletePresetAction : IUndoableAction
   {
     private readonly ObservableCollection<Preset> _presets;
-    private readonly IBackendClient _backendClient;
     private readonly Preset _preset;
     private readonly int _originalIndex;
     private readonly Action<Preset>? _onUndo;
@@ -69,14 +64,12 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeletePresetAction(
         ObservableCollection<Preset> presets,
-        IBackendClient backendClient,
         Preset preset,
         int originalIndex,
         Action<Preset>? onUndo = null,
         Action<Preset>? onRedo = null)
     {
       _presets = presets ?? throw new ArgumentNullException(nameof(presets));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _preset = preset ?? throw new ArgumentNullException(nameof(preset));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

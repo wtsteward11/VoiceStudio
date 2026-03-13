@@ -22,7 +22,8 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class QualityOptimizationWizardViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IVoiceSynthesisService _voiceSynthesisService;
+    private readonly IQualityControlClient _qualityClient;
     private readonly IProfilesClient _profilesClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
@@ -75,10 +76,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? testText = "Hello, this is a test of the voice profile quality.";
 
-    public QualityOptimizationWizardViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient)
+    public QualityOptimizationWizardViewModel(IViewModelContext context, IVoiceSynthesisService voiceSynthesisService, IQualityControlClient qualityClient, IProfilesClient profilesClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _voiceSynthesisService = voiceSynthesisService ?? throw new ArgumentNullException(nameof(voiceSynthesisService));
+      _qualityClient = qualityClient ?? throw new ArgumentNullException(nameof(qualityClient));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
       // Get toast notification service using helper (reduces code duplication)
@@ -103,8 +105,20 @@ namespace VoiceStudio.App.ViewModels
       PreviousStepCommand = new RelayCommand(PreviousStep, () => CanGoBack);
       ResetWizardCommand = new RelayCommand(ResetWizard);
 
-      // Load initial data
-      _ = LoadProfilesAsync(CancellationToken.None);
+      // Initial data load deferred to InitializeAsync (ADR-047)
+    }
+
+    private bool _isInitialized;
+
+    /// <summary>
+    /// One-shot initialization. Call from View Loaded. Loads profiles.
+    /// </summary>
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+      if (_isInitialized)
+        return;
+      _isInitialized = true;
+      await LoadProfilesAsync(cancellationToken);
     }
 
     public IAsyncRelayCommand LoadProfilesCommand { get; }
@@ -202,12 +216,7 @@ namespace VoiceStudio.App.ViewModels
           Language = selectedProfile.Language ?? "en"
         };
 
-        var synthesizeResponse = await _backendClient.SendRequestAsync<VoiceSynthesisRequest, VoiceSynthesisResponse>(
-            "/api/voice/synthesize",
-            synthesizeRequest,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var synthesizeResponse = await _voiceSynthesisService.SynthesizeVoiceAsync(synthesizeRequest, cancellationToken);
 
         if (synthesizeResponse?.QualityMetrics == null)
         {
@@ -216,21 +225,16 @@ namespace VoiceStudio.App.ViewModels
         }
 
         // Analyze quality
-        var analyzeRequest = new
+        var analyzeRequest = new QualityAnalysisRequest
         {
-          mos_score = synthesizeResponse.QualityMetrics.MosScore,
-          similarity = synthesizeResponse.QualityMetrics.Similarity,
-          naturalness = synthesizeResponse.QualityMetrics.Naturalness,
-          snr_db = synthesizeResponse.QualityMetrics.SnrDb,
-          target_tier = targetTier
+          MosScore = synthesizeResponse.QualityMetrics.MosScore,
+          Similarity = synthesizeResponse.QualityMetrics.Similarity,
+          Naturalness = synthesizeResponse.QualityMetrics.Naturalness,
+          SnrDb = synthesizeResponse.QualityMetrics.SnrDb,
+          TargetTier = targetTier
         };
 
-        var analysis = await _backendClient.SendRequestAsync<object, QualityAnalysisResponse>(
-            "/api/quality/analyze",
-            analyzeRequest,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var analysis = await _qualityClient.AnalyzeQualityAsync(analyzeRequest, cancellationToken);
 
         if (analysis != null)
         {
@@ -311,19 +315,14 @@ namespace VoiceStudio.App.ViewModels
           ["quality_mode"] = targetTier
         };
 
-        var optimizeRequest = new
+        var optimizeRequest = new QualityOptimizationRequest
         {
-          metrics = metrics,
-          current_params = currentParams,
-          target_tier = targetTier
+          Metrics = metrics,
+          CurrentParams = currentParams,
+          TargetTier = targetTier
         };
 
-        var optimization = await _backendClient.SendRequestAsync<object, QualityOptimizationResponse>(
-            "/api/quality/optimize",
-            optimizeRequest,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var optimization = await _qualityClient.OptimizeQualityAsync(optimizeRequest, cancellationToken);
 
         if (optimization != null)
         {

@@ -44,7 +44,7 @@ class QueuedRequest(Generic[T]):
     user_id: str | None = None
     timeout_seconds: float = 300.0
 
-    def __lt__(self, other: QueuedRequest) -> bool:
+    def __lt__(self, other: QueuedRequest[T]) -> bool:
         # Lower priority value = higher priority
         if self.priority != other.priority:
             return self.priority < other.priority
@@ -180,7 +180,11 @@ class RequestQueue(Generic[T]):
 
             # Acquire semaphores
             async with self._semaphore:
-                engine_sem = self._engine_semaphores.get(request.engine_type)
+                engine_sem = (
+                    self._engine_semaphores.get(request.engine_type)
+                    if request.engine_type is not None
+                    else None
+                )
                 if engine_sem:
                     await engine_sem.acquire()
 
@@ -284,7 +288,7 @@ class RequestQueue(Generic[T]):
         self._running = False
         logger.info("Request queue stopped")
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> dict[str, Any]:
         """Get queue statistics."""
         return {
             "total_enqueued": self._stats.total_enqueued,
@@ -300,10 +304,10 @@ class RequestQueue(Generic[T]):
 
 
 # Global request queue instance
-_request_queue: RequestQueue | None = None
+_request_queue: RequestQueue[Any] | None = None
 
 
-def get_request_queue() -> RequestQueue:
+def get_request_queue() -> RequestQueue[Any]:
     """Get or create the global request queue."""
     global _request_queue
     if _request_queue is None:

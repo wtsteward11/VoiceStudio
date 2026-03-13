@@ -32,11 +32,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import TypeVar
+from typing import Any, TypeVar, cast
 
 logger = logging.getLogger(__name__)
 
@@ -339,7 +339,7 @@ class CircuitBreaker:
         )
 
     @asynccontextmanager
-    async def __call__(self):
+    async def __call__(self) -> AsyncIterator[None]:
         """
         Async context manager for protected calls.
 
@@ -359,7 +359,9 @@ class CircuitBreaker:
             self.record_failure()
             raise
 
-    async def execute(self, func: Callable[..., T], *args, **kwargs) -> T:
+    async def execute(
+        self, func: Callable[..., T], *args: Any, **kwargs: Any
+    ) -> T:
         """
         Execute a function with circuit breaker protection.
 
@@ -368,9 +370,8 @@ class CircuitBreaker:
         """
         async with self():
             if asyncio.iscoroutinefunction(func):
-                return await func(*args, **kwargs)
-            else:
-                return func(*args, **kwargs)
+                return cast(T, await func(*args, **kwargs))
+            return func(*args, **kwargs)
 
 
 class CircuitBreakerRegistry:

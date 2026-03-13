@@ -157,6 +157,41 @@ Run mypy with `--strict` and address findings incrementally. Target modules: `ba
 - `mypy backend/services/audio_artifacts/usage.py --strict --follow-imports=skip` passes.
 - Fixes: `metadata: dict | None` → `metadata: dict[str, Any] | None`; `from typing import Any`.
 
+## Twenty-Fifth Slice Complete (2026-03-12)
+
+- `mypy backend/services/persistent_store.py backend/services/marketplace_service.py --strict --follow-imports=skip` passes.
+- Fixes: persistent_store: `-> list[str]` for keys, `-> list[Any]` for values, `-> list[tuple[str, Any]]` for items; marketplace_service: `cast(dict[str, Any], r.to_dict())` for add_review no-any-return.
+
+## Twenty-Sixth Slice Complete (2026-03-12)
+
+- `mypy backend/services/quality_metrics_db.py backend/services/phrase_emotion_service.py --strict --follow-imports=skip` passes.
+- Fixes: quality_metrics_db: `return str(entry_id)` for no-any-return; `row: tuple[Any, ...]` for _row_to_entry; phrase_emotion_service: `-> None` for __init__ and _init_default_presets.
+
+## Twenty-Seventh Slice Complete (2026-03-12)
+
+- `mypy backend/services/profile_search_service.py --strict --follow-imports=skip` passes.
+- Fixes: `data: dict[str, Any]` for _DictToObject; `-> Any` for _profile_store; `-> Iterator[str]` for __iter__; `-> list[str]` for keys with cast; `-> list[_DictToObject]` for values with cast; `-> Iterator[tuple[str, _DictToObject | None]]` for items; `cast(_DictToObject | None, default)` for get; `cast(_DictToObject, self._wrap(result))` for __getitem__; `-> Any` for get_profile_timestamps_store.
+
+## Twenty-Eighth Slice Complete (2026-03-12)
+
+- `mypy backend/services/macro_store.py backend/services/effect_chain_store.py --strict --follow-imports=skip` passes.
+- Fixes: cast/str/bool/int for no-any-return; list() for Sequence→list; cast for get() returns; cast for entry.get("status")/("schedule").
+
+## Twenty-Ninth Slice Complete (2026-03-12)
+
+- `mypy backend/services/unified_config.py backend/services/AudioArtifactRegistry.py --strict --follow-imports=skip` passes.
+- Fixes: unified_config: `re.Match[str]` for replacer; cast(dict[str, Any], expand_env_vars_recursive(...)) and cache returns; bool(override.get(...)); AudioArtifactRegistry: cast(Path, get_path(...)); payload: dict[str, Any].
+
+## Thirtieth Slice Complete (2026-03-12)
+
+- `mypy backend/services/ml_optimization/hyperparameter_optimization.py --strict --follow-imports=skip` passes.
+- Fixes: `-> None` for __init__; `Callable[[dict[str, Any]], float]` for objective params; `def wrapped_objective(trial: Any) -> float` and `params: dict[str, Any]`; `def wrapped_objective(params: dict[str, Any]) -> float` for hyperopt.
+
+## Thirty-First Slice Complete (2026-03-12)
+
+- `mypy backend/services/lexicon_service.py --strict --follow-imports=skip` passes.
+- Fixes: Replaced BaseModel with @dataclass for PhonemeEstimateRequest (avoids "BaseModel has type Any" when --follow-imports=skip).
+
 ## Proof Criteria
 
 - `mypy backend/api/routes/ --strict` passes (or documented exceptions)

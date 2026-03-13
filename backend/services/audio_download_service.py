@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from pathlib import Path
+from typing import cast
 from urllib.parse import urlparse
 
 from backend.config.path_config import get_path
@@ -52,7 +53,7 @@ async def download_audio_to_temp(url: str, timeout: float = 30.0) -> Path | None
 
         if cache_path.exists():
             logger.debug("Using cached file for %s: %s", url, cache_path)
-            return cache_path
+            return cast(Path, cache_path)
 
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(url, follow_redirects=True)
@@ -69,7 +70,7 @@ async def download_audio_to_temp(url: str, timeout: float = 30.0) -> Path | None
                 f.write(response.content)
 
             logger.info("Downloaded %d bytes from %s to %s", len(response.content), url, cache_path)
-            return cache_path
+            return cast(Path, cache_path)
 
     except Exception as e:
         logger.error("Failed to download URL %s: %s", url, e)

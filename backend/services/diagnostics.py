@@ -25,6 +25,7 @@ import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ class DiagnosticCheck:
     category: str
     status: str  # "pass", "warn", "fail", "skip"
     message: str
-    details: dict = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     duration_ms: float = 0.0
 
 
@@ -59,7 +60,7 @@ class DiagnosticReport:
     python_version: str
     overall_status: str
     checks: list[DiagnosticCheck] = field(default_factory=list)
-    environment: dict = field(default_factory=dict)
+    environment: dict[str, Any] = field(default_factory=dict)
     recommendations: list[str] = field(default_factory=list)
 
 
@@ -142,7 +143,7 @@ class DiagnosticsService:
         category: str,
         status: str,
         message: str,
-        details: dict | None = None,
+        details: dict[str, Any] | None = None,
         duration_ms: float = 0.0,
     ) -> None:
         """Add a diagnostic check result."""
@@ -539,7 +540,7 @@ class DiagnosticsService:
         elapsed = (time.perf_counter() - start) * 1000
         logger.debug(f"Model drift check: {elapsed:.2f}ms")
 
-    def _collect_environment(self, include_sensitive: bool) -> dict:
+    def _collect_environment(self, include_sensitive: bool) -> dict[str, Any]:
         """Collect environment information."""
         env_vars = [
             "VOICESTUDIO_MODELS_PATH",
@@ -552,7 +553,7 @@ class DiagnosticsService:
             "PYTHONPATH",
         ]
 
-        env_info = {}
+        env_info: dict[str, Any] = {}
         for var in env_vars:
             value = os.environ.get(var)
             if value:
@@ -612,7 +613,7 @@ class DiagnosticsService:
         logger.info(f"Diagnostic report saved to {filepath}")
         return filepath
 
-    def get_quick_status(self) -> dict:
+    def get_quick_status(self) -> dict[str, Any]:
         """Get a quick status summary without running all checks."""
         return {
             "timestamp": datetime.utcnow().isoformat() + "Z",

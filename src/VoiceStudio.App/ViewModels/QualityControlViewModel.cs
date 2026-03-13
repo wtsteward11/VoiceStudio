@@ -19,7 +19,7 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class QualityControlViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IQualityControlClient _qualityClient;
 
     public string PanelId => "quality_control";
     public string DisplayName => ResourceHelper.GetString("Panel.QualityControl.DisplayName", "Quality Control");
@@ -132,10 +132,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool isGeneratingVisualizations;
 
-    public QualityControlViewModel(IViewModelContext context, IBackendClient backendClient)
+    public QualityControlViewModel(IViewModelContext context, IQualityControlClient qualityClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _qualityClient = qualityClient ?? throw new ArgumentNullException(nameof(qualityClient));
 
       // Get error services
       _errorService = ServiceProvider.TryGetErrorPresentationService();
@@ -233,8 +233,20 @@ namespace VoiceStudio.App.ViewModels
         await ExportReportAsync(ct);
       });
 
-      // Load initial data
-      _ = LoadPresetsAsync(CancellationToken.None);
+      // Initial data load deferred to InitializeAsync (ADR-047)
+    }
+
+    private bool _isInitialized;
+
+    /// <summary>
+    /// One-shot initialization. Call from View Loaded. Loads presets.
+    /// </summary>
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+      if (_isInitialized)
+        return;
+      _isInitialized = true;
+      await LoadPresetsAsync(cancellationToken);
     }
 
     private readonly IErrorPresentationService? _errorService;
@@ -269,7 +281,7 @@ namespace VoiceStudio.App.ViewModels
       {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var presetsDict = await _backendClient.GetQualityPresetsAsync();
+        var presetsDict = await _qualityClient.GetQualityPresetsAsync(cancellationToken);
 
         Presets.Clear();
         if (presetsDict != null)
@@ -321,7 +333,7 @@ namespace VoiceStudio.App.ViewModels
           TargetTier = TargetTier
         };
 
-        CurrentAnalysis = await _backendClient.AnalyzeQualityAsync(request);
+        CurrentAnalysis = await _qualityClient.AnalyzeQualityAsync(request, cancellationToken);
       }
       catch (OperationCanceledException)
       {
@@ -366,7 +378,7 @@ namespace VoiceStudio.App.ViewModels
           TargetTier = TargetTier
         };
 
-        CurrentOptimization = await _backendClient.OptimizeQualityAsync(request);
+        CurrentOptimization = await _qualityClient.OptimizeQualityAsync(request, cancellationToken);
       }
       catch (OperationCanceledException)
       {
@@ -403,7 +415,7 @@ namespace VoiceStudio.App.ViewModels
           QualityTier = TargetTier
         };
 
-        CurrentRecommendation = await _backendClient.GetEngineRecommendationAsync(request);
+        CurrentRecommendation = await _qualityClient.GetEngineRecommendationAsync(request, cancellationToken);
         if (CurrentRecommendation?.Recommendations.Any() == true)
         {
           SelectedEngine = CurrentRecommendation.Recommendations.First().RecommendedEngine;
@@ -444,9 +456,10 @@ namespace VoiceStudio.App.ViewModels
       {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var report = await _backendClient.CheckProjectConsistencyAsync(
+        var report = await _qualityClient.CheckProjectConsistencyAsync(
             SelectedProjectId,
-            ConsistencyTimePeriodDays
+            ConsistencyTimePeriodDays,
+            cancellationToken
         );
 
         SelectedProjectReport = report;
@@ -485,8 +498,9 @@ namespace VoiceStudio.App.ViewModels
       {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var response = await _backendClient.CheckAllProjectsConsistencyAsync(
-            ConsistencyTimePeriodDays
+        var response = await _qualityClient.CheckAllProjectsConsistencyAsync(
+            ConsistencyTimePeriodDays,
+            cancellationToken
         );
 
         AllProjectsConsistency = response;
@@ -528,9 +542,10 @@ namespace VoiceStudio.App.ViewModels
       {
         cancellationToken.ThrowIfCancellationRequested();
 
-        SelectedProjectTrends = await _backendClient.GetProjectQualityTrendsAsync(
+        SelectedProjectTrends = await _qualityClient.GetProjectQualityTrendsAsync(
             SelectedProjectId,
-            ConsistencyTimePeriodDays
+            ConsistencyTimePeriodDays,
+            cancellationToken
         );
       }
       catch (OperationCanceledException)
@@ -562,9 +577,10 @@ namespace VoiceStudio.App.ViewModels
       {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var success = await _backendClient.SetQualityStandardAsync(
+        var success = await _qualityClient.SetQualityStandardAsync(
             SelectedProjectId,
-            QualityStandard
+            QualityStandard,
+            cancellationToken
         );
 
         if (success)
@@ -619,7 +635,7 @@ namespace VoiceStudio.App.ViewModels
           Metric = HeatmapMetric
         };
 
-        QualityHeatmap = await _backendClient.GetQualityHeatmapAsync(request);
+        QualityHeatmap = await _qualityClient.GetQualityHeatmapAsync(request, cancellationToken);
       }
       catch (OperationCanceledException)
       {
@@ -651,7 +667,7 @@ namespace VoiceStudio.App.ViewModels
 
         var qualityData = await GetQualityDataForVisualizationAsync(cancellationToken);
 
-        QualityCorrelations = await _backendClient.GetQualityCorrelationsAsync(qualityData);
+        QualityCorrelations = await _qualityClient.GetQualityCorrelationsAsync(qualityData, cancellationToken);
       }
       catch (OperationCanceledException)
       {
@@ -683,10 +699,11 @@ namespace VoiceStudio.App.ViewModels
 
         var qualityData = await GetQualityDataForVisualizationAsync(cancellationToken);
 
-        QualityAnomalies = await _backendClient.DetectQualityAnomaliesAsync(
+        QualityAnomalies = await _qualityClient.DetectQualityAnomaliesAsync(
             qualityData,
             AnomalyMetric,
-            AnomalyThresholdStd
+            AnomalyThresholdStd,
+            cancellationToken
         );
       }
       catch (OperationCanceledException)
@@ -732,7 +749,7 @@ namespace VoiceStudio.App.ViewModels
           InputFactors = inputFactors
         };
 
-        QualityPrediction = await _backendClient.PredictQualityAsync(request);
+        QualityPrediction = await _qualityClient.PredictQualityAsync(request, cancellationToken);
       }
       catch (OperationCanceledException)
       {
@@ -764,9 +781,10 @@ namespace VoiceStudio.App.ViewModels
 
         var qualityData = await GetQualityDataForVisualizationAsync(cancellationToken);
 
-        QualityInsights = await _backendClient.GetQualityInsightsAsync(
+        QualityInsights = await _qualityClient.GetQualityInsightsAsync(
             qualityData,
-            ConsistencyTimePeriodDays
+            ConsistencyTimePeriodDays,
+            cancellationToken
         );
       }
       catch (OperationCanceledException)

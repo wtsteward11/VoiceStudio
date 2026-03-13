@@ -15,8 +15,8 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from numpy.typing import NDArray
 from fastapi import HTTPException, WebSocket
+from numpy.typing import NDArray
 
 from backend.ml.models.engine_service import get_engine_service
 from backend.ml.models.model_preflight import (

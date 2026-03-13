@@ -24,6 +24,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Session State | `.cursor/STATE.md` | 2026-01-25 | Active task, phase, proofs |
 | Memory Index | `openmemory.md` | 2026-01-25 | Living project index for AI context |
 | **Project Handoff Guide** | `docs/governance/PROJECT_HANDOFF_GUIDE.md` | 2026-01-30 | Maintainer entry point; gate status, build/test, structure, roles, task brief creation |
+| **Overseer Newcomer Handoff** | `docs/governance/overseer/OVERSEER_NEWCOMER_HANDOFF.md` | 2026-03-12 | New Overseer (Role 0) onboarding; Day 1 reads, first commands, daily cadence, non-negotiables |
 | **Tech Debt Register** | `docs/governance/TECH_DEBT_REGISTER.md` | 2026-01-29 | Consolidated technical debt, limitations, and future enhancements; categorized by priority (High/Medium/Low) |
 | **Production Readiness Statement** | `docs/PRODUCTION_READINESS.md` | 2026-01-30 | Formal production readiness declaration for v1.0.0 BASELINE; capabilities, limitations, quality gates, support |
 | Task Brief System | `docs/tasks/README.md` | 2026-01-30 | Task brief workflow and conventions; lifecycle: Analyze → Blueprint → Construct → Validate |
@@ -41,6 +42,8 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Completion Roadmap v2.0** | `docs/governance/VOICESTUDIO_COMPLETION_ROADMAP_V2.md` | 2026-03-03 | CI-enforced hardened roadmap for v1.1.0; 7 gaps, 6 phases (0/A/B/C/D/E/F), 5 permanent CI invariants |
 | **Feature Catalog Master** | `docs/governance/FEATURE_CATALOG_MASTER.md` | 2026-03-05 | Single canonical feature inventory; 47 panels, API/engine/plugin surface; machine appendix: [FEATURE_CATALOG_MASTER.appendix.json](FEATURE_CATALOG_MASTER.appendix.json); CI drift check in `tests/ci/test_feature_catalog_appendix.py` |
 | **Finish Line: Personal Studio** | `docs/governance/FINISH_LINE_PERSONAL_STUDIO.md` | 2026-03-06 | Acceptance criteria for workspaces CRUD/import/export, tool catalog, docking/resize/collapse persistence, restore failure recovery; manual thrash test; build determinism rule |
+| **Test Classification** | `docs/governance/TEST_CLASSIFICATION.md` | 2026-03-12 | Seam-aware vs transport-mock vs legacy; supports architectural completion claims |
+| **Training Lifecycle Async Patterns** | `docs/design/TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md` | 2026-03-12 | Fire-and-forget paths in TrainingViewModel; cancellation ownership |
 
 ## Architecture
 
@@ -114,6 +117,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Architecture Integration Phase 4 Backlog | `docs/design/ARCHITECTURE_INTEGRATION_BACKLOG.md` | 2026-01-28 | R10/R11 done; R12 (skills-as-MCP) backlog |
 | **Plugin Phase 3 Remediation Plan** | `docs/design/PLUGIN_PHASE3_REMEDIATION_PLAN.md` | 2026-02-16 | Findings and sprint plan from Phase 3 architectural review |
 | **Timeline Hardening and Next Tasks Plan** | `docs/design/TIMELINE_HARDENING_AND_NEXT_TASKS_PLAN_2026-03-11.md` | 2026-03-11 | Ruthless assessment; verification of 9.4/11.1; Task 10.1 partial status; next 8 tasks in order (Timeline 1A–1C, dialog baseline, audit, proof, mypy, workflow, skip-debt) |
+| **Comprehensive Gap Analysis and Remediation Plan** | `docs/design/COMPREHENSIVE_GAP_ANALYSIS_AND_REMEDIATION_PLAN.md` | 2026-03-11 | Verified work completed vs. remaining; 9 gaps logged; 8-phase remediation plan (R1–R8); P1–P4 priorities |
 | **Cross-Role Escalation Matrix** | `docs/governance/CROSS_ROLE_ESCALATION_MATRIX.md` | 2026-01-29 | Decision tree and routing table for cross-role escalation; when to use Debug Agent vs other roles |
 | **Handoff Protocol** | `docs/governance/HANDOFF_PROTOCOL.md` | 2026-01-29 | Standardized protocol for issue escalation and cross-role handoffs; templates and examples |
 

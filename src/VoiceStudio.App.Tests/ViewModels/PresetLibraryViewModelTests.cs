@@ -16,20 +16,20 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class PresetLibraryViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IPresetLibraryClient>? _mockPresetLibraryClient;
         private Mock<IDialogService>? _mockDialogService;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockPresetLibraryClient = new Mock<IPresetLibraryClient>();
             _mockDialogService = new Mock<IDialogService>();
         }
 
         private PresetLibraryViewModel CreateViewModel()
         {
-            return new PresetLibraryViewModel(MockContext!, _mockBackendClient!.Object, _mockDialogService!.Object);
+            return new PresetLibraryViewModel(MockContext!, _mockPresetLibraryClient!.Object, _mockDialogService!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -52,11 +52,11 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new PresetLibraryViewModel(null!, _mockBackendClient!.Object, _mockDialogService!.Object));
+                new PresetLibraryViewModel(null!, _mockPresetLibraryClient!.Object, _mockDialogService!.Object));
         }
 
         [TestMethod]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullPresetLibraryClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
                 new PresetLibraryViewModel(MockContext!, null!, _mockDialogService!.Object));

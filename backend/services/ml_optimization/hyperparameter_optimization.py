@@ -55,7 +55,7 @@ class HyperparameterOptimizer:
     Hyperparameter optimization using optuna, ray[tune], or hyperopt.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize optimizer."""
         self.optuna_available = HAS_OPTUNA
         self.ray_available = HAS_RAY
@@ -73,7 +73,7 @@ class HyperparameterOptimizer:
 
     def optimize_with_optuna(
         self,
-        objective: Callable,
+        objective: Callable[[dict[str, Any]], float],
         search_space: dict[str, Any],
         n_trials: int = 100,
         direction: str = "minimize",
@@ -98,9 +98,9 @@ class HyperparameterOptimizer:
         try:
             study = optuna.create_study(direction=direction, study_name=study_name)
 
-            def wrapped_objective(trial):
+            def wrapped_objective(trial: Any) -> float:
                 # Convert search space to optuna suggest calls
-                params = {}
+                params: dict[str, Any] = {}
                 for param_name, param_config in search_space.items():
                     if isinstance(param_config, dict):
                         param_type = param_config.get("type", "float")
@@ -150,7 +150,7 @@ class HyperparameterOptimizer:
 
     def optimize_with_hyperopt(
         self,
-        objective: Callable,
+        objective: Callable[[dict[str, Any]], float],
         search_space: dict[str, Any],
         max_evals: int = 100,
     ) -> OptimizationResult:
@@ -194,7 +194,7 @@ class HyperparameterOptimizer:
 
             trials = Trials()
 
-            def wrapped_objective(params):
+            def wrapped_objective(params: dict[str, Any]) -> float:
                 return objective(params)
 
             best = fmin(

@@ -8,6 +8,8 @@ namespace VoiceStudio.App.Services
 {
   /// <summary>
   /// Voice synthesis service. Delegates to IBackendClient for SynthesizeVoiceAsync and GetAudioStreamAsync.
+  /// Task 1.2 (deepen): Deferred — request shaping/response normalization blocked by VoiceSynthesisRequest/Response
+  /// type location (App.Core.Models vs Core; Compile Remove may exclude). See SEAM_MATURITY_AUDIT.
   /// </summary>
   public sealed class VoiceSynthesisService : IVoiceSynthesisService
   {

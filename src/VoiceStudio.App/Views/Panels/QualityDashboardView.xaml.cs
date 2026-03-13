@@ -1,6 +1,8 @@
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
+using System.Threading;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -18,7 +20,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new QualityDashboardViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient()
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IQualityControlClient>()
       );
       this.DataContext = ViewModel;
 
@@ -38,8 +40,8 @@ namespace VoiceStudio.App.Views.Panels
         }
       };
 
-      // Setup keyboard navigation
-      this.Loaded += QualityDashboardView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and initial data load (ADR-047)
+      this.Loaded += QualityDashboardView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -51,9 +53,11 @@ namespace VoiceStudio.App.Views.Panels
       });
     }
 
-    private void QualityDashboardView_KeyboardNavigation_Loaded(object _, Microsoft.UI.Xaml.RoutedEventArgs __)
+    private async void QualityDashboardView_Loaded(object _, RoutedEventArgs __)
     {
+      this.Loaded -= QualityDashboardView_Loaded;
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      await ViewModel.InitializeAsync(CancellationToken.None);
     }
 
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)

@@ -23,10 +23,10 @@ class ProviderInfo:
     name: str
     local: bool
     available: bool
-    models: list[str] = None
+    models: list[str] | None = None
     endpoint: str | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.models is None:
             self.models = []
 
@@ -36,7 +36,7 @@ class ProviderInfo:
             "name": self.name,
             "local": self.local,
             "available": self.available,
-            "models": self.models,
+            "models": self.models if self.models is not None else [],
             "endpoint": self.endpoint,
         }
 
@@ -66,7 +66,7 @@ class LLMProviderService:
     the engine layer.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._providers_cache: dict[str, ProviderInfo] | None = None
         self._cache_valid = False
 
@@ -149,12 +149,16 @@ class LLMProviderService:
     def get_available_providers(self) -> list[ProviderInfo]:
         """Get all available LLM providers."""
         self._ensure_cache()
-        return list(self._providers_cache.values())
+        cache = self._providers_cache
+        assert cache is not None  # _ensure_cache populates it
+        return list(cache.values())
 
     def get_provider_info(self, name: str) -> ProviderInfo | None:
         """Get information about a specific provider."""
         self._ensure_cache()
-        return self._providers_cache.get(name)
+        cache = self._providers_cache
+        assert cache is not None  # _ensure_cache populates it
+        return cache.get(name)
 
     def is_provider_available(self, name: str) -> bool:
         """Check if a provider is available."""

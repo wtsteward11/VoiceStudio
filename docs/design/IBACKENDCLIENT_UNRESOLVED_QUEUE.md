@@ -27,7 +27,7 @@
 | ~~2~~ | ~~`ViewModels/AssistantViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
 | ~~3~~ | ~~`ViewModels/MixAssistantViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
 | ~~4~~ | ~~`ViewModels/AdvancedSettingsViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
-| 5 | `ViewModels/UltimateDashboardViewModel.cs` | Medium | Medium | No | IUltimateDashboardClient | Seam tests |
+| ~~5~~ | ~~`ViewModels/UltimateDashboardViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
 | 6 | `ViewModels/ImageSearchViewModel.cs` | Medium | Medium | Yes | IImageSearchClient | Seam tests |
 | 7 | `ViewModels/TemplateLibraryViewModel.cs` | Medium | Medium | Yes | ITemplateLibraryClient | Seam tests |
 | 8 | `ViewModels/VoiceMorphViewModel.cs` | Medium | Medium | Yes | IVoiceMorphClient | Seam tests |
@@ -109,7 +109,7 @@ AIMixingMasteringViewModel, AIProductionAssistantViewModel, AdvancedSpectrogramV
 
 ## Next Migration Target
 
-**Recommended:** Rank 5 — `ViewModels/UltimateDashboardViewModel.cs` (IUltimateDashboardClient). EffectsMixer (Rank 1) deferred until lifecycle hardened. MixAssistant, Assistant, AdvancedSettings migrated 2026-03-13.
+**Recommended:** Rank 6 — `ViewModels/ImageSearchViewModel.cs` (IImageSearchClient). EffectsMixer (Rank 1) deferred until lifecycle hardened. MixAssistant, Assistant, AdvancedSettings, UltimateDashboard migrated 2026-03-13.
 
 **Alternative:** Rank 1 — `Views/Panels/EffectsMixerViewModel.cs` (IEffectsMixerClient) after lifecycle hardening.
 

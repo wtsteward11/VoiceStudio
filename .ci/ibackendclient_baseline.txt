@@ -50,7 +50,7 @@ src/VoiceStudio.App/ViewModels/TextHighlightingViewModel.cs:76 # TextHighlightin
 src/VoiceStudio.App/ViewModels/TodoPanelViewModel.cs:83 # TodoPanelViewModel constructor
 # TrainingDatasetEditorViewModel MIGRATED to ITrainingDatasetEditorClient (2026-03-12)
 src/VoiceStudio.App/ViewModels/TrainingQualityVisualizationViewModel.cs:67 # TrainingQualityVisualizationViewModel constructor
-src/VoiceStudio.App/ViewModels/UltimateDashboardViewModel.cs:37 # UltimateDashboardViewModel constructor
+# UltimateDashboardViewModel MIGRATED to IUltimateDashboardClient (2026-03-13)
 src/VoiceStudio.App/ViewModels/UpscalingViewModel.cs:68 # UpscalingViewModel constructor
 src/VoiceStudio.App/ViewModels/VideoEditViewModel.cs:42 # VideoEditViewModel constructor
 src/VoiceStudio.App/ViewModels/VideoGenViewModel.cs:60 # VideoGenViewModel constructor

@@ -67,6 +67,7 @@ Seams that sit between ViewModels/Panels and `IBackendClient`. Each is classifie
 | ISceneBuilderClient | Client | Thin pass-through; scene CRUD, apply. No caching policy. | Keep |
 | IMixAssistantClient | Client | Thin pass-through; GetSuggestionsAsync, AnalyzeMixAsync, ApplySuggestionAsync, DeleteSuggestionAsync, GeneratePresetsAsync. MixAssistantViewModel migrated 2026-03-13. | Keep |
 | IAdvancedSettingsClient | Client | Thin pass-through; GetSettingsAsync, GetGpuDevicesAsync, SaveSettingsAsync, ResetSettingsAsync. AdvancedSettingsViewModel migrated 2026-03-13. | Keep |
+| IUltimateDashboardClient | Client | Thin pass-through; GetDashboardAsync. UltimateDashboardViewModel migrated 2026-03-13. | Keep |
 
 ---
 

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
@@ -14,9 +15,9 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the UltimateDashboardView panel - Master dashboard aggregating all data.
   /// </summary>
-  public partial class UltimateDashboardViewModel : BaseViewModel, IPanelView
+  public partial class UltimateDashboardViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IUltimateDashboardClient _dashboardClient;
 
     public string PanelId => "ultimate-dashboard";
     public string DisplayName => ResourceHelper.GetString("Panel.UltimateDashboard.DisplayName", "Ultimate Dashboard");
@@ -34,10 +35,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<string> systemAlerts = new();
 
-    public UltimateDashboardViewModel(IViewModelContext context, IBackendClient backendClient)
+    public UltimateDashboardViewModel(IViewModelContext context, IUltimateDashboardClient dashboardClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _dashboardClient = dashboardClient ?? throw new ArgumentNullException(nameof(dashboardClient));
 
       LoadDashboardCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -49,10 +50,18 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadDashboardAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) =>
+      LoadDashboardAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) =>
+      RefreshAsyncInternal(cancellationToken);
 
     public IAsyncRelayCommand LoadDashboardCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
@@ -64,12 +73,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var data = await _backendClient.SendRequestAsync<object, DashboardData>(
-            "/api/ultimate-dashboard",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var data = await _dashboardClient.GetDashboardAsync(cancellationToken);
 
         if (data != null)
         {
@@ -108,53 +112,10 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task RefreshAsyncInternal(CancellationToken cancellationToken)
     {
       await LoadDashboardAsync(cancellationToken);
       StatusMessage = ResourceHelper.GetString("UltimateDashboard.DashboardRefreshed", "Dashboard refreshed");
-    }
-
-    // Request models
-    public class DashboardSummary
-    {
-      public int TotalProjects { get; set; }
-      public int TotalProfiles { get; set; }
-      public int TotalAudioFiles { get; set; }
-      public int ActiveJobs { get; set; }
-      public int CompletedJobsToday { get; set; }
-      public string SystemStatus { get; set; } = string.Empty;
-      public bool GpuAvailable { get; set; }
-      public double GpuUtilization { get; set; }
-      public double CpuUtilization { get; set; }
-      public double MemoryUsagePercent { get; set; }
-    }
-
-    public class QuickStat
-    {
-      public string StatId { get; set; } = string.Empty;
-      public string Label { get; set; } = string.Empty;
-      public string Value { get; set; } = string.Empty;
-      public string? Trend { get; set; }
-      public double? TrendValue { get; set; }
-      public string? Icon { get; set; }
-      public string? Color { get; set; }
-    }
-
-    public class RecentActivity
-    {
-      public string ActivityId { get; set; } = string.Empty;
-      public string Type { get; set; } = string.Empty;
-      public string Title { get; set; } = string.Empty;
-      public string? Description { get; set; }
-      public string Timestamp { get; set; } = string.Empty;
-    }
-
-    private class DashboardData
-    {
-      public DashboardSummary Summary { get; set; } = new();
-      public QuickStat[] QuickStats { get; set; } = Array.Empty<QuickStat>();
-      public RecentActivity[] RecentActivities { get; set; } = Array.Empty<RecentActivity>();
-      public string[] SystemAlerts { get; set; } = Array.Empty<string>();
     }
   }
 
@@ -177,7 +138,7 @@ namespace VoiceStudio.App.ViewModels
     public string CpuUtilizationDisplay => $"{CpuUtilization:F1}%";
     public string MemoryUsageDisplay => $"{MemoryUsagePercent:F1}%";
 
-    public DashboardSummaryItem(UltimateDashboardViewModel.DashboardSummary summary)
+    public DashboardSummaryItem(UltimateDashboardSummary summary)
     {
       TotalProjects = summary.TotalProjects;
       TotalProfiles = summary.TotalProfiles;
@@ -209,7 +170,7 @@ namespace VoiceStudio.App.ViewModels
       _ => "→"
     };
 
-    public QuickStatItem(UltimateDashboardViewModel.QuickStat stat)
+    public QuickStatItem(UltimateQuickStat stat)
     {
       StatId = stat.StatId;
       Label = stat.Label;
@@ -239,7 +200,7 @@ namespace VoiceStudio.App.ViewModels
       _ => "📋"
     };
 
-    public RecentActivityItem(UltimateDashboardViewModel.RecentActivity activity)
+    public RecentActivityItem(UltimateRecentActivity activity)
     {
       ActivityId = activity.ActivityId;
       Type = activity.Type;

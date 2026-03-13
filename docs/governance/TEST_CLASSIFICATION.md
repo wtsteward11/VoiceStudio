@@ -26,6 +26,7 @@
 | TrainingViewModelSeamTests.cs | TrainingViewModel | ITrainingClient | Instantiates ViewModel with mocked ITrainingClient; verifies InitializeAsync calls ListDatasetsAsync, ListTrainingJobsAsync. |
 | TranscribeViewModelSeamTests.cs | TranscribeViewModel | ITranscriptionClient | Instantiates ViewModel with mocked ITranscriptionClient; verifies InitializeAsync calls GetTranscriptionEnginesAsync, GetSupportedLanguagesAsync. |
 | ProfileComparisonViewModelSeamTests.cs | ProfileComparisonViewModel | IVoiceSynthesisService, IProfilesClient | Instantiates ViewModel with mocked seam clients; verifies InitializeAsync calls GetProfilesAsync. |
+| ImageSearchViewModelSeamTests.cs | ImageSearchViewModel | IImageSearchClient | Instantiates ViewModel with mocked IImageSearchClient; verifies constructor, null checks, IPanelLifecycle, OnActivatedAsync. |
 | RequestCoordinatorIntegrationTests (TimelinePanelScenario_*) | Timeline flow | IProjectsClient, IProfilesClient, ITimelineTrackService, ITimelineClipService | Scenario tests; bounded request counts. |
 
 ### Transport-mock / Legacy

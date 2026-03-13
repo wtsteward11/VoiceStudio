@@ -57,9 +57,9 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## Next 3 Steps
 
-1. **Migration queue** — Confirm GlobalSearch, BackupRestore, APIKeyManager still use seams (not IBackendClient) before next wave; then pick next ranked target from IBACKENDCLIENT_LONGTAIL_RANKING.md.
-2. **Baseline hygiene** — Run creep check periodically; update baseline when new consumers added.
-3. **Further lifecycle cleanup** — VoiceCloningWizard, Library, Training (optional follow-through).
+1. **Next migration target** — TemplateLibraryViewModel (Rank 7) per IBACKENDCLIENT_INSPECTION_TOP3.md. EffectsMixer deferred until lifecycle hardened. Run `python scripts/ci/generate_ibackendclient_queue.py` before trusting queue.
+2. **Baseline hygiene** — Run creep check periodically; retained-async gate in run_verification; reduce .ci/retained_async_baseline.txt over time.
+3. **Further lifecycle cleanup** — EffectsMixer (Task 3.2), VoiceCloningWizard, Library, Training (optional follow-through).
 
 **Truth sync:** **SceneBuilderViewModel** — migration and lifecycle ownership complete (2026-03-13): OnActivatedAsync awaits LoadScenesAsync; staleness guard in LoadScenesAsync; IDispatcherTimer debounce; disposal stops timer. **BatchProcessingViewModel** — migration complete; lifecycle closed with accepted exceptions (polling/WebSocket retained; BATCH_PROCESSING_LIFECYCLE_PATTERNS.md).
 

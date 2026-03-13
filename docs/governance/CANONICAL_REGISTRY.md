@@ -44,6 +44,11 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Finish Line: Personal Studio** | `docs/governance/FINISH_LINE_PERSONAL_STUDIO.md` | 2026-03-06 | Acceptance criteria for workspaces CRUD/import/export, tool catalog, docking/resize/collapse persistence, restore failure recovery; manual thrash test; build determinism rule |
 | **Test Classification** | `docs/governance/TEST_CLASSIFICATION.md` | 2026-03-12 | Seam-aware vs transport-mock vs legacy; supports architectural completion claims |
 | **Training Lifecycle Async Patterns** | `docs/design/TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md` | 2026-03-12 | Fire-and-forget paths in TrainingViewModel; cancellation ownership |
+| **Retained Async Rule** | `docs/design/RETAINED_ASYNC_RULE.md` | 2026-03-13 | Unified rule for ViewModel fire-and-forget; aligns SceneBuilder, BatchProcessing, Training |
+| **IBackendClient Unresolved Queue** | `docs/design/IBACKENDCLIENT_UNRESOLVED_QUEUE.md` | 2026-03-13 | Live ranked list of unresolved IBackendClient consumers; use for next migration wave |
+| **IBackendClient Inspection Top 3** | `docs/design/IBACKENDCLIENT_INSPECTION_TOP3.md` | 2026-03-13 | File-level inspection for EffectsMixer, TemplateLibrary, VoiceMorph; no migration without sheet |
+| **EffectsMixer Domain Split Analysis** | `docs/design/EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md` | 2026-03-13 | Design-before-implementation; three seams (Meter, EffectChain, MixerState); Option C |
+| **Retained-Async Baseline** | `.ci/retained_async_baseline.txt` | 2026-03-13 | Known violations; check fails only on NEW violations (Option C) |
 
 ## Architecture
 
@@ -117,6 +122,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Architecture Integration Phase 4 Backlog | `docs/design/ARCHITECTURE_INTEGRATION_BACKLOG.md` | 2026-01-28 | R10/R11 done; R12 (skills-as-MCP) backlog |
 | **Plugin Phase 3 Remediation Plan** | `docs/design/PLUGIN_PHASE3_REMEDIATION_PLAN.md` | 2026-02-16 | Findings and sprint plan from Phase 3 architectural review |
 | **Timeline Hardening and Next Tasks Plan** | `docs/design/TIMELINE_HARDENING_AND_NEXT_TASKS_PLAN_2026-03-11.md` | 2026-03-11 | Ruthless assessment; verification of 9.4/11.1; Task 10.1 partial status; next 8 tasks in order (Timeline 1A–1C, dialog baseline, audit, proof, mypy, workflow, skip-debt) |
+| **Next 10 Tasks Plan v2** | `docs/design/NEXT_10_TASKS_PLAN_V2.md` | 2026-03-13 | Seam migration (MultiVoiceGenerator, EnsembleSynthesis, MiniTimeline, Automation, GlobalSearch, EffectsMixer); lifecycle audit; seam test audit; doc fix; verification gate |
 | **Comprehensive Gap Analysis and Remediation Plan** | `docs/design/COMPREHENSIVE_GAP_ANALYSIS_AND_REMEDIATION_PLAN.md` | 2026-03-11 | Verified work completed vs. remaining; 9 gaps logged; 8-phase remediation plan (R1–R8); P1–P4 priorities |
 | **Cross-Role Escalation Matrix** | `docs/governance/CROSS_ROLE_ESCALATION_MATRIX.md` | 2026-01-29 | Decision tree and routing table for cross-role escalation; when to use Debug Agent vs other roles |
 | **Handoff Protocol** | `docs/governance/HANDOFF_PROTOCOL.md` | 2026-01-29 | Standardized protocol for issue escalation and cross-role handoffs; templates and examples |
@@ -153,7 +159,8 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Role 7: Debug Agent** | `docs/governance/roles/ROLE_7_DEBUG_AGENT_GUIDE.md` | 2026-01-25 | Root-cause analysis, issue triage, system-wide fixes, validation |
 | Skeptical Validator (subagent) | `docs/governance/SKEPTICAL_VALIDATOR_GUIDE.md` | 2026-01-28 | Cross-cutting validation subagent; §7 "When to Use" |
 | Validator Escalation Protocol | `docs/governance/VALIDATOR_ESCALATION.md` | 2026-01-28 | Overseer queue, HIGH PRIORITY, escalation triggers |
-| **Overseer Final Handoff** | `docs/governance/overseer/handoffs/OVERSEER_FINAL_HANDOFF.md` | 2026-02-18 | **NEW** — Successor handoff: architecture, risks, file map, verification playbook, recommendations (10 sections) |
+| **Overseer Final Handoff** | `docs/governance/overseer/handoffs/OVERSEER_FINAL_HANDOFF.md` | 2026-02-18 | Successor handoff: architecture, risks, file map, verification playbook, recommendations (10 sections) |
+| **Overseer Session Handoff 2026-03-13** | `docs/governance/overseer/handoffs/OVERSEER_SESSION_HANDOFF_2026-03-13.md` | 2026-03-13 | Session handoff: ImageSearch migration complete; completion_guard FAIL; next target Rank 7 (TemplateLibraryViewModel) |
 | Context Manager Integration | `docs/governance/CONTEXT_MANAGER_INTEGRATION.md` | 2026-01-25 | Context manager architecture, ownership, and usage by role |
 | Role Boundaries Protocol | `Recovery Plan/ROLE_SYSTEM_AND_OVERSEER_PROTOCOL.md` | 2026-01-25 | Role playbooks, handshake rules |
 | Role Cheatsheet | `docs/developer/ROLE_CHEATSHEET.md` | 2026-01-25 | Quick one-liner prompts |

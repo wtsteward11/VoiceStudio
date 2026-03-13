@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -17,11 +18,13 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the SceneBuilderView panel - Scene composition editor.
   /// </summary>
-  public partial class SceneBuilderViewModel : BaseViewModel, IPanelView
+  public partial class SceneBuilderViewModel : BaseViewModel, ILifecyclePanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ISceneBuilderClient _sceneBuilderClient;
     private readonly UndoRedoService? _undoRedoService;
-    private CancellationTokenSource? _searchDebounceCts;
+    private readonly CancellationTokenSource _disposalCts = new();
+    private CancellationTokenSource? _loadScenesCts;
+    private readonly IDispatcherTimer? _searchDebounceTimer;
     private const int SearchDebounceMs = 300;
 
     public string PanelId => "scene-builder";
@@ -43,10 +46,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<string> availableProjects = new();
 
-    public SceneBuilderViewModel(IViewModelContext context, IBackendClient backendClient)
+    public SceneBuilderViewModel(IViewModelContext context, ISceneBuilderClient sceneBuilderClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _sceneBuilderClient = sceneBuilderClient ?? throw new ArgumentNullException(nameof(sceneBuilderClient));
 
       // Get undo/redo service (may be null if not initialized)
       try
@@ -87,12 +90,41 @@ namespace VoiceStudio.App.ViewModels
       RefreshCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
-        await RefreshAsync(ct);
+        await RefreshAsyncInternal(ct);
       }, () => !IsLoading);
 
-      // Load initial data
-      _ = LoadScenesAsync(CancellationToken.None);
+      _searchDebounceTimer = Dispatcher.CreateTimer();
+      if (_searchDebounceTimer != null)
+      {
+        _searchDebounceTimer.Interval = TimeSpan.FromMilliseconds(SearchDebounceMs);
+        _searchDebounceTimer.IsRepeating = false;
+        _searchDebounceTimer.Tick += OnSearchDebounceTick;
+      }
     }
+
+    private void OnSearchDebounceTick(object? sender, object e)
+    {
+      if (_disposalCts.IsCancellationRequested) return;
+      _loadScenesCts?.Cancel();
+      _loadScenesCts?.Dispose();
+      _loadScenesCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = LoadScenesAsync(_loadScenesCts.Token);
+    }
+
+    /// <inheritdoc />
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _loadScenesCts?.Cancel();
+      _loadScenesCts?.Dispose();
+      using var linked = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token, cancellationToken);
+      await LoadScenesAsync(linked.Token);
+    }
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public async Task RefreshAsync(CancellationToken cancellationToken = default) => await RefreshAsyncInternal(cancellationToken);
 
     public IAsyncRelayCommand LoadScenesCommand { get; }
     public IAsyncRelayCommand CreateSceneCommand { get; }
@@ -103,33 +135,18 @@ namespace VoiceStudio.App.ViewModels
 
     private async Task LoadScenesAsync(CancellationToken cancellationToken)
     {
+      var projectSnapshot = SelectedProjectId;
+      var searchSnapshot = SearchQuery;
+
       IsLoading = true;
       ErrorMessage = null;
 
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (!string.IsNullOrEmpty(SelectedProjectId))
-          queryParams.Add("project_id", SelectedProjectId);
-        if (!string.IsNullOrEmpty(SearchQuery))
-          queryParams.Add("search", SearchQuery);
+        var scenes = await _sceneBuilderClient.GetScenesAsync(projectSnapshot, searchSnapshot, cancellationToken);
 
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/scenes";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var scenes = await _backendClient.SendRequestAsync<object, Scene[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        if (SelectedProjectId != projectSnapshot || SearchQuery != searchSnapshot)
+          return;
 
         Scenes.Clear();
         if (scenes != null)
@@ -142,7 +159,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -167,20 +184,15 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new SceneCreateRequest
         {
-          name = ResourceHelper.GetString("SceneBuilder.NewSceneName", "New Scene"),
-          description = "",
-          project_id = SelectedProjectId,
-          tags = Array.Empty<string>()
+          Name = ResourceHelper.GetString("SceneBuilder.NewSceneName", "New Scene"),
+          Description = "",
+          ProjectId = SelectedProjectId!,
+          Tags = new List<string>()
         };
 
-        var created = await _backendClient.SendRequestAsync<object, Scene>(
-            "/api/scenes",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var created = await _sceneBuilderClient.CreateSceneAsync(request, cancellationToken);
 
         if (created != null)
         {
@@ -194,7 +206,7 @@ namespace VoiceStudio.App.ViewModels
           {
             var action = new CreateSceneAction(
                 Scenes,
-                _backendClient,
+                _sceneBuilderClient,
                 sceneItem,
                 onUndo: (s) =>
                 {
@@ -232,30 +244,25 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new SceneUpdateRequest
         {
-          name = scene.Name,
-          description = scene.Description,
-          tracks = scene.Tracks.Select(t => new
+          Name = scene.Name,
+          Description = scene.Description,
+          Tracks = scene.Tracks.Select(t => new SceneTrackDto
           {
-            id = t.Id,
-            name = t.Name,
-            track_number = t.TrackNumber,
-            clips = t.Clips,
-            effects = t.Effects,
-            automation = t.Automation
-          }).ToArray(),
-          master_effects = scene.MasterEffects,
-          duration = scene.Duration,
-          tags = scene.Tags
+            Id = t.Id,
+            Name = t.Name,
+            TrackNumber = t.TrackNumber,
+            Clips = t.Clips,
+            Effects = t.Effects,
+            Automation = t.Automation
+          }).ToList(),
+          MasterEffects = scene.MasterEffects,
+          Duration = scene.Duration,
+          Tags = scene.Tags
         };
 
-        var updated = await _backendClient.SendRequestAsync<object, Scene>(
-            $"/api/scenes/{scene.Id}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var updated = await _sceneBuilderClient.UpdateSceneAsync(scene.Id, request, cancellationToken);
 
         if (updated != null)
         {
@@ -289,12 +296,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/scenes/{scene.Id}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _sceneBuilderClient.DeleteSceneAsync(scene.Id, cancellationToken);
 
         var originalIndex = Scenes.IndexOf(scene);
         Scenes.Remove(scene);
@@ -310,7 +312,7 @@ namespace VoiceStudio.App.ViewModels
         {
           var action = new DeleteSceneAction(
               Scenes,
-              _backendClient,
+              _sceneBuilderClient,
               scene,
               originalIndex,
               onUndo: (s) => SelectedScene = s,
@@ -351,12 +353,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var response = await _backendClient.SendRequestAsync<object, SceneApplyResponse>(
-            $"/api/scenes/{scene.Id}/apply?target_project_id={Uri.EscapeDataString(SelectedProjectId)}",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _sceneBuilderClient.ApplySceneAsync(scene.Id, SelectedProjectId, cancellationToken);
 
         StatusMessage = response?.Message ?? ResourceHelper.GetString("SceneBuilder.SceneApplied", "Scene applied");
       }
@@ -370,7 +367,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task RefreshAsyncInternal(CancellationToken cancellationToken)
     {
       try
       {
@@ -389,34 +386,36 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSelectedProjectIdChanged(string? value)
     {
-      _ = LoadScenesAsync(CancellationToken.None);
+      _searchDebounceTimer?.Stop();
+      _loadScenesCts?.Cancel();
+      _loadScenesCts?.Dispose();
+      _loadScenesCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = LoadScenesAsync(_loadScenesCts.Token);
     }
 
     partial void OnSearchQueryChanged(string value)
     {
-      _searchDebounceCts?.Cancel();
-      _searchDebounceCts = new CancellationTokenSource();
-      var cts = _searchDebounceCts;
-      _ = Task.Run(async () =>
-      {
-        try
-        {
-          await Task.Delay(SearchDebounceMs, cts.Token);
-          Dispatcher.TryEnqueue(() => _ = LoadScenesAsync(cts.Token));
-        }
-        catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "SceneBuilderViewModel.OnSearchQueryChanged");
-      }
-      });
+      _searchDebounceTimer?.Stop();
+      _searchDebounceTimer?.Start();
     }
 
-    // Response models
-    private class SceneApplyResponse
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
     {
-      public bool Success { get; set; }
-      public string Message { get; set; } = string.Empty;
+      if (disposing)
+      {
+        _searchDebounceTimer?.Stop();
+        if (_searchDebounceTimer != null)
+          _searchDebounceTimer.Tick -= OnSearchDebounceTick;
+        _loadScenesCts?.Cancel();
+        _loadScenesCts?.Dispose();
+        _loadScenesCts = null;
+        _disposalCts.Cancel();
+        _disposalCts.Dispose();
+      }
+      base.Dispose(disposing);
     }
+
   }
 
   // Data models

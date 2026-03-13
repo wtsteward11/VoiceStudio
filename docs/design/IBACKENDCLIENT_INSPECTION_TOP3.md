@@ -8,7 +8,7 @@
 
 ## True Top 3 (by rank: daily-use, lifecycle, mutation)
 
-1. **EffectsMixerViewModel** — Rank 1, DEFERRED until lifecycle hardened
+1. **EffectsMixerViewModel** — Rank 1, lifecycle hardened (2026-03-13); seam migration deferred per domain split
 2. **TemplateLibraryViewModel** — Rank 7, recommended next
 3. **VoiceMorphViewModel** — Rank 8
 
@@ -19,7 +19,7 @@
 | Field | EffectsMixer | TemplateLibrary | VoiceMorph |
 |-------|--------------|-----------------|------------|
 | **Backend call clusters** | GetAudioMetersAsync, GetEffectChainsAsync, GetEffectPresetsAsync, CreateEffectChainAsync, DeleteEffectChainAsync, ProcessAudioWithChainAsync, UpdateEffectChainAsync, GetMixerStateAsync, UpdateMixerStateAsync, ResetMixerStateAsync, GetMixerPresetsAsync, CreateMixerPresetAsync, ApplyMixerPresetAsync, Create/Delete/Update Send/Return/SubGroup | SendRequestAsync (GetTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, ApplyTemplate, GetCategories) | SendRequestAsync (GetConfigs, CreateConfig, UpdateConfig, DeleteConfig, ApplyMorph), ListProjectAudioAsync |
-| **Lifecycle patterns** | ContinueWith, _pollingCts, no IDisposable, no staleness guard | Constructor FAF: _ = LoadCategoriesAsync/LoadTemplatesAsync(CancellationToken.None); _searchDebounceCts for debounce | No constructor FAF; command-driven loads |
+| **Lifecycle patterns** | Lifecycle hardened (IPanelLifecycle, IDisposable, _disposalCts, _selectionLoadCts, staleness guard) | Constructor FAF: _ = LoadCategoriesAsync/LoadTemplatesAsync(CancellationToken.None); _searchDebounceCts for debounce | No constructor FAF; command-driven loads |
 | **Destructive operations** | Create/Delete/Update effect chains, mixer state, presets, sends/returns/subgroups | CreateTemplate, UpdateTemplate, DeleteTemplate, ApplyTemplate | CreateConfig, UpdateConfig, DeleteConfig, ApplyMorph |
 | **Undo/redo coupling** | EffectChainActions holds _backendClient | TemplateActions (CreateTemplateAction, UpdateTemplateAction) hold _backendClient | None (no UndoRedo) |
 | **UndoableActions dependency** | EffectChainActions needs IEffectChainClient (or equivalent) | TemplateActions needs ITemplateLibraryClient | N/A |
@@ -29,13 +29,11 @@
 
 ---
 
-## Rank 1: EffectsMixerViewModel — DEFER
+## Rank 1: EffectsMixerViewModel — Seam Migration Deferred
 
 **File:** `src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs`
 
-**Lifecycle risks:** OnSelectedProjectIdChanged, OnSelectedAudioIdChanged use `ContinueWith` — no `_disposalCts`, no staleness guard. No IDisposable. UndoRedo actions hold `_backendClient`.
-
-**Recommendation:** Defer until lifecycle hardened (CTS ownership, disposal, staleness guard). See [IBACKENDCLIENT_UNRESOLVED_QUEUE.md](IBACKENDCLIENT_UNRESOLVED_QUEUE.md) § File-Level Inspection.
+**Lifecycle hardened (2026-03-13).** Still uses IBackendClient; seam migration deferred per domain split (Option C: IEffectsMeterClient, IEffectChainClient, IMixerStateClient). See [IBACKENDCLIENT_UNRESOLVED_QUEUE.md](IBACKENDCLIENT_UNRESOLVED_QUEUE.md) § File-Level Inspection.
 
 ---
 
@@ -62,3 +60,4 @@
 ## Changelog
 
 - 2026-03-13: Initial inspection sheet. Top 3 from generate_ibackendclient_queue.py. EffectsMixer deferred; TemplateLibrary recommended next.
+- 2026-03-13: Doc sync. EffectsMixer lifecycle hardened; seam migration deferred per domain split (Option C).

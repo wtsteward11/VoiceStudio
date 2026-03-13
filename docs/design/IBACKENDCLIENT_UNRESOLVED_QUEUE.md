@@ -23,7 +23,7 @@
 
 | Rank | File | Call Sites | Lifecycle Risk | Mutation | Expected Seam | Proof |
 |------|------|------------|----------------|----------|---------------|-------|
-| 1 | `Views/Panels/EffectsMixerViewModel.cs` | High | High (panel) | Yes | IEffectsMixerClient | Seam tests |
+| 1 | `Views/Panels/EffectsMixerViewModel.cs` | High | Lifecycle hardened | Yes | Domain split (Option C) | Seam tests |
 | ~~2~~ | ~~`ViewModels/AssistantViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
 | ~~3~~ | ~~`ViewModels/MixAssistantViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
 | ~~4~~ | ~~`ViewModels/AdvancedSettingsViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
@@ -48,9 +48,11 @@
 
 ## File-Level Inspection (Ranks 1–3)
 
-### Rank 1: EffectsMixerViewModel — DEFER
+### Rank 1: EffectsMixerViewModel — Seam Migration Deferred
 
 **File:** `src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs`
+
+**Lifecycle hardened (2026-03-13).** Still uses IBackendClient; seam migration deferred per domain split (Option C: IEffectsMeterClient, IEffectChainClient, IMixerStateClient). See [EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md](EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md).
 
 | IBackendClient Call | Destructive |
 |---------------------|-------------|
@@ -70,10 +72,6 @@
 | CreateMixerSendAsync, CreateMixerReturnAsync, CreateMixerSubGroupAsync | Yes |
 | DeleteMixerSubGroupAsync, DeleteMixerSendAsync, DeleteMixerReturnAsync | Yes |
 | UpdateMixerSubGroupAsync, UpdateMixerSendAsync, UpdateMixerReturnAsync | Yes |
-
-**Lifecycle risks:** OnSelectedProjectIdChanged, OnSelectedAudioIdChanged use `ContinueWith` — no `_disposalCts`, no staleness guard. No IDisposable. UndoRedo actions hold `_backendClient` reference.
-
-**Recommendation:** **Defer** until lifecycle hardened (CTS ownership, disposal, staleness guard).
 
 ---
 
@@ -125,9 +123,9 @@ AIMixingMasteringViewModel, AIProductionAssistantViewModel, AdvancedSpectrogramV
 
 ## Next Migration Target
 
-**Recommended:** Rank 7 — `ViewModels/TemplateLibraryViewModel.cs` (ITemplateLibraryClient). EffectsMixer (Rank 1) deferred until lifecycle hardened. MixAssistant, Assistant, AdvancedSettings, UltimateDashboard, ImageSearch migrated 2026-03-13.
+**Recommended:** Rank 7 — `ViewModels/TemplateLibraryViewModel.cs` (ITemplateLibraryClient). EffectsMixer (Rank 1) lifecycle hardened (2026-03-13); seam migration deferred per domain split (Option C). MixAssistant, Assistant, AdvancedSettings, UltimateDashboard, ImageSearch migrated 2026-03-13.
 
-**Alternative:** Rank 1 — `Views/Panels/EffectsMixerViewModel.cs` (IEffectsMixerClient) after lifecycle hardening.
+**Alternative:** Rank 1 — `Views/Panels/EffectsMixerViewModel.cs` domain split (IEffectsMeterClient, IEffectChainClient, IMixerStateClient) per [EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md](EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md).
 
 Before starting: run `python scripts/ci/check_ibackendclient_creep.py` and confirm baseline alignment.
 
@@ -138,3 +136,4 @@ Before starting: run `python scripts/ci/check_ibackendclient_creep.py` and confi
 - 2026-03-13: File-level inspection for ranks 1–3. EffectsMixer deferred; MixAssistant recommended as next target. Rationale: constructor-only lifecycle fix, simpler API surface.
 - 2026-03-13: ImageSearchViewModel migrated to IImageSearchClient. IPanelLifecycle; OnActivatedAsync for initial load; seam tests added.
 - 2026-03-13: Initial live queue. Ranks 1–20 derived from baseline; remaining 35+ listed alphabetically. Replaces exhausted historical ranking table for next-wave selection.
+- 2026-03-13: Doc sync. EffectsMixer lifecycle hardened; Rank 1 updated; seam migration deferred per domain split (Option C).

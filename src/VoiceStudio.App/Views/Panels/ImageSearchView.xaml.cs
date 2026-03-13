@@ -18,12 +18,12 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new ImageSearchViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient()
+          AppServices.GetImageSearchClient()
       );
       DataContext = ViewModel;
 
       // Initialize services
-      _toastService = ServiceProvider.GetToastNotificationService();
+      _toastService = AppServices.TryGetToastNotificationService();
 
       // Subscribe to ViewModel events for toast notifications
       ViewModel.PropertyChanged += (_, e) =>

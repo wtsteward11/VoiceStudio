@@ -28,7 +28,7 @@
 | ~~3~~ | ~~`ViewModels/MixAssistantViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
 | ~~4~~ | ~~`ViewModels/AdvancedSettingsViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
 | ~~5~~ | ~~`ViewModels/UltimateDashboardViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
-| 6 | `ViewModels/ImageSearchViewModel.cs` | Medium | Medium | Yes | IImageSearchClient | Seam tests |
+| ~~6~~ | ~~`ViewModels/ImageSearchViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
 | 7 | `ViewModels/TemplateLibraryViewModel.cs` | Medium | Medium | Yes | ITemplateLibraryClient | Seam tests |
 | 8 | `ViewModels/VoiceMorphViewModel.cs` | Medium | Medium | Yes | IVoiceMorphClient | Seam tests |
 | 9 | `ViewModels/VoiceStyleTransferViewModel.cs` | Medium | Medium | Yes | IVoiceStyleTransferClient | Seam tests |
@@ -101,6 +101,22 @@
 
 ---
 
+### Rank 5: UltimateDashboardViewModel — DONE (2026-03-13)
+
+**File:** `src/VoiceStudio.App/ViewModels/UltimateDashboardViewModel.cs`
+
+**Status:** **MIGRATED** to `IUltimateDashboardClient`. IPanelLifecycle implemented; OnActivatedAsync for initial load; constructor fire-and-forget removed. Seam tests in `UltimateDashboardViewModelSeamTests.cs`.
+
+---
+
+### Rank 6: ImageSearchViewModel — DONE (2026-03-13)
+
+**File:** `src/VoiceStudio.App/ViewModels/ImageSearchViewModel.cs`
+
+**Status:** **MIGRATED** to `IImageSearchClient`. IPanelLifecycle implemented; OnActivatedAsync for initial load (LoadSources, LoadCategories, LoadColors); constructor fire-and-forget removed. Seam tests in `ImageSearchViewModelSeamTests.cs`.
+
+---
+
 ## Remaining Unresolved (Alphabetical)
 
 AIMixingMasteringViewModel, AIProductionAssistantViewModel, AdvancedSpectrogramVisualizationViewModel, AdvancedWaveformVisualizationViewModel, AnalyticsDashboardViewModel, AudioAnalysisViewModel, AudioMonitoringDashboardViewModel, DeepfakeCreatorViewModel, EmotionStylePresetEditorViewModel, GPUStatusViewModel, HelpViewModel, ImageVideoEnhancementPipelineViewModel, KeyboardShortcutsViewModel, MCPDashboardViewModel, MarkerManagerViewModel, MultilingualSupportViewModel, PipelineConversationViewModel, ProfileHealthDashboardViewModel, PronunciationLexiconViewModel, ProsodyViewModel, RealTimeAudioVisualizerViewModel, SLODashboardViewModel, SpatialStageViewModel, TagManagerViewModel, TagOrganizationViewModel, TextHighlightingViewModel, TrainingQualityVisualizationViewModel, VideoEditViewModel, VideoGenViewModel, VoiceBrowserViewModel, VoiceMorphingBlendingViewModel, VoiceQuickCloneViewModel, AdvancedRealTimeVisualizationViewModel, AdvancedSearchViewModel, WorkflowAutomationViewModel.
@@ -109,7 +125,7 @@ AIMixingMasteringViewModel, AIProductionAssistantViewModel, AdvancedSpectrogramV
 
 ## Next Migration Target
 
-**Recommended:** Rank 6 — `ViewModels/ImageSearchViewModel.cs` (IImageSearchClient). EffectsMixer (Rank 1) deferred until lifecycle hardened. MixAssistant, Assistant, AdvancedSettings, UltimateDashboard migrated 2026-03-13.
+**Recommended:** Rank 7 — `ViewModels/TemplateLibraryViewModel.cs` (ITemplateLibraryClient). EffectsMixer (Rank 1) deferred until lifecycle hardened. MixAssistant, Assistant, AdvancedSettings, UltimateDashboard, ImageSearch migrated 2026-03-13.
 
 **Alternative:** Rank 1 — `Views/Panels/EffectsMixerViewModel.cs` (IEffectsMixerClient) after lifecycle hardening.
 
@@ -120,4 +136,5 @@ Before starting: run `python scripts/ci/check_ibackendclient_creep.py` and confi
 ## Changelog
 
 - 2026-03-13: File-level inspection for ranks 1–3. EffectsMixer deferred; MixAssistant recommended as next target. Rationale: constructor-only lifecycle fix, simpler API surface.
+- 2026-03-13: ImageSearchViewModel migrated to IImageSearchClient. IPanelLifecycle; OnActivatedAsync for initial load; seam tests added.
 - 2026-03-13: Initial live queue. Ranks 1–20 derived from baseline; remaining 35+ listed alphabetically. Replaces exhausted historical ranking table for next-wave selection.

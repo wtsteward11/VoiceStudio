@@ -15,7 +15,7 @@ src/VoiceStudio.App/ViewModels/DeepfakeCreatorViewModel.cs:71 # DeepfakeCreatorV
 src/VoiceStudio.App/ViewModels/GPUStatusViewModel.cs:49 # GPUStatusViewModel constructor
 # GlobalSearchViewModel MIGRATED to ISearchClient (2026-03-13)
 src/VoiceStudio.App/ViewModels/HelpViewModel.cs:55 # HelpViewModel constructor
-src/VoiceStudio.App/ViewModels/ImageSearchViewModel.cs:75 # ImageSearchViewModel constructor
+# ImageSearchViewModel MIGRATED to IImageSearchClient (2026-03-13)
 # JobProgressViewModel MIGRATED to IJobProgressApiClient (2026-03-12)
 src/VoiceStudio.App/ViewModels/KeyboardShortcutsViewModel.cs:59 # KeyboardShortcutsViewModel constructor
 src/VoiceStudio.App/ViewModels/LexiconViewModel.cs:71 # LexiconViewModel constructor

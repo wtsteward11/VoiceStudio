@@ -3,7 +3,6 @@ using Moq;
 using System;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
-using VoiceStudio.App.Services;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -15,14 +14,14 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class ImageSearchViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IImageSearchClient>? _mockImageSearchClient;
         private ImageSearchViewModel? _viewModel;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockImageSearchClient = new Mock<IImageSearchClient>();
             _viewModel = CreateViewModel();
         }
 
@@ -30,13 +29,13 @@ namespace VoiceStudio.App.Tests.ViewModels
         public override void TestCleanup()
         {
             _viewModel = null;
-            _mockBackendClient = null;
+            _mockImageSearchClient = null;
             base.TestCleanup();
         }
 
         private ImageSearchViewModel CreateViewModel()
         {
-            return new ImageSearchViewModel(MockContext!, _mockBackendClient!.Object);
+            return new ImageSearchViewModel(MockContext!, _mockImageSearchClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -55,12 +54,12 @@ namespace VoiceStudio.App.Tests.ViewModels
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
-            _ = new ImageSearchViewModel(null!, _mockBackendClient!.Object);
+            _ = new ImageSearchViewModel(null!, _mockImageSearchClient!.Object);
         }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullImageSearchClient_ThrowsArgumentNullException()
         {
             _ = new ImageSearchViewModel(MockContext!, null!);
         }

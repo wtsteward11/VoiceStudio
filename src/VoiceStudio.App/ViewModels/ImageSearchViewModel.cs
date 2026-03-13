@@ -1,10 +1,10 @@
 using System;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
@@ -15,9 +15,9 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the ImageSearchView panel - Image search functionality.
   /// </summary>
-  public partial class ImageSearchViewModel : BaseViewModel, IPanelView
+  public partial class ImageSearchViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IImageSearchClient _imageSearchClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
     public string PanelId => "image-search";
@@ -72,10 +72,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<string> availableOrientations = new() { "landscape", "portrait", "square" };
 
-    public ImageSearchViewModel(IViewModelContext context, IBackendClient backendClient)
+    public ImageSearchViewModel(IViewModelContext context, IImageSearchClient imageSearchClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _imageSearchClient = imageSearchClient ?? throw new ArgumentNullException(nameof(imageSearchClient));
 
       // Get services (may be null if not initialized)
       try
@@ -121,19 +121,28 @@ namespace VoiceStudio.App.ViewModels
       RefreshCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
-        await RefreshAsync(ct);
+        await RefreshAsyncInternal(ct);
       }, () => !IsLoading);
       ClearHistoryCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("ClearHistory");
         await ClearHistoryAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadSourcesAsync(CancellationToken.None);
-      _ = LoadCategoriesAsync(CancellationToken.None);
-      _ = LoadColorsAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public async Task OnActivatedAsync(CancellationToken cancellationToken)
+    {
+      await LoadSourcesAsync(cancellationToken);
+      await LoadCategoriesAsync(cancellationToken);
+      await LoadColorsAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => RefreshAsyncInternal(cancellationToken);
 
     public IAsyncRelayCommand SearchCommand { get; }
     public IAsyncRelayCommand LoadSourcesCommand { get; }
@@ -189,12 +198,7 @@ namespace VoiceStudio.App.ViewModels
           PerPage = PerPage
         };
 
-        var response = await _backendClient.SendRequestAsync<ImageSearchRequest, ImageSearchResponse>(
-            "/api/image-search/search",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _imageSearchClient.SearchAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -249,12 +253,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var sources = await _backendClient.SendRequestAsync<object, ImageSource[]>(
-            "/api/image-search/sources",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var sources = await _imageSearchClient.GetSourcesAsync(cancellationToken);
 
         if (sources != null)
         {
@@ -286,12 +285,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var categories = await _backendClient.SendRequestAsync<object, string[]>(
-            "/api/image-search/categories",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var categories = await _imageSearchClient.GetCategoriesAsync(cancellationToken);
 
         if (categories != null)
         {
@@ -316,12 +310,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var colors = await _backendClient.SendRequestAsync<object, string[]>(
-            "/api/image-search/colors",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var colors = await _imageSearchClient.GetColorsAsync(cancellationToken);
 
         if (colors != null)
         {
@@ -361,7 +350,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task RefreshAsyncInternal(CancellationToken cancellationToken)
     {
       await LoadSourcesAsync(cancellationToken);
       await LoadCategoriesAsync(cancellationToken);
@@ -377,13 +366,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            "/api/image-search/history",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
-
+        await _imageSearchClient.ClearHistoryAsync(cancellationToken);
         StatusMessage = ResourceHelper.GetString("ImageSearch.SearchHistoryCleared", "Search history cleared");
         _toastNotificationService?.ShowSuccess(
             ResourceHelper.GetString("ImageSearch.SearchHistoryClearedDetail", "Search history cleared"),
@@ -400,55 +383,6 @@ namespace VoiceStudio.App.ViewModels
             ResourceHelper.GetString("Toast.Title.ClearFailed", "Clear Failed"),
             ex.Message);
       }
-    }
-
-    // Request models
-    private class ImageSearchRequest
-    {
-      public string Query { get; set; } = string.Empty;
-      public string? Source { get; set; }
-      public string? Category { get; set; }
-      public string? Orientation { get; set; }
-      public string? Color { get; set; }
-      public int Page { get; set; } = 1;
-      public int PerPage { get; set; } = 20;
-    }
-
-    private class ImageSearchResponse
-    {
-      public ImageSearchResult[] Results { get; set; } = Array.Empty<ImageSearchResult>();
-      public int Total { get; set; }
-      public int Page { get; set; }
-      public int PerPage { get; set; }
-      public int TotalPages { get; set; }
-      public string Query { get; set; } = string.Empty;
-      public string? Source { get; set; }
-    }
-
-    private class ImageSearchResult
-    {
-      public string ResultId { get; set; } = string.Empty;
-      public string ImageUrl { get; set; } = string.Empty;
-      public string? ThumbnailUrl { get; set; }
-      public string Title { get; set; } = string.Empty;
-      public string? Description { get; set; }
-      public string Source { get; set; } = string.Empty;
-      public int Width { get; set; }
-      public int Height { get; set; }
-      public int? FileSize { get; set; }
-      public string? License { get; set; }
-      public string? Author { get; set; }
-      public string? AuthorUrl { get; set; }
-      public string[] Tags { get; set; } = Array.Empty<string>();
-    }
-
-    private class ImageSource
-    {
-      public string SourceId { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public string Description { get; set; } = string.Empty;
-      public bool RequiresApiKey { get; set; }
-      public bool IsAvailable { get; set; }
     }
   }
 

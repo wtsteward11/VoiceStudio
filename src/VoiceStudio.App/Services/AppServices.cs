@@ -216,6 +216,7 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IMixAssistantClient, MixAssistantClient>();
       services.AddSingleton<IAdvancedSettingsClient, AdvancedSettingsClient>();
       services.AddSingleton<IUltimateDashboardClient, UltimateDashboardClient>();
+      services.AddSingleton<IImageSearchClient, ImageSearchClient>();
 
       // Assistant facade (AssistantViewModel migration)
       services.AddSingleton<IAssistantClient, AssistantClient>();
@@ -517,6 +518,7 @@ namespace VoiceStudio.App.Services
     public static IAssistantClient GetAssistantClient() => GetRequiredService<IAssistantClient>();
     public static IAdvancedSettingsClient GetAdvancedSettingsClient() => GetRequiredService<IAdvancedSettingsClient>();
     public static IUltimateDashboardClient GetUltimateDashboardClient() => GetRequiredService<IUltimateDashboardClient>();
+    public static IImageSearchClient GetImageSearchClient() => GetRequiredService<IImageSearchClient>();
     public static ITimelineClipService GetTimelineClipService() => GetRequiredService<ITimelineClipService>();
     public static ITimelineTrackService GetTimelineTrackService() => GetRequiredService<ITimelineTrackService>();
     public static ITimelineTranscriptionService GetTimelineTranscriptionService() => GetRequiredService<ITimelineTranscriptionService>();

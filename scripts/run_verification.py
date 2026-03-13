@@ -146,6 +146,16 @@ def main():
             "command": f"{sys.executable} {creep_script}"
         })
 
+    # Retained-async rule (Assessment Remediation Plan Task 4.2)
+    # Fails only on NEW violations; baseline in .ci/retained_async_baseline.txt
+    retained_async_script = project_root / "scripts" / "ci" / "check_retained_async.py"
+    retained_async_baseline = project_root / ".ci" / "retained_async_baseline.txt"
+    if retained_async_script.exists() and retained_async_baseline.exists():
+        checks.append({
+            "name": "retained_async",
+            "command": f"{sys.executable} {retained_async_script} --baseline-file {retained_async_baseline}"
+        })
+
     # Quality checks (WS-1, WS-4) - can be skipped with --skip-quality
     if not skip_quality:
         # Empty catch block check (WS-1) - needs longer timeout due to large codebase scan

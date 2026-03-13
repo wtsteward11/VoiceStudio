@@ -57,25 +57,61 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## Next 3 Steps
 
-1. **Governance v3 follow-on** — Training lifecycle: LoadLogs/LoadQualityHistory gated (selection cancellation + staleness guard); Dispose cancels _disposalCts. Remaining fire-and-forget (ConnectWebSocket, LoadDatasets, LoadTrainingJobs, PollTrainingStatus, DisconnectWebSocket) retained per design doc.
-2. **Seam-aware tests** — TrainingViewModelSeamTests, TranscribeViewModelSeamTests, ProfileComparisonViewModelSeamTests added (12 tests). See [TEST_CLASSIFICATION.md](docs/governance/TEST_CLASSIFICATION.md).
-3. **Next lane** — Await selection: further lifecycle cleanup, new seam migrations, or other roadmap items.
+1. **Migration queue** — Confirm GlobalSearch, BackupRestore, APIKeyManager still use seams (not IBackendClient) before next wave; then pick next ranked target from IBACKENDCLIENT_LONGTAIL_RANKING.md.
+2. **Baseline hygiene** — Run creep check periodically; update baseline when new consumers added.
+3. **Further lifecycle cleanup** — VoiceCloningWizard, Library, Training (optional follow-through).
 
-**Seam Migration Status:** All ranked targets complete per [SEAM_MATURITY_AUDIT.md](docs/design/SEAM_MATURITY_AUDIT.md) "Next Architecture Targets" (2026-03-12). Training selected-job loads gated; seam-aware tests added. When SEAM marks a target done, STATE must not advertise it as future; when STATE marks a task complete that touches seams, SEAM must be updated in the same change-set.
+**Truth sync:** **SceneBuilderViewModel** — migration and lifecycle ownership complete (2026-03-13): OnActivatedAsync awaits LoadScenesAsync; staleness guard in LoadScenesAsync; IDispatcherTimer debounce; disposal stops timer. **BatchProcessingViewModel** — migration complete; lifecycle closed with accepted exceptions (polling/WebSocket retained; BATCH_PROCESSING_LIFECYCLE_PATTERNS.md).
 
-## Last Milestone (GOVERNANCE-V3-CORRECTION)
+**Hardening wave:** Closed. SceneBuilder lifecycle ownership complete. BatchProcessing polling/WebSocket retained by design. Migration queue may proceed after verifying unresolved targets against current code.
 
-- **ID**: GOVERNANCE-V3-CORRECTION
-- **Title**: Governance v3 Truth Sync + Training Lifecycle + Seam-Aware Tests
+**Seam Migration Status:** SceneBuilderViewModel (Rank 16) — migration and lifecycle complete. AutomationViewModel (Rank 15), ScriptEditorViewModel (Rank 14), APIKeyManagerViewModel, BackupRestoreViewModel, GlobalSearchViewModel, MultiVoiceGeneratorViewModel, EnsembleSynthesisViewModel, MiniTimelineViewModel, TrainingDatasetEditorViewModel, BatchProcessingViewModel, DiagnosticsViewModel, TextSpeechEditorViewModel, AnalyzerViewModel, SettingsViewModel, MacroViewModel, ModelManagerViewModel, JobProgressViewModel — all migration-complete. Rank 11–16 wave closed.
+
+## Last Milestone (TRUTH-RESET-LIFECYCLE)
+
+- **ID**: TRUTH-RESET-LIFECYCLE
+- **Title**: Truth Reset and Lifecycle Hardening Plan
 - **Status**: **COMPLETE** (2026-03-13)
-- **Completed**: STATE/SEAM truth sync; TrainingViewModel selected-job loads gated (selection cancellation, staleness guard, Dispose); seam-aware tests for Training, Transcribe, ProfileComparison (12 tests); build verified green.
-- **Verification**: dotnet build, dotnet test (SeamAware filter)
+- **Completed**: Task 1: Truth reset (IBACKENDCLIENT_LONGTAIL_RANKING, STATE, SEAM_MATURITY_AUDIT aligned); Task 2: BatchProcessingViewModel lifecycle (_loadJobsCts for filter/project, _selectedJobLoadCts, BATCH_PROCESSING_LIFECYCLE_PATTERNS.md); Task 3: Re-ranked (MultiVoiceGenerator, EnsembleSynthesis, MiniTimeline); Task 4: Next Wave Hardening; Task 5: Lifecycle tests (OnFilterStatusChanged, OnSelectedProjectIdChanged, OnSelectedJobChanged); Task 6: VoiceSynthesisService retry policy documented.
+- **Verification**: verify.ps1 -Quick, creep check, BatchProcessingViewModelSeamTests
 
-**Previous:** QUALITYOPTIMIZATIONWIZARD-HARDENING (2026-03-12)
+**Proof Index (TRUTH-RESET-LIFECYCLE):**
+| Date | Task | Artifact | Type | Status |
+|------|------|----------|------|--------|
+| 2026-03-13 | Truth Reset | check_ibackendclient_creep.py | Gate | PASS |
+| 2026-03-13 | Lifecycle | BatchProcessingViewModelSeamTests (9) | Test | PASS |
+| 2026-03-13 | Lifecycle | BATCH_PROCESSING_LIFECYCLE_PATTERNS.md | Doc | Added |
+| 2026-03-13 | SceneBuilder lifecycle | SceneBuilderViewModel.cs (a1dfafe9) | Code | PASS |
+
+**Previous:** NEXT10-SEAM-BATCH (2026-03-13)
+
+**Previous:** WAVE2-LIFECYCLE-FOLLOW-THROUGH (2026-03-13)
+
+**Proof Index (NEXT10-SEAM-BATCH):**
+| Date | Task | Artifact | Type | Status |
+|------|------|----------|------|--------|
+| 2026-03-13 | NEXT10 | verify.ps1 -Quick | Gate | PASS |
+| 2026-03-13 | NEXT10 | check_ibackendclient_creep.py | Gate | PASS |
+| 2026-03-13 | NEXT10 | JobProgressViewModelTests, JobProgressModelTests (29) | Test | PASS |
+| 2026-03-13 | NEXT10 | dotnet build | Gate | PASS |
+
+## Prior Milestone (WAVE2-LIFECYCLE-FOLLOW-THROUGH)
+
+- **ID**: WAVE2-LIFECYCLE-FOLLOW-THROUGH
+- **Title**: Wave 2 Lifecycle Follow-Through and Wave 3 Preparation
+- **Status**: **COMPLETE** (2026-03-13)
+- **Completed**: WAVE2_LIFECYCLE_AUDIT; BatchProcessing lifecycle (_disposalCts, _selectedJobLoadCts, silent catches fixed); VoiceCloningWizard LoadEnginesAsync moved to Loaded; Library loads moved to OnActivatedAsync; Wave 3 re-ranking (RealTimeVoiceConverter primary); VoiceSynthesisService (no mutation, BackendNotFoundException); seam-aware tests (BatchProcessing, VoiceCloningWizard, VoiceSynthesisService).
+- **Verification**: verify.ps1 -Quick, creep check, seam tests
+
+**Proof Index (WAVE2-LIFECYCLE-FOLLOW-THROUGH):**
+| Date | Task | Artifact | Type | Status |
+|------|------|----------|------|--------|
+| 2026-03-13 | WAVE2-LIFECYCLE | verify.ps1 -Quick | Gate | PASS |
+| 2026-03-13 | WAVE2-LIFECYCLE | SeamTests (VoiceSynthesis, BatchProcessing, VoiceCloningWizard) | Test | PASS |
 
 ---
 
-**Known Debt:** TrainingViewModel lifecycle fire-and-forget: LoadLogsAsync/LoadQualityHistoryAsync now gated (selection-specific cancellation + staleness guard); ConnectWebSocketAsync, LoadDatasetsAsync, LoadTrainingJobsAsync, PollTrainingStatusAsync, DisconnectWebSocketAsync retained. _disposalCts cancelled in Dispose. See [TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md](docs/design/TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md).
+**Known Debt:** TrainingViewModel lifecycle fire-and-forget: LoadLogsAsync/LoadQualityHistoryAsync now gated (selection-specific cancellation + staleness guard); ConnectWebSocketAsync, LoadDatasetsAsync, LoadTrainingJobsAsync, PollTrainingStatusAsync, DisconnectWebSocketAsync retained. _disposalCts cancelled in Dispose. **Decision (2026-03-13):** Training remains explicit exception model (documented in [TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md](docs/design/TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md)); full lifecycle cleanup deferred unless requested.
 
 ---
 

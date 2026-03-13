@@ -5,22 +5,21 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
-using ConversationModel = VoiceStudio.App.ViewModels.AssistantViewModel.Conversation;
-using MessageModel = VoiceStudio.App.ViewModels.AssistantViewModel.Message;
-using TaskSuggestionModel = VoiceStudio.App.ViewModels.AssistantViewModel.TaskSuggestion;
 
 namespace VoiceStudio.App.ViewModels
 {
   /// <summary>
   /// ViewModel for the AssistantView panel - AI production assistant.
   /// </summary>
-  public partial class AssistantViewModel : BaseViewModel, IPanelView
+  public partial class AssistantViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IAssistantClient _assistantClient;
     private readonly IProjectsClient _projectsClient;
+    private CancellationTokenSource? _loadConversationCts;
 
     public string PanelId => "assistant";
     public string DisplayName => ResourceHelper.GetString("Panel.Assistant.DisplayName", "AI Production Assistant");
@@ -62,10 +61,10 @@ namespace VoiceStudio.App.ViewModels
     // CS0108 fix: Intentionally hiding base HasError with local ErrorMessage binding
     public new bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
-    public AssistantViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient)
+    public AssistantViewModel(IViewModelContext context, IAssistantClient assistantClient, IProjectsClient projectsClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _assistantClient = assistantClient ?? throw new ArgumentNullException(nameof(assistantClient));
       _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
 
       SendMessageCommand = new EnhancedAsyncRelayCommand(async (ct) =>
@@ -108,11 +107,14 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       });
-
-      // Load initial data
-      _ = LoadConversationsAsync(CancellationToken.None);
-      _ = LoadProjectsAsync(CancellationToken.None);
     }
+
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      return RefreshAsync(cancellationToken);
+    }
+
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public IAsyncRelayCommand SendMessageCommand { get; }
     public IAsyncRelayCommand LoadConversationsCommand { get; }
@@ -125,9 +127,13 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSelectedConversationChanged(ConversationItem? value)
     {
+      _loadConversationCts?.Cancel();
+      _loadConversationCts?.Dispose();
       if (value != null)
       {
-        _ = LoadConversationAsync(CancellationToken.None);
+        _loadConversationCts = new CancellationTokenSource();
+        var cts = _loadConversationCts;
+        _ = LoadConversationAsync(cts.Token);
       }
     }
 
@@ -166,22 +172,11 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          conversation_id = SelectedConversation?.ConversationId,
-          message = ChatMessage,
-          context = new
-          {
-            project_id = SelectedProjectId
-          }
-        };
-
-        var response = await _backendClient.SendRequestAsync<object, ChatResponse>(
-            "/api/assistant/chat",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _assistantClient.SendChatAsync(
+            SelectedConversation?.ConversationId,
+            ChatMessage,
+            SelectedProjectId,
+            cancellationToken);
 
         if (response != null)
         {
@@ -242,12 +237,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var conversations = await _backendClient.SendRequestAsync<object, Conversation[]>(
-            "/api/assistant/conversations",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var conversations = await _assistantClient.GetConversationsAsync(cancellationToken);
 
         if (conversations != null)
         {
@@ -281,12 +271,9 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var conversation = await _backendClient.SendRequestAsync<object, Conversation>(
-            $"/api/assistant/conversations/{Uri.EscapeDataString(SelectedConversation.ConversationId)}",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var conversation = await _assistantClient.GetConversationAsync(
+            SelectedConversation.ConversationId,
+            cancellationToken);
 
         if (conversation != null)
         {
@@ -320,12 +307,9 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/assistant/conversations/{Uri.EscapeDataString(SelectedConversation.ConversationId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _assistantClient.DeleteConversationAsync(
+            SelectedConversation.ConversationId,
+            cancellationToken);
 
         Conversations.Remove(SelectedConversation);
         SelectedConversation = null;
@@ -364,12 +348,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var suggestions = await _backendClient.SendRequestAsync<object, TaskSuggestion[]>(
-            $"/api/assistant/suggest-tasks?project_id={Uri.EscapeDataString(SelectedProjectId)}",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var suggestions = await _assistantClient.SuggestTasksAsync(SelectedProjectId, cancellationToken);
 
         if (suggestions != null)
         {
@@ -467,7 +446,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var project = await _backendClient.GetProjectAsync(SelectedProjectId, cancellationToken);
+        var project = await _projectsClient.GetProjectAsync(SelectedProjectId, cancellationToken);
 
         if (project != null)
         {
@@ -511,7 +490,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    public async Task RefreshAsync(CancellationToken cancellationToken)
     {
       await LoadConversationsAsync(cancellationToken);
       await LoadProjectsAsync(cancellationToken);
@@ -567,7 +546,7 @@ namespace VoiceStudio.App.ViewModels
     public string Created { get; set; } = string.Empty;
     public string Updated { get; set; } = string.Empty;
 
-    public ConversationItem(ConversationModel conversation)
+    public ConversationItem(AssistantConversation conversation)
     {
       ConversationId = conversation.ConversationId;
       Title = conversation.Title;
@@ -588,7 +567,7 @@ namespace VoiceStudio.App.ViewModels
     public bool IsUser => Role == "user";
     public bool IsAssistant => Role == "assistant";
 
-    public MessageItem(MessageModel message)
+    public MessageItem(AssistantMessage message)
     {
       MessageId = message.MessageId;
       Role = message.Role;
@@ -617,7 +596,7 @@ namespace VoiceStudio.App.ViewModels
         : ResourceHelper.GetString("Assistant.NotAvailable", "N/A");
     public string ConfidenceDisplay => $"{Confidence:P0}";
 
-    public TaskSuggestionItem(TaskSuggestionModel suggestion)
+    public TaskSuggestionItem(AssistantTaskSuggestion suggestion)
     {
       TaskId = suggestion.TaskId;
       Title = suggestion.Title;

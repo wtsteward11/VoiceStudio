@@ -19,23 +19,26 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class AssistantViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IAssistantClient>? _mockAssistantClient;
         private Mock<IProjectsClient>? _mockProjectsClient;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockAssistantClient = new Mock<IAssistantClient>();
             _mockProjectsClient = new Mock<IProjectsClient>();
             _mockProjectsClient
                 .Setup(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<Project>());
+            _mockAssistantClient
+                .Setup(x => x.GetConversationsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Array.Empty<AssistantConversation>());
         }
 
         private AssistantViewModel CreateViewModel()
         {
-            return new AssistantViewModel(MockContext!, _mockBackendClient!.Object, _mockProjectsClient!.Object);
+            return new AssistantViewModel(MockContext!, _mockAssistantClient!.Object, _mockProjectsClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -58,11 +61,11 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new AssistantViewModel(null!, _mockBackendClient!.Object, _mockProjectsClient!.Object));
+                new AssistantViewModel(null!, _mockAssistantClient!.Object, _mockProjectsClient!.Object));
         }
 
         [TestMethod]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullAssistantClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
                 new AssistantViewModel(MockContext!, null!, _mockProjectsClient!.Object));
@@ -216,11 +219,11 @@ namespace VoiceStudio.App.Tests.ViewModels
 
             // Act
             var now = DateTime.UtcNow.ToString("O");
-            var conversation = new AssistantViewModel.Conversation
+            var conversation = new AssistantConversation
             {
                 ConversationId = "conv-1",
                 Title = "Test Conversation",
-                Messages = Array.Empty<AssistantViewModel.Message>(),
+                Messages = Array.Empty<AssistantMessage>(),
                 Created = now,
                 Updated = now
             };

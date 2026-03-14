@@ -19,13 +19,13 @@
 | Field | EffectsMixer | TemplateLibrary | VoiceMorph |
 |-------|--------------|-----------------|------------|
 | **Backend call clusters** | GetAudioMetersAsync, GetEffectChainsAsync, GetEffectPresetsAsync, CreateEffectChainAsync, DeleteEffectChainAsync, ProcessAudioWithChainAsync, UpdateEffectChainAsync, GetMixerStateAsync, UpdateMixerStateAsync, ResetMixerStateAsync, GetMixerPresetsAsync, CreateMixerPresetAsync, ApplyMixerPresetAsync, Create/Delete/Update Send/Return/SubGroup | SendRequestAsync (GetTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, ApplyTemplate, GetCategories) | SendRequestAsync (GetConfigs, CreateConfig, UpdateConfig, DeleteConfig, ApplyMorph), ListProjectAudioAsync |
-| **Lifecycle patterns** | Lifecycle hardened (IPanelLifecycle, IDisposable, _disposalCts, _selectionLoadCts, staleness guard) | MIGRATED: IPanelLifecycle, OnActivatedAsync, IDispatcherTimer debounce | No constructor FAF; command-driven loads |
+| **Lifecycle patterns** | Lifecycle hardened (IPanelLifecycle, IDisposable, _disposalCts, _selectionLoadCts, staleness guard) | MIGRATED: IPanelLifecycle, OnActivatedAsync, IDispatcherTimer debounce | Constructor FAF (L126-128); no IPanelLifecycle |
 | **Destructive operations** | Create/Delete/Update effect chains, mixer state, presets, sends/returns/subgroups | CreateTemplate, UpdateTemplate, DeleteTemplate, ApplyTemplate | CreateConfig, UpdateConfig, DeleteConfig, ApplyMorph |
 | **Undo/redo coupling** | EffectChainActions holds _backendClient | TemplateActions hold ITemplateLibraryClient (migrated) | None (no UndoRedo) |
 | **UndoableActions dependency** | EffectChainActions needs IEffectChainClient (or equivalent) | TemplateActions needs ITemplateLibraryClient | N/A |
-| **Seam split recommendation** | Consider: IEffectsMeterClient, IEffectChainClient, IMixerStateClient | Single ITemplateLibraryClient (cohesive template CRUD) | IVoiceMorphClient; ListProjectAudioAsync → IProjectsClient (already has it, but uses _backendClient for it) |
-| **Test status** | No ViewModel seam tests | Model + seam tests (TemplateLibraryViewModelSeamTests.cs) | VoiceMorphViewModelTests (transport-mock or legacy) |
-| **Migration proof requirement** | Seam tests, lifecycle tests, EffectChainActions update | Seam tests, fix constructor FAF, TemplateActions update | Seam tests |
+| **Seam split recommendation** | Consider: IEffectsMeterClient, IEffectChainClient, IMixerStateClient | Single ITemplateLibraryClient (cohesive template CRUD) | IVoiceMorphClient (config CRUD + ApplyMorph); ListProjectAudioAsync → IProjectAudioClient |
+| **Test status** | No ViewModel seam tests | Model + seam tests (TemplateLibraryViewModelSeamTests.cs) | Model-only (VoiceMorphModelTests); no ViewModel seam tests |
+| **Migration proof requirement** | Seam tests, lifecycle tests, EffectChainActions update | Seam tests, fix constructor FAF, TemplateActions update | Seam tests, fix constructor FAF, IPanelLifecycle, add IProjectAudioClient |
 
 ---
 
@@ -45,15 +45,44 @@
 
 ---
 
-## Rank 3: VoiceMorphViewModel
+## Rank 3: VoiceMorphViewModel — Phase 3 Inspection (2026-03-13)
 
 **File:** `src/VoiceStudio.App/ViewModels/VoiceMorphViewModel.cs`
 
-**Notes:** Already has IProjectsClient, IProfilesClient. IBackendClient used for morph config CRUD and ListProjectAudioAsync. ListProjectAudioAsync should use IProjectsClient or IProjectAudioClient. Single IVoiceMorphClient for config CRUD + ApplyMorph.
+**IBackendClient call sites:**
+
+| Method | Endpoint / Call | Destructive |
+|--------|-----------------|-------------|
+| LoadConfigsAsync | GET `/api/voice-morph/configs` | No |
+| CreateConfigAsync | POST `/api/voice-morph/configs` | Yes |
+| UpdateConfigAsync | PUT `/api/voice-morph/configs/{id}` | Yes |
+| DeleteConfigAsync | DELETE `/api/voice-morph/configs/{id}` | Yes |
+| ApplyMorphAsync | POST `/api/voice-morph/apply` | Yes |
+| LoadAudioFilesAsync | `_backendClient.ListProjectAudioAsync(project.Id, ct)` | No |
+
+**Constructor fire-and-forget (L126-128):**
+```csharp
+_ = LoadConfigsAsync(CancellationToken.None);
+_ = LoadAudioFilesAsync(CancellationToken.None);
+_ = LoadVoiceProfilesAsync(CancellationToken.None);
+```
+Must be removed. Move initial loads to `IPanelLifecycle.OnActivatedAsync`.
+
+**Seam shape recommendation:**
+- **IVoiceMorphClient:** GetConfigsAsync, CreateConfigAsync, UpdateConfigAsync, DeleteConfigAsync, ApplyMorphAsync (thin pass-through)
+- **IProjectAudioClient:** Already exists; add to constructor; replace `_backendClient.ListProjectAudioAsync` in LoadAudioFilesAsync
+- **IProjectsClient, IProfilesClient:** Keep (already used for GetProjectsAsync, GetProfilesAsync)
+
+**Undo/redo:** None. No TemplateActions-style coupling.
+
+**Tests:** `VoiceMorphViewModelTests.cs` → class `VoiceMorphModelTests` (model-only: VoiceBlendItem, MorphConfigItem, MorphConfig, VoiceBlend). No ViewModel seam tests. Add `VoiceMorphViewModelSeamTests.cs` with constructor no-call, IPanelLifecycle, OnActivatedAsync.
+
+**View wiring:** `VoiceMorphView.xaml.cs` uses `ServiceProvider.GetBackendClient()`; will need `GetVoiceMorphClient()` and `GetProjectAudioClient()` after migration.
 
 ---
 
 ## Changelog
 
+- 2026-03-13: Phase 3 VoiceMorph inspection. Corrected: constructor FAF at L126-128; ListProjectAudioAsync → IProjectAudioClient (not IProjectsClient); model-only tests; full call-site table.
 - 2026-03-13: Initial inspection sheet. Top 3 from generate_ibackendclient_queue.py. EffectsMixer deferred; TemplateLibrary recommended next.
 - 2026-03-13: Doc sync. EffectsMixer lifecycle hardened; seam migration deferred per domain split (Option C).

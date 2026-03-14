@@ -39,7 +39,7 @@ and architectural purity are non-negotiable.
 
 Before writing a single line of code, complete all of the following in order:
 
-1. **Read `.cursor/STATE.md`** — Identify current phase, active task, and proof index.
+1. **Read `.cursor/STATE.md` ACTIVE WINDOW only** — Identify current phase, active task, and proof index; treat HISTORY LEDGER as historical context.
 2. **Read `AGENTS.md`** — Confirm active rules, build commands, and architecture boundaries.
 3. **Run `.\scripts\verify.ps1 -Quick`** — Confirm baseline is GREEN before any changes.
 4. **Search the codebase first** — Use Desktop Commander search before proposing new logic.
@@ -59,7 +59,7 @@ When CLAUDE.md contradicts current code, ADRs, or CI results:
 1. **Current code** — The implementation is the source of truth.
 2. **Current ADRs** — Decision rationale; supersede older ADRs per status.
 3. **Current CI results** — verify.ps1, dotnet test, pytest output.
-4. **.cursor/STATE.md** — Session state and proof index.
+4. **.cursor/STATE.md** (ACTIVE WINDOW only) — Session state and proof index; HISTORY LEDGER is historical context.
 5. **CLAUDE.md** — Governance prompt; policy, not audit truth.
 6. **Conversational guidance** — Lowest precedence.
 
@@ -75,7 +75,16 @@ A seam migration is not done because a ViewModel stopped referencing IBackendCli
 
 ## ASYNC LIFECYCLE RULE
 
-Constructor fire-and-forget is banned unless an ADR explicitly justifies it. Lifecycle fire-and-forget (selection handlers, polling, WebSocket connect/disconnect) must be explicit, cancellable, tested, or documented as debt. See [TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md](docs/design/TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md).
+**Constructor fire-and-forget:** Banned (ADR-047). No `_ = SomeAsync()` or fire-and-forget from constructors.
+
+**Lifecycle fire-and-forget:** Allowed only when all of:
+- (a) Cancellation is owned (e.g., `_disposalCts`, `_pollingCts`, `_selectedJobLoadCts`)
+- (b) Staleness guard if selection-triggered (verify selection ID before applying result)
+- (c) Documented in a design doc (e.g., [TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md](docs/design/TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md))
+
+**Selection-triggered async:** Must use selection-specific cancellation token + staleness guard. Never apply results from a stale selection.
+
+**New fire-and-forget:** Requires justification in design doc before adding. No silent fire-and-forget.
 
 ---
 
@@ -549,7 +558,7 @@ When operating as an agentic assistant inside Cursor or via Claude Code:
 
 ### Context Orchestration Sequence
 ```
-1. Read .cursor/STATE.md           → Current phase and task
+1. Read .cursor/STATE.md ACTIVE WINDOW → Current phase and task (HISTORY LEDGER = historical)
 2. Read AGENTS.md                  → Active rules and build commands
 3. Read CLAUDE.md (this file)      → Architect constraints
 4. Read relevant ADR(s)            → Decision rationale

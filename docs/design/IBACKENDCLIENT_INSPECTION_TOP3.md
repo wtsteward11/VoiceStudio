@@ -1,31 +1,27 @@
 # IBackendClient Inspection — Top 3 Unresolved Targets
 
 > **Purpose:** File-level inspection for the top 3 true unresolved IBackendClient consumers. No migration starts without this sheet.  
-> **Source:** Generated from `python scripts/ci/generate_ibackendclient_queue.py` (2026-03-13).  
+> **Source:** Regenerated from `python scripts/ci/generate_ibackendclient_queue.py` (2026-03-14).  
 > **Related:** [IBACKENDCLIENT_UNRESOLVED_QUEUE.md](IBACKENDCLIENT_UNRESOLVED_QUEUE.md), [RETAINED_ASYNC_RULE.md](RETAINED_ASYNC_RULE.md)
 
 ---
 
 ## True Top 3 (by rank: daily-use, lifecycle, mutation)
 
-1. **EffectsMixerViewModel** — Rank 1, lifecycle hardened (2026-03-13); seam migration deferred per domain split
-2. **TemplateLibraryViewModel** — Rank 7, MIGRATED (2026-03-13)
-3. **VoiceMorphViewModel** — Rank 8, recommended next
+1. **EffectsMixerViewModel** — Lifecycle hardened (2026-03-13); seam migration deferred per domain split (Option C). See Architecture Track in queue doc.
+2. **VoiceQuickCloneViewModel** — Property-handler FAF (OnSelectedAudioFileChanged L101: AutoDetectSettingsAsync). CloneVoiceAsync. Core voice cloning workflow. Daily-use.
+3. **WorkflowAutomationViewModel** — No constructor FAF. CreateWorkflowAsync, UpdateWorkflowAsync, ExecuteWorkflowAsync. Mutation: Create, Save, Run.
 
 ---
 
 ## Inspection Table
 
-| Field | EffectsMixer | TemplateLibrary | VoiceMorph |
-|-------|--------------|-----------------|------------|
-| **Backend call clusters** | GetAudioMetersAsync, GetEffectChainsAsync, GetEffectPresetsAsync, CreateEffectChainAsync, DeleteEffectChainAsync, ProcessAudioWithChainAsync, UpdateEffectChainAsync, GetMixerStateAsync, UpdateMixerStateAsync, ResetMixerStateAsync, GetMixerPresetsAsync, CreateMixerPresetAsync, ApplyMixerPresetAsync, Create/Delete/Update Send/Return/SubGroup | SendRequestAsync (GetTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, ApplyTemplate, GetCategories) | SendRequestAsync (GetConfigs, CreateConfig, UpdateConfig, DeleteConfig, ApplyMorph), ListProjectAudioAsync |
-| **Lifecycle patterns** | Lifecycle hardened (IPanelLifecycle, IDisposable, _disposalCts, _selectionLoadCts, staleness guard) | MIGRATED: IPanelLifecycle, OnActivatedAsync, IDispatcherTimer debounce | Constructor FAF (L126-128); no IPanelLifecycle |
-| **Destructive operations** | Create/Delete/Update effect chains, mixer state, presets, sends/returns/subgroups | CreateTemplate, UpdateTemplate, DeleteTemplate, ApplyTemplate | CreateConfig, UpdateConfig, DeleteConfig, ApplyMorph |
-| **Undo/redo coupling** | EffectChainActions holds _backendClient | TemplateActions hold ITemplateLibraryClient (migrated) | None (no UndoRedo) |
-| **UndoableActions dependency** | EffectChainActions needs IEffectChainClient (or equivalent) | TemplateActions needs ITemplateLibraryClient | N/A |
-| **Seam split recommendation** | Consider: IEffectsMeterClient, IEffectChainClient, IMixerStateClient | Single ITemplateLibraryClient (cohesive template CRUD) | IVoiceMorphClient (config CRUD + ApplyMorph); ListProjectAudioAsync → IProjectAudioClient |
-| **Test status** | No ViewModel seam tests | Model + seam tests (TemplateLibraryViewModelSeamTests.cs) | Model-only (VoiceMorphModelTests); no ViewModel seam tests |
-| **Migration proof requirement** | Seam tests, lifecycle tests, EffectChainActions update | Seam tests, fix constructor FAF, TemplateActions update | Seam tests, fix constructor FAF, IPanelLifecycle, add IProjectAudioClient |
+| Field | EffectsMixer | VoiceQuickCloneViewModel | WorkflowAutomationViewModel |
+|-------|--------------|--------------------------|-----------------------------|
+| **Backend call clusters** | GetAudioMetersAsync, GetEffectChainsAsync, GetEffectPresetsAsync, CreateEffectChainAsync, DeleteEffectChainAsync, ProcessAudioWithChainAsync, UpdateEffectChainAsync, GetMixerStateAsync, UpdateMixerStateAsync, ResetMixerStateAsync, GetMixerPresetsAsync, CreateMixerPresetAsync, ApplyMixerPresetAsync, Create/Delete/Update Send/Return/SubGroup | CloneVoiceAsync; AutoDetectSettingsAsync (local, no backend) | CreateWorkflowAsync, UpdateWorkflowAsync, ExecuteWorkflowAsync |
+| **Lifecycle patterns** | Lifecycle hardened (IPanelLifecycle, IDisposable, _disposalCts, _selectionLoadCts, staleness guard) | Property-handler FAF (OnSelectedAudioFileChanged); no IPanelLifecycle | No constructor FAF; LoadTemplates sync; no IPanelLifecycle |
+| **Destructive operations** | Create/Delete/Update effect chains, mixer state, presets, sends/returns/subgroups | CloneVoiceAsync (creates profile) | CreateWorkflow; UpdateWorkflow; ExecuteWorkflow |
+| **Seam split recommendation** | IEffectsMeterClient, IEffectChainClient, IMixerStateClient (Option C) | IVoiceQuickCloneClient (CloneVoiceAsync) | IWorkflowAutomationClient (Create, Update, Execute) |
 
 ---
 
@@ -37,52 +33,39 @@
 
 ---
 
-## Rank 2: TemplateLibraryViewModel — DONE (2026-03-13)
+## Rank 2: VoiceQuickCloneViewModel — Inspection (2026-03-14)
 
-**File:** `src/VoiceStudio.App/ViewModels/TemplateLibraryViewModel.cs`
+**File:** `src/VoiceStudio.App/ViewModels/VoiceQuickCloneViewModel.cs`
 
-**Status:** **MIGRATED** to `ITemplateLibraryClient`. IPanelLifecycle implemented; OnActivatedAsync for initial load; constructor fire-and-forget removed. Debounce uses IDispatcherTimer. TemplateActions updated to ITemplateLibraryClient. Seam tests in `TemplateLibraryViewModelSeamTests.cs`.
+**IBackendClient call sites:** CloneVoiceAsync (L257).
+
+**Property-handler fire-and-forget (L101):**
+```csharp
+_ = AutoDetectSettingsAsync(CancellationToken.None);
+```
+In OnSelectedAudioFileChanged. AutoDetectSettingsAsync does not call backend (local file analysis). Per RETAINED_ASYNC_RULE: property-handler FAF requires cancellation ownership and staleness guard. Move to IPanelLifecycle or debounced command with CTS.
+
+**Seam shape:** Single `IVoiceQuickCloneClient` (CloneVoiceAsync).
 
 ---
 
-## Rank 3: VoiceMorphViewModel — Phase 3 Inspection (2026-03-13)
+## Rank 3: WorkflowAutomationViewModel — Inspection (2026-03-14)
 
-**File:** `src/VoiceStudio.App/ViewModels/VoiceMorphViewModel.cs`
+**File:** `src/VoiceStudio.App/Views/Panels/WorkflowAutomationViewModel.cs`
 
-**IBackendClient call sites:**
+**IBackendClient call sites:** CreateWorkflowAsync (L205), UpdateWorkflowAsync (L200), ExecuteWorkflowAsync (L248, L298).
 
-| Method | Endpoint / Call | Destructive |
-|--------|-----------------|-------------|
-| LoadConfigsAsync | GET `/api/voice-morph/configs` | No |
-| CreateConfigAsync | POST `/api/voice-morph/configs` | Yes |
-| UpdateConfigAsync | PUT `/api/voice-morph/configs/{id}` | Yes |
-| DeleteConfigAsync | DELETE `/api/voice-morph/configs/{id}` | Yes |
-| ApplyMorphAsync | POST `/api/voice-morph/apply` | Yes |
-| LoadAudioFilesAsync | `_backendClient.ListProjectAudioAsync(project.Id, ct)` | No |
+**No constructor fire-and-forget.** LoadTemplates() is sync (no backend). Commands invoke async methods.
 
-**Constructor fire-and-forget (L126-128):**
-```csharp
-_ = LoadConfigsAsync(CancellationToken.None);
-_ = LoadAudioFilesAsync(CancellationToken.None);
-_ = LoadVoiceProfilesAsync(CancellationToken.None);
-```
-Must be removed. Move initial loads to `IPanelLifecycle.OnActivatedAsync`.
-
-**Seam shape recommendation:**
-- **IVoiceMorphClient:** GetConfigsAsync, CreateConfigAsync, UpdateConfigAsync, DeleteConfigAsync, ApplyMorphAsync (thin pass-through)
-- **IProjectAudioClient:** Already exists; add to constructor; replace `_backendClient.ListProjectAudioAsync` in LoadAudioFilesAsync
-- **IProjectsClient, IProfilesClient:** Keep (already used for GetProjectsAsync, GetProfilesAsync)
-
-**Undo/redo:** None. No TemplateActions-style coupling.
-
-**Tests:** `VoiceMorphViewModelTests.cs` → class `VoiceMorphModelTests` (model-only: VoiceBlendItem, MorphConfigItem, MorphConfig, VoiceBlend). No ViewModel seam tests. Add `VoiceMorphViewModelSeamTests.cs` with constructor no-call, IPanelLifecycle, OnActivatedAsync.
-
-**View wiring:** `VoiceMorphView.xaml.cs` uses `ServiceProvider.GetBackendClient()`; will need `GetVoiceMorphClient()` and `GetProjectAudioClient()` after migration.
+**Seam shape:** `IWorkflowAutomationClient` (CreateWorkflowAsync, UpdateWorkflowAsync, ExecuteWorkflowAsync).
 
 ---
 
 ## Changelog
 
+- 2026-03-14: Truth reset. Replaced HelpViewModel and EmotionStylePresetEditorViewModel (both MIGRATED) with VoiceQuickCloneViewModel and WorkflowAutomationViewModel. Top 3 from generator output. EffectsMixer remains Rank 1 (deferred).
+- 2026-03-14: Queue regeneration (Task 2). Top 3: EffectsMixer (deferred), HelpViewModel, EmotionStylePresetEditorViewModel. File-level inspection added for HelpViewModel and EmotionStylePresetEditorViewModel.
+- 2026-03-14: Truth reset. Removed VoiceMorphViewModel and TemplateLibraryViewModel (both MIGRATED). Ranks 2–3 set to TBD; full inspection deferred to Task 2 (queue regeneration).
 - 2026-03-13: Phase 3 VoiceMorph inspection. Corrected: constructor FAF at L126-128; ListProjectAudioAsync → IProjectAudioClient (not IProjectsClient); model-only tests; full call-site table.
 - 2026-03-13: Initial inspection sheet. Top 3 from generate_ibackendclient_queue.py. EffectsMixer deferred; TemplateLibrary recommended next.
 - 2026-03-13: Doc sync. EffectsMixer lifecycle hardened; seam migration deferred per domain split (Option C).

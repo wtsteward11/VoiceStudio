@@ -1,11 +1,45 @@
 # VoiceStudio Session State
 
-**Role:** Session state oracle — phase, active task, Next 3 Steps, proof index. Not an archive or dashboard.
+**Role:** Session state oracle. Zone 1 (ACTIVE WINDOW) = current execution truth. Zone 2 (HISTORY LEDGER) = historical context. Agents read Zone 1 only unless explicitly told to read history.
 
-**Control doc roles:** `.cursor/STATE.md` (this file) = session context. `AGENTS.md` = rules + truth hierarchy. `CLAUDE.md` = architect prompt. `openmemory.md` = memory-first workflow; not architectural truth. Precedence when docs conflict: code → ADRs → CI → STATE → CLAUDE → conversation.
+**Control doc roles:** Code → ADRs → CI → STATE (Zone 1) → CLAUDE → conversation.
 
-**Context Acknowledgment:** 2026-03-13 — TemplateLibrary migration closure executed. Commits applied. Next target: VoiceMorphViewModel.
+---
 
+## ACTIVE WINDOW
+
+Read only this section as current task truth. Treat everything below the divider as historical context.
+
+### Active Task
+- **ID:** VOICEBROWSER-TESTS
+- **Title:** VoiceBrowserViewModelTests fix for IVoiceBrowserClient
+- **Status:** Complete
+
+### Next 3 Steps
+1. Pick next migration target from regenerated queue (Top 3: VoiceQuickCloneViewModel, WorkflowAutomationViewModel)
+2. Inspect call sites per Top 3 sheet before coding
+3. Run verify.ps1 -Quick before any code changes
+
+### Current Target
+VoiceQuickCloneViewModel — IVoiceQuickCloneClient; inspect call sites per Top 3 sheet before coding
+
+### Current Blocker
+None
+
+### Truth Sync Note
+VoiceMorphingBlendingViewModel migrated (2026-03-14). VoiceBrowserViewModelTests updated for IVoiceBrowserClient (mock IVoiceBrowserClient, VoiceSearchResponse/LanguagesResponse/TagsResponse from VoiceStudio.App.Services). 61 migrated ViewModels; 60 with constructor invariant.
+
+### Last Verified Commands
+- `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` — PASS (2026-03-14)
+- `dotnet test ... --filter "FullyQualifiedName~VoiceBrowserViewModelTests"` — 17 passed
+- `python scripts/run_verification.py` — PASS after commit (completion_guard requires committed markers)
+- `python scripts/ci/check_ibackendclient_creep.py` — PASS
+
+### Context Acknowledgment
+2026-03-14 — Bulletproof Plan: Phase 0–5 complete. TextSpeechEditorViewModel FAF fixed; EngineParameterTuningViewModel migrated; AppServices decomposed; STATE and queue docs updated.
+
+---
+## HISTORY LEDGER
 ---
 
 ## Baseline Protection
@@ -25,98 +59,51 @@ git checkout baseline-2026-01-30  # Branch at baseline
 git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructive)
 ```
 
-**Baseline includes:**
+**Baseline includes:** 41 modern rules, 19 ADRs, 8-role governance, validator_workflow.py, circuit breaker, pre-commit hooks, CI verification integrated, legacy 886 files archived, all gates B-H GREEN.
 
-- 41 modern rules in `.cursor/rules/`
-- 19 ADRs in `docs/architecture/decisions/`
-- 8-role governance system complete
-- validator_workflow.py, circuit breaker, pre-commit hooks
-- CI verification integrated
-- Legacy 886 files archived
-- All gates B-H GREEN, verification PASS
+## CURRENT POSITION
+- **Phase:** v1.1.0 Completion Roadmap v2.0 — Phase F COMPLETE
+- **Plan:** VOICESTUDIO_COMPLETION_ROADMAP_V2.md
+- **Known Debt:** TrainingViewModel lifecycle FAF (documented in TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md; deferred)
 
----
+## LATEST MILESTONE
+- **ID:** BULLETPROOF-PLAN
+- **Title:** VoiceStudio Bulletproof Completion Plan — Phases 0–5
+- **Status:** COMPLETE (2026-03-14)
+- **Completed:** Phase 0 (TextSpeechEditorViewModel FAF, constructor invariant gate, audit); Phase 1 (ADR-050 golden path, retained-async baseline); Phase 2 (queue refresh, EngineParameterTuningViewModel migration); Phase 3 (AppServices RegisterPanelServices); Phase 4 (wedge doc, cross-panel); Phase 5 (STATE, queue).
+- **Verification:** constructor_invariant in run_verification.py; 44 migrated, 43 with invariant; EngineParameterTuningViewModelSeamTests pass
 
-## Current Phase
-
-- **Phase**: v1.1.0 Completion Roadmap v2.0 — CI-Enforced Edition
-- **Master Plan Phase**: Phase F COMPLETE — v1.1.0 Release
-- **Started**: 2026-03-03
-- **Context**: Roadmap v2.0 adopted. 7 ground truth gaps verified. 6 phases with CI-enforced gates. Phases 0, C, A, B, D, E, F complete. v1.1.0 shipped.
-
-## Active Plan
-
-- **Plan**: VoiceStudio Completion Roadmap v2.0 — CI-Enforced Edition
-- **Document**: `docs/governance/VOICESTUDIO_COMPLETION_ROADMAP_V2.md`
-- **Status**: COMPLETE — Phase F (v1.1.0 Release)
-- **Previous Plan**: VoiceStudio 100% Completion Plan — COMPLETE (2026-02-26)
-
-## Active Task
-
-- **ID**: None
-- **Title**: —
-- **Status**: Awaiting selection
-
-## Next 3 Steps
-
-1. **Next migration target** — VoiceMorphViewModel (Rank 8) per IBACKENDCLIENT_INSPECTION_TOP3.md. TemplateLibrary migration complete (2026-03-13). EffectsMixer deferred until domain split.
-2. **Baseline hygiene** — Run creep check periodically; retained-async gate in run_verification; reduce .ci/retained_async_baseline.txt over time.
-3. **Further lifecycle cleanup** — EffectsMixer (Task 3.2), VoiceCloningWizard, Library, Training (optional follow-through).
-
-**Truth sync:** **TemplateLibraryViewModel** — MIGRATED (2026-03-13): ITemplateLibraryClient; IPanelLifecycle; OnActivatedAsync; IDispatcherTimer debounce; TemplateActions updated. **SceneBuilderViewModel** — migration and lifecycle ownership complete (2026-03-13). **BatchProcessingViewModel** — migration complete; lifecycle closed with accepted exceptions.
-
-**Hardening wave:** Closed. TemplateLibrary migration complete. Next: VoiceMorph (inspection done; migration deferred to next batch).
-
-**Seam Migration Status:** TemplateLibraryViewModel (Rank 7) — MIGRATED. VoiceMorphViewModel (Rank 8) — next target. SceneBuilderViewModel, AutomationViewModel, ScriptEditorViewModel, APIKeyManagerViewModel, BackupRestoreViewModel, GlobalSearchViewModel, MultiVoiceGeneratorViewModel, EnsembleSynthesisViewModel, MiniTimelineViewModel, TrainingDatasetEditorViewModel, BatchProcessingViewModel, DiagnosticsViewModel, TextSpeechEditorViewModel, AnalyzerViewModel, SettingsViewModel, MacroViewModel, ModelManagerViewModel, JobProgressViewModel — all migration-complete.
-
-## Last Milestone (TEMPLATELIBRARY-MIGRATION)
-
-- **ID**: TEMPLATELIBRARY-MIGRATION
-- **Title**: TemplateLibrary Migration Closure
-- **Status**: **COMPLETE** (2026-03-13)
-- **Completed**: ITemplateLibraryClient + TemplateLibraryClient + TemplateLibraryModels; TemplateLibraryViewModel migrated; TemplateActions updated; TemplateLibraryViewModelSeamTests; baseline + creep; doc sync (IBACKENDCLIENT_UNRESOLVED_QUEUE, IBACKENDCLIENT_INSPECTION_TOP3, SEAM_MATURITY_AUDIT).
-- **Verification**: run_verification.py (completion_guard PASS), TemplateLibrary tests (11 passed), creep check PASS
-
-**Proof Index (TEMPLATELIBRARY-MIGRATION):**
+## LATEST PROOF INDEX
 | Date | Task | Artifact | Type | Status |
 |------|------|----------|------|--------|
-| 2026-03-13 | TemplateLibrary | run_verification.py (completion_guard) | Gate | PASS |
-| 2026-03-13 | TemplateLibrary | TemplateLibraryViewModelSeamTests + ModelTests (11) | Test | PASS |
-| 2026-03-13 | TemplateLibrary | check_ibackendclient_creep.py | Gate | PASS |
-| 2026-03-13 | TemplateLibrary | Commits 676011c6, 767f0d14, d634e3fb, efce421f, 355312d6 | Code | Commit |
+| 2026-03-14 | Bulletproof 0.1 | TextSpeechEditorViewModel IPanelLifecycle, no constructor FAF | Code | Done |
+| 2026-03-14 | Bulletproof 0.2 | run_verification.py constructor_invariant check | Gate | PASS |
+| 2026-03-14 | Bulletproof 2.2 | EngineParameterTuningViewModelSeamTests | Test | 3 passed |
+| 2026-03-14 | ImageGen migration (Rank 13) | ImageGenViewModelSeamTests | Test | 3 passed |
+| 2026-03-14 | Spectrogram migration (Rank 14) | SpectrogramViewModelSeamTests | Test | 3 passed |
+| 2026-03-14 | SpatialAudio migration (Rank 15) | SpatialAudioViewModelSeamTests | Test | Pass |
+| 2026-03-14 | PluginHealth migration (Rank 19) | PluginHealthDashboardViewModelSeamTests | Test | 3 passed |
+| 2026-03-14 | ProfileHealth migration (Rank 20) | ProfileHealthDashboardViewModelSeamTests | Test | 4 passed |
+| 2026-03-14 | Lexicon migration (Rank 17) | LexiconViewModelSeamTests | Test | Added |
+| 2026-03-14 | TodoPanel migration (Rank 18) | TodoPanelViewModelSeamTests | Test | Added |
+| 2026-03-14 | HelpViewModel migration | IHelpClient, HelpClient, HelpViewModelSeamTests | Code | Done |
+| 2026-03-14 | EmotionStylePresetEditorViewModel migration | IEmotionControlClient.UpdatePresetAsync, EmotionStylePresetEditorViewModelSeamTests | Code | Done |
+| 2026-03-14 | KeyboardShortcutsViewModel migration | IKeyboardShortcutsClient, KeyboardShortcutsClient, KeyboardShortcutsViewModelSeamTests | Code | Done |
+| 2026-03-14 | PronunciationLexiconViewModel migration | IPronunciationLexiconClient, PronunciationLexiconClient, IVoiceSynthesisService, PronunciationLexiconViewModelSeamTests | Code | Done |
+| 2026-03-14 | ProsodyViewModel migration | IProsodyClient, ProsodyClient, ILifecyclePanelView, ProsodyViewModelSeamTests (3 passed) | Code | Done |
+| 2026-03-14 | TagManagerViewModel migration | ITagManagerClient, TagManagerClient, ILifecyclePanelView, TagManagerViewModelSeamTests (3 passed) | Code | Done |
+| 2026-03-14 | MarkerManagerViewModel migration | IMarkerManagerClient, MarkerManagerClient, ILifecyclePanelView, MarkerManagerViewModelSeamTests (3 passed) | Code | Done |
+| 2026-03-14 | VoiceMorphingBlendingViewModel migration | IVoiceMorphingBlendingClient, VoiceMorphingBlendingClient, VoiceMorphingBlendingViewModelSeamTests (3 passed) | Code | Done |
+| 2026-03-14 | VoiceBrowserViewModelTests fix | IVoiceBrowserClient mock, VoiceSearchResponse/LanguagesResponse/TagsResponse from Services; 17 tests pass | Test | Done |
+| 2026-03-14 | Bulletproof 3.1 | AppServices RegisterPanelServices | Code | Done |
+| 2026-03-14 | Bulletproof 5.1 | STATE.md, IBACKENDCLIENT_UNRESOLVED_QUEUE.md | Doc | Updated |
 
-**Previous:** TRUTH-RESET-LIFECYCLE (2026-03-13)
+## COMPLETED MILESTONES
+- TRUTH-RESET-LIFECYCLE, NEXT10-SEAM-BATCH, WAVE2-LIFECYCLE-FOLLOW-THROUGH
+- See [STATE_ARCHIVE.md](docs/governance/STATE_ARCHIVE.md) for older milestones
 
-**Previous:** NEXT10-SEAM-BATCH (2026-03-13)
+## PROOF HISTORY
+See [STATE_ARCHIVE.md](docs/governance/STATE_ARCHIVE.md) for older proof indexes.
 
-**Previous:** WAVE2-LIFECYCLE-FOLLOW-THROUGH (2026-03-13)
-
-**Proof Index (NEXT10-SEAM-BATCH):**
-| Date | Task | Artifact | Type | Status |
-|------|------|----------|------|--------|
-| 2026-03-13 | NEXT10 | verify.ps1 -Quick | Gate | PASS |
-| 2026-03-13 | NEXT10 | check_ibackendclient_creep.py | Gate | PASS |
-| 2026-03-13 | NEXT10 | JobProgressViewModelTests, JobProgressModelTests (29) | Test | PASS |
-| 2026-03-13 | NEXT10 | dotnet build | Gate | PASS |
-
-## Prior Milestone (WAVE2-LIFECYCLE-FOLLOW-THROUGH)
-
-- **ID**: WAVE2-LIFECYCLE-FOLLOW-THROUGH
-- **Title**: Wave 2 Lifecycle Follow-Through and Wave 3 Preparation
-- **Status**: **COMPLETE** (2026-03-13)
-- **Completed**: WAVE2_LIFECYCLE_AUDIT; BatchProcessing lifecycle (_disposalCts, _selectedJobLoadCts, silent catches fixed); VoiceCloningWizard LoadEnginesAsync moved to Loaded; Library loads moved to OnActivatedAsync; Wave 3 re-ranking (RealTimeVoiceConverter primary); VoiceSynthesisService (no mutation, BackendNotFoundException); seam-aware tests (BatchProcessing, VoiceCloningWizard, VoiceSynthesisService).
-- **Verification**: verify.ps1 -Quick, creep check, seam tests
-
-**Proof Index (WAVE2-LIFECYCLE-FOLLOW-THROUGH):**
-| Date | Task | Artifact | Type | Status |
-|------|------|----------|------|--------|
-| 2026-03-13 | WAVE2-LIFECYCLE | verify.ps1 -Quick | Gate | PASS |
-| 2026-03-13 | WAVE2-LIFECYCLE | SeamTests (VoiceSynthesis, BatchProcessing, VoiceCloningWizard) | Test | PASS |
-
----
-
-**Known Debt:** TrainingViewModel lifecycle fire-and-forget: LoadLogsAsync/LoadQualityHistoryAsync now gated (selection-specific cancellation + staleness guard); ConnectWebSocketAsync, LoadDatasetsAsync, LoadTrainingJobsAsync, PollTrainingStatusAsync, DisconnectWebSocketAsync retained. _disposalCts cancelled in Dispose. **Decision (2026-03-13):** Training remains explicit exception model (documented in [TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md](docs/design/TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md)); full lifecycle cleanup deferred unless requested.
-
----
-
-**Archive:** Previous milestones, proof index, and session log → [docs/governance/STATE_ARCHIVE.md](../docs/governance/STATE_ARCHIVE.md)
+## ARCHIVE POINTER
+[docs/governance/STATE_ARCHIVE.md](docs/governance/STATE_ARCHIVE.md)

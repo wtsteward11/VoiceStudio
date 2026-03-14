@@ -79,6 +79,7 @@ MIGRATED_NO_IBACKENDCLIENT = [
     "AdvancedSettingsViewModel",
     "UltimateDashboardViewModel",
     "ImageSearchViewModel",
+    "TemplateLibraryViewModel",
 ]
 
 # Match IBackendClient as constructor parameter (exclude field declarations with readonly)

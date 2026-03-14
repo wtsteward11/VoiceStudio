@@ -43,7 +43,7 @@ src/VoiceStudio.App/ViewModels/SpatialStageViewModel.cs:69 # SpatialStageViewMod
 src/VoiceStudio.App/ViewModels/SpectrogramViewModel.cs:72 # SpectrogramViewModel constructor
 src/VoiceStudio.App/ViewModels/StyleTransferViewModel.cs:62 # StyleTransferViewModel constructor
 src/VoiceStudio.App/ViewModels/TagManagerViewModel.cs:75 # TagManagerViewModel constructor
-src/VoiceStudio.App/ViewModels/TemplateLibraryViewModel.cs:58 # TemplateLibraryViewModel constructor
+# TemplateLibraryViewModel MIGRATED to ITemplateLibraryClient (2026-03-13)
 # TextBasedSpeechEditorViewModel MIGRATED to ITextBasedSpeechEditorClient (2026-03-12)
 src/VoiceStudio.App/ViewModels/TextHighlightingViewModel.cs:76 # TextHighlightingViewModel constructor
 # TextSpeechEditorViewModel MIGRATED to ITextSpeechEditorClient (2026-03-12)
@@ -66,7 +66,7 @@ src/VoiceStudio.App/Views/Panels/AdvancedSearchViewModel.cs:46 # AdvancedSearchV
 src/VoiceStudio.App/Views/Panels/AudioMonitoringDashboardViewModel.cs:106 # AudioMonitoringDashboardViewModel constructor
 # BatchProcessingViewModel MIGRATED to IBatchProcessingClient (2026-03-12)
 # DiagnosticsViewModel MIGRATED to IDiagnosticsClient (2026-03-12)
-src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs:131 # EffectsMixerViewModel constructor
+src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs:134 # EffectsMixerViewModel constructor (lifecycle hardened; seam migration deferred per Foundation-First Plan)
 src/VoiceStudio.App/Views/Panels/EngineParameterTuningViewModel.cs:58 # EngineParameterTuningViewModel constructor
 src/VoiceStudio.App/Views/Panels/ImageGenViewModel.cs:140 # ImageGenViewModel constructor
 src/VoiceStudio.App/Views/Panels/ImageVideoEnhancementPipelineViewModel.cs:61 # ImageVideoEnhancementPipelineViewModel constructor

@@ -4,6 +4,8 @@
 
 **Control doc roles:** `.cursor/STATE.md` (this file) = session context. `AGENTS.md` = rules + truth hierarchy. `CLAUDE.md` = architect prompt. `openmemory.md` = memory-first workflow; not architectural truth. Precedence when docs conflict: code → ADRs → CI → STATE → CLAUDE → conversation.
 
+**Context Acknowledgment:** 2026-03-13 — TemplateLibrary migration closure executed. Commits applied. Next target: VoiceMorphViewModel.
+
 ---
 
 ## Baseline Protection
@@ -57,31 +59,33 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## Next 3 Steps
 
-1. **Next migration target** — TemplateLibraryViewModel (Rank 7) per IBACKENDCLIENT_INSPECTION_TOP3.md. EffectsMixer deferred until lifecycle hardened. Run `python scripts/ci/generate_ibackendclient_queue.py` before trusting queue.
+1. **Next migration target** — VoiceMorphViewModel (Rank 8) per IBACKENDCLIENT_INSPECTION_TOP3.md. TemplateLibrary migration complete (2026-03-13). EffectsMixer deferred until domain split.
 2. **Baseline hygiene** — Run creep check periodically; retained-async gate in run_verification; reduce .ci/retained_async_baseline.txt over time.
 3. **Further lifecycle cleanup** — EffectsMixer (Task 3.2), VoiceCloningWizard, Library, Training (optional follow-through).
 
-**Truth sync:** **SceneBuilderViewModel** — migration and lifecycle ownership complete (2026-03-13): OnActivatedAsync awaits LoadScenesAsync; staleness guard in LoadScenesAsync; IDispatcherTimer debounce; disposal stops timer. **BatchProcessingViewModel** — migration complete; lifecycle closed with accepted exceptions (polling/WebSocket retained; BATCH_PROCESSING_LIFECYCLE_PATTERNS.md).
+**Truth sync:** **TemplateLibraryViewModel** — MIGRATED (2026-03-13): ITemplateLibraryClient; IPanelLifecycle; OnActivatedAsync; IDispatcherTimer debounce; TemplateActions updated. **SceneBuilderViewModel** — migration and lifecycle ownership complete (2026-03-13). **BatchProcessingViewModel** — migration complete; lifecycle closed with accepted exceptions.
 
-**Hardening wave:** Closed. SceneBuilder lifecycle ownership complete. BatchProcessing polling/WebSocket retained by design. Migration queue may proceed after verifying unresolved targets against current code.
+**Hardening wave:** Closed. TemplateLibrary migration complete. Next: VoiceMorph (inspection done; migration deferred to next batch).
 
-**Seam Migration Status:** SceneBuilderViewModel (Rank 16) — migration and lifecycle complete. AutomationViewModel (Rank 15), ScriptEditorViewModel (Rank 14), APIKeyManagerViewModel, BackupRestoreViewModel, GlobalSearchViewModel, MultiVoiceGeneratorViewModel, EnsembleSynthesisViewModel, MiniTimelineViewModel, TrainingDatasetEditorViewModel, BatchProcessingViewModel, DiagnosticsViewModel, TextSpeechEditorViewModel, AnalyzerViewModel, SettingsViewModel, MacroViewModel, ModelManagerViewModel, JobProgressViewModel — all migration-complete. Rank 11–16 wave closed.
+**Seam Migration Status:** TemplateLibraryViewModel (Rank 7) — MIGRATED. VoiceMorphViewModel (Rank 8) — next target. SceneBuilderViewModel, AutomationViewModel, ScriptEditorViewModel, APIKeyManagerViewModel, BackupRestoreViewModel, GlobalSearchViewModel, MultiVoiceGeneratorViewModel, EnsembleSynthesisViewModel, MiniTimelineViewModel, TrainingDatasetEditorViewModel, BatchProcessingViewModel, DiagnosticsViewModel, TextSpeechEditorViewModel, AnalyzerViewModel, SettingsViewModel, MacroViewModel, ModelManagerViewModel, JobProgressViewModel — all migration-complete.
 
-## Last Milestone (TRUTH-RESET-LIFECYCLE)
+## Last Milestone (TEMPLATELIBRARY-MIGRATION)
 
-- **ID**: TRUTH-RESET-LIFECYCLE
-- **Title**: Truth Reset and Lifecycle Hardening Plan
+- **ID**: TEMPLATELIBRARY-MIGRATION
+- **Title**: TemplateLibrary Migration Closure
 - **Status**: **COMPLETE** (2026-03-13)
-- **Completed**: Task 1: Truth reset (IBACKENDCLIENT_LONGTAIL_RANKING, STATE, SEAM_MATURITY_AUDIT aligned); Task 2: BatchProcessingViewModel lifecycle (_loadJobsCts for filter/project, _selectedJobLoadCts, BATCH_PROCESSING_LIFECYCLE_PATTERNS.md); Task 3: Re-ranked (MultiVoiceGenerator, EnsembleSynthesis, MiniTimeline); Task 4: Next Wave Hardening; Task 5: Lifecycle tests (OnFilterStatusChanged, OnSelectedProjectIdChanged, OnSelectedJobChanged); Task 6: VoiceSynthesisService retry policy documented.
-- **Verification**: verify.ps1 -Quick, creep check, BatchProcessingViewModelSeamTests
+- **Completed**: ITemplateLibraryClient + TemplateLibraryClient + TemplateLibraryModels; TemplateLibraryViewModel migrated; TemplateActions updated; TemplateLibraryViewModelSeamTests; baseline + creep; doc sync (IBACKENDCLIENT_UNRESOLVED_QUEUE, IBACKENDCLIENT_INSPECTION_TOP3, SEAM_MATURITY_AUDIT).
+- **Verification**: run_verification.py (completion_guard PASS), TemplateLibrary tests (11 passed), creep check PASS
 
-**Proof Index (TRUTH-RESET-LIFECYCLE):**
+**Proof Index (TEMPLATELIBRARY-MIGRATION):**
 | Date | Task | Artifact | Type | Status |
 |------|------|----------|------|--------|
-| 2026-03-13 | Truth Reset | check_ibackendclient_creep.py | Gate | PASS |
-| 2026-03-13 | Lifecycle | BatchProcessingViewModelSeamTests (9) | Test | PASS |
-| 2026-03-13 | Lifecycle | BATCH_PROCESSING_LIFECYCLE_PATTERNS.md | Doc | Added |
-| 2026-03-13 | SceneBuilder lifecycle | SceneBuilderViewModel.cs (a1dfafe9) | Code | PASS |
+| 2026-03-13 | TemplateLibrary | run_verification.py (completion_guard) | Gate | PASS |
+| 2026-03-13 | TemplateLibrary | TemplateLibraryViewModelSeamTests + ModelTests (11) | Test | PASS |
+| 2026-03-13 | TemplateLibrary | check_ibackendclient_creep.py | Gate | PASS |
+| 2026-03-13 | TemplateLibrary | Commits 676011c6, 767f0d14, d634e3fb, efce421f, 355312d6 | Code | Commit |
+
+**Previous:** TRUTH-RESET-LIFECYCLE (2026-03-13)
 
 **Previous:** NEXT10-SEAM-BATCH (2026-03-13)
 

@@ -69,6 +69,7 @@ Seams that sit between ViewModels/Panels and `IBackendClient`. Each is classifie
 | IAdvancedSettingsClient | Client | Thin pass-through; GetSettingsAsync, GetGpuDevicesAsync, SaveSettingsAsync, ResetSettingsAsync. AdvancedSettingsViewModel migrated 2026-03-13. | Keep |
 | IUltimateDashboardClient | Client | Thin pass-through; GetDashboardAsync. UltimateDashboardViewModel migrated 2026-03-13. | Keep |
 | IImageSearchClient | Client | Thin pass-through; SearchAsync, GetSourcesAsync, GetCategoriesAsync, GetColorsAsync, ClearHistoryAsync. ImageSearchViewModel migrated 2026-03-13. | Keep |
+| ITemplateLibraryClient | Client | Thin pass-through; GetTemplatesAsync, CreateTemplateAsync, UpdateTemplateAsync, DeleteTemplateAsync, ApplyTemplateAsync, GetCategoriesAsync. TemplateLibraryViewModel migrated 2026-03-13. | Keep |
 
 ---
 
@@ -108,8 +109,9 @@ Seams that sit between ViewModels/Panels and `IBackendClient`. Each is classifie
 | 20 | ~~ModelManagerViewModel~~ | — | DONE (2026-03-13). IModelManagerClient added; ModelManagerViewModel migrated. | — |
 | 21 | ~~JobProgressViewModel~~ | — | DONE (2026-03-13). IJobProgressApiClient added; JobProgressViewModel migrated. | — |
 | 22 | ~~SceneBuilderViewModel~~ | — | DONE (2026-03-13). Migration and lifecycle ownership complete: OnActivatedAsync awaits; staleness guard; IDispatcherTimer debounce; disposal. | — |
+| 23 | ~~TemplateLibraryViewModel~~ | — | DONE (2026-03-13). ITemplateLibraryClient added; TemplateLibraryViewModel migrated; IPanelLifecycle; OnActivatedAsync; IDispatcherTimer debounce; TemplateActions updated. | — |
 
-**Recommendation:** Rank 1–3 migration complete. BatchProcessing: lifecycle closed with accepted exceptions. SceneBuilder: lifecycle ownership complete (2026-03-13). Migration queue may proceed.
+**Recommendation:** Rank 1–3 migration complete. TemplateLibrary migration complete (2026-03-13). Next target: VoiceMorphViewModel (Rank 8).
 
 ---
 
@@ -135,6 +137,7 @@ Seams that sit between ViewModels/Panels and `IBackendClient`. Each is classifie
 
 ## Changelog
 
+- 2026-03-13: ITemplateLibraryClient added; TemplateLibraryViewModel migrated; IPanelLifecycle; OnActivatedAsync; IDispatcherTimer debounce; TemplateActions updated.
 - 2026-03-13: SceneBuilderViewModel lifecycle ownership complete: OnActivatedAsync awaits; staleness guard; IDispatcherTimer debounce; disposal (SCENEBUILDER_LIFECYCLE_PATTERNS.md).
 - 2026-03-13: IBatchProcessingClient: documented retry policy (no retry on 5xx; single attempt). Second seam beyond VoiceSynthesisService with explicit policy.
 - 2026-03-13: Next 10 Tasks: IDiagnosticsClient, ITextSpeechEditorClient, IAnalyzerClient, ISettingsClient, IMacroClient, IModelManagerClient, IJobProgressApiClient added; DiagnosticsViewModel, TextSpeechEditorViewModel, AnalyzerViewModel, SettingsViewModel, MacroViewModel, ModelManagerViewModel, JobProgressViewModel migrated.

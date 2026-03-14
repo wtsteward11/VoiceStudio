@@ -9,8 +9,8 @@
 ## True Top 3 (by rank: daily-use, lifecycle, mutation)
 
 1. **EffectsMixerViewModel** — Rank 1, lifecycle hardened (2026-03-13); seam migration deferred per domain split
-2. **TemplateLibraryViewModel** — Rank 7, recommended next
-3. **VoiceMorphViewModel** — Rank 8
+2. **TemplateLibraryViewModel** — Rank 7, MIGRATED (2026-03-13)
+3. **VoiceMorphViewModel** — Rank 8, recommended next
 
 ---
 
@@ -19,12 +19,12 @@
 | Field | EffectsMixer | TemplateLibrary | VoiceMorph |
 |-------|--------------|-----------------|------------|
 | **Backend call clusters** | GetAudioMetersAsync, GetEffectChainsAsync, GetEffectPresetsAsync, CreateEffectChainAsync, DeleteEffectChainAsync, ProcessAudioWithChainAsync, UpdateEffectChainAsync, GetMixerStateAsync, UpdateMixerStateAsync, ResetMixerStateAsync, GetMixerPresetsAsync, CreateMixerPresetAsync, ApplyMixerPresetAsync, Create/Delete/Update Send/Return/SubGroup | SendRequestAsync (GetTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, ApplyTemplate, GetCategories) | SendRequestAsync (GetConfigs, CreateConfig, UpdateConfig, DeleteConfig, ApplyMorph), ListProjectAudioAsync |
-| **Lifecycle patterns** | Lifecycle hardened (IPanelLifecycle, IDisposable, _disposalCts, _selectionLoadCts, staleness guard) | Constructor FAF: _ = LoadCategoriesAsync/LoadTemplatesAsync(CancellationToken.None); _searchDebounceCts for debounce | No constructor FAF; command-driven loads |
+| **Lifecycle patterns** | Lifecycle hardened (IPanelLifecycle, IDisposable, _disposalCts, _selectionLoadCts, staleness guard) | MIGRATED: IPanelLifecycle, OnActivatedAsync, IDispatcherTimer debounce | No constructor FAF; command-driven loads |
 | **Destructive operations** | Create/Delete/Update effect chains, mixer state, presets, sends/returns/subgroups | CreateTemplate, UpdateTemplate, DeleteTemplate, ApplyTemplate | CreateConfig, UpdateConfig, DeleteConfig, ApplyMorph |
-| **Undo/redo coupling** | EffectChainActions holds _backendClient | TemplateActions (CreateTemplateAction, UpdateTemplateAction) hold _backendClient | None (no UndoRedo) |
+| **Undo/redo coupling** | EffectChainActions holds _backendClient | TemplateActions hold ITemplateLibraryClient (migrated) | None (no UndoRedo) |
 | **UndoableActions dependency** | EffectChainActions needs IEffectChainClient (or equivalent) | TemplateActions needs ITemplateLibraryClient | N/A |
 | **Seam split recommendation** | Consider: IEffectsMeterClient, IEffectChainClient, IMixerStateClient | Single ITemplateLibraryClient (cohesive template CRUD) | IVoiceMorphClient; ListProjectAudioAsync → IProjectsClient (already has it, but uses _backendClient for it) |
-| **Test status** | No ViewModel seam tests | TemplateLibraryModelTests (model only); no ViewModel seam tests | VoiceMorphViewModelTests (transport-mock or legacy) |
+| **Test status** | No ViewModel seam tests | Model + seam tests (TemplateLibraryViewModelSeamTests.cs) | VoiceMorphViewModelTests (transport-mock or legacy) |
 | **Migration proof requirement** | Seam tests, lifecycle tests, EffectChainActions update | Seam tests, fix constructor FAF, TemplateActions update | Seam tests |
 
 ---
@@ -37,15 +37,11 @@
 
 ---
 
-## Rank 2: TemplateLibraryViewModel — Next Target
+## Rank 2: TemplateLibraryViewModel — DONE (2026-03-13)
 
 **File:** `src/VoiceStudio.App/ViewModels/TemplateLibraryViewModel.cs`
 
-**Blockers before migration:**
-- Constructor fire-and-forget: `_ = LoadCategoriesAsync(CancellationToken.None); _ = LoadTemplatesAsync(CancellationToken.None);` — must move to IPanelLifecycle.OnActivatedAsync
-- TemplateActions (UndoableActions) holds IBackendClient — must accept ITemplateLibraryClient
-
-**Seam:** ITemplateLibraryClient — GetTemplatesAsync, CreateTemplateAsync, UpdateTemplateAsync, DeleteTemplateAsync, ApplyTemplateAsync, GetCategoriesAsync.
+**Status:** **MIGRATED** to `ITemplateLibraryClient`. IPanelLifecycle implemented; OnActivatedAsync for initial load; constructor fire-and-forget removed. Debounce uses IDispatcherTimer. TemplateActions updated to ITemplateLibraryClient. Seam tests in `TemplateLibraryViewModelSeamTests.cs`.
 
 ---
 

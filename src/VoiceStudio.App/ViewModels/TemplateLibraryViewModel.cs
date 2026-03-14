@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
@@ -17,11 +18,13 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the TemplateLibraryView panel - Template management.
   /// </summary>
-  public partial class TemplateLibraryViewModel : BaseViewModel, IPanelView
+  public partial class TemplateLibraryViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ITemplateLibraryClient _templateLibraryClient;
     private readonly UndoRedoService? _undoRedoService;
-    private CancellationTokenSource? _searchDebounceCts;
+    private readonly CancellationTokenSource _disposalCts = new();
+    private CancellationTokenSource? _loadTemplatesCts;
+    private readonly IDispatcherTimer? _searchDebounceTimer;
     private const int SearchDebounceMs = 300;
 
     public string PanelId => "template_library";
@@ -55,10 +58,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? creatingDescription;
 
-    public TemplateLibraryViewModel(IViewModelContext context, IBackendClient backendClient)
+    public TemplateLibraryViewModel(IViewModelContext context, ITemplateLibraryClient templateLibraryClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _templateLibraryClient = templateLibraryClient ?? throw new ArgumentNullException(nameof(templateLibraryClient));
 
       // Get undo/redo service (may be null if not initialized)
       try
@@ -69,6 +72,14 @@ namespace VoiceStudio.App.ViewModels
       {
         // Service may not be initialized yet - that's okay
         _undoRedoService = null;
+      }
+
+      _searchDebounceTimer = Dispatcher.CreateTimer();
+      if (_searchDebounceTimer != null)
+      {
+        _searchDebounceTimer.Interval = TimeSpan.FromMilliseconds(SearchDebounceMs);
+        _searchDebounceTimer.IsRepeating = false;
+        _searchDebounceTimer.Tick += OnSearchDebounceTick;
       }
 
       LoadTemplatesCommand = new EnhancedAsyncRelayCommand(async (ct) =>
@@ -109,12 +120,46 @@ namespace VoiceStudio.App.ViewModels
       RefreshCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
-        await RefreshAsync(ct);
+        await RefreshAsyncInternal(ct);
       }, () => !IsLoading);
+    }
 
-      // Load initial data
-      _ = LoadCategoriesAsync(CancellationToken.None);
-      _ = LoadTemplatesAsync(CancellationToken.None);
+    /// <inheritdoc />
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _loadTemplatesCts?.Cancel();
+      _loadTemplatesCts?.Dispose();
+      using var linked = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token, cancellationToken);
+      await LoadCategoriesAsync(linked.Token);
+      await LoadTemplatesAsync(linked.Token);
+    }
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => RefreshAsyncInternal(cancellationToken);
+
+    private void OnSearchDebounceTick(object? sender, object e)
+    {
+      if (_disposalCts.IsCancellationRequested) return;
+      _loadTemplatesCts?.Cancel();
+      _loadTemplatesCts?.Dispose();
+      _loadTemplatesCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = LoadTemplatesAsync(_loadTemplatesCts.Token);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+      if (disposing)
+      {
+        _searchDebounceTimer?.Stop();
+        _loadTemplatesCts?.Cancel();
+        _loadTemplatesCts?.Dispose();
+        _disposalCts.Cancel();
+        _disposalCts.Dispose();
+      }
+      base.Dispose(disposing);
     }
 
     public IAsyncRelayCommand LoadTemplatesCommand { get; }
@@ -133,28 +178,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (!string.IsNullOrEmpty(SelectedCategory))
-          queryParams.Add("category", SelectedCategory);
-        if (!string.IsNullOrEmpty(SearchQuery))
-          queryParams.Add("search", SearchQuery);
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/templates";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var templates = await _backendClient.SendRequestAsync<object, Template[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var templates = await _templateLibraryClient.GetTemplatesAsync(SelectedCategory, SearchQuery, cancellationToken).ConfigureAwait(false);
 
         Templates.Clear();
         if (templates != null)
@@ -208,22 +232,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          name = CreatingName,
-          category = CreatingCategory ?? "general",
-          description = CreatingDescription,
-          project_data = new { },
-          tags = new string[] { },
-          is_public = false
-        };
-
-        var created = await _backendClient.SendRequestAsync<object, Template>(
-            "/api/templates",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var created = await _templateLibraryClient.CreateTemplateAsync(CreatingName!, CreatingCategory, CreatingDescription, cancellationToken).ConfigureAwait(false);
 
         if (created != null)
         {
@@ -237,7 +246,7 @@ namespace VoiceStudio.App.ViewModels
           {
             var action = new CreateTemplateAction(
                 Templates,
-                _backendClient,
+                _templateLibraryClient,
                 templateItem,
                 onUndo: (t) =>
                 {
@@ -281,21 +290,14 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          name = template.Name,
-          category = template.Category,
-          description = template.Description,
-          tags = template.Tags,
-          is_public = template.IsPublic
-        };
-
-        var updated = await _backendClient.SendRequestAsync<object, Template>(
-            $"/api/templates/{template.Id}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var updated = await _templateLibraryClient.UpdateTemplateAsync(
+            template.Id,
+            template.Name,
+            template.Category,
+            template.Description,
+            template.Tags,
+            template.IsPublic,
+            cancellationToken).ConfigureAwait(false);
 
         if (updated != null)
         {
@@ -329,16 +331,10 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/templates/{template.Id}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _templateLibraryClient.DeleteTemplateAsync(template.Id, cancellationToken).ConfigureAwait(false);
 
         var originalIndex = Templates.IndexOf(template);
         Templates.Remove(template);
-        var previousSelected = SelectedTemplate;
         if (SelectedTemplate == template)
         {
           SelectedTemplate = null;
@@ -350,7 +346,7 @@ namespace VoiceStudio.App.ViewModels
         {
           var action = new DeleteTemplateAction(
               Templates,
-              _backendClient,
+              _templateLibraryClient,
               template,
               originalIndex,
               onUndo: (t) => SelectedTemplate = t,
@@ -388,17 +384,8 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          project_name = ResourceHelper.FormatString("TemplateLibrary.ProjectNameFromTemplate", template.Name)
-        };
-
-        var response = await _backendClient.SendRequestAsync<object, TemplateApplyResponse>(
-            $"/api/templates/{template.Id}/apply",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var projectName = ResourceHelper.FormatString("TemplateLibrary.ProjectNameFromTemplate", template.Name);
+        var response = await _templateLibraryClient.ApplyTemplateAsync(template.Id, projectName, cancellationToken).ConfigureAwait(false);
 
         if (response != null)
         {
@@ -424,17 +411,12 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, TemplateCategoriesResponse>(
-            "/api/templates/categories/list",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var categories = await _templateLibraryClient.GetCategoriesAsync(cancellationToken).ConfigureAwait(false);
 
         AvailableCategories.Clear();
-        if (response?.Categories != null)
+        if (categories != null)
         {
-          foreach (var category in response.Categories)
+          foreach (var category in categories)
           {
             AvailableCategories.Add(category);
           }
@@ -450,7 +432,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task RefreshAsyncInternal(CancellationToken cancellationToken)
     {
       try
       {
@@ -469,61 +451,25 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSelectedCategoryChanged(string? value)
     {
-      _ = LoadTemplatesAsync(CancellationToken.None);
+      if (_disposalCts.IsCancellationRequested) return;
+      _searchDebounceTimer?.Stop();
+      _loadTemplatesCts?.Cancel();
+      _loadTemplatesCts?.Dispose();
+      _loadTemplatesCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = LoadTemplatesAsync(_loadTemplatesCts.Token);
     }
 
     partial void OnSearchQueryChanged(string? value)
     {
-      _searchDebounceCts?.Cancel();
-      _searchDebounceCts = new CancellationTokenSource();
-      var cts = _searchDebounceCts;
-      _ = Task.Run(async () =>
-      {
-        try
-        {
-          await Task.Delay(SearchDebounceMs, cts.Token);
-          Dispatcher.TryEnqueue(() => _ = SearchTemplatesAsync(cts.Token));
-        }
-        catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "TemplateLibraryViewModel.OnSearchQueryChanged");
-      }
-      });
-    }
-
-    // Response models
-    private class TemplateApplyResponse
-    {
-      public bool Success { get; set; }
-      public string ProjectId { get; set; } = string.Empty;
-      public string TemplateId { get; set; } = string.Empty;
-      public string Message { get; set; } = string.Empty;
-    }
-
-    private class TemplateCategoriesResponse
-    {
-      public string[] Categories { get; set; } = Array.Empty<string>();
+      if (_disposalCts.IsCancellationRequested) return;
+      _searchDebounceTimer?.Stop();
+      _searchDebounceTimer?.Start();
     }
   }
 
-  // Data models
-  public class Template
-  {
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string Category { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public string? ThumbnailUrl { get; set; }
-    public System.Collections.Generic.Dictionary<string, object> ProjectData { get; set; } = new();
-    public System.Collections.Generic.List<string> Tags { get; set; } = new();
-    public string? Author { get; set; }
-    public string Version { get; set; } = "1.0";
-    public bool IsPublic { get; set; }
-    public int UsageCount { get; set; }
-    public string Created { get; set; } = string.Empty;
-    public string Modified { get; set; } = string.Empty;
-  }
-
+  /// <summary>
+  /// UI wrapper for TemplateLibraryTemplate.
+  /// </summary>
   public class TemplateItem : ObservableObject
   {
     public string Id { get; set; }
@@ -536,25 +482,25 @@ namespace VoiceStudio.App.ViewModels
     public bool IsPublic { get; set; }
     public int UsageCount { get; set; }
 
-    public TemplateItem(Template template)
+    public TemplateItem(TemplateLibraryTemplate template)
     {
       Id = template.Id;
       Name = template.Name;
       Category = template.Category;
       Description = template.Description;
       ThumbnailUrl = template.ThumbnailUrl;
-      Tags = template.Tags;
+      Tags = template.Tags ?? new System.Collections.Generic.List<string>();
       Author = template.Author;
       IsPublic = template.IsPublic;
       UsageCount = template.UsageCount;
     }
 
-    public void UpdateFrom(Template template)
+    public void UpdateFrom(TemplateLibraryTemplate template)
     {
       Name = template.Name;
       Category = template.Category;
       Description = template.Description;
-      Tags = template.Tags;
+      Tags = template.Tags ?? new System.Collections.Generic.List<string>();
       IsPublic = template.IsPublic;
       OnPropertyChanged(nameof(Name));
       OnPropertyChanged(nameof(Category));

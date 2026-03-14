@@ -12,7 +12,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateTemplateAction : IUndoableAction
   {
     private readonly ObservableCollection<TemplateItem> _templates;
-    private readonly IBackendClient _backendClient;
+    private readonly ITemplateLibraryClient _templateLibraryClient;
     private readonly TemplateItem _template;
     private readonly Action<TemplateItem>? _onUndo;
     private readonly Action<TemplateItem>? _onRedo;
@@ -21,13 +21,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateTemplateAction(
         ObservableCollection<TemplateItem> templates,
-        IBackendClient backendClient,
+        ITemplateLibraryClient templateLibraryClient,
         TemplateItem template,
         Action<TemplateItem>? onUndo = null,
         Action<TemplateItem>? onRedo = null)
     {
       _templates = templates ?? throw new ArgumentNullException(nameof(templates));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _templateLibraryClient = templateLibraryClient ?? throw new ArgumentNullException(nameof(templateLibraryClient));
       _template = template ?? throw new ArgumentNullException(nameof(template));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -59,7 +59,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteTemplateAction : IUndoableAction
   {
     private readonly ObservableCollection<TemplateItem> _templates;
-    private readonly IBackendClient _backendClient;
+    private readonly ITemplateLibraryClient _templateLibraryClient;
     private readonly TemplateItem _template;
     private readonly int _originalIndex;
     private readonly Action<TemplateItem>? _onUndo;
@@ -69,14 +69,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteTemplateAction(
         ObservableCollection<TemplateItem> templates,
-        IBackendClient backendClient,
+        ITemplateLibraryClient templateLibraryClient,
         TemplateItem template,
         int originalIndex,
         Action<TemplateItem>? onUndo = null,
         Action<TemplateItem>? onRedo = null)
     {
       _templates = templates ?? throw new ArgumentNullException(nameof(templates));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _templateLibraryClient = templateLibraryClient ?? throw new ArgumentNullException(nameof(templateLibraryClient));
       _template = template ?? throw new ArgumentNullException(nameof(template));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

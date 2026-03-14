@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
+using VoiceStudio.Core.Models;
 using System;
 using Windows.Foundation;
 using Windows.ApplicationModel.DataTransfer;
@@ -27,7 +28,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new TemplateLibraryViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient()
+          AppServices.GetTemplateLibraryClient()
       );
       DataContext = ViewModel;
 
@@ -322,7 +323,7 @@ namespace VoiceStudio.App.Views.Panels
       if (template is TemplateItem originalTemplate)
       {
         var duplicate = new TemplateItem(
-            new Template
+            new TemplateLibraryTemplate
             {
               Id = Guid.NewGuid().ToString(),
               Name = $"{originalTemplate.Name} (Copy)",

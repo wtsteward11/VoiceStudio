@@ -54,12 +54,28 @@ namespace VoiceStudio.App.Services
     public static void Initialize()
     {
       var services = new ServiceCollection();
+      RegisterCoreInfrastructure(services);
+      RegisterBackendFacades(services);
+      RegisterUIServices(services);
 
+      _provider = services.BuildServiceProvider();
+
+      // Wire up command queue service to registry (GAP-B12)
+      WireCommandQueueService();
+
+      // Register all panels after services are ready
+      RegisterAllPanels();
+    }
+
+    /// <summary>
+    /// Registers core infrastructure: correlation, config, metrics, coordinator, graceful degradation, HttpClient.
+    /// Must run before RegisterBackendFacades.
+    /// </summary>
+    private static void RegisterCoreInfrastructure(IServiceCollection services)
+    {
       // GAP-I12: Correlation ID provider for cross-layer request tracing
-      // Must be registered before ErrorLoggingService and BackendClient
       services.AddSingleton<ICorrelationIdProvider, CorrelationIdProvider>();
 
-      // Config and backend - use environment variable with fallback to 8000
       var apiHost = Environment.GetEnvironmentVariable("VOICESTUDIO_API_HOST") ?? "localhost";
       var apiPort = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT") ?? "8000";
       var baseUrl = $"http://{apiHost}:{apiPort}";
@@ -67,7 +83,21 @@ namespace VoiceStudio.App.Services
       services.AddSingleton(new BackendClientConfig { BaseUrl = baseUrl, WebSocketUrl = wsUrl });
       services.AddSingleton<IRequestMetricsService, RequestMetricsService>();
       services.AddSingleton<IRequestCoordinator, RequestCoordinator>();
-      // GAP-I12: Inject correlation provider into BackendClient
+      services.AddSingleton<GracefulDegradationService>();
+      services.AddSingleton<HttpClient>(_ =>
+      {
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        client.DefaultRequestHeaders.Add("User-Agent", "VoiceStudio-Quantum-Plus/1.0");
+        return client;
+      });
+    }
+
+    /// <summary>
+    /// Registers BackendClient and all domain facades (ProfilesClient, ProjectsClient, Timeline services, etc.).
+    /// Must run after RegisterCoreInfrastructure.
+    /// </summary>
+    private static void RegisterBackendFacades(IServiceCollection services)
+    {
       services.AddSingleton<IBackendClient>(sp => new BackendClient(
         sp.GetRequiredService<BackendClientConfig>(),
         sp.GetRequiredService<ICorrelationIdProvider>(),
@@ -217,6 +247,7 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IAdvancedSettingsClient, AdvancedSettingsClient>();
       services.AddSingleton<IUltimateDashboardClient, UltimateDashboardClient>();
       services.AddSingleton<IImageSearchClient, ImageSearchClient>();
+      services.AddSingleton<ITemplateLibraryClient, TemplateLibraryClient>();
 
       // Assistant facade (AssistantViewModel migration)
       services.AddSingleton<IAssistantClient, AssistantClient>();
@@ -231,10 +262,15 @@ namespace VoiceStudio.App.Services
           sp.GetService<IWebSocketService>(),
           sp.GetRequiredService<BackendClientConfig>().BaseUrl));
 
-      // Use cases
       services.AddSingleton<IProfilesUseCase, ProfilesUseCase>();
+    }
 
-      // Panel ViewModels (transient; PanelRegistry creates via ViewModelFactory)
+    /// <summary>
+    /// Registers UI services: DialogService, PanelRegistry, ViewModel factory, ToastNotificationService, etc.
+    /// Must run after RegisterBackendFacades.
+    /// </summary>
+    private static void RegisterUIServices(IServiceCollection services)
+    {
       services.AddTransient<VoiceStudio.App.Views.Panels.ProfilesViewModel>();
 
       // ViewModel context (factory: dispatcher may be null at startup; fallback when resolved)
@@ -263,12 +299,6 @@ namespace VoiceStudio.App.Services
         sp.GetRequiredService<ICorrelationIdProvider>()));
       services.AddSingleton<IAuditLoggingService>(sp => new AuditLoggingService(sp.GetRequiredService<IErrorLoggingService>()));
       services.AddSingleton<IHelpOverlayService, HelpOverlayService>();
-      services.AddSingleton<HttpClient>(_ =>
-      {
-        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-        client.DefaultRequestHeaders.Add("User-Agent", "VoiceStudio-Quantum-Plus/1.0");
-        return client;
-      });
       services.AddSingleton<IUpdateService>(sp => new UpdateService(sp.GetRequiredService<HttpClient>()));
       services.AddSingleton<IAudioPlayerService>(sp => new AudioPlayerService(sp.GetRequiredService<HttpClient>()));
       services.AddSingleton<IProfilePreviewService, ProfilePreviewService>();
@@ -282,7 +312,6 @@ namespace VoiceStudio.App.Services
           sp.GetRequiredService<IBackendClient>(),
           sp.GetRequiredService<ITimelineTrackService>(),
           sp.GetService<StateCacheService>()));
-      services.AddSingleton<GracefulDegradationService>();
       services.AddSingleton<PluginManager>();
       // Plugin Bridge Service for frontend-backend plugin state synchronization (Phase 1)
       services.AddSingleton<IPluginBridgeService, PluginBridgeService>(sp => new PluginBridgeService(
@@ -394,14 +423,6 @@ namespace VoiceStudio.App.Services
           sp.GetRequiredService<IUnifiedCommandRegistry>(),
           sp.GetService<ICommandMutexService>(),
           DispatcherQueue.GetForCurrentThread()));
-
-      _provider = services.BuildServiceProvider();
-
-      // Wire up command queue service to registry (GAP-B12)
-      WireCommandQueueService();
-
-      // Register all panels after services are ready
-      RegisterAllPanels();
     }
 
     /// <summary>
@@ -519,6 +540,7 @@ namespace VoiceStudio.App.Services
     public static IAdvancedSettingsClient GetAdvancedSettingsClient() => GetRequiredService<IAdvancedSettingsClient>();
     public static IUltimateDashboardClient GetUltimateDashboardClient() => GetRequiredService<IUltimateDashboardClient>();
     public static IImageSearchClient GetImageSearchClient() => GetRequiredService<IImageSearchClient>();
+    public static ITemplateLibraryClient GetTemplateLibraryClient() => GetRequiredService<ITemplateLibraryClient>();
     public static ITimelineClipService GetTimelineClipService() => GetRequiredService<ITimelineClipService>();
     public static ITimelineTrackService GetTimelineTrackService() => GetRequiredService<ITimelineTrackService>();
     public static ITimelineTranscriptionService GetTimelineTranscriptionService() => GetRequiredService<ITimelineTranscriptionService>();

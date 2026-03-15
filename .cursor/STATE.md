@@ -16,9 +16,9 @@ Read only this section as current task truth. Treat everything below the divider
 - **Status:** —
 
 ### Next 3 Steps
-1. Update IBACKENDCLIENT_UNRESOLVED_QUEUE.md — mark EffectsMixerViewModel MIGRATED
-2. Update CONSTRUCTOR_INVARIANT_COVERAGE_AUDIT.md — add EffectsMixerViewModel to matrix
-3. Run full verification; commit governance truth-sync docs
+1. (Optional) Golden path real proof — run when STT available; see GOLDEN_PATH_PROOF_STATUS.md
+2. (Optional) Next IBackendClient migration target from longtail — see IBACKENDCLIENT_LONGTAIL_RANKING.md
+3. (Optional) Run full verification periodically; maintain gate hygiene
 
 ### Current Target
 Governance truth sync after EffectsMixer Slice 3. All IBackendClient architecture-track migrations complete.
@@ -33,7 +33,8 @@ None
 - `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` — PASS (2026-03-15)
 - `dotnet test ... --filter "FullyQualifiedName~EffectsMixerViewModelSeamTests"` — 6 passed
 - `python scripts/ci/check_ibackendclient_creep.py` — PASS
-- `python scripts/run_verification.py` — PASS (2026-03-15, after EffectsMixer Slice 3 commits)
+- `python scripts/run_verification.py` — PASS (2026-03-15)
+- Ruthless Architect Next 10 Tasks: Task 7 (Release XAML), 8 (ADR-051), 9 (retained-async audit), 3 (golden path doc), 4+10 (synthesis refactor) — DONE
 
 ### Context Acknowledgment
 2026-03-15 — EffectsMixer Slice 3 complete. IEffectsMeterClient + IEffectChainClient + IMixerStateClient; IBackendClient removed. 80 migrated, 0 unresolved.
@@ -64,7 +65,7 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## CURRENT POSITION
 - **Phase:** v1.1.0 Completion Roadmap v2.0 — Phase F COMPLETE
 - **Plan:** VOICESTUDIO_COMPLETION_ROADMAP_V2.md
-- **Known Debt:** TrainingViewModel lifecycle FAF (documented in TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md; deferred)
+- **Known Debt:** TrainingViewModel lifecycle FAF — formal decision per ADR-051 (retained with CTS ownership; not deferred)
 
 ## LATEST MILESTONE
 - **ID:** EFFECTSMIXER-SLICE3
@@ -76,6 +77,11 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## LATEST PROOF INDEX
 | Date | Task | Artifact | Type | Status |
 |------|------|----------|------|--------|
+| 2026-03-15 | Synthesis route thin | synthesis.py delegates to SynthesisService; register_synthesize_handler removed | Code | Done |
+| 2026-03-15 | Golden path status | GOLDEN_PATH_PROOF_STATUS.md; STT blocker documented | Doc | Done |
+| 2026-03-15 | Retained-async exemptions | RETAINED_ASYNC_EXEMPTIONS.md; baseline audit | Doc | Done |
+| 2026-03-15 | ADR-051 | TrainingViewModel lifecycle FAF retention | ADR | Done |
+| 2026-03-15 | Release XAML smoke | verify.ps1 Stage 4 | Gate | Done |
 | 2026-03-14 | Bulletproof 0.1 | TextSpeechEditorViewModel IPanelLifecycle, no constructor FAF | Code | Done |
 | 2026-03-14 | Bulletproof 0.2 | run_verification.py constructor_invariant check | Gate | PASS |
 | 2026-03-14 | Bulletproof 2.2 | EngineParameterTuningViewModelSeamTests | Test | 3 passed |

@@ -6,6 +6,12 @@
 
 ---
 
+## ROUTINE MIGRATION QUEUE: CLOSED (2026-03-14)
+
+All routine IBackendClient migration targets are complete. SLODashboardViewModel and TagOrganizationViewModel migrated. Only EffectsMixerViewModel remains — on the **architecture track**, not the routine queue. Do not reopen routine migration work.
+
+---
+
 ## Architecture Track (Not Routine Queue)
 
 **EffectsMixerViewModel** is **excluded from the routine migration queue**. It requires a domain split per [EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md](EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md) Option C: `IEffectsMeterClient`, `IEffectChainClient`, `IMixerStateClient`. Lifecycle is hardened; seam migration is a separate architecture track.
@@ -51,6 +57,20 @@
 | ~~18~~ | ~~`ViewModels/TodoPanelViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
 | ~~19~~ | ~~`ViewModels/PluginHealthDashboardViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
 | ~~20~~ | ~~`ViewModels/ProfileHealthDashboardViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~21~~ | ~~`ViewModels/AIMixingMasteringViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~22~~ | ~~`ViewModels/AIProductionAssistantViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~23~~ | ~~`ViewModels/AdvancedSpectrogramVisualizationViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~24~~ | ~~`ViewModels/AdvancedWaveformVisualizationViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~25~~ | ~~`ViewModels/AnalyticsDashboardViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~26~~ | ~~`ViewModels/AudioAnalysisViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~27~~ | ~~`ViewModels/DeepfakeCreatorViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~28~~ | ~~`ViewModels/GPUStatusViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~29~~ | ~~`ViewModels/MCPDashboardViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~30~~ | ~~`ViewModels/MultilingualSupportViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~31~~ | ~~`ViewModels/PipelineConversationViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~32~~ | ~~`ViewModels/RealTimeAudioVisualizerViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~33~~ | ~~`ViewModels/SpatialStageViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
+| ~~34~~ | ~~`ViewModels/TextHighlightingViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-14) | Seam tests |
 
 ---
 
@@ -131,15 +151,125 @@
 
 ---
 
-## Remaining Unresolved (from generator output)
+### Rank 24: AdvancedWaveformVisualizationViewModel — DONE (2026-03-14)
 
-AIMixingMasteringViewModel, AIProductionAssistantViewModel, AdvancedRealTimeVisualizationViewModel, AdvancedSearchViewModel, AdvancedSpectrogramVisualizationViewModel, AdvancedWaveformVisualizationViewModel, AnalyticsDashboardViewModel, AudioAnalysisViewModel, AudioMonitoringDashboardViewModel, DeepfakeCreatorViewModel, EffectsMixerViewModel, GPUStatusViewModel, ImageVideoEnhancementPipelineViewModel, MCPDashboardViewModel, MultilingualSupportViewModel, PipelineConversationViewModel, RealTimeAudioVisualizerViewModel, SLODashboardViewModel, SpatialStageViewModel, TagOrganizationViewModel, TextHighlightingViewModel, TrainingQualityVisualizationViewModel, VideoEditViewModel, VideoGenViewModel, VoiceQuickCloneViewModel, WorkflowAutomationViewModel.
+**File:** `src/VoiceStudio.App/ViewModels/AdvancedWaveformVisualizationViewModel.cs`
+
+**Status:** **MIGRATED** to `IAdvancedWaveformClient` + `IProjectAudioClient`. AdvancedWaveformModels.cs (Core.Models), AdvancedWaveformClient. Constructor FAF removed; IPanelLifecycle with OnActivatedAsync. Seam tests in `AdvancedWaveformVisualizationViewModelSeamTests.cs`.
 
 ---
 
-## Next Migration Target
+### Rank 25: AnalyticsDashboardViewModel — DONE (2026-03-14)
 
-**VoiceQuickCloneViewModel** — Core voice cloning workflow; property-handler FAF (OnSelectedAudioFileChanged); CloneVoiceAsync. Seam: IVoiceQuickCloneClient. See [IBACKENDCLIENT_INSPECTION_TOP3.md](IBACKENDCLIENT_INSPECTION_TOP3.md) Rank 2.
+**File:** `src/VoiceStudio.App/ViewModels/AnalyticsDashboardViewModel.cs`
+
+**Status:** **MIGRATED** to `IAnalyticsDashboardClient`. AnalyticsDashboardModels.cs (Services), AnalyticsDashboardClient. Constructor FAF removed; IPanelLifecycle with OnActivatedAsync. Seam tests in `AnalyticsDashboardViewModelSeamTests.cs`.
+
+---
+
+### Rank 26: AudioAnalysisViewModel — DONE (2026-03-14)
+
+**File:** `src/VoiceStudio.App/ViewModels/AudioAnalysisViewModel.cs`
+
+**Status:** **MIGRATED** to `IAudioAnalysisClient`. AudioAnalysisModels.cs (Core.Models), AudioAnalysisClient. IPanelLifecycle; selection-triggered load with cancellation + staleness guard. Seam tests in `AudioAnalysisViewModelSeamTests.cs`.
+
+---
+
+### Rank 27: DeepfakeCreatorViewModel — DONE (2026-03-14)
+
+**File:** `src/VoiceStudio.App/ViewModels/DeepfakeCreatorViewModel.cs`
+
+**Status:** **MIGRATED** to `IDeepfakeCreatorClient`. DeepfakeCreatorModels.cs (Core.Models), DeepfakeCreatorClient. Constructor FAF removed; IPanelLifecycle with OnActivatedAsync. Seam tests in `DeepfakeCreatorViewModelSeamTests.cs`.
+
+---
+
+### Rank 28: GPUStatusViewModel — DONE (2026-03-14)
+
+**File:** `src/VoiceStudio.App/ViewModels/GPUStatusViewModel.cs`
+
+**Status:** **MIGRATED** to `IGPUStatusClient`. GPUStatusModels.cs (Core.Models), GPUStatusClient. Constructor FAF removed; IPanelLifecycle with OnActivatedAsync. Seam tests in `GPUStatusViewModelSeamTests.cs`.
+
+---
+
+## Truly Remaining (from generator output, 1 total)
+
+Source: `python scripts/ci/generate_ibackendclient_queue.py`. Last verified: 2026-03-14.
+
+| # | File | Notes |
+|---|------|-------|
+| 1 | `Views/Panels/EffectsMixerViewModel.cs` | **Architecture track deferred** — domain split (Option C) |
+| ~~2~~ | ~~`Views/Panels/SLODashboardViewModel.cs`~~ | **MIGRATED** (2026-03-14) to ISLODashboardClient |
+| ~~3~~ | ~~`Views/Panels/TagOrganizationViewModel.cs`~~ | **MIGRATED** (2026-03-14) to ITagOrganizationClient |
+
+---
+
+## VideoEditViewModel — DONE (2026-03-14)
+
+**File:** `src/VoiceStudio.App/ViewModels/VideoEditViewModel.cs`
+
+**Status:** **MIGRATED** to `IVideoEditClient`. Selection-triggered (SelectedVideoPath) FAF removed; cancellation + staleness guard for LoadVideoInfoForSelectionAsync. Seam tests in `VideoEditViewModelSeamTests.cs`.
+
+---
+
+## VideoGenViewModel — DONE (2026-03-14)
+
+**File:** `src/VoiceStudio.App/ViewModels/VideoGenViewModel.cs`
+
+**Status:** **MIGRATED** to `IVideoGenClient`. Constructor FAF removed; IPanelLifecycle with OnActivatedAsync (LoadEnginesAsync); selection-triggered quality metrics with cancellation + staleness guard. Seam tests in `VideoGenViewModelSeamTests.cs`.
+
+---
+
+## AdvancedRealTimeVisualizationViewModel — DONE (2026-03-14)
+
+**File:** `src/VoiceStudio.App/Views/Panels/AdvancedRealTimeVisualizationViewModel.cs`
+
+**Status:** **MIGRATED** to `IAdvancedRealTimeVisualizationClient`. GetVisualizationDataAsync, GetPlaybackPositionAsync. Timer-based updates retained (starts in constructor). Seam tests in `AdvancedRealTimeVisualizationViewModelSeamTests.cs`. Constructor invariant omitted (timer-based FAF).
+
+---
+
+## AudioMonitoringDashboardViewModel — DONE (2026-03-14)
+
+**File:** `src/VoiceStudio.App/Views/Panels/AudioMonitoringDashboardViewModel.cs`
+
+**Status:** **MIGRATED** to `IAudioMonitoringDashboardClient`. GetAudioMetersAsync, GetLoudnessDataAsync. No constructor FAF; polling via owned _pollingCts. Seam tests in `AudioMonitoringDashboardViewModelSeamTests.cs`.
+
+---
+
+## ImageVideoEnhancementPipelineViewModel — DONE (2026-03-14)
+
+**File:** `src/VoiceStudio.App/Views/Panels/ImageVideoEnhancementPipelineViewModel.cs`
+
+**Status:** **MIGRATED** to `IImageVideoEnhancementPipelineClient`. ApplyPipelineAsync, PreviewPipelineAsync. No constructor FAF; LoadEnhancementPresets/LoadAvailableEnhancements are sync in-memory. Seam tests in `ImageVideoEnhancementPipelineViewModelSeamTests.cs`.
+
+---
+
+## SLODashboardViewModel — DONE (2026-03-14)
+
+**File:** `src/VoiceStudio.App/Views/Panels/SLODashboardViewModel.cs`
+
+**Status:** **MIGRATED** to `ISLODashboardClient`. GetSloDataAsync. SloDashboardModels.cs (SloMetricDto, SloDataResponse), SLODashboardClient. No constructor FAF; LoadSloDataAsync from View Loaded. Seam tests in `SLODashboardViewModelSeamTests.cs`.
+
+---
+
+## TagOrganizationViewModel — DONE (2026-03-14)
+
+**File:** `src/VoiceStudio.App/Views/Panels/TagOrganizationViewModel.cs`
+
+**Status:** **MIGRATED** to `ITagOrganizationClient` + `IProfilesClient`. UpdateTagAsync. TagOrganizationClient. Tag data from IProfilesClient.GetProfilesAsync; update via ITagOrganizationClient. No constructor FAF; RefreshAsync from View Loaded and property changes. Seam tests in `TagOrganizationViewModelSeamTests.cs`.
+
+---
+
+## TrainingQualityVisualizationViewModel — DONE (2026-03-14)
+
+**File:** `src/VoiceStudio.App/ViewModels/TrainingQualityVisualizationViewModel.cs`
+
+**Status:** **MIGRATED** to `ITrainingClient`. Constructor FAF removed; IPanelLifecycle with OnActivatedAsync; selection-triggered load with cancellation + staleness guard. Seam tests in `TrainingQualityVisualizationViewModelSeamTests.cs`.
+
+---
+
+## Next Migration Target (Routine)
+
+**NONE.** Routine queue closed. Next work is EffectsMixer architecture-track split (see [EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md](EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md)).
 
 Before starting any migration: run `python scripts/ci/check_ibackendclient_creep.py` and confirm baseline alignment.
 
@@ -147,6 +277,23 @@ Before starting any migration: run `python scripts/ci/check_ibackendclient_creep
 
 ## Changelog
 
+- 2026-03-14: TagOrganizationViewModel migrated to ITagOrganizationClient. 1 unresolved (EffectsMixer deferred). Routine targets complete.
+- 2026-03-14: SLODashboardViewModel migrated to ISLODashboardClient. 2 unresolved. Next target: TagOrganizationViewModel.
+- 2026-03-14: ImageVideoEnhancementPipelineViewModel migrated to IImageVideoEnhancementPipelineClient. 3 unresolved. Next target: SLODashboardViewModel.
+- 2026-03-14: AudioMonitoringDashboardViewModel migrated to IAudioMonitoringDashboardClient. 4 unresolved. Next target: ImageVideoEnhancementPipelineViewModel.
+- 2026-03-14: AdvancedRealTimeVisualizationViewModel migrated to IAdvancedRealTimeVisualizationClient. 5 unresolved. Next target: AudioMonitoringDashboardViewModel.
+- 2026-03-14: VideoGenViewModel migrated to IVideoGenClient. 6 unresolved. Next target: AdvancedRealTimeVisualizationViewModel.
+- 2026-03-14: VideoEditViewModel migrated to IVideoEditClient. 7 unresolved. Next target: VideoGenViewModel.
+- 2026-03-14: TrainingQualityVisualizationViewModel migrated to ITrainingClient. 8 unresolved. Next target: VideoEditViewModel.
+- 2026-03-14: Governance Truth Reset. Replaced "Remaining Unresolved" with "Truly Remaining" (9 from generator). Next routine target: TrainingQualityVisualizationViewModel. EffectsMixer stays deferred. TrainingQualityVisualizationViewModel inspection added (ITrainingClient; constructor + selection FAF).
+- 2026-03-14: GPUStatusViewModel migrated to IGPUStatusClient. 15 unresolved. Next target: MCPDashboardViewModel.
+- 2026-03-14: DeepfakeCreatorViewModel migrated to IDeepfakeCreatorClient. 16 unresolved. Next target: GPUStatusViewModel.
+- 2026-03-14: AudioAnalysisViewModel migrated to IAudioAnalysisClient. 17 unresolved. Next target: DeepfakeCreatorViewModel.
+- 2026-03-14: AnalyticsDashboardViewModel migrated to IAnalyticsDashboardClient. 18 unresolved. Next target: AudioAnalysisViewModel.
+- 2026-03-14: AdvancedWaveformVisualizationViewModel migrated to IAdvancedWaveformClient + IProjectAudioClient. 20 unresolved. Next target: AnalyticsDashboardViewModel.
+- 2026-03-14: AdvancedSearchViewModel migrated to ISearchClient. 23 unresolved. Next target: AIMixingMasteringViewModel (IAIMixingClient).
+- 2026-03-14: WorkflowAutomationViewModel migrated to IWorkflowAutomationClient. Next target: TBD (regenerate queue).
+- 2026-03-14: VoiceQuickCloneViewModel migrated to IVoiceQuickCloneClient. Next target: WorkflowAutomationViewModel (IWorkflowAutomationClient).
 - 2026-03-14: Next target: VoiceQuickCloneViewModel (IVoiceQuickCloneClient). Rationale: core workflow, Top 3 Rank 2.
 - 2026-03-14: Truth reset. Alphabetical list synced to generate_ibackendclient_queue.py output. Removed migrated ViewModels (VoiceBrowser, VoiceMorphingBlending, KeyboardShortcuts, MarkerManager, PronunciationLexicon, Prosody, TagManager). Next target set to TBD until Top-3 inspection.
 - 2026-03-14: Truth Reset Task 2. Queue regenerated from generate_ibackendclient_queue.py. Next target: HelpViewModel (IHelpClient). Alphabetical list updated; ProfileHealthDashboardViewModel removed (MIGRATED).

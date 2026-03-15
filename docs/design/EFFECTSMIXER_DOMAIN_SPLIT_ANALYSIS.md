@@ -109,12 +109,15 @@ Split by domain.
 
 ## 6. Prerequisites (No Migration Before These)
 
-1. **Lifecycle hardening** (Task 3.2): Replace `ContinueWith` with proper async + CTS + staleness guard; add `IDisposable`; cancel `_pollingCts` in `Dispose`.
+1. **Lifecycle hardening** (Task 3.2): Replace `ContinueWith` with proper async + CTS + staleness guard; add `IDisposable`; cancel `_pollingCts` in `Dispose`. **DONE.**
 2. **EffectChainActions update:** Add `IEffectChainClient`; refactor CreateEffectChainAction and DeleteEffectChainAction to accept it.
 3. **Seam tests:** EffectsMixerViewModelSeamTests, lifecycle tests.
+
+**Execution plan:** See [EFFECTSMIXER_SEAM_EXECUTION_PLAN.md](EFFECTSMIXER_SEAM_EXECUTION_PLAN.md) for step-by-step slice sequence.
 
 ---
 
 ## Changelog
 
+- 2026-03-14: Execution plan created (EFFECTSMIXER_SEAM_EXECUTION_PLAN.md). Prerequisites §6 updated.
 - 2026-03-13: Initial analysis. Option C (three seams) recommended. EffectChainActions must accept IEffectChainClient.

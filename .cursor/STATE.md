@@ -11,28 +11,27 @@
 Read only this section as current task truth. Treat everything below the divider as historical context.
 
 ### Active Task
-- **ID:** VOICEBROWSER-TESTS
-- **Title:** VoiceBrowserViewModelTests fix for IVoiceBrowserClient
+- **ID:** ROUTINE-CLOSURE
+- **Title:** Routine IBackendClient migration queue closure
 - **Status:** Complete
 
 ### Next 3 Steps
-1. Pick next migration target from regenerated queue (Top 3: VoiceQuickCloneViewModel, WorkflowAutomationViewModel)
-2. Inspect call sites per Top 3 sheet before coding
-3. Run verify.ps1 -Quick before any code changes
+1. Execute EffectsMixer Slice 1 (IEffectsMeterClient) per [EFFECTSMIXER_SEAM_EXECUTION_PLAN.md](docs/design/EFFECTSMIXER_SEAM_EXECUTION_PLAN.md)
+2. Exemption documentation complete (Phase 6)
+3. Run full verification after EffectsMixer Slice 1
 
 ### Current Target
-VoiceQuickCloneViewModel — IVoiceQuickCloneClient; inspect call sites per Top 3 sheet before coding
+EffectsMixer architecture-track split (Option C). Routine queue frozen.
 
 ### Current Blocker
 None
 
 ### Truth Sync Note
-VoiceMorphingBlendingViewModel migrated (2026-03-14). VoiceBrowserViewModelTests updated for IVoiceBrowserClient (mock IVoiceBrowserClient, VoiceSearchResponse/LanguagesResponse/TagsResponse from VoiceStudio.App.Services). 61 migrated ViewModels; 60 with constructor invariant.
+78 migrated ViewModels; 76 with constructor invariant; 2 exempt (MiniTimelineViewModel, AdvancedRealTimeVisualizationViewModel timer-based FAF). 1 truly unresolved (EffectsMixer deferred). Routine targets complete.
 
 ### Last Verified Commands
 - `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` — PASS (2026-03-14)
-- `dotnet test ... --filter "FullyQualifiedName~VoiceBrowserViewModelTests"` — 17 passed
-- `python scripts/run_verification.py` — PASS after commit (completion_guard requires committed markers)
+- `dotnet test ... --filter "FullyQualifiedName~SLODashboardViewModelSeamTests|FullyQualifiedName~TagOrganizationViewModelSeamTests"` — 7 passed
 - `python scripts/ci/check_ibackendclient_creep.py` — PASS
 
 ### Context Acknowledgment
@@ -97,6 +96,26 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 | 2026-03-14 | VoiceBrowserViewModelTests fix | IVoiceBrowserClient mock, VoiceSearchResponse/LanguagesResponse/TagsResponse from Services; 17 tests pass | Test | Done |
 | 2026-03-14 | Bulletproof 3.1 | AppServices RegisterPanelServices | Code | Done |
 | 2026-03-14 | Bulletproof 5.1 | STATE.md, IBACKENDCLIENT_UNRESOLVED_QUEUE.md | Doc | Updated |
+| 2026-03-14 | Truth-sync | STATE.md 54/53 counts; creep +7; VoiceBrowserViewModelSeamTests; run_verification PASS | Doc/Test | Done |
+| 2026-03-14 | WorkflowAutomationViewModel migration | IWorkflowAutomationClient, WorkflowAutomationClient, WorkflowAutomationViewModelSeamTests (3 passed) | Code | Done |
+| 2026-03-14 | AIMixingMasteringViewModel migration | IAIMixingClient, AIMixingClient, AIMixingModels.cs, AIMixingMasteringViewModelSeamTests (20 passed) | Code | Done |
+| 2026-03-14 | AIProductionAssistantViewModel migration | IAIProductionAssistantClient, AIProductionAssistantClient, AIProductionAssistantModels.cs, AIProductionAssistantViewModelSeamTests (3 passed) | Code | Done |
+| 2026-03-14 | AdvancedSpectrogramVisualizationViewModel migration | IAdvancedSpectrogramClient, AdvancedSpectrogramClient, AdvancedSpectrogramModels.cs, IProjectAudioClient, IPanelLifecycle, AdvancedSpectrogramVisualizationViewModelSeamTests (4 passed) | Code | Done |
+| 2026-03-14 | AdvancedWaveformVisualizationViewModel migration | IAdvancedWaveformClient, AdvancedWaveformClient, AdvancedWaveformModels.cs, IProjectAudioClient, IPanelLifecycle, AdvancedWaveformVisualizationViewModelSeamTests | Code | Done |
+| 2026-03-14 | AnalyticsDashboardViewModel migration | IAnalyticsDashboardClient, AnalyticsDashboardClient, AnalyticsDashboardModels.cs, IPanelLifecycle, AnalyticsDashboardViewModelSeamTests (21 passed) | Code | Done |
+| 2026-03-14 | AudioAnalysisViewModel migration | IAudioAnalysisClient, AudioAnalysisClient, AudioAnalysisModels.cs, IPanelLifecycle, selection-triggered staleness guard, AudioAnalysisViewModelSeamTests (4 passed) | Code | Done |
+| 2026-03-14 | DeepfakeCreatorViewModel migration | IDeepfakeCreatorClient, DeepfakeCreatorClient, DeepfakeCreatorModels.cs, IPanelLifecycle, OnActivatedAsync, DeepfakeCreatorViewModelSeamTests (18 passed) | Code | Done |
+| 2026-03-14 | GPUStatusViewModel migration | IGPUStatusClient, GPUStatusClient, GPUStatusModels.cs, IPanelLifecycle, OnActivatedAsync, GPUStatusViewModelSeamTests (19 passed) | Code | Done |
+| 2026-03-14 | SpatialStageViewModel migration | ISpatialStageClient, SpatialStageClient, IProjectsClient, IProjectAudioClient, IPanelLifecycle, SpatialStageViewModelSeamTests (4 passed), SpatialStageViewModelTests (42 passed) | Code | Done |
+| 2026-03-14 | TextHighlightingViewModel migration | ITextHighlightingClient, TextHighlightingClient, TextHighlightingModels.cs, IProjectsClient, IProjectAudioClient, IPanelLifecycle, TextHighlightingViewModelSeamTests (4 passed), TextHighlightingModelTests (9 passed) | Code | Done |
+| 2026-03-14 | VideoEditViewModel migration | IVideoEditClient, VideoEditClient, selection-triggered cancellation + staleness guard, VideoEditViewModelSeamTests (5 passed), VideoEditViewModelTests (15 passed) | Code | Done |
+| 2026-03-14 | VideoGenViewModel migration | IVideoGenClient, VideoGenClient, VideoQualityMetricsResponse, IPanelLifecycle, selection-triggered quality metrics with staleness guard, VideoGenViewModelSeamTests (5 passed) | Code | Done |
+| 2026-03-14 | AdvancedRealTimeVisualizationViewModel migration | IAdvancedRealTimeVisualizationClient, AdvancedRealTimeVisualizationClient, GetVisualizationDataAsync, GetPlaybackPositionAsync, AdvancedRealTimeVisualizationViewModelSeamTests (3 passed) | Code | Done |
+| 2026-03-14 | AudioMonitoringDashboardViewModel migration | IAudioMonitoringDashboardClient, AudioMonitoringDashboardClient, GetAudioMetersAsync, GetLoudnessDataAsync, AudioMonitoringDashboardViewModelSeamTests (3 passed) | Code | Done |
+| 2026-03-14 | ImageVideoEnhancementPipelineViewModel migration | IImageVideoEnhancementPipelineClient, ImageVideoEnhancementPipelineClient, ApplyPipelineAsync, PreviewPipelineAsync, ImageVideoEnhancementPipelineViewModelSeamTests (3 passed) | Code | Done |
+| 2026-03-14 | SLODashboardViewModelSeamTests fix | ViewModelContext, DispatcherQueueController | Test | PASS |
+| 2026-03-14 | TagOrganizationViewModel migration closure | ITagOrganizationClient, IProfilesClient, TagOrganizationViewModelSeamTests (4 passed) | Code + Test | Done |
+| 2026-03-14 | Routine IBackendClient migration queue closure | IBACKENDCLIENT_UNRESOLVED_QUEUE.md closure banner | Doc | Done |
 
 ## COMPLETED MILESTONES
 - TRUTH-RESET-LIFECYCLE, NEXT10-SEAM-BATCH, WAVE2-LIFECYCLE-FOLLOW-THROUGH

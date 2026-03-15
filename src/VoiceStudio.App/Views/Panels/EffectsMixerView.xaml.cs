@@ -28,11 +28,11 @@ namespace VoiceStudio.App.Views.Panels
     public EffectsMixerView()
     {
       this.InitializeComponent();
-      // Wire DataContext with BackendClient, IEffectsMeterClient, IEffectChainClient
+      // Wire DataContext with IEffectsMeterClient, IEffectChainClient, IMixerStateClient
       ViewModel = new EffectsMixerViewModel(
-          ServiceProvider.GetBackendClient(),
           ServiceProvider.GetEffectsMeterClient(),
-          ServiceProvider.GetEffectChainClient()
+          ServiceProvider.GetEffectChainClient(),
+          ServiceProvider.GetMixerStateClient()
       );
       this.DataContext = ViewModel;
 

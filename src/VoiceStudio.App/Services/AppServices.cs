@@ -293,6 +293,7 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IAudioMonitoringDashboardClient, AudioMonitoringDashboardClient>();
       services.AddSingleton<IEffectsMeterClient, EffectsMeterClient>();
       services.AddSingleton<IEffectChainClient, EffectChainClient>();
+      services.AddSingleton<IMixerStateClient, MixerStateClient>();
       services.AddSingleton<IImageVideoEnhancementPipelineClient, ImageVideoEnhancementPipelineClient>();
       services.AddSingleton<ISLODashboardClient, SLODashboardClient>();
 
@@ -638,6 +639,7 @@ namespace VoiceStudio.App.Services
     public static IAudioMonitoringDashboardClient GetAudioMonitoringDashboardClient() => GetRequiredService<IAudioMonitoringDashboardClient>();
     public static IEffectsMeterClient GetEffectsMeterClient() => GetRequiredService<IEffectsMeterClient>();
     public static IEffectChainClient GetEffectChainClient() => GetRequiredService<IEffectChainClient>();
+    public static IMixerStateClient GetMixerStateClient() => GetRequiredService<IMixerStateClient>();
     public static IImageVideoEnhancementPipelineClient GetImageVideoEnhancementPipelineClient() => GetRequiredService<IImageVideoEnhancementPipelineClient>();
     public static ISLODashboardClient GetSLODashboardClient() => GetRequiredService<ISLODashboardClient>();
     public static IEmotionControlClient GetEmotionControlClient() => GetRequiredService<IEmotionControlClient>();

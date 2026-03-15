@@ -18,9 +18,9 @@ namespace VoiceStudio.App.Views.Panels
 {
   public partial class EffectsMixerViewModel : ObservableObject, IPanelView, IPanelLifecycle, IDisposable
   {
-    private readonly IBackendClient _backendClient;
     private readonly IEffectsMeterClient _effectsMeterClient;
     private readonly IEffectChainClient _effectChainClient;
+    private readonly IMixerStateClient _mixerStateClient;
     private readonly UndoRedoService? _undoRedoService;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly MultiSelectService _multiSelectService;
@@ -133,11 +133,11 @@ namespace VoiceStudio.App.Views.Panels
             "vocoder"
         };
 
-    public EffectsMixerViewModel(IBackendClient backendClient, IEffectsMeterClient effectsMeterClient, IEffectChainClient effectChainClient)
+    public EffectsMixerViewModel(IEffectsMeterClient effectsMeterClient, IEffectChainClient effectChainClient, IMixerStateClient mixerStateClient)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _effectsMeterClient = effectsMeterClient ?? throw new ArgumentNullException(nameof(effectsMeterClient));
       _effectChainClient = effectChainClient ?? throw new ArgumentNullException(nameof(effectChainClient));
+      _mixerStateClient = mixerStateClient ?? throw new ArgumentNullException(nameof(mixerStateClient));
       _disposalCts = new CancellationTokenSource();
 
       // Get multi-select service
@@ -1431,7 +1431,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var state = await _backendClient.GetMixerStateAsync(projectId, cancellationToken);
+        var state = await _mixerStateClient.GetMixerStateAsync(projectId, cancellationToken);
 
         // Staleness guard: selection may have changed during await
         if (SelectedProjectId != projectId || cancellationToken.IsCancellationRequested)
@@ -1534,7 +1534,7 @@ namespace VoiceStudio.App.Views.Panels
         MixerState.Returns = Returns.ToList();
         MixerState.SubGroups = SubGroups.ToList();
 
-        var updatedState = await _backendClient.UpdateMixerStateAsync(SelectedProjectId, MixerState, cancellationToken);
+        var updatedState = await _mixerStateClient.UpdateMixerStateAsync(SelectedProjectId, MixerState, cancellationToken);
         MixerState = updatedState;
 
         // Update Master from returned state (no need to reload everything)
@@ -1570,7 +1570,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var state = await _backendClient.ResetMixerStateAsync(SelectedProjectId, cancellationToken);
+        var state = await _mixerStateClient.ResetMixerStateAsync(SelectedProjectId, cancellationToken);
         MixerState = state;
         Master = state.Master ?? new MixerMaster { Id = "master", Volume = 1.0, Pan = 0.0, IsMuted = false };
 
@@ -1628,7 +1628,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var presets = await _backendClient.GetMixerPresetsAsync(projectId, cancellationToken);
+        var presets = await _mixerStateClient.GetMixerPresetsAsync(projectId, cancellationToken);
 
         // Staleness guard: selection may have changed during await
         if (SelectedProjectId != projectId || cancellationToken.IsCancellationRequested)
@@ -1677,7 +1677,7 @@ namespace VoiceStudio.App.Views.Panels
           Modified = DateTime.UtcNow
         };
 
-        var createdPreset = await _backendClient.CreateMixerPresetAsync(SelectedProjectId, preset, cancellationToken);
+        var createdPreset = await _mixerStateClient.CreateMixerPresetAsync(SelectedProjectId, preset, cancellationToken);
         MixerPresets.Add(createdPreset);
       }
       catch (OperationCanceledException)
@@ -1707,7 +1707,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var state = await _backendClient.ApplyMixerPresetAsync(SelectedProjectId, presetId, cancellationToken);
+        var state = await _mixerStateClient.ApplyMixerPresetAsync(SelectedProjectId, presetId, cancellationToken);
         MixerState = state;
         Master = state.Master ?? new MixerMaster { Id = "master", Volume = 1.0, Pan = 0.0, IsMuted = false };
 
@@ -1770,7 +1770,7 @@ namespace VoiceStudio.App.Views.Panels
           IsEnabled = true
         };
 
-        var created = await _backendClient.CreateMixerSendAsync(SelectedProjectId, send, cancellationToken);
+        var created = await _mixerStateClient.CreateMixerSendAsync(SelectedProjectId, send, cancellationToken);
         Sends.Add(created);
         await SaveMixerStateAsync(cancellationToken); // Save the updated state
       }
@@ -1811,7 +1811,7 @@ namespace VoiceStudio.App.Views.Panels
           IsEnabled = true
         };
 
-        var created = await _backendClient.CreateMixerReturnAsync(SelectedProjectId, returnBus, cancellationToken);
+        var created = await _mixerStateClient.CreateMixerReturnAsync(SelectedProjectId, returnBus, cancellationToken);
         Returns.Add(created);
         await SaveMixerStateAsync(cancellationToken); // Save the updated state
       }
@@ -1854,7 +1854,7 @@ namespace VoiceStudio.App.Views.Panels
           ChannelIds = new List<string>()
         };
 
-        var created = await _backendClient.CreateMixerSubGroupAsync(SelectedProjectId, subGroup, cancellationToken);
+        var created = await _mixerStateClient.CreateMixerSubGroupAsync(SelectedProjectId, subGroup, cancellationToken);
         SubGroups.Add(created);
         await SaveMixerStateAsync(cancellationToken); // Save the updated state
       }
@@ -1885,7 +1885,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        await _backendClient.DeleteMixerSubGroupAsync(SelectedProjectId, subGroup.Id, cancellationToken);
+        await _mixerStateClient.DeleteMixerSubGroupAsync(SelectedProjectId, subGroup.Id, cancellationToken);
         SubGroups.Remove(subGroup);
 
         // Update channels that were routed to this sub-group
@@ -1927,7 +1927,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var updated = await _backendClient.UpdateMixerSubGroupAsync(SelectedProjectId, subGroup.Id, subGroup, cancellationToken);
+        var updated = await _mixerStateClient.UpdateMixerSubGroupAsync(SelectedProjectId, subGroup.Id, subGroup, cancellationToken);
         var index = SubGroups.ToList().FindIndex(sg => sg.Id == subGroup.Id);
         if (index >= 0)
         {
@@ -1962,7 +1962,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var updated = await _backendClient.UpdateMixerSendAsync(SelectedProjectId, send.Id, send, cancellationToken);
+        var updated = await _mixerStateClient.UpdateMixerSendAsync(SelectedProjectId, send.Id, send, cancellationToken);
         var index = Sends.ToList().FindIndex(s => s.Id == send.Id);
         if (index >= 0)
         {
@@ -1997,7 +1997,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var updated = await _backendClient.UpdateMixerReturnAsync(SelectedProjectId, returnBus.Id, returnBus, cancellationToken);
+        var updated = await _mixerStateClient.UpdateMixerReturnAsync(SelectedProjectId, returnBus.Id, returnBus, cancellationToken);
         var index = Returns.ToList().FindIndex(r => r.Id == returnBus.Id);
         if (index >= 0)
         {
@@ -2032,7 +2032,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        await _backendClient.DeleteMixerSendAsync(SelectedProjectId, send.Id, cancellationToken);
+        await _mixerStateClient.DeleteMixerSendAsync(SelectedProjectId, send.Id, cancellationToken);
         Sends.Remove(send);
 
         // Remove send references from all channels
@@ -2071,7 +2071,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        await _backendClient.DeleteMixerReturnAsync(SelectedProjectId, returnBus.Id, cancellationToken);
+        await _mixerStateClient.DeleteMixerReturnAsync(SelectedProjectId, returnBus.Id, cancellationToken);
         Returns.Remove(returnBus);
         await SaveMixerStateAsync(cancellationToken);
       }

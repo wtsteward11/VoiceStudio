@@ -33,11 +33,19 @@ namespace VoiceStudio.App.Services
     private readonly IEventAggregator? _eventAggregator;
     private ISubscriptionToken? _playbackRequestedSubscription;
 
+    /// <summary>
+    /// True if this instance successfully subscribed to PlaybackRequestedEvent.
+    /// Used for startup diagnostics to confirm playback wiring.
+    /// </summary>
+    public static bool IsPlaybackSubscribed { get; private set; }
+
     public AudioPlayerService(HttpClient httpClient)
     {
       _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
       _eventAggregator = AppServices.TryGetEventAggregator();
       _playbackRequestedSubscription = _eventAggregator?.Subscribe<PlaybackRequestedEvent>(OnPlaybackRequested);
+      IsPlaybackSubscribed = _playbackRequestedSubscription != null;
+      System.Diagnostics.Debug.WriteLine($"[AudioPlayer] Event subscription: {(IsPlaybackSubscribed ? "OK" : "MISSING (EventAggregator or Subscribe failed)")}");
     }
 
     public bool IsPlaying { get; private set; }
@@ -601,30 +609,49 @@ namespace VoiceStudio.App.Services
     /// </summary>
     private async void OnPlaybackRequested(PlaybackRequestedEvent e)
     {
+      System.Diagnostics.Debug.WriteLine($"[AudioPlayer] PlaybackRequested: panel={e.SourcePanelId}, assetId={e.AssetId ?? "(null)"}, path={e.AssetPath ?? "(null)"}, name={e.AssetName ?? "(null)"}");
+
       try
       {
         if (!string.IsNullOrEmpty(e.AssetPath) && File.Exists(e.AssetPath))
         {
+          System.Diagnostics.Debug.WriteLine($"[AudioPlayer] Path exists, playing file: {e.AssetPath}");
           await PlayFileAsync(e.AssetPath);
           System.Diagnostics.Debug.WriteLine($"[AudioPlayer] Playing: {e.AssetName ?? e.AssetPath}");
           return;
         }
 
+        if (!string.IsNullOrEmpty(e.AssetPath) && !File.Exists(e.AssetPath))
+        {
+          System.Diagnostics.Debug.WriteLine($"[AudioPlayer] Path provided but file not found: {e.AssetPath}");
+        }
+
         if (!string.IsNullOrEmpty(e.AssetId))
         {
-          var baseUrl = AppServices.GetService<VoiceStudio.Core.Services.BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+          var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
               ?? "http://localhost:8000";
+          System.Diagnostics.Debug.WriteLine($"[AudioPlayer] Fallback to backend ID: {e.AssetId}");
           await PlayBackendAudioIdAsync(e.AssetId, baseUrl);
           System.Diagnostics.Debug.WriteLine($"[AudioPlayer] Playing backend audio: {e.AssetName ?? e.AssetId}");
           return;
         }
 
         System.Diagnostics.Debug.WriteLine("[AudioPlayer] PlaybackRequested: No asset path or ID provided");
+        LastPlaybackError = "No asset path or ID provided";
+        var toast = ServiceProvider.TryGetToastNotificationService();
+        toast?.ShowToast(ToastType.Warning, "Playback", "No audio file or ID to play.");
       }
       catch (Exception ex)
       {
         System.Diagnostics.Debug.WriteLine($"[AudioPlayer] PlaybackRequested error: {ex.Message}");
+        LastPlaybackError = ex.Message;
         ErrorLogger.LogError($"Failed to play audio: {ex.Message}", "AudioPlayerService.OnPlaybackRequested");
+        if (!_hasShownPlaybackErrorThisSession)
+        {
+          _hasShownPlaybackErrorThisSession = true;
+          var toast = ServiceProvider.TryGetToastNotificationService();
+          toast?.ShowToast(ToastType.Error, "Playback Failed", ex.Message);
+        }
       }
     }
 

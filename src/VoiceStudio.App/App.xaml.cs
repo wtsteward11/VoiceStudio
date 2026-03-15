@@ -243,6 +243,10 @@ namespace VoiceStudio.App
             Debug.WriteLine($"[App] Command handler initialization failed: {ex.Message}");
           }
 
+          // Eager init: ensure IAudioPlayerService exists so PlaybackRequestedEvent subscription is active before any panel publishes
+          _ = AppServices.GetAudioPlayerService();
+          Debug.WriteLine("[App] IAudioPlayerService eagerly resolved for playback subscription");
+
           if (IsSmokeHinted())
           {
             WriteUiSmokeDebugSnapshot(phase: "mainwindow_created", args: args, smokeExit: smokeExit, uiSmoke: uiSmoke);
@@ -365,6 +369,10 @@ namespace VoiceStudio.App
         Debug.WriteLine($"[App] Command handler initialization failed: {ex.Message}");
         // Non-fatal - app can continue without command handlers
       }
+
+      // Eager init: ensure IAudioPlayerService exists so PlaybackRequestedEvent subscription is active before any panel publishes
+      _ = AppServices.GetAudioPlayerService();
+      Debug.WriteLine("[App] IAudioPlayerService eagerly resolved for playback subscription");
 
       if (IsSmokeHinted())
       {

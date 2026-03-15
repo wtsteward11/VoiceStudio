@@ -10,8 +10,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
-using VoiceStudio.Core.Models;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Models;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.Utilities;
 using VoiceStudio.App.Logging;
@@ -26,8 +26,9 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class LibraryViewModel : BaseViewModel, IPanelView, IPanelStatePersistable, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ILibraryClient _libraryClient;
     private readonly IDialogService _dialogService;
+    private readonly IAudioPlayerService? _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly UndoRedoService? _undoRedoService;
     private readonly IEventAggregator? _eventAggregator;
@@ -86,10 +87,13 @@ namespace VoiceStudio.App.ViewModels
     private CancellationTokenSource? _searchDebounceCts;
     private const int SearchDebounceMs = 300;
 
-    public LibraryViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService, Action? triggerImport = null)
+    private readonly CancellationTokenSource _disposalCts = new();
+    private CancellationTokenSource? _loadAssetsCts;
+
+    public LibraryViewModel(IViewModelContext context, ILibraryClient libraryClient, IDialogService dialogService, Action? triggerImport = null)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _libraryClient = libraryClient ?? throw new ArgumentNullException(nameof(libraryClient));
       _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
       _triggerImport = triggerImport;
       var multiSelectService = AppServices.TryGetMultiSelectService();
@@ -97,6 +101,7 @@ namespace VoiceStudio.App.ViewModels
       _multiSelectState = _multiSelectService.GetState(PanelId);
 
       // Get optional services using helper (reduces code duplication)
+      _audioPlayer = AppServices.GetService<IAudioPlayerService>();
       _toastNotificationService = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetToastNotificationService());
       _undoRedoService = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetUndoRedoService());
       _workflowCoordinator = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetWorkflowCoordinatorService());
@@ -181,11 +186,6 @@ namespace VoiceStudio.App.ViewModels
         _synthesisCompletedToken = _eventAggregator.Subscribe<SynthesisCompletedEvent>(OnSynthesisCompleted);
       }
 
-      // Load initial data
-      _ = LoadAssetTypesAsync(CancellationToken.None);
-      _ = LoadFoldersAsync(CancellationToken.None);
-      _ = LoadAssetsAsync(CancellationToken.None);
-
       // Update ShowEmptyState when Assets, IsLoading, or ErrorMessage changes
       Assets.CollectionChanged += (_, __) => OnPropertyChanged(nameof(ShowEmptyState));
       PropertyChanged += (_, e) =>
@@ -218,7 +218,7 @@ namespace VoiceStudio.App.ViewModels
     {
       System.Diagnostics.Debug.WriteLine(
           $"LibraryViewModel: Asset added - {e.AssetId} ({e.AssetType}) from {e.SourcePanelId}");
-      _ = LoadAssetsAsync(CancellationToken.None);
+      _ = LoadAssetsAsync(_disposalCts.Token);
     }
 
     /// <summary>
@@ -229,7 +229,7 @@ namespace VoiceStudio.App.ViewModels
     {
       System.Diagnostics.Debug.WriteLine(
           $"LibraryViewModel: Profile created - {e.ProfileId} ({e.ProfileName}) from {e.SourcePanelId}");
-      _ = LoadAssetsAsync(CancellationToken.None);
+      _ = LoadAssetsAsync(_disposalCts.Token);
     }
 
     /// <summary>
@@ -240,7 +240,7 @@ namespace VoiceStudio.App.ViewModels
     {
       System.Diagnostics.Debug.WriteLine(
           $"LibraryViewModel: Synthesis completed - {e.AudioId} from {e.SourcePanelId}");
-      _ = LoadAssetsAsync(CancellationToken.None);
+      _ = LoadAssetsAsync(_disposalCts.Token);
     }
 
     public IRelayCommand ImportFromEmptyStateCommand { get; }
@@ -271,7 +271,14 @@ namespace VoiceStudio.App.ViewModels
     public IRelayCommand<LibraryAsset> PlayAssetCommand { get; }
 
     /// <inheritdoc />
-    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      // Load initial data when panel becomes active (ADR-047: no constructor fire-and-forget)
+      _ = LoadAssetTypesAsync(cancellationToken);
+      _ = LoadFoldersAsync(cancellationToken);
+      _ = LoadAssetsAsync(cancellationToken);
+      return Task.CompletedTask;
+    }
 
     /// <inheritdoc />
     /// <summary>Unsubscribe from EventAggregator to prevent memory leaks (GAP-W3).</summary>
@@ -288,6 +295,22 @@ namespace VoiceStudio.App.ViewModels
       return Task.CompletedTask;
     }
 
+    protected override void Dispose(bool disposing)
+    {
+      if (disposing)
+      {
+        _disposalCts.Cancel();
+        _disposalCts.Dispose();
+        _loadAssetsCts?.Cancel();
+        _loadAssetsCts?.Dispose();
+        _loadAssetsCts = null;
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = null;
+      }
+      base.Dispose(disposing);
+    }
+
     private async Task LoadFoldersAsync(CancellationToken cancellationToken)
     {
       IsLoading = true;
@@ -296,11 +319,7 @@ namespace VoiceStudio.App.ViewModels
       try
       {
         var parentId = SelectedFolder?.Id;
-        var response = await _backendClient.SendRequestAsync<object, LibraryFoldersResponse>(
-            $"/api/library/folders?parent_id={parentId ?? ""}",
-            null,
-            System.Net.Http.HttpMethod.Get
-        );
+        var response = await _libraryClient.GetLibraryFoldersAsync(parentId, cancellationToken);
 
         Folders.Clear();
         if (response?.Folders != null)
@@ -333,30 +352,11 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (!string.IsNullOrEmpty(SearchQuery))
-          queryParams.Add("query", SearchQuery);
-        if (!string.IsNullOrEmpty(SelectedAssetType))
-          queryParams.Add("asset_type", SelectedAssetType);
-        if (SelectedFolder != null)
-          queryParams.Add("folder_id", SelectedFolder.Id);
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/library/assets";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var response = await _backendClient.SendRequestAsync<object, AssetSearchResponse>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _libraryClient.SearchAssetsAsync(
+            SearchQuery,
+            SelectedAssetType,
+            SelectedFolder?.Id,
+            cancellationToken);
 
         Assets.Clear();
         if (response?.Assets != null)
@@ -403,18 +403,7 @@ namespace VoiceStudio.App.ViewModels
 
         var parentId = SelectedFolder?.Id;
 
-        var request = new
-        {
-          name = folderName,
-          parent_id = parentId
-        };
-
-        var createdFolder = await _backendClient.SendRequestAsync<object, LibraryFolder>(
-            "/api/library/folders",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var createdFolder = await _libraryClient.CreateFolderAsync(folderName, parentId, cancellationToken);
 
         if (createdFolder == null)
         {
@@ -432,7 +421,7 @@ namespace VoiceStudio.App.ViewModels
         {
           var action = new CreateLibraryFolderAction(
               Folders,
-              _backendClient,
+              _libraryClient,
               folderInCollection);
           _undoRedoService.RegisterAction(action);
         }
@@ -475,19 +464,14 @@ namespace VoiceStudio.App.ViewModels
         var assetToDelete = asset;
         var wasSelected = SelectedAsset?.Id == asset.Id;
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/library/assets/{asset.Id}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _libraryClient.DeleteAssetAsync(asset.Id, cancellationToken);
 
         // Register undo action before reload
         if (_undoRedoService != null)
         {
           var action = new DeleteLibraryAssetAction(
               Assets,
-              _backendClient,
+              _libraryClient,
               assetToDelete,
               onUndo: (a) => SelectedAsset = a,
               onRedo: (a) =>
@@ -538,12 +522,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, AssetTypesResponse>(
-            "/api/library/types",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _libraryClient.GetAssetTypesAsync(cancellationToken);
 
         AvailableAssetTypes.Clear();
         if (response?.Types != null)
@@ -567,7 +546,10 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSelectedFolderChanged(LibraryFolder? value)
     {
-      _ = LoadAssetsAsync(CancellationToken.None);
+      _loadAssetsCts?.Cancel();
+      _loadAssetsCts?.Dispose();
+      _loadAssetsCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = LoadAssetsAsync(_loadAssetsCts.Token);
     }
 
     partial void OnSearchQueryChanged(string? value)
@@ -591,7 +573,10 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSelectedAssetTypeChanged(string? value)
     {
-      _ = SearchAssetsAsync(CancellationToken.None);
+      _loadAssetsCts?.Cancel();
+      _loadAssetsCts?.Dispose();
+      _loadAssetsCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = LoadAssetsAsync(_loadAssetsCts.Token);
     }
 
     /// <summary>
@@ -741,7 +726,7 @@ namespace VoiceStudio.App.ViewModels
 
     /// <summary>
     /// Play the selected audio asset.
-    /// Uses WorkflowCoordinatorService for consistent playback workflow.
+    /// Prefers direct IAudioPlayerService call for immediate playback; falls back to event for cross-panel workflows.
     /// </summary>
     private async void PlayAsset(LibraryAsset? asset)
     {
@@ -749,18 +734,44 @@ namespace VoiceStudio.App.ViewModels
 
       System.Diagnostics.Debug.WriteLine($"LibraryViewModel: PlayAsset - {asset.Id} ({asset.Name})");
 
-      // Use workflow coordinator for playback
+      // Primary path: direct playback when service available (no event subscription dependency)
+      if (_audioPlayer != null)
+      {
+        try
+        {
+          if (!string.IsNullOrEmpty(asset.Path) && System.IO.File.Exists(asset.Path))
+          {
+            await _audioPlayer.PlayFileAsync(asset.Path, () =>
+              _toastNotificationService?.ShowToast(ToastType.Info, "Playback Complete", $"Finished playing {asset.Name}"));
+            _toastNotificationService?.ShowToast(ToastType.Success, "Playing", $"Now playing: {asset.Name}");
+            return;
+          }
+          if (!string.IsNullOrEmpty(asset.Id))
+          {
+            var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+                ?? "http://localhost:8000";
+            await _audioPlayer.PlayBackendAudioIdAsync(asset.Id, baseUrl, () =>
+              _toastNotificationService?.ShowToast(ToastType.Info, "Playback Complete", $"Finished playing {asset.Name}"));
+            _toastNotificationService?.ShowToast(ToastType.Success, "Playing", $"Now playing: {asset.Name}");
+            return;
+          }
+        }
+        catch (Exception ex)
+        {
+          System.Diagnostics.Debug.WriteLine($"[LibraryViewModel] Direct playback failed: {ex.Message}");
+          _toastNotificationService?.ShowToast(ToastType.Error, "Playback Error", ex.Message);
+          return;
+        }
+      }
+
+      // Fallback: event path for cross-panel workflows or when service unavailable
       if (_workflowCoordinator != null)
       {
-        await _workflowCoordinator.StartPlayFromLibraryAsync(
-          asset.Id,
-          asset.Path,
-          asset.Name);
+        await _workflowCoordinator.StartPlayFromLibraryAsync(asset.Id, asset.Path ?? string.Empty, asset.Name);
       }
       else
       {
-        // Fallback: Publish playback request event directly
-        _eventAggregator?.Publish(new PlaybackRequestedEvent(PanelId, asset.Id, asset.Path, asset.Name));
+        _eventAggregator?.Publish(new PlaybackRequestedEvent(PanelId, asset.Id, asset.Path ?? string.Empty, asset.Name));
       }
     }
 
@@ -881,12 +892,7 @@ namespace VoiceStudio.App.ViewModels
 
           try
           {
-            await _backendClient.SendRequestAsync<object, object>(
-                $"/api/library/assets/{assetId}",
-                null,
-                System.Net.Http.HttpMethod.Delete,
-                cancellationToken
-            );
+            await _libraryClient.DeleteAssetAsync(assetId, cancellationToken);
           }
           catch (OperationCanceledException)
           {
@@ -903,7 +909,7 @@ namespace VoiceStudio.App.ViewModels
         {
           var action = new BatchDeleteLibraryAssetsAction(
               Assets,
-              _backendClient,
+              _libraryClient,
               assetsToDelete,
               onUndo: (assets) =>
               {
@@ -1084,30 +1090,6 @@ namespace VoiceStudio.App.ViewModels
 
     #endregion
 
-    // Response models
-    private class LibraryFoldersResponse
-    {
-      public LibraryFolder[] Folders { get; set; } = Array.Empty<LibraryFolder>();
-    }
-
-    private class AssetSearchResponse
-    {
-      public LibraryAsset[] Assets { get; set; } = Array.Empty<LibraryAsset>();
-      public int Total { get; set; }
-      public int Limit { get; set; }
-      public int Offset { get; set; }
-    }
-
-    private class AssetTypesResponse
-    {
-      public AssetTypeInfo[] Types { get; set; } = Array.Empty<AssetTypeInfo>();
-    }
-
-    private class AssetTypeInfo
-    {
-      public string Id { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-    }
   }
 
   // Data models

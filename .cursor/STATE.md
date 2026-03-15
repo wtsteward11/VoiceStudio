@@ -11,8 +11,8 @@
 Read only this section as current task truth. Treat everything below the divider as historical context.
 
 ### Active Task
-- **ID:** GOLDEN-PATH-INTEGRITY
-- **Title:** Golden path proof definition integrity closure
+- **ID:** PLAYBACK-WIRING-BULLETPROOF
+- **Title:** Playback wiring bulletproof — imported audio plays reliably
 - **Status:** Complete
 
 ### Next 3 Steps
@@ -39,14 +39,14 @@ Definition-of-done integrity: governing principle, proof-status doc, and proof a
 STT (faster-whisper or whisper_cpp) required for `write_golden_path_real_proof.py`; install `pip install faster-whisper==1.0.3` or whisper-cpp-python. Existing proof PROOF_GOLDEN_PATH_REAL_2026-03-15.json valid; pipeline verified when STT available.
 
 ### Truth Sync Note
-80 migrated ViewModels; 77 with constructor invariant; 2 exempt. Golden path proof definition: real STT + real TTS (XTTS/Piper or espeak_ng fallback). GOLDEN_PATH_PROOF_STATUS.md and roadmap aligned. Proof artifact records tts_engine_name.
+80 migrated ViewModels; 77 with constructor invariant; 2 exempt. Playback wiring: IAudioPlayerService eagerly resolved at startup; LibraryViewModel direct playback path; diagnostics in OnPlaybackRequested. Imported asset playback documented in GOLDEN_PATH_PROOF_STATUS.md.
 
 ### Last Verified Commands
 - `python scripts/ci/write_golden_path_real_proof.py` — PASS (2026-03-15)
 - `python scripts/run_verification.py` — PASS (2026-03-15)
 
 ### Context Acknowledgment
-2026-03-15 — Golden path proof closure complete. Product-proof artifact on disk.
+2026-03-16 — Playback wiring bulletproof complete. Eager init, direct path, diagnostics, imported-asset proof documented.
 
 ---
 ## HISTORY LEDGER
@@ -77,6 +77,12 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 - **Known Debt:** TrainingViewModel lifecycle FAF — formal decision per ADR-051 (retained with CTS ownership; not deferred)
 
 ## LATEST MILESTONE
+- **ID:** PLAYBACK-WIRING-BULLETPROOF
+- **Title:** Playback Wiring Bulletproof — systemic playback fix
+- **Status:** COMPLETE (2026-03-16)
+- **Completed:** Phase 1–6: eager IAudioPlayerService resolution; LibraryViewModel direct playback path; OnPlaybackRequested diagnostics; imported asset playback documented in GOLDEN_PATH_PROOF_STATUS.md; asset path/ID error surfacing.
+- **Verification:** dotnet build PASS
+
 - **ID:** BULLETPROOF-HARDENING-WAVE
 - **Title:** Bulletproof Hardening Wave — 7 gaps closed
 - **Status:** COMPLETE (2026-03-15)
@@ -92,6 +98,7 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## LATEST PROOF INDEX
 | Date | Task | Artifact | Type | Status |
 |------|------|----------|------|--------|
+| 2026-03-16 | Playback wiring bulletproof | App.xaml.cs eager init; AudioPlayerService.IsPlaybackSubscribed; LibraryViewModel direct path; OnPlaybackRequested diagnostics; GOLDEN_PATH_PROOF_STATUS imported-asset section | Code/Doc | Done |
 | 2026-03-15 | Bulletproof Hardening Wave | 7 gaps; STATE.md, proof_fingerprint, proof_schema, PROOF_GOLDEN_PATH_REAL, synthesis commit, RELEASE_XAML_SMOKE_GATE.md, RETAINED_ASYNC_RISK_ASSESSMENT.md | Doc/Code | Done |
 | 2026-03-15 | Golden path proof integrity | GOLDEN_PATH_PROOF_STATUS.md; proof artifact tts_engine_name; roadmap aligned | Doc | Done |
 | 2026-03-15 | Golden path real proof | PROOF_GOLDEN_PATH_REAL_2026-03-15.json; artifact golden_path_export.wav | Proof | Done |

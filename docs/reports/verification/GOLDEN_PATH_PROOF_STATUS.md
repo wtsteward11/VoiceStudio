@@ -77,8 +77,24 @@ CI typically runs without a live backend or real engines. Manual proof runs are 
 
 ---
 
+## Imported Asset Playback (Required Proof Point)
+
+**Definition:** Imported audio must play in Library (and other panels) on the same path users use.
+
+**Gate C UI smoke** (`--ui-smoke` / `--smoke-ui`) proves:
+- Synthesis creates audio and uploads to backend
+- Library panel opens and refreshes
+- Asset visible in Library (by audio_id or first playable asset)
+- `PlayAssetCommand.Execute(asset)` triggers real playback
+- `IAudioPlayerService.IsPlaying == true` and position advances
+
+**Code path:** LibraryViewModel.PlayAsset uses direct `IAudioPlayerService` call when available; event path is fallback. Both paths are exercised by the smoke.
+
+---
+
 ## Changelog
 
+- 2026-03-16: Playback wiring bulletproof: imported asset playback documented as required proof point; Gate C smoke asserts Library playback.
 - 2026-03-15: Proof definition integrity: governing principle explicitly accepts espeak_ng fallback; proof artifact records tts_engine_name; roadmap aligned.
 - 2026-03-15: Proof generated. PROOF_GOLDEN_PATH_REAL_2026-03-15.json; golden_path_export.wav. STT: faster-whisper; TTS: espeak_ng fallback in test.
 - 2026-03-15: Initial document. Blocker: STT (faster-whisper). Verification steps documented.

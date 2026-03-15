@@ -121,4 +121,5 @@
 
 ## Changelog
 
+- 2026-03-15: Slice 3 complete. EffectsMixerViewModel migrated to IEffectsMeterClient + IEffectChainClient + IMixerStateClient; IBackendClient removed. Added to MIGRATED_NO_IBACKENDCLIENT.
 - 2026-03-14: Initial execution plan. Option C (3 slices). No IEffectsMixerClient mega-facade.

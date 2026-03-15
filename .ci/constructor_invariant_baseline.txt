@@ -1,0 +1,7 @@
+# ViewModels in MIGRATED_NO_IBACKENDCLIENT allowed to lack Constructor_DoesNotCallClient_BeforeActivation.
+# Remove entries when seam tests are added. See CONSTRUCTOR_INVARIANT_COVERAGE_AUDIT.md.
+# Created: 2026-03-14
+# Updated: 2026-03-14 - Routine closure: AdvancedRealTimeVisualizationViewModel (timer-based FAF, documented exemption).
+
+MiniTimelineViewModel
+AdvancedRealTimeVisualizationViewModel

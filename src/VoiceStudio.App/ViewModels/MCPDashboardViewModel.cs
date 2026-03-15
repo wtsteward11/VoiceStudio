@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
@@ -14,9 +15,10 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the MCPDashboardView panel - MCP server dashboard and management.
   /// </summary>
-  public partial class MCPDashboardViewModel : BaseViewModel, IPanelView
+  public partial class MCPDashboardViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IMCPDashboardClient _client;
+    private CancellationTokenSource? _selectedServerOperationsCts;
 
     public string PanelId => "mcp-dashboard";
     public string DisplayName => ResourceHelper.GetString("Panel.MCPDashboard.DisplayName", "MCP Dashboard");
@@ -52,10 +54,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool isCreatingServer;
 
-    public MCPDashboardViewModel(IViewModelContext context, IBackendClient backendClient)
+    public MCPDashboardViewModel(IViewModelContext context, IMCPDashboardClient client)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
 
       LoadSummaryCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -107,11 +109,6 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadSummaryAsync(CancellationToken.None);
-      _ = LoadServersAsync(CancellationToken.None);
-      _ = LoadServerTypesAsync(CancellationToken.None);
     }
 
     public IAsyncRelayCommand LoadSummaryCommand { get; }
@@ -124,6 +121,22 @@ namespace VoiceStudio.App.ViewModels
     public IAsyncRelayCommand DeleteServerCommand { get; }
     public IAsyncRelayCommand LoadOperationsCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
+
+    Task IPanelLifecycle.OnActivatedAsync(CancellationToken cancellationToken)
+    {
+      return RefreshAsync(cancellationToken);
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken cancellationToken)
+    {
+      _selectedServerOperationsCts?.Cancel();
+      return Task.CompletedTask;
+    }
+
+    Task IPanelLifecycle.RefreshAsync(CancellationToken cancellationToken)
+    {
+      return RefreshAsync(cancellationToken);
+    }
 
     partial void OnIsCreatingServerChanged(bool value)
     {
@@ -150,7 +163,23 @@ namespace VoiceStudio.App.ViewModels
 
       if (value != null)
       {
-        _ = LoadOperationsAsync(CancellationToken.None);
+        _selectedServerOperationsCts?.Cancel();
+        _selectedServerOperationsCts = new CancellationTokenSource();
+        var cts = _selectedServerOperationsCts;
+        var serverId = value.ServerId;
+        _ = LoadOperationsForSelectionAsync(serverId, cts.Token);
+      }
+    }
+
+    private async Task LoadOperationsForSelectionAsync(string serverId, CancellationToken cancellationToken)
+    {
+      try
+      {
+        await LoadOperationsAsync(cancellationToken);
+      }
+      catch (OperationCanceledException)
+      {
+        return;
       }
     }
 
@@ -161,21 +190,15 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var summary = await _backendClient.SendRequestAsync<object, MCPDashboardSummary>(
-            "/api/mcp-dashboard",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
-
-        if (summary != null)
+        var s = await _client.GetSummaryAsync(cancellationToken);
+        if (s != null)
         {
-          Summary = new MCPDashboardSummaryItem(summary);
+          Summary = new MCPDashboardSummaryItem(s);
         }
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -194,17 +217,11 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var servers = await _backendClient.SendRequestAsync<object, MCPServer[]>(
-            "/api/mcp-dashboard/servers",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
-
-        if (servers != null)
+        var list = await _client.GetServersAsync(cancellationToken);
+        if (list != null)
         {
           Servers.Clear();
-          foreach (var server in servers)
+          foreach (var server in list)
           {
             Servers.Add(new MCPServerItem(server));
           }
@@ -212,7 +229,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -228,13 +245,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var types = await _backendClient.SendRequestAsync<object, string[]>(
-            "/api/mcp-dashboard/server-types",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
-
+        var types = await _client.GetServerTypesAsync(cancellationToken);
         if (types != null)
         {
           AvailableServerTypes.Clear();
@@ -246,7 +257,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -274,30 +285,21 @@ namespace VoiceStudio.App.ViewModels
           Endpoint = NewServerEndpoint
         };
 
-        var server = await _backendClient.SendRequestAsync<MCPServerCreateRequest, MCPServer>(
-            "/api/mcp-dashboard/servers",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
-
+        var server = await _client.CreateServerAsync(request, cancellationToken);
         if (server != null)
         {
           Servers.Add(new MCPServerItem(server));
-
-          // Clear form
           NewServerName = null;
           NewServerDescription = null;
           NewServerType = null;
           NewServerEndpoint = null;
-
           StatusMessage = ResourceHelper.GetString("MCPDashboard.ServerCreated", "MCP server created successfully");
           await LoadSummaryAsync(cancellationToken);
         }
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -328,13 +330,7 @@ namespace VoiceStudio.App.ViewModels
           Endpoint = SelectedServer.Endpoint
         };
 
-        var server = await _backendClient.SendRequestAsync<MCPServerUpdateRequest, MCPServer>(
-            $"/api/mcp-dashboard/servers/{Uri.EscapeDataString(SelectedServer.ServerId)}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
-
+        var server = await _client.UpdateServerAsync(SelectedServer.ServerId, request, cancellationToken);
         if (server != null)
         {
           var index = Servers.IndexOf(SelectedServer);
@@ -342,13 +338,12 @@ namespace VoiceStudio.App.ViewModels
           {
             Servers[index] = new MCPServerItem(server);
           }
-
           StatusMessage = ResourceHelper.GetString("MCPDashboard.ServerUpdated", "MCP server updated successfully");
         }
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -372,13 +367,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var server = await _backendClient.SendRequestAsync<object, MCPServer>(
-            $"/api/mcp-dashboard/servers/{Uri.EscapeDataString(SelectedServer.ServerId)}/connect",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
-
+        var server = await _client.ConnectServerAsync(SelectedServer.ServerId, cancellationToken);
         if (server != null)
         {
           var index = Servers.IndexOf(SelectedServer);
@@ -386,7 +375,6 @@ namespace VoiceStudio.App.ViewModels
           {
             Servers[index] = new MCPServerItem(server);
           }
-
           StatusMessage = ResourceHelper.GetString("MCPDashboard.ServerConnected", "Connected to MCP server");
           await LoadSummaryAsync(cancellationToken);
           await LoadOperationsAsync(cancellationToken);
@@ -394,7 +382,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -418,13 +406,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var server = await _backendClient.SendRequestAsync<object, MCPServer>(
-            $"/api/mcp-dashboard/servers/{Uri.EscapeDataString(SelectedServer.ServerId)}/disconnect",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
-
+        var server = await _client.DisconnectServerAsync(SelectedServer.ServerId, cancellationToken);
         if (server != null)
         {
           var index = Servers.IndexOf(SelectedServer);
@@ -432,7 +414,6 @@ namespace VoiceStudio.App.ViewModels
           {
             Servers[index] = new MCPServerItem(server);
           }
-
           StatusMessage = ResourceHelper.GetString("MCPDashboard.ServerDisconnected", "Disconnected from MCP server");
           await LoadSummaryAsync(cancellationToken);
           ServerOperations.Clear();
@@ -440,7 +421,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -464,23 +445,16 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/mcp-dashboard/servers/{Uri.EscapeDataString(SelectedServer.ServerId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
-
+        await _client.DeleteServerAsync(SelectedServer.ServerId, cancellationToken);
         Servers.Remove(SelectedServer);
         SelectedServer = null;
         ServerOperations.Clear();
-
         StatusMessage = ResourceHelper.GetString("MCPDashboard.ServerDeleted", "MCP server deleted successfully");
         await LoadSummaryAsync(cancellationToken);
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -499,30 +473,25 @@ namespace VoiceStudio.App.ViewModels
         return;
       }
 
+      var serverId = SelectedServer.ServerId;
       IsLoading = true;
       ErrorMessage = null;
 
       try
       {
-        var operations = await _backendClient.SendRequestAsync<object, MCPOperation[]>(
-            $"/api/mcp-dashboard/servers/{Uri.EscapeDataString(SelectedServer.ServerId)}/operations",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
-
-        if (operations != null)
+        var operations = await _client.GetOperationsAsync(serverId, cancellationToken);
+        if (operations != null && SelectedServer?.ServerId == serverId)
         {
           ServerOperations.Clear();
-          foreach (var operation in operations)
+          foreach (var op in operations)
           {
-            ServerOperations.Add(new MCPOperationItem(operation));
+            ServerOperations.Add(new MCPOperationItem(op));
           }
         }
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -545,58 +514,9 @@ namespace VoiceStudio.App.ViewModels
       }
       StatusMessage = ResourceHelper.GetString("MCPDashboard.Refreshed", "Refreshed");
     }
-
-    // Request models
-    private class MCPServerCreateRequest
-    {
-      public string Name { get; set; } = string.Empty;
-      public string Description { get; set; } = string.Empty;
-      public string ServerType { get; set; } = string.Empty;
-      public string? Endpoint { get; set; }
-    }
-
-    private class MCPServerUpdateRequest
-    {
-      public string? Name { get; set; }
-      public string? Description { get; set; }
-      public string? Endpoint { get; set; }
-    }
-
-    public class MCPServer
-    {
-      public string ServerId { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public string Description { get; set; } = string.Empty;
-      public string ServerType { get; set; } = string.Empty;
-      public string Status { get; set; } = string.Empty;
-      public string? Endpoint { get; set; }
-      public string? Version { get; set; }
-      public string[] Capabilities { get; set; } = Array.Empty<string>();
-      public string? LastConnected { get; set; }
-      public string? ErrorMessage { get; set; }
-    }
-
-    public class MCPOperation
-    {
-      public string OperationId { get; set; } = string.Empty;
-      public string ServerId { get; set; } = string.Empty;
-      public string OperationName { get; set; } = string.Empty;
-      public string Description { get; set; } = string.Empty;
-      public bool IsAvailable { get; set; }
-    }
-
-    public class MCPDashboardSummary
-    {
-      public int TotalServers { get; set; }
-      public int ConnectedServers { get; set; }
-      public int DisconnectedServers { get; set; }
-      public int ErrorServers { get; set; }
-      public int TotalOperations { get; set; }
-      public int AvailableOperations { get; set; }
-    }
   }
 
-  // Data models
+  // View-specific wrappers for display
   public class MCPDashboardSummaryItem : ObservableObject
   {
     public int TotalServers { get; set; }
@@ -606,14 +526,14 @@ namespace VoiceStudio.App.ViewModels
     public int TotalOperations { get; set; }
     public int AvailableOperations { get; set; }
 
-    public MCPDashboardSummaryItem(MCPDashboardViewModel.MCPDashboardSummary summary)
+    public MCPDashboardSummaryItem(MCPDashboardSummary s)
     {
-      TotalServers = summary.TotalServers;
-      ConnectedServers = summary.ConnectedServers;
-      DisconnectedServers = summary.DisconnectedServers;
-      ErrorServers = summary.ErrorServers;
-      TotalOperations = summary.TotalOperations;
-      AvailableOperations = summary.AvailableOperations;
+      TotalServers = s.TotalServers;
+      ConnectedServers = s.ConnectedServers;
+      DisconnectedServers = s.DisconnectedServers;
+      ErrorServers = s.ErrorServers;
+      TotalOperations = s.TotalOperations;
+      AvailableOperations = s.AvailableOperations;
     }
   }
 
@@ -634,7 +554,7 @@ namespace VoiceStudio.App.ViewModels
     public string CapabilitiesDisplay => Capabilities?.Length > 0 ? string.Join(", ", Capabilities) : ResourceHelper.GetString("MCPDashboard.NoCapabilities", "No capabilities");
     public string LastConnectedDisplay => LastConnected != null ? FormatDateTime(LastConnected) : ResourceHelper.GetString("MCPDashboard.Never", "Never");
 
-    public MCPServerItem(MCPDashboardViewModel.MCPServer server)
+    public MCPServerItem(MCPServerInfo server)
     {
       ServerId = server.ServerId;
       Name = server.Name;
@@ -668,13 +588,13 @@ namespace VoiceStudio.App.ViewModels
 
     public string StatusDisplay => IsAvailable ? "Available" : "Unavailable";
 
-    public MCPOperationItem(MCPDashboardViewModel.MCPOperation operation)
+    public MCPOperationItem(MCPOperationInfo op)
     {
-      OperationId = operation.OperationId;
-      ServerId = operation.ServerId;
-      OperationName = operation.OperationName;
-      Description = operation.Description;
-      IsAvailable = operation.IsAvailable;
+      OperationId = op.OperationId;
+      ServerId = op.ServerId;
+      OperationName = op.OperationName;
+      Description = op.Description;
+      IsAvailable = op.IsAvailable;
     }
   }
 }

@@ -1,10 +1,10 @@
 using System;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
@@ -15,10 +15,11 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the AudioAnalysisView panel - Advanced audio analysis.
   /// </summary>
-  public partial class AudioAnalysisViewModel : BaseViewModel, IPanelView
+  public partial class AudioAnalysisViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IAudioAnalysisClient _audioAnalysisClient;
     private readonly ToastNotificationService? _toastNotificationService;
+    private CancellationTokenSource? _selectedAudioLoadCts;
 
     public string PanelId => "audio-analysis";
     public string DisplayName => ResourceHelper.GetString("Panel.AudioAnalysis.DisplayName", "Audio Analysis");
@@ -54,19 +55,17 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? statusMessage;
 
-    public AudioAnalysisViewModel(IViewModelContext context, IBackendClient backendClient)
+    public AudioAnalysisViewModel(IViewModelContext context, IAudioAnalysisClient audioAnalysisClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _audioAnalysisClient = audioAnalysisClient ?? throw new ArgumentNullException(nameof(audioAnalysisClient));
 
-      // Get services (may be null if not initialized)
       try
       {
         _toastNotificationService = AppServices.TryGetToastNotificationService();
       }
       catch
       {
-        // Services may not be initialized yet - that's okay
         _toastNotificationService = null;
       }
 
@@ -97,7 +96,14 @@ namespace VoiceStudio.App.ViewModels
     public IAsyncRelayCommand CompareAudioCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
 
-    private async Task LoadAnalysisAsync(CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken ct) => Task.CompletedTask;
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken ct) => await RefreshAsync(ct);
+
+    private async Task LoadAnalysisAsync(CancellationToken cancellationToken, string? idForStalenessCheck = null)
     {
       if (string.IsNullOrEmpty(SelectedAudioId))
       {
@@ -110,30 +116,17 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        queryParams.Add("include_spectral", IncludeSpectral.ToString().ToLower());
-        queryParams.Add("include_temporal", IncludeTemporal.ToString().ToLower());
-        queryParams.Add("include_perceptual", IncludePerceptual.ToString().ToLower());
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = $"/api/audio-analysis/{Uri.EscapeDataString(SelectedAudioId)}";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var result = await _backendClient.SendRequestAsync<object, AudioAnalysisResult>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var result = await _audioAnalysisClient.GetAnalysisAsync(
+          SelectedAudioId,
+          IncludeSpectral,
+          IncludeTemporal,
+          IncludePerceptual,
+          cancellationToken);
 
         if (result != null)
         {
+          if (idForStalenessCheck != null && SelectedAudioId != idForStalenessCheck)
+            return;
           AnalysisResult = new AudioAnalysisResultItem(result);
         }
 
@@ -144,7 +137,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -172,25 +165,19 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, AudioAnalysisQueueResponse>(
-            $"/api/audio-analysis/{Uri.EscapeDataString(SelectedAudioId)}/analyze",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _audioAnalysisClient.QueueAnalysisAsync(SelectedAudioId, cancellationToken);
 
         StatusMessage = response?.Message ?? "Analysis queued";
         _toastNotificationService?.ShowSuccess(
             ResourceHelper.GetString("AudioAnalysis.AnalysisStartedDetail", "Audio analysis started successfully"),
             ResourceHelper.GetString("Toast.Title.AnalysisStarted", "Analysis Started"));
 
-        // Wait a bit then reload
         await Task.Delay(1000, cancellationToken);
         await LoadAnalysisAsync(cancellationToken);
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -218,21 +205,22 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var response = await _backendClient.SendRequestAsync<object, AudioComparisonResponse>(
-            $"/api/audio-analysis/{Uri.EscapeDataString(SelectedAudioId)}/compare?reference_audio_id={Uri.EscapeDataString(ReferenceAudioId)}",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _audioAnalysisClient.CompareAudioAsync(
+          SelectedAudioId,
+          ReferenceAudioId,
+          cancellationToken);
 
-        StatusMessage = response?.Message ?? ResourceHelper.GetString("AudioAnalysis.ComparisonComplete", "Comparison complete");
+        var msg = response?.Summary?.SimilarityScore is { } score
+          ? $"Comparison complete. Similarity: {score:P0}"
+          : ResourceHelper.GetString("AudioAnalysis.ComparisonComplete", "Comparison complete");
+        StatusMessage = msg;
         _toastNotificationService?.ShowSuccess(
             ResourceHelper.GetString("AudioAnalysis.ComparisonCompleteDetail", "Audio comparison completed successfully"),
             ResourceHelper.GetString("Toast.Title.ComparisonComplete", "Comparison Complete"));
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -256,7 +244,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -269,74 +257,36 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSelectedAudioIdChanged(string? value)
     {
-      if (!string.IsNullOrEmpty(value))
+      if (string.IsNullOrEmpty(value))
+        return;
+
+      _selectedAudioLoadCts?.Cancel();
+      _selectedAudioLoadCts?.Dispose();
+      _selectedAudioLoadCts = new CancellationTokenSource();
+      var token = _selectedAudioLoadCts.Token;
+      var capturedId = value;
+
+      _ = LoadSelectionAsync(token, capturedId);
+    }
+
+    private async Task LoadSelectionAsync(CancellationToken cancellationToken, string capturedId)
+    {
+      try
       {
-        _ = LoadAnalysisAsync(CancellationToken.None);
+        await LoadAnalysisAsync(cancellationToken, idForStalenessCheck: capturedId);
+      }
+      catch (OperationCanceledException)
+      {
+        return;
+      }
+      catch (Exception ex)
+      {
+        await HandleErrorAsync(ex, "LoadSelection");
       }
     }
-
-    // Response models
-    private class AudioAnalysisQueueResponse
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public string Status { get; set; } = string.Empty;
-      public string Message { get; set; } = string.Empty;
-    }
-
-    private class AudioComparisonResponse
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public string ReferenceAudioId { get; set; } = string.Empty;
-      public System.Collections.Generic.Dictionary<string, double> Differences { get; set; } = new();
-      public string Message { get; set; } = string.Empty;
-    }
   }
 
-  // Data models
-  public class AudioAnalysisResult
-  {
-    public string AudioId { get; set; } = string.Empty;
-    public int SampleRate { get; set; }
-    public double Duration { get; set; }
-    public int Channels { get; set; }
-    public SpectralAnalysis Spectral { get; set; } = new();
-    public TemporalAnalysis Temporal { get; set; } = new();
-    public PerceptualAnalysis Perceptual { get; set; } = new();
-    public string Created { get; set; } = string.Empty;
-  }
-
-  public class SpectralAnalysis
-  {
-    public double Centroid { get; set; }
-    public double Rolloff { get; set; }
-    public double Flux { get; set; }
-    public double ZeroCrossingRate { get; set; }
-    public double Bandwidth { get; set; }
-    public double Flatness { get; set; }
-    public double Kurtosis { get; set; }
-    public double Skewness { get; set; }
-  }
-
-  public class TemporalAnalysis
-  {
-    public double Rms { get; set; }
-    public double ZeroCrossingRate { get; set; }
-    public double? AttackTime { get; set; }
-    public double? DecayTime { get; set; }
-    public double? SustainLevel { get; set; }
-    public double? ReleaseTime { get; set; }
-  }
-
-  public class PerceptualAnalysis
-  {
-    public double LoudnessLufs { get; set; }
-    public double PeakLufs { get; set; }
-    public double TruePeakDb { get; set; }
-    public double DynamicRange { get; set; }
-    public double CrestFactor { get; set; }
-    public double? Lra { get; set; }
-  }
-
+  // Presentation model for display (ObservableObject)
   public class AudioAnalysisResultItem : ObservableObject
   {
     public string AudioId { get; set; }

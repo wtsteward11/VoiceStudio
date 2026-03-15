@@ -146,15 +146,37 @@ def main():
             "command": f"{sys.executable} {creep_script}"
         })
 
-    # Retained-async rule (Assessment Remediation Plan Task 4.2)
-    # Fails only on NEW violations; baseline in .ci/retained_async_baseline.txt
+    # Constructor invariant: all MIGRATED ViewModels must have Constructor_DoesNotCallClient_BeforeActivation
+    # Uses baseline for documented exemptions (MiniTimeline, AdvancedRealTimeVisualization)
+    constructor_invariant_script = project_root / "scripts" / "ci" / "check_constructor_invariant_coverage.py"
+    constructor_invariant_baseline = project_root / ".ci" / "constructor_invariant_baseline.txt"
+    if constructor_invariant_script.exists():
+        if constructor_invariant_baseline.exists():
+            checks.append({
+                "name": "constructor_invariant",
+                "command": f"{sys.executable} {constructor_invariant_script} --baseline-file {constructor_invariant_baseline}"
+            })
+        else:
+            checks.append({
+                "name": "constructor_invariant",
+                "command": f"{sys.executable} {constructor_invariant_script}"
+            })
+
+    # Retained-async rule (Assessment Remediation Plan Task 4.2, Truth Reset Task 4)
+    # Fails only on NEW violations when baseline exists; FAIL when baseline missing (no skip)
     retained_async_script = project_root / "scripts" / "ci" / "check_retained_async.py"
     retained_async_baseline = project_root / ".ci" / "retained_async_baseline.txt"
-    if retained_async_script.exists() and retained_async_baseline.exists():
-        checks.append({
-            "name": "retained_async",
-            "command": f"{sys.executable} {retained_async_script} --baseline-file {retained_async_baseline}"
-        })
+    if retained_async_script.exists():
+        if retained_async_baseline.exists():
+            checks.append({
+                "name": "retained_async",
+                "command": f"{sys.executable} {retained_async_script} --baseline-file {retained_async_baseline}"
+            })
+        else:
+            checks.append({
+                "name": "retained_async",
+                "command": f"{sys.executable} -c \"import sys; print('ERROR: .ci/retained_async_baseline.txt is required; create with: python scripts/ci/check_retained_async.py --baseline'); sys.exit(1)\""
+            })
 
     # Quality checks (WS-1, WS-4) - can be skipped with --skip-quality
     if not skip_quality:

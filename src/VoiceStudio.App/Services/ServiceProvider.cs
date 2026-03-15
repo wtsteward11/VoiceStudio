@@ -52,6 +52,7 @@ namespace VoiceStudio.App.Services
     public static IAdvancedRealTimeVisualizationClient GetAdvancedRealTimeVisualizationClient() => AppServices.GetAdvancedRealTimeVisualizationClient();
     public static IAudioMonitoringDashboardClient GetAudioMonitoringDashboardClient() => AppServices.GetAudioMonitoringDashboardClient();
     public static IEffectsMeterClient GetEffectsMeterClient() => AppServices.GetEffectsMeterClient();
+    public static IEffectChainClient GetEffectChainClient() => AppServices.GetEffectChainClient();
     public static IImageVideoEnhancementPipelineClient GetImageVideoEnhancementPipelineClient() => AppServices.GetImageVideoEnhancementPipelineClient();
     public static ISLODashboardClient GetSLODashboardClient() => AppServices.GetSLODashboardClient();
     public static IBackupRestoreClient GetBackupRestoreClient() => AppServices.GetBackupRestoreClient();

@@ -292,6 +292,7 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IAdvancedRealTimeVisualizationClient, AdvancedRealTimeVisualizationClient>();
       services.AddSingleton<IAudioMonitoringDashboardClient, AudioMonitoringDashboardClient>();
       services.AddSingleton<IEffectsMeterClient, EffectsMeterClient>();
+      services.AddSingleton<IEffectChainClient, EffectChainClient>();
       services.AddSingleton<IImageVideoEnhancementPipelineClient, ImageVideoEnhancementPipelineClient>();
       services.AddSingleton<ISLODashboardClient, SLODashboardClient>();
 
@@ -636,6 +637,7 @@ namespace VoiceStudio.App.Services
     public static IAdvancedRealTimeVisualizationClient GetAdvancedRealTimeVisualizationClient() => GetRequiredService<IAdvancedRealTimeVisualizationClient>();
     public static IAudioMonitoringDashboardClient GetAudioMonitoringDashboardClient() => GetRequiredService<IAudioMonitoringDashboardClient>();
     public static IEffectsMeterClient GetEffectsMeterClient() => GetRequiredService<IEffectsMeterClient>();
+    public static IEffectChainClient GetEffectChainClient() => GetRequiredService<IEffectChainClient>();
     public static IImageVideoEnhancementPipelineClient GetImageVideoEnhancementPipelineClient() => GetRequiredService<IImageVideoEnhancementPipelineClient>();
     public static ISLODashboardClient GetSLODashboardClient() => GetRequiredService<ISLODashboardClient>();
     public static IEmotionControlClient GetEmotionControlClient() => GetRequiredService<IEmotionControlClient>();

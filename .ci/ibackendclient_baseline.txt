@@ -66,7 +66,7 @@
 # AudioMonitoringDashboardViewModel MIGRATED to IAudioMonitoringDashboardClient (2026-03-14)
 # BatchProcessingViewModel MIGRATED to IBatchProcessingClient (2026-03-12)
 # DiagnosticsViewModel MIGRATED to IDiagnosticsClient (2026-03-12)
-src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs:135 # EffectsMixerViewModel constructor (lifecycle hardened; Slice 1 IEffectsMeterClient added; IBackendClient retained for effect chains/mixer per plan)
+src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs:136 # EffectsMixerViewModel constructor (Slice 2 IEffectChainClient added; IBackendClient retained for mixer state per plan)
 # EngineParameterTuningViewModel MIGRATED to IEngineParameterTuningClient (2026-03-14)
 # ImageGenViewModel MIGRATED to IImageGenClient (2026-03-14)
 # ImageVideoEnhancementPipelineViewModel MIGRATED to IImageVideoEnhancementPipelineClient (2026-03-14)

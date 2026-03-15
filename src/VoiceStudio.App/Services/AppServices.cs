@@ -56,6 +56,7 @@ namespace VoiceStudio.App.Services
       var services = new ServiceCollection();
       RegisterCoreInfrastructure(services);
       RegisterBackendFacades(services);
+      RegisterPanelServices(services);
       RegisterUIServices(services);
 
       _provider = services.BuildServiceProvider();
@@ -248,6 +249,51 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IUltimateDashboardClient, UltimateDashboardClient>();
       services.AddSingleton<IImageSearchClient, ImageSearchClient>();
       services.AddSingleton<ITemplateLibraryClient, TemplateLibraryClient>();
+      services.AddSingleton<IVoiceMorphClient, VoiceMorphClient>();
+      services.AddSingleton<IVoiceStyleTransferClient, VoiceStyleTransferClient>();
+      services.AddSingleton<IStyleTransferClient, StyleTransferClient>();
+      services.AddSingleton<IUpscalingClient, UpscalingClient>();
+      services.AddSingleton<IEngineParameterTuningClient, EngineParameterTuningClient>();
+      services.AddSingleton<IImageGenClient, ImageGenClient>();
+      services.AddSingleton<ISpectrogramClient, SpectrogramClient>();
+      services.AddSingleton<ISpatialAudioClient, SpatialAudioClient>();
+      services.AddSingleton<IPluginHealthClient, PluginHealthClient>();
+      services.AddSingleton<IProfileHealthClient, ProfileHealthClient>();
+      services.AddSingleton<ISonographyClient, SonographyClient>();
+      services.AddSingleton<ILexiconClient, LexiconClient>();
+      services.AddSingleton<IHelpClient, HelpClient>();
+      services.AddSingleton<IKeyboardShortcutsClient, KeyboardShortcutsClient>();
+      services.AddSingleton<ITodoPanelClient, TodoPanelClient>();
+      services.AddSingleton<IPronunciationLexiconClient, PronunciationLexiconClient>();
+      services.AddSingleton<IProsodyClient, ProsodyClient>();
+      services.AddSingleton<ITagManagerClient, TagManagerClient>();
+      services.AddSingleton<ITagOrganizationClient, TagOrganizationClient>();
+      services.AddSingleton<IMarkerManagerClient, MarkerManagerClient>();
+      services.AddSingleton<IVoiceMorphingBlendingClient, VoiceMorphingBlendingClient>();
+      services.AddSingleton<IVoiceBrowserClient, VoiceBrowserClient>();
+      services.AddSingleton<IVoiceQuickCloneClient, VoiceQuickCloneClient>();
+      services.AddSingleton<IWorkflowAutomationClient, WorkflowAutomationClient>();
+      services.AddSingleton<IAIMixingClient, AIMixingClient>();
+      services.AddSingleton<IAIProductionAssistantClient, AIProductionAssistantClient>();
+      services.AddSingleton<IAdvancedSpectrogramClient, AdvancedSpectrogramClient>();
+      services.AddSingleton<IAdvancedWaveformClient, AdvancedWaveformClient>();
+      services.AddSingleton<IAnalyticsDashboardClient, AnalyticsDashboardClient>();
+      services.AddSingleton<IAudioAnalysisClient, AudioAnalysisClient>();
+      services.AddSingleton<IDeepfakeCreatorClient, DeepfakeCreatorClient>();
+      services.AddSingleton<IGPUStatusClient, GPUStatusClient>();
+      services.AddSingleton<IMCPDashboardClient, MCPDashboardClient>();
+      services.AddSingleton<IMultilingualSupportClient, MultilingualSupportClient>();
+      services.AddSingleton<IPipelineConversationClient, PipelineConversationClient>();
+      services.AddSingleton<IRealTimeAudioVisualizerClient, RealTimeAudioVisualizerClient>();
+      services.AddSingleton<ISpatialStageClient, SpatialStageClient>();
+      services.AddSingleton<ITextHighlightingClient, TextHighlightingClient>();
+      services.AddSingleton<IVideoEditClient, VideoEditClient>();
+      services.AddSingleton<IVideoGenClient, VideoGenClient>();
+      services.AddSingleton<IAdvancedRealTimeVisualizationClient, AdvancedRealTimeVisualizationClient>();
+      services.AddSingleton<IAudioMonitoringDashboardClient, AudioMonitoringDashboardClient>();
+      services.AddSingleton<IEffectsMeterClient, EffectsMeterClient>();
+      services.AddSingleton<IImageVideoEnhancementPipelineClient, ImageVideoEnhancementPipelineClient>();
+      services.AddSingleton<ISLODashboardClient, SLODashboardClient>();
 
       // Assistant facade (AssistantViewModel migration)
       services.AddSingleton<IAssistantClient, AssistantClient>();
@@ -266,13 +312,80 @@ namespace VoiceStudio.App.Services
     }
 
     /// <summary>
-    /// Registers UI services: DialogService, PanelRegistry, ViewModel factory, ToastNotificationService, etc.
+    /// Registers panel-specific services: PanelRegistry, LayoutService, WorkspaceService, ContextManager, etc.
     /// Must run after RegisterBackendFacades.
+    /// </summary>
+    private static void RegisterPanelServices(IServiceCollection services)
+    {
+      services.AddTransient<VoiceStudio.App.Views.Panels.ProfilesViewModel>();
+      services.AddSingleton<IPanelRegistry, PanelRegistry>();
+      services.AddSingleton<PanelStateService>();
+      services.AddSingleton<INavigationService, NavigationService>();
+
+      // Event aggregator for cross-panel synchronization (Phase 4)
+      services.AddSingleton<IEventAggregator, EventAggregator>();
+
+      // Central state store with undo/redo support (Panel Architecture Phase 5)
+      // Must be before ContextManager, DragDropService, EventReplayService
+      services.AddSingleton<IAppStateStore, AppStateStore>();
+      services.AddSingleton<AppStateStore>();
+
+      // Context manager for centralized active state (Panel Architecture Phase 2)
+      services.AddSingleton<IContextManager>(sp => new ContextManager(
+          sp.GetRequiredService<IEventAggregator>(),
+          sp.GetService<AppStateStore>()));
+
+      // Layout and Workspace services (Panel Architecture Phase 3)
+      services.AddSingleton<ILayoutService, LayoutService>();
+      services.AddSingleton<IWorkspaceService>(sp => new WorkspaceService(
+          sp.GetService<ILayoutService>(),
+          sp.GetService<IEventAggregator>(),
+          sp.GetService<Microsoft.Extensions.Logging.ILogger<WorkspaceService>>()));
+
+      // Selection navigation stack for back/forward navigation (Panel Architecture Phase 5)
+      services.AddSingleton<ISelectionStack, SelectionStack>();
+
+      // Drag and Drop service (Panel Architecture Phase 4)
+      services.AddSingleton<IDragDropService>(sp => new DragDropService(
+          sp.GetService<IEventAggregator>(),
+          sp.GetService<IAppStateStore>(),
+          sp.GetService<Microsoft.Extensions.Logging.ILogger<DragDropService>>()));
+
+      // Capability service for engine/feature progressive disclosure (Panel Architecture Phase 7)
+      services.AddSingleton<ICapabilityService, CapabilityService>();
+
+      // Job service for unified job tracking across panels (Panel Architecture)
+      services.AddSingleton<IJobService>(sp => new JobService(
+          sp.GetService<IEventAggregator>(),
+          sp.GetService<Microsoft.Extensions.Logging.ILogger<JobService>>()));
+
+      // Selection broadcast service for follow-selection behavior (Panel Architecture Phase D)
+      services.AddSingleton<ISelectionBroadcastService>(sp => new SelectionBroadcastService(
+          sp.GetService<IEventAggregator>(),
+          sp.GetService<Microsoft.Extensions.Logging.ILogger<SelectionBroadcastService>>()));
+
+      // Synchronized scroll service for cross-panel scroll coordination (Panel Architecture Phase D)
+      services.AddSingleton<ISynchronizedScrollService>(sp => new SynchronizedScrollService(
+          sp.GetService<IEventAggregator>(),
+          sp.GetService<Microsoft.Extensions.Logging.ILogger<SynchronizedScrollService>>()));
+
+      // Event replay service for debug capture and replay bundles (Panel Architecture Phase D)
+      services.AddSingleton<IEventReplayService>(sp => new EventReplayService(
+          sp.GetService<IEventAggregator>(),
+          sp.GetService<IAppStateStore>(),
+          sp.GetService<IContextManager>(),
+          sp.GetService<Microsoft.Extensions.Logging.ILogger<EventReplayService>>()));
+
+      // Workflow coordinator for multi-panel sequences (Panel Workflow Integration)
+      services.AddSingleton<IWorkflowCoordinatorService, WorkflowCoordinatorService>();
+    }
+
+    /// <summary>
+    /// Registers UI services: DialogService, ViewModel factory, ToastNotificationService, etc.
+    /// Must run after RegisterPanelServices.
     /// </summary>
     private static void RegisterUIServices(IServiceCollection services)
     {
-      services.AddTransient<VoiceStudio.App.Views.Panels.ProfilesViewModel>();
-
       // ViewModel context (factory: dispatcher may be null at startup; fallback when resolved)
       services.AddSingleton<IViewModelContext>(_ =>
       {
@@ -290,9 +403,6 @@ namespace VoiceStudio.App.Services
         return new DialogService(window);
       });
       services.AddSingleton<ISettingsService, SettingsService>();
-      services.AddSingleton<IPanelRegistry, PanelRegistry>();
-      services.AddSingleton<PanelStateService>();
-      services.AddSingleton<INavigationService, NavigationService>();
       services.AddSingleton<IErrorDialogService, ErrorDialogService>();
       // GAP-I12: Inject correlation provider into ErrorLoggingService
       services.AddSingleton<IErrorLoggingService>(sp => new ErrorLoggingService(
@@ -340,64 +450,6 @@ namespace VoiceStudio.App.Services
 
       // Theme service: unified theme management with persistence
       services.AddSingleton<IUnifiedThemeService, ThemeManager>();
-
-      // Event aggregator for cross-panel synchronization (Phase 4)
-      services.AddSingleton<IEventAggregator, EventAggregator>();
-      
-      // Context manager for centralized active state (Panel Architecture Phase 2)
-      // Uses AppStateStore for undo/redo support (Phase 5)
-      services.AddSingleton<IContextManager>(sp => new ContextManager(
-          sp.GetRequiredService<IEventAggregator>(),
-          sp.GetService<AppStateStore>()));
-      
-      // Layout and Workspace services (Panel Architecture Phase 3)
-      services.AddSingleton<ILayoutService, LayoutService>();
-      services.AddSingleton<IWorkspaceService>(sp => new WorkspaceService(
-          sp.GetService<ILayoutService>(),
-          sp.GetService<IEventAggregator>(),
-          sp.GetService<Microsoft.Extensions.Logging.ILogger<WorkspaceService>>()));
-      
-      // Central state store with undo/redo support (Panel Architecture Phase 5)
-      services.AddSingleton<IAppStateStore, AppStateStore>();
-      services.AddSingleton<AppStateStore>();
-      
-      // Selection navigation stack for back/forward navigation (Panel Architecture Phase 5)
-      services.AddSingleton<ISelectionStack, SelectionStack>();
-      
-      // Drag and Drop service (Panel Architecture Phase 4)
-      // Injecting StateStore for command pattern support
-      services.AddSingleton<IDragDropService>(sp => new DragDropService(
-          sp.GetService<IEventAggregator>(),
-          sp.GetService<IAppStateStore>(),
-          sp.GetService<Microsoft.Extensions.Logging.ILogger<DragDropService>>()));
-      
-      // Capability service for engine/feature progressive disclosure (Panel Architecture Phase 7)
-      services.AddSingleton<ICapabilityService, CapabilityService>();
-      
-      // Job service for unified job tracking across panels (Panel Architecture)
-      services.AddSingleton<IJobService>(sp => new JobService(
-          sp.GetService<IEventAggregator>(),
-          sp.GetService<Microsoft.Extensions.Logging.ILogger<JobService>>()));
-      
-      // Selection broadcast service for follow-selection behavior (Panel Architecture Phase D)
-      services.AddSingleton<ISelectionBroadcastService>(sp => new SelectionBroadcastService(
-          sp.GetService<IEventAggregator>(),
-          sp.GetService<Microsoft.Extensions.Logging.ILogger<SelectionBroadcastService>>()));
-      
-      // Synchronized scroll service for cross-panel scroll coordination (Panel Architecture Phase D)
-      services.AddSingleton<ISynchronizedScrollService>(sp => new SynchronizedScrollService(
-          sp.GetService<IEventAggregator>(),
-          sp.GetService<Microsoft.Extensions.Logging.ILogger<SynchronizedScrollService>>()));
-      
-      // Event replay service for debug capture and replay bundles (Panel Architecture Phase D)
-      services.AddSingleton<IEventReplayService>(sp => new EventReplayService(
-          sp.GetService<IEventAggregator>(),
-          sp.GetService<IAppStateStore>(),
-          sp.GetService<IContextManager>(),
-          sp.GetService<Microsoft.Extensions.Logging.ILogger<EventReplayService>>()));
-      
-      // Workflow coordinator for multi-panel sequences (Panel Workflow Integration)
-      services.AddSingleton<IWorkflowCoordinatorService, WorkflowCoordinatorService>();
 
       // ITelemetryService: stub when no dedicated implementation (GAP-003 follow-up can add real impl)
       services.AddSingleton<ITelemetryService, TelemetryServiceStub>();
@@ -541,6 +593,53 @@ namespace VoiceStudio.App.Services
     public static IUltimateDashboardClient GetUltimateDashboardClient() => GetRequiredService<IUltimateDashboardClient>();
     public static IImageSearchClient GetImageSearchClient() => GetRequiredService<IImageSearchClient>();
     public static ITemplateLibraryClient GetTemplateLibraryClient() => GetRequiredService<ITemplateLibraryClient>();
+    public static IVoiceMorphClient GetVoiceMorphClient() => GetRequiredService<IVoiceMorphClient>();
+    public static IVoiceStyleTransferClient GetVoiceStyleTransferClient() => GetRequiredService<IVoiceStyleTransferClient>();
+    public static IStyleTransferClient GetStyleTransferClient() => GetRequiredService<IStyleTransferClient>();
+    public static IUpscalingClient GetUpscalingClient() => GetRequiredService<IUpscalingClient>();
+    public static IEngineParameterTuningClient GetEngineParameterTuningClient() => GetRequiredService<IEngineParameterTuningClient>();
+    public static IImageGenClient GetImageGenClient() => GetRequiredService<IImageGenClient>();
+    public static ISpectrogramClient GetSpectrogramClient() => GetRequiredService<ISpectrogramClient>();
+    public static ISpatialAudioClient GetSpatialAudioClient() => GetRequiredService<ISpatialAudioClient>();
+    public static IPluginHealthClient GetPluginHealthClient() => GetRequiredService<IPluginHealthClient>();
+    public static IProfileHealthClient GetProfileHealthClient() => GetRequiredService<IProfileHealthClient>();
+    public static ISonographyClient GetSonographyClient() => GetRequiredService<ISonographyClient>();
+    public static IProjectAudioClient GetProjectAudioClient() => GetRequiredService<IProjectAudioClient>();
+    public static ILexiconClient GetLexiconClient() => GetRequiredService<ILexiconClient>();
+    public static IHelpClient GetHelpClient() => GetRequiredService<IHelpClient>();
+    public static IKeyboardShortcutsClient GetKeyboardShortcutsClient() => GetRequiredService<IKeyboardShortcutsClient>();
+    public static IPronunciationLexiconClient GetPronunciationLexiconClient() => GetRequiredService<IPronunciationLexiconClient>();
+    public static IProsodyClient GetProsodyClient() => GetRequiredService<IProsodyClient>();
+    public static ITagManagerClient GetTagManagerClient() => GetRequiredService<ITagManagerClient>();
+    public static ITagOrganizationClient GetTagOrganizationClient() => GetRequiredService<ITagOrganizationClient>();
+    public static IMarkerManagerClient GetMarkerManagerClient() => GetRequiredService<IMarkerManagerClient>();
+    public static IVoiceMorphingBlendingClient GetVoiceMorphingBlendingClient() => GetRequiredService<IVoiceMorphingBlendingClient>();
+    public static IVoiceBrowserClient GetVoiceBrowserClient() => GetRequiredService<IVoiceBrowserClient>();
+    public static IVoiceQuickCloneClient GetVoiceQuickCloneClient() => GetRequiredService<IVoiceQuickCloneClient>();
+    public static IWorkflowAutomationClient GetWorkflowAutomationClient() => GetRequiredService<IWorkflowAutomationClient>();
+    public static IAIMixingClient GetAIMixingClient() => GetRequiredService<IAIMixingClient>();
+    public static IAIProductionAssistantClient GetAIProductionAssistantClient() => GetRequiredService<IAIProductionAssistantClient>();
+    public static IAdvancedSpectrogramClient GetAdvancedSpectrogramClient() => GetRequiredService<IAdvancedSpectrogramClient>();
+    public static IAdvancedWaveformClient GetAdvancedWaveformClient() => GetRequiredService<IAdvancedWaveformClient>();
+    public static IAnalyticsDashboardClient GetAnalyticsDashboardClient() => GetRequiredService<IAnalyticsDashboardClient>();
+    public static IAudioAnalysisClient GetAudioAnalysisClient() => GetRequiredService<IAudioAnalysisClient>();
+    public static IDeepfakeCreatorClient GetDeepfakeCreatorClient() => GetRequiredService<IDeepfakeCreatorClient>();
+    public static IGPUStatusClient GetGPUStatusClient() => GetRequiredService<IGPUStatusClient>();
+    public static IMCPDashboardClient GetMCPDashboardClient() => GetRequiredService<IMCPDashboardClient>();
+    public static IMultilingualSupportClient GetMultilingualSupportClient() => GetRequiredService<IMultilingualSupportClient>();
+    public static IPipelineConversationClient GetPipelineConversationClient() => GetRequiredService<IPipelineConversationClient>();
+    public static IRealTimeAudioVisualizerClient GetRealTimeAudioVisualizerClient() => GetRequiredService<IRealTimeAudioVisualizerClient>();
+    public static ISpatialStageClient GetSpatialStageClient() => GetRequiredService<ISpatialStageClient>();
+    public static ITextHighlightingClient GetTextHighlightingClient() => GetRequiredService<ITextHighlightingClient>();
+    public static IVideoEditClient GetVideoEditClient() => GetRequiredService<IVideoEditClient>();
+    public static IVideoGenClient GetVideoGenClient() => GetRequiredService<IVideoGenClient>();
+    public static IAdvancedRealTimeVisualizationClient GetAdvancedRealTimeVisualizationClient() => GetRequiredService<IAdvancedRealTimeVisualizationClient>();
+    public static IAudioMonitoringDashboardClient GetAudioMonitoringDashboardClient() => GetRequiredService<IAudioMonitoringDashboardClient>();
+    public static IEffectsMeterClient GetEffectsMeterClient() => GetRequiredService<IEffectsMeterClient>();
+    public static IImageVideoEnhancementPipelineClient GetImageVideoEnhancementPipelineClient() => GetRequiredService<IImageVideoEnhancementPipelineClient>();
+    public static ISLODashboardClient GetSLODashboardClient() => GetRequiredService<ISLODashboardClient>();
+    public static IEmotionControlClient GetEmotionControlClient() => GetRequiredService<IEmotionControlClient>();
+    public static ITodoPanelClient GetTodoPanelClient() => GetRequiredService<ITodoPanelClient>();
     public static ITimelineClipService GetTimelineClipService() => GetRequiredService<ITimelineClipService>();
     public static ITimelineTrackService GetTimelineTrackService() => GetRequiredService<ITimelineTrackService>();
     public static ITimelineTranscriptionService GetTimelineTranscriptionService() => GetRequiredService<ITimelineTranscriptionService>();

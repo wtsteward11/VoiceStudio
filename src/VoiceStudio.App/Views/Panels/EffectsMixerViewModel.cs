@@ -16,9 +16,10 @@ using VoiceStudio.App.Utilities;
 
 namespace VoiceStudio.App.Views.Panels
 {
-  public partial class EffectsMixerViewModel : ObservableObject, IPanelView
+  public partial class EffectsMixerViewModel : ObservableObject, IPanelView, IPanelLifecycle, IDisposable
   {
     private readonly IBackendClient _backendClient;
+    private readonly IEffectsMeterClient _effectsMeterClient;
     private readonly UndoRedoService? _undoRedoService;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly MultiSelectService _multiSelectService;
@@ -26,7 +27,10 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IErrorLoggingService? _logService;
     private MultiSelectState? _multiSelectState;
     private CancellationTokenSource? _pollingCts;
+    private CancellationTokenSource? _disposalCts;
+    private CancellationTokenSource? _selectionLoadCts;
     private bool _isPolling;
+    private bool _disposed;
 
     public string PanelId => "effectsmixer";
     public string DisplayName => ResourceHelper.GetString("Panel.EffectsMixer.DisplayName", "Effects & Mixer");
@@ -128,9 +132,11 @@ namespace VoiceStudio.App.Views.Panels
             "vocoder"
         };
 
-    public EffectsMixerViewModel(IBackendClient backendClient)
+    public EffectsMixerViewModel(IBackendClient backendClient, IEffectsMeterClient effectsMeterClient)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _effectsMeterClient = effectsMeterClient ?? throw new ArgumentNullException(nameof(effectsMeterClient));
+      _disposalCts = new CancellationTokenSource();
 
       // Get multi-select service
       var multiSelectService = AppServices.TryGetMultiSelectService();
@@ -408,24 +414,11 @@ namespace VoiceStudio.App.Views.Panels
 
       if (!string.IsNullOrWhiteSpace(value))
       {
-        var ct = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
-        _ = LoadEffectChainsAsync(ct).ContinueWith(t =>
-        {
-          if (t.IsFaulted)
-            _logService?.LogError(t.Exception?.InnerException ?? new Exception("LoadEffectChains failed"), "LoadEffectChains");
-        }, TaskScheduler.Default);
-
-        _ = LoadMixerStateAsync(ct).ContinueWith(t =>
-        {
-          if (t.IsFaulted)
-            _logService?.LogError(t.Exception?.InnerException ?? new Exception("LoadMixerState failed"), "LoadMixerState");
-        }, TaskScheduler.Default);
-
-        _ = LoadMixerPresetsAsync(ct).ContinueWith(t =>
-        {
-          if (t.IsFaulted)
-            _logService?.LogError(t.Exception?.InnerException ?? new Exception("LoadMixerPresets failed"), "LoadMixerPresets");
-        }, TaskScheduler.Default);
+        CancelSelectionLoad();
+        var projectId = value;
+        _selectionLoadCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts!.Token);
+        var ct = _selectionLoadCts.Token;
+        _ = LoadProjectSelectionDataAsync(projectId, ct);
       }
     }
 
@@ -457,12 +450,11 @@ namespace VoiceStudio.App.Views.Panels
 
       if (!string.IsNullOrWhiteSpace(value))
       {
-        var ct = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
-        _ = LoadMetersAsync(ct).ContinueWith(t =>
-        {
-          if (t.IsFaulted)
-            _logService?.LogError(t.Exception?.InnerException ?? new Exception("LoadMeters failed"), "LoadMeters");
-        }, TaskScheduler.Default);
+        CancelSelectionLoad();
+        var audioId = value;
+        _selectionLoadCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts!.Token);
+        var ct = _selectionLoadCts.Token;
+        _ = LoadAudioSelectionDataAsync(audioId, ct);
       }
     }
 
@@ -501,6 +493,89 @@ namespace VoiceStudio.App.Views.Panels
       _pollingCts = null;
     }
 
+    private void CancelSelectionLoad()
+    {
+      _selectionLoadCts?.Cancel();
+      _selectionLoadCts?.Dispose();
+      _selectionLoadCts = null;
+    }
+
+    /// <summary>
+    /// Lifecycle fire-and-forget: loads project data when selection changes.
+    /// Uses _selectionLoadCts; staleness guard before each apply.
+    /// </summary>
+    private async Task LoadProjectSelectionDataAsync(string projectId, CancellationToken ct)
+    {
+      try
+      {
+        await LoadEffectChainsForProjectAsync(projectId, ct);
+        if (SelectedProjectId != projectId || ct.IsCancellationRequested) return;
+        await LoadMixerStateForProjectAsync(projectId, ct);
+        if (SelectedProjectId != projectId || ct.IsCancellationRequested) return;
+        await LoadMixerPresetsForProjectAsync(projectId, ct);
+      }
+      // ALLOWED: empty catch - OperationCanceledException expected when selection changes or panel deactivates
+      catch (OperationCanceledException) { }
+      catch (Exception ex)
+      {
+        _logService?.LogError(ex, "LoadProjectSelectionData");
+      }
+    }
+
+    /// <summary>
+    /// Lifecycle fire-and-forget: loads meters when audio selection changes.
+    /// Uses _selectionLoadCts; staleness guard before apply.
+    /// </summary>
+    private async Task LoadAudioSelectionDataAsync(string audioId, CancellationToken ct)
+    {
+      try
+      {
+        await LoadMetersForAudioAsync(audioId, ct);
+      }
+      // ALLOWED: empty catch - OperationCanceledException expected when selection changes or panel deactivates
+      catch (OperationCanceledException) { }
+      catch (Exception ex)
+      {
+        _logService?.LogError(ex, "LoadAudioSelectionData");
+      }
+    }
+
+    Task IPanelLifecycle.OnActivatedAsync(CancellationToken ct) => Task.CompletedTask;
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken ct)
+    {
+      if (!string.IsNullOrWhiteSpace(SelectedProjectId))
+      {
+        await LoadEffectChainsForProjectAsync(SelectedProjectId, ct);
+        if (ct.IsCancellationRequested) return;
+        await LoadMixerStateForProjectAsync(SelectedProjectId, ct);
+        if (ct.IsCancellationRequested) return;
+        await LoadMixerPresetsForProjectAsync(SelectedProjectId, ct);
+      }
+      if (!string.IsNullOrWhiteSpace(SelectedAudioId))
+      {
+        await LoadMetersForAudioAsync(SelectedAudioId, ct);
+      }
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken ct)
+    {
+      StopPolling();
+      CancelSelectionLoad();
+      return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+      if (_disposed) return;
+      _disposed = true;
+      StopPolling();
+      CancelSelectionLoad();
+      _disposalCts?.Cancel();
+      _disposalCts?.Dispose();
+      _disposalCts = null;
+    }
+
     private async Task PollMetersAsync(CancellationToken cancellationToken)
     {
       while (!cancellationToken.IsCancellationRequested && _isPolling)
@@ -528,12 +603,20 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (string.IsNullOrWhiteSpace(SelectedAudioId))
         return;
+      await LoadMetersForAudioAsync(SelectedAudioId, cancellationToken);
+    }
 
+    private async Task LoadMetersForAudioAsync(string audioId, CancellationToken cancellationToken)
+    {
       try
       {
         // Don't set IsLoading for meter updates to avoid UI flicker during polling
         // Only update meter values, not the entire state
-        var meters = await _backendClient.GetAudioMetersAsync(SelectedAudioId, cancellationToken);
+        var meters = await _effectsMeterClient.GetAudioMetersAsync(audioId, cancellationToken);
+
+        // Staleness guard: selection may have changed during await
+        if (SelectedAudioId != audioId || cancellationToken.IsCancellationRequested)
+          return;
 
         // Update channels with meter data
         if (meters.Channels?.Count > 0)
@@ -609,13 +692,21 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (string.IsNullOrWhiteSpace(SelectedProjectId))
         return;
+      await LoadEffectChainsForProjectAsync(SelectedProjectId, cancellationToken);
+    }
 
+    private async Task LoadEffectChainsForProjectAsync(string projectId, CancellationToken cancellationToken)
+    {
       try
       {
         IsLoading = true;
         ErrorMessage = null;
 
-        var chains = await _backendClient.GetEffectChainsAsync(SelectedProjectId, cancellationToken);
+        var chains = await _backendClient.GetEffectChainsAsync(projectId, cancellationToken);
+
+        // Staleness guard: selection may have changed during await
+        if (SelectedProjectId != projectId || cancellationToken.IsCancellationRequested)
+          return;
 
         EffectChains.Clear();
         foreach (var chain in chains)
@@ -1328,13 +1419,22 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (string.IsNullOrWhiteSpace(SelectedProjectId))
         return;
+      await LoadMixerStateForProjectAsync(SelectedProjectId, cancellationToken);
+    }
 
+    private async Task LoadMixerStateForProjectAsync(string projectId, CancellationToken cancellationToken)
+    {
       IsLoading = true;
       ErrorMessage = null;
 
       try
       {
-        var state = await _backendClient.GetMixerStateAsync(SelectedProjectId, cancellationToken);
+        var state = await _backendClient.GetMixerStateAsync(projectId, cancellationToken);
+
+        // Staleness guard: selection may have changed during await
+        if (SelectedProjectId != projectId || cancellationToken.IsCancellationRequested)
+          return;
+
         MixerState = state;
         Master = state.Master ?? new MixerMaster { Id = "master", Volume = 1.0, Pan = 0.0, IsMuted = false };
 
@@ -1516,13 +1616,21 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (string.IsNullOrWhiteSpace(SelectedProjectId))
         return;
+      await LoadMixerPresetsForProjectAsync(SelectedProjectId, cancellationToken);
+    }
 
+    private async Task LoadMixerPresetsForProjectAsync(string projectId, CancellationToken cancellationToken)
+    {
       IsLoading = true;
       ErrorMessage = null;
 
       try
       {
-        var presets = await _backendClient.GetMixerPresetsAsync(SelectedProjectId, cancellationToken);
+        var presets = await _backendClient.GetMixerPresetsAsync(projectId, cancellationToken);
+
+        // Staleness guard: selection may have changed during await
+        if (SelectedProjectId != projectId || cancellationToken.IsCancellationRequested)
+          return;
 
         MixerPresets.Clear();
         foreach (var preset in presets)

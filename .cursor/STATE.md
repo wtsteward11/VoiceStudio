@@ -16,27 +16,27 @@ Read only this section as current task truth. Treat everything below the divider
 - **Status:** —
 
 ### Next 3 Steps
-1. Execute EffectsMixer Slice 2 (effect chains/mixer seam) per [EFFECTSMIXER_SEAM_EXECUTION_PLAN.md](docs/design/EFFECTSMIXER_SEAM_EXECUTION_PLAN.md)
-2. Run full verification before closure
-3. Commit governance truth sync + EffectsMixer Slice 1 per plan (max 3 files per commit)
+1. Update IBACKENDCLIENT_UNRESOLVED_QUEUE.md — mark EffectsMixerViewModel MIGRATED
+2. Update CONSTRUCTOR_INVARIANT_COVERAGE_AUDIT.md — add EffectsMixerViewModel to matrix
+3. Run full verification; commit governance truth-sync docs
 
 ### Current Target
-EffectsMixer architecture-track split (Option C). Routine queue frozen.
+Governance truth sync after EffectsMixer Slice 3. All IBackendClient architecture-track migrations complete.
 
 ### Current Blocker
 None
 
 ### Truth Sync Note
-79 migrated ViewModels; 76 with constructor invariant; 2 exempt (MiniTimelineViewModel, AdvancedRealTimeVisualizationViewModel timer-based FAF). 1 truly unresolved (EffectsMixer deferred). Routine targets complete. Source: MIGRATED_NO_IBACKENDCLIENT from check_ibackendclient_creep.py.
+80 migrated ViewModels; 77 with constructor invariant; 2 exempt (MiniTimelineViewModel, AdvancedRealTimeVisualizationViewModel timer-based FAF). 0 unresolved. EffectsMixer Slice 3 complete (2026-03-15). Source: MIGRATED_NO_IBACKENDCLIENT from check_ibackendclient_creep.py.
 
 ### Last Verified Commands
-- `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` — PASS (2026-03-14)
-- `dotnet test ... --filter "FullyQualifiedName~SLODashboardViewModelSeamTests|FullyQualifiedName~TagOrganizationViewModelSeamTests"` — 7 passed
+- `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` — PASS (2026-03-15)
+- `dotnet test ... --filter "FullyQualifiedName~EffectsMixerViewModelSeamTests"` — 6 passed
 - `python scripts/ci/check_ibackendclient_creep.py` — PASS
-- `python scripts/run_verification.py` — PASS (2026-03-14, after routine closure commit)
+- `python scripts/run_verification.py` — PASS (2026-03-15, after EffectsMixer Slice 3 commits)
 
 ### Context Acknowledgment
-2026-03-14 — Bulletproof Plan: Phase 0–5 complete. TextSpeechEditorViewModel FAF fixed; EngineParameterTuningViewModel migrated; AppServices decomposed; STATE and queue docs updated.
+2026-03-15 — EffectsMixer Slice 3 complete. IEffectsMeterClient + IEffectChainClient + IMixerStateClient; IBackendClient removed. 80 migrated, 0 unresolved.
 
 ---
 ## HISTORY LEDGER
@@ -67,11 +67,11 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 - **Known Debt:** TrainingViewModel lifecycle FAF (documented in TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md; deferred)
 
 ## LATEST MILESTONE
-- **ID:** BULLETPROOF-PLAN
-- **Title:** VoiceStudio Bulletproof Completion Plan — Phases 0–5
-- **Status:** COMPLETE (2026-03-14)
-- **Completed:** Phase 0 (TextSpeechEditorViewModel FAF, constructor invariant gate, audit); Phase 1 (ADR-050 golden path, retained-async baseline); Phase 2 (queue refresh, EngineParameterTuningViewModel migration); Phase 3 (AppServices RegisterPanelServices); Phase 4 (wedge doc, cross-panel); Phase 5 (STATE, queue).
-- **Verification:** constructor_invariant in run_verification.py; 44 migrated, 43 with invariant; EngineParameterTuningViewModelSeamTests pass
+- **ID:** EFFECTSMIXER-SLICE3
+- **Title:** EffectsMixer Slice 3 — IMixerStateClient; IBackendClient removed
+- **Status:** COMPLETE (2026-03-15)
+- **Completed:** IEffectsMeterClient, IEffectChainClient, IMixerStateClient; EffectsMixerViewModel IBackendClient removed; MIGRATED_NO_IBACKENDCLIENT; EffectsMixerViewModelSeamTests (6 passed).
+- **Verification:** run_verification.py PASS; check_ibackendclient_creep.py PASS; 80 migrated, 0 unresolved
 
 ## LATEST PROOF INDEX
 | Date | Task | Artifact | Type | Status |
@@ -118,8 +118,11 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 | 2026-03-14 | TagOrganizationViewModel migration closure | ITagOrganizationClient, IProfilesClient, TagOrganizationViewModelSeamTests (4 passed) | Code + Test | Done |
 | 2026-03-14 | Routine IBackendClient migration queue closure | IBACKENDCLIENT_UNRESOLVED_QUEUE.md closure banner | Doc | Done |
 | 2026-03-14 | Governance Truth Sync | STATE.md, CONSTRUCTOR_INVARIANT_COVERAGE_AUDIT.md counts reconciled; ibackendclient_baseline line 135 | Doc | Done |
+| 2026-03-15 | EffectsMixer Slice 3 | IMixerStateClient, EffectsMixerViewModel IBackendClient removed, EffectsMixerViewModelSeamTests (6 passed) | Code + Test | Done |
 | 2026-03-14 | EffectsMixer Slice 1 | IEffectsMeterClient, EffectsMeterClient, EffectsMixerViewModel GetAudioMetersAsync via seam | Code | Done |
 | 2026-03-14 | EffectsMixerViewModelSeamTests | 5 tests: Constructor_DoesNotCallClient_BeforeActivation, CreatesInstance, null throws, IPanelLifecycle | Test | PASS |
+| 2026-03-14 | EffectsMixer Slice 2 | IEffectChainClient, EffectChainClient, EffectChainActions migration, EffectsMixerViewModel chain calls via seam | Code | Done |
+| 2026-03-14 | EffectsMixerViewModelSeamTests Slice 2 | 6 tests: IEffectChainClient mock, Constructor_WithNullEffectChainClient_Throws | Test | PASS |
 
 ## COMPLETED MILESTONES
 - TRUTH-RESET-LIFECYCLE, NEXT10-SEAM-BATCH, WAVE2-LIFECYCLE-FOLLOW-THROUGH

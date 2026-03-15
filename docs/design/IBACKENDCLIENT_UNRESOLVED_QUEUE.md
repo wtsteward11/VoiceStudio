@@ -2,7 +2,7 @@
 
 > **Purpose:** Live ranked list of ViewModels/Panels that still take `IBackendClient` directly. Use this for the next migration wave — not the completed historical table in [IBACKENDCLIENT_LONGTAIL_RANKING.md](IBACKENDCLIENT_LONGTAIL_RANKING.md).  
 > **Source:** Derived from [.ci/ibackendclient_baseline.txt](../../.ci/ibackendclient_baseline.txt) — entries without `MIGRATED` comment.  
-> **Last Generated:** 2026-03-14
+> **Last Generated:** 2026-03-15
 
 ---
 
@@ -14,9 +14,7 @@ All routine IBackendClient migration targets are complete. SLODashboardViewModel
 
 ## Architecture Track (Not Routine Queue)
 
-**EffectsMixerViewModel** is **excluded from the routine migration queue**. It requires a domain split per [EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md](EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md) Option C: `IEffectsMeterClient`, `IEffectChainClient`, `IMixerStateClient`. Lifecycle is hardened; seam migration is a separate architecture track.
-
-**Do not treat EffectsMixer as a simple one-interface migration.** Only reopen when ready to implement the full domain split. Do not list it as "recommended next" for routine migration.
+**EffectsMixerViewModel** — **MIGRATED** (2026-03-15). Domain split per [EFFECTSMIXER_SEAM_EXECUTION_PLAN.md](EFFECTSMIXER_SEAM_EXECUTION_PLAN.md) complete: `IEffectsMeterClient`, `IEffectChainClient`, `IMixerStateClient`. IBackendClient removed. EffectsMixerViewModelSeamTests (6 passed).
 
 ---
 
@@ -37,7 +35,7 @@ All routine IBackendClient migration targets are complete. SLODashboardViewModel
 
 | Rank | File | Call Sites | Lifecycle Risk | Mutation | Expected Seam | Proof |
 |------|------|------------|----------------|----------|---------------|-------|
-| 1 | `Views/Panels/EffectsMixerViewModel.cs` | High | Lifecycle hardened | Yes | Domain split (Option C) | Seam tests |
+| ~~1~~ | ~~`Views/Panels/EffectsMixerViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-15) IEffectsMeterClient + IEffectChainClient + IMixerStateClient | EffectsMixerViewModelSeamTests (6 passed) |
 | ~~2~~ | ~~`ViewModels/AssistantViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
 | ~~3~~ | ~~`ViewModels/MixAssistantViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
 | ~~4~~ | ~~`ViewModels/AdvancedSettingsViewModel.cs`~~ | — | — | — | **MIGRATED** (2026-03-13) | Seam tests |
@@ -76,30 +74,11 @@ All routine IBackendClient migration targets are complete. SLODashboardViewModel
 
 ## File-Level Inspection (Ranks 1–3)
 
-### Rank 1: EffectsMixerViewModel — Seam Migration Deferred
+### Rank 1: EffectsMixerViewModel — DONE (2026-03-15)
 
 **File:** `src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs`
 
-**Lifecycle hardened (2026-03-13).** Still uses IBackendClient; seam migration deferred per domain split (Option C: IEffectsMeterClient, IEffectChainClient, IMixerStateClient). See [EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md](EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md).
-
-| IBackendClient Call | Destructive |
-|---------------------|-------------|
-| GetAudioMetersAsync | No |
-| GetEffectChainsAsync | No |
-| GetEffectPresetsAsync | No |
-| CreateEffectChainAsync | Yes |
-| DeleteEffectChainAsync | Yes |
-| ProcessAudioWithChainAsync | Yes |
-| UpdateEffectChainAsync | Yes |
-| GetMixerStateAsync | No |
-| UpdateMixerStateAsync | Yes |
-| ResetMixerStateAsync | Yes |
-| GetMixerPresetsAsync | No |
-| CreateMixerPresetAsync | Yes |
-| ApplyMixerPresetAsync | Yes |
-| CreateMixerSendAsync, CreateMixerReturnAsync, CreateMixerSubGroupAsync | Yes |
-| DeleteMixerSubGroupAsync, DeleteMixerSendAsync, DeleteMixerReturnAsync | Yes |
-| UpdateMixerSubGroupAsync, UpdateMixerSendAsync, UpdateMixerReturnAsync | Yes |
+**Status:** **MIGRATED** to `IEffectsMeterClient` + `IEffectChainClient` + `IMixerStateClient`. IBackendClient removed. Domain split per [EFFECTSMIXER_SEAM_EXECUTION_PLAN.md](EFFECTSMIXER_SEAM_EXECUTION_PLAN.md). EffectsMixerViewModelSeamTests (6 passed).
 
 ---
 

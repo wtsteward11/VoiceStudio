@@ -39,6 +39,7 @@
 | BatchProcessingViewModel | Y | Y | BatchProcessingViewModelSeamTests |
 | DatasetQAViewModel | Y | Y | DatasetQAViewModelSeamTests |
 | DiagnosticsViewModel | Y | Y | DiagnosticsViewModelSeamTests |
+| EffectsMixerViewModel | Y | Y | EffectsMixerViewModelSeamTests (migrated 2026-03-15) |
 | EmbeddingExplorerViewModel | Y | Y | EmbeddingExplorerViewModelSeamTests |
 | EmotionStylePresetEditorViewModel | Y | Y | EmotionStylePresetEditorViewModelSeamTests (migrated 2026-03-14) |
 | EngineParameterTuningViewModel | Y | Y | EngineParameterTuningViewModelSeamTests (migrated 2026-03-14) |
@@ -117,11 +118,11 @@
 
 | Metric | Count |
 |--------|-------|
-| Migrated ViewModels (baseline) | 79 |
-| With seam test + constructor invariant | 76 |
+| Migrated ViewModels (baseline) | 80 |
+| With seam test + constructor invariant | 77 |
 | **Exemptions (documented)** | **2** (MiniTimeline N/A; AdvancedRealTimeVisualization timer-based FAF) |
 
-**Canonical source:** `scripts/ci/check_ibackendclient_creep.py` MIGRATED_NO_IBACKENDCLIENT (79 entries). Audit matrix must include all entries. Exemption math: 79 - 2 exempt = 77 required; 76 with invariant; 1 in baseline (AdvancedRealTimeVisualization). No contradiction with STATE.md.
+**Canonical source:** `scripts/ci/check_ibackendclient_creep.py` MIGRATED_NO_IBACKENDCLIENT (80 entries). Audit matrix must include all entries. Exemption math: 80 - 2 exempt = 78 required; 77 with invariant; 1 in baseline (AdvancedRealTimeVisualization). No contradiction with STATE.md.
 
 ---
 
@@ -140,6 +141,7 @@ Per plan: Start with Assistant, EmbeddingExplorer, Recording, Diagnostics.
 
 ## Changelog
 
+- 2026-03-15: EffectsMixerViewModel added to matrix (Y/Y). Summary updated to 80 migrated, 77 with invariant.
 - 2026-03-14: Truth sync. Summary updated to 79 migrated, 76 with invariant (derived from check_ibackendclient_creep.py). MiniTimelineViewModel note corrected: in MIGRATED_NO_IBACKENDCLIENT.
 - 2026-03-14: Exemption Justification subsection added. MiniTimelineViewModel: N/A (no backend seam). AdvancedRealTimeVisualizationViewModel: documented exemption per RETAINED_ASYNC_RULE (timer-based FAF, disposal safe).
 - 2026-03-14: VideoEditViewModel migrated to IVideoEditClient. Seam tests added. 72 migrated, 71 with invariant.

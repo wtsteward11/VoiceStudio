@@ -1,18 +1,18 @@
-src/VoiceStudio.App/ViewModels/AIMixingMasteringViewModel.cs:99 # AIMixingMasteringViewModel constructor
-src/VoiceStudio.App/ViewModels/AIProductionAssistantViewModel.cs:57 # AIProductionAssistantViewModel constructor
+# AIMixingMasteringViewModel MIGRATED to IAIMixingClient (2026-03-14)
+# AIProductionAssistantViewModel MIGRATED to IAIProductionAssistantClient (2026-03-14)
 # APIKeyManagerViewModel MIGRATED to IAPIKeyManagerClient (2026-03-13)
 # AdvancedSettingsViewModel MIGRATED to IAdvancedSettingsClient (2026-03-13)
-src/VoiceStudio.App/ViewModels/AdvancedSpectrogramVisualizationViewModel.cs:83 # AdvancedSpectrogramVisualizationViewModel constructor
-src/VoiceStudio.App/ViewModels/AdvancedWaveformVisualizationViewModel.cs:92 # AdvancedWaveformVisualizationViewModel constructor
-src/VoiceStudio.App/ViewModels/AnalyticsDashboardViewModel.cs:61 # AnalyticsDashboardViewModel constructor
+# AdvancedSpectrogramVisualizationViewModel MIGRATED to IAdvancedSpectrogramClient + IProjectAudioClient (2026-03-14)
+# AdvancedWaveformVisualizationViewModel MIGRATED to IAdvancedWaveformClient + IProjectAudioClient (2026-03-14)
+# AnalyticsDashboardViewModel MIGRATED to IAnalyticsDashboardClient (2026-03-14)
 # AssistantViewModel MIGRATED to IAssistantClient (2026-03-13)
-src/VoiceStudio.App/ViewModels/AudioAnalysisViewModel.cs:57 # AudioAnalysisViewModel constructor
+# AudioAnalysisViewModel MIGRATED to IAudioAnalysisClient (2026-03-14)
 # BackupRestoreViewModel MIGRATED to IBackupRestoreClient (2026-03-13)
 # DatasetQAViewModel MIGRATED to IDatasetQAClient (2026-03-12)
-src/VoiceStudio.App/ViewModels/DeepfakeCreatorViewModel.cs:71 # DeepfakeCreatorViewModel constructor
+# DeepfakeCreatorViewModel MIGRATED to IDeepfakeCreatorClient (2026-03-14)
 # EmbeddingExplorerViewModel MIGRATED to IEmbeddingExplorerClient + IProjectAudioClient (2026-03-12)
 # EnsembleSynthesisViewModel MIGRATED to IEnsembleSynthesisClient (2026-03-13)
-src/VoiceStudio.App/ViewModels/GPUStatusViewModel.cs:49 # GPUStatusViewModel constructor
+# GPUStatusViewModel MIGRATED to IGPUStatusClient (2026-03-14)
 # GlobalSearchViewModel MIGRATED to ISearchClient (2026-03-13)
 # HelpViewModel MIGRATED to IHelpClient (2026-03-13)
 # ImageSearchViewModel MIGRATED to IImageSearchClient (2026-03-13)
@@ -20,17 +20,17 @@ src/VoiceStudio.App/ViewModels/GPUStatusViewModel.cs:49 # GPUStatusViewModel con
 # KeyboardShortcutsViewModel MIGRATED to IKeyboardShortcutsClient (2026-03-14)
 # LexiconViewModel MIGRATED to ILexiconClient (2026-03-14)
 # LibraryViewModel MIGRATED to ILibraryClient (2026-03-12)
-src/VoiceStudio.App/ViewModels/MCPDashboardViewModel.cs:55 # MCPDashboardViewModel constructor
+# MCPDashboardViewModel MIGRATED to IMCPDashboardClient (2026-03-14)
 # MarkerManagerViewModel MIGRATED to IMarkerManagerClient (2026-03-14)
 # MixAssistantViewModel MIGRATED to IMixAssistantClient (2026-03-13)
 # MultiVoiceGeneratorViewModel MIGRATED to IMultiVoiceGeneratorClient (2026-03-13)
-src/VoiceStudio.App/ViewModels/MultilingualSupportViewModel.cs:61 # MultilingualSupportViewModel constructor
-src/VoiceStudio.App/ViewModels/PipelineConversationViewModel.cs:97 # PipelineConversationViewModel constructor
+# MultilingualSupportViewModel MIGRATED to IMultilingualSupportClient (2026-03-14)
+# PipelineConversationViewModel MIGRATED to IPipelineConversationClient (2026-03-14)
 # PluginHealthDashboardViewModel MIGRATED to IPluginHealthClient (2026-03-14)
 # ProfileHealthDashboardViewModel MIGRATED to IProfileHealthClient (2026-03-14)
 # PronunciationLexiconViewModel MIGRATED to IPronunciationLexiconClient + IVoiceSynthesisService (2026-03-14)
 # ProsodyViewModel MIGRATED to IProsodyClient (2026-03-14)
-src/VoiceStudio.App/ViewModels/RealTimeAudioVisualizerViewModel.cs:61 # RealTimeAudioVisualizerViewModel constructor
+# RealTimeAudioVisualizerViewModel MIGRATED to IRealTimeAudioVisualizerClient (2026-03-14)
 # RealTimeVoiceConverterViewModel MIGRATED to IRealTimeVoiceConverterClient (2026-03-12)
 # RecordingViewModel MIGRATED to IRecordingClient (2026-03-12)
 # SceneBuilderViewModel MIGRATED to ISceneBuilderClient (2026-03-13)
@@ -39,41 +39,41 @@ src/VoiceStudio.App/ViewModels/RealTimeAudioVisualizerViewModel.cs:61 # RealTime
 # SettingsViewModel MIGRATED to ISettingsClient (2026-03-12)
 # SonographyVisualizationViewModel MIGRATED to ISonographyClient + IProjectAudioClient (2026-03-14)
 # SpatialAudioViewModel MIGRATED to ISpatialAudioClient (2026-03-14)
-src/VoiceStudio.App/ViewModels/SpatialStageViewModel.cs:69 # SpatialStageViewModel constructor
+# SpatialStageViewModel MIGRATED to ISpatialStageClient + IProjectAudioClient (2026-03-14)
 # SpectrogramViewModel MIGRATED to ISpectrogramClient (2026-03-14)
 # StyleTransferViewModel MIGRATED to IStyleTransferClient + IProjectAudioClient (2026-03-14)
 # TagManagerViewModel MIGRATED to ITagManagerClient (2026-03-14)
 # TemplateLibraryViewModel MIGRATED to ITemplateLibraryClient (2026-03-13)
 # TextBasedSpeechEditorViewModel MIGRATED to ITextBasedSpeechEditorClient (2026-03-12)
-src/VoiceStudio.App/ViewModels/TextHighlightingViewModel.cs:76 # TextHighlightingViewModel constructor
+# TextHighlightingViewModel MIGRATED to ITextHighlightingClient + IProjectAudioClient (2026-03-14)
 # TextSpeechEditorViewModel MIGRATED to ITextSpeechEditorClient (2026-03-12)
 # TodoPanelViewModel MIGRATED to ITodoPanelClient (2026-03-14)
 # TrainingDatasetEditorViewModel MIGRATED to ITrainingDatasetEditorClient (2026-03-12)
-src/VoiceStudio.App/ViewModels/TrainingQualityVisualizationViewModel.cs:67 # TrainingQualityVisualizationViewModel constructor
+# TrainingQualityVisualizationViewModel MIGRATED to ITrainingClient (2026-03-14)
 # UltimateDashboardViewModel MIGRATED to IUltimateDashboardClient (2026-03-13)
 # UpscalingViewModel MIGRATED to IUpscalingClient (2026-03-14)
-src/VoiceStudio.App/ViewModels/VideoEditViewModel.cs:42 # VideoEditViewModel constructor
-src/VoiceStudio.App/ViewModels/VideoGenViewModel.cs:60 # VideoGenViewModel constructor
+# VideoEditViewModel MIGRATED to IVideoEditClient (2026-03-14)
+# VideoGenViewModel MIGRATED to IVideoGenClient (2026-03-14)
 # VoiceBrowserViewModel MIGRATED to IVoiceBrowserClient (2026-03-14)
 # VoiceCloningWizardViewModel MIGRATED to IVoiceCloningWizardClient (2026-03-12)
 # VoiceMorphViewModel MIGRATED to IVoiceMorphClient + IProjectAudioClient (2026-03-14)
 # VoiceMorphingBlendingViewModel MIGRATED to IVoiceMorphingBlendingClient (2026-03-14)
-src/VoiceStudio.App/ViewModels/VoiceQuickCloneViewModel.cs:66 # VoiceQuickCloneViewModel constructor
+# VoiceQuickCloneViewModel MIGRATED to IVoiceQuickCloneClient (2026-03-14)
 # VoiceStyleTransferViewModel MIGRATED to IVoiceStyleTransferClient (2026-03-14)
-src/VoiceStudio.App/Views/Panels/AdvancedRealTimeVisualizationViewModel.cs:83 # AdvancedRealTimeVisualizationViewModel constructor
-src/VoiceStudio.App/Views/Panels/AdvancedSearchViewModel.cs:46 # AdvancedSearchViewModel constructor
+# AdvancedRealTimeVisualizationViewModel MIGRATED to IAdvancedRealTimeVisualizationClient (2026-03-14)
+# AdvancedSearchViewModel MIGRATED to ISearchClient (2026-03-14)
 # AnalyzerViewModel MIGRATED to IAnalyzerClient (2026-03-12)
-src/VoiceStudio.App/Views/Panels/AudioMonitoringDashboardViewModel.cs:106 # AudioMonitoringDashboardViewModel constructor
+# AudioMonitoringDashboardViewModel MIGRATED to IAudioMonitoringDashboardClient (2026-03-14)
 # BatchProcessingViewModel MIGRATED to IBatchProcessingClient (2026-03-12)
 # DiagnosticsViewModel MIGRATED to IDiagnosticsClient (2026-03-12)
-src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs:134 # EffectsMixerViewModel constructor (lifecycle hardened; seam migration deferred per Foundation-First Plan)
+src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs:135 # EffectsMixerViewModel constructor (lifecycle hardened; Slice 1 IEffectsMeterClient added; IBackendClient retained for effect chains/mixer per plan)
 # EngineParameterTuningViewModel MIGRATED to IEngineParameterTuningClient (2026-03-14)
 # ImageGenViewModel MIGRATED to IImageGenClient (2026-03-14)
-src/VoiceStudio.App/Views/Panels/ImageVideoEnhancementPipelineViewModel.cs:61 # ImageVideoEnhancementPipelineViewModel constructor
+# ImageVideoEnhancementPipelineViewModel MIGRATED to IImageVideoEnhancementPipelineClient (2026-03-14)
 # MacroViewModel MIGRATED to IMacroClient (2026-03-12)
 # MiniTimelineViewModel MIGRATED - IBackendClient removed (was unused) (2026-03-13)
 # ModelManagerViewModel MIGRATED to IModelManagerClient (2026-03-12)
-src/VoiceStudio.App/Views/Panels/SLODashboardViewModel.cs:88 # SLODashboardViewModel constructor
-src/VoiceStudio.App/Views/Panels/TagOrganizationViewModel.cs:41 # TagOrganizationViewModel constructor
+# SLODashboardViewModel MIGRATED to ISLODashboardClient (2026-03-14)
+# TagOrganizationViewModel MIGRATED to ITagOrganizationClient (2026-03-14)
 # EmotionStylePresetEditorViewModel MIGRATED to IEmotionControlClient (2026-03-14)
-src/VoiceStudio.App/Views/Panels/WorkflowAutomationViewModel.cs:56 # WorkflowAutomationViewModel constructor
+# WorkflowAutomationViewModel MIGRATED to IWorkflowAutomationClient (2026-03-14)

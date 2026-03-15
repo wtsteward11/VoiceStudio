@@ -242,24 +242,23 @@ async def transcribe_audio(
         except Exception as e:
             logger.debug("Could not get engine from EngineService: %s", e)
 
-    if not stt_engine and request.engine in ("whisper_cpp", "whisper"):
-        try:
-            logger.info("Getting %s engine via EngineService", request.engine)
-            stt_engine = engine_service.get_whisper_engine()
-            if not stt_engine:
-                raise ServiceError(503, f"Engine {request.engine} not available")
-        except ServiceError:
-            raise
-        except Exception as e:
-            logger.error("Whisper engine not available: %s", e)
-            raise ServiceError(
-                503,
-                (
-                    f"Transcription engine '{request.engine}' is not available. "
-                    "Please ensure the engine is properly installed. "
-                    "Install with: pip install faster-whisper==1.0.3"
-                ),
-            )
+    if not stt_engine and request.engine == "whisper_cpp":
+        raise ServiceError(
+            503,
+            (
+                "Transcription engine 'whisper_cpp' is not available. "
+                "Install with: pip install whisper-cpp-python. "
+                "Ensure GGUF model exists (ensure_whisper_cpp preflight)."
+            ),
+        )
+    if not stt_engine and request.engine == "whisper":
+        raise ServiceError(
+            503,
+            (
+                "Transcription engine 'whisper' is not available. "
+                "Install with: pip install faster-whisper==1.0.3"
+            ),
+        )
     elif not stt_engine:
         raise ServiceError(
             503,

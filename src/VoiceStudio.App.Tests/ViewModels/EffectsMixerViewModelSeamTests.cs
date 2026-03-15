@@ -15,26 +15,26 @@ namespace VoiceStudio.App.Tests.ViewModels
 {
   /// <summary>
   /// Seam-aware tests for EffectsMixerViewModel.
-  /// Instantiates ViewModel with mocked IBackendClient and IEffectsMeterClient.
-  /// Supports EffectsMixer seam migration (Slice 1: IEffectsMeterClient for meters).
+  /// Instantiates ViewModel with mocked IEffectsMeterClient, IEffectChainClient, IMixerStateClient.
+  /// Supports EffectsMixer seam migration (Slice 1–3: meters, effect chains, mixer state).
   /// See docs/governance/TEST_CLASSIFICATION.md.
   /// </summary>
   [TestClass]
   [TestCategory("SeamAware")]
   public class EffectsMixerViewModelSeamTests
   {
-    private Mock<IBackendClient> _mockBackendClient = null!;
     private Mock<IEffectsMeterClient> _mockEffectsMeterClient = null!;
     private Mock<IEffectChainClient> _mockEffectChainClient = null!;
+    private Mock<IMixerStateClient> _mockMixerStateClient = null!;
     private DispatcherQueueController? _dispatcherController;
 
     [TestInitialize]
     public void Setup()
     {
       TestAppServicesHelper.EnsureInitialized();
-      _mockBackendClient = new Mock<IBackendClient>();
       _mockEffectsMeterClient = new Mock<IEffectsMeterClient>();
       _mockEffectChainClient = new Mock<IEffectChainClient>();
+      _mockMixerStateClient = new Mock<IMixerStateClient>();
       _dispatcherController = DispatcherQueueController.CreateOnDedicatedThread();
 
       _mockEffectsMeterClient
@@ -55,7 +55,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestMethod]
     public void Constructor_DoesNotCallClient_BeforeActivation()
     {
-      _ = new EffectsMixerViewModel(_mockBackendClient.Object, _mockEffectsMeterClient.Object, _mockEffectChainClient.Object);
+      _ = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
       _mockEffectsMeterClient.Verify(x => x.GetAudioMetersAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
       _mockEffectChainClient.Verify(x => x.GetEffectChainsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -63,7 +63,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestMethod]
     public void Constructor_WithClients_CreatesInstance()
     {
-      var vm = new EffectsMixerViewModel(_mockBackendClient.Object, _mockEffectsMeterClient.Object, _mockEffectChainClient.Object);
+      var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
       Assert.IsNotNull(vm);
       Assert.AreEqual("effectsmixer", vm.PanelId);
       Assert.IsNotNull(vm.LoadMetersCommand);
@@ -72,29 +72,29 @@ namespace VoiceStudio.App.Tests.ViewModels
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void Constructor_WithNullBackendClient_Throws()
-    {
-      _ = new EffectsMixerViewModel(null!, _mockEffectsMeterClient.Object, _mockEffectChainClient.Object);
-    }
-
-    [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
     public void Constructor_WithNullEffectsMeterClient_Throws()
     {
-      _ = new EffectsMixerViewModel(_mockBackendClient.Object, null!, _mockEffectChainClient.Object);
+      _ = new EffectsMixerViewModel(null!, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
     }
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void Constructor_WithNullEffectChainClient_Throws()
     {
-      _ = new EffectsMixerViewModel(_mockBackendClient.Object, _mockEffectsMeterClient.Object, null!);
+      _ = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, null!, _mockMixerStateClient.Object);
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public void Constructor_WithNullMixerStateClient_Throws()
+    {
+      _ = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, null!);
     }
 
     [TestMethod]
     public void ViewModel_ImplementsIPanelLifecycle()
     {
-      var vm = new EffectsMixerViewModel(_mockBackendClient.Object, _mockEffectsMeterClient.Object, _mockEffectChainClient.Object);
+      var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
       Assert.IsTrue(vm is IPanelLifecycle);
     }
   }

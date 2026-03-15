@@ -20,6 +20,7 @@ namespace VoiceStudio.App.Views.Panels
   {
     private readonly IBackendClient _backendClient;
     private readonly IEffectsMeterClient _effectsMeterClient;
+    private readonly IEffectChainClient _effectChainClient;
     private readonly UndoRedoService? _undoRedoService;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly MultiSelectService _multiSelectService;
@@ -132,10 +133,11 @@ namespace VoiceStudio.App.Views.Panels
             "vocoder"
         };
 
-    public EffectsMixerViewModel(IBackendClient backendClient, IEffectsMeterClient effectsMeterClient)
+    public EffectsMixerViewModel(IBackendClient backendClient, IEffectsMeterClient effectsMeterClient, IEffectChainClient effectChainClient)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _effectsMeterClient = effectsMeterClient ?? throw new ArgumentNullException(nameof(effectsMeterClient));
+      _effectChainClient = effectChainClient ?? throw new ArgumentNullException(nameof(effectChainClient));
       _disposalCts = new CancellationTokenSource();
 
       // Get multi-select service
@@ -702,7 +704,7 @@ namespace VoiceStudio.App.Views.Panels
         IsLoading = true;
         ErrorMessage = null;
 
-        var chains = await _backendClient.GetEffectChainsAsync(projectId, cancellationToken);
+        var chains = await _effectChainClient.GetEffectChainsAsync(projectId, cancellationToken);
 
         // Staleness guard: selection may have changed during await
         if (SelectedProjectId != projectId || cancellationToken.IsCancellationRequested)
@@ -748,7 +750,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var presets = await _backendClient.GetEffectPresetsAsync(null, cancellationToken);
+        var presets = await _effectChainClient.GetEffectPresetsAsync(null, cancellationToken);
 
         EffectPresets.Clear();
         foreach (var preset in presets)
@@ -801,7 +803,7 @@ namespace VoiceStudio.App.Views.Panels
           Modified = DateTime.UtcNow
         };
 
-        var createdChain = await _backendClient.CreateEffectChainAsync(SelectedProjectId, chain, cancellationToken);
+        var createdChain = await _effectChainClient.CreateEffectChainAsync(SelectedProjectId, chain, cancellationToken);
         EffectChains.Insert(0, createdChain); // Add to beginning
         SelectedEffectChain = createdChain;
 
@@ -810,7 +812,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           var action = new CreateEffectChainAction(
               EffectChains,
-              _backendClient,
+              _effectChainClient,
               createdChain,
               onUndo: (c) =>
               {
@@ -857,7 +859,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var success = await _backendClient.DeleteEffectChainAsync(SelectedProjectId, chainId, cancellationToken);
+        var success = await _effectChainClient.DeleteEffectChainAsync(SelectedProjectId, chainId, cancellationToken);
         if (success)
         {
           var chain = EffectChains.FirstOrDefault(c => c.Id == chainId);
@@ -874,9 +876,9 @@ namespace VoiceStudio.App.Views.Panels
             // Register undo action
             if (_undoRedoService != null)
             {
-              var action = new DeleteEffectChainAction(
+                  var action = new DeleteEffectChainAction(
                   EffectChains,
-                  _backendClient,
+                  _effectChainClient,
                   deletedChain,
                   originalIndex,
                   onUndo: (c) => SelectedEffectChain = c,
@@ -927,7 +929,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var response = await _backendClient.ProcessAudioWithChainAsync(SelectedProjectId, chainId, SelectedAudioId, null, cancellationToken);
+        var response = await _effectChainClient.ProcessAudioWithChainAsync(SelectedProjectId, chainId, SelectedAudioId, null, cancellationToken);
         if (!response.Success)
         {
           ErrorMessage = response.ErrorMessage ?? ResourceHelper.GetString("EffectsMixer.EffectChainApplyFailed", "Failed to apply effect chain");
@@ -1224,7 +1226,7 @@ namespace VoiceStudio.App.Views.Panels
       try
       {
         SelectedEffectChain.Modified = DateTime.UtcNow;
-        var updatedChain = await _backendClient.UpdateEffectChainAsync(SelectedProjectId, SelectedEffectChain.Id, SelectedEffectChain, cancellationToken);
+        var updatedChain = await _effectChainClient.UpdateEffectChainAsync(SelectedProjectId, SelectedEffectChain.Id, SelectedEffectChain, cancellationToken);
 
         // Update in collection
         var index = EffectChains.IndexOf(SelectedEffectChain);

@@ -9,11 +9,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 {
   /// <summary>
   /// Undoable action for creating an effect chain.
+  /// Migration: Before EffectsMixer seam extraction, this must accept IEffectChainClient instead of IBackendClient.
+  /// See docs/design/EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md §5.
   /// </summary>
   public class CreateEffectChainAction : IUndoableAction
   {
     private readonly ObservableCollection<EffectChain> _chains;
-    private readonly IBackendClient _backendClient;
+    private readonly IEffectChainClient _effectChainClient;
     private readonly EffectChain _chain;
     private readonly Action<EffectChain>? _onUndo;
     private readonly Action<EffectChain>? _onRedo;
@@ -22,13 +24,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateEffectChainAction(
         ObservableCollection<EffectChain> chains,
-        IBackendClient backendClient,
+        IEffectChainClient effectChainClient,
         EffectChain chain,
         Action<EffectChain>? onUndo = null,
         Action<EffectChain>? onRedo = null)
     {
       _chains = chains ?? throw new ArgumentNullException(nameof(chains));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _effectChainClient = effectChainClient ?? throw new ArgumentNullException(nameof(effectChainClient));
       _chain = chain ?? throw new ArgumentNullException(nameof(chain));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -56,11 +58,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
   /// <summary>
   /// Undoable action for deleting an effect chain.
+  /// Migration: Before EffectsMixer seam extraction, this must accept IEffectChainClient instead of IBackendClient.
+  /// See docs/design/EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md §5.
   /// </summary>
   public class DeleteEffectChainAction : IUndoableAction
   {
     private readonly ObservableCollection<EffectChain> _chains;
-    private readonly IBackendClient _backendClient;
+    private readonly IEffectChainClient _effectChainClient;
     private readonly EffectChain _chain;
     private readonly int _originalIndex;
     private readonly Action<EffectChain>? _onUndo;
@@ -70,14 +74,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteEffectChainAction(
         ObservableCollection<EffectChain> chains,
-        IBackendClient backendClient,
+        IEffectChainClient effectChainClient,
         EffectChain chain,
         int originalIndex,
         Action<EffectChain>? onUndo = null,
         Action<EffectChain>? onRedo = null)
     {
       _chains = chains ?? throw new ArgumentNullException(nameof(chains));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _effectChainClient = effectChainClient ?? throw new ArgumentNullException(nameof(effectChainClient));
       _chain = chain ?? throw new ArgumentNullException(nameof(chain));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

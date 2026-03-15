@@ -1,8 +1,8 @@
 {
   "command": "python -m pytest tests/e2e/test_golden_path.py -v --tb=short",
   "exit_code": 0,
-  "timestamp": "2026-03-15T02:02:13Z",
-  "git_commit": "033704366314e90b323b0de60ad7ded646038dc4",
+  "timestamp": "2026-03-15T20:37:03Z",
+  "git_commit": "498ee117491fbea14ac41f5e4b1467ab37c21926",
   "git_branch": "main",
   "engine_mode": "real",
   "checks": {
@@ -20,9 +20,9 @@
   },
   "passed": true,
   "test_ran": true,
-  "pytest_stdout_sha256": "9abcfc05233c96dde3774ff1e0030310b9e1ff870ca6620920643fa890e1cfa2",
+  "pytest_stdout_sha256": "845e2fc9aed6f6e39e1e07e3ff04523f1201e200a0390623a427d5e501c5313d",
   "pytest_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "pytest_duration_seconds": 35.65,
+  "pytest_duration_seconds": 34.38,
   "artifact_path": "docs/reports/verification/artifacts/golden_path_export.wav",
   "artifact_sha256": "ca2fdd6df19717622ec73b24acc4590d1731ce0a72ac99e3a6a841537e982e56",
   "artifact_bytes": 924180,
@@ -30,5 +30,5 @@
   "stt_engine_name": "backend_default",
   "tts_engine_name": "espeak_ng",
   "historical_proof": false,
-  "evidence_fingerprint": "6213b470c3754b5c8cbc0afc678b3ae74846f6bdcb7f19284508617fab54e7c5"
+  "evidence_fingerprint": "803f93e3b60b98918794a536767e49eecefa64a609cce45d5cc527972a7e23a5"
 }

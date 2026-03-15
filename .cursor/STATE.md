@@ -11,21 +11,24 @@
 Read only this section as current task truth. Treat everything below the divider as historical context.
 
 ### Active Task
-- **ID:** PLAYBACK-WIRING-BULLETPROOF
-- **Title:** Playback wiring bulletproof — imported audio plays reliably
+- **ID:** RELEASE-TRUST-HARDENING-WAVE
+- **Title:** Release-Trust Hardening Wave — teardown, playback, proof integrity
 - **Status:** Complete
 
 ### Next 3 Steps
-1. Regenerate golden path proof when STT (faster-whisper) available — pipeline verified; fingerprint includes tts_engine_name
-2. Add staleness guards to top 5 retained-async ViewModels when touching (VoiceSynthesis, Timeline, Profiles, VoiceBrowser, JobProgress)
-3. Run verify.ps1 (full) before release for Release XAML smoke
+1. Prove test→build works without forced taskkill (or identify next leak cluster)
+2. Run full verify.ps1 (no -Quick) before release; commit completion markers for completion_guard
+3. Finalize closure note and STATE.md; make v1.2 transition decision
+
+### v1.2 Transition Decision (2026-03-16)
+**Do NOT transition yet.** Proof regenerated; testhost still lingers (taskkill required). Finish teardown proof and final verification first. Transition is explicit, not accidental.
 
 ### Optional Backlog (Reclassified)
 
 **Release-trust (do before v1.2):**
 - verify.ps1 Release XAML smoke — documented in RELEASE_XAML_SMOKE_GATE.md (manual; run full verify before release)
-- retained-async baseline — risk assessed in RETAINED_ASYNC_RISK_ASSESSMENT.md; top 5 identified; no release blockers
-- synthesis-route thin — committed (b50f3775)
+- taskkill testhost remains safety net until teardown fully proven clean
+- retained-async baseline — risk assessed; top 5 identified; no release blockers
 
 **True v1.2 deferred:**
 - skip debt cleanup (SKIP_DEBT_CLEANUP_SUBPLAN.md)
@@ -33,20 +36,20 @@ Read only this section as current task truth. Treat everything below the divider
 - ADR-051 (TrainingViewModel FAF) — decision made, retained
 
 ### Current Target
-Definition-of-done integrity: governing principle, proof-status doc, and proof artifact agree. No contradiction between "real XTTS" and espeak_ng fallback.
+Release-trust closure: wave complete per HARDENING_WAVE_CLOSURE_2026.md; project still has remaining items (STT/proof regeneration, clean no-taskkill confidence).
 
 ### Current Blocker
-STT (faster-whisper or whisper_cpp) required for `write_golden_path_real_proof.py`; install `pip install faster-whisper==1.0.3` or whisper-cpp-python. Existing proof PROOF_GOLDEN_PATH_REAL_2026-03-15.json valid; pipeline verified when STT available.
+None. Proof regenerated. Testhost teardown not yet proven clean (taskkill remains safety net).
 
 ### Truth Sync Note
-80 migrated ViewModels; 77 with constructor invariant; 2 exempt. Playback wiring: IAudioPlayerService eagerly resolved at startup; LibraryViewModel direct playback path; diagnostics in OnPlaybackRequested. Imported asset playback documented in GOLDEN_PATH_PROOF_STATUS.md.
+Release-Trust Hardening Wave complete per closure note. Testhost leak: VoiceBrowserViewModelTests, JobProgressViewModelTests fixed; taskkill remains safety net. Playback: audio_id contract; Library lifecycle hardened. Proof: regenerated 2026-03-15 (PROOF_GOLDEN_PATH_REAL_2026-03-15.json); STT/proof blocker closed.
 
 ### Last Verified Commands
-- `python scripts/ci/write_golden_path_real_proof.py` — PASS (2026-03-15)
-- `python scripts/run_verification.py` — PASS (2026-03-15)
+- `python scripts/run_verification.py --build` — PASS (with taskkill safety net when needed)
+- `.\scripts\verify.ps1` — Stages 1–5 passed (Release XAML Smoke included)
 
 ### Context Acknowledgment
-2026-03-16 — Playback wiring bulletproof complete. Eager init, direct path, diagnostics, imported-asset proof documented.
+2026-03-16 — Release-Trust Closure Plan Task 3. STT/proof blocker closed; proof regenerated. Remaining: prove teardown clean, final release verification.
 
 ---
 ## HISTORY LEDGER
@@ -77,6 +80,12 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 - **Known Debt:** TrainingViewModel lifecycle FAF — formal decision per ADR-051 (retained with CTS ownership; not deferred)
 
 ## LATEST MILESTONE
+- **ID:** TRUTH-SYNC-AND-VERIFICATION-REPORTING
+- **Title:** Truth-sync STATE.md; run_verification reports stale_process_cleaned
+- **Status:** COMPLETE (2026-03-16)
+- **Completed:** STATE.md aligned to Release-Trust Hardening Wave closure; run_verification.py prints [AUDIT] stale_process_cleaned in console; JSON report includes stale_process_cleaned; HARDENING_WAVE_CLOSURE_2026.md updated with "Wave Complete vs Project Release-Ready" section.
+- **Verification:** python scripts/run_verification.py --build --skip-guard PASS
+
 - **ID:** PLAYBACK-WIRING-BULLETPROOF
 - **Title:** Playback Wiring Bulletproof — systemic playback fix
 - **Status:** COMPLETE (2026-03-16)
@@ -98,6 +107,8 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## LATEST PROOF INDEX
 | Date | Task | Artifact | Type | Status |
 |------|------|----------|------|--------|
+| 2026-03-16 | Release-Trust Closure: proof regeneration | PROOF_GOLDEN_PATH_REAL_2026-03-15.json; golden_path_export.wav; STT/proof blocker closed | Proof | Done |
+| 2026-03-16 | Truth-sync and verification reporting | STATE.md ACTIVE WINDOW; run_verification.py stale_process_cleaned; HARDENING_WAVE_CLOSURE_2026.md wave vs release-ready | Doc/Code | Done |
 | 2026-03-16 | Playback wiring bulletproof | App.xaml.cs eager init; AudioPlayerService.IsPlaybackSubscribed; LibraryViewModel direct path; OnPlaybackRequested diagnostics; GOLDEN_PATH_PROOF_STATUS imported-asset section | Code/Doc | Done |
 | 2026-03-15 | Bulletproof Hardening Wave | 7 gaps; STATE.md, proof_fingerprint, proof_schema, PROOF_GOLDEN_PATH_REAL, synthesis commit, RELEASE_XAML_SMOKE_GATE.md, RETAINED_ASYNC_RISK_ASSESSMENT.md | Doc/Code | Done |
 | 2026-03-15 | Golden path proof integrity | GOLDEN_PATH_PROOF_STATUS.md; proof artifact tts_engine_name; roadmap aligned | Doc | Done |

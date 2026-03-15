@@ -49,6 +49,7 @@ class GoldenPathTestData:
         self.voice_profile_id: Optional[str] = None
         self.synthesized_audio_id: Optional[str] = None
         self.synthesized_audio_url: Optional[str] = None  # URL to synthesized audio
+        self.tts_engine_used: Optional[str] = None  # Engine used for synthesis (for proof manifest)
         self.validation_passed: bool = False
 
     def cleanup(self):
@@ -416,6 +417,7 @@ class TestGoldenPath:
             "engine": "espeak_ng",  # Lightweight, no models; fallback when XTTS/Piper unavailable
             "enhance_quality": False,  # Faster for testing
         }
+        golden_path_data.tts_engine_used = synthesis_request["engine"]
 
         response = requests.post(
             f"{API_BASE_URL}/api/voice/synthesize", json=synthesis_request, timeout=TIMEOUT_SECONDS
@@ -531,6 +533,7 @@ class TestGoldenPath:
 
                     manifest = {
                         "output_wav": wav_filename,
+                        "tts_engine": golden_path_data.tts_engine_used or "espeak_ng",
                     }
                     manifest_path = os.path.join(
                         export_dir, "output_manifest.json"

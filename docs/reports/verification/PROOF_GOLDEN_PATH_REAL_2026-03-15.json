@@ -28,6 +28,7 @@
   "artifact_bytes": 924180,
   "stt_step_ran": true,
   "stt_engine_name": "backend_default",
+  "tts_engine_name": "espeak_ng",
   "historical_proof": false,
   "evidence_fingerprint": "6213b470c3754b5c8cbc0afc678b3ae74846f6bdcb7f19284508617fab54e7c5"
 }

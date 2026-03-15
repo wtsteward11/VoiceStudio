@@ -11,23 +11,35 @@
 Read only this section as current task truth. Treat everything below the divider as historical context.
 
 ### Active Task
-- **ID:** GOLDEN-PATH-PROOF
-- **Title:** Golden path real proof closure
+- **ID:** GOLDEN-PATH-INTEGRITY
+- **Title:** Golden path proof definition integrity closure
 - **Status:** Complete
 
 ### Next 3 Steps
-1. (Optional) Commit remaining Ruthless Architect work: synthesis route, ADR-051, retained-async baseline, verify.ps1 Release XAML
-2. (Optional) v1.2 deferred: skip debt cleanup, workflow consolidation (DEFERRED_V1_2.md)
-3. (Optional) Retained-async baseline tightening
+1. Re-run verification (Task 5)
+2. Decide: hardening wave complete or one last release-confidence pass
+3. If continuing: release-trust work before v1.2 deferred
+
+### Optional Backlog (Reclassified)
+
+**Release-trust (do before v1.2):**
+- verify.ps1 Release XAML smoke — gate confidence
+- retained-async baseline — if it hides real risk
+- synthesis-route thin — already done; commit when ready
+
+**True v1.2 deferred:**
+- skip debt cleanup (SKIP_DEBT_CLEANUP_SUBPLAN.md)
+- workflow consolidation (DEFERRED_V1_2.md)
+- ADR-051 (TrainingViewModel FAF) — decision made, retained
 
 ### Current Target
-Product-proof: golden path real proof artifact on disk. PROOF_GOLDEN_PATH_REAL_2026-03-15.json; golden_path_export.wav.
+Definition-of-done integrity: governing principle, proof-status doc, and proof artifact agree. No contradiction between "real XTTS" and espeak_ng fallback.
 
 ### Current Blocker
 None
 
 ### Truth Sync Note
-80 migrated ViewModels; 77 with constructor invariant; 2 exempt. Golden path real proof complete (2026-03-15): PROOF_GOLDEN_PATH_REAL_2026-03-15.json, golden_path_export.wav. STT: faster-whisper; TTS: espeak_ng fallback in test.
+80 migrated ViewModels; 77 with constructor invariant; 2 exempt. Golden path proof definition: real STT + real TTS (XTTS/Piper or espeak_ng fallback). GOLDEN_PATH_PROOF_STATUS.md and roadmap aligned. Proof artifact to record tts_engine.
 
 ### Last Verified Commands
 - `python scripts/ci/write_golden_path_real_proof.py` — PASS (2026-03-15)
@@ -74,6 +86,7 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## LATEST PROOF INDEX
 | Date | Task | Artifact | Type | Status |
 |------|------|----------|------|--------|
+| 2026-03-15 | Golden path proof integrity | GOLDEN_PATH_PROOF_STATUS.md; proof artifact tts_engine_name; roadmap aligned | Doc | Done |
 | 2026-03-15 | Golden path real proof | PROOF_GOLDEN_PATH_REAL_2026-03-15.json; artifact golden_path_export.wav | Proof | Done |
 | 2026-03-15 | Transcription STT fix | whisper_cpp vs whisper separation; clear 503; GOLDEN_PATH_PROOF_STATUS updated | Code | Done |
 | 2026-03-15 | Synthesis route thin | synthesis.py delegates to SynthesisService; register_synthesize_handler removed | Code | Done |

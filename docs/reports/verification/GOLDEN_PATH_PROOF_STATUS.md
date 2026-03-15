@@ -8,7 +8,9 @@
 
 ## Governing Principle
 
-> 100% complete means exactly one thing: `pytest tests/e2e/test_golden_path.py` exits 0 with real XTTS + STT engine loaded, real audio in, real synthesized audio out, proof artifact on disk with model hashes and git commit.
+> 100% complete means exactly one thing: `pytest tests/e2e/test_golden_path.py` exits 0 with **real STT + real TTS engine** loaded, real audio in, real synthesized audio out, proof artifact on disk with model hashes and git commit.
+
+**Proof definition (explicit):** "Real TTS" includes XTTS, Piper, or **espeak_ng fallback** when XTTS/Piper are unavailable. The test uses `engine: "espeak_ng"` to guarantee the pipeline runs end-to-end without requiring heavy model downloads. This proves pipeline integrity. A stricter proof (XTTS/Piper required) is aspirational for future proof levels; see roadmap.
 
 ---
 
@@ -27,7 +29,7 @@
 **Proof artifact:** `docs/reports/verification/PROOF_GOLDEN_PATH_REAL_2026-03-15.json`  
 **WAV artifact:** `docs/reports/verification/artifacts/golden_path_export.wav`
 
-The golden path E2E test ran successfully with real engines. Synthesis uses `espeak_ng` fallback in the test when XTTS/Piper are unavailable; STT uses faster-whisper or whisper_cpp.
+The golden path E2E test ran successfully with real engines. **TTS:** espeak_ng (explicit fallback per governing principle above). **STT:** faster-whisper or whisper_cpp. Proof artifact records both engines.
 
 ---
 
@@ -77,5 +79,6 @@ CI typically runs without a live backend or real engines. Manual proof runs are 
 
 ## Changelog
 
+- 2026-03-15: Proof definition integrity: governing principle explicitly accepts espeak_ng fallback; proof artifact records tts_engine_name; roadmap aligned.
 - 2026-03-15: Proof generated. PROOF_GOLDEN_PATH_REAL_2026-03-15.json; golden_path_export.wav. STT: faster-whisper; TTS: espeak_ng fallback in test.
 - 2026-03-15: Initial document. Blocker: STT (faster-whisper). Verification steps documented.

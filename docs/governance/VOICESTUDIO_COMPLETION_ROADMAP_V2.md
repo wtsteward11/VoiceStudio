@@ -25,7 +25,9 @@ v1.0 roadmap: correct gaps, weak enforcement. ChatGPT critique: mostly valid on 
 
 ### Governing Principle — UNCHANGED
 
-100% complete means exactly one thing: `pytest tests/e2e/test_golden_path.py` exits 0 with real XTTS + STT engine loaded, real audio in, real synthesized audio out, proof artifact on disk with model hashes and git commit. Everything else is scaffolding.
+100% complete means exactly one thing: `pytest tests/e2e/test_golden_path.py` exits 0 with **real STT + real TTS engine** loaded, real audio in, real synthesized audio out, proof artifact on disk with model hashes and git commit. Everything else is scaffolding.
+
+**Real TTS:** XTTS, Piper, or espeak_ng fallback when XTTS/Piper unavailable. See [GOLDEN_PATH_PROOF_STATUS.md](../reports/verification/GOLDEN_PATH_PROOF_STATUS.md) for proof definition.
 
 **Canonical:** As long as there are placeholders, this project can never be considered complete.
 

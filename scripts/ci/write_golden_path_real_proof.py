@@ -270,6 +270,7 @@ def main() -> int:
         return 1
 
     stt_engine_name = _detect_stt_engine(model_hashes)
+    tts_engine_name = manifest.get("tts_engine", "unknown")
 
     # Copy WAV to durable location for release evidence
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -304,6 +305,7 @@ def main() -> int:
         "artifact_bytes": artifact_bytes,
         "stt_step_ran": True,
         "stt_engine_name": stt_engine_name,
+        "tts_engine_name": tts_engine_name,
         "historical_proof": False,
     }
     proof["evidence_fingerprint"] = compute_fingerprint(

@@ -16,16 +16,16 @@ Read only this section as current task truth. Treat everything below the divider
 - **Status:** Complete
 
 ### Next 3 Steps
-1. Re-run verification (Task 5)
-2. Decide: hardening wave complete or one last release-confidence pass
-3. If continuing: release-trust work before v1.2 deferred
+1. Regenerate golden path proof when STT (faster-whisper) available — pipeline verified; fingerprint includes tts_engine_name
+2. Add staleness guards to top 5 retained-async ViewModels when touching (VoiceSynthesis, Timeline, Profiles, VoiceBrowser, JobProgress)
+3. Run verify.ps1 (full) before release for Release XAML smoke
 
 ### Optional Backlog (Reclassified)
 
 **Release-trust (do before v1.2):**
-- verify.ps1 Release XAML smoke — gate confidence
-- retained-async baseline — if it hides real risk
-- synthesis-route thin — already done; commit when ready
+- verify.ps1 Release XAML smoke — documented in RELEASE_XAML_SMOKE_GATE.md (manual; run full verify before release)
+- retained-async baseline — risk assessed in RETAINED_ASYNC_RISK_ASSESSMENT.md; top 5 identified; no release blockers
+- synthesis-route thin — committed (b50f3775)
 
 **True v1.2 deferred:**
 - skip debt cleanup (SKIP_DEBT_CLEANUP_SUBPLAN.md)
@@ -36,10 +36,10 @@ Read only this section as current task truth. Treat everything below the divider
 Definition-of-done integrity: governing principle, proof-status doc, and proof artifact agree. No contradiction between "real XTTS" and espeak_ng fallback.
 
 ### Current Blocker
-None
+STT (faster-whisper or whisper_cpp) required for `write_golden_path_real_proof.py`; install `pip install faster-whisper==1.0.3` or whisper-cpp-python. Existing proof PROOF_GOLDEN_PATH_REAL_2026-03-15.json valid; pipeline verified when STT available.
 
 ### Truth Sync Note
-80 migrated ViewModels; 77 with constructor invariant; 2 exempt. Golden path proof definition: real STT + real TTS (XTTS/Piper or espeak_ng fallback). GOLDEN_PATH_PROOF_STATUS.md and roadmap aligned. Proof artifact to record tts_engine.
+80 migrated ViewModels; 77 with constructor invariant; 2 exempt. Golden path proof definition: real STT + real TTS (XTTS/Piper or espeak_ng fallback). GOLDEN_PATH_PROOF_STATUS.md and roadmap aligned. Proof artifact records tts_engine_name.
 
 ### Last Verified Commands
 - `python scripts/ci/write_golden_path_real_proof.py` — PASS (2026-03-15)
@@ -77,6 +77,12 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 - **Known Debt:** TrainingViewModel lifecycle FAF — formal decision per ADR-051 (retained with CTS ownership; not deferred)
 
 ## LATEST MILESTONE
+- **ID:** BULLETPROOF-HARDENING-WAVE
+- **Title:** Bulletproof Hardening Wave — 7 gaps closed
+- **Status:** COMPLETE (2026-03-15)
+- **Completed:** Gap 1–7: stale Next 3 Steps, Truth Sync Note, tts_engine_name evidence fields, proof pipeline verified, synthesis route committed, Release XAML smoke documented, retained-async risk assessment. Proof fingerprint recomputed; check_state_proofs PASS.
+- **Verification:** run_verification.py PASS; check_state_proofs PROOF_GOLDEN_PATH_REAL_2026-03-15.json PASS
+
 - **ID:** EFFECTSMIXER-SLICE3
 - **Title:** EffectsMixer Slice 3 — IMixerStateClient; IBackendClient removed
 - **Status:** COMPLETE (2026-03-15)
@@ -86,6 +92,7 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## LATEST PROOF INDEX
 | Date | Task | Artifact | Type | Status |
 |------|------|----------|------|--------|
+| 2026-03-15 | Bulletproof Hardening Wave | 7 gaps; STATE.md, proof_fingerprint, proof_schema, PROOF_GOLDEN_PATH_REAL, synthesis commit, RELEASE_XAML_SMOKE_GATE.md, RETAINED_ASYNC_RISK_ASSESSMENT.md | Doc/Code | Done |
 | 2026-03-15 | Golden path proof integrity | GOLDEN_PATH_PROOF_STATUS.md; proof artifact tts_engine_name; roadmap aligned | Doc | Done |
 | 2026-03-15 | Golden path real proof | PROOF_GOLDEN_PATH_REAL_2026-03-15.json; artifact golden_path_export.wav | Proof | Done |
 | 2026-03-15 | Transcription STT fix | whisper_cpp vs whisper separation; clear 503; GOLDEN_PATH_PROOF_STATUS updated | Code | Done |

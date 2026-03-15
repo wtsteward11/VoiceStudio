@@ -413,6 +413,7 @@ class TestGoldenPath:
             "profile_id": golden_path_data.voice_profile_id,
             "text": synthesis_text,
             "language": "en",
+            "engine": "espeak_ng",  # Lightweight, no models; fallback when XTTS/Piper unavailable
             "enhance_quality": False,  # Faster for testing
         }
 

@@ -11,31 +11,30 @@
 Read only this section as current task truth. Treat everything below the divider as historical context.
 
 ### Active Task
-- **ID:** None
-- **Title:** —
-- **Status:** —
+- **ID:** GOLDEN-PATH-PROOF
+- **Title:** Golden path real proof closure
+- **Status:** Complete
 
 ### Next 3 Steps
-1. Golden path: install `pip install whisper-cpp-python` OR `pip install faster-whisper==1.0.3`; run `python scripts/ci/write_golden_path_real_proof.py` when STT ready
-2. (Optional) Commit remaining Ruthless Architect work: synthesis route, ADR-051, retained-async baseline, verify.ps1 Release XAML
-3. (Optional) v1.2 deferred: skip debt cleanup, workflow consolidation (DEFERRED_V1_2.md)
+1. (Optional) Commit remaining Ruthless Architect work: synthesis route, ADR-051, retained-async baseline, verify.ps1 Release XAML
+2. (Optional) v1.2 deferred: skip debt cleanup, workflow consolidation (DEFERRED_V1_2.md)
+3. (Optional) Retained-async baseline tightening
 
 ### Current Target
-Post-Phase-F progress: transcription STT fix committed; golden path unblock path documented. IBackendClient migrations complete (80/77/2).
+Product-proof: golden path real proof artifact on disk. PROOF_GOLDEN_PATH_REAL_2026-03-15.json; golden_path_export.wav.
 
 ### Current Blocker
 None
 
 ### Truth Sync Note
-80 migrated ViewModels; 77 with constructor invariant; 2 exempt (MiniTimelineViewModel, AdvancedRealTimeVisualizationViewModel timer-based FAF). 0 unresolved. EffectsMixer Slice 3 complete (2026-03-15). Source: MIGRATED_NO_IBACKENDCLIENT from check_ibackendclient_creep.py.
+80 migrated ViewModels; 77 with constructor invariant; 2 exempt. Golden path real proof complete (2026-03-15): PROOF_GOLDEN_PATH_REAL_2026-03-15.json, golden_path_export.wav. STT: faster-whisper; TTS: espeak_ng fallback in test.
 
 ### Last Verified Commands
+- `python scripts/ci/write_golden_path_real_proof.py` — PASS (2026-03-15)
 - `python scripts/run_verification.py` — PASS (2026-03-15)
-- Transcription STT fix: whisper_cpp vs whisper separation; clear 503 with install instructions
-- Golden path: install whisper-cpp-python OR faster-whisper to unblock
 
 ### Context Acknowledgment
-2026-03-15 — EffectsMixer Slice 3 complete. IEffectsMeterClient + IEffectChainClient + IMixerStateClient; IBackendClient removed. 80 migrated, 0 unresolved.
+2026-03-15 — Golden path proof closure complete. Product-proof artifact on disk.
 
 ---
 ## HISTORY LEDGER
@@ -75,6 +74,7 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## LATEST PROOF INDEX
 | Date | Task | Artifact | Type | Status |
 |------|------|----------|------|--------|
+| 2026-03-15 | Golden path real proof | PROOF_GOLDEN_PATH_REAL_2026-03-15.json; artifact golden_path_export.wav | Proof | Done |
 | 2026-03-15 | Transcription STT fix | whisper_cpp vs whisper separation; clear 503; GOLDEN_PATH_PROOF_STATUS updated | Code | Done |
 | 2026-03-15 | Synthesis route thin | synthesis.py delegates to SynthesisService; register_synthesize_handler removed | Code | Done |
 | 2026-03-15 | Golden path status | GOLDEN_PATH_PROOF_STATUS.md; STT blocker documented | Doc | Done |

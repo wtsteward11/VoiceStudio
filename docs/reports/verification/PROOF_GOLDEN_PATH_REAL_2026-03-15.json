@@ -1,0 +1,33 @@
+{
+  "command": "python -m pytest tests/e2e/test_golden_path.py -v --tb=short",
+  "exit_code": 0,
+  "timestamp": "2026-03-15T02:02:13Z",
+  "git_commit": "033704366314e90b323b0de60ad7ded646038dc4",
+  "git_branch": "main",
+  "engine_mode": "real",
+  "checks": {
+    "preconditions": "passed",
+    "e2e_test": "passed"
+  },
+  "output_metrics": {
+    "duration_seconds": 20.955,
+    "rms_energy": 0.144964,
+    "output_sha256": "ca2fdd6df19717622ec73b24acc4590d1731ce0a72ac99e3a6a841537e982e56"
+  },
+  "models": {
+    "piper:en_US-amy-medium.onnx": "b3a6e47b57b8c7fbe6a0ce2518161a50f59a9cdd8a50835c02cb02bdd6206c18",
+    "xtts:model.pth": "9d121d9068896e5e1427ffc6dd069f1785baf1ed0d63d5a3d6855c47aed340ad"
+  },
+  "passed": true,
+  "test_ran": true,
+  "pytest_stdout_sha256": "9abcfc05233c96dde3774ff1e0030310b9e1ff870ca6620920643fa890e1cfa2",
+  "pytest_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "pytest_duration_seconds": 35.65,
+  "artifact_path": "docs/reports/verification/artifacts/golden_path_export.wav",
+  "artifact_sha256": "ca2fdd6df19717622ec73b24acc4590d1731ce0a72ac99e3a6a841537e982e56",
+  "artifact_bytes": 924180,
+  "stt_step_ran": true,
+  "stt_engine_name": "backend_default",
+  "historical_proof": false,
+  "evidence_fingerprint": "6213b470c3754b5c8cbc0afc678b3ae74846f6bdcb7f19284508617fab54e7c5"
+}

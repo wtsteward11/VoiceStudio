@@ -1,26 +1,17 @@
 """
 Voice synthesis service for routes that need to synthesize.
 
-Voice testing route needs synthesize. Synthesis route registers its handler.
+Thin wrapper: delegates to SynthesisService (canonical synthesis logic).
+No handler registration; explicit dependency on SynthesisService.
 """
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable
-
-_synthesize_handler: Callable[..., Awaitable[Any]] | None = None
-
-
-def register_synthesize_handler(handler: Callable[..., Awaitable[Any]]) -> None:
-    """Register the synthesize handler (called by synthesis route at load)."""
-    global _synthesize_handler
-    _synthesize_handler = handler
+from typing import Any
 
 
 async def synthesize(request: Any, http_request: Any = None, config_service: Any = None) -> Any:
-    """Synthesize via registered handler."""
-    if _synthesize_handler is None:
-        raise RuntimeError(
-            "Synthesize handler not registered. Ensure voice/synthesis route is loaded."
-        )
-    return await _synthesize_handler(request, http_request, config_service)
+    """Synthesize via SynthesisService (canonical entry point)."""
+    from backend.voice.services.synthesis_service import SynthesisService
+
+    return await SynthesisService.synthesize(request, http_request, config_service)

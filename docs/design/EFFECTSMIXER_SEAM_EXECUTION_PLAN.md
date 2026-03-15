@@ -39,7 +39,7 @@
 ### 3.2 Notes
 
 - **Do not** add EffectsMixerViewModel to MIGRATED_NO_IBACKENDCLIENT after Slice 1 — it still uses IBackendClient for effect chains and mixer.
-- Max 10 files per change-set (repo-hygiene rule).
+- Max 3 files per commit (non-negotiable). Slice 1 may require multiple commits: e.g., Commit 1: IEffectsMeterClient + EffectsMeterClient; Commit 2: EffectsMixerViewModel + View + registration.
 
 ### 3.3 Verification
 
@@ -102,8 +102,9 @@
 
 ## 6. Commit Discipline
 
-- Each slice: interface + client + ViewModel/View/registration. Max 10 files per change-set per repo-hygiene rule.
-- One logical commit per slice. Message format: `feat(seam): EffectsMixer Slice N — IEffectsMeterClient | IEffectChainClient | IMixerStateClient`
+- Max 3 files per commit. Split slices into multiple commits if needed. One logical slice can span 2–3 commits.
+- Slice 1 commit split: Commit 1: `IEffectsMeterClient` (Core) + `EffectsMeterClient` (App); Commit 2: EffectsMixerViewModel injection + View/registration + AppServices.
+- Message format: `feat(seam): EffectsMixer Slice N — IEffectsMeterClient | IEffectChainClient | IMixerStateClient`
 
 ---
 

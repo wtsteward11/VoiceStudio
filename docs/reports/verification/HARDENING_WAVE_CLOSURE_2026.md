@@ -100,7 +100,16 @@ The Release-Trust Hardening Wave addressed testhost teardown correctness, Librar
 
 ---
 
+## Final Release-Trust Closure (2026-03-16)
+
+| Item | Status |
+|------|--------|
+| STT/proof blocker | Closed. Proof regenerated. |
+| Clean no-taskkill confidence | Not proven. taskkill remains safety net. |
+| Project release-ready | One accepted caveat: teardown may require taskkill before build. |
+
 ## Changelog
 
+- 2026-03-16: Final closure. STT/proof closed; proof regenerated. Clean no-taskkill not proven; taskkill safety net documented. Verification passes on committed tree.
 - 2026-03-16: Added "Wave Complete vs Project Release-Ready" section. Clarified remaining items: STT/proof regeneration, clean no-taskkill confidence, final release verification. STATE.md truth-synced. run_verification.py reports stale_process_cleaned in console + JSON.
 - 2026-03-16: Initial closure note. All 12 tasks complete.

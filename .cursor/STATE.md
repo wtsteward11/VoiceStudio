@@ -11,17 +11,17 @@
 Read only this section as current task truth. Treat everything below the divider as historical context.
 
 ### Active Task
-- **ID:** RELEASE-TRUST-HARDENING-WAVE
-- **Title:** Release-Trust Hardening Wave — teardown, playback, proof integrity
+- **ID:** TRANSPORT-COHERENCE-WAVE-3
+- **Title:** Transport Coherence Wave 3 — leak-free, test-proven, shell-safe
 - **Status:** Complete
 
 ### Next 3 Steps
-1. Prove test→build works without forced taskkill (or identify next leak cluster)
-2. Run full verify.ps1 (no -Quick) before release; commit completion markers for completion_guard
-3. Finalize closure note and STATE.md; make v1.2 transition decision
+1. Run full verify.ps1 to confirm all gates pass
+2. v1.2 transition when ready (see Release-Trust)
+3. Optional: further smoke hardening per TRANSPORT_PANEL_PUBLISHERS.md
 
-### v1.2 Transition Decision (2026-03-16)
-**Do NOT transition yet.** Proof regenerated; testhost still lingers (taskkill required). Finish teardown proof and final verification first. Transition is explicit, not accidental.
+### Release-Trust (Parallel Requirement)
+Release-trust remains a parallel requirement, not the active coding wave. Do not bypass verify.ps1 or run_verification.py before release. v1.2 transition deferred (one accepted caveat: taskkill when testhost lingers).
 
 ### Optional Backlog (Reclassified)
 
@@ -36,20 +36,20 @@ Read only this section as current task truth. Treat everything below the divider
 - ADR-051 (TrainingViewModel FAF) — decision made, retained
 
 ### Current Target
-Release-trust closure: wave complete per HARDENING_WAVE_CLOSURE_2026.md; project still has remaining items (STT/proof regeneration, clean no-taskkill confidence).
+Global transport v1 hardened: no subscription leaks, typed ownership, orchestration extracted. Release-trust gates remain in place.
 
 ### Current Blocker
-None. Proof regenerated. Testhost teardown not yet proven clean (taskkill remains safety net).
+None.
 
 ### Truth Sync Note
-Release-Trust Hardening Wave complete per closure note. Testhost leak: VoiceBrowserViewModelTests, JobProgressViewModelTests fixed; taskkill remains safety net. Playback: audio_id contract; Library lifecycle hardened. Proof: regenerated 2026-03-15 (PROOF_GOLDEN_PATH_REAL_2026-03-15.json); STT/proof blocker closed.
+Transport Coherence Wave 3 complete (2026-03-16). All 9 tasks done: MainWindow event cleanup, TransportContextChanged event, verification scripts, ContextManagerTests, StatusBarCoordinator extraction, panel publishers verified, smoke verified, PlaybackOperationsHandler delegates to orchestrator (toolbar/keyboard coherence). Release-Trust remains parallel. **Reconciliation (2026-03-16):** Phase 1 truth-check PASS (IContextManager, ContextManager, MainWindow, GlobalTransportControl, StatusBarCoordinator); Phase 2 skipped (no gaps); Phase 3: 11 transport ownership tests PASS; PlaybackOperationsHandler delegates to orchestrator verified.
 
 ### Last Verified Commands
 - `python scripts/run_verification.py --build` — PASS (with taskkill safety net when needed)
 - `.\scripts\verify.ps1` — Stages 1–5 passed (Release XAML Smoke included)
 
 ### Context Acknowledgment
-2026-03-16 — Release-Trust Closure Plan Task 3. STT/proof blocker closed; proof regenerated. Remaining: prove teardown clean, final release verification.
+2026-03-16 — Transport Coherence Wave 3 complete. Release-trust parallel; v1.2 deferred. Next: verify.ps1, v1.2 when ready.
 
 ---
 ## HISTORY LEDGER
@@ -80,6 +80,12 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 - **Known Debt:** TrainingViewModel lifecycle FAF — formal decision per ADR-051 (retained with CTS ownership; not deferred)
 
 ## LATEST MILESTONE
+- **ID:** TRANSPORT-COHERENCE-WAVE-3
+- **Title:** Transport Coherence Wave 3 — leak-free, test-proven, shell-safe
+- **Status:** COMPLETE (2026-03-16)
+- **Completed:** Task 1–9: MainWindow transport/status cleanup; TransportContextChangedEventArgs; run_verification + verify.ps1; ContextManagerTests; StatusBarCoordinator; panel publishers; smoke; PlaybackOperationsHandler→orchestrator; STATE.md.
+- **Verification:** dotnet build PASS; ContextManagerTests 29 passed
+
 - **ID:** TRUTH-SYNC-AND-VERIFICATION-REPORTING
 - **Title:** Truth-sync STATE.md; run_verification reports stale_process_cleaned
 - **Status:** COMPLETE (2026-03-16)
@@ -107,6 +113,9 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## LATEST PROOF INDEX
 | Date | Task | Artifact | Type | Status |
 |------|------|----------|------|--------|
+| 2026-03-16 | Transport Coherence Reconciliation | Phase 1 truth-check PASS; 11 ContextManagerTests.SetCurrentPlayable PASS; run_verification.py build_smoke PASS; completion_guard requires commit | Verification | Done |
+| 2026-03-16 | Transport Coherence Wave 3 | MainWindow cleanup; TransportContextChanged; StatusBarCoordinator; PlaybackOperationsHandler→orchestrator; TRANSPORT_PANEL_PUBLISHERS.md | Code/Doc | Done |
+| 2026-03-16 | Release-Trust Closure Plan (12 tasks) | Proof regenerated; closure note final; STATE.md; verification PASS; v1.2 deferred (one caveat) | Doc/Proof | Done |
 | 2026-03-16 | Release-Trust Closure: proof regeneration | PROOF_GOLDEN_PATH_REAL_2026-03-15.json; golden_path_export.wav; STT/proof blocker closed | Proof | Done |
 | 2026-03-16 | Truth-sync and verification reporting | STATE.md ACTIVE WINDOW; run_verification.py stale_process_cleaned; HARDENING_WAVE_CLOSURE_2026.md wave vs release-ready | Doc/Code | Done |
 | 2026-03-16 | Playback wiring bulletproof | App.xaml.cs eager init; AudioPlayerService.IsPlaybackSubscribed; LibraryViewModel direct path; OnPlaybackRequested diagnostics; GOLDEN_PATH_PROOF_STATUS imported-asset section | Code/Doc | Done |

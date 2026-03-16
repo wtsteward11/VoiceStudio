@@ -11,14 +11,14 @@
 Read only this section as current task truth. Treat everything below the divider as historical context.
 
 ### Active Task
-- **ID:** TRANSPORT-COHERENCE-WAVE-3
-- **Title:** Transport Coherence Wave 3 — leak-free, test-proven, shell-safe
+- **ID:** TRANSPORT-COHERENCE-WAVE-4
+- **Title:** Transport Coherence Wave 4 — shell decomposition, shortcut/import extraction
 - **Status:** Complete
 
 ### Next 3 Steps
-1. Run full verify.ps1 to confirm all gates pass
-2. v1.2 transition when ready (see Release-Trust)
-3. Optional: further smoke hardening per TRANSPORT_PANEL_PUBLISHERS.md
+1. Commit plan/docs updates (completion_guard requires committed completion markers)
+2. Run full verify.ps1 to confirm all gates pass
+3. v1.2 transition when ready (see Release-Trust)
 
 ### Release-Trust (Parallel Requirement)
 Release-trust remains a parallel requirement, not the active coding wave. Do not bypass verify.ps1 or run_verification.py before release. v1.2 transition deferred (one accepted caveat: taskkill when testhost lingers).
@@ -42,14 +42,14 @@ Global transport v1 hardened: no subscription leaks, typed ownership, orchestrat
 None.
 
 ### Truth Sync Note
-Transport Coherence Wave 3 complete (2026-03-16). All 9 tasks done: MainWindow event cleanup, TransportContextChanged event, verification scripts, ContextManagerTests, StatusBarCoordinator extraction, panel publishers verified, smoke verified, PlaybackOperationsHandler delegates to orchestrator (toolbar/keyboard coherence). Release-Trust remains parallel. **Reconciliation (2026-03-16):** Phase 1 truth-check PASS (IContextManager, ContextManager, MainWindow, GlobalTransportControl, StatusBarCoordinator); Phase 2 skipped (no gaps); Phase 3: 11 transport ownership tests PASS; PlaybackOperationsHandler delegates to orchestrator verified.
+Transport Coherence Wave 4 complete (2026-03-16). Phase 1: TransportShortcutCoordinator (Space/S/Ctrl+R via orchestrator). Phase 2: IImportWorkflowService + ImportWorkflowService; ImportAudioFile thin wrapper. Phase 4: LibraryPlayback + LibraryImportPlayback proven by verify.ps1 Stage 8.5 (--ui-self-test). Phase 5: MAINWINDOW_DECOMPOSITION_PLAN updated (Status Bar, Transport Shortcut, Import Workflow marked done). Phase 3 (PlayableMediaContext) deferred. Release-Trust remains parallel.
 
 ### Last Verified Commands
 - `python scripts/run_verification.py --build` — PASS (with taskkill safety net when needed)
 - `.\scripts\verify.ps1` — Stages 1–5 passed (Release XAML Smoke included)
 
 ### Context Acknowledgment
-2026-03-16 — Transport Coherence Wave 3 complete. Release-trust parallel; v1.2 deferred. Next: verify.ps1, v1.2 when ready.
+2026-03-16 — Transport Coherence Wave 4 complete. Commit plan/docs; run verify.ps1; v1.2 when ready.
 
 ---
 ## HISTORY LEDGER
@@ -80,7 +80,13 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 - **Known Debt:** TrainingViewModel lifecycle FAF — formal decision per ADR-051 (retained with CTS ownership; not deferred)
 
 ## LATEST MILESTONE
-- **ID:** TRANSPORT-COHERENCE-WAVE-3
+- **ID:** TRANSPORT-COHERENCE-WAVE-4
+- **Title:** Transport Coherence Wave 4 — shell decomposition
+- **Status:** COMPLETE (2026-03-16)
+- **Completed:** Phase 1 TransportShortcutCoordinator; Phase 2 ImportWorkflowService; Phase 4 smoke (LibraryPlayback, LibraryImportPlayback via Stage 8.5); Phase 5 MAINWINDOW_DECOMPOSITION_PLAN. Phase 3 PlayableMediaContext deferred.
+- **Verification:** build_smoke PASS; completion_guard requires commit of plan/docs
+
+- **ID:** TRANSPORT-COHERENCE-WAVE-3 (prior)
 - **Title:** Transport Coherence Wave 3 — leak-free, test-proven, shell-safe
 - **Status:** COMPLETE (2026-03-16)
 - **Completed:** Task 1–9: MainWindow transport/status cleanup; TransportContextChangedEventArgs; run_verification + verify.ps1; ContextManagerTests; StatusBarCoordinator; panel publishers; smoke; PlaybackOperationsHandler→orchestrator; STATE.md.
@@ -113,6 +119,7 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## LATEST PROOF INDEX
 | Date | Task | Artifact | Type | Status |
 |------|------|----------|------|--------|
+| 2026-03-16 | Transport Wave 4 | TransportShortcutCoordinator; ImportWorkflowService; MAINWINDOW_DECOMPOSITION_PLAN; smoke via Stage 8.5 | Code/Doc | Done |
 | 2026-03-16 | Transport Coherence Reconciliation | Phase 1 truth-check PASS; 11 ContextManagerTests.SetCurrentPlayable PASS; run_verification.py PASS (all gates); STATE.md committed | Verification | Done |
 | 2026-03-16 | Transport Coherence Wave 3 | MainWindow cleanup; TransportContextChanged; StatusBarCoordinator; PlaybackOperationsHandler→orchestrator; TRANSPORT_PANEL_PUBLISHERS.md | Code/Doc | Done |
 | 2026-03-16 | Release-Trust Closure Plan (12 tasks) | Proof regenerated; closure note final; STATE.md; verification PASS; v1.2 deferred (one caveat) | Doc/Proof | Done |

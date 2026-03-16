@@ -113,7 +113,7 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## LATEST PROOF INDEX
 | Date | Task | Artifact | Type | Status |
 |------|------|----------|------|--------|
-| 2026-03-16 | Transport Coherence Reconciliation | Phase 1 truth-check PASS; 11 ContextManagerTests.SetCurrentPlayable PASS; run_verification.py build_smoke PASS; completion_guard requires commit | Verification | Done |
+| 2026-03-16 | Transport Coherence Reconciliation | Phase 1 truth-check PASS; 11 ContextManagerTests.SetCurrentPlayable PASS; run_verification.py PASS (all gates); STATE.md committed | Verification | Done |
 | 2026-03-16 | Transport Coherence Wave 3 | MainWindow cleanup; TransportContextChanged; StatusBarCoordinator; PlaybackOperationsHandler→orchestrator; TRANSPORT_PANEL_PUBLISHERS.md | Code/Doc | Done |
 | 2026-03-16 | Release-Trust Closure Plan (12 tasks) | Proof regenerated; closure note final; STATE.md; verification PASS; v1.2 deferred (one caveat) | Doc/Proof | Done |
 | 2026-03-16 | Release-Trust Closure: proof regeneration | PROOF_GOLDEN_PATH_REAL_2026-03-15.json; golden_path_export.wav; STT/proof blocker closed | Proof | Done |

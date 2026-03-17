@@ -9,6 +9,8 @@ using Microsoft.UI.Xaml;
 using VoiceStudio.App.Commands;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Utilities;
+using VoiceStudio.Core.Services;
+using VoiceStudio.App.Core.ErrorHandling;
 using VoiceStudio.App.Logging;
 using VoiceStudio.App.Views;
 
@@ -41,25 +43,7 @@ namespace VoiceStudio.App
 
       // Command handlers are bootstrapped in OnLaunched after MainWindow is created
       // (DialogService requires Window which is only available after window creation)
-
-      // Start backend process in background (non-blocking)
-      _ = Task.Run(async () =>
-      {
-        try
-        {
-          var backendManager = ServiceProvider.TryGetBackendProcessManager();
-          if (backendManager != null)
-          {
-            var started = await backendManager.EnsureBackendRunningAsync();
-            Debug.WriteLine($"[App] Backend auto-start: {(started ? "SUCCESS" : "FAILED")}");
-          }
-        }
-        catch (Exception ex)
-        {
-          Debug.WriteLine($"[App] Backend auto-start error: {ex.Message}");
-          ErrorLogger.LogWarning($"Backend auto-start failed: {ex.Message}", "App.Constructor");
-        }
-      });
+      // Backend startup is an explicit phase in OnLaunched (see STARTUP_ORCHESTRATION_HARDENING_PLAN.md)
 
       // Gate C UI smoke relies on capturing binding failures deterministically.
       if (IsUiSmokeRequested())
@@ -174,14 +158,21 @@ namespace VoiceStudio.App
     {
       _startupProfiler?.Checkpoint("OnLaunched Start");
 
+      var smokeExit = IsSmokeExit(args);
+      var uiSmoke = IsUiSmoke(args);
+      var isSmokeMode = smokeExit || uiSmoke;
+
+      // For UI smoke, ensure backend is ready before MainWindow/smoke (backend-dependent actions)
+      if (uiSmoke)
+      {
+        await EnsureBackendWithTrackingAsync();
+        _startupProfiler?.Checkpoint("Backend Ready (UI Smoke)");
+      }
+
       if (IsSmokeHinted())
       {
         WriteUiSmokeDebugSnapshot(phase: "onlaunched_enter", args: args, smokeExit: null, uiSmoke: null);
       }
-
-      var smokeExit = IsSmokeExit(args);
-      var uiSmoke = IsUiSmoke(args);
-      var isSmokeMode = smokeExit || uiSmoke;
 
       if (IsSmokeHinted())
       {
@@ -329,8 +320,8 @@ namespace VoiceStudio.App
         }
       }
 
-      // GAP-X02: Check if first-run wizard should be shown
-      if (!isSmokeMode && await FirstRunWizard.ShouldShowWizardAsync())
+      // GAP-X02: Check if first-run wizard should be shown (skip for smoke modes)
+      if (!isSmokeMode && !IsIconLaunchSmokeRequested() && !IsSmokeFailurePortRequested() && await FirstRunWizard.ShouldShowWizardAsync())
       {
         _startupProfiler?.Checkpoint("FirstRunWizard Check - Should Show");
 
@@ -385,6 +376,167 @@ namespace VoiceStudio.App
       if (IsSmokeHinted())
       {
         WriteUiSmokeDebugSnapshot(phase: "mainwindow_activated", args: args, smokeExit: smokeExit, uiSmoke: uiSmoke);
+      }
+
+      // Explicit backend startup with tracked state (STARTUP_ORCHESTRATION_HARDENING_PLAN)
+      // MainWindow shows startup overlay until BackendReady or BackendFailed
+      if (!isSmokeMode)
+      {
+        if (IsSmokeFailurePortRequested())
+        {
+          var startupState = ServiceProvider.GetStartupStateService();
+          void Handler(object? s, StartupStateChangedEventArgs e)
+          {
+            if (e.NewState == StartupState.BackendFailed)
+            {
+              startupState.StateChanged -= Handler;
+              var msg = e.FailureMessage ?? "";
+              var hasPortMsg = msg.IndexOf("port", StringComparison.OrdinalIgnoreCase) >= 0
+                  || msg.IndexOf("in use", StringComparison.OrdinalIgnoreCase) >= 0;
+              var payload = new
+              {
+                status = hasPortMsg ? "PASS" : "FAIL",
+                timestamp_utc = DateTime.UtcNow.ToString("o"),
+                backend_failed = true,
+                failure_message = msg,
+                expected_port_message = hasPortMsg,
+              };
+              WriteFailureSmokeSummary(GetCrashDir(), payload);
+              Environment.Exit(hasPortMsg ? 0 : 1);
+            }
+            else if (e.NewState == StartupState.BackendReady)
+            {
+              startupState.StateChanged -= Handler;
+              var payload = new
+              {
+                status = "FAIL",
+                timestamp_utc = DateTime.UtcNow.ToString("o"),
+                backend_failed = false,
+                failure_message = (string?)null,
+                expected_port_message = false,
+                error = "Expected BackendFailed (port occupied) but got BackendReady",
+              };
+              WriteFailureSmokeSummary(GetCrashDir(), payload);
+              Environment.Exit(1);
+            }
+          }
+          startupState.StateChanged += Handler;
+          _ = Task.Run(async () =>
+          {
+            await Task.Delay(30_000).ConfigureAwait(false);
+            startupState.StateChanged -= Handler;
+            var payload = new
+            {
+              status = "FAIL",
+              timestamp_utc = DateTime.UtcNow.ToString("o"),
+              backend_failed = false,
+              failure_message = (string?)null,
+              expected_port_message = false,
+              error = "Timeout: did not get BackendFailed within 30s",
+            };
+            WriteFailureSmokeSummary(GetCrashDir(), payload);
+            Environment.Exit(1);
+          });
+        }
+        else if (IsSmokeFailureRuntimeRequested())
+        {
+          var tempDir = Path.Combine(Path.GetTempPath(), "VoiceStudio_RuntimeSmoke_" + Guid.NewGuid().ToString("N")[..8]);
+          Directory.CreateDirectory(tempDir);
+          Environment.SetEnvironmentVariable("VOICESTUDIO_APP_ROOT", tempDir);
+          var startupState = ServiceProvider.GetStartupStateService();
+          void Handler(object? s, StartupStateChangedEventArgs e)
+          {
+            if (e.NewState == StartupState.BackendFailed)
+            {
+              startupState.StateChanged -= Handler;
+              var msg = e.FailureMessage ?? "";
+              var hasRuntimeMsg = msg.IndexOf("app root", StringComparison.OrdinalIgnoreCase) >= 0
+                  || msg.IndexOf("VOICESTUDIO_APP_ROOT", StringComparison.OrdinalIgnoreCase) >= 0
+                  || msg.IndexOf("Python", StringComparison.OrdinalIgnoreCase) >= 0
+                  || msg.IndexOf("runtime", StringComparison.OrdinalIgnoreCase) >= 0;
+              var payload = new
+              {
+                status = hasRuntimeMsg ? "PASS" : "FAIL",
+                timestamp_utc = DateTime.UtcNow.ToString("o"),
+                backend_failed = true,
+                failure_message = msg,
+                expected_runtime_message = hasRuntimeMsg,
+              };
+              WriteFailureRuntimeSmokeSummary(GetCrashDir(), payload);
+              _ = ErrorBoundary.TryExecute(() => Directory.Delete(tempDir, recursive: false), "cleanup temp dir before exit");
+              Environment.Exit(hasRuntimeMsg ? 0 : 1);
+            }
+            else if (e.NewState == StartupState.BackendReady)
+            {
+              startupState.StateChanged -= Handler;
+              var payload = new
+              {
+                status = "FAIL",
+                timestamp_utc = DateTime.UtcNow.ToString("o"),
+                backend_failed = false,
+                failure_message = (string?)null,
+                expected_runtime_message = false,
+                error = "Expected BackendFailed (runtime missing) but got BackendReady",
+              };
+              WriteFailureRuntimeSmokeSummary(GetCrashDir(), payload);
+              _ = ErrorBoundary.TryExecute(() => Directory.Delete(tempDir, recursive: false), "cleanup temp dir before exit");
+              Environment.Exit(1);
+            }
+          }
+          startupState.StateChanged += Handler;
+          _ = Task.Run(async () =>
+          {
+            await Task.Delay(30_000).ConfigureAwait(false);
+            startupState.StateChanged -= Handler;
+            var payload = new
+            {
+              status = "FAIL",
+              timestamp_utc = DateTime.UtcNow.ToString("o"),
+              backend_failed = false,
+              failure_message = (string?)null,
+              expected_runtime_message = false,
+              error = "Timeout: did not get BackendFailed within 30s",
+            };
+            WriteFailureRuntimeSmokeSummary(GetCrashDir(), payload);
+            _ = ErrorBoundary.TryExecute(() => Directory.Delete(tempDir, recursive: false), "cleanup temp dir before exit");
+            Environment.Exit(1);
+          });
+        }
+        StartBackendWithTracking();
+      }
+
+      // Icon-launch smoke: wait for overlay to clear, run one backend action, write summary, exit
+      if (IsIconLaunchSmokeRequested())
+      {
+        _ = Task.Run(async () =>
+        {
+          try
+          {
+            var exitCode = await RunIconLaunchSmokeAsync();
+            Environment.Exit(exitCode);
+          }
+          catch (Exception ex)
+          {
+            _ = ErrorBoundary.TryExecute(() =>
+            {
+              var crashDir = GetCrashDir();
+              Directory.CreateDirectory(crashDir);
+              var summaryPath = Path.Combine(crashDir, "icon_launch_smoke_summary.json");
+              var payload = new
+              {
+                status = "FAIL",
+                timestamp_utc = DateTime.UtcNow.ToString("o"),
+                backend_ready = false,
+                overlay_cleared_ms = (double?)null,
+                action_succeeded = false,
+                action_name = "profiles",
+                failures = new[] { new { step = "exception", error = ex.ToString() } },
+              };
+              File.WriteAllText(summaryPath, System.Text.Json.JsonSerializer.Serialize(payload, _jsonOptions));
+            }, "write icon launch smoke failure summary");
+            Environment.Exit(1);
+          }
+        });
       }
 
       // Start deferred initialization in background after window is visible
@@ -581,6 +733,222 @@ namespace VoiceStudio.App
       }
     }
 
+    private static bool IsIconLaunchSmokeRequested()
+    {
+      try
+      {
+        var env = Environment.GetEnvironmentVariable("VOICE_STUDIO_ICON_LAUNCH_SMOKE");
+        return !string.IsNullOrWhiteSpace(env) && (env.Equals("1", StringComparison.OrdinalIgnoreCase) || env.Equals("true", StringComparison.OrdinalIgnoreCase));
+      }
+      catch
+      {
+        return false;
+      }
+    }
+
+    private static bool IsSmokeFailurePortRequested()
+    {
+      try
+      {
+        var env = Environment.GetEnvironmentVariable("VOICE_STUDIO_SMOKE_FAILURE_PORT");
+        return !string.IsNullOrWhiteSpace(env) && (env.Equals("1", StringComparison.OrdinalIgnoreCase) || env.Equals("true", StringComparison.OrdinalIgnoreCase));
+      }
+      catch
+      {
+        return false;
+      }
+    }
+
+    private static bool IsSmokeFailureRuntimeRequested()
+    {
+      try
+      {
+        var env = Environment.GetEnvironmentVariable("VOICE_STUDIO_SMOKE_FAILURE_RUNTIME");
+        return !string.IsNullOrWhiteSpace(env) && (env.Equals("1", StringComparison.OrdinalIgnoreCase) || env.Equals("true", StringComparison.OrdinalIgnoreCase));
+      }
+      catch
+      {
+        return false;
+      }
+    }
+
+    private static void WriteFailureSmokeSummary(string crashDir, object payload)
+    {
+      try
+      {
+        Directory.CreateDirectory(crashDir);
+        var summaryPath = Path.Combine(crashDir, "failure_smoke_summary.json");
+        var json = System.Text.Json.JsonSerializer.Serialize(payload, _jsonOptions);
+        File.WriteAllText(summaryPath, json);
+      }
+      catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Failed to write failure smoke summary: {ex.Message}", "App.FailureSmoke");
+      }
+    }
+
+    private static void WriteFailureRuntimeSmokeSummary(string crashDir, object payload)
+    {
+      try
+      {
+        Directory.CreateDirectory(crashDir);
+        var summaryPath = Path.Combine(crashDir, "failure_runtime_smoke_summary.json");
+        var json = System.Text.Json.JsonSerializer.Serialize(payload, _jsonOptions);
+        File.WriteAllText(summaryPath, json);
+      }
+      catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Failed to write runtime failure smoke summary: {ex.Message}", "App.FailureRuntimeSmoke");
+      }
+    }
+
+    /// <summary>
+    /// Icon-launch smoke: poll for backend ready, run one backend action, write summary.
+    /// Returns exit code (0 = PASS, 1 = FAIL).
+    /// </summary>
+    private static async Task<int> RunIconLaunchSmokeAsync()
+    {
+      var startupState = ServiceProvider.GetStartupStateService();
+      var crashDir = GetCrashDir();
+      Directory.CreateDirectory(crashDir);
+      var sw = System.Diagnostics.Stopwatch.StartNew();
+
+      // Poll for IsReady, up to 60s
+      const int timeoutMs = 60_000;
+      const int pollIntervalMs = 500;
+      while (sw.ElapsedMilliseconds < timeoutMs)
+      {
+        if (startupState.IsReady)
+          break;
+        if (startupState.CurrentState == StartupState.BackendFailed)
+        {
+          var payload = new
+          {
+            status = "FAIL",
+            timestamp_utc = DateTime.UtcNow.ToString("o"),
+            backend_ready = false,
+            overlay_cleared_ms = (double?)null,
+            action_succeeded = false,
+            action_name = "profiles",
+            failures = new[] { new { step = "backend_failed", error = startupState.FailureMessage ?? "Backend failed to start" } },
+          };
+          WriteIconLaunchSmokeSummary(crashDir, payload);
+          return 1;
+        }
+        await Task.Delay(pollIntervalMs).ConfigureAwait(false);
+      }
+
+      if (!startupState.IsReady)
+      {
+        var payload = new
+        {
+          status = "FAIL",
+          timestamp_utc = DateTime.UtcNow.ToString("o"),
+          backend_ready = false,
+          overlay_cleared_ms = sw.Elapsed.TotalMilliseconds,
+          action_succeeded = false,
+          action_name = "profiles",
+          failures = new[] { new { step = "timeout", error = "Backend did not become ready within 60s" } },
+        };
+        WriteIconLaunchSmokeSummary(crashDir, payload);
+        return 1;
+      }
+
+      var overlayClearedMs = sw.Elapsed.TotalMilliseconds;
+
+      // Run backend-dependent actions: profiles + library folders (Round 4 Task 3)
+      bool action1Succeeded = false;
+      string? action1Error = null;
+      try
+      {
+        var backend = ServiceProvider.GetBackendClient();
+        var profiles = await backend.GetProfilesAsync().ConfigureAwait(false);
+        action1Succeeded = profiles != null;
+      }
+      catch (Exception ex)
+      {
+        action1Error = ex.ToString();
+      }
+
+      bool action2Succeeded = false;
+      string? action2Error = null;
+      try
+      {
+        var libraryClient = AppServices.GetRequiredService<ILibraryClient>();
+        var folders = await libraryClient.GetLibraryFoldersAsync(parentId: null).ConfigureAwait(false);
+        action2Succeeded = folders != null;
+      }
+      catch (Exception ex)
+      {
+        action2Error = ex.ToString();
+      }
+
+      // Round 6 Task 6: Shell-level action — prove one gated command executes post-ready
+      bool action3Succeeded = false;
+      string? action3Error = null;
+      try
+      {
+        var router = AppServices.TryGetCommandRouter();
+        if (router != null)
+        {
+          action3Succeeded = await router.ExecuteSafeAsync("nav.library").ConfigureAwait(false);
+        }
+        else
+        {
+          action3Error = "CommandRouter not available";
+        }
+      }
+      catch (Exception ex)
+      {
+        action3Error = ex.ToString();
+      }
+
+      var allSucceeded = action1Succeeded && action2Succeeded && action3Succeeded;
+      var failures = new List<object>();
+      if (!action1Succeeded) failures.Add(new { step = "profiles_fetch", error = action1Error ?? "Unknown" });
+      if (!action2Succeeded) failures.Add(new { step = "library_folders", error = action2Error ?? "Unknown" });
+      if (!action3Succeeded) failures.Add(new { step = "nav_library", error = action3Error ?? "Unknown" });
+
+      var resultPayload = new
+      {
+        status = allSucceeded ? "PASS" : "FAIL",
+        timestamp_utc = DateTime.UtcNow.ToString("o"),
+        backend_ready = true,
+        overlay_cleared_ms = overlayClearedMs,
+        action_succeeded = action1Succeeded,
+        action_name = "profiles",
+        action_2_succeeded = action2Succeeded,
+        action_2_name = "library_folders",
+        action_3_succeeded = action3Succeeded,
+        action_3_name = "nav_library",
+        failures = failures,
+      };
+      WriteIconLaunchSmokeSummary(crashDir, resultPayload);
+      return allSucceeded ? 0 : 1;
+    }
+
+    private static void WriteIconLaunchSmokeSummary(string crashDir, object payload)
+    {
+      try
+      {
+        Directory.CreateDirectory(crashDir);
+        var summaryPath = Path.Combine(crashDir, "icon_launch_smoke_summary.json");
+        var json = System.Text.Json.JsonSerializer.Serialize(payload, _jsonOptions);
+        File.WriteAllText(summaryPath, json);
+
+        var outPath = Environment.GetEnvironmentVariable("VOICE_STUDIO_ICON_LAUNCH_SMOKE_OUT");
+        if (!string.IsNullOrWhiteSpace(outPath))
+        {
+          Directory.CreateDirectory(Path.GetDirectoryName(outPath) ?? crashDir);
+          File.WriteAllText(outPath, json);
+        }
+      }
+      catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Failed to write icon launch smoke summary: {ex.Message}", "App.IconLaunchSmoke");
+      }
+    }
+
     private static void WriteUiSmokeDebugSnapshot(
       string phase,
       Microsoft.UI.Xaml.LaunchActivatedEventArgs? args,
@@ -614,6 +982,98 @@ namespace VoiceStudio.App
       {
         ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "detailed.WriteUiSmokeDebugSnapshot");
       }
+    }
+
+    /// <summary>
+    /// Ensures backend is running with explicit startup state tracking.
+    /// Awaited for UI smoke so backend is ready before synthesis.
+    /// </summary>
+    private static async Task EnsureBackendWithTrackingAsync()
+    {
+      var startupState = ServiceProvider.GetStartupStateService();
+      var backendManager = ServiceProvider.TryGetBackendProcessManager();
+      if (backendManager == null)
+      {
+        startupState.SetBackendFailed("Backend manager not available");
+        return;
+      }
+
+      startupState.SetBackendStarting();
+      backendManager.BackendStarted += OnBackendStarted;
+      backendManager.BackendStartFailed += OnBackendStartFailed;
+      try
+      {
+        var started = await backendManager.EnsureBackendRunningAsync();
+        if (!started && startupState.CurrentState == StartupState.BackendStarting)
+        {
+          startupState.SetBackendFailed("Backend failed to start");
+        }
+      }
+      finally
+      {
+        backendManager.BackendStarted -= OnBackendStarted;
+        backendManager.BackendStartFailed -= OnBackendStartFailed;
+      }
+    }
+
+    /// <summary>
+    /// Starts backend with tracked state (fire-and-forget but state-driven).
+    /// MainWindow overlay hides when BackendReady or BackendFailed.
+    /// </summary>
+    private static void StartBackendWithTracking()
+    {
+      var startupState = ServiceProvider.GetStartupStateService();
+      var backendManager = ServiceProvider.TryGetBackendProcessManager();
+      if (backendManager == null)
+      {
+        startupState.SetBackendFailed("Backend manager not available");
+        return;
+      }
+
+      startupState.SetBackendStarting();
+      backendManager.BackendStarted += OnBackendStarted;
+      backendManager.BackendStartFailed += OnBackendStartFailed;
+      _ = Task.Run(async () =>
+      {
+        try
+        {
+          var started = await backendManager.EnsureBackendRunningAsync();
+          if (!started)
+          {
+            var state = ServiceProvider.GetStartupStateService();
+            if (state.CurrentState == StartupState.BackendStarting)
+            {
+              state.SetBackendFailed("Backend failed to start");
+            }
+          }
+        }
+        catch (Exception ex)
+        {
+          Debug.WriteLine($"[App] Backend auto-start error: {ex.Message}");
+          ErrorLogger.LogWarning($"Backend auto-start failed: {ex.Message}", "App.StartBackendWithTracking");
+          ServiceProvider.GetStartupStateService().SetBackendFailed(ex.Message);
+        }
+      });
+    }
+
+    private static void OnBackendStarted(object? sender, EventArgs e)
+    {
+      if (sender is BackendProcessManager mgr)
+      {
+        mgr.BackendStarted -= OnBackendStarted;
+        mgr.BackendStartFailed -= OnBackendStartFailed;
+      }
+      ServiceProvider.GetStartupStateService().SetBackendReady();
+    }
+
+    private static void OnBackendStartFailed(object? sender, string message)
+    {
+      if (sender is BackendProcessManager mgr)
+      {
+        mgr.BackendStarted -= OnBackendStarted;
+        mgr.BackendStartFailed -= OnBackendStartFailed;
+      }
+      ServiceProvider.GetStartupStateService().SetBackendFailed(message);
     }
 
     private static string GetCrashDir()
@@ -703,9 +1163,12 @@ namespace VoiceStudio.App
       public bool TempFileCreated { get; init; }
       public bool PlaybackStarted { get; init; }
       public double PlaybackPositionAdvancedMs { get; init; }
-      public bool LibraryTempFileCreated { get; init; }
+      public bool LibraryPlaybackTempFileCreated { get; init; }
       public bool LibraryPlaybackStarted { get; init; }
       public double LibraryPlaybackPositionAdvancedMs { get; init; }
+      public bool LibraryImportTempFileCreated { get; init; }
+      public bool LibraryImportPlaybackStarted { get; init; }
+      public double LibraryImportPlaybackPositionAdvancedMs { get; init; }
       public (string Step, string Error)[] Failures { get; init; } = [];
     }
 
@@ -727,7 +1190,7 @@ namespace VoiceStudio.App
           return result with { ExitCode = 2 };
         }
 
-        var (steps, timedOut, timedOutStep, synthesisStepRan, playbackInvoked, audioId, streamCheckPassed, tempFileCreated, playbackStarted, playbackPositionAdvancedMs, libraryTempFileCreated, libraryPlaybackStarted, libraryPlaybackPositionAdvancedMs, synthesisFailures) = await mainWindow.RunGateCUiSmokeNavigationAsync(crashDir).ConfigureAwait(false);
+        var (steps, timedOut, timedOutStep, synthesisStepRan, playbackInvoked, audioId, streamCheckPassed, tempFileCreated, playbackStarted, playbackPositionAdvancedMs, libraryPlaybackTempFileCreated, libraryPlaybackStarted, libraryPlaybackPositionAdvancedMs, libraryImportTempFileCreated, libraryImportPlaybackStarted, libraryImportPlaybackPositionAdvancedMs, synthesisFailures) = await mainWindow.RunGateCUiSmokeNavigationAsync(crashDir).ConfigureAwait(false);
 
         if (timedOut)
         {
@@ -781,9 +1244,12 @@ namespace VoiceStudio.App
           TempFileCreated = tempFileCreated,
           PlaybackStarted = playbackStarted,
           PlaybackPositionAdvancedMs = playbackPositionAdvancedMs,
-          LibraryTempFileCreated = libraryTempFileCreated,
+          LibraryPlaybackTempFileCreated = libraryPlaybackTempFileCreated,
           LibraryPlaybackStarted = libraryPlaybackStarted,
           LibraryPlaybackPositionAdvancedMs = libraryPlaybackPositionAdvancedMs,
+          LibraryImportTempFileCreated = libraryImportTempFileCreated,
+          LibraryImportPlaybackStarted = libraryImportPlaybackStarted,
+          LibraryImportPlaybackPositionAdvancedMs = libraryImportPlaybackPositionAdvancedMs,
           Failures = synthesisFailures.ToArray(),
         };
       }
@@ -848,9 +1314,12 @@ namespace VoiceStudio.App
             temp_file_created = result.TempFileCreated,
             playback_started = result.PlaybackStarted,
             playback_position_advanced_ms = result.PlaybackPositionAdvancedMs,
-            library_temp_file_created = result.LibraryTempFileCreated,
+            library_playback_temp_file_created = result.LibraryPlaybackTempFileCreated,
             library_playback_started = result.LibraryPlaybackStarted,
             library_playback_position_advanced_ms = result.LibraryPlaybackPositionAdvancedMs,
+            library_import_temp_file_created = result.LibraryImportTempFileCreated,
+            library_import_playback_started = result.LibraryImportPlaybackStarted,
+            library_import_playback_position_advanced_ms = result.LibraryImportPlaybackPositionAdvancedMs,
             failures = result.Failures.Select(f => new { step = f.Step, error = f.Error }).ToArray(),
             binding_log = result.BindingLogPath,
             binding_failure_count = result.BindingFailures.Length,

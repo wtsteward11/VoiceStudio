@@ -60,6 +60,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Transport Wave 4 Shell Decomposition** | `docs/design/TRANSPORT_WAVE_4_SHELL_DECOMPOSITION_PLAN.md` | 2026-03-16 | Transport shortcut coordinator, import workflow extraction, PlayableMediaContext, smoke automation |
 | **Startup Orchestration Hardening** | `docs/design/STARTUP_ORCHESTRATION_HARDENING_PLAN.md` | 2026-03-16 | Backend auto-start hardening: explicit phases, startup states, production runtime discovery, readiness gate, failure recovery UX |
 | **Backend Ownership Policy** | `docs/design/BACKEND_OWNERSHIP_POLICY.md` | 2026-03-14 | Backend lifecycle rules: reuse, port conflict, stale backend, frontend exit, app root, runtime discovery |
+| **Premium Software Coherence Audit** | `docs/design/PREMIUM_SOFTWARE_COHERENCE_AUDIT.md` | 2026-03-17 | Formal audit: startup, shell, transport, panel lifecycle, event wiring, backend seam, workflows, UX; gaps ranked S0–S2 |
 
 ## Architecture
 

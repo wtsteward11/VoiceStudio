@@ -333,6 +333,10 @@ namespace VoiceStudio.App.Services
       // Event aggregator for cross-panel synchronization (Phase 4)
       services.AddSingleton<IEventAggregator, EventAggregator>();
 
+      // Throttled event publisher for high-frequency events (Premium Reliability Pass Task 7)
+      services.AddSingleton<ThrottledEventPublisher>(sp => new ThrottledEventPublisher(
+          sp.GetRequiredService<IEventAggregator>()));
+
       // Central state store with undo/redo support (Panel Architecture Phase 5)
       // Must be before ContextManager, DragDropService, EventReplayService
       services.AddSingleton<IAppStateStore, AppStateStore>();
@@ -370,12 +374,14 @@ namespace VoiceStudio.App.Services
       // Selection broadcast service for follow-selection behavior (Panel Architecture Phase D)
       services.AddSingleton<ISelectionBroadcastService>(sp => new SelectionBroadcastService(
           sp.GetService<IEventAggregator>(),
-          sp.GetService<Microsoft.Extensions.Logging.ILogger<SelectionBroadcastService>>()));
+          sp.GetService<Microsoft.Extensions.Logging.ILogger<SelectionBroadcastService>>(),
+          sp.GetService<ThrottledEventPublisher>()));
 
       // Synchronized scroll service for cross-panel scroll coordination (Panel Architecture Phase D)
       services.AddSingleton<ISynchronizedScrollService>(sp => new SynchronizedScrollService(
           sp.GetService<IEventAggregator>(),
-          sp.GetService<Microsoft.Extensions.Logging.ILogger<SynchronizedScrollService>>()));
+          sp.GetService<Microsoft.Extensions.Logging.ILogger<SynchronizedScrollService>>(),
+          sp.GetService<ThrottledEventPublisher>()));
 
       // Event replay service for debug capture and replay bundles (Panel Architecture Phase D)
       services.AddSingleton<IEventReplayService>(sp => new EventReplayService(
@@ -755,6 +761,8 @@ namespace VoiceStudio.App.Services
     public static IWebSocketClientFactory? TryGetWebSocketClientFactory() => GetService<IWebSocketClientFactory>();
     public static IEventAggregator GetEventAggregator() => GetRequiredService<IEventAggregator>();
     public static IEventAggregator? TryGetEventAggregator() => GetService<IEventAggregator>();
+    public static ThrottledEventPublisher GetThrottledEventPublisher() => GetRequiredService<ThrottledEventPublisher>();
+    public static ThrottledEventPublisher? TryGetThrottledEventPublisher() => GetService<ThrottledEventPublisher>();
     public static IContextManager GetContextManager() => GetRequiredService<IContextManager>();
     public static IContextManager? TryGetContextManager() => GetService<IContextManager>();
     public static ILayoutService GetLayoutService() => GetRequiredService<ILayoutService>();

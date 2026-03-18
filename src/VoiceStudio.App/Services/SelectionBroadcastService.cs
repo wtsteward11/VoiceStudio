@@ -20,6 +20,7 @@ namespace VoiceStudio.App.Services
     {
         private readonly ILogger<SelectionBroadcastService>? _logger;
         private readonly IEventAggregator? _eventAggregator;
+        private readonly ThrottledEventPublisher? _throttledPublisher;
         private readonly List<WeakReference<ISelectionFollower>> _followers = new();
         private readonly Dictionary<string, bool> _panelFollowState = new();
         private readonly List<SelectionInfo> _selectionHistory = new();
@@ -58,10 +59,12 @@ namespace VoiceStudio.App.Services
         public SelectionBroadcastService(
             IEventAggregator? eventAggregator = null,
             ILogger<SelectionBroadcastService>? logger = null,
+            ThrottledEventPublisher? throttledPublisher = null,
             int maxHistorySize = 50)
         {
             _eventAggregator = eventAggregator;
             _logger = logger;
+            _throttledPublisher = throttledPublisher;
             _maxHistorySize = maxHistorySize;
         }
 
@@ -109,7 +112,12 @@ namespace VoiceStudio.App.Services
             SelectionBroadcast?.Invoke(this, args);
 
             // Also publish through event aggregator if available
-            _eventAggregator?.Publish(new SelectionBroadcastEvent(previousSelection, selection));
+            // HIGH_FREQUENCY_EVENT_THROTTLE_POLICY: 50ms Trailing
+            var evt = new SelectionBroadcastEvent(previousSelection, selection);
+            if (_throttledPublisher != null)
+                _throttledPublisher.Publish(evt, throttleMs: 50, mode: ThrottleMode.Trailing);
+            else
+                _eventAggregator?.Publish(evt);
         }
 
         /// <inheritdoc />

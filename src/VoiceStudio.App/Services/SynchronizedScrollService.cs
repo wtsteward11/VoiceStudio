@@ -18,6 +18,7 @@ namespace VoiceStudio.App.Services
     {
         private readonly ILogger<SynchronizedScrollService>? _logger;
         private readonly IEventAggregator? _eventAggregator;
+        private readonly ThrottledEventPublisher? _throttledPublisher;
         private readonly List<WeakReference<ISynchronizedScrolling>> _panels = new();
         private readonly object _lock = new();
         private bool _isEnabled = true;
@@ -39,10 +40,12 @@ namespace VoiceStudio.App.Services
 
         public SynchronizedScrollService(
             IEventAggregator? eventAggregator = null,
-            ILogger<SynchronizedScrollService>? logger = null)
+            ILogger<SynchronizedScrollService>? logger = null,
+            ThrottledEventPublisher? throttledPublisher = null)
         {
             _eventAggregator = eventAggregator;
             _logger = logger;
+            _throttledPublisher = throttledPublisher;
         }
 
         /// <inheritdoc />
@@ -152,7 +155,12 @@ namespace VoiceStudio.App.Services
             ScrollBroadcast?.Invoke(this, args);
 
             // Publish through event aggregator
-            _eventAggregator?.Publish(new ScrollSyncEvent(args));
+            // HIGH_FREQUENCY_EVENT_THROTTLE_POLICY: 50-100ms Trailing
+            var evt = new ScrollSyncEvent(args);
+            if (_throttledPublisher != null)
+                _throttledPublisher.Publish(evt, throttleMs: 75, mode: ThrottleMode.Trailing);
+            else
+                _eventAggregator?.Publish(evt);
         }
 
         /// <inheritdoc />

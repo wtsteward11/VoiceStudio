@@ -157,6 +157,7 @@ public partial class TimelineViewModel : BaseViewModel, IPanelStatePersistable, 
     public const string PanelIdConst = "timeline";
     private readonly ITimelineGateway _timelineGateway;
     private readonly IEventAggregator? _eventAggregator;
+    private readonly ThrottledEventPublisher? _throttledPublisher;
     private ISubscriptionToken? _assetSelectedToken;
     private ISubscriptionToken? _profileSelectedToken;
     
@@ -195,6 +196,7 @@ public partial class TimelineViewModel : BaseViewModel, IPanelStatePersistable, 
 
         // Initialize EventAggregator and subscribe to cross-panel events (Phase 4)
         _eventAggregator = AppServices.TryGetEventAggregator();
+        _throttledPublisher = AppServices.TryGetThrottledEventPublisher();
         if (_eventAggregator != null)
         {
             _assetSelectedToken = _eventAggregator.Subscribe<AssetSelectedEvent>(OnAssetSelected);
@@ -477,22 +479,33 @@ public partial class TimelineViewModel : BaseViewModel, IPanelStatePersistable, 
     {
         IsPlaying = true;
         // Publish playback state change for cross-panel synchronization (Phase 4)
-        _eventAggregator?.Publish(new PlaybackStateChangedEvent(PanelIdConst, true, CurrentTime));
+        // HIGH_FREQUENCY_EVENT_THROTTLE_POLICY: 100ms Trailing
+        var evt = new PlaybackStateChangedEvent(PanelIdConst, true, CurrentTime);
+        if (_throttledPublisher != null)
+            _throttledPublisher.Publish(evt, throttleMs: 100, mode: ThrottleMode.Trailing);
+        else
+            _eventAggregator?.Publish(evt);
     }
 
     public void Pause()
     {
         IsPlaying = false;
-        // Publish playback state change for cross-panel synchronization (Phase 4)
-        _eventAggregator?.Publish(new PlaybackStateChangedEvent(PanelIdConst, false, CurrentTime));
+        var evt = new PlaybackStateChangedEvent(PanelIdConst, false, CurrentTime);
+        if (_throttledPublisher != null)
+            _throttledPublisher.Publish(evt, throttleMs: 100, mode: ThrottleMode.Trailing);
+        else
+            _eventAggregator?.Publish(evt);
     }
 
     public void Stop()
     {
         IsPlaying = false;
         CurrentTime = 0;
-        // Publish playback state change for cross-panel synchronization (Phase 4)
-        _eventAggregator?.Publish(new PlaybackStateChangedEvent(PanelIdConst, false, 0));
+        var evt = new PlaybackStateChangedEvent(PanelIdConst, false, 0);
+        if (_throttledPublisher != null)
+            _throttledPublisher.Publish(evt, throttleMs: 100, mode: ThrottleMode.Trailing);
+        else
+            _eventAggregator?.Publish(evt);
     }
 
     public async Task AddTrackAsync(TrackType type)
@@ -701,11 +714,16 @@ public partial class TimelineViewModel : BaseViewModel, IPanelStatePersistable, 
     private void PublishSelectionChangedEvent()
     {
         var selectedClipIds = SelectedClips.Select(c => c.Id).ToList();
-        _eventAggregator?.Publish(new TimelineSelectionChangedEvent(
-            PanelIdConst, 
-            SelectionStart, 
-            SelectionEnd, 
-            selectedClipIds));
+        var evt = new TimelineSelectionChangedEvent(
+            PanelIdConst,
+            SelectionStart,
+            SelectionEnd,
+            selectedClipIds);
+        // HIGH_FREQUENCY_EVENT_THROTTLE_POLICY: 100ms Trailing
+        if (_throttledPublisher != null)
+            _throttledPublisher.Publish(evt, throttleMs: 100, mode: ThrottleMode.Trailing);
+        else
+            _eventAggregator?.Publish(evt);
     }
 
     private async Task DeleteSelectedAsync()

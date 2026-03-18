@@ -4,6 +4,7 @@
 > Cross-reference: [PANEL_COMMUNICATION_MATRIX](../architecture/PANEL_COMMUNICATION_MATRIX.md)
 >
 > **Last Updated**: 2026-03-06  
+> **Last Verified**: 2026-03-17 (Premium Reliability Task 5 re-audit)  
 > **Status**: Active
 
 ## Overview
@@ -69,11 +70,11 @@ Module panels: VoiceCloningWizard, MultiVoiceGenerator, RealTimeConverter, Emoti
 | Category | Details |
 |----------|---------|
 | **Publishes** | `SynthesisCompletedEvent` (L499) |
-| **Subscribes** | `VoiceProfileSelectedEvent` (L153) |
+| **Subscribes** | `VoiceProfileSelectedEvent` (L154) |
 | **Backend** | Via BackendClient |
 | **Shared Services** | IEventAggregator |
 | **Throttle** | None |
-| **Unsubscribe** | ❌ No Unsubscribe |
+| **Unsubscribe** | ❌ No Unsubscribe — **Known debt** (constructor subscription; no Dispose/OnDeactivatedAsync) |
 
 ### Training (TrainingView / TrainingViewModel)
 
@@ -95,18 +96,29 @@ Module panels: VoiceCloningWizard, MultiVoiceGenerator, RealTimeConverter, Emoti
 | **Backend** | Clone-related APIs |
 | **Shared Services** | IEventAggregator |
 | **Throttle** | None |
-| **Unsubscribe** | ❌ No Unsubscribe |
+| **Unsubscribe** | ❌ No Unsubscribe — **Known debt** (constructor subscription; no Dispose/OnDeactivatedAsync) |
 
 ### VoiceCloningWizard (VoiceCloningWizardView / VoiceCloningWizardViewModel)
 
 | Category | Details |
 |----------|---------|
 | **Publishes** | `ProfileCreatedEvent`, `NavigateToEvent` |
-| **Subscribes** | `CloneReferenceSelectedEvent` (L115) |
+| **Subscribes** | `CloneReferenceSelectedEvent` (L118) |
 | **Backend** | `/api/voice/clone/wizard/*`, `/api/audio/upload` |
 | **Shared Services** | IEventAggregator |
 | **Throttle** | None |
-| **Unsubscribe** | ❌ No Unsubscribe |
+| **Unsubscribe** | ❌ No Unsubscribe — **Known debt** (constructor subscription; no Dispose/OnDeactivatedAsync) |
+
+### ScriptEditor (ScriptEditorView / ScriptEditorViewModel)
+
+| Category | Details |
+|----------|---------|
+| **Publishes** | None |
+| **Subscribes** | Selection/timeline via handler (OnActivatedAsync) |
+| **Backend** | Script/SSML APIs |
+| **Shared Services** | IScriptEditorClient |
+| **Throttle** | None |
+| **Unsubscribe** | ✅ OnDeactivatedAsync unsubscribes selection handler |
 
 ### Transcribe (TranscribeView / TranscribeViewModel)
 
@@ -134,23 +146,23 @@ Module panels: VoiceCloningWizard, MultiVoiceGenerator, RealTimeConverter, Emoti
 
 | Category | Details |
 |----------|---------|
-| **Publishes** | None (subscribe-only per matrix) |
-| **Subscribes** | `TimelineSelectionChangedEvent`, `AssetSelectedEvent` |
+| **Publishes** | None |
+| **Subscribes** | MultiSelectService.SelectionChanged (channel selection); SelectedAudioId/SelectedProjectId from context/store |
 | **Backend** | Effects/mixer APIs |
-| **Shared Services** | IEventAggregator |
-| **Throttle** | TimelineSelectionChangedEvent — **SHOULD THROTTLE** |
-| **Unsubscribe** | ❌ No Unsubscribe |
+| **Shared Services** | IEffectsMeterClient, IEffectChainClient, IMixerStateClient, MultiSelectService |
+| **Throttle** | N/A (no EventAggregator high-freq) |
+| **Unsubscribe** | ✅ Dispose disposes _disposalCts, _pollingCts, _selectionLoadCts; OnDeactivatedAsync exists; MultiSelectService handler not explicitly unsubscribed — **Partial** |
 
 ### Analyzer (AnalyzerView / AnalyzerViewModel)
 
 | Category | Details |
 |----------|---------|
-| **Publishes** | None |
-| **Subscribes** | `AssetSelectedEvent`, `VoiceProfileSelectedEvent` |
+| **Publishes** | None (sets transport via IContextManager.SetCurrentPlayable) |
+| **Subscribes** | IAudioPlayerService.PositionChanged (playback position) |
 | **Backend** | Analysis APIs |
-| **Shared Services** | IEventAggregator, IAudioPlayerService |
+| **Shared Services** | IContextManager, IAudioPlayerService, IAnalyzerClient |
 | **Throttle** | None |
-| **Unsubscribe** | Partial (audio player) |
+| **Unsubscribe** | ✅ Dispose unsubscribes PositionChanged |
 
 ### Settings (SettingsView / SettingsViewModel)
 
@@ -242,7 +254,7 @@ Events that MAY be used in `Publish<T>` and `Subscribe<T>`:
 | GAP-W1 | Library | ~~Missing `SynthesisCompletedEvent` subscription~~ **RESOLVED** |
 | GAP-W2 | Timeline | ~~Missing SynthesisCompletedEvent~~ **RESOLVED** — auto-add on synthesis complete |
 | GAP-W3 | Multiple | ~~No Unsubscribe~~ **Library, VoiceSynthesis, Timeline, Features/Timeline, Profiles**: IPanelLifecycle.OnDeactivatedAsync |
-| GAP-W4 | Timeline, EffectsMixer | PlaybackStateChangedEvent, TimelineSelectionChangedEvent need throttling |
+| GAP-W4 | Timeline | PlaybackStateChangedEvent, TimelineSelectionChangedEvent need throttling (EffectsMixer uses MultiSelectService, not EventAggregator) |
 | GAP-W5 | Import flow | AssetAddedEvent published from Import; Library subscribes — verify ImportView/FileOperationsHandler wiring |
 
 ---

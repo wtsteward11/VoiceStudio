@@ -225,12 +225,20 @@ public sealed class BackendProcessManager : IDisposable
             Debug.WriteLine($"[BackendProcessManager] Starting backend: {psi.FileName} {psi.Arguments}");
             Debug.WriteLine($"[BackendProcessManager] Working directory: {appRoot}");
 
+            var sessionStart = Stopwatch.StartNew();
+            var firstStdoutLogged = 0;
+            var firstStderrLogged = 0;
+
             _backendProcess = new Process { StartInfo = psi };
             _backendProcess.OutputDataReceived += (s, e) =>
             {
                 if (!string.IsNullOrEmpty(e.Data))
                 {
                     Debug.WriteLine($"[Backend] {e.Data}");
+                    if (Interlocked.Exchange(ref firstStdoutLogged, 1) == 0)
+                    {
+                        _diagnostics?.Log("milestone_first_stdout_ms", sessionStart.ElapsedMilliseconds.ToString());
+                    }
                 }
             };
             _backendProcess.ErrorDataReceived += (s, e) =>
@@ -238,6 +246,10 @@ public sealed class BackendProcessManager : IDisposable
                 if (!string.IsNullOrEmpty(e.Data))
                 {
                     Debug.WriteLine($"[Backend ERR] {e.Data}");
+                    if (Interlocked.Exchange(ref firstStderrLogged, 1) == 0)
+                    {
+                        _diagnostics?.Log("milestone_first_stderr_ms", sessionStart.ElapsedMilliseconds.ToString());
+                    }
                 }
             };
             _backendProcess.EnableRaisingEvents = true;
@@ -252,10 +264,12 @@ public sealed class BackendProcessManager : IDisposable
             _backendProcess.BeginErrorReadLine();
 
             Debug.WriteLine($"[BackendProcessManager] Backend process started (PID: {_backendProcess.Id})");
+            _diagnostics?.Log("milestone_process_started_ms", sessionStart.ElapsedMilliseconds.ToString());
             _diagnostics?.Log("process_started", $"PID={_backendProcess.Id}");
 
-            // Wait for backend to become healthy
-            var (healthy, attempts, elapsed) = await WaitForHealthWithMetricsAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            // Wait for backend to become healthy (45s for first launch to allow cold Python/uvicorn startup)
+            var healthTimeout = TimeSpan.FromSeconds(45);
+            var (healthy, attempts, elapsed) = await WaitForHealthWithMetricsAsync(healthTimeout, cancellationToken, sessionStart, port);
             _diagnostics?.Log("health_probe_attempts", attempts.ToString());
             _diagnostics?.Log("health_probe_elapsed_ms", elapsed.TotalMilliseconds.ToString("F0"));
 
@@ -298,22 +312,42 @@ public sealed class BackendProcessManager : IDisposable
     /// </summary>
     private async Task<bool> WaitForHealthAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
     {
-        var (healthy, _, _) = await WaitForHealthWithMetricsAsync(timeout, cancellationToken);
+        var (healthy, _, _) = await WaitForHealthWithMetricsAsync(timeout, cancellationToken, null, 0);
         return healthy;
     }
 
     /// <summary>
     /// Waits for the backend to become healthy, returning attempt count and elapsed time.
+    /// Logs milestone_first_tcp_ms and milestone_first_health_ms when diagnostics and port are provided.
     /// </summary>
-    private async Task<(bool Success, int Attempts, TimeSpan Elapsed)> WaitForHealthWithMetricsAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
+    private async Task<(bool Success, int Attempts, TimeSpan Elapsed)> WaitForHealthWithMetricsAsync(
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default,
+        Stopwatch? sessionStart = null,
+        int port = 0)
     {
         var sw = Stopwatch.StartNew();
         var attempts = 0;
+        var firstTcpLogged = 0;
         while (sw.Elapsed < timeout && !cancellationToken.IsCancellationRequested)
         {
             attempts++;
+
+            // Log first TCP reachability milestone (once, when TCP first becomes reachable)
+            if (port > 0 && sessionStart != null && Volatile.Read(ref firstTcpLogged) == 0)
+            {
+                if (await IsTcpReachableAsync(port, cancellationToken) && Interlocked.Exchange(ref firstTcpLogged, 1) == 0)
+                {
+                    _diagnostics?.Log("milestone_first_tcp_ms", sessionStart.ElapsedMilliseconds.ToString());
+                }
+            }
+
             if (await IsBackendHealthyAsync(cancellationToken))
             {
+                if (sessionStart != null)
+                {
+                    _diagnostics?.Log("milestone_first_health_ms", sessionStart.ElapsedMilliseconds.ToString());
+                }
                 return (true, attempts, sw.Elapsed);
             }
 
@@ -321,6 +355,20 @@ public sealed class BackendProcessManager : IDisposable
         }
 
         return (false, attempts, sw.Elapsed);
+    }
+
+    private static async Task<bool> IsTcpReachableAsync(int port, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync("127.0.0.1", port, cancellationToken);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>

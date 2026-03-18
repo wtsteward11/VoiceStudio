@@ -1,6 +1,10 @@
 # VoiceStudio Complete Phase Roadmap
 ## From Shell to 100% Studio Functionality
 
+> **Classification**: Vision/Spec — phase and task guidance. **For active execution, see [.cursor/STATE.md](../../.cursor/STATE.md) and active hardening plans.**
+
+---
+
 ## 🚦 Global Guardrails (Remind Cursor Constantly)
 
 **Put this near the top of any big instruction you give Cursor:**

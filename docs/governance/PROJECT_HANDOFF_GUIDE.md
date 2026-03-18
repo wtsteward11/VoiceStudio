@@ -74,13 +74,19 @@ Role prompts: `.cursor/prompts/ROLE_PROMPTS_INDEX.md`. Escalation: [VALIDATOR_ES
 
 ---
 
-## Next Steps
+## Active Execution (Operational Truth)
 
-- **Roadmap**: [MASTER_ROADMAP_UNIFIED.md](MASTER_ROADMAP_UNIFIED.md) — Phases 0–5 COMPLETE; Phase 2 follow-up (TASK-0013) COMPLETE. Next: Phase 6+ items or tech-debt from [TECH_DEBT_REGISTER.md](TECH_DEBT_REGISTER.md) (wizard e2e, protobuf CVE, CI baseline proof, etc.).
-- **Realignment**: Before updating plan/roadmap/roles, use [Final Sweep — Consolidated for Realignment](../reports/audit/FINAL_SWEEP_CONSOLIDATED_FOR_REALIGNMENT_2026-01-30.md) (single reference for all roles): §6 realignment checklist (canonical/governance, task briefs, workflows, implementation gaps, role verification). Detailed sweep: [Final Sweep — All Roles (Pre-Realignment)](../reports/audit/FINAL_SWEEP_ALL_ROLES_PRE_REALIGNMENT_2026-01-30.md). Registry entries for still-missing items (ARCHIVE_POLICY, GOVERNANCE_LOCK, RULE_PROPOSAL_TEMPLATE, Part*.md, docs/archive/governance/) are annotated in [CANONICAL_REGISTRY.md](CANONICAL_REGISTRY.md).
-- **Governance/docs**: Registry and handoff alignment per [CANONICAL_REGISTRY.md](CANONICAL_REGISTRY.md); optional link-check CI; archiving policy in DOCUMENT_GOVERNANCE.
+**For active execution, see [.cursor/STATE.md](../../.cursor/STATE.md) and active hardening plans.** Roadmap and spec docs below are vision/spec or historical context; STATE.md ACTIVE WINDOW is the single source of truth for current task, next steps, blockers, and proof index.
+
+---
+
+## Roadmap & Spec Context (Vision / Historical)
+
+- **Roadmap**: [MASTER_ROADMAP_UNIFIED.md](MASTER_ROADMAP_UNIFIED.md) — Phases 0–5 COMPLETE; [VOICESTUDIO_COMPLETION_ROADMAP_V2.md](VOICESTUDIO_COMPLETION_ROADMAP_V2.md) for CI-enforced gaps. Vision/spec; active work in STATE.md.
+- **Realignment**: Before updating plan/roadmap/roles, use [Final Sweep — Consolidated for Realignment](../reports/audit/FINAL_SWEEP_CONSOLIDATED_FOR_REALIGNMENT_2026-01-30.md) (single reference for all roles): §6 realignment checklist. Registry annotations in [CANONICAL_REGISTRY.md](CANONICAL_REGISTRY.md).
+- **Governance/docs**: Registry and handoff alignment per [CANONICAL_REGISTRY.md](CANONICAL_REGISTRY.md).
 - **Task briefs**: [docs/tasks/README.md](../tasks/README.md); active task and next steps in [.cursor/STATE.md](../../.cursor/STATE.md).
-- **Preflight live check (Role 4)**: When backend on 8001, run `curl http://localhost:8001/api/health/preflight` and record 200 in STATE or Proof Index. See [CORE_PLATFORM_STREAM_STATUS_2026-01-29.md](../reports/verification/CORE_PLATFORM_STREAM_STATUS_2026-01-29.md).
+- **Preflight live check (Role 4)**: When backend on 8001, run `curl http://localhost:8001/api/health/preflight` and record 200 in STATE or Proof Index.
 
 ---
 
@@ -113,5 +119,6 @@ Lifecycle: Analyze → Blueprint → Construct → Validate. See [docs/tasks/REA
 
 | Date | Change |
 |------|--------|
+| 2026-03-16 | Truth-sync: Active Execution section points to STATE.md as operational truth; roadmap/spec docs marked vision/historical. Premium Reliability Coherence Pass Task 11. |
 | 2026-01-30 | Created from PROJECT_HANDOFF_DOCUMENT_2025-01-28.md; updated for post-Phase-5 state; added task brief creation, Phase 6+ track, preflight check. |
 | 2026-01-30 | Next Steps: added Realignment bullet linking to Final Sweep (Pre-Realignment) and CANONICAL_REGISTRY annotations for still-missing items. |

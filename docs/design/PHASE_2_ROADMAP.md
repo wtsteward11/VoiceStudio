@@ -1,5 +1,9 @@
 # VoiceStudio Phase 2 Roadmap
 
+> **Classification**: Vision/Spec — phase 2 feature guidance. **For active execution, see [.cursor/STATE.md](../../.cursor/STATE.md) and active hardening plans.**
+
+---
+
 ## Overview
 
 Phase 1 delivers the complete UI shell and structure. Phase 2 adds the advanced features and polish.

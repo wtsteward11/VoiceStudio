@@ -3,10 +3,12 @@
 > **Version**: 1.0.0  
 > **Last Updated**: 2026-02-10  
 > **Owner**: Overseer (Role 0)  
-> **Status**: ACTIVE — Primary canonical roadmap  
+> **Status**: Vision/Spec — phase and milestone reference  
 > **Supersedes**: MASTER_ROADMAP.md, MASTER_ROADMAP_SUMMARY.md, MASTER_ROADMAP_INDEX.md (archived to `docs/archive/governance/`)
 
-This is the **single source of truth** for VoiceStudio's development roadmap. All other roadmap documents are superseded or archived.
+> **For active execution, see [.cursor/STATE.md](../../.cursor/STATE.md) and active hardening plans.** This roadmap is the canonical phase/milestone reference; current task, next steps, and blockers live in STATE.md ACTIVE WINDOW.
+
+This is the **single source of truth** for VoiceStudio's development roadmap phases and milestones. All other roadmap documents are superseded or archived.
 
 ---
 

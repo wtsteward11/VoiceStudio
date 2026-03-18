@@ -1,5 +1,9 @@
 # VoiceStudio Development Roadmap
 
+> **Classification**: Vision/Spec — architectural and phase guidance. **For active execution, see [.cursor/STATE.md](../../.cursor/STATE.md) and active hardening plans.**
+
+---
+
 ## ✅ MainWindow Shell Complete
 
 The complete MainWindow.xaml skeleton is now implemented with:

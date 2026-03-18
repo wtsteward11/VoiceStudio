@@ -2,6 +2,8 @@
 
 **Date**: March 3, 2026 | **Target**: v1.1.0 | **Confidential**
 
+> **For active execution, see [.cursor/STATE.md](../../.cursor/STATE.md) and active hardening plans.** This doc defines CI-enforced gaps and phases; current work is in STATE.md.
+
 **Stack**: WinUI 3 / C# + FastAPI / Python
 **Engines**: XTTS v2 (primary) · Piper · STT engine (whisper_cpp, faster-whisper, or equivalent) · 42 adapters
 

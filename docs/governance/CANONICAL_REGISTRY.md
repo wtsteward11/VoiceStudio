@@ -21,7 +21,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Archive Policy | `docs/governance/ARCHIVE_POLICY.md` | — | **DEFERRED** — Use [document-lifecycle.mdc](.cursor/rules/workflows/document-lifecycle.mdc) and archive structure in `docs/archive/` |
 | Governance Lock | `docs/governance/GOVERNANCE_LOCK.md` | — | **DEFERRED** — Low priority |
 | Definition of Done | `docs/governance/DEFINITION_OF_DONE.md` | 2026-01-25 | Consolidated completion criteria |
-| Session State | `.cursor/STATE.md` | 2026-01-25 | Active task, phase, proofs |
+| Session State | `.cursor/STATE.md` | 2026-01-25 | **Operational truth** — active task, next steps, blockers, proofs. For active execution, see STATE.md ACTIVE WINDOW; roadmap/spec docs are vision/spec or historical |
 | Memory Index | `openmemory.md` | 2026-01-25 | Living project index for AI context |
 | **Project Handoff Guide** | `docs/governance/PROJECT_HANDOFF_GUIDE.md` | 2026-01-30 | Maintainer entry point; gate status, build/test, structure, roles, task brief creation |
 | **Overseer Newcomer Handoff** | `docs/governance/overseer/OVERSEER_NEWCOMER_HANDOFF.md` | 2026-03-12 | New Overseer (Role 0) onboarding; Day 1 reads, first commands, daily cadence, non-negotiables |
@@ -48,7 +48,18 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **IBackendClient Unresolved Queue** | `docs/design/IBACKENDCLIENT_UNRESOLVED_QUEUE.md` | 2026-03-13 | Live ranked list of unresolved IBackendClient consumers; use for next migration wave |
 | **IBackendClient Inspection Top 3** | `docs/design/IBACKENDCLIENT_INSPECTION_TOP3.md` | 2026-03-13 | File-level inspection for EffectsMixer, TemplateLibrary, VoiceMorph; no migration without sheet |
 | **EffectsMixer Domain Split Analysis** | `docs/design/EFFECTSMIXER_DOMAIN_SPLIT_ANALYSIS.md` | 2026-03-13 | Design-before-implementation; three seams (Meter, EffectChain, MixerState); Option C |
+| **EffectsMixer Lifecycle Verification** | `docs/design/EFFECTSMIXER_LIFECYCLE_VERIFICATION.md` | 2026-03-13 | Confirmed runtime lifecycle risk; lifecycle hardening done (IPanelLifecycle, IDisposable, no ContinueWith) |
 | **Retained-Async Baseline** | `.ci/retained_async_baseline.txt` | 2026-03-13 | Known violations; check fails only on NEW violations (Option C) |
+| **Retained-Async Exemptions** | `docs/design/RETAINED_ASYNC_EXEMPTIONS.md` | 2026-03-15 | Baseline strategy, exemption rationale, documented exemptions |
+| **Retained-Async Risk Assessment** | `docs/design/RETAINED_ASYNC_RISK_ASSESSMENT.md` | 2026-03-15 | Top 5 high-risk ViewModels; staleness guard remediation path |
+| **Golden Path Proof Status** | `docs/reports/verification/GOLDEN_PATH_PROOF_STATUS.md` | 2026-03-15 | Golden path E2E proof requirements, blocker (STT), verification steps |
+| **Release XAML Smoke Gate** | `docs/design/RELEASE_XAML_SMOKE_GATE.md` | 2026-03-15 | Where Release XAML smoke runs; manual, not CI gate |
+| **Playback Entry Points** | `docs/design/PLAYBACK_ENTRY_POINTS.md` | 2026-03-16 | Global transport UX; playback entry points map; panel play affordances; transport ownership rules |
+| **Transport Panel Publishers** | `docs/design/TRANSPORT_PANEL_PUBLISHERS.md` | 2026-03-16 | Audit of when each panel sets/clears transport ownership; last-writer-wins rules |
+| **Hardening Wave Closure** | `docs/reports/verification/HARDENING_WAVE_CLOSURE_2026.md` | 2026-03-16 | Release-Trust Hardening Wave closure; testhost teardown, Library lifecycle, playback, proof integrity |
+| **Transport Wave 4 Shell Decomposition** | `docs/design/TRANSPORT_WAVE_4_SHELL_DECOMPOSITION_PLAN.md` | 2026-03-16 | Transport shortcut coordinator, import workflow extraction, PlayableMediaContext, smoke automation |
+| **Startup Orchestration Hardening** | `docs/design/STARTUP_ORCHESTRATION_HARDENING_PLAN.md` | 2026-03-16 | Backend auto-start hardening: explicit phases, startup states, production runtime discovery, readiness gate, failure recovery UX |
+| **Backend Ownership Policy** | `docs/design/BACKEND_OWNERSHIP_POLICY.md` | 2026-03-14 | Backend lifecycle rules: reuse, port conflict, stale backend, frontend exit, app root, runtime discovery |
 
 ## Architecture
 
@@ -124,6 +135,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Timeline Hardening and Next Tasks Plan** | `docs/design/TIMELINE_HARDENING_AND_NEXT_TASKS_PLAN_2026-03-11.md` | 2026-03-11 | Ruthless assessment; verification of 9.4/11.1; Task 10.1 partial status; next 8 tasks in order (Timeline 1A–1C, dialog baseline, audit, proof, mypy, workflow, skip-debt) |
 | **Next 10 Tasks Plan v2** | `docs/design/NEXT_10_TASKS_PLAN_V2.md` | 2026-03-13 | Seam migration (MultiVoiceGenerator, EnsembleSynthesis, MiniTimeline, Automation, GlobalSearch, EffectsMixer); lifecycle audit; seam test audit; doc fix; verification gate |
 | **Comprehensive Gap Analysis and Remediation Plan** | `docs/design/COMPREHENSIVE_GAP_ANALYSIS_AND_REMEDIATION_PLAN.md` | 2026-03-11 | Verified work completed vs. remaining; 9 gaps logged; 8-phase remediation plan (R1–R8); P1–P4 priorities |
+| **MainWindow Decomposition Plan** | `docs/design/MAINWINDOW_DECOMPOSITION_PLAN.md` | 2026-03-15 | Next extraction target: Status Bar Orchestration; future slices: import flow, navigation-shell |
 | **Cross-Role Escalation Matrix** | `docs/governance/CROSS_ROLE_ESCALATION_MATRIX.md` | 2026-01-29 | Decision tree and routing table for cross-role escalation; when to use Debug Agent vs other roles |
 | **Handoff Protocol** | `docs/governance/HANDOFF_PROTOCOL.md` | 2026-01-29 | Standardized protocol for issue escalation and cross-role handoffs; templates and examples |
 
@@ -161,6 +173,8 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Validator Escalation Protocol | `docs/governance/VALIDATOR_ESCALATION.md` | 2026-01-28 | Overseer queue, HIGH PRIORITY, escalation triggers |
 | **Overseer Final Handoff** | `docs/governance/overseer/handoffs/OVERSEER_FINAL_HANDOFF.md` | 2026-02-18 | Successor handoff: architecture, risks, file map, verification playbook, recommendations (10 sections) |
 | **Overseer Session Handoff 2026-03-13** | `docs/governance/overseer/handoffs/OVERSEER_SESSION_HANDOFF_2026-03-13.md` | 2026-03-13 | Session handoff: ImageSearch migration complete; completion_guard FAIL; next target Rank 7 (TemplateLibraryViewModel) |
+| **Overseer Session Handoff 2026-03-14** | `docs/governance/overseer/handoffs/OVERSEER_SESSION_HANDOFF_2026-03-14.md` | 2026-03-14 | Session handoff: VoiceMorphingBlendingViewModel migration; VoiceBrowserViewModelTests fix; 61 migrated; regenerate queue for next target |
+| **Overseer Session Handoff 2026-03-16** | `docs/governance/overseer/handoffs/OVERSEER_SESSION_HANDOFF_2026-03-16.md` | 2026-03-16 | Session handoff: Startup Orchestration Round 2 plan truth sync; Transport Wave 4 complete; commit plan docs if completion_guard FAILs |
 | Context Manager Integration | `docs/governance/CONTEXT_MANAGER_INTEGRATION.md` | 2026-01-25 | Context manager architecture, ownership, and usage by role |
 | Role Boundaries Protocol | `Recovery Plan/ROLE_SYSTEM_AND_OVERSEER_PROTOCOL.md` | 2026-01-25 | Role playbooks, handshake rules |
 | Role Cheatsheet | `docs/developer/ROLE_CHEATSHEET.md` | 2026-01-25 | Quick one-liner prompts |

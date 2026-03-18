@@ -1,5 +1,9 @@
 # MainWindow.xaml Structure
 
+> **Classification**: Reference — structure documentation. **For active execution, see [.cursor/STATE.md](../../.cursor/STATE.md).**
+
+---
+
 ## Complete Shell Implementation
 
 The MainWindow.xaml provides a complete, production-ready shell with:
@@ -84,7 +88,9 @@ BottomPanelHost.Content = new MacroView();
 - **Status Bar**: 26px height
 - **Panel Margins**: 4-8px spacing
 
-## Next Steps
+## Next Steps (Historical — Implementation Guidance)
+
+*For current project next steps, see [.cursor/STATE.md](../../.cursor/STATE.md).*
 
 1. Wire up navigation rail buttons to switch panel content
 2. Connect transport controls to playback engine

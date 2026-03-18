@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -20,7 +21,7 @@ namespace VoiceStudio.App.Tests.ViewModels
   public class RecordingViewModelTests
   {
     private IViewModelContext _context = null!;
-    private Mock<IBackendClient> _mockBackendClient = null!;
+    private Mock<IRecordingClient> _mockRecordingClient = null!;
     private Mock<IAudioPlayerService> _mockAudioPlayer = null!;
     private DispatcherQueueController? _dispatcherController;
     private RecordingViewModel _sut = null!;
@@ -32,7 +33,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       _dispatcherController = DispatcherQueueController.CreateOnDedicatedThread();
       var dispatcher = _dispatcherController.DispatcherQueue;
       _context = new ViewModelContext(NullLogger.Instance, dispatcher);
-      _mockBackendClient = new Mock<IBackendClient>();
+      _mockRecordingClient = new Mock<IRecordingClient>();
       _mockAudioPlayer = new Mock<IAudioPlayerService>();
       _mockAudioPlayer.Setup(x => x.PlayBackendAudioIdAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Action>()))
           .Returns(Task.CompletedTask);
@@ -41,7 +42,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockAudioPlayer.Setup(x => x.PlayUrlAsync(It.IsAny<string>(), It.IsAny<Action>()))
           .Returns(Task.CompletedTask);
 
-      _sut = new RecordingViewModel(_context, _mockBackendClient.Object, _mockAudioPlayer.Object);
+      _sut = new RecordingViewModel(_context, _mockRecordingClient.Object, _mockAudioPlayer.Object);
     }
 
     [TestCleanup]
@@ -56,7 +57,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestMethod]
     public void PanelId_ReturnsRecording()
     {
-      Assert.AreEqual("recording", _sut.PanelId);
+      Assert.AreEqual(PanelIds.Recording, _sut.PanelId);
     }
 
     [TestMethod]
@@ -81,9 +82,20 @@ namespace VoiceStudio.App.Tests.ViewModels
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+    public void Constructor_WithNullRecordingClient_ThrowsArgumentNullException()
     {
       _ = new RecordingViewModel(_context, null!, _mockAudioPlayer.Object);
+    }
+
+    /// <summary>
+    /// Verifies Dispose can be called multiple times without throwing.
+    /// </summary>
+    [TestMethod]
+    public void Dispose_CanBeCalledMultipleTimes()
+    {
+      var vm = new RecordingViewModel(_context, _mockRecordingClient.Object, _mockAudioPlayer.Object);
+      vm.Dispose();
+      vm.Dispose();
     }
 
     #endregion

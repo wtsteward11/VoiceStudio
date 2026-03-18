@@ -65,7 +65,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     {
       var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
       Assert.IsNotNull(vm);
-      Assert.AreEqual("effectsmixer", vm.PanelId);
+      Assert.AreEqual(PanelIds.EffectsMixer, vm.PanelId);
       Assert.IsNotNull(vm.LoadMetersCommand);
       Assert.IsNotNull(vm.LoadEffectChainsCommand);
     }
@@ -96,6 +96,17 @@ namespace VoiceStudio.App.Tests.ViewModels
     {
       var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
       Assert.IsTrue(vm is IPanelLifecycle);
+    }
+
+    /// <summary>
+    /// Verifies Dispose cleans up without throwing. Prevents subscription leak.
+    /// </summary>
+    [TestMethod]
+    public void Dispose_DoesNotThrow()
+    {
+      var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
+      vm.Dispose();
+      vm.Dispose(); // Idempotent
     }
   }
 }

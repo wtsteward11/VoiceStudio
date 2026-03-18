@@ -8,6 +8,7 @@ using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -73,7 +74,18 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestCleanup]
     public void Cleanup()
     {
-      // TimelineViewModel doesn't implement IDisposable
+      _ = _sut?.OnDeactivatedAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Verifies OnDeactivatedAsync disposes EventAggregator tokens without throwing.
+    /// Prevents subscription leak (GAP-W3).
+    /// </summary>
+    [TestMethod]
+    public async Task OnDeactivatedAsync_DisposesTokens_DoesNotThrow()
+    {
+      await _sut.OnDeactivatedAsync(CancellationToken.None);
+      await _sut.OnDeactivatedAsync(CancellationToken.None); // Idempotent
     }
 
     #region Panel Properties Tests
@@ -81,7 +93,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestMethod]
     public void PanelId_ReturnsTimeline()
     {
-      Assert.AreEqual("timeline", _sut.PanelId);
+      Assert.AreEqual(PanelIds.Timeline, _sut.PanelId);
     }
 
     [TestMethod]

@@ -74,7 +74,7 @@ Module panels: VoiceCloningWizard, MultiVoiceGenerator, RealTimeConverter, Emoti
 | **Backend** | Via BackendClient |
 | **Shared Services** | IEventAggregator |
 | **Throttle** | None |
-| **Unsubscribe** | ❌ No Unsubscribe — **Known debt** (constructor subscription; no Dispose/OnDeactivatedAsync) |
+| **Unsubscribe** | ✅ Dispose disposes _voiceProfileSelectedSubscription |
 
 ### Training (TrainingView / TrainingViewModel)
 
@@ -96,7 +96,7 @@ Module panels: VoiceCloningWizard, MultiVoiceGenerator, RealTimeConverter, Emoti
 | **Backend** | Clone-related APIs |
 | **Shared Services** | IEventAggregator |
 | **Throttle** | None |
-| **Unsubscribe** | ❌ No Unsubscribe — **Known debt** (constructor subscription; no Dispose/OnDeactivatedAsync) |
+| **Unsubscribe** | ✅ Dispose disposes _cloneReferenceSubscription |
 
 ### VoiceCloningWizard (VoiceCloningWizardView / VoiceCloningWizardViewModel)
 
@@ -107,7 +107,7 @@ Module panels: VoiceCloningWizard, MultiVoiceGenerator, RealTimeConverter, Emoti
 | **Backend** | `/api/voice/clone/wizard/*`, `/api/audio/upload` |
 | **Shared Services** | IEventAggregator |
 | **Throttle** | None |
-| **Unsubscribe** | ❌ No Unsubscribe — **Known debt** (constructor subscription; no Dispose/OnDeactivatedAsync) |
+| **Unsubscribe** | ✅ Dispose disposes _cloneReferenceSubscription |
 
 ### ScriptEditor (ScriptEditorView / ScriptEditorViewModel)
 

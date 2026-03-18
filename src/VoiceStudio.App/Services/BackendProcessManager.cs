@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Threading;
@@ -17,6 +18,7 @@ public sealed class BackendProcessManager : IDisposable
 {
     private readonly string _backendUrl;
     private readonly HttpClient _httpClient;
+    private readonly IStartupDiagnosticsWriter? _diagnostics;
     private Process? _backendProcess;
     private bool _isStarting;
     private bool _disposed;
@@ -46,7 +48,7 @@ public sealed class BackendProcessManager : IDisposable
     /// </summary>
     public bool IsStarting => _isStarting;
 
-    public BackendProcessManager(string backendUrl = "http://localhost:8000")
+    public BackendProcessManager(string backendUrl = "http://localhost:8000", IStartupDiagnosticsWriter? diagnostics = null)
     {
         _backendUrl = backendUrl;
         _httpClient = new HttpClient
@@ -54,6 +56,7 @@ public sealed class BackendProcessManager : IDisposable
             BaseAddress = new Uri(backendUrl),
             Timeout = TimeSpan.FromSeconds(5)
         };
+        _diagnostics = diagnostics;
     }
 
     /// <summary>
@@ -109,30 +112,43 @@ public sealed class BackendProcessManager : IDisposable
         }
 
         _isStarting = true;
+        _diagnostics?.BeginSession();
         try
         {
-            // Detect port 8000 in use before starting to avoid double-bind
-            if (await IsPort8000InUseAsync(cancellationToken))
+            var port = GetBackendPort();
+            _diagnostics?.Log("backend_port", port.ToString());
+
+            var portInUse = await IsPortInUseAsync(port, cancellationToken);
+            _diagnostics?.Log("port_occupied", portInUse.ToString());
+
+            if (portInUse)
             {
                 if (await IsBackendHealthyAsync(cancellationToken))
                 {
-                    Debug.WriteLine("[BackendProcessManager] Port 8000 in use and backend healthy");
+                    Debug.WriteLine($"[BackendProcessManager] Port {port} in use and backend healthy");
                     BackendStarted?.Invoke(this, EventArgs.Empty);
                     return true;
                 }
 
-                var error = "Port 8000 is in use by another process. Stop the other process or set VOICESTUDIO_API_PORT to use a different port.";
+                var error = $"Port {port} is in use by another process. Stop the other process or set VOICESTUDIO_API_PORT to use a different port.";
                 Debug.WriteLine($"[BackendProcessManager] {error}");
+                _diagnostics?.LogFailure("port_collision", error);
+                _diagnostics?.EndSession();
                 BackendStartFailed?.Invoke(this, error);
                 return false;
             }
 
-            // Find the venv Python executable
-            var repoRoot = FindRepoRoot();
-            if (repoRoot == null)
+            // Find app/runtime root (production-grade: env, installed, portable; dev fallback only in Debug)
+            var appRoot = FindAppRoot(out var rootSource);
+            _diagnostics?.Log("app_root_source", rootSource);
+            _diagnostics?.Log("app_root_path", appRoot ?? "(null)");
+
+            if (appRoot == null)
             {
-                var error = "Could not find VoiceStudio repository root";
+                var error = "Could not find VoiceStudio app root. Set VOICESTUDIO_APP_ROOT to the app directory.";
                 Debug.WriteLine($"[BackendProcessManager] {error}");
+                _diagnostics?.LogFailure("invalid_app_root", error);
+                _diagnostics?.EndSession();
                 BackendStartFailed?.Invoke(this, error);
                 return false;
             }
@@ -143,28 +159,35 @@ public sealed class BackendProcessManager : IDisposable
             // 3. Alternate venv (.venv)
             var pythonCandidates = new[]
             {
-                Path.Combine(repoRoot, "Runtime", "python", "python.exe"),
-                Path.Combine(repoRoot, "venv", "Scripts", "python.exe"),
-                Path.Combine(repoRoot, ".venv", "Scripts", "python.exe"),
+                Path.Combine(appRoot, "Runtime", "python", "python.exe"),
+                Path.Combine(appRoot, "venv", "Scripts", "python.exe"),
+                Path.Combine(appRoot, ".venv", "Scripts", "python.exe"),
             };
 
             var venvPython = Array.Find(pythonCandidates, File.Exists);
+            _diagnostics?.Log("python_candidates", string.Join(";", pythonCandidates));
+            _diagnostics?.Log("python_chosen", venvPython ?? "(none)");
 
             if (venvPython == null)
             {
                 var error = "Python runtime not found. Checked: " +
                     string.Join(", ", pythonCandidates.Select(p => Path.GetDirectoryName(p) ?? p));
                 Debug.WriteLine($"[BackendProcessManager] {error}");
+                _diagnostics?.LogFailure("missing_python_runtime", error);
+                _diagnostics?.EndSession();
                 BackendStartFailed?.Invoke(this, error);
                 return false;
             }
+
+            Debug.WriteLine($"[BackendProcessManager] App root: {appRoot} (source: {rootSource})");
+            Debug.WriteLine($"[BackendProcessManager] Python: {venvPython}");
 
             // Prepare process
             var psi = new ProcessStartInfo
             {
                 FileName = venvPython,
-                Arguments = "-m uvicorn backend.api.main:app --host 127.0.0.1 --port 8000",
-                WorkingDirectory = repoRoot,
+                Arguments = $"-m uvicorn backend.api.main:app --host 127.0.0.1 --port {port}",
+                WorkingDirectory = appRoot,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -172,23 +195,23 @@ public sealed class BackendProcessManager : IDisposable
             };
 
             // Set environment
-            psi.Environment["PYTHONPATH"] = repoRoot;
+            psi.Environment["PYTHONPATH"] = appRoot;
             psi.Environment["PYTHONUNBUFFERED"] = "1";
 
             // Point to bundled FFmpeg if available
-            var bundledFfmpeg = Path.Combine(repoRoot, "Runtime", "ffmpeg", "ffmpeg.exe");
+            var bundledFfmpeg = Path.Combine(appRoot, "Runtime", "ffmpeg", "ffmpeg.exe");
             if (File.Exists(bundledFfmpeg))
             {
                 psi.Environment["VOICESTUDIO_FFMPEG_PATH"] = bundledFfmpeg;
             }
 
             // Detect portable mode
-            var portableFlag = Path.Combine(repoRoot, "portable.flag");
+            var portableFlag = Path.Combine(appRoot, "portable.flag");
             if (File.Exists(portableFlag))
             {
-                psi.Environment["VOICESTUDIO_DATA_DIR"] = Path.Combine(repoRoot, "data");
-                psi.Environment["VOICESTUDIO_MODELS_DIR"] = Path.Combine(repoRoot, "models");
-                psi.Environment["VOICESTUDIO_DB_PATH"] = Path.Combine(repoRoot, "data", "voicestudio.db");
+                psi.Environment["VOICESTUDIO_DATA_DIR"] = Path.Combine(appRoot, "data");
+                psi.Environment["VOICESTUDIO_MODELS_DIR"] = Path.Combine(appRoot, "models");
+                psi.Environment["VOICESTUDIO_DB_PATH"] = Path.Combine(appRoot, "data", "voicestudio.db");
                 Debug.WriteLine("[BackendProcessManager] Portable mode active - data stored relative to app root");
             }
 
@@ -200,7 +223,7 @@ public sealed class BackendProcessManager : IDisposable
             }
 
             Debug.WriteLine($"[BackendProcessManager] Starting backend: {psi.FileName} {psi.Arguments}");
-            Debug.WriteLine($"[BackendProcessManager] Working directory: {repoRoot}");
+            Debug.WriteLine($"[BackendProcessManager] Working directory: {appRoot}");
 
             _backendProcess = new Process { StartInfo = psi };
             _backendProcess.OutputDataReceived += (s, e) =>
@@ -229,11 +252,18 @@ public sealed class BackendProcessManager : IDisposable
             _backendProcess.BeginErrorReadLine();
 
             Debug.WriteLine($"[BackendProcessManager] Backend process started (PID: {_backendProcess.Id})");
+            _diagnostics?.Log("process_started", $"PID={_backendProcess.Id}");
 
             // Wait for backend to become healthy
-            if (await WaitForHealthAsync(TimeSpan.FromSeconds(30), cancellationToken))
+            var (healthy, attempts, elapsed) = await WaitForHealthWithMetricsAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            _diagnostics?.Log("health_probe_attempts", attempts.ToString());
+            _diagnostics?.Log("health_probe_elapsed_ms", elapsed.TotalMilliseconds.ToString("F0"));
+
+            if (healthy)
             {
                 Debug.WriteLine("[BackendProcessManager] Backend is healthy");
+                _diagnostics?.Log("result", "success");
+                _diagnostics?.EndSession();
                 BackendStarted?.Invoke(this, EventArgs.Empty);
                 return true;
             }
@@ -241,6 +271,8 @@ public sealed class BackendProcessManager : IDisposable
             {
                 var error = "Backend started but did not become healthy within timeout";
                 Debug.WriteLine($"[BackendProcessManager] {error}");
+                _diagnostics?.LogFailure("health_timeout", error);
+                _diagnostics?.EndSession();
                 BackendStartFailed?.Invoke(this, error);
                 return false;
             }
@@ -249,6 +281,8 @@ public sealed class BackendProcessManager : IDisposable
         {
             var error = $"Failed to start backend: {ex.Message}";
             Debug.WriteLine($"[BackendProcessManager] {error}");
+            _diagnostics?.LogFailure("spawn_failure", error);
+            _diagnostics?.EndSession();
             ErrorLogger.LogError($"Failed to start backend: {ex.Message}", "BackendProcessManager.StartBackendProcessAsync");
             BackendStartFailed?.Invoke(this, error);
             return false;
@@ -264,18 +298,29 @@ public sealed class BackendProcessManager : IDisposable
     /// </summary>
     private async Task<bool> WaitForHealthAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
     {
+        var (healthy, _, _) = await WaitForHealthWithMetricsAsync(timeout, cancellationToken);
+        return healthy;
+    }
+
+    /// <summary>
+    /// Waits for the backend to become healthy, returning attempt count and elapsed time.
+    /// </summary>
+    private async Task<(bool Success, int Attempts, TimeSpan Elapsed)> WaitForHealthWithMetricsAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
         var sw = Stopwatch.StartNew();
+        var attempts = 0;
         while (sw.Elapsed < timeout && !cancellationToken.IsCancellationRequested)
         {
+            attempts++;
             if (await IsBackendHealthyAsync(cancellationToken))
             {
-                return true;
+                return (true, attempts, sw.Elapsed);
             }
 
             await Task.Delay(500, cancellationToken);
         }
 
-        return false;
+        return (false, attempts, sw.Elapsed);
     }
 
     /// <summary>
@@ -295,14 +340,35 @@ public sealed class BackendProcessManager : IDisposable
     }
 
     /// <summary>
-    /// Checks if port 8000 is in use (TCP connect).
+    /// Gets backend port from URL or VOICESTUDIO_API_PORT env.
     /// </summary>
-    private static async Task<bool> IsPort8000InUseAsync(CancellationToken cancellationToken = default)
+    private int GetBackendPort()
+    {
+        try
+        {
+            var envPort = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT");
+            if (!string.IsNullOrWhiteSpace(envPort) && int.TryParse(envPort, out var p) && p > 0 && p < 65536)
+            {
+                return p;
+            }
+            var uri = new Uri(_backendUrl);
+            return uri.Port > 0 ? uri.Port : 8000;
+        }
+        catch
+        {
+            return 8000;
+        }
+    }
+
+    /// <summary>
+    /// Checks if the given port is in use (TCP connect).
+    /// </summary>
+    private async Task<bool> IsPortInUseAsync(int port, CancellationToken cancellationToken = default)
     {
         try
         {
             using var client = new TcpClient();
-            await client.ConnectAsync("127.0.0.1", 8000, cancellationToken);
+            await client.ConnectAsync("127.0.0.1", port, cancellationToken);
             return true;
         }
         catch (SocketException)
@@ -339,26 +405,63 @@ public sealed class BackendProcessManager : IDisposable
     }
 
     /// <summary>
-    /// Finds the VoiceStudio repository root.
+    /// Finds the VoiceStudio app root using production-grade strategy.
+    /// Order: VOICESTUDIO_APP_ROOT env, exe directory (installed/portable), dev walk-up (Debug only).
+    /// No hardcoded paths.
     /// </summary>
-    private static string? FindRepoRoot()
+    private static string? FindAppRoot(out string source)
     {
-        // Start from executable location
+        source = "unknown";
+
+        // 1. Explicit override via environment
+        var envRoot = Environment.GetEnvironmentVariable("VOICESTUDIO_APP_ROOT");
+        if (!string.IsNullOrWhiteSpace(envRoot) && Directory.Exists(envRoot))
+        {
+            if (HasBackendMarker(envRoot))
+            {
+                source = "VOICESTUDIO_APP_ROOT";
+                return Path.GetFullPath(envRoot);
+            }
+            // Explicit override set but invalid (no backend marker) — do not fall through to other strategies
+            source = "VOICESTUDIO_APP_ROOT";
+            return null;
+        }
+
+        // 2. Exe directory (installed: exe is in app root; portable: portable.flag next to exe)
         var exePath = Environment.ProcessPath;
         if (string.IsNullOrEmpty(exePath))
         {
             exePath = AppContext.BaseDirectory;
         }
 
-        var dir = Path.GetDirectoryName(exePath);
+        var exeDir = Path.GetDirectoryName(exePath);
+        if (!string.IsNullOrEmpty(exeDir) && HasBackendMarker(exeDir))
+        {
+            source = "exe_dir";
+            return exeDir;
+        }
 
-        // Walk up looking for VoiceStudio.sln or .git
+        // 3. Parent of exe (e.g. exe in bin/ subdir)
+        var parentDir = Directory.GetParent(exeDir)?.FullName;
+        if (!string.IsNullOrEmpty(parentDir) && HasBackendMarker(parentDir))
+        {
+            source = "exe_parent";
+            return parentDir;
+        }
+
+#if DEBUG
+        // 4. Dev fallback: walk up for .git or VoiceStudio.sln (Debug only)
+        var dir = exeDir;
         while (!string.IsNullOrEmpty(dir))
         {
             if (File.Exists(Path.Combine(dir, "VoiceStudio.sln")) ||
                 Directory.Exists(Path.Combine(dir, ".git")))
             {
-                return dir;
+                if (HasBackendMarker(dir))
+                {
+                    source = "dev_walk";
+                    return dir;
+                }
             }
 
             var parent = Directory.GetParent(dir);
@@ -369,14 +472,15 @@ public sealed class BackendProcessManager : IDisposable
 
             dir = parent.FullName;
         }
-
-        // Fallback: try known development path
-        if (Directory.Exists(@"E:\VoiceStudio"))
-        {
-            return @"E:\VoiceStudio";
-        }
+#endif
 
         return null;
+    }
+
+    private static bool HasBackendMarker(string dir)
+    {
+        return Directory.Exists(Path.Combine(dir, "backend")) &&
+               File.Exists(Path.Combine(dir, "backend", "api", "main.py"));
     }
 
     public void Dispose()

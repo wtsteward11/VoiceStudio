@@ -183,6 +183,12 @@ namespace VoiceStudio.App.Services
       // Library facade (LibraryViewModel hardening)
       services.AddSingleton<ILibraryClient, LibraryClient>();
 
+      // Import workflow (Transport Coherence Wave 4 Phase 2)
+      services.AddSingleton<IImportWorkflowService>(sp => new ImportWorkflowService(
+          sp.GetRequiredService<ILibraryClient>(),
+          sp.GetRequiredService<IContextManager>(),
+          sp.GetService<IEventAggregator>()));
+
       // Real-time voice converter facade (RealTimeVoiceConverterViewModel hardening)
       services.AddSingleton<IRealTimeVoiceConverterClient, RealTimeVoiceConverterClient>();
 
@@ -413,6 +419,13 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IHelpOverlayService, HelpOverlayService>();
       services.AddSingleton<IUpdateService>(sp => new UpdateService(sp.GetRequiredService<HttpClient>()));
       services.AddSingleton<IAudioPlayerService>(sp => new AudioPlayerService(sp.GetRequiredService<HttpClient>()));
+      services.AddSingleton<TransportOrchestrationBootstrap>();
+      services.AddSingleton<IGlobalTransportOrchestrator>(sp => new GlobalTransportOrchestrator(
+          sp.GetRequiredService<IContextManager>(),
+          sp.GetRequiredService<IAudioPlayerService>(),
+          sp.GetRequiredService<BackendClientConfig>(),
+          sp.GetService<ToastNotificationService>(),
+          sp.GetRequiredService<TransportOrchestrationBootstrap>()));
       services.AddSingleton<IProfilePreviewService, ProfilePreviewService>();
       services.AddSingleton<IProfileQualityInsightsService, ProfileQualityInsightsService>();
       services.AddSingleton<IProfileTransferService, ProfileTransferService>();
@@ -438,13 +451,23 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<RecentProjectsService>();
       services.AddSingleton<ToolbarConfigurationService>();
       services.AddSingleton<StatusBarActivityService>();
+      services.AddSingleton<StatusBarCoordinator>();
+      services.AddSingleton<TransportShortcutCoordinator>(sp =>
+          new TransportShortcutCoordinator(sp.GetService<IGlobalTransportOrchestrator>()));
       services.AddSingleton<KeyboardShortcutService>();
       services.AddSingleton<IUnifiedCommandRegistry>(sp =>
-        new UnifiedCommandRegistry(sp.GetRequiredService<KeyboardShortcutService>()));
+        new UnifiedCommandRegistry(
+          sp.GetRequiredService<KeyboardShortcutService>(),
+          sp.GetRequiredService<IStartupStateService>()));
       services.AddSingleton<CommandRouter>(sp =>
         new CommandRouter(sp.GetRequiredService<IUnifiedCommandRegistry>()));
       services.AddSingleton<CollaborationService>();
-      services.AddSingleton<BackendProcessManager>();
+      services.AddSingleton<IStartupStateService, StartupStateService>();
+      services.AddSingleton<IStartupDiagnosticsWriter, StartupDiagnosticsWriter>();
+      services.AddSingleton<BackendProcessManager>(sp =>
+        new BackendProcessManager(
+          sp.GetRequiredService<BackendClientConfig>().BaseUrl,
+          sp.GetRequiredService<IStartupDiagnosticsWriter>()));
       services.AddSingleton<IFeatureFlagsService, FeatureFlagsService>();
       services.AddSingleton<IErrorPresentationService, ErrorPresentationService>();
       services.AddSingleton<IAnalyticsService, AnalyticsService>();
@@ -725,6 +748,7 @@ namespace VoiceStudio.App.Services
     public static IDialogService? TryGetDialogService() => GetService<IDialogService>();
     public static BackendProcessManager GetBackendProcessManager() => GetRequiredService<BackendProcessManager>();
     public static BackendProcessManager? TryGetBackendProcessManager() => GetService<BackendProcessManager>();
+    public static IStartupStateService GetStartupStateService() => GetRequiredService<IStartupStateService>();
     public static IUnifiedThemeService GetThemeService() => GetRequiredService<IUnifiedThemeService>();
     public static IUnifiedThemeService? TryGetThemeService() => GetService<IUnifiedThemeService>();
     public static IWebSocketClientFactory GetWebSocketClientFactory() => GetRequiredService<IWebSocketClientFactory>();

@@ -150,6 +150,7 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## LATEST PROOF INDEX
 | Date | Task | Artifact | Type | Status |
 |------|------|----------|------|--------|
+| 2026-03-17 | Premium Reliability Task 1 | artifacts/verify/20260317_190721/full_verify_output.txt; stages_8_6_8_7_8_8_summary.txt; 8.6 PASS, 8.7 FAIL, 8.8 not run; full verify failed at Stage 13 (Services TIMED OUT) | Proof | Captured |
 | 2026-03-16 | STARTUP-ORCHESTRATION-ROUND-6-CLOSURE | OpenPanelByIdAsync policy; BackendFailed panel behavior; verify.ps1 attempted (timed out) | Doc | Done |
 | 2026-03-16 | STARTUP-ORCHESTRATION-ROUND-6 | OpenRecentProject, ToggleRecording, OpenPanelByIdAsync guards; icon-launch nav.library; StartupOverlayGatingTests 10 passed | Code + Test | Done |
 | 2026-03-16 | STARTUP-ORCHESTRATION-ROUND-3 | verify.ps1 Stages 8.6/8.7; StartupOverlayGatingTests | smoke + unit | Pending verify |

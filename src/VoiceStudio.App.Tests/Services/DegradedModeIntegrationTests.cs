@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using VoiceStudio.App.Services;
+using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.Utilities;
 using VoiceStudio.Core.Exceptions;
 using VoiceStudio.Core.Services;
@@ -35,6 +36,10 @@ namespace VoiceStudio.App.Tests.Services
     {
       _provider = null;
       _services = null;
+      // Restore full test AppServices for subsequent tests (Stage 13 order-dependence fix).
+      // DegradedModeIntegrationTests replaces AppServices with minimal provider; without this,
+      // tests that run after may see broken IEventAggregator/IViewModelContext.
+      TestAppServicesHelper.EnsureInitialized();
     }
 
     /// <summary>

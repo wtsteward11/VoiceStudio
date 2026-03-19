@@ -11,17 +11,19 @@
 Read only this section as current task truth. Treat everything below the divider as historical context.
 
 ### Active Task
-- **ID:** STARTUP-ORCHESTRATION-ROUND-6
-- **Title:** Startup Orchestration Round 6 — Closure Honesty
-- **Status:** Complete
+- **ID:** STAGE13-ROOT-CAUSE-CLOSURE
+- **Title:** Stage 13 Root-Cause Diagnosis — COMPLETE
+- **Status:** Complete (DegradedModeIntegrationTests fix; subcluster matrix; 2 full verify runs passed Stage 13)
 
 ### Next 3 Steps
-1. Run full verify.ps1 to confirm Stages 8.6, 8.7, 8.8 (harness hardened with timeouts; ~15+ min; use -OnlyStage to debug specific stages)
-2. v1.2 transition when ready (see Release-Trust)
-3. Optional: further smoke hardening per TRANSPORT_PANEL_PUBLISHERS.md
+1. Resume architecture cleanup (FULL_SCOPE_ARCHITECTURE_NEXT_WAVE.md) when ready.
+2. Re-run full verify periodically to confirm Stage 13 stability.
+3. If Stage 13 timeout recurs: inspect blame-hang output; re-run scripts/stage13_subcluster_matrix.ps1.
 
 ### Release-Trust (Parallel Requirement)
-Release-trust remains a parallel requirement, not the active coding wave. Do not bypass verify.ps1 or run_verification.py before release. v1.2 transition deferred (one accepted caveat: taskkill when testhost lingers).
+- **Wave complete:** Stage 13 Root-Cause Diagnosis plan (Task A–F) implemented. DegradedModeIntegrationTests.TestCleanup now restores AppServices via EnsureInitialized().
+- **Release-trust (shard):** Stage 13 PASSED in full verify runs 20260319_002957 (20.5s), 20260319_004506 (12.1s). Subcluster matrix (2026-03-19) all 12 runs PASS. Contamination test (Legacy + Services) PASS.
+- **Release-trust (full lane):** GREEN. Python blocker fixed. Stage 13 targeted fix applied. Two full verify runs passed Stage 13.
 
 ### Optional Backlog (Reclassified)
 
@@ -39,18 +41,21 @@ Release-trust remains a parallel requirement, not the active coding wave. Do not
 Global transport v1 hardened: no subscription leaks, typed ownership, orchestration extracted. Release-trust gates remain in place.
 
 ### Current Blocker
-None.
+- **Release-trust blocker:** None.
+- **Coding blocker:** None
 
 ### Truth Sync Note
-Verification Harness Hardening complete (2026-03-16): Stage-level timeouts, hang diagnostics, C# test sharding, -OnlyStage support, TIMED_OUT reporting, post-stage cleanup, smoke script timeouts. Full verify.ps1 is operationally reliable; use -OnlyStage to isolate failing stages. See Verification Harness Hardening Plan.
+2026-03-19: Stage 13 Root-Cause Diagnosis complete. DegradedModeIntegrationTests.TestCleanup now calls TestAppServicesHelper.EnsureInitialized() to restore AppServices. Subcluster matrix (scripts/stage13_subcluster_matrix.ps1) all 12 runs PASS. Full verify 20260319_002957, 20260319_004506: Stage 13 PASSED. Blocker closed.
 
 ### Last Verified Commands
-- `dotnet build src/VoiceStudio.App/VoiceStudio.App.csproj -c Debug -p:Platform=x64` — PASS
-- `dotnet test --filter "FullyQualifiedName~StartupOverlayGatingTests"` — 10 passed
-- `.\scripts\verify.ps1 -Quick` — recommended pre-commit; `.\scripts\verify.ps1` full run with hardened harness (timeouts, sharding)
+- `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` — PASS
+- `.\scripts\stage13_contamination_test.ps1` — PASS (Legacy + Services)
+- `.\scripts\stage13_subcluster_matrix.ps1` — PASS (all 12 subcluster runs)
+- `.\scripts\verify.ps1` (full) — 20260319_002957, 20260319_004506 Stage 13 PASSED
+- `.\scripts\verify.ps1 -Quick` — recommended pre-commit
 
 ### Context Acknowledgment
-2026-03-16 — Startup Orchestration Round 4 complete. Run verify.ps1; commit when green.
+2026-03-19 — Stage 13 Root-Cause Diagnosis plan implemented. DegradedModeIntegrationTests fix applied. Release-trust GREEN.
 
 ---
 ## HISTORY LEDGER
@@ -81,6 +86,24 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 - **Known Debt:** TrainingViewModel lifecycle FAF — formal decision per ADR-051 (retained with CTS ownership; not deferred)
 
 ## LATEST MILESTONE
+- **ID:** STAGE13-ROOT-CAUSE-DIAGNOSIS
+- **Title:** Stage 13 Root-Cause Diagnosis — COMPLETE
+- **Status:** COMPLETE (2026-03-19)
+- **Completed:** Task A subcluster matrix (scripts/stage13_subcluster_matrix.ps1); Task B root-cause doc (DegradedModeIntegrationTests); Task C fix (EnsureInitialized in TestCleanup); Task D re-prove (Services isolation + contamination path); Task E full verify (2 runs passed Stage 13); Task F truth-sync.
+- **Verification:** stage13_contamination_test.ps1 PASS; stage13_subcluster_matrix.ps1 all 12 PASS; full verify 20260319_002957, 20260319_004506 Stage 13 PASSED. Proof: artifacts/verify/stage13_subcluster_matrix.md, docs/reports/stage13_blocker_20260319.md.
+
+- **ID:** CREDIBLE-HARDENING-NEXT-5
+- **Title:** Credible Hardening Next 5 — COMPLETE
+- **Status:** COMPLETE (2026-03-17)
+- **Completed:** T1 INavigatablePanel (ProfilesView, TimelineView); T2 BackendStartFailedEventArgs + category-aware retry; T3 IProjectCreateHandler/OpenHandler/SaveHandler; T4 full verify run (artifact captured; Stage 13 timeout); T5 Gate C publish PASS.
+- **Verification:** dotnet build PASS; StartupRetryCoordinatorTests 7 passed; gatec-publish-launch.ps1 -NoLaunch PASS; full verify artifact artifacts/verify/20260317_215028/full_verify_proof.txt
+
+- **ID:** PREMIUM-PROOF-CLOSURE
+- **Title:** Premium Proof Closure — A1–E2 Complete
+- **Status:** COMPLETE (2026-03-17)
+- **Completed:** A1 startup proof (8.6/8.7/8.8 PASS); A2 STATE truth-sync; B1 panel_lifecycle_disposal_proof; B2 throttle_usage_proof; C1 IProjectWorkflowCoordinator; C2 StartupRetryCoordinatorTests; D1 profile_to_synthesis_coherence_proof; D2 search_to_panel_focus_proof; E1 error_message_audit; E2 PREMIUM_SOFTWARE_COHERENCE_AUDIT re-ranked.
+- **Verification:** dotnet build PASS; StartupRetryCoordinatorTests 4 passed; verify.ps1 -OnlyStage 8.6/8.7/8.8 PASS. Proof: artifacts/verify/*.md
+
 - **ID:** STARTUP-ORCHESTRATION-ROUND-6-CLOSURE
 - **Title:** Startup Orchestration Round 6 — Closure and Policy Finalization
 - **Status:** COMPLETE (2026-03-16)
@@ -150,7 +173,24 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 ## LATEST PROOF INDEX
 | Date | Task | Artifact | Type | Status |
 |------|------|----------|------|--------|
-| 2026-03-17 | Premium Reliability Task 1 | artifacts/verify/20260317_190721/full_verify_output.txt; stages_8_6_8_7_8_8_summary.txt; 8.6 PASS, 8.7 FAIL, 8.8 not run; full verify failed at Stage 13 (Services TIMED OUT) | Proof | Captured |
+| 2026-03-19 | Stage 13 Classification Proof Wave (Tasks 1–5) | STATE.md truth discipline; ToastNotificationServiceTests exclusion verified; stage13_blocker + contamination script; StartupDiagnosticsWriter empty-catch fix | Doc/Code | Done |
+| 2026-03-19 | Full verify 20260318_235846 | Stage 13 (C# Services) TIMED OUT 300s — non-deterministic; prior run 20260318_234610 passed | Proof | FAIL |
+| 2026-03-19 | Full verify 20260318_234610 | Stage 13 (C# Services) PASSED 21.5s in full harness | Proof | PASS (single run) |
+| 2026-03-19 | STATE.md truth discipline | Stage 13 wording: "has shown both repeated PASS and repeated TIMEOUT in full harness; currently non-deterministic" | Doc | Done |
+| 2026-03-18 | Stage 13 previously passed 3× consecutive (20260318_085303, 085833, 090331); later runs (191809, 195640, 211549, 223358) TIMED OUT; status: non-deterministic | artifacts/verify/20260318_085303, 20260318_085833, 20260318_090331; pre-C# cleanup + 3s delay | Proof | Superseded by later timeouts |
+| 2026-03-18 | Python Unit Tests FAIL | artifacts/verify/20260318_085303; test_resource_monitor.py::TestGlobalRegistry::test_global_registry_singleton; RuntimeError: no current event loop | Proof | FAIL |
+| 2026-03-18 | Python blocker fix | resource_monitor.py + audit_logger.py lazy lock/queue; Python Unit Tests stage PASS | Code | FIXED |
+| 2026-03-18 | Full verify 20260318_192552 | Claim unproven: no verification_report.md in run dir | Proof | UNPROVEN |
+| 2026-03-18 | Full verify 20260318_195640 | Stage 13 (C# Services) TIMED OUT 300s; full run FAILED | Proof | FAIL |
+| 2026-03-18 | Full verify.ps1 | artifacts/verify/20260318_082139/; Stage 13 (C# Services) TIMED OUT 300s in full harness; exit 1 | Proof | FAIL |
+| 2026-03-18 | Stage 13 isolated | `.\scripts\verify.ps1 -OnlyStage "C# Unit Tests - Services"` PASS; 554 tests, ~14s | Proof | PASS (isolated only) |
+| 2026-03-18 | Full verify.ps1 (pre-fix) | artifacts/verify/20260318_072749/; Stage 13 TIMED OUT | Proof | **Superseded** — same failure mode |
+| 2026-03-17 | Stage 13 (C# Services) post-fix (isolated) | `.\scripts\verify.ps1 -OnlyStage "C# Unit Tests - Services"` PASS; 554 tests, ~10s; retryDelayOverride | Proof | PASS (isolated only) |
+| 2026-03-17 | Credible Hardening Next 5 T4 | artifacts/verify/20260317_215028/full_verify_proof.txt; Stage 13 timeout; exit 1 | Proof | **Superseded** by Stage 13 post-fix PASS (isolated) |
+| 2026-03-17 | Credible Hardening Next 5 T5 | gatec-publish-launch.ps1 -NoLaunch PASS; EXE: .buildlogs/x64/Release/gatec-publish/VoiceStudio.App.exe | Gate C | Done |
+| 2026-03-17 | Premium Proof Closure A1–E2 | artifacts/verify/*.md (profile_to_synthesis, search_to_panel_focus, error_message_audit, panel_lifecycle, throttle_usage); IProjectWorkflowCoordinator; StartupRetryCoordinatorTests 4 passed; PREMIUM_SOFTWARE_COHERENCE_AUDIT re-ranked | Proof + Code | Done |
+| 2026-03-17 | Premium Proof Closure A1 | artifacts/verify/20260317_211315/startup_stages_8_6_8_7_8_8_proof.txt; 8.6/8.7/8.8 PASS via verify.ps1 -OnlyStage; verify.ps1 $RootDir fix | Proof | Done |
+| 2026-03-17 | Premium Reliability Task 1 (superseded) | 8.7 FAIL, 8.8 not run; full verify failed at Stage 13 | Proof | Superseded by A1 |
 | 2026-03-16 | STARTUP-ORCHESTRATION-ROUND-6-CLOSURE | OpenPanelByIdAsync policy; BackendFailed panel behavior; verify.ps1 attempted (timed out) | Doc | Done |
 | 2026-03-16 | STARTUP-ORCHESTRATION-ROUND-6 | OpenRecentProject, ToggleRecording, OpenPanelByIdAsync guards; icon-launch nav.library; StartupOverlayGatingTests 10 passed | Code + Test | Done |
 | 2026-03-16 | STARTUP-ORCHESTRATION-ROUND-3 | verify.ps1 Stages 8.6/8.7; StartupOverlayGatingTests | smoke + unit | Pending verify |

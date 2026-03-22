@@ -23,6 +23,9 @@ using Generated = VoiceStudio.App.Services.Generated;
 using Macro = VoiceStudio.Core.Models.Macro;
 using BatchJob = VoiceStudio.Core.Models.BatchJob;
 
+// Architecture wave (2026-03-20): HTTP policy lives in BackendClientHttpPipeline.cs (PR-1). Feature endpoints remain here.
+// Inventory: docs/design/BACKENDCLIENT_TRANSPORT_EXTRACTION_INVENTORY.md — PR-2 may dedupe with Gateways/BackendTransport.cs.
+
 namespace VoiceStudio.App.Services
 {
   /// <summary>
@@ -219,18 +222,12 @@ namespace VoiceStudio.App.Services
     private readonly HttpClient _httpClient;
     private readonly BackendClientConfig _config;
     private readonly JsonSerializerOptions _jsonOptions;
-    private readonly Utilities.CircuitBreaker _circuitBreaker;
-    private const int MaxRetries = 3;
-    private const int RetryDelayMs = 1000;
-
-    // Connection status tracking
-    private bool _isConnected = true;
-    private DateTime _lastConnectionCheck = DateTime.MinValue;
-    private const int ConnectionCheckIntervalSeconds = 5;
+    private readonly BackendClientHttpPipeline _pipeline;
 
     private readonly IRequestCoordinator _requestCoordinator;
 
-    public IWebSocketService? WebSocketService { get; }
+    private IWebSocketService? _webSocketService;
+    public IWebSocketService? WebSocketService => _webSocketService;
 
     /// <summary>
     /// Initializes a new instance of BackendClient without correlation provider.
@@ -272,155 +269,66 @@ namespace VoiceStudio.App.Services
       // Use centralized JSON options for consistent snake_case serialization
       _jsonOptions = JsonSerializerOptionsFactory.BackendApi;
 
-      // Initialize circuit breaker (5 failures before opening, 30s timeout)
-      _circuitBreaker = new Utilities.CircuitBreaker(failureThreshold: 5, timeout: TimeSpan.FromSeconds(30));
+      _pipeline = new BackendClientHttpPipeline(_httpClient, _jsonOptions);
 
-      // Initialize WebSocket service if URL is provided
-      if (!string.IsNullOrEmpty(config.WebSocketUrl))
-      {
-        // Convert HTTP URL to WebSocket URL if needed
-        var wsUrl = config.WebSocketUrl;
-        if (wsUrl.StartsWith("http://"))
-        {
-          wsUrl = wsUrl.Replace("http://", "ws://");
-        }
-        else if (wsUrl.StartsWith("https://"))
-        {
-          wsUrl = wsUrl.Replace("https://", "wss://");
-        }
-
-        // Ensure it points to the realtime endpoint
-        if (!wsUrl.EndsWith("/realtime") && !wsUrl.EndsWith("/realtime/"))
-        {
-          wsUrl = wsUrl.TrimEnd('/') + "/realtime";
-        }
-
-        WebSocketService = new WebSocketService(wsUrl);
-      }
+      InitializeWebSocket(config);
     }
 
     /// <summary>
-    /// Gets the current connection status.
+    /// PR-3: Constructor that uses shared <see cref="BackendHttpContext"/> for HTTP transport.
+    /// Used when PluginHealthClient and BackendClient share the same pipeline.
     /// </summary>
-    public bool IsConnected => _isConnected;
+    internal BackendClient(BackendHttpContext httpContext, BackendClientConfig config, IRequestCoordinator? requestCoordinator = null)
+    {
+      _config = config ?? throw new ArgumentNullException(nameof(config));
+      _requestCoordinator = requestCoordinator ?? new RequestCoordinator();
+      _httpClient = httpContext.HttpClient;
+      _jsonOptions = JsonSerializerOptionsFactory.BackendApi;
+      _pipeline = httpContext.Pipeline;
+
+      InitializeWebSocket(config);
+    }
+
+    private void InitializeWebSocket(BackendClientConfig config)
+    {
+      if (string.IsNullOrEmpty(config.WebSocketUrl))
+        return;
+
+      var wsUrl = config.WebSocketUrl;
+      if (wsUrl.StartsWith("http://", StringComparison.Ordinal))
+        wsUrl = wsUrl.Replace("http://", "ws://");
+      else if (wsUrl.StartsWith("https://", StringComparison.Ordinal))
+        wsUrl = wsUrl.Replace("https://", "wss://");
+
+      if (!wsUrl.EndsWith("/realtime", StringComparison.Ordinal) && !wsUrl.EndsWith("/realtime/", StringComparison.Ordinal))
+        wsUrl = wsUrl.TrimEnd('/') + "/realtime";
+
+      _webSocketService = new WebSocketService(wsUrl);
+    }
 
     /// <summary>
     /// Gets the base address of the backend API.
     /// </summary>
     public System.Uri? BaseAddress => _httpClient?.BaseAddress;
 
-    /// <summary>
-    /// Gets the circuit breaker state.
-    /// </summary>
-    public Utilities.CircuitState CircuitState => _circuitBreaker.State;
-
-    public async Task<TResponse> SendRequestAsync<TRequest, TResponse>(
+    public Task<TResponse> SendRequestAsync<TRequest, TResponse>(
         string endpoint,
         TRequest request,
         CancellationToken cancellationToken = default)
     {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        var json = JsonSerializer.Serialize(request, _jsonOptions);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync(endpoint, content, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-        try
-        {
-          return JsonSerializer.Deserialize<TResponse>(responseJson, _jsonOptions)
-                    ?? throw new BackendDeserializationException("Failed to deserialize response from backend.");
-        }
-        catch (JsonException ex)
-        {
-          throw new BackendDeserializationException(
-                    "The backend returned an invalid response format.",
-                    ex);
-        }
-      });
+      return _pipeline.SendRequestAsync<TRequest, TResponse>(endpoint, request, cancellationToken);
     }
 
     /// <summary>
     /// Generic request helper method with HTTP method support.
     /// </summary>
-    public async Task<TResponse?> SendRequestAsync<TRequest, TResponse>(
+    public Task<TResponse?> SendRequestAsync<TRequest, TResponse>(
         string endpoint,
         TRequest? request,
         System.Net.Http.HttpMethod method,
         CancellationToken cancellationToken = default) where TResponse : class
     {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        System.Net.Http.HttpResponseMessage response;
-
-        if (method == System.Net.Http.HttpMethod.Get)
-        {
-          response = await _httpClient.GetAsync(endpoint, cancellationToken);
-        }
-        else if (method == System.Net.Http.HttpMethod.Post)
-        {
-          if (request != null)
-          {
-            response = await _httpClient.PostAsJsonAsync(endpoint, request, _jsonOptions, cancellationToken);
-          }
-          else
-          {
-            response = await _httpClient.PostAsync(endpoint, null, cancellationToken);
-          }
-        }
-        else if (method == System.Net.Http.HttpMethod.Put)
-        {
-          if (request != null)
-          {
-            response = await _httpClient.PutAsJsonAsync(endpoint, request, _jsonOptions, cancellationToken);
-          }
-          else
-          {
-            response = await _httpClient.PutAsync(endpoint, null, cancellationToken);
-          }
-        }
-        else if (method == System.Net.Http.HttpMethod.Delete)
-        {
-          response = await _httpClient.DeleteAsync(endpoint, cancellationToken);
-        }
-        else
-        {
-          throw new NotSupportedException($"HTTP method {method.Method} is not supported");
-        }
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        // For DELETE requests with no response body, return default
-        if (method == System.Net.Http.HttpMethod.Delete && response.Content.Headers.ContentLength == 0)
-        {
-          return default;
-        }
-
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-        if (string.IsNullOrEmpty(responseJson))
-        {
-          return default;
-        }
-
-        try
-        {
-          return JsonSerializer.Deserialize<TResponse>(responseJson, _jsonOptions);
-        }
-        catch (JsonException ex)
-        {
-          throw new BackendDeserializationException(
-                    "The backend returned an invalid response format.",
-                    ex);
-        }
-      });
+      return _pipeline.SendRequestAsync<TRequest, TResponse>(endpoint, request, method, cancellationToken);
     }
 
     public async Task<TResponse> SendMcpOperationAsync<TRequest, TResponse>(
@@ -430,23 +338,6 @@ namespace VoiceStudio.App.Services
     {
       // MCP bridge endpoint
       return await SendRequestAsync<TRequest, TResponse>($"/api/mcp/{operation}", payload, cancellationToken);
-    }
-
-    public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
-    {
-      try
-      {
-        var response = await _httpClient.GetAsync("/api/health", cancellationToken);
-        _isConnected = response.IsSuccessStatusCode;
-        _lastConnectionCheck = DateTime.UtcNow;
-        return _isConnected;
-      }
-      catch (Exception)
-      {
-        _isConnected = false;
-        _lastConnectionCheck = DateTime.UtcNow;
-        return false;
-      }
     }
 
     /// <summary>
@@ -463,182 +354,18 @@ namespace VoiceStudio.App.Services
       try
       {
         using var cts = new CancellationTokenSource(timeoutMs);
-        var client = AppServices.GetService<HttpClient>();
-        if (client == null)
-          return false;
-        var response = await client.GetAsync(url, cts.Token);
+        using var handler = new HttpClientHandler();
+        using var probeClient = new HttpClient(handler)
+        {
+          Timeout = TimeSpan.FromMilliseconds(timeoutMs)
+        };
+        var response = await probeClient.GetAsync(url, cts.Token).ConfigureAwait(false);
         return response.IsSuccessStatusCode;
       }
-      catch
+      catch (Exception)
       {
         return false;
       }
-    }
-
-    /// <summary>
-    /// Expected API version for this client.
-    /// </summary>
-    public const string ExpectedApiVersion = "v2";
-
-    /// <summary>
-    /// Minimum supported API version.
-    /// </summary>
-    public const string MinimumApiVersion = "v1";
-
-    /// <summary>
-    /// Checks API version compatibility with the backend.
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Version compatibility result</returns>
-    public async Task<ApiVersionCheckResult> CheckApiVersionAsync(CancellationToken cancellationToken = default)
-    {
-      try
-      {
-        var response = await _httpClient.GetAsync("/api/version/compatibility", cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          // Version endpoint not available - assume compatible for backwards compatibility
-          return new ApiVersionCheckResult
-          {
-            IsCompatible = true,
-            ServerVersion = "unknown",
-            ClientVersion = ExpectedApiVersion,
-            Message = "Version endpoint not available. Assuming compatible."
-          };
-        }
-
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-
-        var serverVersion = root.TryGetProperty("server_version", out var sv) ? sv.GetString() ?? "unknown" : "unknown";
-        var isCompatible = root.TryGetProperty("compatible", out var compat) && compat.GetBoolean();
-        var supportedVersions = new List<string>();
-
-        if (root.TryGetProperty("supported_versions", out var supported) && supported.ValueKind == JsonValueKind.Array)
-        {
-          foreach (var v in supported.EnumerateArray())
-          {
-            if (v.ValueKind == JsonValueKind.String)
-            {
-              supportedVersions.Add(v.GetString() ?? "");
-            }
-          }
-        }
-
-        string? recommendation = null;
-        if (root.TryGetProperty("recommendation", out var rec) && rec.ValueKind == JsonValueKind.String)
-        {
-          recommendation = rec.GetString();
-        }
-
-        // Check if our expected version is in supported versions
-        var clientVersionSupported = supportedVersions.Contains(ExpectedApiVersion) ||
-                                     supportedVersions.Contains(MinimumApiVersion);
-
-        var message = isCompatible ?
-          $"API version compatible. Server: {serverVersion}, Client: {ExpectedApiVersion}" :
-          $"API version mismatch. Server: {serverVersion}, Client expected: {ExpectedApiVersion}";
-
-        return new ApiVersionCheckResult
-        {
-          IsCompatible = isCompatible && clientVersionSupported,
-          ServerVersion = serverVersion,
-          ClientVersion = ExpectedApiVersion,
-          SupportedVersions = supportedVersions,
-          Message = message,
-          Recommendation = recommendation
-        };
-      }
-      catch (Exception ex)
-      {
-        // Log but don't fail - version check is informational
-        return new ApiVersionCheckResult
-        {
-          IsCompatible = true, // Assume compatible on error for backwards compatibility
-          ServerVersion = "unknown",
-          ClientVersion = ExpectedApiVersion,
-          Message = $"Version check failed: {ex.Message}",
-          Error = ex.Message
-        };
-      }
-    }
-
-    /// <summary>
-    /// Gets version information from the backend.
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>API version information</returns>
-    public async Task<ApiVersionInfo?> GetApiVersionInfoAsync(CancellationToken cancellationToken = default)
-    {
-      try
-      {
-        var response = await _httpClient.GetAsync("/api/version/", cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          return null;
-        }
-
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-
-        var currentVersion = root.TryGetProperty("current_version", out var cv) ? cv.GetString() : null;
-        var defaultVersion = root.TryGetProperty("default_version", out var dv) ? dv.GetString() : null;
-        var supportedVersions = new List<string>();
-
-        if (root.TryGetProperty("supported_versions", out var supported) && supported.ValueKind == JsonValueKind.Array)
-        {
-          foreach (var v in supported.EnumerateArray())
-          {
-            if (v.ValueKind == JsonValueKind.String)
-            {
-              supportedVersions.Add(v.GetString() ?? "");
-            }
-          }
-        }
-
-        return new ApiVersionInfo
-        {
-          CurrentVersion = currentVersion ?? "unknown",
-          DefaultVersion = defaultVersion ?? "unknown",
-          SupportedVersions = supportedVersions
-        };
-      }
-      catch
-      {
-        return null;
-      }
-    }
-
-    /// <summary>
-    /// Validates API version on startup and logs warnings if there are compatibility issues.
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>True if compatible, false if incompatible</returns>
-    public async Task<bool> ValidateApiVersionOnStartupAsync(CancellationToken cancellationToken = default)
-    {
-      var result = await CheckApiVersionAsync(cancellationToken);
-
-      if (!result.IsCompatible)
-      {
-        // Log warning about version mismatch
-        System.Diagnostics.Debug.WriteLine(
-          $"[WARNING] API version mismatch: {result.Message}. " +
-          $"Recommendation: {result.Recommendation ?? "Update client"}");
-        return false;
-      }
-
-      if (!string.IsNullOrEmpty(result.Recommendation))
-      {
-        // Log recommendation even if compatible
-        System.Diagnostics.Debug.WriteLine(
-          $"[INFO] API version note: {result.Recommendation}");
-      }
-
-      return true;
     }
 
     public async Task<VoiceSynthesisResponse> SynthesizeVoiceAsync(
@@ -655,7 +382,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         try
@@ -693,7 +420,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         try
@@ -756,7 +483,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         try
@@ -783,7 +510,7 @@ namespace VoiceStudio.App.Services
           response = await _httpClient.GetAsync($"/api/voice/audio/{audioId}", cancellationToken);
 
         if (!response.IsSuccessStatusCode)
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
 
         return await response.Content.ReadAsStreamAsync(cancellationToken);
       });
@@ -822,7 +549,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -840,7 +567,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var jsonString = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -884,7 +611,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<AudioUploadResponse>(_jsonOptions, cancellationToken)
@@ -900,7 +627,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<ProjectAudioFile>>(_jsonOptions, cancellationToken)
@@ -916,7 +643,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -932,7 +659,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<WaveformData>(_jsonOptions, cancellationToken)
@@ -949,7 +676,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<SpectrogramData>(_jsonOptions, cancellationToken)
@@ -966,7 +693,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<AudioMeters>(_jsonOptions, cancellationToken)
@@ -983,7 +710,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<RadarData>(_jsonOptions, cancellationToken)
@@ -1001,7 +728,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<LoudnessData>(_jsonOptions, cancellationToken)
@@ -1018,7 +745,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<PhaseData>(_jsonOptions, cancellationToken)
@@ -1046,7 +773,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         // Backend returns dict with filename, url, saved_path
@@ -1073,7 +800,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<AudioTrack>>(_jsonOptions, cancellationToken)
@@ -1089,7 +816,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<AudioTrack>(_jsonOptions, cancellationToken)
@@ -1106,7 +833,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<AudioTrack>(_jsonOptions, cancellationToken)
@@ -1126,7 +853,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<AudioTrack>(_jsonOptions, cancellationToken)
@@ -1164,7 +891,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var backendClip = await response.Content.ReadFromJsonAsync<BackendAudioClip>(_jsonOptions, cancellationToken)
@@ -1198,7 +925,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var backendClip = await response.Content.ReadFromJsonAsync<BackendAudioClip>(_jsonOptions, cancellationToken)
@@ -1289,161 +1016,7 @@ namespace VoiceStudio.App.Services
       public double? QualityScore { get; set; }
     }
 
-    private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, int maxRetries = MaxRetries)
-    {
-      // Check connection status periodically
-      await UpdateConnectionStatusAsync();
-
-      // Execute through circuit breaker with exponential backoff retry
-      try
-      {
-        return await _circuitBreaker.ExecuteAsync(async () =>
-            await RetryHelper.ExecuteWithExponentialBackoffAsync<T>(
-                operation,
-                maxRetries: maxRetries,
-                initialDelayMs: RetryDelayMs,
-                maxDelayMs: 10000
-            )
-        );
-      }
-      catch (Exception ex)
-      {
-        // Update connection status on failure
-        await UpdateConnectionStatusAsync();
-
-        // Convert to appropriate BackendException
-        if (ex is BackendException bex)
-        {
-          throw;
-        }
-        else if (ex is HttpRequestException httpEx)
-        {
-          _isConnected = false;
-          throw new BackendUnavailableException(
-              "Unable to connect to the backend server. Please check your connection and ensure the backend is running.",
-              httpEx);
-        }
-        else if (ex is TaskCanceledException timeoutEx && !timeoutEx.CancellationToken.IsCancellationRequested)
-        {
-          _isConnected = false;
-          throw new BackendTimeoutException(
-              "The request timed out. Please check your network connection and try again.",
-              timeoutEx);
-        }
-
-        throw;
-      }
-    }
-
-    /// <summary>
-    /// Updates the connection status by checking backend health.
-    /// </summary>
-    private async Task UpdateConnectionStatusAsync()
-    {
-      // Only check periodically to avoid excessive requests
-      var now = DateTime.UtcNow;
-      if ((now - _lastConnectionCheck).TotalSeconds < ConnectionCheckIntervalSeconds)
-        return;
-
-      _lastConnectionCheck = now;
-
-      try
-      {
-        var response = await _httpClient.GetAsync("/api/health", CancellationToken.None);
-        _isConnected = response.IsSuccessStatusCode;
-      }
-      catch
-      {
-        _isConnected = false;
-      }
-    }
-
-    private async Task<BackendException> CreateExceptionFromResponseAsync(HttpResponseMessage response)
-    {
-      var statusCode = (int)response.StatusCode;
-      string? errorMessage = null;
-      string? errorCode = null;
-      string? requestId = null;
-      string? timestamp = null;
-      string? path = null;
-      string? recoverySuggestion = null;
-
-      try
-      {
-        var content = await response.Content.ReadAsStringAsync();
-        if (!string.IsNullOrEmpty(content))
-        {
-          try
-          {
-            var errorJson = JsonSerializer.Deserialize<JsonElement>(content, _jsonOptions);
-            // Parse backend StandardErrorResponse fields
-            if (errorJson.TryGetProperty("message", out var messageProp))
-              errorMessage = messageProp.GetString();
-            if (errorJson.TryGetProperty("error", out var errorProp) && errorProp.ValueKind == JsonValueKind.String)
-              errorMessage = errorProp.GetString() ?? errorMessage;
-            if (errorJson.TryGetProperty("error_code", out var codeProp))
-              errorCode = codeProp.GetString();
-            if (errorJson.TryGetProperty("request_id", out var requestIdProp))
-              requestId = requestIdProp.GetString();
-            if (errorJson.TryGetProperty("timestamp", out var timestampProp))
-              timestamp = timestampProp.GetString();
-            if (errorJson.TryGetProperty("path", out var pathProp))
-              path = pathProp.GetString();
-            if (errorJson.TryGetProperty("recovery_suggestion", out var recoverySuggestionProp))
-              recoverySuggestion = recoverySuggestionProp.GetString();
-          }
-          catch
-          {
-            // If JSON parsing fails, use raw content
-            errorMessage = content.Length > 200 ? content.Substring(0, 200) + "..." : content;
-          }
-        }
-      }
-      catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "BackendAudioClip.Task");
-      }
-
-      // Default messages based on status code
-      errorMessage ??= statusCode switch
-      {
-        400 => "Invalid request. Please check your input and try again.",
-        401 => "Authentication failed. Please check your credentials.",
-        403 => "You don't have permission to perform this action.",
-        404 => "The requested resource was not found.",
-        409 => "A conflict occurred. The resource may have been modified.",
-        422 => "Validation failed. Please check your input.",
-        429 => "Too many requests. Please wait a moment and try again.",
-        500 => "An internal server error occurred. Please try again later.",
-        502 => "Bad gateway. The backend server may be unavailable.",
-        503 => "Service unavailable. The backend server is temporarily unavailable.",
-        504 => "Gateway timeout. The request took too long to process.",
-        _ => $"An error occurred (HTTP {statusCode}). Please try again."
-      };
-
-      // Determine retryability
-      var isRetryable = statusCode >= 500 || statusCode == 429;
-      
-      BackendException exception = statusCode switch
-      {
-        400 => new BackendValidationException(errorMessage),
-        401 => new BackendAuthenticationException(errorMessage),
-        404 => new BackendNotFoundException(errorMessage),
-        422 => new BackendValidationException(errorMessage),
-        >= 500 => new BackendServerException(errorMessage, statusCode),
-        _ => new BackendServerException(errorMessage, statusCode)
-      };
-
-      // Populate additional fields from backend StandardErrorResponse
-      exception.ErrorCode = errorCode;
-      exception.RequestId = requestId;
-      exception.Timestamp = timestamp;
-      exception.Path = path;
-      exception.RecoverySuggestion = recoverySuggestion;
-      exception.IsRetryable = isRetryable;
-
-      return exception;
-    }
+    private Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation) => _pipeline.ExecuteWithRetryAsync(operation);
 
     // Macro management
     public async Task<List<Macro>> GetMacrosAsync(string? projectId = null, CancellationToken cancellationToken = default)
@@ -1459,7 +1032,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<Macro>>(_jsonOptions, cancellationToken)
@@ -1475,7 +1048,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<Macro>(_jsonOptions, cancellationToken)
@@ -1491,7 +1064,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<Macro>(_jsonOptions, cancellationToken)
@@ -1507,7 +1080,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<Macro>(_jsonOptions, cancellationToken)
@@ -1523,7 +1096,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
@@ -1538,7 +1111,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
@@ -1553,7 +1126,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MacroExecutionStatus>(_jsonOptions, cancellationToken)
@@ -1570,7 +1143,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<AutomationCurve>>(_jsonOptions, cancellationToken)
@@ -1586,7 +1159,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<AutomationCurve>(_jsonOptions, cancellationToken)
@@ -1602,7 +1175,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<AutomationCurve>(_jsonOptions, cancellationToken)
@@ -1618,7 +1191,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
@@ -1641,7 +1214,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<Workflow>>(_jsonOptions, cancellationToken)
@@ -1657,7 +1230,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<Workflow>(_jsonOptions, cancellationToken)
@@ -1673,7 +1246,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<Workflow>(_jsonOptions, cancellationToken)
@@ -1689,7 +1262,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<Workflow>(_jsonOptions, cancellationToken)
@@ -1705,7 +1278,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
@@ -1721,7 +1294,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<WorkflowExecutionResult>(_jsonOptions, cancellationToken)
@@ -1743,7 +1316,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<ModelInfo>>(_jsonOptions, cancellationToken)
@@ -1759,7 +1332,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<ModelInfo>(_jsonOptions, cancellationToken)
@@ -1783,7 +1356,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<ModelInfo>(_jsonOptions, cancellationToken)
@@ -1799,7 +1372,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<ModelVerifyResponse>(_jsonOptions, cancellationToken)
@@ -1815,7 +1388,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<ModelInfo>(_jsonOptions, cancellationToken)
@@ -1831,26 +1404,10 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
-      });
-    }
-
-    public async Task<Telemetry> GetTelemetryAsync(CancellationToken cancellationToken = default)
-    {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        var response = await _httpClient.GetAsync("/api/engine/telemetry", cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        return await response.Content.ReadFromJsonAsync<Telemetry>(_jsonOptions, cancellationToken)
-                  ?? throw new BackendDeserializationException("Failed to deserialize telemetry");
       });
     }
 
@@ -1862,7 +1419,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -1887,7 +1444,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<ModelInfo>(_jsonOptions, cancellationToken)
@@ -1903,7 +1460,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<StorageStats>(_jsonOptions, cancellationToken)
@@ -1920,7 +1477,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var chains = await response.Content.ReadFromJsonAsync<List<EffectChain>>(_jsonOptions, cancellationToken);
@@ -1936,7 +1493,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var chain = await response.Content.ReadFromJsonAsync<EffectChain>(_jsonOptions, cancellationToken);
@@ -1954,7 +1511,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var createdChain = await response.Content.ReadFromJsonAsync<EffectChain>(_jsonOptions, cancellationToken);
@@ -1972,7 +1529,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var updatedChain = await response.Content.ReadFromJsonAsync<EffectChain>(_jsonOptions, cancellationToken);
@@ -1988,7 +1545,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         // Delete operations return success if status code is 200-299
@@ -2010,7 +1567,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var result = await response.Content.ReadFromJsonAsync<EffectProcessResponse>(_jsonOptions, cancellationToken);
@@ -2033,7 +1590,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var presets = await response.Content.ReadFromJsonAsync<List<EffectPreset>>(_jsonOptions, cancellationToken);
@@ -2051,7 +1608,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var createdPreset = await response.Content.ReadFromJsonAsync<EffectPreset>(_jsonOptions, cancellationToken);
@@ -2067,7 +1624,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         // Delete operations return success if status code is 200-299
@@ -2086,7 +1643,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var job = await response.Content.ReadFromJsonAsync<BatchJob>(_jsonOptions, cancellationToken);
@@ -2114,7 +1671,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var jobs = await response.Content.ReadFromJsonAsync<List<BatchJob>>(_jsonOptions, cancellationToken);
@@ -2130,7 +1687,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var job = await response.Content.ReadFromJsonAsync<BatchJob>(_jsonOptions, cancellationToken);
@@ -2146,7 +1703,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         // Delete operations return success if status code is 200-299
@@ -2162,7 +1719,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var job = await response.Content.ReadFromJsonAsync<BatchJob>(_jsonOptions, cancellationToken);
@@ -2178,7 +1735,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var job = await response.Content.ReadFromJsonAsync<BatchJob>(_jsonOptions, cancellationToken);
@@ -2194,7 +1751,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var status = await response.Content.ReadFromJsonAsync<BatchQueueStatus>(_jsonOptions, cancellationToken);
@@ -2211,7 +1768,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<BatchQualityReport>(_jsonOptions, cancellationToken)
@@ -2227,7 +1784,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<BatchQualityReport>(_jsonOptions, cancellationToken)
@@ -2253,7 +1810,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<BatchQualityStatistics>(_jsonOptions, cancellationToken)
@@ -2269,7 +1826,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<BatchJob>(_jsonOptions, cancellationToken)
@@ -2286,7 +1843,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<SupportedLanguage>>(_jsonOptions, cancellationToken)
@@ -2303,7 +1860,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<TranscriptionEngine>>(_jsonOptions, cancellationToken)
@@ -2324,7 +1881,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<TranscriptionResponse>(_jsonOptions, cancellationToken)
@@ -2340,7 +1897,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<TranscriptionResponse>(_jsonOptions, cancellationToken)
@@ -2370,7 +1927,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<TranscriptionResponse>>(_jsonOptions, cancellationToken)
@@ -2386,7 +1943,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
@@ -2409,7 +1966,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<TrainingDataset>(_jsonOptions, cancellationToken)
@@ -2425,7 +1982,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<TrainingDataset>>(_jsonOptions, cancellationToken)
@@ -2441,7 +1998,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<TrainingDataset>(_jsonOptions, cancellationToken)
@@ -2457,7 +2014,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return response.IsSuccessStatusCode;
@@ -2472,7 +2029,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<TrainingStatus>(_jsonOptions, cancellationToken)
@@ -2488,7 +2045,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<TrainingStatus>(_jsonOptions, cancellationToken)
@@ -2518,7 +2075,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<TrainingStatus>>(_jsonOptions, cancellationToken)
@@ -2534,7 +2091,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
@@ -2554,7 +2111,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<TrainingLogEntry>>(_jsonOptions, cancellationToken)
@@ -2570,7 +2127,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
@@ -2591,7 +2148,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<TrainingQualityMetrics>>(_jsonOptions, cancellationToken)
@@ -2608,7 +2165,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MultiEngineEnsembleResponse>(_jsonOptions, cancellationToken)
@@ -2624,7 +2181,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MultiEngineEnsembleStatus>(_jsonOptions, cancellationToken)
@@ -2657,7 +2214,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerState>(_jsonOptions, cancellationToken)
@@ -2673,7 +2230,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerState>(_jsonOptions, cancellationToken)
@@ -2689,7 +2246,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerState>(_jsonOptions, cancellationToken)
@@ -2762,7 +2319,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerSend>(_jsonOptions, cancellationToken)
@@ -2778,7 +2335,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerSend>(_jsonOptions, cancellationToken)
@@ -2794,7 +2351,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
@@ -2810,7 +2367,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerReturn>(_jsonOptions, cancellationToken)
@@ -2826,7 +2383,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerReturn>(_jsonOptions, cancellationToken)
@@ -2842,7 +2399,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
@@ -2858,7 +2415,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerSubGroup>(_jsonOptions, cancellationToken)
@@ -2874,7 +2431,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerSubGroup>(_jsonOptions, cancellationToken)
@@ -2890,7 +2447,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
@@ -2906,7 +2463,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerMaster>(_jsonOptions, cancellationToken)
@@ -2923,7 +2480,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<ChannelRouting>(_jsonOptions, cancellationToken)
@@ -2940,7 +2497,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<MixerPreset>>(_jsonOptions, cancellationToken)
@@ -2956,7 +2513,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerPreset>(_jsonOptions, cancellationToken)
@@ -2972,7 +2529,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerPreset>(_jsonOptions, cancellationToken)
@@ -2988,7 +2545,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerPreset>(_jsonOptions, cancellationToken)
@@ -3004,7 +2561,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
@@ -3019,7 +2576,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<MixerState>(_jsonOptions, cancellationToken)
@@ -3042,7 +2599,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<VideoGenerateResponse>(_jsonOptions, cancellationToken)
@@ -3064,7 +2621,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<VideoUpscaleResponse>(_jsonOptions, cancellationToken)
@@ -3080,7 +2637,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var result = await response.Content.ReadFromJsonAsync<VideoEnginesListResponse>(_jsonOptions, cancellationToken)
@@ -3098,7 +2655,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -3136,7 +2693,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var result = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>(_jsonOptions, cancellationToken)
@@ -3155,115 +2712,42 @@ namespace VoiceStudio.App.Services
     /// <summary>
     /// Generic GET request helper method.
     /// </summary>
-    public async Task<T?> GetAsync<T>(string endpoint, CancellationToken cancellationToken = default) where T : class
+    public Task<T?> GetAsync<T>(string endpoint, CancellationToken cancellationToken = default) where T : class
     {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        var response = await _httpClient.GetAsync(endpoint, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        try
-        {
-          return await response.Content.ReadFromJsonAsync<T>(_jsonOptions, cancellationToken);
-        }
-        catch (JsonException ex)
-        {
-          throw new BackendDeserializationException(
-                    "The backend returned an invalid response format.",
-                    ex);
-        }
-      });
+      return _pipeline.GetAsync<T>(endpoint, cancellationToken);
     }
 
     /// <summary>
     /// Generic POST request helper method.
     /// </summary>
-    public async Task<TResponse> PostAsync<TRequest, TResponse>(
+    public Task<TResponse> PostAsync<TRequest, TResponse>(
         string endpoint,
         TRequest request,
         CancellationToken cancellationToken = default)
     {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        var response = await _httpClient.PostAsJsonAsync(endpoint, request, _jsonOptions, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        try
-        {
-          var result = await response.Content.ReadFromJsonAsync<TResponse>(_jsonOptions, cancellationToken);
-          if (result == null)
-          {
-            throw new BackendDeserializationException("Failed to deserialize response: result was null");
-          }
-          return result;
-        }
-        catch (JsonException ex)
-        {
-          throw new BackendDeserializationException(
-                    "The backend returned an invalid response format.",
-                    ex);
-        }
-      });
+      return _pipeline.PostAsync<TRequest, TResponse>(endpoint, request, cancellationToken);
     }
 
     /// <summary>
     /// Generic POST request helper method (void response).
     /// </summary>
-    public async Task PostAsync<TRequest>(
+    public Task PostAsync<TRequest>(
         string endpoint,
         TRequest request,
         CancellationToken cancellationToken = default)
     {
-      await ExecuteWithRetryAsync<bool>(async () =>
-      {
-        var response = await _httpClient.PostAsJsonAsync(endpoint, request, _jsonOptions, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        return true;
-      });
+      return _pipeline.PostAsync(endpoint, request, cancellationToken);
     }
 
     /// <summary>
     /// Generic PUT request helper method.
     /// </summary>
-    public async Task<TResponse> PutAsync<TRequest, TResponse>(
+    public Task<TResponse> PutAsync<TRequest, TResponse>(
         string endpoint,
         TRequest request,
         CancellationToken cancellationToken = default)
     {
-      return await ExecuteWithRetryAsync(async () =>
-      {
-        var response = await _httpClient.PutAsJsonAsync(endpoint, request, _jsonOptions, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-          throw await CreateExceptionFromResponseAsync(response);
-        }
-
-        try
-        {
-          return await response.Content.ReadFromJsonAsync<TResponse>(_jsonOptions, cancellationToken)
-                    ?? throw new BackendDeserializationException("Failed to deserialize response");
-        }
-        catch (JsonException ex)
-        {
-          throw new BackendDeserializationException(
-                    "The backend returned an invalid response format.",
-                    ex);
-        }
-      });
+      return _pipeline.PutAsync<TRequest, TResponse>(endpoint, request, cancellationToken);
     }
 
     // Video Editing
@@ -3282,7 +2766,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         try
@@ -3316,7 +2800,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         try
@@ -3342,7 +2826,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<List<BackupInfo>>(_jsonOptions, cancellationToken)
@@ -3358,7 +2842,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<BackupInfo>(_jsonOptions, cancellationToken)
@@ -3374,7 +2858,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<BackupInfo>(_jsonOptions, cancellationToken)
@@ -3390,7 +2874,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -3405,7 +2889,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<RestoreResponse>(_jsonOptions, cancellationToken)
@@ -3431,7 +2915,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<BackupInfo>(_jsonOptions, cancellationToken)
@@ -3447,7 +2931,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
@@ -3463,7 +2947,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<SettingsData>(_jsonOptions, cancellationToken)
@@ -3479,7 +2963,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<T>(_jsonOptions, cancellationToken);
@@ -3494,7 +2978,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<SettingsData>(_jsonOptions, cancellationToken)
@@ -3510,7 +2994,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<T>(_jsonOptions, cancellationToken)
@@ -3526,7 +3010,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<SettingsData>(_jsonOptions, cancellationToken)
@@ -3579,19 +3063,6 @@ namespace VoiceStudio.App.Services
           ?? throw new BackendDeserializationException("Failed to deserialize benchmark response");
     }
 
-    public async Task<SearchResponse> SearchAsync(string query, string? types = null, int limit = 50, CancellationToken cancellationToken = default)
-    {
-      var queryParams = new List<string> { $"q={Uri.EscapeDataString(query)}", $"limit={limit}" };
-      if (!string.IsNullOrEmpty(types))
-      {
-        queryParams.Add($"types={Uri.EscapeDataString(types)}");
-      }
-
-      var url = $"/api/search?{string.Join("&", queryParams)}";
-      return await GetAsync<SearchResponse>(url, cancellationToken)
-          ?? throw new BackendDeserializationException("Failed to deserialize search response");
-    }
-
     // Emotion preset management
     public async Task<List<EmotionPreset>> GetEmotionPresetsAsync(CancellationToken cancellationToken = default)
     {
@@ -3601,7 +3072,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var presets = await response.Content.ReadFromJsonAsync<List<EmotionPreset>>(_jsonOptions, cancellationToken);
@@ -3617,7 +3088,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var preset = await response.Content.ReadFromJsonAsync<EmotionPreset>(_jsonOptions, cancellationToken);
@@ -3635,7 +3106,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var preset = await response.Content.ReadFromJsonAsync<EmotionPreset>(_jsonOptions, cancellationToken);
@@ -3653,7 +3124,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var preset = await response.Content.ReadFromJsonAsync<EmotionPreset>(_jsonOptions, cancellationToken);
@@ -3669,7 +3140,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return true;
@@ -3684,7 +3155,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var emotions = await response.Content.ReadFromJsonAsync<List<string>>(_jsonOptions, cancellationToken);
@@ -3933,7 +3404,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<PreviewPipelineResponse>(_jsonOptions, cancellationToken)
@@ -3951,7 +3422,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<PipelineComparisonResponse>(_jsonOptions, cancellationToken)
@@ -3975,7 +3446,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         // Backend returns {"message": "..."} on success
@@ -4003,7 +3474,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         // Backend returns {"message": "..."} on success
@@ -4022,7 +3493,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<QualityConsistencyReport>(_jsonOptions, cancellationToken)
@@ -4040,7 +3511,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<AllProjectsConsistencyResponse>(_jsonOptions, cancellationToken)
@@ -4058,7 +3529,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<QualityTrendsResponse>(_jsonOptions, cancellationToken)
@@ -4077,7 +3548,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<QualityHeatmapResponse>(_jsonOptions, cancellationToken)
@@ -4095,7 +3566,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<QualityCorrelationResponse>(_jsonOptions, cancellationToken)
@@ -4113,7 +3584,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<QualityAnomalyResponse>(_jsonOptions, cancellationToken)
@@ -4131,7 +3602,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<QualityPredictionResponse>(_jsonOptions, cancellationToken)
@@ -4149,72 +3620,12 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<QualityInsightsResponse>(_jsonOptions, cancellationToken)
                   ?? throw new BackendDeserializationException("Failed to deserialize quality insights response");
       });
-    }
-
-    // Script editor endpoints
-    public async Task<List<Script>> GetScriptsAsync(string? projectId = null, string? search = null, CancellationToken cancellationToken = default)
-    {
-      var queryParams = new NameValueCollection();
-      if (!string.IsNullOrEmpty(projectId))
-        queryParams.Add("project_id", projectId);
-      if (!string.IsNullOrEmpty(search))
-        queryParams.Add("search", search);
-
-      var queryString = string.Join("&",
-          (queryParams.AllKeys ?? Array.Empty<string>()).SelectMany(key =>
-              queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-          )
-      );
-
-      var url = "/api/script-editor";
-      if (!string.IsNullOrEmpty(queryString))
-        url += $"?{queryString}";
-
-      return await GetAsync<List<Script>>(url, cancellationToken) ?? new List<Script>();
-    }
-
-    public async Task<Script> GetScriptAsync(string scriptId, CancellationToken cancellationToken = default)
-    {
-      return await GetAsync<Script>($"/api/script-editor/{Uri.EscapeDataString(scriptId)}", cancellationToken)
-          ?? throw new BackendDeserializationException("Failed to deserialize script");
-    }
-
-    public async Task<Script> CreateScriptAsync(ScriptCreateRequest request, CancellationToken cancellationToken = default)
-    {
-      return await PostAsync<ScriptCreateRequest, Script>("/api/script-editor", request, cancellationToken);
-    }
-
-    public async Task<Script> UpdateScriptAsync(string scriptId, ScriptUpdateRequest request, CancellationToken cancellationToken = default)
-    {
-      return await PutAsync<ScriptUpdateRequest, Script>($"/api/script-editor/{Uri.EscapeDataString(scriptId)}", request, cancellationToken);
-    }
-
-    public async Task<bool> DeleteScriptAsync(string scriptId, CancellationToken cancellationToken = default)
-    {
-      var response = await SendRequestAsync<object, object>($"/api/script-editor/{Uri.EscapeDataString(scriptId)}", null, System.Net.Http.HttpMethod.Delete, cancellationToken);
-      return response != null;
-    }
-
-    public async Task<Script> AddSegmentToScriptAsync(string scriptId, ScriptSegment segment, CancellationToken cancellationToken = default)
-    {
-      return await PostAsync<ScriptSegment, Script>($"/api/script-editor/{Uri.EscapeDataString(scriptId)}/segments", segment, cancellationToken);
-    }
-
-    public async Task<bool> RemoveSegmentFromScriptAsync(string scriptId, string segmentId, CancellationToken cancellationToken = default)
-    {
-      var response = await SendRequestAsync<object, object>($"/api/script-editor/{Uri.EscapeDataString(scriptId)}/segments/{Uri.EscapeDataString(segmentId)}", null, System.Net.Http.HttpMethod.Delete, cancellationToken);
-      return response != null;
-    }
-
-    public async Task<ScriptSynthesisResponse> SynthesizeScriptAsync(string scriptId, CancellationToken cancellationToken = default)
-    {
-      return await PostAsync<object, ScriptSynthesisResponse>($"/api/script-editor/{Uri.EscapeDataString(scriptId)}/synthesize", new { }, cancellationToken);
     }
 
     // ========== Pipeline API (Phase 22) ==========
@@ -4351,24 +3762,27 @@ namespace VoiceStudio.App.Services
           }
         }
 
-        // Set timeout
-        var originalTimeout = _httpClient.Timeout;
-        if (timeout.HasValue)
+        // Per-upload timeout without mutating shared HttpClient.Timeout (PR-1 footgun fix).
+        CancellationToken uploadToken = cancellationToken;
+        CancellationTokenSource? linkedTimeout = null;
+        if (timeout is { } t && t > TimeSpan.Zero)
         {
-          _httpClient.Timeout = timeout.Value;
+          linkedTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+          linkedTimeout.CancelAfter(t);
+          uploadToken = linkedTimeout.Token;
         }
 
         try
         {
-          var response = await _httpClient.PostAsync(endpoint, content, cancellationToken);
+          var response = await _httpClient.PostAsync(endpoint, content, uploadToken);
           response.EnsureSuccessStatusCode();
 
-          var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+          var responseJson = await response.Content.ReadAsStringAsync(uploadToken);
           return JsonSerializer.Deserialize<TResponse>(responseJson, _jsonOptions);
         }
         finally
         {
-          _httpClient.Timeout = originalTimeout;
+          linkedTimeout?.Dispose();
         }
       }
       catch (Exception ex)
@@ -4379,63 +3793,11 @@ namespace VoiceStudio.App.Services
       }
     }
 
-    // Plugin Health Dashboard endpoints (Phase 4)
-    public async Task<PluginHealthDashboardResponse?> GetPluginHealthDashboardAsync(CancellationToken cancellationToken = default)
-    {
-      try
-      {
-        return await SendRequestAsync<object?, PluginHealthDashboardResponse>(
-          "api/plugins/health/dashboard",
-          null,
-          HttpMethod.Get,
-          cancellationToken);
-      }
-      catch (Exception ex)
-      {
-        System.Diagnostics.Debug.WriteLine($"Error getting plugin health dashboard: {ex.Message}");
-        ErrorLogger.LogError($"Error getting plugin health dashboard: {ex.Message}", "BackendClient.GetPluginHealthDashboardAsync");
-        throw;
-      }
-    }
-
-    public async Task<PluginMetricsResponse?> GetPluginMetricsAsync(string pluginId, CancellationToken cancellationToken = default)
-    {
-      try
-      {
-        var encodedPluginId = Uri.EscapeDataString(pluginId);
-        return await SendRequestAsync<object?, PluginMetricsResponse>(
-          $"api/plugins/{encodedPluginId}/metrics",
-          null,
-          HttpMethod.Get,
-          cancellationToken);
-      }
-      catch (Exception ex)
-      {
-        System.Diagnostics.Debug.WriteLine($"Error getting plugin metrics for {pluginId}: {ex.Message}");
-        ErrorLogger.LogError($"Error getting plugin metrics for {pluginId}: {ex.Message}", "BackendClient.GetPluginMetricsAsync");
-        throw;
-      }
-    }
-
-    public async Task<string> ExportPluginMetricsAsync(string format = "json", CancellationToken cancellationToken = default)
-    {
-      try
-      {
-        var response = await _httpClient.GetAsync($"api/plugins/metrics/export?format={format}", cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadAsStringAsync(cancellationToken);
-      }
-      catch (Exception ex)
-      {
-        System.Diagnostics.Debug.WriteLine($"Error exporting plugin metrics: {ex.Message}");
-        ErrorLogger.LogError($"Error exporting plugin metrics: {ex.Message}", "BackendClient.ExportPluginMetricsAsync");
-        throw;
-      }
-    }
+    // Plugin Health Dashboard — PR-3: moved to PluginHealthClient; use IPluginHealthClient.
 
     public void Dispose()
     {
-      WebSocketService?.Dispose();
+      _webSocketService?.Dispose();
       _httpClient?.Dispose();
       // CircuitBreaker doesn't implement IDisposable - no cleanup needed
     }

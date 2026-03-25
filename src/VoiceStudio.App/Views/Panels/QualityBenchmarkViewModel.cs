@@ -24,9 +24,15 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IProfilesClient _profilesClient;
     private bool _isInitialized;
 
-    public string PanelId => "quality_benchmark";
+    public string PanelId => PanelIds.QualityBenchmark;
     public string DisplayName => ResourceHelper.GetString("Panel.QualityBenchmarking.DisplayName", "Quality Benchmarking");
     public PanelRegion Region => PanelRegion.Center;
+
+    /// <summary>Product trust Pass 01 slice 4: Quality Benchmark panel is partial — not workflow-pass-closed (matrix §2).</summary>
+    public string SurfaceMaturityFootnote =>
+        ResourceHelper.GetString(
+            "QualityBenchmark.Pass01.SurfaceMaturityFootnote",
+            "Quality benchmarking is available here, but this workflow cluster is not closed under a workflow-coherence pass (no §8 proof). Treat metrics and comparisons as partial—do not assume full production quality workflow coverage.");
 
     [ObservableProperty]
     private ObservableCollection<VoiceProfile> profiles = new();
@@ -48,6 +54,10 @@ namespace VoiceStudio.App.Views.Panels
 
     [ObservableProperty]
     private bool enhanceQuality = true;
+
+    /// <summary>W8-C1: resource-backed next-step copy after a successful benchmark (bindable + seam-tested).</summary>
+    [ObservableProperty]
+    private string? nextStepHint;
 
     [ObservableProperty]
     private bool isLoading;
@@ -140,6 +150,8 @@ namespace VoiceStudio.App.Views.Panels
       IsLoading = true;
       HasError = false;
       ErrorMessage = null;
+      StatusMessage = null;
+      NextStepHint = null;
 
       try
       {
@@ -167,6 +179,12 @@ namespace VoiceStudio.App.Views.Panels
 
         OnPropertyChanged(nameof(HasResults));
         OnPropertyChanged(nameof(ResultsSummary));
+        StatusMessage = ResourceHelper.GetString(
+            "QualityBenchmark.W8C1.RunSuccessToast",
+            "Benchmark finished successfully.");
+        NextStepHint = ResourceHelper.GetString(
+            "QualityBenchmark.W8C1.NextStepHint",
+            "Review per-engine metrics below.");
       }
       catch (OperationCanceledException)
       {
@@ -174,7 +192,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (Exception ex)
       {
-        ErrorMessage = $"Benchmark failed: {ex.Message}";
+        ErrorMessage = ResourceHelper.FormatString("QualityBenchmark.BenchmarkFailed", ex.Message);
         HasError = true;
         await HandleErrorAsync(ex, "RunBenchmark");
       }
@@ -194,6 +212,14 @@ namespace VoiceStudio.App.Views.Panels
     {
       RunBenchmarkCommand.NotifyCanExecuteChanged();
     }
+
+    partial void OnTestXTTSChanged(bool value) => RunBenchmarkCommand.NotifyCanExecuteChanged();
+
+    partial void OnTestChatterboxChanged(bool value) => RunBenchmarkCommand.NotifyCanExecuteChanged();
+
+    partial void OnTestTortoiseChanged(bool value) => RunBenchmarkCommand.NotifyCanExecuteChanged();
+
+    partial void OnIsLoadingChanged(bool value) => RunBenchmarkCommand.NotifyCanExecuteChanged();
   }
 
   /// <summary>

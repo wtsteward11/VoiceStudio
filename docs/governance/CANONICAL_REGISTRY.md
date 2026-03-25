@@ -3,7 +3,7 @@
 This registry is the single source of truth for all canonical documents in VoiceStudio.
 Before creating a new document, check this registry to ensure the topic isn't already covered.
 
-> **Last Updated**: 2026-03-11 (CI Suppression Policy)
+> **Last Updated**: 2026-03-25 — **Workflow Coherence Pass 08** — **W8-C1 closed** ([Pass 08](../design/WORKFLOW_COHERENCE_PASS_08_QUALITY_BENCHMARK_PROFILE_COMPARISON.md)); seam **`VoiceStudio.App.Tests.ViewModels.QualityBenchmarkViewModelSeamTests`**, **8** passed; Quick **`artifacts/verify/20260325_181543`**; **`artifacts/verify/latest_pointer.json`** → **`20260325_181543`** (PASSED); **W8-C2/C3** §5/§8-gated. **Workflow 7** — **W7-C1 closed**; **paused after W7-C1** ([Pass 07 §8.4](../design/WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md#84-workflow-7--continuation--pause-governance)) — Quick **`20260325_162114`** / seam **2**. **Product trust Pass 01** [**paused after slice 4** (§8.9 Option 1)](../design/PRODUCT_TRUST_AND_RELEASE_HONESTY_PASS_01.md#89-pass-01-continuation--closure-decision-planning-only). Pass 01 audit: Quick **`20260325_143041`** / seam **5**. **A4** §12-gated; **Pass 06** Quick **`20260325_055851`** / seam **32**. **Pass 05 Option A** Quick **`20260325_044801`** / seam **50**; Option **C** **`20260325_031737`** / **27**.
 
 ---
 
@@ -21,10 +21,10 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Archive Policy | `docs/governance/ARCHIVE_POLICY.md` | — | **DEFERRED** — Use [document-lifecycle.mdc](.cursor/rules/workflows/document-lifecycle.mdc) and archive structure in `docs/archive/` |
 | Governance Lock | `docs/governance/GOVERNANCE_LOCK.md` | — | **DEFERRED** — Low priority |
 | Definition of Done | `docs/governance/DEFINITION_OF_DONE.md` | 2026-01-25 | Consolidated completion criteria |
-| Session State | `.cursor/STATE.md` | 2026-01-25 | **Operational truth** — active task, next steps, blockers, proofs. For active execution, see STATE.md ACTIVE WINDOW; roadmap/spec docs are vision/spec or historical |
+| Session State | `.cursor/STATE.md` | 2026-03-25 | **ACTIVE WINDOW** truth. **Workflow 8 / Pass 08 W8-C1 closed**; **W8-C2/C3** new §5/§8 only; **Workflow 7 paused after W7-C1** (Pass 07 §8.4); Product trust **paused** §8.9; Pass 06 §5; Option A §12. |
 | Memory Index | `openmemory.md` | 2026-01-25 | Living project index for AI context |
 | **Project Handoff Guide** | `docs/governance/PROJECT_HANDOFF_GUIDE.md` | 2026-01-30 | Maintainer entry point; gate status, build/test, structure, roles, task brief creation |
-| **Overseer Newcomer Handoff** | `docs/governance/overseer/OVERSEER_NEWCOMER_HANDOFF.md` | 2026-03-12 | New Overseer (Role 0) onboarding; Day 1 reads, first commands, daily cadence, non-negotiables |
+| **Overseer Newcomer Handoff** | `docs/governance/overseer/OVERSEER_NEWCOMER_HANDOFF.md` | 2026-03-24 | New Overseer (Role 0) onboarding; **§2 project snapshot** (workflow passes, verify pointers, code-truth); Day 1 reads, first commands, daily cadence, non-negotiables |
 | **Tech Debt Register** | `docs/governance/TECH_DEBT_REGISTER.md` | 2026-01-29 | Consolidated technical debt, limitations, and future enhancements; categorized by priority (High/Medium/Low) |
 | **Production Readiness Statement** | `docs/PRODUCTION_READINESS.md` | 2026-01-30 | Formal production readiness declaration for v1.0.0 BASELINE; capabilities, limitations, quality gates, support |
 | Task Brief System | `docs/tasks/README.md` | 2026-01-30 | Task brief workflow and conventions; lifecycle: Analyze → Blueprint → Construct → Validate |
@@ -57,9 +57,37 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Playback Entry Points** | `docs/design/PLAYBACK_ENTRY_POINTS.md` | 2026-03-16 | Global transport UX; playback entry points map; panel play affordances; transport ownership rules |
 | **Transport Panel Publishers** | `docs/design/TRANSPORT_PANEL_PUBLISHERS.md` | 2026-03-16 | Audit of when each panel sets/clears transport ownership; last-writer-wins rules |
 | **Hardening Wave Closure** | `docs/reports/verification/HARDENING_WAVE_CLOSURE_2026.md` | 2026-03-16 | Release-Trust Hardening Wave closure; testhost teardown, Library lifecycle, playback, proof integrity |
+| **Release Trust Closure (full verify lane)** | `docs/reports/release_trust_closure_20260320.md` | 2026-03-20 | Two green full `verify.ps1` runs; stub synthesis; Backend Integration subprocess + curated pytest; UI smoke; architecture wave unblocked |
 | **Transport Wave 4 Shell Decomposition** | `docs/design/TRANSPORT_WAVE_4_SHELL_DECOMPOSITION_PLAN.md` | 2026-03-16 | Transport shortcut coordinator, import workflow extraction, PlayableMediaContext, smoke automation |
 | **Startup Orchestration Hardening** | `docs/design/STARTUP_ORCHESTRATION_HARDENING_PLAN.md` | 2026-03-16 | Backend auto-start hardening: explicit phases, startup states, production runtime discovery, readiness gate, failure recovery UX |
 | **Backend Ownership Policy** | `docs/design/BACKEND_OWNERSHIP_POLICY.md` | 2026-03-14 | Backend lifecycle rules: reuse, port conflict, stale backend, frontend exit, app root, runtime discovery |
+| **BackendClient transport extraction inventory** | `docs/design/BACKENDCLIENT_TRANSPORT_EXTRACTION_INVENTORY.md` | 2026-03-22 | PR-1–PR-12 extraction log; Post-PR-12 remainder pointer; stop criteria link |
+| **BackendClient remainder inventory** | `docs/design/BACKENDCLIENT_REMAINDER_INVENTORY.md` | 2026-03-24 | Post-PR-17 re-baseline from code; stop criteria; decision PAUSE; re-entry rule; date integrity repaired |
+| **STATE archived history** | `docs/archive/STATE_HISTORY.md` | 2026-02-24 | Archived from .cursor/STATE.md per STATE_TRIM_PLAN (Post-PR-17 remainder reassessment) |
+| **Extraction stop criteria** | `docs/design/EXTRACTION_STOP_CRITERIA.md` | 2026-03-22 | When NOT to extract; leverage threshold, fragmentation cost, sparse callers, DTO glue, cross-cutting |
+| **STATE trim plan** | `docs/design/STATE_TRIM_PLAN.md` | 2026-03-22 | Bounded plan for STATE.md archive; do not execute without approval |
+| **PR-13 Pipeline scope** | `docs/design/PR-13_PIPELINE_SCOPE.md` | 2026-03-22 | Frozen PR-13 slice: GetPipelineProvidersAsync, ProcessPipelineAsync to IPipelineConversationClient |
+| **PR-14 BackupRestore scope** | `docs/design/PR-14_BACKUP_RESTORE_SCOPE.md` | 2026-03-22 | Frozen PR-14 slice: 7 backup methods to IBackupRestoreClient |
+| **PR-15 Models scope** | `docs/design/PR-15_MODELS_SCOPE.md` | 2026-03-23 | Frozen PR-15 slice: 9 model methods to IModelManagerClient / pipeline |
+| **PR-16 Video scope** | `docs/design/PR-16_VIDEO_SCOPE.md` | 2026-03-23 | Frozen PR-16 slice: 5 video methods to IVideoGenClient, IVideoEditClient / pipeline |
+| **PR-17 Mixer scope** | `docs/design/PR-17_MIXER_SCOPE.md` | 2026-03-23 | Frozen PR-17 slice: 19 mixer methods to IMixerStateClient / pipeline; 4 gap methods added to interface |
+| **Post-extraction transition plan** | `docs/design/POST_EXTRACTION_TRANSITION_PLAN.md` | 2026-03-24 | Next active lane after extraction pause; re-entry triggers; proof expectations |
+| **Cross-feature workflow backlog** | `docs/design/CROSS_FEATURE_WORKFLOW_BACKLOG.md` | 2026-03-25 | **Workflow 8 / Pass 08** — **W8-C1 closed**; **W8-C2/C3** §5/§8; **Workflow 7 paused** (Pass 07 §8.4); Product trust **paused** (§8.9 Option 1) |
+| **Workflow Pass 01 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_01_PROFILE_SYNTHESIS_TIMELINE.md` | 2026-03-24 | Bounded pass: Profile → synthesis → timeline |
+| **Workflow Pass 02 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_02_PROJECT_TIMELINE_EFFECTS_MIXER.md` | 2026-03-24 | Bounded pass: Project → timeline → effects/mixer; closure §12–§14 |
+| **Workflow Pass 02 proof reconciliation** | `docs/design/WORKFLOW_PASS_02_ARTIFACT_RECONCILIATION.md` | 2026-03-24 | Incomplete verify runs vs latest_pointer; Pass 02 authoritative artifact |
+| **Workflow Pass 03 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_03_SEARCH_PANEL_FOCUS_NAVIGATION.md` | 2026-03-24 | **Complete** (2026-03-24): Search → panel focus → item navigation; proof `artifacts/verify/20260324_030133` |
+| **Workflow Pass 03 governance reconciliation** | `docs/design/WORKFLOW_PASS_03_GOVERNANCE_RECONCILIATION.md` | 2026-03-24 | Mapper path canon (`VoiceStudio.Core/Panels`); pointer rule; audit checklist vs split-brain |
+| **Workflow Pass 04 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_04_SCRIPT_EDITOR_SYNTHESIS_PREVIEW.md` | 2026-03-24 | **Complete** (2026-03-24): Script editor → synthesis / preview; proof `artifacts/verify/20260324_070722`; §10 implementation lock; C5 deferred |
+| **Workflow Pass 05 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_05_RECORD_IMPORT_TRANSCRIPTION_PROJECT.md` | 2026-03-24 | **Slices 1–3 complete** — C3 Option B (proof `20260324_190103`). Slices 1–2 proofs `20260324_173141`, `20260324_181021`. **§10.7** lock; matrix **C3-OptB**. Code-truth §1 (`TranscribeViewModel`, not `TranscriptionViewModel`) |
+| **Workflow Pass 06 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_06_BACKUP_RESTORE_PROJECT_SETTINGS_PROFILE_RECOVERY.md` | 2026-03-25 | **Pass 06 open; slices 1–4 complete** (§8). **Slice 4** D4 merge-hint copy closed — Quick **`20260325_055851`**; seam **32** |
+| **Workflow Pass 07 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md` | 2026-03-25 | **W7-C1 closed**; **lane paused after W7-C1** (**§8.4**) — Quick **`20260325_162114`**, seam **2**; [backlog](../design/CROSS_FEATURE_WORKFLOW_BACKLOG.md) Workflow 7 |
+| **Workflow Pass 08 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_08_QUALITY_BENCHMARK_PROFILE_COMPARISON.md` | 2026-03-25 | **W8-C1 closed** — seam **`VoiceStudio.App.Tests.ViewModels.QualityBenchmarkViewModelSeamTests`**, **8** passed; Quick **`artifacts/verify/20260325_181543`**; **`artifacts/verify/latest_pointer.json`** → **`20260325_181543`** (PASSED); **W8-C2/C3** new §5/§8; [backlog](../design/CROSS_FEATURE_WORKFLOW_BACKLOG.md) Workflow 8 |
+| **Product trust / release honesty Pass 01** | `docs/design/PRODUCT_TRUST_AND_RELEASE_HONESTY_PASS_01.md` | 2026-03-26 | **Paused after slice 4** (§8.9 **Option 1**); slices **1–4** closed; **no slice 5** authorized; reopen = new §8 sign-off; slice 4 Quick **`20260325_143041`** / seam **5** |
+| **Pass 05 C3 persistence policy** | `docs/design/PASS_05_C3_PROJECT_AUDIO_PERSISTENCE_POLICY.md` | 2026-03-24 | **Option B frozen** 2026-03-24 — decisions §2, OUT §5, matrix **C3-OptB**, pre-map §8 |
+| **Pass 05 persistence Option C follow-up** | `docs/design/WORKFLOW_COHERENCE_PASS_05_PERSISTENCE_OPTION_C_FOLLOWUP.md` | 2026-03-25 | Record-only `IProjectAudioClient` bridge; §8 execution |
+| **Pass 05 persistence follow-up (Option A — transcribe + import)** | `docs/design/WORKFLOW_COHERENCE_PASS_05_PERSISTENCE_OPTION_A_FOLLOWUP.md` | 2026-03-25 | **A1+A2+A3** complete — Quick **`20260325_044801`**, seam **50** (§7). **P05-Persist-A4:** §12 **freeze template** + §8 **Planned**; implementation **pending** sign-off. |
+| **PR-8 Telemetry/Diagnostics scope** | `docs/design/PR-8_TELEMETRY_DIAGNOSTICS_SCOPE.md` | 2026-03-22 | PR-8 extraction scope: Option A (DiagnosticsClient decoupling) or Option B (Macros) |
 | **Premium Software Coherence Audit** | `docs/design/PREMIUM_SOFTWARE_COHERENCE_AUDIT.md` | 2026-03-17 | Formal audit: startup, shell, transport, panel lifecycle, event wiring, backend seam, workflows, UX; gaps ranked S0–S2 |
 
 ## Architecture
@@ -137,6 +165,8 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Next 10 Tasks Plan v2** | `docs/design/NEXT_10_TASKS_PLAN_V2.md` | 2026-03-13 | Seam migration (MultiVoiceGenerator, EnsembleSynthesis, MiniTimeline, Automation, GlobalSearch, EffectsMixer); lifecycle audit; seam test audit; doc fix; verification gate |
 | **Comprehensive Gap Analysis and Remediation Plan** | `docs/design/COMPREHENSIVE_GAP_ANALYSIS_AND_REMEDIATION_PLAN.md` | 2026-03-11 | Verified work completed vs. remaining; 9 gaps logged; 8-phase remediation plan (R1–R8); P1–P4 priorities |
 | **MainWindow Decomposition Plan** | `docs/design/MAINWINDOW_DECOMPOSITION_PLAN.md` | 2026-03-15 | Next extraction target: Status Bar Orchestration; future slices: import flow, navigation-shell |
+| **Search Overlay Ownership Contract** | `docs/design/SEARCH_OVERLAY_OWNERSHIP_CONTRACT.md` | 2026-03-21 | Coordinator vs shell responsibilities; prevents search coordinator blob |
+| **Workflow Toast Wiring Proof** | `docs/design/WORKFLOW_TOAST_WIRING_PROOF.md` | 2026-03-19 | Evidence chain for IToastNotificationService production wiring; interface-compatible end-to-end |
 | **Cross-Role Escalation Matrix** | `docs/governance/CROSS_ROLE_ESCALATION_MATRIX.md` | 2026-01-29 | Decision tree and routing table for cross-role escalation; when to use Debug Agent vs other roles |
 | **Handoff Protocol** | `docs/governance/HANDOFF_PROTOCOL.md` | 2026-01-29 | Standardized protocol for issue escalation and cross-role handoffs; templates and examples |
 
@@ -148,6 +178,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Engine Reference | `docs/REFERENCE/ENGINE_REFERENCE.md` | 2026-01-25 | Engine capabilities and config |
 | Engine Config | `backend/config/engine_config.json` | 2026-01-25 | Runtime engine configuration |
 | **AutomationId Registry** | `docs/developer/AUTOMATION_ID_REGISTRY.md` | 2026-02-09 | Authoritative registry of stable AutomationIds; treat as public API; naming conventions and deprecation process |
+| **Connector/working-tree alignment** | `docs/developer/CONNECTOR_WORKING_TREE_ALIGNMENT.md` | 2026-03-22 | Expected root, branch, verify connector freshness; detect stale STATE.md |
 | Overseer Reference | `docs/REFERENCE/OVERSEER_REFERENCE.md` | 2026-01-25 | Overseer tooling guide |
 | Workers Reference | `docs/REFERENCE/WORKERS_REFERENCE.md` | 2026-01-25 | Worker system documentation |
 | Project Status | `docs/REFERENCE/PROJECT_STATUS_REFERENCE.md` | 2026-01-25 | Current project status |
@@ -298,6 +329,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Skip Debt Cleanup Subplan** | `docs/design/SKIP_DEBT_CLEANUP_SUBPLAN.md` | 2026-03-11 | v1.2 executable subplan; scope, sequence, burn-down 312→200, policy |
 | **Workflow Consolidation Subplan** | `docs/design/WORKFLOW_CONSOLIDATION_SUBPLAN.md` | 2026-03-11 | v1.2 executable subplan; Build/CI/Tests/Sentinel duplication, blast-radius |
 | **Strict Mypy Burn-Down Subplan** | `docs/design/STRICT_MYPY_BURNDOWN_SUBPLAN.md` | 2026-03-11 | v1.2 advisory subplan; routes + services, incremental strict mypy |
+| **Contract Tests OpenAPI strategy** | `docs/design/CONTRACT_TESTS_OPENAPI_STRATEGY.md` | 2026-03-19 | Static vs live OpenAPI split; session fixture vs `test_openapi_contract` static file |
 
 ## Security
 
@@ -343,6 +375,11 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Panel Architecture Analysis** | `docs/reports/audit/PROFESSIONAL_PANEL_ARCHITECTURE_ANALYSIS.md` | 2026-02-14 | Moved from root (GAP-DOC-002). Professional-grade panel system analysis. |
 | **Architecture Assessment and Remediation Plan** | `docs/reports/audit/ARCHITECTURAL_ASSESSMENT_AND_REMEDIATION_PLAN.md` | 2026-02-13 | Moved from root (GAP-DOC-002). Comprehensive architecture assessment. |
 | **Complete System Report** | `docs/reports/VOICESTUDIO_COMPLETE_SYSTEM_REPORT.md` | 2026-02-13 | Moved from root (GAP-DOC-002). Full system capabilities report. |
+| **Verify artifact audit (proof trail)** | `docs/reports/verify_artifact_audit_20260319.md` | 2026-03-19 | Why missing `verification_report.md`; Contract Tests timeout/logging; Write-Report paths |
+| **Contract tests hang diagnosis** | `docs/reports/contract_tests_hang_diagnosis_20260319.md` | 2026-03-19 | Repro, buffering vs hang, Invoke-Stage notes |
+| **Contract tests blocker** | `docs/reports/contract_tests_blocker_20260319.md` | 2026-03-19 | Headline blocker doc; harness + proof hygiene |
+| **Contract tests failure inventory** | `docs/reports/contract_tests_failure_inventory_20260319.md` | 2026-03-19 | Enumerated former 18 failures + resolutions; fix order |
+| **WorkflowModels corruption audit** | `docs/reports/workflowmodels_corruption_audit_20260321.md` | 2026-03-22 | Edit-integrity audit; JsonPropertyName incident; recurrence guards |
 
 ## Release
 

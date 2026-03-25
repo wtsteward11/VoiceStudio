@@ -1313,6 +1313,16 @@
   <data name="QualityBenchmark.TimeDisplay" xml:space="preserve">
     <value>{0:F2}s</value>
   </data>
+  <!-- Product trust Pass 01 slice 4: Quality Benchmark panel not workflow-pass-closed (matrix §2) -->
+  <data name="QualityBenchmark.Pass01.SurfaceMaturityFootnote" xml:space="preserve">
+    <value>Quality benchmarking is available here, but this workflow cluster is not closed under a workflow-coherence pass (no §8 proof). Treat metrics and comparisons as partial—do not assume full production quality workflow coverage.</value>
+  </data>
+  <data name="QualityBenchmark.W8C1.RunSuccessToast" xml:space="preserve">
+    <value>Benchmark finished successfully.</value>
+  </data>
+  <data name="QualityBenchmark.W8C1.NextStepHint" xml:space="preserve">
+    <value>Review per-engine metrics below. To compare voices head-to-head, use Profile Comparison when that workflow is complete (Pass 08 W8-C3).</value>
+  </data>
 
   <!-- Text Speech Editor Messages -->
   <data name="TextSpeechEditor.LoadSessionsFailed" xml:space="preserve">

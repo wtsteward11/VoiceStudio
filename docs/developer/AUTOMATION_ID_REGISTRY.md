@@ -172,6 +172,8 @@ Every panel has a `_Root` AutomationId for test navigation:
 | EffectsMixerView | `EffectsMixerView_Root` |
 | AnalyzerView | `AnalyzerView_Root` |
 | TimelineView | `TimelineView_Root` |
+| TrainingView | `TrainingView_Root` |
+| QualityBenchmarkView | `QualityBenchmarkView_Root` |
 | LibraryView | `LibraryView_Root` |
 | SettingsView | `SettingsView_Root` |
 | DiagnosticsView | `DiagnosticsView_Root` |
@@ -190,6 +192,26 @@ Every panel has a `_Root` AutomationId for test navigation:
 | VoiceMorphingBlendingView | `VoiceMorphingBlendingView_Root` |
 | BatchProcessingView | `BatchProcessingView_Root` |
 | BackupRestoreView | `BackupRestoreView_Root` |
+| BackupRestoreView (merge expectation hint) | `BackupRestore_MergeExpectationHint` |
+| BackupRestoreView (restore busy) | `BackupRestore_RestoreBusyRow` |
+| BackupRestoreView (cancel restore) | `BackupRestore_CancelRestoreButton` |
+| TranscribeView (persistence scope footnote, Pass 01) | `TranscribeView_PersistenceScopeFootnote` |
+| LibraryView (import vs drag-drop scope footnote, Pass 01 slice 2) | `LibraryView_ImportDragDropScopeFootnote` |
+| TrainingView (surface maturity footnote, Pass 01 slice 3) | `TrainingView_SurfaceMaturityFootnote` |
+| QualityBenchmarkView (surface maturity footnote, Pass 01 slice 4) | `QualityBenchmarkView_SurfaceMaturityFootnote` |
+| QualityBenchmarkView (W8-C1 operational shell, Pass 08) | `QualityBenchmarkView_HelpButton` |
+| QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_ErrorInfoBar` |
+| QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_ProfileComboBox` |
+| QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_TestTextBox` |
+| QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_EngineXTTSCheckBox` |
+| QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_EngineChatterboxCheckBox` |
+| QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_EngineTortoiseCheckBox` |
+| QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_EnhanceQualityCheckBox` |
+| QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_RunButton` |
+| QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_LoadingRing` |
+| QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_ResultsSummary` |
+| QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_NextStepHint` |
+| QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_ResultsListView` |
 | DatasetQAView | `DatasetQAView_Root` |
 | DeepfakeCreatorView | `DeepfakeCreatorView_Root` |
 | ImageGenView | `ImageGenView_Root` |

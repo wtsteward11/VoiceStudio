@@ -336,6 +336,34 @@ class SynthesisService:
             except Exception as _ce:
                 logger.warning("Consent check error: %s", _ce)
 
+        # Golden-loop / CI: VOICESTUDIO_TEST_MODE=stub (see tests/ci/test_golden_loop_smoke.py)
+        # yields a registered WAV artifact without initializing real TTS engines.
+        _test_mode = os.environ.get("VOICESTUDIO_TEST_MODE", "").strip().lower()
+        if _test_mode == "stub":
+            from backend.api.models_additional import VoiceSynthesizeResponse
+
+            if not getattr(req, "profile_id", None):
+                raise ServiceError(400, "profile_id required")
+            if not getattr(req, "text", None):
+                raise ServiceError(400, "text required")
+            sample_rate = 22050
+            samples = 4000
+            audio = np.zeros(samples, dtype=np.float32)
+            audio_id = f"synth_stub_{req.profile_id}_{uuid.uuid4().hex[:8]}"
+            create_audio_artifact_from_wav_array(
+                audio,
+                sample_rate,
+                created_by="stub",
+                audio_id=audio_id,
+            )
+            return VoiceSynthesizeResponse(
+                audio_id=audio_id,
+                audio_url=f"/api/voice/audio/{audio_id}",
+                duration=float(samples) / float(sample_rate),
+                quality_score=0.0,
+                quality_metrics=None,
+            )
+
         request_id = getattr(request.state, "request_id", None)
 
         if not req.engine or not req.engine.strip():

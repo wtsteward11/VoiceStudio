@@ -1,6 +1,6 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -53,6 +53,13 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? previewText = ResourceHelper.GetString("ProfileComparison.PreviewTextDefault", "Hello, this is a comparison of two voice profiles.");
 
+    /// <summary>Engine id applied to both synthesis requests (single policy surface; default xtts).</summary>
+    [ObservableProperty]
+    private string comparisonEngineId = "xtts";
+
+    /// <summary>Selectable engines for comparison (lowercase ids aligned with synthesis backend).</summary>
+    public IReadOnlyList<string> ComparisonEngineOptions { get; } = new[] { "xtts", "chatterbox", "tortoise" };
+
     [ObservableProperty]
     private string? audioUrlA;
 
@@ -66,15 +73,7 @@ namespace VoiceStudio.App.ViewModels
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
-      // Get toast notification service
-      try
-      {
-        _toastNotificationService = AppServices.TryGetToastNotificationService();
-      }
-      catch
-      {
-        _toastNotificationService = null;
-      }
+      _toastNotificationService = AppServices.TryGetToastNotificationService();
 
       LoadProfilesCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -85,7 +84,7 @@ namespace VoiceStudio.App.ViewModels
       {
         using var profiler = PerformanceProfiler.StartCommand("CompareProfiles");
         await CompareProfilesAsync(ct);
-      }, () => SelectedProfileA != null && SelectedProfileB != null && !IsComparing && !IsLoading);
+      }, CanExecuteCompareProfiles);
       PlayProfileACommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("PlayProfileA");
@@ -107,11 +106,38 @@ namespace VoiceStudio.App.ViewModels
       await LoadProfilesAsync(cancellationToken);
     }
 
+    public bool HasComparisonResults => ComparisonData is not null;
+
     public IAsyncRelayCommand LoadProfilesCommand { get; }
     public IAsyncRelayCommand CompareProfilesCommand { get; }
     public IAsyncRelayCommand PlayProfileACommand { get; }
     public IAsyncRelayCommand PlayProfileBCommand { get; }
     public IRelayCommand StopPlaybackCommand { get; }
+
+    private bool CanExecuteCompareProfiles()
+    {
+      return SelectedProfileA != null
+          && SelectedProfileB != null
+          && !IsComparing
+          && !IsLoading
+          && !string.IsNullOrWhiteSpace(PreviewText)
+          && !string.IsNullOrWhiteSpace(ComparisonEngineId);
+    }
+
+    partial void OnPreviewTextChanged(string? value)
+    {
+      CompareProfilesCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnComparisonEngineIdChanged(string value)
+    {
+      CompareProfilesCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnComparisonDataChanged(ProfileComparisonData? value)
+    {
+      OnPropertyChanged(nameof(HasComparisonResults));
+    }
 
     partial void OnSelectedProfileAChanged(VoiceProfile? value)
     {
@@ -189,7 +215,11 @@ namespace VoiceStudio.App.ViewModels
 
     private async Task CompareProfilesAsync(CancellationToken cancellationToken)
     {
-      if (SelectedProfileA == null || SelectedProfileB == null || string.IsNullOrEmpty(PreviewText))
+      if (SelectedProfileA == null || SelectedProfileB == null || string.IsNullOrWhiteSpace(PreviewText))
+        return;
+
+      var engine = (ComparisonEngineId ?? string.Empty).Trim();
+      if (string.IsNullOrEmpty(engine))
         return;
 
       IsComparing = true;
@@ -200,15 +230,13 @@ namespace VoiceStudio.App.ViewModels
       {
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Generate audio for both profiles using the same text
-        var text = PreviewText;
+        var text = PreviewText.Trim();
 
-        // Generate audio for Profile A
         var requestA = new VoiceSynthesisRequest
         {
           ProfileId = SelectedProfileA.Id,
           Text = text,
-          Engine = "xtts", // Default engine
+          Engine = engine,
           Language = SelectedProfileA.Language ?? "en"
         };
 
@@ -216,12 +244,11 @@ namespace VoiceStudio.App.ViewModels
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Generate audio for Profile B
         var requestB = new VoiceSynthesisRequest
         {
           ProfileId = SelectedProfileB.Id,
           Text = text,
-          Engine = "xtts", // Default engine
+          Engine = engine,
           Language = SelectedProfileB.Language ?? "en"
         };
 

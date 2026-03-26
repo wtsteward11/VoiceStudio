@@ -2,9 +2,125 @@
   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:controls="using:VoiceStudio.App.Controls"
+  xmlns:converters="using:VoiceStudio.App.Converters"
   xmlns:local="using:VoiceStudio.App.Views.Panels"
   x:DataType="local:ProfileComparisonView">
-  <Grid AutomationProperties.AutomationId="ProfileComparisonView_Root">
-    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed" />
+  <UserControl.Resources>
+    <converters:BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+  </UserControl.Resources>
+  <Grid AutomationProperties.AutomationId="ProfileComparisonView_Root"
+        Background="{StaticResource VSQ.Panel.Background}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <Border Grid.Row="0"
+            Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+            Padding="{StaticResource VSQ.Spacing.Medium}">
+      <Grid ColumnSpacing="12">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Text="Profile Comparison"
+                   FontSize="{StaticResource VSQ.FontSize.Title}"
+                   Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
+        <Button Grid.Column="1"
+                Content="Help"
+                Click="HelpButton_Click"
+                AutomationProperties.AutomationId="ProfileComparisonView_HelpButton" />
+      </Grid>
+    </Border>
+
+    <ScrollViewer Grid.Row="1"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="{StaticResource VSQ.Spacing.Medium}">
+      <StackPanel Spacing="16" MaxWidth="920">
+        <InfoBar IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+                 Severity="Error"
+                 Title="Profile comparison"
+                 Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                 AutomationProperties.AutomationId="ProfileComparisonView_ErrorInfoBar" />
+
+        <TextBlock Text="Profile A" FontWeight="SemiBold" />
+        <ComboBox ItemsSource="{x:Bind ViewModel.AvailableProfiles, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.SelectedProfileA, Mode=TwoWay}"
+                  DisplayMemberPath="Name"
+                  PlaceholderText="Select profile A"
+                  MinWidth="280"
+                  HorizontalAlignment="Left"
+                  AutomationProperties.AutomationId="ProfileComparisonView_ProfileAComboBox" />
+
+        <TextBlock Text="Profile B" FontWeight="SemiBold" />
+        <ComboBox ItemsSource="{x:Bind ViewModel.AvailableProfiles, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.SelectedProfileB, Mode=TwoWay}"
+                  DisplayMemberPath="Name"
+                  PlaceholderText="Select profile B"
+                  MinWidth="280"
+                  HorizontalAlignment="Left"
+                  AutomationProperties.AutomationId="ProfileComparisonView_ProfileBComboBox" />
+
+        <TextBlock Text="Preview text" FontWeight="SemiBold" />
+        <TextBox Text="{x:Bind ViewModel.PreviewText, Mode=TwoWay}"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 MinHeight="80"
+                 AutomationProperties.AutomationId="ProfileComparisonView_PreviewTextBox" />
+
+        <TextBlock Text="Comparison engine" FontWeight="SemiBold" />
+        <ComboBox ItemsSource="{x:Bind ViewModel.ComparisonEngineOptions, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.ComparisonEngineId, Mode=TwoWay}"
+                  MinWidth="200"
+                  HorizontalAlignment="Left"
+                  AutomationProperties.AutomationId="ProfileComparisonView_EngineComboBox" />
+
+        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          <Button Content="Compare profiles"
+                  Command="{x:Bind ViewModel.CompareProfilesCommand}"
+                  AutomationProperties.AutomationId="ProfileComparisonView_CompareButton" />
+          <ProgressRing IsActive="{x:Bind ViewModel.IsComparing, Mode=OneWay}"
+                        Width="32"
+                        Height="32"
+                        AutomationProperties.AutomationId="ProfileComparisonView_CompareProgressRing" />
+          <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                        Width="32"
+                        Height="32"
+                        AutomationProperties.AutomationId="ProfileComparisonView_LoadingProgressRing" />
+        </StackPanel>
+
+        <TextBlock Text="Results"
+                   FontWeight="SemiBold"
+                   Visibility="{x:Bind ViewModel.HasComparisonResults, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+        <StackPanel Spacing="8"
+                    Visibility="{x:Bind ViewModel.HasComparisonResults, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+          <TextBlock Text="{x:Bind ViewModel.ComparisonData.QualityScoreADisplay, Mode=OneWay}"
+                     AutomationProperties.AutomationId="ProfileComparisonView_ScoreA" />
+          <TextBlock Text="{x:Bind ViewModel.ComparisonData.QualityScoreBDisplay, Mode=OneWay}"
+                     AutomationProperties.AutomationId="ProfileComparisonView_ScoreB" />
+          <TextBlock Text="{x:Bind ViewModel.ComparisonData.QualityScoreDifference, Mode=OneWay}"
+                     FontWeight="SemiBold"
+                     AutomationProperties.AutomationId="ProfileComparisonView_ScoreDifference" />
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <Button Content="Play profile A"
+                    Command="{x:Bind ViewModel.PlayProfileACommand}"
+                    AutomationProperties.AutomationId="ProfileComparisonView_PlayAButton" />
+            <Button Content="Play profile B"
+                    Command="{x:Bind ViewModel.PlayProfileBCommand}"
+                    AutomationProperties.AutomationId="ProfileComparisonView_PlayBButton" />
+            <Button Content="Stop"
+                    Command="{x:Bind ViewModel.StopPlaybackCommand}"
+                    AutomationProperties.AutomationId="ProfileComparisonView_StopButton" />
+          </StackPanel>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+
+    <controls:HelpOverlay x:Name="HelpOverlay"
+                          Grid.RowSpan="2"
+                          IsVisible="False"
+                          Visibility="Collapsed" />
   </Grid>
 </UserControl>

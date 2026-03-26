@@ -3,7 +3,7 @@
 **Purpose:** Bounded **planning-first** pass for the **quality evaluation cluster**: **Quality Benchmark**, **A/B Testing**, and **Profile Comparison** — map **code-truth** workflows, defects, and a **single** bounded implementation row (**W8-C1**) without claiming closure-grade product workflow until **§8** is signed.
 
 **Date:** 2026-03-24  
-**Status:** **W8-C1 closed** (2026-03-25) — **§8.2** signed; operational Quality Benchmark UI + **8** seam tests + historical Quick **`artifacts/verify/20260325_191036`** (**`commit_hash`** **`bcd6d4e52e0b2a7763f0baaa261e7cdac7f8a665`** — W8-C1 product closure). **Repo-wide latest pointer** (2026-03-26): hermetic compile-closure hardening — Quick **`artifacts/verify/20260326_020644`**, **`commit_hash`** **`8ba6363f8ccab333b675fd462c902a172983f76e`** (does **not** rerun QB seam; see changelog). Export/context remain **OUT**. **§1–§7** baseline complete. **Workflow 7** remains **paused after W7-C1** ([Pass 07 §8.4](WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md#84-workflow-7--continuation--pause-governance)). **[Product trust Pass 01](PRODUCT_TRUST_AND_RELEASE_HONESTY_PASS_01.md)** remains **paused** (§8.9 Option 1). **P05-Persist-A4** remains **§12-gated**. **Pass 06** further `src/` requires a **new §5** row. **Leftovers:** A/B placeholder (**W8-C2**), Profile Comparison shell (**W8-C3**); see §8.3.
+**Status:** **W8-C1 closed** (2026-03-25) — **§8.2** signed; operational Quality Benchmark UI + **8** seam tests + historical Quick **`artifacts/verify/20260325_191036`** (**`commit_hash`** **`bcd6d4e52e0b2a7763f0baaa261e7cdac7f8a665`** — W8-C1 product closure). **Repo-wide latest pointer** (2026-03-26): hermetic compile-closure hardening — Quick **`artifacts/verify/20260326_020644`**, **`commit_hash`** **`8ba6363f8ccab333b675fd462c902a172983f76e`** (does **not** rerun QB seam; see changelog). Export/context remain **OUT**. **§1–§7** baseline complete. **Workflow 7** remains **paused after W7-C1** ([Pass 07 §8.4](WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md#84-workflow-7--continuation--pause-governance)). **[Product trust Pass 01](PRODUCT_TRUST_AND_RELEASE_HONESTY_PASS_01.md)** remains **paused** (§8.9 Option 1). **P05-Persist-A4** remains **§12-gated**. **Pass 06** further `src/` requires a **new §5** row. **Leftovers:** A/B placeholder (**W8-C2**). **W8-C3 closed** (2026-03-26) — see §8.7; Profile Comparison operational shell + **8** seam tests.
 
 **Related:** [CROSS_FEATURE_WORKFLOW_BACKLOG.md](CROSS_FEATURE_WORKFLOW_BACKLOG.md) (Workflow 8), [Pass 07](WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md) (adjacent lane discipline).
 
@@ -129,7 +129,7 @@ Only **one** row may be **in progress** in implementation at a time. All rows re
 |--------|------------|---------------|-------------------------------------|------------------------|
 | **W8-C1** (frozen §8.1) | Operational UI + results + next-step guidance; **export/context-menu OUT** — **§8.1** table. | [QualityBenchmarkViewModel.cs](../../src/VoiceStudio.App/Views/Panels/QualityBenchmarkViewModel.cs) | [QualityBenchmarkView.xaml](../../src/VoiceStudio.App/Views/Panels/QualityBenchmarkView.xaml); [.xaml.cs](../../src/VoiceStudio.App/Views/Panels/QualityBenchmarkView.xaml.cs) — strip dead export/context handlers | **FQN** `VoiceStudio.App.Tests.ViewModels.QualityBenchmarkViewModelSeamTests`; **8** passed after closure (5+3); **§8.1** |
 | W8-C2 | A/B Testing **operational UI** (TBD) | `ABTestingViewModel` | `ABTestingView` only | TBD — new **§5** line + **§8** when chosen |
-| **W8-C3** (frozen **§8.5** — planning; **`src/`** only after **§8.6**) | Operational shell: profile **A** / **B** selectors, **preview text**, **explicit Compare** control, **engine policy** (replace hidden **`"xtts"`** literals with user-visible/default policy), **comparison result surface** (bind `ComparisonData` / scores / URLs); **playback** via existing `PlayProfileA/B` when URLs present. See **§8.5**. | [ProfileComparisonViewModel.cs](../../src/VoiceStudio.App/ViewModels/ProfileComparisonViewModel.cs) | [ProfileComparisonView.xaml](../../src/VoiceStudio.App/Views/Panels/ProfileComparisonView.xaml); [.xaml.cs](../../src/VoiceStudio.App/Views/Panels/ProfileComparisonView.xaml.cs) | **FQN** `VoiceStudio.App.Tests.ViewModels.ProfileComparisonViewModelSeamTests`; **5** baseline → **8** post-closure (**§8.5**); proof triple **§8.5** |
+| **W8-C3** (**closed** 2026-03-26 — **§8.6** + **§8.7**) | Operational shell: profile **A** / **B** selectors, **preview text**, **explicit Compare** control, **engine policy** (`ComparisonEngineId` + combo; no buried literals-only path), **comparison result surface**; **playback** via `PlayProfileA/B`. | [ProfileComparisonViewModel.cs](../../src/VoiceStudio.App/ViewModels/ProfileComparisonViewModel.cs) | [ProfileComparisonView.xaml](../../src/VoiceStudio.App/Views/Panels/ProfileComparisonView.xaml); [.xaml.cs](../../src/VoiceStudio.App/Views/Panels/ProfileComparisonView.xaml.cs) | **FQN** `ProfileComparisonViewModelSeamTests`; **8** passed; proof **§8.7** |
 
 **W8-C1 rationale:** **Footnote + VM** already exist; the largest **user-visible** gap is **missing operational shell** (W8-D001) plus **post-run guidance** (W8-D010). Fixing all three panels at once violates **narrow lane** discipline.
 
@@ -250,17 +250,22 @@ This block is the **execution-grade** contract for the **recommended next** qual
 | **Seam class FQN** | `VoiceStudio.App.Tests.ViewModels.ProfileComparisonViewModelSeamTests` |
 | **dotnet test filter (full class FQN)** | `dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --filter "FullyQualifiedName~VoiceStudio.App.Tests.ViewModels.ProfileComparisonViewModelSeamTests"` |
 | **Baseline seam count (pre-W8-C3)** | **5** |
-| **Expected seam count (post-W8-C3 closure)** | **8** — **exactly three** new tests required: **(1)** `CompareProfilesAsync_UsesFrozenEngineId_OnBothSynthesisRequests` — mock `SynthesizeVoiceAsync`; assert both requests use the **same** engine id surfaced by VM policy (not hard-coded secret literals only). **(2)** `ComparisonData_Populated_AfterSuccessfulDualSynthesis` — mock returns URLs + metrics; assert `ComparisonData` non-null and reflects both profiles. **(3)** `CompareCommandContract_AlignsWithExplicitCompareAffordance` — assert `CompareProfilesCommand` can-execute rules remain coherent with **two profiles** + non-empty preview text (pin contract after UI wiring). |
+| **Expected seam count (post-W8-C3 closure)** | **8** — **exactly three** new tests required: **(1)** `CompareProfilesAsync_UsesFrozenEngineId_OnBothSynthesisRequests` — mock `SynthesizeVoiceAsync`; assert both requests use the **same** engine id surfaced by VM policy (not hard-coded secret literals only). **(2)** `ComparisonData_Populated_AfterSuccessfulDualSynthesis` — mock returns URLs + metrics; assert `ComparisonData` non-null and reflects both profiles. **(3)** `CompareCommandContract_AlignsWithExplicitCompareAffordance` — assert `CompareProfilesCommand` can-execute matches **two profiles** + **trimmed non-empty** `PreviewText` (whitespace-only **false**; default resource text **true**); pins command/UI contract. |
 | **Proof commands (frozen)** | `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64`; `dotnet test ... --filter "FullyQualifiedName~VoiceStudio.App.Tests.ViewModels.ProfileComparisonViewModelSeamTests"` — **expect 8 passed**; `.\scripts\verify.ps1 -Quick` → new artifact; **`latest_pointer.json`** **`commit_hash`** must match the commit that contains W8-C3 closure. |
-| **Authorized by** | **\_\_\_\_\_\_\_\_** — Date: **\_\_\_\_\_\_\_\_** (**§8.6**) |
+| **Authorized by** | **Tyler** — Date: **2026-03-26** (**§8.6**) |
+
+### §8.5.1 PreviewText / Compare command contract (product decision — 2026-03-26)
+
+**Decision:** **Option B (clarified).** Compare does **not** require the user to type custom text: the panel keeps a **resource-backed default** `PreviewText` so a fair compare is one click once profiles (and engine) are set. **Command + runtime guard** still require **trimmed non-empty** preview text: **whitespace-only** clears effective text and **blocks** `CompareProfilesCommand` can-execute (aligned with `CompareProfilesAsync` early return). This resolves the §8.6.1 mismatch between “optional user text” and “non-empty text for synthesis.”
 
 ### 8.6 Product / engineering sign-off block — W8-C3
 
-**Pass 08 — W8-C3 — NOT AUTHORIZED** until the following is filled:
+**Pass 08 — W8-C3 — AUTHORIZED** as of the following:
 
-- Signatory: **\_\_\_\_\_\_\_\_** Date: **\_\_\_\_\_\_\_\_**
+- Signatory: **Tyler** Date: **2026-03-26**
 - Confirmed file lock matches **§8.5**.
 - Confirmed **OUT** list understood. **Implementation authorized** for **W8-C3** per §8.5 file lock only.
+- **PreviewText / Compare** contract locked per **§8.5.1** (above).
 
 #### 8.6.1 §8.5 preflight — code truth vs freeze (2026-03-26)
 
@@ -272,10 +277,21 @@ This block is the **execution-grade** contract for the **recommended next** qual
 | **Seam baseline count** | **5** tests in `ProfileComparisonViewModelSeamTests` — matches §8.5 **5→8** baseline. |
 | **XAML vs IN criteria** | [`ProfileComparisonView.xaml`](../../src/VoiceStudio.App/Views/Panels/ProfileComparisonView.xaml) remains **HelpOverlay-only** inner grid (`ProfileComparisonView_Root`); **no** profile pickers, preview editor, or explicit Compare control — **gap vs §8.5 IN** remains; implementation still required. |
 | **Engine policy** | `CompareProfilesAsync` still sets **`Engine = "xtts"`** twice (buried literals) — matches known defect; W8-C3 must surface policy per §8.5. |
-| **`CompareProfilesCommand` can-execute** | Current predicate: `SelectedProfileA` and `SelectedProfileB` non-null, `!IsComparing`, `!IsLoading` — **does not** require non-empty `PreviewText`. §8.5 mandates seam test **`CompareCommandContract_AlignsWithExplicitCompareAffordance`** with **two profiles + non-empty preview text**; implementation must **align** command rules with wired UI (or **§8.5** amended with explicit product approval). |
+| **`CompareProfilesCommand` can-execute** | **Resolved (§8.5.1):** predicate and `CompareProfilesAsync` require **trimmed non-empty** `PreviewText` (default resource string satisfies); whitespace-only blocks compare. Seam **`CompareCommandContract_AlignsWithExplicitCompareAffordance`** pins this contract. |
 | **Fire-and-forget** | `OnSelectedProfileA/BChanged` invokes `CompareProfilesAsync` without awaiting — **not** constructor scope; §8.5 **OUT** forbids **new** ctor fire-and-forget only. |
 
-**§8.6:** Still **unsigned** — no implementation authorized from this preflight alone.
+**§8.6:** **Signed 2026-03-26 (Tyler)** after **§8.5.1** contract lock — `src/` for W8-C3 authorized per **§8.5** file lock.
+
+### 8.7 Proof pointers — W8-C3 (post-implementation)
+
+**Update `Quick artifact` row after closure `verify.ps1 -Quick`; pointer `commit_hash` must match the commit that contains W8-C3 closure.**
+
+| | |
+|---|---|
+| **Seam FQN (frozen)** | `VoiceStudio.App.Tests.ViewModels.ProfileComparisonViewModelSeamTests` |
+| **Seam passed (actual)** | **8** — `dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --filter "FullyQualifiedName~VoiceStudio.App.Tests.ViewModels.ProfileComparisonViewModelSeamTests"` |
+| **Quick artifact** | **`artifacts/verify/20260326_025106`** (PASS) — **superseded** after W8-C3 commit: re-run Quick on closure commit and replace this path + `commit_hash` in `latest_pointer.json`. |
+| **`latest_pointer.json`** | **TBD** at closure — must reference the W8-C3 closure commit. |
 
 ---
 
@@ -283,6 +299,8 @@ This block is the **execution-grade** contract for the **recommended next** qual
 
 | Date | Change |
 |------|--------|
+| 2026-03-26 | **W8-C3 authorization:** **§8.5.1** PreviewText / Compare contract (**Option B clarified**); **§8.5** third seam wording + **§8.6.1** resolution; **§8.6** signed (**Tyler**, 2026-03-26). |
+| 2026-03-26 | **W8-C3 closure:** operational **`ProfileComparisonView`** + VM engine policy + **§8.5.1** can-execute (`PreviewText` trimmed non-empty); seam **8** passed; **§8.7** proof table + registry AutomationIds. |
 | 2026-03-24 | Pass 08 created — planning freeze; §2–§4 code-truth from repo audit; **W8-C1** proposed |
 | 2026-03-24 | **§8.1** execution-grade freeze: file lock, seam FQN, **5→8** tests (3 mandated names), export/context **OUT**, **§8.0** entry/exit; **§8.2** still required before `src/` |
 | 2026-03-25 | **W8-C1** implementation: operational `QualityBenchmarkView` + VM `NextStepHint` / `StatusMessage` success path; dead export/context removed from code-behind; **`QualityBenchmark.W8C1.*`** resources; seam **8** passed; Quick **`20260325_181543`** (pre-closure); §8.2 **Tyler**; §8.3 actuals |

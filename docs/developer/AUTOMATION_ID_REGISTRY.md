@@ -251,6 +251,22 @@ Every panel has a `_Root` AutomationId for test navigation:
 | QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_ResultsSummary` |
 | QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_NextStepHint` |
 | QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_ResultsListView` |
+| ProfileComparisonView (Pass 08 W8-C3) | `ProfileComparisonView_Root` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_HelpButton` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_ErrorInfoBar` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_ProfileAComboBox` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_ProfileBComboBox` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_PreviewTextBox` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_EngineComboBox` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_CompareButton` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_CompareProgressRing` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_LoadingProgressRing` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_ScoreA` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_ScoreB` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_ScoreDifference` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_PlayAButton` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_PlayBButton` |
+| ProfileComparisonView (W8-C3) | `ProfileComparisonView_StopButton` |
 | DatasetQAView | `DatasetQAView_Root` |
 | DeepfakeCreatorView | `DeepfakeCreatorView_Root` |
 | ImageGenView | `ImageGenView_Root` |

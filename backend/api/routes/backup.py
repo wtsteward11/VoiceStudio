@@ -100,6 +100,63 @@ _state_lock = asyncio.Lock()
 _MAX_BACKUP_SIZE_MB = 5000  # 5GB max backup size
 _MAX_BACKUP_COUNT = 100  # Maximum number of backups
 _MAX_UPLOAD_SIZE_MB = 5000  # 5GB max upload size
+_BACKUP_METADATA_SCHEMA_VERSION = 1
+
+
+def _normalize_backup_schema_version(metadata: dict) -> int:
+    """Return schema version for upload validation; 0 = legacy (field absent)."""
+    raw = metadata.get("schema_version")
+    if raw is None:
+        return 0
+    if isinstance(raw, bool):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid backup: schema_version must be an integer",
+        )
+    if isinstance(raw, int):
+        return raw
+    raise HTTPException(
+        status_code=400,
+        detail="Invalid backup: schema_version must be an integer",
+    )
+
+
+def _validate_upload_backup_metadata(metadata: dict) -> None:
+    """Reject archives whose metadata.json is not a VoiceStudio backup manifest (Pass 06 D6 / upload)."""
+    required_bools = (
+        "includes_profiles",
+        "includes_projects",
+        "includes_settings",
+        "includes_models",
+    )
+    for key in required_bools:
+        if key not in metadata:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid backup: metadata missing required field '{key}'",
+            )
+        if not isinstance(metadata[key], bool):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid backup: metadata field '{key}' must be a boolean",
+            )
+    if not any(metadata[k] for k in required_bools):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid backup: archive does not declare any components to restore",
+        )
+    version = _normalize_backup_schema_version(metadata)
+    if version in (0, _BACKUP_METADATA_SCHEMA_VERSION):
+        return
+    if version > _BACKUP_METADATA_SCHEMA_VERSION:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid backup: backup archive version is newer than this app supports",
+        )
+    raise HTTPException(
+        status_code=400,
+        detail="Invalid backup: unsupported backup metadata version",
+    )
 
 
 def _get_backup_path(backup_id: str) -> Path:
@@ -307,6 +364,7 @@ async def create_backup(
                 "id": backup_id,
                 "name": request.name,
                 "created": now,
+                "schema_version": _BACKUP_METADATA_SCHEMA_VERSION,
                 "includes_profiles": request.includes_profiles,
                 "includes_projects": request.includes_projects,
                 "includes_settings": request.includes_settings,
@@ -588,6 +646,11 @@ async def upload_backup(
             with open(metadata_file) as f:
                 metadata = json.load(f)
 
+            if not isinstance(metadata, dict):
+                raise HTTPException(status_code=400, detail="Invalid backup: metadata must be a JSON object")
+
+            _validate_upload_backup_metadata(metadata)
+
             # Update metadata with upload info
             metadata["id"] = backup_id
             metadata["created"] = now
@@ -621,8 +684,12 @@ async def upload_backup(
         if backup_path.exists():
             try:
                 backup_path.unlink()
-            except Exception:
-                pass  # Ignore cleanup errors
+            except OSError as cleanup_err:
+                logger.warning(
+                    "Could not remove partial upload at %s: %s",
+                    backup_path,
+                    cleanup_err,
+                )
         raise HTTPException(status_code=500, detail=f"Failed to upload backup: {e!s}") from e
 
 

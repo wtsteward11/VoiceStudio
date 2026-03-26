@@ -2,14 +2,14 @@
 
 **Purpose:** Bounded pass to make **restore** semantically trustworthy end-to-end: backend replaces on-disk data (profiles, projects, settings, optional models), and the **WinUI shell** reflects that truth—no stale project lists, invalid selections, or success copy that implies UI refresh that did not occur. This pass does **not** redesign backup format, cloud sync, or the extraction subsystem.
 
-**Date:** 2026-03-25  
-**Status:** **Pass 06 open** — **slices 1–4 complete** (§8; slice 4 D4 merge-hint copy **2026-03-25**; Quick **`artifacts/verify/20260325_055851`**; seam **32**). Further D6 / backend scope remains **OUT** unless a new §5 row authorizes it. **Hard-lock** (§1, D4, §6) unchanged.
+**Date:** 2026-03-26  
+**Status:** **Pass 06 open** — **slices 1–5 complete** (§8; slice 5 D6 upload **`metadata.json`** validation **2026-03-26**; seam **32** unchanged; Python **`test_backup_upload_metadata`** **8** passed). **Hard-lock** (§1, D4, §6) unchanged except D6 authorized by §5.5.
 
 **Related:** [CROSS_FEATURE_WORKFLOW_BACKLOG.md](CROSS_FEATURE_WORKFLOW_BACKLOG.md) (Workflow 6), [PR-14_BACKUP_RESTORE_SCOPE.md](PR-14_BACKUP_RESTORE_SCOPE.md) (transport extraction — **not** UX coherence), [POST_EXTRACTION_TRANSITION_PLAN.md](POST_EXTRACTION_TRANSITION_PLAN.md), [WORKFLOW_COHERENCE_PASS_05_RECORD_IMPORT_TRANSCRIPTION_PROJECT.md](WORKFLOW_COHERENCE_PASS_05_RECORD_IMPORT_TRANSCRIPTION_PROJECT.md) (prior lane; **Pass 05 Option A/C persistence is out of scope here**).
 
 **Authoritative prior proof:** Pass 05 slice 3 closed with `artifacts/verify/20260324_190103` (see Pass 05 §8.2).
 
-**This pass proof:** §8 — **slice 1** seam **10**; Quick `20260324_204541`. **Slice 2** seam **27**; Quick **`20260324_221954`**. **Slice 3** seam **30**; Quick **`20260324_225957`**. **Slice 4** seam **32**; Quick **`artifacts/verify/20260325_055851`**. **Quick verify does not subsume seam tests.**
+**This pass proof:** §8 — **slice 1** seam **10**; Quick `20260324_204541`. **Slice 2** seam **27**; Quick **`20260324_221954`**. **Slice 3** seam **30**; Quick **`20260324_225957`**. **Slice 4** seam **32**; Quick **`artifacts/verify/20260325_055851`**. **Slice 5** (§5.5): Python **`tests/unit/backend/api/routes/test_backup_upload_metadata.py`** **8** passed; .NET seam **32** unchanged — §7.2. **Quick verify does not subsume seam tests.**
 
 ---
 
@@ -95,7 +95,7 @@
 | D3 | Success message implies full app recovery while shell is stale | `BackupRestoreViewModel`, [Resources.resw](../../src/VoiceStudio.App/Resources/en-US/Resources.resw) (or equivalent) | Copy/reason mismatch | **Med** | **IN** slice 1 |
 | D4 | Restore **merges** directories; extra files from current session can remain | [backup.py](../../backend/api/routes/backup.py) `copytree(..., dirs_exist_ok=True)` | Backend merge semantics | **Med** | **OUT** — **no** `backup.py` semantic change in Pass 06. **IN** — user-facing **expectation-setting** only (status detail, help, or secondary line: restore merges over existing data dirs; not a full replace wipe). |
 | D5 | Large model restore / no progress / no cancel affordance | [`BackupRestoreViewModel`](../../src/VoiceStudio.App/ViewModels/BackupRestoreViewModel.cs), [`BackupRestoreView.xaml`](../../src/VoiceStudio.App/Views/Panels/BackupRestoreView.xaml) | UX | **Med** | **IN** slice 3 (§5.3) — **no** backend streaming/progress API |
-| D6 | Upload path / archive version validation | `upload_backup` | Schema | **Low** | **OUT** unless matrix expands |
+| D6 | Upload path: **`metadata.json`** not a VoiceStudio manifest (missing keys, wrong types, no components, unknown schema) | [`backup.py`](../../backend/api/routes/backup.py) `upload_backup` | No server-side manifest validation | **Low** | **IN** slice 5 (§5.5) |
 
 ---
 
@@ -205,6 +205,43 @@ Rows are **implementation-sized**. Slice 1 executes **C1a–C3a + C4** only (see
 
 **§5.4 sign-off:** **2026-03-25 — Tyler (product/engineering)** — §5.4 **IN/OUT** accepted as written; **implementation file lock** (four files) unless §8 expanded; merge-expectation **copy only**; no `backup.py` / behavior / D6 / Pass 05 spillover.
 
+### 5.5 Slice 5 planning lock — D6 upload `metadata.json` validation (backend only)
+
+**Intent:** After ZIP integrity checks, reject uploaded archives whose **`metadata.json`** is not a **VoiceStudio backup manifest**, so the Backup panel cannot register empty or foreign ZIPs as backups. **No** restore merge semantics change; **no** WinUI changes required (`BackupRestoreViewModel` already surfaces HTTP **400** detail via `UploadBackupFailed`).
+
+**User-visible defect addressed:** Previously, a ZIP with **`metadata.json`** missing `includes_*` booleans (or with all `false`) could upload and appear as a backup with misleading flags.
+
+**IN (slice 5 only):**
+
+- After loading `metadata.json` on **`POST /api/backup/upload`**, require:
+  - JSON **object** (not array/primitive).
+  - Presence of **`includes_profiles`**, **`includes_projects`**, **`includes_settings`**, **`includes_models`**, each **boolean**.
+  - At least one **`true`** (archive must declare at least one component).
+  - **`schema_version`**: absent or **`0`** (legacy) or **`1`** accepted; integer **`> 1`** → **400** “newer than this app”; other types or negative / unsupported → **400**.
+- **New backups** created via **`POST /api/backup`**: include **`schema_version`: `1`** in written `metadata.json` for forward clarity.
+
+**OUT (slice 5):**
+
+- Changing restore or **`backup.py`** merge / **`copytree`** semantics.
+- ZIP encryption, incremental backup, or new transport format.
+- **`SettingsViewModel`**, **`BackupRestoreView.xaml`**, or seam count change for Pass 06 extended filter (remain **32** unless a future row authorizes).
+- Pass 05 persistence; “refresh all panels.”
+
+**Implementation file lock (after §5.5 sign-off):** [`backend/api/routes/backup.py`](../../backend/api/routes/backup.py) (validation helpers + create-metadata field); [`tests/unit/backend/api/routes/test_backup_upload_metadata.py`](../../tests/unit/backend/api/routes/test_backup_upload_metadata.py) **only**.
+
+**Proof:**
+
+1. `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` — **0** errors.  
+2. **Pass 06 seam (unchanged):**  
+   `FullyQualifiedName~BackupRestoreViewModelSeam|FullyQualifiedName~ApplyBackupRestoredAsync_|FullyQualifiedName~SettingsViewModelSeam` → **32 passed**.  
+3. **Slice 5 Python:**  
+   `python -m pytest tests/unit/backend/api/routes/test_backup_upload_metadata.py -q` → **8** passed.  
+4. `.\scripts\verify.ps1 -Quick` — PASS; record artifact in §8.
+
+**Baseline → target:** .NET seam **32** → **32**; Python upload tests **0** → **8**.
+
+**§5.5 sign-off:** **2026-03-26 — Tyler (product/engineering)** — §5.5 **IN/OUT** and **file lock** accepted; upload validation backend-only; no WinUI scope in this slice.
+
 ---
 
 ## 6. Strict scope — IN vs OUT (pass-wide)
@@ -216,7 +253,8 @@ Rows are **implementation-sized**. Slice 1 executes **C1a–C3a + C4** only (see
 - **Restore busy UX + cancel + honest models copy** when `RestoreModels` is opted (slice 3 / D5).  
 - **Active project** validity and dependent panel consistency (slice 1).  
 - **Honest restore messaging** including merge expectations (**D4** via copy, not backend).  
-- Targeted **tests + proof artifacts** per §7.
+- Targeted **tests + proof artifacts** per §7.  
+- **Upload** `metadata.json` validation on **`POST /api/backup/upload`** (slice 5 / §5.5).
 
 ### 6.2 OUT (Pass 06)
 
@@ -257,6 +295,18 @@ Rows are **implementation-sized**. Slice 1 executes **C1a–C3a + C4** only (see
 
 **Closure bar:** §7 bullets 1–3 unchanged; **never** cite Quick as substitute for seam filter output.
 
+### 7.2 Slice 5 (D6) — Python proof spec
+
+**Scope:** Backend upload manifest validation only — **not** a substitute for §7.1 seam tests.
+
+**Command:**
+
+```text
+python -m pytest tests/unit/backend/api/routes/test_backup_upload_metadata.py -q
+```
+
+**Expected:** **8** passed (see §5.5). **Quick** remains separate proof per §7 bullet 3.
+
 ---
 
 ## 8. Execution record (fill on closure)
@@ -273,6 +323,8 @@ Rows are **implementation-sized**. Slice 1 executes **C1a–C3a + C4** only (see
 | **Slice 3** (D5 busy UX; §5.3) | **Complete** (2026-03-24 UTC run stamp **`225957`**) | **Seam:** filter §7.1 — **30 passed**. **Quick:** `artifacts/verify/20260324_225957` (Quick does not subsume seam). | Busy row (`BackupRestoreView.xaml`) + `CancelRestoreCommand` + `RestoreBusyDetail`; `ResolveRestoreSessionCompleteResourceKey`; resources for models/settings+models/cancel. **Tests:** `BackupRestoreViewModelSeamTests` (+3). **OUT:** backend progress streaming, `backup.py`, refresh-all. |
 | **Slice 4 sign-off** (§5.4 D4 copy-only) | **Complete** (2026-03-25) | N/A | §5.4 sign-off recorded; implementation authorized per file lock |
 | **Slice 4** (D4 merge expectation copy; §5.4) | **Complete** (2026-03-25) | **Seam:** filter §7.1 — **32 passed**. **Quick:** `artifacts/verify/20260325_055851` (Quick does not subsume seam). | **`RestoreMergeExpectationHint`** (`BackupRestoreViewModel` + `Resources.resw`); **`BackupRestoreView.xaml`** merge-expectation line (`AutomationProperties.AutomationId`=`BackupRestore_MergeExpectationHint`). **`BackupRestoreViewModelSeamTests`** (+2). **OUT:** `backup.py`, restore RPC behavior, D6, Pass 05 persistence. |
+| **Slice 5 sign-off** (§5.5 D6 upload metadata) | **Complete** (2026-03-26) | N/A | §5.5 **IN/OUT** + file lock (**`backup.py`** + **`test_backup_upload_metadata.py`** only). |
+| **Slice 5** (D6 `metadata.json` validation; §5.5) | **Complete** (2026-03-26) | **Seam:** §7.1 — **32 passed** (unchanged). **Python:** §7.2 — **8 passed**. **Quick:** **not** green in closure environment (`verify.ps1 -Quick` run **`20260326_142216`** — Quick Critical Gates / golden-loop synthesis **503** engines unavailable); **`latest_pointer.json`** retains prior **PASSED** **`20260326_131604`** until a green Quick on a capable machine. **Build:** `dotnet build` **0** errors. | **`upload_backup`:** `_validate_upload_backup_metadata`, `schema_version` on create; partial-upload cleanup logs **`OSError`**. **Tests:** `test_backup_upload_metadata.py`. **OUT:** restore merge, WinUI, Pass 05 persistence. |
 
 ---
 
@@ -293,3 +345,4 @@ Rows are **implementation-sized**. Slice 1 executes **C1a–C3a + C4** only (see
 | 2026-03-24 | **Slice 4 planning freeze:** §5.4 D4 merge-expectation copy-only; §8 **Planned** rows; explicit next lane in STATE (no `src/` until sign-off) |
 | 2026-03-25 | **Doc hygiene:** header **Date** synced; §5.4 **implementation file lock** (four files only unless §8 expands) |
 | 2026-03-25 | **Slice 4 closed:** D4 merge-expectation copy — `RestoreMergeExpectationHint`; `BackupRestoreView.xaml`; **`Resources.resw`**; seam **32**; Quick **`artifacts/verify/20260325_055851`**; `AUTOMATION_ID_REGISTRY` `BackupRestore_MergeExpectationHint` |
+| 2026-03-26 | **Slice 5 (§5.5 D6):** upload `metadata.json` validation in `backup.py`; create metadata **`schema_version: 1`**; pytest **`test_backup_upload_metadata`** **8**; seam **32** unchanged; §7.2 proof spec; partial-upload cleanup uses **`logger.warning`** (no silent `except`). |

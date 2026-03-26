@@ -1421,6 +1421,17 @@ namespace VoiceStudio.App.Views.Panels
               // Upload to backend
               var uploadResult = await backendClient.UploadAudioFileAsync(file.Path);
               System.Diagnostics.Debug.WriteLine($"[LibraryView] Uploaded: {file.Name} -> {uploadResult.Id}");
+              if (!string.IsNullOrWhiteSpace(uploadResult.Id))
+              {
+                await LibraryDragDropToProjectPersistence.TrySaveAfterLibraryDragDropUploadAsync(
+                    AppServices.GetProjectAudioClient(),
+                    AppServices.TryGetErrorLoggingService(),
+                    AppServices.TryGetContextManager(),
+                    uploadResult.Id,
+                    file.Path,
+                    CancellationToken.None).ConfigureAwait(true);
+              }
+
               imported++;
             }
             catch (Exception ex)

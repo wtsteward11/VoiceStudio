@@ -3,7 +3,7 @@
 **Purpose:** Bounded **execution** matrix for **Option A** from [PASS_05_C3_PROJECT_AUDIO_PERSISTENCE_POLICY.md](PASS_05_C3_PROJECT_AUDIO_PERSISTENCE_POLICY.md): after **successful transcription**, when an **active project** is selected, persist **source library audio** to the project via **`IProjectAudioClient.SaveAudioToProjectAsync`**.
 
 **Date:** 2026-03-25  
-**Status:** **P05-Persist-A1 — complete**. **P05-Persist-A2 — complete**. **P05-Persist-A3 — complete** (2026-03-25): batch **`LibraryUseCase.ImportFilesAsync`** → per-item **`SaveAudioToProjectAsync`** when **`IContextManager.ActiveProjectId`** set; Quick **`artifacts/verify/20260325_044801`**; seam §7 **50 passed**. Proof §8. **P05-Persist-A4** — §12 freeze; §1 **signed** (2026-03-27); implementation + proof — see §8.
+**Status:** **P05-Persist-A1 — complete**. **P05-Persist-A2 — complete**. **P05-Persist-A3 — complete** (2026-03-25): Quick **`artifacts/verify/20260325_044801`**; seam **50** at §8 row. **P05-Persist-A4 — complete** (2026-03-27): **`LibraryDragDropToProjectPersistence`** + `LibraryView` drag-drop; Quick **`artifacts/verify/20260326_163358`**; verified commit **`3ad39e35`**; seam §7 **54 passed** (see §7 note).
 
 **Parent:** [WORKFLOW_COHERENCE_PASS_05_RECORD_IMPORT_TRANSCRIPTION_PROJECT.md](WORKFLOW_COHERENCE_PASS_05_RECORD_IMPORT_TRANSCRIPTION_PROJECT.md). **Sibling (closed):** [WORKFLOW_COHERENCE_PASS_05_PERSISTENCE_OPTION_C_FOLLOWUP.md](WORKFLOW_COHERENCE_PASS_05_PERSISTENCE_OPTION_C_FOLLOWUP.md) (Option C — record-only; **do not** reopen for Option A work). **Policy reference:** [PASS_05_C3_PROJECT_AUDIO_PERSISTENCE_POLICY.md](PASS_05_C3_PROJECT_AUDIO_PERSISTENCE_POLICY.md) — **Option B** frozen; **do not** edit C3-OptB matrix.
 
@@ -105,10 +105,10 @@ After **`ITranscriptionClient.TranscribeAudioAsync`** returns a successful **`Tr
 **Seam filter (Pass 05 lane + persistence):**
 
 ```text
-dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --filter "FullyQualifiedName~TranscribeViewModelSeam|FullyQualifiedName~RecordingViewModelSeam|FullyQualifiedName~RecordingToProjectPersistenceTests|FullyQualifiedName~TranscribeToProjectPersistenceTests|FullyQualifiedName~ImportToProjectPersistenceTests|FullyQualifiedName~ImportWorkflowServiceTests|FullyQualifiedName~LibraryUseCaseImportFilesPersistenceTests"
+dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --filter "FullyQualifiedName~TranscribeViewModelSeam|FullyQualifiedName~RecordingViewModelSeam|FullyQualifiedName~RecordingToProjectPersistenceTests|FullyQualifiedName~TranscribeToProjectPersistenceTests|FullyQualifiedName~ImportToProjectPersistenceTests|FullyQualifiedName~ImportWorkflowServiceTests|FullyQualifiedName~LibraryUseCaseImportFilesPersistenceTests|FullyQualifiedName~LibraryDragDropToProjectPersistenceTests"
 ```
 
-**Baseline before A1:** **27** passed (Option C hardened). **After A1:** **35** passed. **After A2:** **43** passed. **After A3 (authoritative):** **50** passed (adds `LibraryUseCaseImportFilesPersistenceTests` + batch rows in `ImportToProjectPersistenceTests`; 2026-03-25).
+**Baseline before A1:** **27** passed (Option C hardened). **After A1:** **35** passed. **After A2:** **43** passed. **After A3 (§8 row):** **50** passed. **Pre-A4 implementation (code-truth, same filter without drag-drop class):** **51** passed — one additional test in persistence/import seam since A3 doc. **After A4:** **54** passed (**+3** `LibraryDragDropToProjectPersistenceTests`).
 
 **Quick verify** (does **not** subsume seam):
 
@@ -127,7 +127,7 @@ Align **`artifacts/verify/latest_pointer.json`** and **`verification_report.md`*
 | **P05-Persist-A1** | **Complete** (2026-03-25) | **`artifacts/verify/20260325_035320`** | Seam filter §7: **35 passed** (Quick does not subsume seam) | `TranscribeToProjectPersistence`; `TranscribeViewModel` + `TranscribeView` DI; `Transcribe.A1.*`; `TranscribeToProjectPersistenceTests` + extended `TranscribeViewModelSeamTests` |
 | **P05-Persist-A2** | **Complete** (2026-03-25) | **`artifacts/verify/20260325_042444`** | Seam filter §7: **43 passed** (Quick does not subsume seam) | `ImportToProjectPersistence`; `ImportWorkflowService` + `ApplyPostSingleFileLibraryImportSuccessAsync` (public seam for tests); `AppServices` DI; `ImportToProjectPersistenceTests` + `ImportWorkflowServiceTests` |
 | **P05-Persist-A3** | **Complete** (2026-03-25) | **`artifacts/verify/20260325_044801`** | Seam filter §7: **50 passed** (Quick does not subsume seam) | `ImportToProjectPersistence.TrySaveAfterBatchLibraryImportAsync`; `LibraryUseCase.ImportFilesAsync` + ctor (`IContextManager`, `IProjectAudioClient`, `IErrorLoggingService?`); `AppServices` `ILibraryUseCase`; `LibraryUseCaseImportFilesPersistenceTests`; extended `ImportToProjectPersistenceTests` |
-| **P05-Persist-A4** | **Planned** (execution freeze **§12.2**; §1 sign-off **pending**) | — | Baseline §7 filter **50** passed → target **53** (**+3** `LibraryDragDropToProjectPersistenceTests`); Quick TBD on implementation close | **Path A** only until §1 authorizes; see §12 **OUT** |
+| **P05-Persist-A4** | **Complete** (2026-03-27) | **`artifacts/verify/20260326_163358`** | Seam filter §7: **54 passed** (Quick does not subsume seam); verified commit **`3ad39e35678758eb2903e08713db35b876737c81`** | **`LibraryDragDropToProjectPersistence.TrySaveAfterLibraryDragDropUploadAsync`**; `LibraryView.LibraryPanel_Drop` after **`UploadAudioFileAsync`**; **`LibraryDragDropToProjectPersistenceTests`** (**3**); log **`SaveDragDropToProject`** |
 
 ---
 
@@ -143,6 +143,7 @@ Align **`artifacts/verify/latest_pointer.json`** and **`verification_report.md`*
 | 2026-03-24 | **§12 / A4 planning shell:** frozen questions + OUT list for **P05-Persist-A4** (drag-drop parity); §8 **Planned** row; next implementation lane = [Pass 06 slice 4](WORKFLOW_COHERENCE_PASS_06_BACKUP_RESTORE_PROJECT_SETTINGS_PROFILE_RECOVERY.md) per STATE |
 | 2026-03-26 | **STATE active lane:** **P05-Persist-A4** planning-only — finalize §12 + §1 authorization before **`src/`**; [`.cursor/STATE.md`](../../.cursor/STATE.md) records **`stash@{0}`** read-only inspection + **parked** disposition (83 paths; no pop). |
 | 2026-03-26 | **§12 execution-grade freeze:** **Path A** — [`LibraryView.xaml.cs`](../../src/VoiceStudio.App/Views/Panels/LibraryView.xaml.cs) + new **`LibraryDragDropToProjectPersistence`** (`Services/`); **Path B** (drag-drop → **`ImportFilesAsync`**) **OUT** for A4 v1. §1 **P05-Persist-A4** row **Pending** (product sign-off). Seam **50** → **53** (**+3** `LibraryDragDropToProjectPersistenceTests`); §8 row + §12 matrix locked until §1 dated. |
+| 2026-03-27 | **A4 delivered:** §1 signed; **`TrySaveAfterLibraryDragDropUploadAsync`** + `LibraryPanel_Drop`; **3** tests; seam **54** (pre-A4 filter **51** + **3**); Quick **`20260326_163358`** / **`3ad39e35`**. |
 
 ---
 
@@ -258,11 +259,11 @@ Align **`artifacts/verify/latest_pointer.json`** and **`verification_report.md`*
 
 ---
 
-## 12. P05-Persist-A4 — library drag-drop → project audio (execution-grade freeze; sign-off pending)
+## 12. P05-Persist-A4 — library drag-drop → project audio (complete)
 
 **Purpose:** Close **§11.1** gap: **multi-file drag-drop** in [`LibraryView.xaml.cs`](../../src/VoiceStudio.App/Views/Panels/LibraryView.xaml.cs) uses per-file **`UploadAudioFileAsync`** — **not** **`ImportFilesAsync`**. When **`IContextManager.ActiveProjectId`** is set, optionally mirror **A2/A3** with **`IProjectAudioClient.SaveAudioToProjectAsync`** (non-blocking; honest failures logged).
 
-**Current truth:** **A3** covers **`ImportFilesAsync`** only. **Drag-drop** remains **OUT** of shipped behavior until §1 **A4** row is **dated** and §8 moves to **Complete** with proof.
+**Current truth:** **A4** **Complete** — §8 row; Quick **`artifacts/verify/20260326_163358`**; seam §7 **54** passed.
 
 ### 12.0 Frozen architecture choice (A4 v1)
 
@@ -292,11 +293,11 @@ Align **`artifacts/verify/latest_pointer.json`** and **`verification_report.md`*
 | Field | Content |
 |-------|---------|
 | **ID** | **P05-Persist-A4** |
-| **Target** | Path **A**: post-upload drag-drop: **`LibraryDragDropToProjectPersistence.TrySaveAfterUploadAsync`** (or equivalent) when **`ActiveProjectId`** + library id set |
+| **Target** | Path **A**: post-upload drag-drop: **`LibraryDragDropToProjectPersistence.TrySaveAfterLibraryDragDropUploadAsync`** when **`ActiveProjectId`** + library id set |
 | **Primary owner** | [`LibraryView.xaml.cs`](../../src/VoiceStudio.App/Views/Panels/LibraryView.xaml.cs) |
 | **Supporting** | **`LibraryDragDropToProjectPersistence`** (new under `Services/`); **`IProjectAudioClient`**; **`IContextManager`**; **`IErrorLoggingService`**; **`AppServices`** (if DI) |
-| **Baseline seam count** | **50** passed (§7 filter as of **A3** closure) |
-| **Target seam count** | **53** passed (**+3** unit tests on new helper) |
+| **Baseline seam count** | **51** passed (same §7 filter **without** `LibraryDragDropToProjectPersistenceTests`; code-truth pre-A4 — A3 §8 cited **50**) |
+| **Target seam count** | **54** passed (**+3** unit tests on new helper) |
 | **Proof commands** | (1) `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` (2) `dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --filter "<§7 filter + LibraryDragDrop FQN>"` (3) `.\scripts\verify.ps1 -Quick` → record artifact in §8; **pointer** only per repo rules |
 
 ### 12.3 OUT (strict — A4 v1)
@@ -314,4 +315,4 @@ Same discipline as §7 / §12.3 prior text: **seam count** and **Quick** cited *
 
 ### 12.5 Sign-off
 
-**No implementation** until §1 **Product / engineering** row for **P05-Persist-A4** is **dated** (replaces **Pending**). Then §8 **Planned** → **Complete** with artifact + seam note.
+**Complete** — §1 **P05-Persist-A4** dated **2026-03-27 — Tyler**; §8 row **Complete** with Quick **`20260326_163358`** + seam **54**.

@@ -140,6 +140,7 @@ Align **`artifacts/verify/latest_pointer.json`** and **`verification_report.md`*
 | 2026-03-25 | **A3 freeze + delivery:** §11 **P05-Persist-A3**; batch `ImportFilesAsync` persistence; §7 filter **50**; proof **`20260325_044801`**. |
 | 2026-03-24 | **Post-A3 lane pick (default):** product **defers** library drag-drop → project parity (**P05-Persist-A4** not opened); Workflow 5 bounded persistence considered **sufficient for now** — pick next lane in STATE / [CROSS_FEATURE_WORKFLOW_BACKLOG.md](CROSS_FEATURE_WORKFLOW_BACKLOG.md). §11.1 caller audit hardened with reproducible `rg` scope. |
 | 2026-03-24 | **§12 / A4 planning shell:** frozen questions + OUT list for **P05-Persist-A4** (drag-drop parity); §8 **Planned** row; next implementation lane = [Pass 06 slice 4](WORKFLOW_COHERENCE_PASS_06_BACKUP_RESTORE_PROJECT_SETTINGS_PROFILE_RECOVERY.md) per STATE |
+| 2026-03-26 | **STATE active lane:** **P05-Persist-A4** planning-only — finalize §12 + §1 authorization before **`src/`**; [`.cursor/STATE.md`](../../.cursor/STATE.md) records **`stash@{0}`** read-only inspection + **parked** disposition (83 paths; no pop). |
 
 ---
 

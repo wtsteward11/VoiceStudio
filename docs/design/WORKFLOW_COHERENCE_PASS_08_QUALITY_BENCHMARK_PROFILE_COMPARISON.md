@@ -335,8 +335,8 @@ This block is the **execution-grade** contract for **A/B Testing** operational U
 |---|---|
 | **Seam FQN (frozen)** | `VoiceStudio.App.Tests.ViewModels.ABTestingViewModelSeamTests` |
 | **Seam passed (actual)** | **8** — `dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --filter "FullyQualifiedName~VoiceStudio.App.Tests.ViewModels.ABTestingViewModelSeamTests"` |
-| **Quick artifact** | **Post–W8-C2-commit Quick** (authoritative for pointer) — dev validation **`artifacts/verify/20260326_033214`** (PASS) **with W8-C2 files in working tree**; **re-run `verify.ps1 -Quick` after the W8-C2 implementation commit** and record **that** run_dir below (supersedes dev row when committed). |
-| **`latest_pointer.json`** | **After post-commit verify:** **`commit_hash`** = W8-C2 implementation commit; see **STATE.md** **LATEST PROOF INDEX** + **LATEST MILESTONE** row. |
+| **Quick artifact** | **`artifacts/verify/20260326_034012`** (PASS) — cited **separately** from seam (**Quick does not subsume** seam). |
+| **`latest_pointer.json`** | **`commit_hash`** **`0575ea2e976cedb3e6113527bd924776b9a4f423`** — run_dir **`20260326_034012`**. |
 
 ---
 

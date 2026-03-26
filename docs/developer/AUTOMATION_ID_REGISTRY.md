@@ -1,7 +1,7 @@
 # AutomationId Registry
 
 > **Version**: 1.0.0  
-> **Last Updated**: 2026-02-09  
+> **Last Updated**: 2026-03-25  
 > **Status**: ACTIVE  
 > **Owner**: UI Engineer (Role 3)
 
@@ -71,6 +71,24 @@ Every panel MUST have a root AutomationId on its outermost container:
 
 ---
 
+## Shell / MainWindow
+
+| AutomationId | Control Type | Purpose | Stable Since |
+|--------------|--------------|---------|--------------|
+| `MainWindow_StartupOverlay` | Border | Startup overlay (visible until backend ready) | v1.2.0 |
+| `MainWindow_DegradedModeBanner` | InfoBar | Degraded mode (429/backend stress) banner | v1.0.0 |
+| `MainWindow_WorkspaceGrid` | Grid | Primary workspace layout (panel hosts) | v1.2.0 |
+| `MainWindow_CenterPanelHost` | PanelHost | Center region panel host | v1.2.0 |
+| `MainWindow_LeftPanelHost` | PanelHost | Left region panel host | v1.2.0 |
+| `StartupOverlay_RetryButton` | Button | Retry backend startup on failure | v1.2.0 |
+| `StatusBar_ProcessingIndicator` | Border | Processing status indicator | v1.0.0 |
+| `StatusBar_StatusText` | TextBlock | Status text | v1.0.0 |
+| `StatusBar_JobStatusText` | TextBlock | Job status | v1.0.0 |
+| `StatusBar_JobProgressBar` | ProgressBar | Job progress | v1.0.0 |
+| `StatusBar_CurrentMedia` | TextBlock | Current media info | v1.0.0 |
+
+---
+
 ## Registry by Panel
 
 ### Core Panels
@@ -137,6 +155,27 @@ Audio effects and mixing.
 | `EffectsMixerView_MasterVolumeSlider` | Slider | Master volume | v1.0.0 |
 | `EffectsMixerView_MasterPanSlider` | Slider | Master pan | v1.0.0 |
 | `EffectsMixerView_MasterMuteButton` | Button | Master mute | v1.0.0 |
+
+#### ScriptEditorView
+Script editor for multi-segment voice synthesis.
+
+| AutomationId | Control Type | Purpose | Stable Since |
+|--------------|--------------|---------|--------------|
+| `ScriptEditorView_Root` | Grid | Panel root container | v1.1.0 |
+| `ScriptEditorView_RefreshButton` | Button | Refresh scripts list | v1.1.0 |
+| `ScriptEditorView_HelpButton` | Button | Show help overlay | v1.1.0 |
+| `ScriptEditorView_ProjectComboBox` | ComboBox | Project selector | v1.1.0 |
+| `ScriptEditorView_SearchBox` | TextBox | Search scripts | v1.1.0 |
+| `ScriptEditorView_ScriptsList` | ListView | Scripts list | v1.1.0 |
+| `ScriptEditorView_CreateButton` | Button | Create new script | v1.1.0 |
+| `ScriptEditorView_ScriptName` | TextBox | Script name input | v1.1.0 |
+| `ScriptEditorView_ScriptDescription` | TextBox | Script description input | v1.1.0 |
+| `ScriptEditorView_AddSegmentButton` | Button | Add segment | v1.1.0 |
+| `ScriptEditorView_SegmentsList` | ListView | Segments list | v1.1.0 |
+| `ScriptEditorView_SaveButton` | Button | Save script | v1.1.0 |
+| `ScriptEditorView_DeleteButton` | Button | Delete script | v1.1.0 |
+| `ScriptEditorView_StatusText` | TextBlock | Status message | v1.1.0 |
+| `NavScript` | Button | Navigation to Script Editor panel | v1.1.0 |
 
 #### AnalyzerView
 Audio analysis tools.

@@ -3,7 +3,7 @@
 **Purpose:** Bounded **planning-first** pass for the **quality evaluation cluster**: **Quality Benchmark**, **A/B Testing**, and **Profile Comparison** — map **code-truth** workflows, defects, and a **single** bounded implementation row (**W8-C1**) without claiming closure-grade product workflow until **§8** is signed.
 
 **Date:** 2026-03-24  
-**Status:** **W8-C1 closed** (2026-03-25) — **§8.2** signed; operational Quality Benchmark UI + **8** seam tests + historical Quick **`artifacts/verify/20260325_191036`** (**`commit_hash`** **`bcd6d4e52e0b2a7763f0baaa261e7cdac7f8a665`** — W8-C1 product closure). **Repo-wide latest pointer** (2026-03-26): hermetic compile-closure hardening — Quick **`artifacts/verify/20260326_020644`**, **`commit_hash`** **`8ba6363f8ccab333b675fd462c902a172983f76e`** (does **not** rerun QB seam; see changelog). Export/context remain **OUT**. **§1–§7** baseline complete. **Workflow 7** remains **paused after W7-C1** ([Pass 07 §8.4](WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md#84-workflow-7--continuation--pause-governance)). **[Product trust Pass 01](PRODUCT_TRUST_AND_RELEASE_HONESTY_PASS_01.md)** remains **paused** (§8.9 Option 1). **P05-Persist-A4** remains **§12-gated**. **Pass 06** further `src/` requires a **new §5** row. **Leftovers:** A/B placeholder (**W8-C2**). **W8-C3 closed** (2026-03-26) — see §8.7; Profile Comparison operational shell + **8** seam tests.
+**Status:** **W8-C1 closed** (2026-03-25) — **§8.2** signed; operational Quality Benchmark UI + **8** seam tests + historical Quick **`artifacts/verify/20260325_191036`** (**`commit_hash`** **`bcd6d4e52e0b2a7763f0baaa261e7cdac7f8a665`** — W8-C1 product closure). **Repo-wide latest pointer** (2026-03-26): **W8-C3 closure** — Quick **`artifacts/verify/20260326_025824`**, **`commit_hash`** **`eb98604039b390f676c98fdb805957a46cd9429c`** (**§8.7**). **Hermetic hardening** milestone remains **`20260326_020644`** / **`8ba6363f`** (compile baseline; does **not** rerun QB/C3 seams). Export/context remain **OUT**. **§1–§7** baseline complete. **Workflow 7** remains **paused after W7-C1** ([Pass 07 §8.4](WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md#84-workflow-7--continuation--pause-governance)). **[Product trust Pass 01](PRODUCT_TRUST_AND_RELEASE_HONESTY_PASS_01.md)** remains **paused** (§8.9 Option 1). **P05-Persist-A4** remains **§12-gated**. **Pass 06** further `src/` requires a **new §5** row. **Leftovers:** A/B placeholder (**W8-C2**). **W8-C3 closed** (2026-03-26) — see §8.7; Profile Comparison operational shell + **8** seam tests.
 
 **Related:** [CROSS_FEATURE_WORKFLOW_BACKLOG.md](CROSS_FEATURE_WORKFLOW_BACKLOG.md) (Workflow 8), [Pass 07](WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md) (adjacent lane discipline).
 
@@ -284,14 +284,12 @@ This block is the **execution-grade** contract for the **recommended next** qual
 
 ### 8.7 Proof pointers — W8-C3 (post-implementation)
 
-**Update `Quick artifact` row after closure `verify.ps1 -Quick`; pointer `commit_hash` must match the commit that contains W8-C3 closure.**
-
 | | |
 |---|---|
 | **Seam FQN (frozen)** | `VoiceStudio.App.Tests.ViewModels.ProfileComparisonViewModelSeamTests` |
 | **Seam passed (actual)** | **8** — `dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --filter "FullyQualifiedName~VoiceStudio.App.Tests.ViewModels.ProfileComparisonViewModelSeamTests"` |
-| **Quick artifact** | **`artifacts/verify/20260326_025106`** (PASS) — **superseded** after W8-C3 commit: re-run Quick on closure commit and replace this path + `commit_hash` in `latest_pointer.json`. |
-| **`latest_pointer.json`** | **TBD** at closure — must reference the W8-C3 closure commit. |
+| **Quick artifact** | **`artifacts/verify/20260326_025824`** (PASS) — cited **separately** from seam (**Quick does not subsume** seam). |
+| **`latest_pointer.json`** | **`commit_hash`** **`eb98604039b390f676c98fdb805957a46cd9429c`** — run_dir **`20260326_025824`**. |
 
 ---
 
@@ -300,7 +298,7 @@ This block is the **execution-grade** contract for the **recommended next** qual
 | Date | Change |
 |------|--------|
 | 2026-03-26 | **W8-C3 authorization:** **§8.5.1** PreviewText / Compare contract (**Option B clarified**); **§8.5** third seam wording + **§8.6.1** resolution; **§8.6** signed (**Tyler**, 2026-03-26). |
-| 2026-03-26 | **W8-C3 closure:** operational **`ProfileComparisonView`** + VM engine policy + **§8.5.1** can-execute (`PreviewText` trimmed non-empty); seam **8** passed; **§8.7** proof table + registry AutomationIds. |
+| 2026-03-26 | **W8-C3 closure:** operational **`ProfileComparisonView`** + VM engine policy + **§8.5.1** can-execute (`PreviewText` trimmed non-empty); seam **8** passed; **§8.7** proof — Quick **`20260326_025824`**, pointer **`eb986040`**; registry AutomationIds. |
 | 2026-03-24 | Pass 08 created — planning freeze; §2–§4 code-truth from repo audit; **W8-C1** proposed |
 | 2026-03-24 | **§8.1** execution-grade freeze: file lock, seam FQN, **5→8** tests (3 mandated names), export/context **OUT**, **§8.0** entry/exit; **§8.2** still required before `src/` |
 | 2026-03-25 | **W8-C1** implementation: operational `QualityBenchmarkView` + VM `NextStepHint` / `StatusMessage` success path; dead export/context removed from code-behind; **`QualityBenchmark.W8C1.*`** resources; seam **8** passed; Quick **`20260325_181543`** (pre-closure); §8.2 **Tyler**; §8.3 actuals |

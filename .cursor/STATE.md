@@ -31,14 +31,14 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## ACTIVE WINDOW
 
-- **Active Task:** **Pass 08 — W8-C3 (Profile Comparison)** — **§8.6** signed **2026-03-26**; **§8.5.1** PreviewText contract locked (**trimmed non-empty**; default resource ok). Implement + close only inside **§8.5** file lock. Owner **Tyler**.
-- **Current Target:** **W8-C3** operational shell + **8** seam tests + proof triple; hermetic baseline **`8ba6363f`** / Quick **`20260326_020644`** until C3 closure advances pointer.
-- **Next 3 Steps:** (1) Complete **W8-C3** `src/` (VM + view + seam tests + AutomationIds per lock). (2) `dotnet test` **`FullyQualifiedName~ProfileComparisonViewModelSeamTests`** → **8** passed. (3) `verify.ps1 -Quick` → advance **`latest_pointer.json`**; update **§8.7** proof table / STATE / backlog if required by artifact.
-- **Current Blocker:** **None** — §8.6 authorization complete; execution in progress.
-- **Truth Sync Note:** **Hermetic hardening** — `verify.ps1 -Quick` **`artifacts/verify/20260326_020644`** PASS; **`latest_pointer.json`** **`8ba6363f`** (HEAD may advance after W8-C3). **W8-C1** historical proof unchanged (**`bcd6d4e5`**). [Pass 08](../docs/design/WORKFLOW_COHERENCE_PASS_08_QUALITY_BENCHMARK_PROFILE_COMPARISON.md): **§8.5.1**, **§8.6** signed; **§8.6.1** preflight updated with contract resolution.
-- **Last Verified Commands:** `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` (PASS); `verify.ps1 -Quick` → **`artifacts/verify/20260326_020644`** (PASS); **`latest_pointer.json`** aligned to **`8ba6363f`**. **Hardening:** no Pass 08 Quality Benchmark seam rerun (commit did not touch that surface).
-- **Context Acknowledgment:** 2026-03-26 — W8-C3 **§8.6** signed; **§8.5.1** contract recorded; **W8-C3** implementation lane open under **§8.5** file lock.
-- **Latest verify artifact:** `artifacts/verify/20260326_020644`
+- **Active Task:** **None** — **Pass 08 W8-C3** closed (2026-03-26): operational Profile Comparison inside **§8.5** file lock; seam **8**; Quick **`artifacts/verify/20260326_025824`**; **`latest_pointer.json`** **`eb98604039b390f676c98fdb805957a46cd9429c`**. **W8-C2** next candidate (§5/§8). Owner **Tyler**.
+- **Current Target:** **W8-C2** (A/B Testing UI) or adjacent backlog rows — **not** without new **Pass 08** §5 + §8.
+- **Next 3 Steps:** (1) Choose **W8-C2** vs other lanes per product. (2) If **W8-C2:** draft execution row + §8 sign-off (same discipline as C1/C3). (3) Keep **Workflow 7** / **Product trust** paused posture unchanged until explicit §8.
+- **Current Blocker:** **None**.
+- **Truth Sync Note:** **Latest authoritative Quick** → **`20260326_025824`** / **`eb986040`** (**W8-C3** — [Pass 08 §8.7](../docs/design/WORKFLOW_COHERENCE_PASS_08_QUALITY_BENCHMARK_PROFILE_COMPARISON.md)). **Hermetic hardening** proof line **preserved:** **`20260326_020644`** / **`8ba6363f`**. **W8-C1** historical **`bcd6d4e5`**. [Backlog](../docs/design/CROSS_FEATURE_WORKFLOW_BACKLOG.md) / [CANONICAL_REGISTRY](../docs/governance/CANONICAL_REGISTRY.md) updated.
+- **Last Verified Commands:** `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` (PASS); `dotnet test ... ProfileComparisonViewModelSeamTests` **8** passed; `verify.ps1 -Quick` → **`artifacts/verify/20260326_025824`** (PASS); **`latest_pointer.json`** → **`eb986040`**.
+- **Context Acknowledgment:** 2026-03-26 — **W8-C3** proof triple complete (**§8.7**).
+- **Latest verify artifact:** `artifacts/verify/20260326_025824`
 
 ---
 
@@ -46,6 +46,7 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ### LATEST MILESTONE
 
+- **Workflow Coherence Pass 08 — W8-C3 closed** (2026-03-26): [WORKFLOW_COHERENCE_PASS_08_QUALITY_BENCHMARK_PROFILE_COMPARISON.md](../docs/design/WORKFLOW_COHERENCE_PASS_08_QUALITY_BENCHMARK_PROFILE_COMPARISON.md) — **§8.7**: seam **`VoiceStudio.App.Tests.ViewModels.ProfileComparisonViewModelSeamTests`**, **8** passed; Quick **`artifacts/verify/20260326_025824`**; **`latest_pointer.json`** **`commit_hash`** **`eb98604039b390f676c98fdb805957a46cd9429c`**. File lock per **§8.5** only.
 - **Hermetic compile-closure hardening** (2026-03-26): [BUILD_INTEGRITY_NON_HERMETIC_W8C1_2026-03-25.md](../docs/reports/build/BUILD_INTEGRITY_NON_HERMETIC_W8C1_2026-03-25.md) changelog — baseline **`c7c40a6b`** isolated tree failed until App/Core/App.Tests closure committed; **`fix(build)`** **`8ba6363f`**; `verify.ps1 -Quick` **`artifacts/verify/20260326_020644`**; **`latest_pointer.json`** **`8ba6363f`**. **Seam:** not in scope (compile + Quick only).
 - **Workflow Coherence Pass 08 — W8-C1 closed** (2026-03-25): [WORKFLOW_COHERENCE_PASS_08_QUALITY_BENCHMARK_PROFILE_COMPARISON.md](../docs/design/WORKFLOW_COHERENCE_PASS_08_QUALITY_BENCHMARK_PROFILE_COMPARISON.md) — **§8.3** proof: seam **`VoiceStudio.App.Tests.ViewModels.QualityBenchmarkViewModelSeamTests`**, **8** passed; Quick **`artifacts/verify/20260325_191036`**; **`latest_pointer.json`** **`commit_hash`** **`bcd6d4e52e0b2a7763f0baaa261e7cdac7f8a665`**; export/context remain **OUT**. **W8-C2/C3** → new §5/§8 only. **Workflow 7** remains paused ([Pass 07 §8.4](../docs/design/WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md#84-workflow-7--continuation--pause-governance)).
 - **Workflow Coherence Pass 08 — §8.1 W8-C1 frozen** (2026-03-24): Superseded by **W8-C1 closed** row above for implementation truth; **§8.1** remains the technical contract reference.
@@ -100,6 +101,7 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 | Date       | Task  | Artifact                                                          | Type               | Status   |
 |------------|-------|-------------------------------------------------------------------|--------------------|----------|
+| 2026-03-26 | **Workflow Pass 08 W8-C3 (Profile Comparison)** | `dotnet build` PASS; seam **`FullyQualifiedName~ProfileComparisonViewModelSeamTests`** **8** passed; `verify.ps1 -Quick` **`artifacts/verify/20260326_025824`** (PASS); **`latest_pointer.json`** **`commit_hash`** **`eb98604039b390f676c98fdb805957a46cd9429c`**; Quick **does not** subsume seam | Build+Test+Verify | PASS     |
 | 2026-03-26 | **Hermetic compile-closure hardening** | `dotnet build` PASS; `verify.ps1 -Quick` **`artifacts/verify/20260326_020644`** (PASS); **`latest_pointer.json`** **`commit_hash`** **`8ba6363f8ccab333b675fd462c902a172983f76e`**; inventory [BUILD_INTEGRITY_NON_HERMETIC_W8C1_2026-03-25.md](../docs/reports/build/BUILD_INTEGRITY_NON_HERMETIC_W8C1_2026-03-25.md) § Changelog 2026-03-26; Pass 08 QB seam **not** rerun | Build+Verify | PASS     |
 | 2026-03-25 | **Workflow Pass 08 W8-C1 (Quality Benchmark operational UI + seam)** | `dotnet build`; seam **`FullyQualifiedName~VoiceStudio.App.Tests.ViewModels.QualityBenchmarkViewModelSeamTests`** **8 passed**; `verify.ps1 -Quick` **`artifacts/verify/20260325_191036`** (PASS); **`latest_pointer.json`** **`commit_hash`** **`bcd6d4e52e0b2a7763f0baaa261e7cdac7f8a665`**; Quick does not subsume seam | Build+Test+Verify | PASS     |
 | 2026-03-25 | **Workflow Pass 07 W7-C1 (Training → Profiles `ProfileCreatedEvent` selection)** | `dotnet build`; seam **`FullyQualifiedName~VoiceStudio.App.Tests.ViewModels.ProfilesViewModelSeamTests`** **2 passed**; `verify.ps1 -Quick` **`artifacts/verify/20260325_162114`** (PASS); Quick does not subsume seam | Build+Test+Verify | PASS     |

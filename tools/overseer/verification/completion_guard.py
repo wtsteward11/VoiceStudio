@@ -29,14 +29,15 @@ GUARDED_PREFIXES = (
     "docs/design/",
 )
 
-COMPLETION_PATTERNS = [
+# Require "status:" (label) for status lines — avoids false positives in governance tables.
+# Omit broad "state ... complete" / "phase ... complete" — they fire on STATE.md / archive prose.
+_COMPLETION_LINE_PATTERNS = [
     re.compile(r"\[[xX]\]"),
-    re.compile(r"\bstatus\b.*\bcomplete(d)?\b", re.IGNORECASE),
-    re.compile(r"\bstatus\b.*\bdone\b", re.IGNORECASE),
-    re.compile(r"\bstate\b.*\bcomplete(d)?\b", re.IGNORECASE),
-    re.compile(r"\bstate\b.*\bdone\b", re.IGNORECASE),
-    re.compile(r"\bphase\b.*\bcomplete(d)?\b", re.IGNORECASE),
+    re.compile(r"(?i)status\s*:\s*.*\bcomplete(d)?\b"),
+    re.compile(r"(?i)status\s*:\s*.*\bdone\b"),
 ]
+
+_MARKDOWN_CHECKLIST_DONE = re.compile(r"^[-*]\s+\[[xX]\]\s+")
 
 # Ensure UTF-8 output on Windows console
 if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
@@ -69,8 +70,22 @@ def _run_git(args: list[str], root: Path) -> str | None:
     return result.stdout.strip() if result.stdout else ""
 
 
-def _matches_completion(line: str) -> bool:
-    return any(pattern.search(line) for pattern in COMPLETION_PATTERNS)
+def _is_docs_design_path(rel_path: str | None) -> bool:
+    if not rel_path:
+        return False
+    normalized = rel_path.replace("\\", "/")
+    return normalized.startswith("docs/design/")
+
+
+def _matches_completion(line: str, rel_path: str | None = None) -> bool:
+    """True if line looks like an uncommitted task-closure marker in a guarded path."""
+    s = line.strip()
+    design = _is_docs_design_path(rel_path)
+    if design and _MARKDOWN_CHECKLIST_DONE.match(s):
+        return False
+    if design and re.match(r"^\*\*Status:\*\*", s, re.IGNORECASE):
+        return False
+    return any(pattern.search(line) for pattern in _COMPLETION_LINE_PATTERNS)
 
 
 def _is_guarded_path(path: str) -> bool:
@@ -97,7 +112,7 @@ def _parse_diff(diff_text: str, source: str) -> list[MarkerHit]:
         if not current_file or not _is_guarded_path(current_file):
             continue
         line = raw[1:]
-        if _matches_completion(line):
+        if _matches_completion(line, current_file):
             hits.append(MarkerHit(path=current_file, line=line.strip(), source=source))
     return hits
 
@@ -140,7 +155,7 @@ def _scan_untracked(paths: Iterable[str]) -> list[MarkerHit]:
         for line_no, line in enumerate(all_lines, start=1):
             if _is_in_code_fence(all_lines, line_no):
                 continue
-            if _matches_completion(line):
+            if _matches_completion(line, rel_path):
                 hits.append(
                     MarkerHit(
                         path=rel_path,
@@ -196,7 +211,9 @@ def main() -> int:
         help="Report what would fail but exit 0",
     )
     parser.add_argument("--list-paths", action="store_true", help="Print GUARDED_PREFIXES and exit")
-    parser.add_argument("--list-patterns", action="store_true", help="Print COMPLETION_PATTERNS and exit")
+    parser.add_argument(
+        "--list-patterns", action="store_true", help="Print completion line patterns and exit"
+    )
     parser.add_argument("--verbose", action="store_true", help="Show all scanned files, not just hits")
     args = parser.parse_args()
 
@@ -205,7 +222,7 @@ def main() -> int:
             print(p)
         return 0
     if args.list_patterns:
-        for p in COMPLETION_PATTERNS:
+        for p in _COMPLETION_LINE_PATTERNS:
             print(p.pattern)
         return 0
 

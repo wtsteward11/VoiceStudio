@@ -23,7 +23,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new ProsodyViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient()
+          AppServices.GetProsodyClient()
       );
       DataContext = ViewModel;
 
@@ -45,8 +45,8 @@ namespace VoiceStudio.App.Views.Panels
         }
       };
 
-      // Setup keyboard navigation
-      this.Loaded += ProsodyView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and load configs (ILifecyclePanelView; not constructor — RETAINED_ASYNC_RULE)
+      this.Loaded += ProsodyView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -58,9 +58,13 @@ namespace VoiceStudio.App.Views.Panels
       });
     }
 
-    private void ProsodyView_KeyboardNavigation_Loaded(object _, RoutedEventArgs __)
+    private void ProsodyView_Loaded(object _, RoutedEventArgs __)
     {
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      if (ViewModel is VoiceStudio.Core.Panels.ILifecyclePanelView lifecycle)
+      {
+        _ = lifecycle.OnActivatedAsync();
+      }
     }
 
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)

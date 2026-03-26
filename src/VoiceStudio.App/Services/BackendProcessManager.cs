@@ -31,7 +31,12 @@ public sealed class BackendProcessManager : IDisposable
     /// <summary>
     /// Event raised when backend fails to start.
     /// </summary>
-    public event EventHandler<string>? BackendStartFailed;
+    public event EventHandler<BackendStartFailedEventArgs>? BackendStartFailed;
+
+    /// <summary>
+    /// Last failure info, set when BackendStartFailed is raised. Used by StartupRetryCoordinator for category-aware retry.
+    /// </summary>
+    public BackendStartFailedEventArgs? LastFailure { get; private set; }
 
     /// <summary>
     /// Event raised when backend process exits unexpectedly.
@@ -70,6 +75,7 @@ public sealed class BackendProcessManager : IDisposable
         if (await IsBackendHealthyAsync(cancellationToken))
         {
             Debug.WriteLine("[BackendProcessManager] Backend already running");
+            LastFailure = null;
             BackendStarted?.Invoke(this, EventArgs.Empty);
             return true;
         }
@@ -123,18 +129,20 @@ public sealed class BackendProcessManager : IDisposable
 
             if (portInUse)
             {
-                if (await IsBackendHealthyAsync(cancellationToken))
-                {
-                    Debug.WriteLine($"[BackendProcessManager] Port {port} in use and backend healthy");
-                    BackendStarted?.Invoke(this, EventArgs.Empty);
-                    return true;
-                }
+            if (await IsBackendHealthyAsync(cancellationToken))
+            {
+                Debug.WriteLine($"[BackendProcessManager] Port {port} in use and backend healthy");
+                LastFailure = null;
+                BackendStarted?.Invoke(this, EventArgs.Empty);
+                return true;
+            }
 
                 var error = $"Port {port} is in use by another process. Stop the other process or set VOICESTUDIO_API_PORT to use a different port.";
                 Debug.WriteLine($"[BackendProcessManager] {error}");
                 _diagnostics?.LogFailure("port_collision", error);
                 _diagnostics?.EndSession();
-                BackendStartFailed?.Invoke(this, error);
+                LastFailure = new BackendStartFailedEventArgs(BackendStartFailureCategory.PortCollision, error);
+                BackendStartFailed?.Invoke(this, LastFailure);
                 return false;
             }
 
@@ -149,7 +157,8 @@ public sealed class BackendProcessManager : IDisposable
                 Debug.WriteLine($"[BackendProcessManager] {error}");
                 _diagnostics?.LogFailure("invalid_app_root", error);
                 _diagnostics?.EndSession();
-                BackendStartFailed?.Invoke(this, error);
+                LastFailure = new BackendStartFailedEventArgs(BackendStartFailureCategory.InvalidAppRoot, error);
+                BackendStartFailed?.Invoke(this, LastFailure);
                 return false;
             }
 
@@ -175,7 +184,8 @@ public sealed class BackendProcessManager : IDisposable
                 Debug.WriteLine($"[BackendProcessManager] {error}");
                 _diagnostics?.LogFailure("missing_python_runtime", error);
                 _diagnostics?.EndSession();
-                BackendStartFailed?.Invoke(this, error);
+                LastFailure = new BackendStartFailedEventArgs(BackendStartFailureCategory.RuntimeMissing, error);
+                BackendStartFailed?.Invoke(this, LastFailure);
                 return false;
             }
 
@@ -278,6 +288,7 @@ public sealed class BackendProcessManager : IDisposable
                 Debug.WriteLine("[BackendProcessManager] Backend is healthy");
                 _diagnostics?.Log("result", "success");
                 _diagnostics?.EndSession();
+                LastFailure = null;
                 BackendStarted?.Invoke(this, EventArgs.Empty);
                 return true;
             }
@@ -287,7 +298,8 @@ public sealed class BackendProcessManager : IDisposable
                 Debug.WriteLine($"[BackendProcessManager] {error}");
                 _diagnostics?.LogFailure("health_timeout", error);
                 _diagnostics?.EndSession();
-                BackendStartFailed?.Invoke(this, error);
+                LastFailure = new BackendStartFailedEventArgs(BackendStartFailureCategory.HealthTimeout, error);
+                BackendStartFailed?.Invoke(this, LastFailure);
                 return false;
             }
         }
@@ -298,7 +310,8 @@ public sealed class BackendProcessManager : IDisposable
             _diagnostics?.LogFailure("spawn_failure", error);
             _diagnostics?.EndSession();
             ErrorLogger.LogError($"Failed to start backend: {ex.Message}", "BackendProcessManager.StartBackendProcessAsync");
-            BackendStartFailed?.Invoke(this, error);
+            LastFailure = new BackendStartFailedEventArgs(BackendStartFailureCategory.SpawnFailure, error);
+            BackendStartFailed?.Invoke(this, LastFailure);
             return false;
         }
         finally

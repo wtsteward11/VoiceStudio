@@ -316,6 +316,13 @@ namespace VoiceStudio.App.Services
       try
       {
         var response = await _httpClient.GetAsync(audioUrl).ConfigureAwait(false);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+          LastPlaybackError = "Audio not found. The file may have been moved or deleted.";
+          var toast = ServiceProvider.TryGetToastNotificationService();
+          toast?.ShowToast(ToastType.Error, "Playback Failed", "Audio not found. The file may have been moved or deleted.");
+          throw new InvalidOperationException(LastPlaybackError);
+        }
         response.EnsureSuccessStatusCode();
 
         var contentType = response.Content.Headers.ContentType?.MediaType;
@@ -624,6 +631,10 @@ namespace VoiceStudio.App.Services
         if (!string.IsNullOrEmpty(e.AssetPath) && !File.Exists(e.AssetPath))
         {
           System.Diagnostics.Debug.WriteLine($"[AudioPlayer] Path provided but file not found: {e.AssetPath}");
+          LastPlaybackError = $"File not found: {e.AssetPath}";
+          var pathToast = ServiceProvider.TryGetToastNotificationService();
+          pathToast?.ShowToast(ToastType.Warning, "Playback", $"File not found: {e.AssetPath}");
+          // Continue to try backend ID if available
         }
 
         if (!string.IsNullOrEmpty(e.AssetId))

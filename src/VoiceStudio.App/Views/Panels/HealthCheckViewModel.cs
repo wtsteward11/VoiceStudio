@@ -26,7 +26,7 @@ namespace VoiceStudio.App.Views.Panels
         private readonly string _backendBaseUrl;
 
         /// <inheritdoc/>
-        public string PanelId => "health-check";
+        public string PanelId => PanelIds.HealthCheck;
 
         /// <inheritdoc/>
         public string DisplayName => "Health Check";

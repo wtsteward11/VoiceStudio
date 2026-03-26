@@ -27,7 +27,7 @@ namespace VoiceStudio.App.ViewModels
     private readonly IProfilesClient _profilesClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
-    public string PanelId => "quality-optimization-wizard";
+    public string PanelId => PanelIds.QualityOptimizer;
     public string DisplayName => ResourceHelper.GetString("Panel.QualityOptimizationWizard.DisplayName", "Quality Optimization Wizard");
     public PanelRegion Region => PanelRegion.Center;
 

@@ -19,7 +19,7 @@ namespace VoiceStudio.App.ViewModels
   {
     private readonly IEmotionStyleClient _emotionStyleClient;
 
-    public string PanelId => "emotion-style-control";
+    public string PanelId => PanelIds.EmotionStyle;
     public string DisplayName => ResourceHelper.GetString("Panel.EmotionStyleControl.DisplayName", "Emotion & Style Control");
     public PanelRegion Region => PanelRegion.Right;
 

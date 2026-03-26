@@ -19,7 +19,7 @@ namespace VoiceStudio.App.Views
     {
       this.InitializeComponent();
       ViewModel = new GlobalSearchViewModel(
-          ServiceProvider.GetBackendClient()
+          ServiceProvider.GetSearchClient()
       );
       DataContext = ViewModel;
 

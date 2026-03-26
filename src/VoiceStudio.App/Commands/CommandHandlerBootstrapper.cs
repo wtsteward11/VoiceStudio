@@ -150,7 +150,8 @@ namespace VoiceStudio.App.Commands
 
                 if (audioPlayer != null)
                 {
-                    _playbackHandler = new PlaybackOperationsHandler(_registry, audioPlayer, toastService);
+                    var orchestrator = TryGetService<IGlobalTransportOrchestrator>();
+                    _playbackHandler = new PlaybackOperationsHandler(_registry, audioPlayer, toastService, orchestrator);
                     Debug.WriteLine("[CommandHandlerBootstrapper] PlaybackOperationsHandler initialized");
                 }
                 else
@@ -254,6 +255,8 @@ namespace VoiceStudio.App.Commands
                 return AppServices.TryGetProfilesUseCase();
             if (serviceType == typeof(IAudioPlayerService))
                 return AppServices.GetService<IAudioPlayerService>();
+            if (serviceType == typeof(IGlobalTransportOrchestrator))
+                return AppServices.GetService<IGlobalTransportOrchestrator>();
             if (serviceType == typeof(INavigationService))
                 return AppServices.TryGetNavigationService();
             if (serviceType == typeof(ISettingsService))

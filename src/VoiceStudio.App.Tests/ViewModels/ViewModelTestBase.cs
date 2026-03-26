@@ -86,7 +86,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     protected Mock<IBackendClient> CreateMockBackendClient()
     {
       var mock = new Mock<IBackendClient>();
-      mock.Setup(x => x.IsConnected).Returns(true);
+      // IBackendClient no longer has IsConnected (PR-8: extracted to IConnectionStatusClient)
       return mock;
     }
   }

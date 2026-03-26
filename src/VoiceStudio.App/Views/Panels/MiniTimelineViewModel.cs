@@ -15,7 +15,6 @@ namespace VoiceStudio.App.Views.Panels
   /// </summary>
   public partial class MiniTimelineViewModel : ObservableObject, IPanelView
   {
-    private readonly IBackendClient _backendClient;
     private readonly IAudioPlayerService _audioPlayer;
     private TimelineViewModel? _mainTimelineViewModel;
 
@@ -78,9 +77,8 @@ namespace VoiceStudio.App.Views.Panels
     public IRelayCommand ZoomInCommand { get; }
     public IRelayCommand ZoomOutCommand { get; }
 
-    public MiniTimelineViewModel(IBackendClient backendClient, IAudioPlayerService audioPlayer)
+    public MiniTimelineViewModel(IAudioPlayerService audioPlayer)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
       PlayPauseCommand = new RelayCommand(PlayPause, () => Duration > 0);

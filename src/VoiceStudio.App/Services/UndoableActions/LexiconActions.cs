@@ -12,7 +12,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateLexiconAction : IUndoableAction
   {
     private readonly ObservableCollection<LexiconItem> _lexicons;
-    private readonly IBackendClient _backendClient;
+    private readonly ILexiconClient _lexiconClient;
     private readonly LexiconItem _lexicon;
     private readonly Action<LexiconItem>? _onUndo;
     private readonly Action<LexiconItem>? _onRedo;
@@ -21,13 +21,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateLexiconAction(
         ObservableCollection<LexiconItem> lexicons,
-        IBackendClient backendClient,
+        ILexiconClient lexiconClient,
         LexiconItem lexicon,
         Action<LexiconItem>? onUndo = null,
         Action<LexiconItem>? onRedo = null)
     {
       _lexicons = lexicons ?? throw new ArgumentNullException(nameof(lexicons));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _lexiconClient = lexiconClient ?? throw new ArgumentNullException(nameof(lexiconClient));
       _lexicon = lexicon ?? throw new ArgumentNullException(nameof(lexicon));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -59,7 +59,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteLexiconAction : IUndoableAction
   {
     private readonly ObservableCollection<LexiconItem> _lexicons;
-    private readonly IBackendClient _backendClient;
+    private readonly ILexiconClient _lexiconClient;
     private readonly LexiconItem _lexicon;
     private readonly int _originalIndex;
     private readonly Action<LexiconItem>? _onUndo;
@@ -69,14 +69,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteLexiconAction(
         ObservableCollection<LexiconItem> lexicons,
-        IBackendClient backendClient,
+        ILexiconClient lexiconClient,
         LexiconItem lexicon,
         int originalIndex,
         Action<LexiconItem>? onUndo = null,
         Action<LexiconItem>? onRedo = null)
     {
       _lexicons = lexicons ?? throw new ArgumentNullException(nameof(lexicons));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _lexiconClient = lexiconClient ?? throw new ArgumentNullException(nameof(lexiconClient));
       _lexicon = lexicon ?? throw new ArgumentNullException(nameof(lexicon));
       _originalIndex = originalIndex;
       _onUndo = onUndo;
@@ -116,7 +116,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateLexiconEntryAction : IUndoableAction
   {
     private readonly ObservableCollection<LexiconEntryItem> _entries;
-    private readonly IBackendClient _backendClient;
+    private readonly ILexiconClient _lexiconClient;
     private readonly string _lexiconId;
     private readonly LexiconEntryItem _entry;
     private readonly Action<LexiconEntryItem>? _onUndo;
@@ -126,14 +126,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateLexiconEntryAction(
         ObservableCollection<LexiconEntryItem> entries,
-        IBackendClient backendClient,
+        ILexiconClient lexiconClient,
         string lexiconId,
         LexiconEntryItem entry,
         Action<LexiconEntryItem>? onUndo = null,
         Action<LexiconEntryItem>? onRedo = null)
     {
       _entries = entries ?? throw new ArgumentNullException(nameof(entries));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _lexiconClient = lexiconClient ?? throw new ArgumentNullException(nameof(lexiconClient));
       _lexiconId = lexiconId ?? throw new ArgumentNullException(nameof(lexiconId));
       _entry = entry ?? throw new ArgumentNullException(nameof(entry));
       _onUndo = onUndo;
@@ -166,7 +166,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteLexiconEntryAction : IUndoableAction
   {
     private readonly ObservableCollection<LexiconEntryItem> _entries;
-    private readonly IBackendClient _backendClient;
+    private readonly ILexiconClient _lexiconClient;
     private readonly string _lexiconId;
     private readonly LexiconEntryItem _entry;
     private readonly int _originalIndex;
@@ -177,7 +177,7 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteLexiconEntryAction(
         ObservableCollection<LexiconEntryItem> entries,
-        IBackendClient backendClient,
+        ILexiconClient lexiconClient,
         string lexiconId,
         LexiconEntryItem entry,
         int originalIndex,
@@ -185,7 +185,7 @@ namespace VoiceStudio.App.Services.UndoableActions
         Action<LexiconEntryItem>? onRedo = null)
     {
       _entries = entries ?? throw new ArgumentNullException(nameof(entries));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _lexiconClient = lexiconClient ?? throw new ArgumentNullException(nameof(lexiconClient));
       _lexiconId = lexiconId ?? throw new ArgumentNullException(nameof(lexiconId));
       _entry = entry ?? throw new ArgumentNullException(nameof(entry));
       _originalIndex = originalIndex;

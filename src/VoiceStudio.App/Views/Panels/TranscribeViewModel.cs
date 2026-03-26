@@ -17,16 +17,26 @@ using VoiceStudio.App.ViewModels;
 
 namespace VoiceStudio.App.Views.Panels
 {
-  public partial class TranscribeViewModel : BaseViewModel, IPanelView
+  public partial class TranscribeViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
     private readonly ITranscriptionClient _transcriptionClient;
+    private readonly IProjectAudioClient _projectAudioClient;
+    private readonly IErrorLoggingService? _logService;
     private readonly ToastNotificationService? _toastNotificationService;
     private bool _isInitialized;
+    private ISubscriptionToken? _projectChangedToken;
+    private ISubscriptionToken? _assetAddedToken;
+
+    /// <summary>Must match <see cref="RecordingViewModel"/> upload success publisher.</summary>
+    private const string AssetSourceRecordingPanel = "recording-panel";
+
+    /// <summary>Must match <see cref="ImportWorkflowService"/>.</summary>
+    private const string AssetSourceImportWorkflow = "import-workflow";
     private readonly UndoRedoService? _undoRedoService;
     private readonly MultiSelectService _multiSelectService;
     private MultiSelectState? _multiSelectState;
 
-    public string PanelId => "transcribe";
+    public string PanelId => PanelIds.Transcribe;
     public string DisplayName => ResourceHelper.GetString("Panel.Transcribe.DisplayName", "Transcribe");
     public PanelRegion Region => PanelRegion.Bottom;
 
@@ -63,6 +73,17 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private string? errorMessage;
 
+    /// <summary>Pass 05 C3 Option B: one-line honesty about library vs project audio (bindable).</summary>
+    [ObservableProperty]
+    private string? audioPersistenceSemanticsHint;
+
+    /// <summary>Product trust Pass 01 slice 1: always-visible scope note — batch/drag-drop parity is not the same guarantee as transcribe/import project copy until A4 is signed.</summary>
+    public string PersistenceScopeFootnote =>
+        ResourceHelper.GetString(
+            "Transcribe.Pass01.PersistenceScopeFootnote",
+            "Dragging or dropping library items onto the project may not copy audio to the project yet. "
+            + "With a project selected, transcribing library audio can copy to project audio (Pass 05 Option A paths)—not all import paths behave the same until batch/drag-drop is separately enabled.");
+
     [ObservableProperty]
     private string transcriptionText = string.Empty;
 
@@ -84,10 +105,15 @@ namespace VoiceStudio.App.Views.Panels
 
     public ObservableCollection<SupportedLanguage> Languages { get; } = new();
 
-    public TranscribeViewModel(IViewModelContext context, ITranscriptionClient transcriptionClient)
+    public TranscribeViewModel(
+        IViewModelContext context,
+        ITranscriptionClient transcriptionClient,
+        IProjectAudioClient projectAudioClient)
         : base(context)
     {
       _transcriptionClient = transcriptionClient ?? throw new ArgumentNullException(nameof(transcriptionClient));
+      _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
+      _logService = ServiceProvider.TryGetErrorLoggingService();
 
       // Get multi-select service
       var multiSelectService = AppServices.TryGetMultiSelectService();
@@ -159,9 +185,124 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (_isInitialized)
         return;
+      SyncSelectedProjectFromContext();
+      EnsureProjectChangedSubscription();
+      EnsureAssetAddedSubscription();
       _isInitialized = true;
       await LoadLanguagesAsync(cancellationToken);
       await LoadEnginesAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      SyncSelectedProjectFromContext();
+      EnsureProjectChangedSubscription();
+      EnsureAssetAddedSubscription();
+      if (!_isInitialized)
+        await InitializeAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default)
+    {
+      ReleasePanelEventSubscriptions();
+      return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default)
+    {
+      SyncSelectedProjectFromContext();
+      return Task.CompletedTask;
+    }
+
+    /// <summary>Pass 05 C1: align with active project from <see cref="IContextManager"/>.</summary>
+    private void SyncSelectedProjectFromContext()
+    {
+      var ctx = AppServices.TryGetContextManager();
+      if (ctx == null)
+        return;
+      var activeId = ctx.ActiveProjectId;
+      if (SelectedProjectId != activeId)
+        SelectedProjectId = activeId;
+    }
+
+    private void EnsureProjectChangedSubscription()
+    {
+      if (_projectChangedToken != null)
+        return;
+      var agg = AppServices.TryGetEventAggregator();
+      if (agg == null)
+        return;
+      _projectChangedToken = agg.Subscribe<ProjectChangedEvent>(OnProjectChanged);
+    }
+
+    /// <summary>Pass 05 C2: prefill <see cref="SelectedAudioId"/> from recording/import without overwriting user input.</summary>
+    private void EnsureAssetAddedSubscription()
+    {
+      if (_assetAddedToken != null)
+        return;
+      var agg = AppServices.TryGetEventAggregator();
+      if (agg == null)
+        return;
+      _assetAddedToken = agg.Subscribe<AssetAddedEvent>(OnAssetAdded);
+    }
+
+    private void ReleasePanelEventSubscriptions()
+    {
+      var agg = AppServices.TryGetEventAggregator();
+      if (_projectChangedToken != null)
+      {
+        agg?.Unsubscribe(_projectChangedToken);
+        _projectChangedToken = null;
+      }
+
+      if (_assetAddedToken != null)
+      {
+        agg?.Unsubscribe(_assetAddedToken);
+        _assetAddedToken = null;
+      }
+    }
+
+    private void OnProjectChanged(ProjectChangedEvent e)
+    {
+      Dispatcher.TryEnqueue(() =>
+      {
+        if (SelectedProjectId != e.ProjectId)
+          SelectedProjectId = e.ProjectId;
+      });
+    }
+
+    private void OnAssetAdded(AssetAddedEvent e)
+    {
+      if (e == null)
+        return;
+      if (!string.Equals(e.AssetType, "audio", StringComparison.OrdinalIgnoreCase))
+        return;
+      if (string.IsNullOrWhiteSpace(e.AssetId))
+        return;
+      if (e.SourcePanelId != AssetSourceRecordingPanel && e.SourcePanelId != AssetSourceImportWorkflow)
+        return;
+
+      Dispatcher.TryEnqueue(() =>
+      {
+        if (!string.IsNullOrWhiteSpace(SelectedAudioId))
+          return;
+        SelectedAudioId = e.AssetId;
+        _toastNotificationService?.ShowToast(
+            ToastType.Info,
+            ResourceHelper.GetString("Transcribe.AudioIdPrefilled", "Audio id set from recording or import."),
+            ResourceHelper.GetString("Transcribe.AudioIdPrefilledTitle", "Audio id ready"));
+      });
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+      if (disposing)
+        ReleasePanelEventSubscriptions();
+      base.Dispose(disposing);
     }
 
     public IAsyncRelayCommand LoadLanguagesCommand { get; }
@@ -185,6 +326,7 @@ namespace VoiceStudio.App.Views.Panels
 
     partial void OnSelectedAudioIdChanged(string? value)
     {
+      AudioPersistenceSemanticsHint = null;
       TranscribeCommand.NotifyCanExecuteChanged();
     }
 
@@ -293,12 +435,20 @@ namespace VoiceStudio.App.Views.Panels
     private async Task TranscribeAsync(CancellationToken cancellationToken = default)
     {
       if (string.IsNullOrWhiteSpace(SelectedAudioId))
+      {
+        var msg = ResourceHelper.GetString("Transcribe.MissingAudioId", "Enter a backend audio id before transcribing or loading transcriptions.");
+        ErrorMessage = msg;
+        _toastNotificationService?.ShowWarning(
+            ResourceHelper.GetString("Transcribe.MissingAudioIdTitle", "Audio id required"),
+            msg);
         return;
+      }
 
       try
       {
         IsLoading = true;
         ErrorMessage = null;
+        AudioPersistenceSemanticsHint = null;
 
         var request = new TranscriptionRequest
         {
@@ -338,7 +488,55 @@ namespace VoiceStudio.App.Views.Panels
             transcription.Language));
         }
 
-        _toastNotificationService?.ShowSuccess("Transcription Complete", $"Transcribed audio using {SelectedEngine} engine");
+        var saveOutcome = await TranscribeToProjectPersistence.TrySaveLibraryAudioToProjectAsync(
+            _projectAudioClient,
+            _logService,
+            SelectedProjectId,
+            transcription.AudioId,
+            cancellationToken).ConfigureAwait(false);
+
+        var title = ResourceHelper.GetString("Transcribe.C3.TranscribeCompleteTitle", "Transcription complete");
+        string detail;
+        string hint;
+        switch (saveOutcome)
+        {
+          case TranscribeProjectAudioSaveOutcome.Saved:
+          {
+            var detailFmt = ResourceHelper.GetString(
+                "Transcribe.A1.TranscribeCompleteDetailWithProjectCopy",
+                "Transcribed with {0}. Source audio was also added to project audio.");
+            detail = string.Format(System.Globalization.CultureInfo.CurrentCulture, detailFmt, SelectedEngine);
+            hint = ResourceHelper.GetString(
+                "Transcribe.A1.AudioPersistenceHintProjectCopy",
+                "Source audio is in the library and was copied to project audio.");
+            break;
+          }
+          case TranscribeProjectAudioSaveOutcome.Failed:
+          {
+            var detailFmt = ResourceHelper.GetString(
+                "Transcribe.A1.TranscribeCompleteDetailProjectCopyFailed",
+                "Transcribed with {0}. The transcript is ready; copying source audio to the project failed. Check logs.");
+            detail = string.Format(System.Globalization.CultureInfo.CurrentCulture, detailFmt, SelectedEngine);
+            hint = ResourceHelper.GetString(
+                "Transcribe.A1.AudioPersistenceHintProjectCopyFailed",
+                "Transcript is ready; source audio could not be copied to the project. See logs.");
+            break;
+          }
+          default:
+          {
+            var detailTemplate = ResourceHelper.GetString(
+                "Transcribe.C3.TranscribeCompleteDetail",
+                "Transcribed with {0}. Source audio remains a library asset; this step does not add it to project audio. Creating a transcript does not save source audio to the project.");
+            detail = string.Format(System.Globalization.CultureInfo.CurrentCulture, detailTemplate, SelectedEngine);
+            hint = ResourceHelper.GetString(
+                "Transcribe.C3.AudioPersistenceHint",
+                "Source audio remains a library asset; transcribing does not add it to project audio.");
+            break;
+          }
+        }
+
+        _toastNotificationService?.ShowSuccess(detail, title);
+        AudioPersistenceSemanticsHint = hint;
       }
       catch (Exception ex)
       {
@@ -353,6 +551,16 @@ namespace VoiceStudio.App.Views.Panels
 
     private async Task LoadTranscriptionsAsync(CancellationToken cancellationToken)
     {
+      if (string.IsNullOrWhiteSpace(SelectedAudioId))
+      {
+        var msg = ResourceHelper.GetString("Transcribe.MissingAudioId", "Enter a backend audio id before transcribing or loading transcriptions.");
+        ErrorMessage = msg;
+        _toastNotificationService?.ShowWarning(
+            ResourceHelper.GetString("Transcribe.MissingAudioIdTitle", "Audio id required"),
+            msg);
+        return;
+      }
+
       IsLoading = true;
       ErrorMessage = null;
 
@@ -491,9 +699,15 @@ namespace VoiceStudio.App.Views.Panels
             { "transcriptionId", SelectedTranscription.Id }
           }));
 
-      _toastNotificationService?.ShowSuccess(
-          "Sent to Timeline",
-          "Transcript segments loaded in Timeline as subtitle track");
+      var stTitle = ResourceHelper.GetString("Transcribe.C3.SendToTimelineTitle", "Sent to Timeline");
+      var stDetail = ResourceHelper.GetString(
+          "Transcribe.C3.SendToTimelineDetail",
+          "Transcript overlay loads on the Timeline; it does not persist source audio to the project.");
+      _toastNotificationService?.ShowSuccess(stDetail, stTitle);
+
+      AudioPersistenceSemanticsHint = ResourceHelper.GetString(
+          "Transcribe.C3.SendToTimelineHint",
+          "Timeline shows a transcript overlay only; source audio is not saved to the project from this action.");
     }
 
     // Multi-select methods

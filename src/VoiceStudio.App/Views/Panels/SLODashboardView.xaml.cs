@@ -23,7 +23,7 @@ namespace VoiceStudio.App.Views.Panels
             this.InitializeComponent();
             ViewModel = new SLODashboardViewModel(
                 AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-                ServiceProvider.GetBackendClient()
+                ServiceProvider.GetSLODashboardClient()
             );
             this.DataContext = ViewModel;
 

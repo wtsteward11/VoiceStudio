@@ -25,7 +25,7 @@ namespace VoiceStudio.App.ViewModels
     private readonly ToastNotificationService? _toastNotificationService;
     private bool _isInitialized;
 
-    public string PanelId => "profile-comparison";
+    public string PanelId => PanelIds.ProfileComparison;
     public string DisplayName => ResourceHelper.GetString("Panel.ProfileComparison.DisplayName", "Profile Comparison");
     public PanelRegion Region => PanelRegion.Center;
 

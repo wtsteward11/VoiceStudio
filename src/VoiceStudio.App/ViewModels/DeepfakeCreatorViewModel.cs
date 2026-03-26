@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
@@ -15,11 +17,11 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the DeepfakeCreatorView panel - Face swapping and face replacement.
   /// </summary>
-  public partial class DeepfakeCreatorViewModel : BaseViewModel, IPanelView
+  public partial class DeepfakeCreatorViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IDeepfakeCreatorClient _deepfakeClient;
 
-    public string PanelId => "deepfake-creator";
+    public string PanelId => PanelIds.DeepfakeCreator;
     public string DisplayName => ResourceHelper.GetString("Panel.DeepfakeCreator.DisplayName", "Deepfake Creator");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -68,10 +70,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool isUploading;
 
-    public DeepfakeCreatorViewModel(IViewModelContext context, IBackendClient backendClient)
+    public DeepfakeCreatorViewModel(IViewModelContext context, IDeepfakeCreatorClient deepfakeClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _deepfakeClient = deepfakeClient ?? throw new ArgumentNullException(nameof(deepfakeClient));
 
       LoadEnginesCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -98,10 +100,6 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadEnginesAsync(CancellationToken.None);
-      _ = LoadJobsAsync(CancellationToken.None);
     }
 
     public IAsyncRelayCommand LoadEnginesCommand { get; }
@@ -109,6 +107,18 @@ namespace VoiceStudio.App.ViewModels
     public IAsyncRelayCommand LoadJobsCommand { get; }
     public IAsyncRelayCommand DeleteJobCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _ = LoadEnginesAsync(cancellationToken);
+      _ = LoadJobsAsync(cancellationToken);
+      return Task.CompletedTask;
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken ct) => Task.CompletedTask;
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken ct) => await RefreshAsync(ct);
 
     partial void OnIsProcessingChanged(bool value)
     {
@@ -181,12 +191,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var engines = await _backendClient.SendRequestAsync<object, DeepfakeEngine[]>(
-            "/api/deepfake-creator/engines",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var engines = await _deepfakeClient.GetEnginesAsync(cancellationToken);
 
         if (engines != null)
         {
@@ -292,7 +297,7 @@ namespace VoiceStudio.App.ViewModels
         IsProcessing = true;
         ErrorMessage = null;
 
-        var request = new DeepfakeRequest
+        var request = new DeepfakeCreateRequest
         {
           MediaType = SelectedMediaType,
           Engine = SelectedEngine.EngineId,
@@ -326,12 +331,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var jobs = await _backendClient.SendRequestAsync<object, DeepfakeJob[]>(
-            "/api/deepfake-creator/jobs",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var jobs = await _deepfakeClient.GetJobsAsync(cancellationToken);
 
         if (jobs != null)
         {
@@ -372,12 +372,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/deepfake-creator/jobs/{Uri.EscapeDataString(SelectedJob.JobId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _deepfakeClient.DeleteJobAsync(SelectedJob.JobId, cancellationToken);
 
         DeepfakeJobs.Remove(SelectedJob);
         SelectedJob = null;
@@ -401,77 +396,26 @@ namespace VoiceStudio.App.ViewModels
       StatusMessage = ResourceHelper.GetString("DeepfakeCreator.Refreshed", "Refreshed");
     }
 
-    private async Task<DeepfakeJobResponse?> UploadFilesAndCreateDeepfakeAsync(string sourceFacePath, string targetMediaPath, DeepfakeRequest requestData, CancellationToken cancellationToken = default)
+    private async Task<DeepfakeJobResponse?> UploadFilesAndCreateDeepfakeAsync(string sourceFacePath, string targetMediaPath, DeepfakeCreateRequest requestData, CancellationToken cancellationToken = default)
     {
       IsUploading = true;
       UploadProgress = 0.0;
 
       try
       {
-        var requestJson = System.Text.Json.JsonSerializer.Serialize(requestData);
-        var additionalData = new Dictionary<string, string>
-        {
-          { "request", requestJson }
-        };
-
-        var files = new Dictionary<string, string>
-        {
-          { "source_face", sourceFacePath },
-          { "target_media", targetMediaPath }
-        };
-
         var progress = new Progress<double>(p => UploadProgress = p);
-
-        return await _backendClient.UploadFilesWithProgressAsync<DeepfakeJobResponse>(
-            "/api/deepfake-creator/create",
-            files,
-            additionalData,
-            progress,
-            TimeSpan.FromMinutes(30),
-            cancellationToken);
+        return await _deepfakeClient.CreateDeepfakeAsync(
+          sourceFacePath,
+          targetMediaPath,
+          requestData,
+          progress,
+          cancellationToken);
       }
       finally
       {
         IsUploading = false;
         UploadProgress = 0.0;
       }
-    }
-
-    // Request/Response models
-    private class DeepfakeJobResponse
-    {
-      public string JobId { get; set; } = string.Empty;
-      public string Status { get; set; } = string.Empty;
-    }
-    private class DeepfakeRequest
-    {
-      public string MediaType { get; set; } = string.Empty;
-      public string Engine { get; set; } = string.Empty;
-      public bool ConsentGiven { get; set; }
-      public bool ApplyWatermark { get; set; } = true;
-      public string Quality { get; set; } = "high";
-    }
-
-    private class DeepfakeEngine
-    {
-      public string EngineId { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public string Description { get; set; } = string.Empty;
-      public string[] SupportedTypes { get; set; } = Array.Empty<string>();
-      public bool RequiresConsent { get; set; }
-      public bool WatermarkRequired { get; set; }
-      public bool IsAvailable { get; set; }
-    }
-
-    private class DeepfakeJob
-    {
-      public string JobId { get; set; } = string.Empty;
-      public string Status { get; set; } = string.Empty;
-      public double Progress { get; set; }
-      public string? OutputFile { get; set; }
-      public bool ConsentGiven { get; set; }
-      public bool WatermarkApplied { get; set; }
-      public string? ErrorMessage { get; set; }
     }
   }
 

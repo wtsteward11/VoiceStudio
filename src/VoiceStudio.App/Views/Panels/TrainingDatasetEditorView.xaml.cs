@@ -25,7 +25,7 @@ namespace VoiceStudio.App.Views.Panels
       ViewModel = new TrainingDatasetEditorViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
           AppServices.GetRequiredService<VoiceStudio.Core.Services.ITrainingClient>(),
-          AppServices.GetRequiredService<VoiceStudio.Core.Services.IBackendClient>()
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.ITrainingDatasetEditorClient>()
       );
       DataContext = ViewModel;
 
@@ -47,8 +47,8 @@ namespace VoiceStudio.App.Views.Panels
         }
       };
 
-      // Setup keyboard navigation
-      this.Loaded += TrainingDatasetEditorView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and initial load (ADR-047: no constructor fire-and-forget)
+      this.Loaded += TrainingDatasetEditorView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -60,9 +60,10 @@ namespace VoiceStudio.App.Views.Panels
       });
     }
 
-    private void TrainingDatasetEditorView_KeyboardNavigation_Loaded(object _, RoutedEventArgs __)
+    private async void TrainingDatasetEditorView_Loaded(object _, RoutedEventArgs __)
     {
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      await ViewModel.InitializeAsync(System.Threading.CancellationToken.None);
     }
 
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)

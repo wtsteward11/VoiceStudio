@@ -13,7 +13,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   {
     private readonly DatasetDetailItem _dataset;
     private readonly DatasetAudioFileItem _audioFile;
-    private readonly IBackendClient _backendClient;
+    private readonly ITrainingDatasetEditorClient _datasetEditorClient;
     private readonly int _originalIndex;
     private readonly Action<DatasetAudioFileItem>? _onUndo;
     private readonly Action<DatasetAudioFileItem>? _onRedo;
@@ -23,13 +23,13 @@ namespace VoiceStudio.App.Services.UndoableActions
     public AddDatasetAudioAction(
         DatasetDetailItem dataset,
         DatasetAudioFileItem audioFile,
-        IBackendClient backendClient,
+        ITrainingDatasetEditorClient datasetEditorClient,
         Action<DatasetAudioFileItem>? onUndo = null,
         Action<DatasetAudioFileItem>? onRedo = null)
     {
       _dataset = dataset ?? throw new ArgumentNullException(nameof(dataset));
       _audioFile = audioFile ?? throw new ArgumentNullException(nameof(audioFile));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _datasetEditorClient = datasetEditorClient ?? throw new ArgumentNullException(nameof(datasetEditorClient));
       _originalIndex = dataset.AudioFiles.IndexOf(audioFile);
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -68,7 +68,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   {
     private readonly DatasetDetailItem _dataset;
     private readonly DatasetAudioFileItem _audioFile;
-    private readonly IBackendClient _backendClient;
+    private readonly ITrainingDatasetEditorClient _datasetEditorClient;
     private readonly int _originalIndex;
     private readonly Action<DatasetAudioFileItem>? _onUndo;
     private readonly Action<DatasetAudioFileItem>? _onRedo;
@@ -78,14 +78,14 @@ namespace VoiceStudio.App.Services.UndoableActions
     public RemoveDatasetAudioAction(
         DatasetDetailItem dataset,
         DatasetAudioFileItem audioFile,
-        IBackendClient backendClient,
+        ITrainingDatasetEditorClient datasetEditorClient,
         int originalIndex,
         Action<DatasetAudioFileItem>? onUndo = null,
         Action<DatasetAudioFileItem>? onRedo = null)
     {
       _dataset = dataset ?? throw new ArgumentNullException(nameof(dataset));
       _audioFile = audioFile ?? throw new ArgumentNullException(nameof(audioFile));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _datasetEditorClient = datasetEditorClient ?? throw new ArgumentNullException(nameof(datasetEditorClient));
       _originalIndex = originalIndex;
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -125,7 +125,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   {
     private readonly DatasetDetailItem _dataset;
     private readonly DatasetAudioFileItem _audioFile;
-    private readonly IBackendClient _backendClient;
+    private readonly ITrainingDatasetEditorClient _datasetEditorClient;
     private readonly string _originalTranscript;
     private readonly int _originalOrder;
     private readonly string _newTranscript;
@@ -138,7 +138,7 @@ namespace VoiceStudio.App.Services.UndoableActions
     public UpdateDatasetAudioAction(
         DatasetDetailItem dataset,
         DatasetAudioFileItem audioFile,
-        IBackendClient backendClient,
+        ITrainingDatasetEditorClient datasetEditorClient,
         string originalTranscript,
         int originalOrder,
         string newTranscript,
@@ -148,7 +148,7 @@ namespace VoiceStudio.App.Services.UndoableActions
     {
       _dataset = dataset ?? throw new ArgumentNullException(nameof(dataset));
       _audioFile = audioFile ?? throw new ArgumentNullException(nameof(audioFile));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _datasetEditorClient = datasetEditorClient ?? throw new ArgumentNullException(nameof(datasetEditorClient));
       _originalTranscript = originalTranscript;
       _originalOrder = originalOrder;
       _newTranscript = newTranscript;

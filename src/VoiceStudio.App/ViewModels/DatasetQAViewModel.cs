@@ -17,12 +17,12 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the DatasetQAView panel - Dataset quality assurance reports.
   /// </summary>
-  public partial class DatasetQAViewModel : BaseViewModel, IPanelView
+  public partial class DatasetQAViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IDatasetQAClient _datasetQAClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
-    public string PanelId => "dataset-qa";
+    public string PanelId => PanelIds.DatasetQA;
     public string DisplayName => ResourceHelper.GetString("Panel.DatasetQA.DisplayName", "Dataset QA Reports");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -62,10 +62,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? statusMessage;
 
-    public DatasetQAViewModel(IViewModelContext context, IBackendClient backendClient)
+    public DatasetQAViewModel(IViewModelContext context, IDatasetQAClient datasetQAClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _datasetQAClient = datasetQAClient ?? throw new ArgumentNullException(nameof(datasetQAClient));
 
       try
       {
@@ -96,9 +96,11 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      _ = LoadDatasetsAsync(CancellationToken.None);
     }
+
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => RefreshAsync(cancellationToken);
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => RefreshAsyncInternal(cancellationToken);
 
     public IAsyncRelayCommand LoadDatasetsCommand { get; }
     public IAsyncRelayCommand RunQACommand { get; }
@@ -112,7 +114,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var datasets = await _backendClient.GetTrainingDatasetsAsync(cancellationToken);
+        var datasets = await _datasetQAClient.GetTrainingDatasetsAsync(cancellationToken);
 
         AvailableDatasets.Clear();
         foreach (var dataset in datasets)
@@ -152,7 +154,7 @@ namespace VoiceStudio.App.ViewModels
           return;
         }
 
-        var dataset = await _backendClient.GetTrainingDatasetAsync(SelectedDatasetId, cancellationToken);
+        var dataset = await _datasetQAClient.GetTrainingDatasetAsync(SelectedDatasetId, cancellationToken);
         if (dataset == null || dataset.AudioFiles == null || dataset.AudioFiles.Count == 0)
         {
           ErrorMessage = ResourceHelper.GetString("DatasetQA.DatasetNotFoundOrEmpty", "Dataset not found or has no audio files");
@@ -167,12 +169,7 @@ namespace VoiceStudio.App.ViewModels
         var json = JsonSerializer.Serialize(scoreRequest);
         var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
-        var response = await _backendClient.SendRequestAsync<Dictionary<string, object>, JsonElement[]>(
-            "/api/dataset/score",
-            scoreRequest,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _datasetQAClient.ScoreDatasetAsync(scoreRequest, cancellationToken);
 
         if (response?.Length > 0)
         {
@@ -264,12 +261,7 @@ namespace VoiceStudio.App.ViewModels
                     { "clips", ClipResults.Select(c => c.ClipId).ToList() }
                 };
 
-        await _backendClient.SendRequestAsync<Dictionary<string, object>, object>(
-            "/api/dataset/cull",
-            cullRequest,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _datasetQAClient.CullLowQualityAsync(cullRequest, cancellationToken);
 
         StatusMessage = ResourceHelper.GetString("DatasetQA.ClipsCulled", "Low-quality clips culled from dataset");
         _toastNotificationService?.ShowToast(ToastType.Success,
@@ -292,7 +284,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task RefreshAsyncInternal(CancellationToken cancellationToken)
     {
       try
       {

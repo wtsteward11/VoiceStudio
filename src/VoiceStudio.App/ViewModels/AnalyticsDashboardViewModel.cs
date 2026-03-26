@@ -6,23 +6,19 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
-using AnalyticsSummaryModel = VoiceStudio.App.ViewModels.AnalyticsDashboardViewModel.AnalyticsSummary;
-using AnalyticsCategoryModel = VoiceStudio.App.ViewModels.AnalyticsDashboardViewModel.AnalyticsCategory;
-using AnalyticsMetricModel = VoiceStudio.App.ViewModels.AnalyticsDashboardViewModel.AnalyticsMetric;
-using StatisticalAnalysisResponseModel = VoiceStudio.App.ViewModels.AnalyticsDashboardViewModel.StatisticalAnalysisResponse;
-using StatisticalTestResultModel = VoiceStudio.App.ViewModels.AnalyticsDashboardViewModel.StatisticalTestResult;
 
 namespace VoiceStudio.App.ViewModels
 {
   /// <summary>
   /// ViewModel for the AnalyticsDashboardView panel - Analytics dashboard.
   /// </summary>
-  public partial class AnalyticsDashboardViewModel : BaseViewModel, IPanelView
+  public partial class AnalyticsDashboardViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IAnalyticsDashboardClient _analyticsClient;
 
     public string PanelId => "analytics-dashboard";
     public string DisplayName => ResourceHelper.GetString("Panel.AnalyticsDashboard.DisplayName", "Analytics Dashboard");
@@ -58,10 +54,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool showStatisticalAnalysis;
 
-    public AnalyticsDashboardViewModel(IViewModelContext context, IBackendClient backendClient)
+    public AnalyticsDashboardViewModel(IViewModelContext context, IAnalyticsDashboardClient analyticsClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _analyticsClient = analyticsClient ?? throw new ArgumentNullException(nameof(analyticsClient));
 
       LoadSummaryCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -88,11 +84,19 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadSummaryAsync(CancellationToken.None);
-      _ = LoadCategoriesAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _ = LoadSummaryAsync(cancellationToken);
+      _ = LoadCategoriesAsync(cancellationToken);
+      return Task.CompletedTask;
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken ct) => Task.CompletedTask;
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken ct) => await RefreshAsync(ct);
 
     public IAsyncRelayCommand LoadSummaryCommand { get; }
     public IAsyncRelayCommand LoadCategoryMetricsCommand { get; }
@@ -127,12 +131,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var summary = await _backendClient.SendRequestAsync<object, AnalyticsSummary>(
-            "/api/analytics/summary",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var summary = await _analyticsClient.GetSummaryAsync(cancellationToken);
 
         if (summary != null)
         {
@@ -165,14 +164,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var url = $"/api/analytics/metrics/{Uri.EscapeDataString(SelectedCategory)}?interval={Uri.EscapeDataString(SelectedInterval)}";
-
-        var metrics = await _backendClient.SendRequestAsync<object, AnalyticsMetric[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var metrics = await _analyticsClient.GetMetricsAsync(SelectedCategory, SelectedInterval, cancellationToken);
 
         if (metrics != null)
         {
@@ -201,12 +193,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var categories = await _backendClient.SendRequestAsync<object, string[]>(
-            "/api/analytics/categories",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var categories = await _analyticsClient.GetCategoriesAsync(cancellationToken);
 
         if (categories != null)
         {
@@ -239,16 +226,9 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var url = $"/api/analytics/statistical/{Uri.EscapeDataString(SelectedCategory)}?interval={Uri.EscapeDataString(SelectedInterval)}";
-
         try
         {
-          var analysis = await _backendClient.SendRequestAsync<object, StatisticalAnalysisResponse>(
-              url,
-              null,
-              System.Net.Http.HttpMethod.Get,
-              cancellationToken
-          );
+          var analysis = await _analyticsClient.GetStatisticalAnalysisAsync(SelectedCategory, SelectedInterval, cancellationToken);
 
           if (analysis != null)
           {
@@ -302,68 +282,9 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Response models
-    public class AnalyticsSummary
-    {
-      public string PeriodStart { get; set; } = string.Empty;
-      public string PeriodEnd { get; set; } = string.Empty;
-      public int TotalSynthesis { get; set; }
-      public int TotalProjects { get; set; }
-      public int TotalAudioProcessed { get; set; }
-      public double TotalProcessingTime { get; set; }
-      public double AverageQualityScore { get; set; }
-      public AnalyticsCategory[] Categories { get; set; } = Array.Empty<AnalyticsCategory>();
-    }
-
-    public class AnalyticsCategory
-    {
-      public string Category { get; set; } = string.Empty;
-      public double Total { get; set; }
-      public int Count { get; set; }
-      public double Average { get; set; }
-      public double MinValue { get; set; }
-      public double MaxValue { get; set; }
-      public string Trend { get; set; } = string.Empty;
-    }
-
-    public class AnalyticsMetric
-    {
-      public string Timestamp { get; set; } = string.Empty;
-      public double Value { get; set; }
-      public string? Label { get; set; }
-    }
-
-    public class StatisticalAnalysisResponse
-    {
-      public double Mean { get; set; }
-      public double Median { get; set; }
-      public double? Mode { get; set; }
-      public double StandardDeviation { get; set; }
-      public double Variance { get; set; }
-      public double Min { get; set; }
-      public double Max { get; set; }
-      public double Range { get; set; }
-      public double Q1 { get; set; }
-      public double Q3 { get; set; }
-      public double IQR { get; set; }
-      public double Skewness { get; set; }
-      public double Kurtosis { get; set; }
-      public int SampleSize { get; set; }
-      public Dictionary<string, double>? Correlations { get; set; }
-      public Dictionary<string, StatisticalTestResultModel>? TestResults { get; set; }
-    }
-
-    public class StatisticalTestResult
-    {
-      public string TestName { get; set; } = string.Empty;
-      public double TestStatistic { get; set; }
-      public double PValue { get; set; }
-      public bool Significant { get; set; }
-      public string Interpretation { get; set; } = string.Empty;
-    }
   }
 
-  // Data models
+  // Data models (UI presentation)
   public class AnalyticsSummaryItem : ObservableObject
   {
     public string PeriodStart { get; set; }
@@ -377,7 +298,7 @@ namespace VoiceStudio.App.ViewModels
     public string ProcessingTimeDisplay => $"{TotalProcessingTime:F1}s";
     public string QualityScoreDisplay => $"{AverageQualityScore:F1}/5.0";
 
-    public AnalyticsSummaryItem(AnalyticsSummaryModel summary)
+    public AnalyticsSummaryItem(AnalyticsDashboardSummary summary)
     {
       PeriodStart = summary.PeriodStart;
       PeriodEnd = summary.PeriodEnd;
@@ -405,7 +326,7 @@ namespace VoiceStudio.App.ViewModels
     public string TrendDisplay => Trend.ToUpper();
     public string AverageDisplay => $"{Average:F2}";
 
-    public AnalyticsCategoryItem(AnalyticsCategoryModel category)
+    public AnalyticsCategoryItem(AnalyticsDashboardCategory category)
     {
       Category = category.Category;
       Total = category.Total;
@@ -425,7 +346,7 @@ namespace VoiceStudio.App.ViewModels
     public string ValueDisplay => $"{Value:F1}";
     public string DisplayLabel => Label ?? Timestamp;
 
-    public AnalyticsMetricItem(AnalyticsMetricModel metric)
+    public AnalyticsMetricItem(AnalyticsDashboardMetric metric)
     {
       Timestamp = metric.Timestamp;
       Value = metric.Value;
@@ -462,7 +383,7 @@ namespace VoiceStudio.App.ViewModels
     public string SkewnessDisplay => $"{Skewness:F3}";
     public string KurtosisDisplay => $"{Kurtosis:F3}";
 
-    public StatisticalAnalysisItem(StatisticalAnalysisResponseModel response)
+    public StatisticalAnalysisItem(AnalyticsDashboardStatisticalResponse response)
     {
       Mean = response.Mean;
       Median = response.Median;
@@ -529,7 +450,7 @@ namespace VoiceStudio.App.ViewModels
     public string PValueDisplay => $"{PValue:F4}";
     public string SignificanceDisplay => Significant ? "Significant" : "Not Significant";
 
-    public StatisticalTestResultItem(StatisticalTestResultModel result)
+    public StatisticalTestResultItem(AnalyticsDashboardStatisticalTestResult result)
     {
       TestName = result.TestName;
       TestStatistic = result.TestStatistic;

@@ -19,7 +19,7 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public sealed partial class GlobalSearchViewModel : BaseViewModel
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ISearchClient _searchClient;
     private readonly SemaphoreSlim _searchSemaphore = new(1, 1);
     private int _activeSearchCount;
     private CancellationTokenSource? _searchDebounceCts;
@@ -52,10 +52,10 @@ namespace VoiceStudio.App.ViewModels
     public Visibility ResultsListVisibility => IsLoading ? Visibility.Collapsed : Visibility.Visible;
     public Visibility ErrorVisibility => string.IsNullOrEmpty(ErrorMessage) ? Visibility.Collapsed : Visibility.Visible;
 
-    public GlobalSearchViewModel(IBackendClient backendClient)
+    public GlobalSearchViewModel(ISearchClient searchClient)
         : base(AppServices.GetViewModelContext())
     {
-      _backendClient = backendClient;
+      _searchClient = searchClient ?? throw new ArgumentNullException(nameof(searchClient));
     }
 
     [RelayCommand]
@@ -79,7 +79,7 @@ namespace VoiceStudio.App.ViewModels
         await _searchSemaphore.WaitAsync();
         try
         {
-          var response = await _backendClient.SearchAsync(SearchQuery, null, 50);
+          var response = await _searchClient.SearchAsync(SearchQuery, null, 50);
 
           Results.Clear();
           FilteredResults.Clear();

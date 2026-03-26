@@ -1,6 +1,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Collections.Generic;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.Core.Models;
 
 namespace VoiceStudio.App.Tests.ViewModels
 {
@@ -12,7 +13,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleProfileResponse_DefaultValues()
         {
-            var response = new VoiceStyleTransferViewModel.StyleProfileResponse();
+            var response = new VoiceStyleTransferProfileResponse();
 
             Assert.AreEqual(string.Empty, response.AudioId);
             Assert.AreEqual(0f, response.AveragePitch);
@@ -30,7 +31,7 @@ namespace VoiceStudio.App.Tests.ViewModels
             var prosodicFeatures = new Dictionary<string, object> { { "feature1", 1.0 } };
             var styleEmbedding = new List<float> { 0.1f, 0.2f, 0.3f };
 
-            var response = new VoiceStyleTransferViewModel.StyleProfileResponse
+            var response = new VoiceStyleTransferProfileResponse
             {
                 AudioId = "audio123",
                 AveragePitch = 150.5f,
@@ -59,7 +60,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleAnalyzeResponse_DefaultValues()
         {
-            var response = new VoiceStyleTransferViewModel.StyleAnalyzeResponse();
+            var response = new VoiceStyleTransferAnalyzeResponse();
 
             Assert.AreEqual(string.Empty, response.AudioId);
             Assert.IsNull(response.PitchContour);
@@ -79,7 +80,7 @@ namespace VoiceStudio.App.Tests.ViewModels
                 new Dictionary<string, object> { { "type", "emphasis" } }
             };
 
-            var response = new VoiceStyleTransferViewModel.StyleAnalyzeResponse
+            var response = new VoiceStyleTransferAnalyzeResponse
             {
                 AudioId = "audio456",
                 PitchContour = pitchContour,
@@ -102,7 +103,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleProfileItem_CreatedFromResponse()
         {
-            var response = new VoiceStyleTransferViewModel.StyleProfileResponse
+            var response = new VoiceStyleTransferProfileResponse
             {
                 AudioId = "a1",
                 AveragePitch = 140f,
@@ -125,7 +126,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleProfileItem_EnergyDisplay_FormatsAsPercent()
         {
-            var response = new VoiceStyleTransferViewModel.StyleProfileResponse { Energy = 0.75f };
+            var response = new VoiceStyleTransferProfileResponse { Energy = 0.75f };
             var item = new StyleProfileItem(response);
 
             Assert.AreEqual("75%", item.EnergyDisplay);
@@ -134,7 +135,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleProfileItem_HasEmotion_TrueWhenEmotionSet()
         {
-            var response = new VoiceStyleTransferViewModel.StyleProfileResponse { EmotionTag = "happy" };
+            var response = new VoiceStyleTransferProfileResponse { EmotionTag = "happy" };
             var item = new StyleProfileItem(response);
 
             Assert.IsTrue(item.HasEmotion);
@@ -143,7 +144,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleProfileItem_HasEmotion_FalseWhenEmotionNull()
         {
-            var response = new VoiceStyleTransferViewModel.StyleProfileResponse { EmotionTag = null };
+            var response = new VoiceStyleTransferProfileResponse { EmotionTag = null };
             var item = new StyleProfileItem(response);
 
             Assert.IsFalse(item.HasEmotion);
@@ -152,7 +153,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleProfileItem_HasEmotion_FalseWhenEmotionEmpty()
         {
-            var response = new VoiceStyleTransferViewModel.StyleProfileResponse { EmotionTag = "" };
+            var response = new VoiceStyleTransferProfileResponse { EmotionTag = "" };
             var item = new StyleProfileItem(response);
 
             Assert.IsFalse(item.HasEmotion);
@@ -161,7 +162,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleProfileItem_HasEmotion_FalseWhenEmotionWhitespace()
         {
-            var response = new VoiceStyleTransferViewModel.StyleProfileResponse { EmotionTag = "   " };
+            var response = new VoiceStyleTransferProfileResponse { EmotionTag = "   " };
             var item = new StyleProfileItem(response);
 
             Assert.IsFalse(item.HasEmotion);
@@ -174,7 +175,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleAnalysisItem_CreatedFromResponse()
         {
-            var response = new VoiceStyleTransferViewModel.StyleAnalyzeResponse
+            var response = new VoiceStyleTransferAnalyzeResponse
             {
                 AudioId = "a1",
                 PitchContour = new List<float> { 1f, 2f },
@@ -197,7 +198,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleAnalysisItem_MarkerCount_ReturnsCorrectCount()
         {
-            var response = new VoiceStyleTransferViewModel.StyleAnalyzeResponse
+            var response = new VoiceStyleTransferAnalyzeResponse
             {
                 StyleMarkers = new List<Dictionary<string, object>>
                 {
@@ -214,7 +215,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleAnalysisItem_MarkerCount_ZeroWhenNull()
         {
-            var response = new VoiceStyleTransferViewModel.StyleAnalyzeResponse { StyleMarkers = null };
+            var response = new VoiceStyleTransferAnalyzeResponse { StyleMarkers = null };
             var item = new StyleAnalysisItem(response);
 
             Assert.AreEqual(0, item.MarkerCount);
@@ -223,7 +224,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleAnalysisItem_HasMarkers_TrueWhenMarkersExist()
         {
-            var response = new VoiceStyleTransferViewModel.StyleAnalyzeResponse
+            var response = new VoiceStyleTransferAnalyzeResponse
             {
                 StyleMarkers = new List<Dictionary<string, object>> { new Dictionary<string, object>() }
             };
@@ -235,7 +236,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleAnalysisItem_HasMarkers_FalseWhenEmpty()
         {
-            var response = new VoiceStyleTransferViewModel.StyleAnalyzeResponse
+            var response = new VoiceStyleTransferAnalyzeResponse
             {
                 StyleMarkers = new List<Dictionary<string, object>>()
             };
@@ -247,7 +248,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void StyleAnalysisItem_HasMarkers_FalseWhenNull()
         {
-            var response = new VoiceStyleTransferViewModel.StyleAnalyzeResponse { StyleMarkers = null };
+            var response = new VoiceStyleTransferAnalyzeResponse { StyleMarkers = null };
             var item = new StyleAnalysisItem(response);
 
             Assert.IsFalse(item.HasMarkers);

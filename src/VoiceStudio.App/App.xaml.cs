@@ -1066,14 +1066,14 @@ namespace VoiceStudio.App
       ServiceProvider.GetStartupStateService().SetBackendReady();
     }
 
-    private static void OnBackendStartFailed(object? sender, string message)
+    private static void OnBackendStartFailed(object? sender, BackendStartFailedEventArgs e)
     {
       if (sender is BackendProcessManager mgr)
       {
         mgr.BackendStarted -= OnBackendStarted;
         mgr.BackendStartFailed -= OnBackendStartFailed;
       }
-      ServiceProvider.GetStartupStateService().SetBackendFailed(message);
+      ServiceProvider.GetStartupStateService().SetBackendFailed(e.Message);
     }
 
     private static string GetCrashDir()

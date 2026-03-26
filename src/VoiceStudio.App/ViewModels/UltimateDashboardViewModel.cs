@@ -19,7 +19,7 @@ namespace VoiceStudio.App.ViewModels
   {
     private readonly IUltimateDashboardClient _dashboardClient;
 
-    public string PanelId => "ultimate-dashboard";
+    public string PanelId => PanelIds.UltimateDashboard;
     public string DisplayName => ResourceHelper.GetString("Panel.UltimateDashboard.DisplayName", "Ultimate Dashboard");
     public PanelRegion Region => PanelRegion.Center;
 

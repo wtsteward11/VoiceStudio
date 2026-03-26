@@ -16,7 +16,7 @@ namespace VoiceStudio.App
 {
     public sealed partial class MainWindow
     {
-        internal async Task<(string[] Steps, bool TimedOut, string? TimedOutStep, bool SynthesisStepRan, bool PlaybackInvoked, string? AudioId, bool StreamCheckPassed, bool TempFileCreated, bool PlaybackStarted, double PlaybackPositionAdvancedMs, bool LibraryTempFileCreated, bool LibraryPlaybackStarted, double LibraryPlaybackPositionAdvancedMs, List<(string Step, string Error)> Failures)> RunGateCUiSmokeNavigationAsync(string crashDir)
+        internal async Task<(string[] Steps, bool TimedOut, string? TimedOutStep, bool SynthesisStepRan, bool PlaybackInvoked, string? AudioId, bool StreamCheckPassed, bool TempFileCreated, bool PlaybackStarted, double PlaybackPositionAdvancedMs, bool LibraryPlaybackTempFileCreated, bool LibraryPlaybackStarted, double LibraryPlaybackPositionAdvancedMs, bool LibraryImportTempFileCreated, bool LibraryImportPlaybackStarted, double LibraryImportPlaybackPositionAdvancedMs, List<(string Step, string Error)> Failures)> RunGateCUiSmokeNavigationAsync(string crashDir)
         {
             // Deterministic Gate C UI smoke: exercise primary nav buttons to surface binding failures.
             var executed = new List<string>();
@@ -174,7 +174,7 @@ namespace VoiceStudio.App
             if (warmupCompleted != warmupTask)
             {
                 AppendStepLog($"WARMUP_TIMEOUT\ttimeout_sec={(int)warmupTimeout.TotalSeconds}");
-                return (executed.ToArray(), true, "Warmup", false, false, null, false, false, false, 0.0, false, false, 0.0, new List<(string Step, string Error)>());
+                return (executed.ToArray(), true, "Warmup", false, false, null, false, false, false, 0.0, false, false, 0.0, false, false, 0.0, new List<(string Step, string Error)>());
             }
 
             try
@@ -196,12 +196,16 @@ namespace VoiceStudio.App
             var tempFileCreated = false;
             var playbackStarted = false;
             var playbackPositionAdvancedMs = 0.0;
-            var libraryTempFileCreated = false;
+            var libraryPlaybackTempFileCreated = false;
             var libraryPlaybackStarted = false;
             var libraryPlaybackPositionAdvancedMs = 0.0;
+            var libraryImportTempFileCreated = false;
+            var libraryImportPlaybackStarted = false;
+            var libraryImportPlaybackPositionAdvancedMs = 0.0;
             var synthesisFailures = new List<(string Step, string Error)>();
             var synthProof = new SynthesisProof();
-            var libProof = new LibraryProof();
+            var libPlaybackProof = new LibraryProof();
+            var libImportProof = new LibraryProof();
 
             async Task AssertPanelOpened(string panelId, PanelRegion region)
             {
@@ -224,7 +228,9 @@ namespace VoiceStudio.App
         // Core synthesis panels (4 steps)
         ("PanelVoiceSynthesis", () => AssertPanelOpened("VoiceSynthesis", PanelRegion.Center)),
         ("SynthesisAndPlayback", () => RunSynthesisAndPlaybackAsync(AppendStepLog, synthProof)),
-        ("LibraryPlayback", () => RunLibraryPlaybackAsync(AppendStepLog, synthProof.AudioId ?? "", libProof)),
+        ("LibraryPlayback", () => RunLibraryPlaybackAsync(AppendStepLog, synthProof.AudioId ?? "", libPlaybackProof)),
+        ("LibraryImportPlayback", () => RunLibraryImportAndPlaybackAsync(AppendStepLog, libImportProof)),
+        ("LibraryImportPlaybackRepeated", () => RunRepeatedLibraryImportPlaybackAsync(AppendStepLog)),
         ("PanelEnsembleSynthesis", () => AssertPanelOpened("EnsembleSynthesis", PanelRegion.Center)),
         ("PanelBatchProcessing", () => AssertPanelOpened("BatchProcessing", PanelRegion.Center)),
         ("PanelTextSpeechEditor", () => AssertPanelOpened("TextSpeechEditor", PanelRegion.Center)),
@@ -258,13 +264,13 @@ namespace VoiceStudio.App
 
                 var stepTask = RunOnUiThreadAsyncTask(step.Name, step.Action);
                 var synthTimeout = step.Name == "SynthesisAndPlayback" ? TimeSpan.FromSeconds(45)
-                    : step.Name == "LibraryPlayback" ? TimeSpan.FromSeconds(30)
+                    : step.Name == "LibraryPlayback" || step.Name == "LibraryImportPlayback" || step.Name == "LibraryImportPlaybackRepeated" ? TimeSpan.FromSeconds(45)
                     : perStepTimeout;
                 var completed = await Task.WhenAny(stepTask, Task.Delay(synthTimeout)).ConfigureAwait(false);
                 if (completed != stepTask)
                 {
                     AppendStepLog($"STEP_TIMEOUT\t{step.Name}\ttimeout_sec={(int)synthTimeout.TotalSeconds}");
-                    return (executed.ToArray(), true, step.Name, synthesisStepRan, playbackInvoked, audioId, streamCheckPassed, tempFileCreated, playbackStarted, playbackPositionAdvancedMs, libraryTempFileCreated, libraryPlaybackStarted, libraryPlaybackPositionAdvancedMs, synthesisFailures);
+                    return (executed.ToArray(), true, step.Name, synthesisStepRan, playbackInvoked, audioId, streamCheckPassed, tempFileCreated, playbackStarted, playbackPositionAdvancedMs, libraryPlaybackTempFileCreated, libraryPlaybackStarted, libraryPlaybackPositionAdvancedMs, libraryImportTempFileCreated, libraryImportPlaybackStarted, libraryImportPlaybackPositionAdvancedMs, synthesisFailures);
                 }
 
                 try
@@ -282,9 +288,15 @@ namespace VoiceStudio.App
                     }
                     if (step.Name == "LibraryPlayback")
                     {
-                        libraryTempFileCreated = libProof.TempFileCreated;
-                        libraryPlaybackStarted = libProof.PlaybackStarted;
-                        libraryPlaybackPositionAdvancedMs = libProof.PlaybackPositionAdvancedMs;
+                        libraryPlaybackTempFileCreated = libPlaybackProof.TempFileCreated;
+                        libraryPlaybackStarted = libPlaybackProof.PlaybackStarted;
+                        libraryPlaybackPositionAdvancedMs = libPlaybackProof.PlaybackPositionAdvancedMs;
+                    }
+                    if (step.Name == "LibraryImportPlayback")
+                    {
+                        libraryImportTempFileCreated = libImportProof.TempFileCreated;
+                        libraryImportPlaybackStarted = libImportProof.PlaybackStarted;
+                        libraryImportPlaybackPositionAdvancedMs = libImportProof.PlaybackPositionAdvancedMs;
                     }
                 }
                 catch (Exception ex)
@@ -293,7 +305,7 @@ namespace VoiceStudio.App
                     if (step.Name == "SynthesisAndPlayback")
                     {
                         synthesisFailures.Add((step.Name, $"{ex.GetType().Name}: {ex.Message}"));
-                        return (executed.ToArray(), false, null, false, false, null, false, false, false, 0.0, false, false, 0.0, synthesisFailures);
+                        return (executed.ToArray(), false, null, false, false, null, false, false, false, 0.0, false, false, 0.0, false, false, 0.0, synthesisFailures);
                     }
                     throw;
                 }
@@ -358,7 +370,7 @@ namespace VoiceStudio.App
                         if (assertCompleted != assertTask)
                         {
                             AppendStepLog($"STEP_TIMEOUT\tAssert_{wsStep.Name}\ttimeout_sec={(int)perStepTimeout.TotalSeconds}");
-                            return (executed.ToArray(), true, $"Assert_{wsStep.Name}", synthesisStepRan, playbackInvoked, audioId, streamCheckPassed, tempFileCreated, playbackStarted, playbackPositionAdvancedMs, libraryTempFileCreated, libraryPlaybackStarted, libraryPlaybackPositionAdvancedMs, synthesisFailures);
+                            return (executed.ToArray(), true, $"Assert_{wsStep.Name}", synthesisStepRan, playbackInvoked, audioId, streamCheckPassed, tempFileCreated, playbackStarted, playbackPositionAdvancedMs, libraryPlaybackTempFileCreated, libraryPlaybackStarted, libraryPlaybackPositionAdvancedMs, libraryImportTempFileCreated, libraryImportPlaybackStarted, libraryImportPlaybackPositionAdvancedMs, synthesisFailures);
                         }
 
                         await assertTask.ConfigureAwait(false);
@@ -393,7 +405,7 @@ namespace VoiceStudio.App
                 AppendStepLog($"REQUEST_COUNTS_ERROR\t{ex.Message}");
             }
 
-            return (executed.ToArray(), false, null, synthesisStepRan, playbackInvoked, audioId, streamCheckPassed, tempFileCreated, playbackStarted, playbackPositionAdvancedMs, libraryTempFileCreated, libraryPlaybackStarted, libraryPlaybackPositionAdvancedMs, synthesisFailures);
+            return (executed.ToArray(), false, null, synthesisStepRan, playbackInvoked, audioId, streamCheckPassed, tempFileCreated, playbackStarted, playbackPositionAdvancedMs, libraryPlaybackTempFileCreated, libraryPlaybackStarted, libraryPlaybackPositionAdvancedMs, libraryImportTempFileCreated, libraryImportPlaybackStarted, libraryImportPlaybackPositionAdvancedMs, synthesisFailures);
         }
 
         private sealed class SynthesisProof
@@ -624,6 +636,10 @@ namespace VoiceStudio.App
             });
         }
 
+        /// <summary>
+        /// Library playback smoke: PlayAsset on selected asset, then selection-driven main Play.
+        /// Proves select existing Library asset → SetCurrentPlayable → main Play → playback starts (Transport Coherence Wave 2 Task 6).
+        /// </summary>
         private async Task RunLibraryPlaybackAsync(Action<string> appendStepLog, string audioId, LibraryProof proof)
         {
             if (string.IsNullOrWhiteSpace(audioId))
@@ -667,14 +683,17 @@ namespace VoiceStudio.App
             }
             appendStepLog("LIBRARY_REFRESH_PASS");
 
-            var asset = vm.Assets.FirstOrDefault(a => string.Equals(a.Id, audioId, StringComparison.Ordinal))
+            // Find asset by playback ID (metadata.upload_id for imported, else asset.Id) per repaired contract
+            var asset = vm.Assets.FirstOrDefault(a => string.Equals(GetPlaybackAudioId(a), audioId, StringComparison.Ordinal))
+                ?? vm.Assets.FirstOrDefault(a => string.Equals(a.Id, audioId, StringComparison.Ordinal))
                 ?? vm.Assets.FirstOrDefault(a => IsPlayableLibraryAsset(a));
             if (asset == null)
             {
                 appendStepLog($"LIBRARY_PLAYBACK_SKIP\tNo playable asset (audio_id={audioId})");
                 throw new InvalidOperationException($"No playable asset in Library for audio_id={audioId}");
             }
-            appendStepLog($"LIBRARY_PLAY_ASSET\tid={asset.Id}");
+            var playbackId = GetPlaybackAudioId(asset);
+            appendStepLog($"LIBRARY_PLAY_ASSET\tplayback_id={playbackId} asset_id={asset.Id}");
 
             if (!vm.PlayAssetCommand.CanExecute(asset))
             {
@@ -718,7 +737,404 @@ namespace VoiceStudio.App
                 throw new InvalidOperationException($"Library playback position did not advance (got {advancedMs:F0}ms, required >= 250ms)");
             }
             appendStepLog($"LIBRARY_POSITION_PASS\tadvancement={advancedMs:F0}ms");
+
+            // Task 8: Selection-driven main Play smoke — select existing asset → main Play → playback starts
+            appendStepLog("LIBRARY_MAIN_PLAY_BEGIN\tProves select existing Library asset → main Play → playback starts");
+            audioPlayer.Stop();
+            await Task.Delay(200);
+            var ctx = AppServices.GetContextManager();
+            ctx.SetCurrentPlayable(playbackId ?? asset.Id, TransportSource.Library, asset.Name);
+            if (ctx.CurrentPlayableSource != TransportSource.Library)
+            {
+                appendStepLog($"LIBRARY_MAIN_PLAY_SOURCE_FAIL\tsource={ctx.CurrentPlayableSource}");
+                throw new InvalidOperationException("Transport source must be Library before main Play");
+            }
+            TogglePlayback();
+            var mainPlayDeadline = DateTime.UtcNow.AddSeconds(5);
+            var mainPlayStarted = false;
+            while (DateTime.UtcNow < mainPlayDeadline)
+            {
+                await Task.Delay(100);
+                if (audioPlayer.IsPlaying)
+                {
+                    mainPlayStarted = true;
+                    break;
+                }
+            }
+            if (!mainPlayStarted)
+            {
+                appendStepLog("LIBRARY_MAIN_PLAY_FAIL\tMain Play did not start within 5s");
+                throw new InvalidOperationException("Select existing Library asset → main Play did not start within 5s");
+            }
+            appendStepLog("LIBRARY_MAIN_PLAY_PASS\tTitle/source in transport match selection; main Play works");
+
             appendStepLog("LIBRARY_PLAYBACK_DONE");
+        }
+
+        /// <summary>
+        /// UI-path smoke: import audio via library upload, asset appears in Library, PlayAsset executes, playback starts.
+        /// Proves import → SetCurrentPlayable → main Play → playback starts (Transport Coherence Wave 2 Task 5).
+        /// Proves playback intent survives panel switch (IMPORT_NAV_AWAY; Task 7).
+        /// Uses ILibraryClient.UploadLibraryAssetAsync (not MainWindow.ImportAudioFile); same backend contract.
+        /// </summary>
+        private async Task RunLibraryImportAndPlaybackAsync(Action<string> appendStepLog, LibraryProof proof)
+        {
+            var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? "http://localhost:8000";
+
+            appendStepLog("IMPORT_BACKEND_POLL_BEGIN");
+            await Task.Run(async () =>
+            {
+                var backendDeadline = DateTime.UtcNow.AddSeconds(10);
+                while (DateTime.UtcNow < backendDeadline)
+                {
+                    if (await BackendClient.TryCheckHealthAsync(baseUrl, 2000))
+                        return;
+                    await Task.Delay(500);
+                }
+                if (!await BackendClient.TryCheckHealthAsync(baseUrl, 2000))
+                {
+                    appendStepLog($"IMPORT_BACKEND_POLL_FAIL\tBackend not healthy within 10s\tbaseUrl={baseUrl}");
+                    throw new InvalidOperationException("Backend not healthy within 10s");
+                }
+            });
+            appendStepLog("IMPORT_BACKEND_POLL_PASS");
+
+            var tempWavPath = Path.Combine(Path.GetTempPath(), $"vs_smoke_import_{Guid.NewGuid():N}.wav");
+            try
+            {
+                CreateMinimalWavFile(tempWavPath);
+                appendStepLog("IMPORT_WAV_CREATED");
+
+                var libraryClient = AppServices.GetRequiredService<ILibraryClient>();
+                var uploadedAsset = await libraryClient.UploadLibraryAssetAsync(tempWavPath);
+                if (uploadedAsset == null)
+                {
+                    appendStepLog("IMPORT_UPLOAD_FAIL_DETAIL\tresponse=null\tmetadata_keys=");
+                    appendStepLog("IMPORT_UPLOAD_FAIL\tUploadLibraryAssetAsync returned null");
+                    throw new InvalidOperationException("Library import upload returned null");
+                }
+
+                var uploadId = GetPlaybackAudioId(uploadedAsset);
+                if (string.IsNullOrEmpty(uploadId))
+                {
+                    appendStepLog($"IMPORT_UPLOAD_FAIL_DETAIL\tresponse={uploadedAsset?.Id ?? "null"}\tmetadata_keys={(uploadedAsset?.Metadata != null ? string.Join(",", uploadedAsset.Metadata.Keys) : "")}");
+                    appendStepLog("IMPORT_UPLOAD_FAIL\tNo upload_id in metadata");
+                    throw new InvalidOperationException("Uploaded asset has no playback ID (upload_id)");
+                }
+                appendStepLog($"IMPORT_UPLOAD_PASS\tupload_id={uploadId}");
+
+                var eventAggregator = AppServices.TryGetEventAggregator();
+                eventAggregator?.Publish(new VoiceStudio.Core.Events.AssetAddedEvent(
+                    "smoke-import",
+                    uploadId,
+                    "audio",
+                    tempWavPath));
+
+                appendStepLog("IMPORT_NAV_BEGIN");
+                if (!await OpenPanelByIdAsync("Library", PanelRegion.Left))
+                {
+                    appendStepLog("IMPORT_NAV_FAIL\tFailed to open Library panel");
+                    throw new InvalidOperationException("Smoke: failed to open Library panel");
+                }
+                appendStepLog("IMPORT_NAV_PASS");
+
+                await Task.Delay(300);
+
+                var leftHost = FindNameOnContent("LeftPanelHost") as PanelHost;
+                if (leftHost?.Content is not LibraryView libraryView)
+                {
+                    appendStepLog("IMPORT_SKIP\tLibraryView not in left panel");
+                    throw new InvalidOperationException("LibraryView not found in left panel");
+                }
+
+                var vm = libraryView.ViewModel;
+                appendStepLog("IMPORT_REFRESH_BEGIN");
+                if (vm.RefreshCommand.CanExecute(null))
+                {
+                    await vm.RefreshCommand.ExecuteAsync(null);
+                }
+                var refreshDeadline = DateTime.UtcNow.AddSeconds(8);
+                while (DateTime.UtcNow < refreshDeadline)
+                {
+                    await Task.Delay(200);
+                    var asset = vm.Assets.FirstOrDefault(a => string.Equals(GetPlaybackAudioId(a), uploadId, StringComparison.Ordinal));
+                    if (asset != null)
+                    {
+                        appendStepLog("IMPORT_REFRESH_PASS\tImported asset visible");
+
+                        // Simulate Import establishing transport context (Task 11: import-to-global-play smoke)
+                        var ctx = AppServices.GetContextManager();
+                        ctx.SetCurrentPlayable(uploadId, TransportSource.Library, asset.Name);
+                        if (ctx.CurrentPlayableAudioId != uploadId)
+                        {
+                            appendStepLog("IMPORT_TRANSPORT_FAIL\tSetCurrentPlayable did not set CurrentPlayableAudioId");
+                            throw new InvalidOperationException("Import-to-global-play: CurrentPlayableAudioId not set");
+                        }
+                        appendStepLog("IMPORT_TRANSPORT_PASS\tCurrentPlayableAudioId set");
+
+                        // Task 12: Panel switching without losing playback intent
+                        appendStepLog("IMPORT_NAV_AWAY_BEGIN");
+                        if (await OpenPanelByIdAsync("Settings", PanelRegion.Right))
+                        {
+                            await Task.Delay(200);
+                            if (ctx.CurrentPlayableAudioId != uploadId || ctx.CurrentPlayableSource != TransportSource.Library)
+                            {
+                                appendStepLog($"IMPORT_NAV_AWAY_FAIL\taudioId={ctx.CurrentPlayableAudioId}\tsource={ctx.CurrentPlayableSource}");
+                                throw new InvalidOperationException("Playback intent lost after panel navigation");
+                            }
+                            appendStepLog("IMPORT_NAV_AWAY_PASS\tPlayback intent survives panel switch");
+                        }
+                        appendStepLog("IMPORT_NAV_AWAY_DONE");
+
+                        // Assert transport context before main Play (Task 7: import smoke hardening)
+                        if (ctx.CurrentPlayableSource != TransportSource.Library)
+                        {
+                            appendStepLog($"IMPORT_SOURCE_FAIL\tsource={ctx.CurrentPlayableSource} (expected Library)");
+                            throw new InvalidOperationException("Transport source must be Library before main Play");
+                        }
+                        appendStepLog("IMPORT_MAIN_PLAY_INVOKED\tProves import → SetCurrentPlayable → main Play → playback starts");
+                        TogglePlayback();
+                        var audioPlayer = AppServices.GetAudioPlayerService();
+                        var deadline = DateTime.UtcNow.AddSeconds(5);
+                        while (DateTime.UtcNow < deadline)
+                        {
+                            await Task.Delay(100);
+                            if (audioPlayer.IsPlaying)
+                                proof.PlaybackStarted = true;
+                            var tempPath = audioPlayer.LastTempPlaybackPath;
+                            if (tempPath != null && File.Exists(tempPath))
+                            {
+                                var fi = new FileInfo(tempPath);
+                                if (fi.Length > 100)
+                                    proof.TempFileCreated = true;
+                            }
+                            if (proof.PlaybackStarted && proof.TempFileCreated)
+                                break;
+                        }
+
+                        if (!proof.TempFileCreated || !proof.PlaybackStarted)
+                        {
+                            appendStepLog($"IMPORT_PLAYBACK_FAIL_DETAIL\tLastPlaybackError={audioPlayer.LastPlaybackError}\tIsPlaying={audioPlayer.IsPlaying}\tLastTempPath={audioPlayer.LastTempPlaybackPath}\tstream_path={baseUrl}/api/audio/file/{uploadId}");
+                            appendStepLog("IMPORT_PLAYBACK_FAIL\tPlayback did not start within 5s");
+                            throw new InvalidOperationException("Imported-audio playback did not start within 5s");
+                        }
+
+                        var pos1 = audioPlayer.Position;
+                        await Task.Delay(500);
+                        var pos2 = audioPlayer.Position;
+                        var advancedMs = (pos2 - pos1) * 1000.0;
+                        proof.PlaybackPositionAdvancedMs = advancedMs;
+                        if (advancedMs < 250)
+                        {
+                            appendStepLog($"IMPORT_POSITION_FAIL\tadvancement={advancedMs:F0}ms (required >= 250ms)");
+                            throw new InvalidOperationException($"Imported-audio playback position did not advance (got {advancedMs:F0}ms)");
+                        }
+                        appendStepLog($"IMPORT_POSITION_PASS\tadvancement={advancedMs:F0}ms");
+                        appendStepLog("IMPORT_PLAYBACK_DONE");
+                        return;
+                    }
+                }
+
+                appendStepLog($"IMPORT_REFRESH_FAIL_DETAIL\tasset_count={vm.Assets.Count}\tsearch_upload_id={uploadId}\tassets_ids={string.Join(",", vm.Assets.Take(5).Select(a => GetPlaybackAudioId(a) ?? "null"))}");
+                appendStepLog("IMPORT_REFRESH_FAIL\tImported asset not visible in Library within 8s");
+                throw new InvalidOperationException("Imported asset did not appear in Library within 8s");
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(tempWavPath))
+                        File.Delete(tempWavPath);
+                }
+                catch (Exception ex)
+                {
+                    appendStepLog($"IMPORT_CLEANUP_WARN\t{ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Repeated import/playback cycles: import A, play; import B, play; navigate away and back; play A; refresh, play B.
+        /// Proves imported-audio playback remains reliable after repeated use and navigation.
+        /// </summary>
+        private async Task RunRepeatedLibraryImportPlaybackAsync(Action<string> appendStepLog)
+        {
+            var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? "http://localhost:8000";
+            appendStepLog("REPEATED_BACKEND_POLL_BEGIN");
+            await Task.Run(async () =>
+            {
+                var deadline = DateTime.UtcNow.AddSeconds(10);
+                while (DateTime.UtcNow < deadline)
+                {
+                    if (await BackendClient.TryCheckHealthAsync(baseUrl, 2000))
+                        return;
+                    await Task.Delay(500);
+                }
+                throw new InvalidOperationException("Backend not healthy within 10s");
+            });
+            appendStepLog("REPEATED_BACKEND_POLL_PASS");
+
+            var tempA = Path.Combine(Path.GetTempPath(), $"vs_smoke_repeat_a_{Guid.NewGuid():N}.wav");
+            var tempB = Path.Combine(Path.GetTempPath(), $"vs_smoke_repeat_b_{Guid.NewGuid():N}.wav");
+            try
+            {
+                CreateMinimalWavFile(tempA);
+                CreateMinimalWavFile(tempB);
+                var libraryClient = AppServices.GetRequiredService<ILibraryClient>();
+
+                string uploadIdA = await UploadAndGetPlaybackIdAsync(appendStepLog, libraryClient, tempA, "A");
+                string uploadIdB = await UploadAndGetPlaybackIdAsync(appendStepLog, libraryClient, tempB, "B");
+
+                appendStepLog("REPEATED_NAV_LIBRARY");
+                if (!await OpenPanelByIdAsync("Library", PanelRegion.Left))
+                    throw new InvalidOperationException("Failed to open Library");
+                await Task.Delay(300);
+
+                await PlayAssetAndAssertAsync(appendStepLog, uploadIdA, "cycle1_A");
+                await PlayAssetAndAssertAsync(appendStepLog, uploadIdB, "cycle1_B");
+
+                appendStepLog("REPEATED_NAV_AWAY");
+                if (!await OpenPanelByIdAsync("Profiles", PanelRegion.Left))
+                    throw new InvalidOperationException("Failed to open Profiles (nav away)");
+                await Task.Delay(200);
+                appendStepLog("REPEATED_NAV_BACK");
+                if (!await OpenPanelByIdAsync("Library", PanelRegion.Left))
+                    throw new InvalidOperationException("Failed to open Library (nav back)");
+                await Task.Delay(300);
+
+                await PlayAssetAndAssertAsync(appendStepLog, uploadIdA, "cycle2_A");
+
+                appendStepLog("REPEATED_REFRESH");
+                var leftHost = FindNameOnContent("LeftPanelHost") as PanelHost;
+                if (leftHost?.Content is not LibraryView libView)
+                    throw new InvalidOperationException("LibraryView not found");
+                if (libView.ViewModel.RefreshCommand.CanExecute(null))
+                    await libView.ViewModel.RefreshCommand.ExecuteAsync(null);
+                await Task.Delay(500);
+
+                await PlayAssetAndAssertAsync(appendStepLog, uploadIdB, "cycle2_B");
+                appendStepLog("REPEATED_PLAYBACK_DONE");
+            }
+            finally
+            {
+                foreach (var p in new[] { tempA, tempB })
+                {
+                    try
+                    {
+                        if (File.Exists(p))
+                            File.Delete(p);
+                    }
+                    catch (Exception ex)
+                    {
+                        appendStepLog($"REPEATED_CLEANUP_WARN\t{ex.Message}");
+                    }
+                }
+            }
+        }
+
+        private static async Task<string> UploadAndGetPlaybackIdAsync(Action<string> appendStepLog, ILibraryClient client, string path, string label)
+        {
+            var asset = await client.UploadLibraryAssetAsync(path);
+            if (asset == null)
+                throw new InvalidOperationException($"Upload {label} returned null");
+            var id = GetPlaybackAudioId(asset);
+            if (string.IsNullOrEmpty(id))
+                throw new InvalidOperationException($"Upload {label} has no playback ID");
+            appendStepLog($"REPEATED_UPLOAD_PASS\t{label}\tupload_id={id}");
+            var ev = AppServices.TryGetEventAggregator();
+            ev?.Publish(new VoiceStudio.Core.Events.AssetAddedEvent("smoke-repeated", id, "audio", path));
+            return id;
+        }
+
+        private async Task PlayAssetAndAssertAsync(Action<string> appendStepLog, string uploadId, string label)
+        {
+            var leftHost = FindNameOnContent("LeftPanelHost") as PanelHost;
+            if (leftHost?.Content is not LibraryView libView)
+                throw new InvalidOperationException("LibraryView not found");
+            var vm = libView.ViewModel;
+            if (vm.RefreshCommand.CanExecute(null))
+                await vm.RefreshCommand.ExecuteAsync(null);
+            var deadline = DateTime.UtcNow.AddSeconds(8);
+            LibraryAsset? asset = null;
+            while (DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(200);
+                asset = vm.Assets.FirstOrDefault(a => string.Equals(GetPlaybackAudioId(a), uploadId, StringComparison.Ordinal));
+                if (asset != null) break;
+            }
+            if (asset == null)
+                throw new InvalidOperationException($"Asset {label} (upload_id={uploadId}) not visible in Library within 8s");
+            if (!vm.PlayAssetCommand.CanExecute(asset))
+                throw new InvalidOperationException($"PlayAssetCommand not executable for {label}");
+            vm.PlayAssetCommand.Execute(asset);
+            var audioPlayer = AppServices.GetAudioPlayerService();
+            deadline = DateTime.UtcNow.AddSeconds(5);
+            var started = false;
+            var tempCreated = false;
+            while (DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(100);
+                if (audioPlayer.IsPlaying) started = true;
+                var tp = audioPlayer.LastTempPlaybackPath;
+                if (tp != null && File.Exists(tp) && new FileInfo(tp).Length > 100)
+                    tempCreated = true;
+                if (started && tempCreated) break;
+            }
+            if (!started || !tempCreated)
+                throw new InvalidOperationException($"Playback {label} did not start within 5s");
+            var pos1 = audioPlayer.Position;
+            await Task.Delay(500);
+            var advancedMs = (audioPlayer.Position - pos1) * 1000.0;
+            if (advancedMs < 250)
+                throw new InvalidOperationException($"Playback {label} position did not advance (got {advancedMs:F0}ms)");
+            appendStepLog($"REPEATED_PLAY_PASS\t{label}\tadvancement={advancedMs:F0}ms");
+        }
+
+        private static void CreateMinimalWavFile(string path)
+        {
+            const int sampleRate = 44100;
+            const short channels = 1;
+            const short bitsPerSample = 16;
+            const int durationSeconds = 1;
+            var numSamples = sampleRate * channels * durationSeconds;
+            var dataSize = numSamples * (bitsPerSample / 8);
+            var fileSize = 36 + dataSize;
+
+            using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+            using var bw = new System.IO.BinaryWriter(fs);
+
+            bw.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+            bw.Write(fileSize);
+            bw.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+            bw.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+            bw.Write(16);
+            bw.Write((short)1);
+            bw.Write(channels);
+            bw.Write(sampleRate);
+            bw.Write(sampleRate * channels * (bitsPerSample / 8));
+            bw.Write((short)(channels * (bitsPerSample / 8)));
+            bw.Write(bitsPerSample);
+            bw.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+            bw.Write(dataSize);
+            for (var i = 0; i < numSamples; i++)
+                bw.Write((short)0);
+        }
+
+        /// <summary>Gets backend-playable ID (prefers AudioId, else metadata.upload_id, else asset.Id). Matches LibraryViewModel contract.</summary>
+        private static string? GetPlaybackAudioId(LibraryAsset asset)
+        {
+            if (asset == null) return null;
+            if (!string.IsNullOrEmpty(asset.AudioId)) return asset.AudioId;
+            if (asset.Metadata != null && asset.Metadata.TryGetValue("upload_id", out var v))
+            {
+                var s = v as string;
+#if NET6_0_OR_GREATER
+                if (s == null && v is System.Text.Json.JsonElement je && je.ValueKind == System.Text.Json.JsonValueKind.String)
+                    s = je.GetString();
+#endif
+                if (!string.IsNullOrEmpty(s)) return s;
+            }
+            return asset.Id;
         }
 
         private static bool IsPlayableLibraryAsset(LibraryAsset asset)

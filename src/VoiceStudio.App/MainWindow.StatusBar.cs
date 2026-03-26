@@ -94,11 +94,12 @@ namespace VoiceStudio.App
             try
             {
                 // Ping backend to get latency
-                var backendClient = ServiceProvider.GetBackendClient();
-                if (backendClient != null)
+                var healthClient = ServiceProvider.GetHealthVersionClient();
+                var telemetryClient = ServiceProvider.GetTelemetryClient();
+                if (healthClient != null && telemetryClient != null)
                 {
                     var stopwatch = Stopwatch.StartNew();
-                    var isConnected = await backendClient.CheckHealthAsync();
+                    var isConnected = await healthClient.CheckHealthAsync();
                     stopwatch.Stop();
 
                     if (isConnected)
@@ -108,7 +109,7 @@ namespace VoiceStudio.App
                         // Try to get GPU/VRAM usage from backend telemetry
                         try
                         {
-                            var telemetry = await backendClient.GetTelemetryAsync();
+                            var telemetry = await telemetryClient.GetTelemetryAsync();
                             if (telemetry != null)
                             {
                                 _lastGpuPercent = (int)telemetry.VramPct;

@@ -18,11 +18,11 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class VoiceMorphingBlendingViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IVoiceMorphingBlendingClient _voiceMorphingBlendingClient;
     private readonly IProfilesClient _profilesClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
-    public string PanelId => "voice-morphing-blending";
+    public string PanelId => PanelIds.VoiceMorphingBlending;
     public string DisplayName => ResourceHelper.GetString("Panel.VoiceMorphingBlending.DisplayName", "Voice Morphing/Blending");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -91,10 +91,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? morphedAudioUrl;
 
-    public VoiceMorphingBlendingViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient)
+    public VoiceMorphingBlendingViewModel(IViewModelContext context, IVoiceMorphingBlendingClient voiceMorphingBlendingClient, IProfilesClient profilesClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _voiceMorphingBlendingClient = voiceMorphingBlendingClient ?? throw new ArgumentNullException(nameof(voiceMorphingBlendingClient));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
       // Get toast notification service (may be null if not initialized)
@@ -216,20 +216,8 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new VoicePreviewRequest
-        {
-          VoiceAId = VoiceAId,
-          VoiceBId = VoiceBId,
-          BlendRatio = BlendRatio,
-          Text = PreviewText ?? ResourceHelper.GetString("VoiceMorphingBlending.PreviewTextDefault", "Hello, this is a preview of the blended voice.")
-        };
-
-        var response = await _backendClient.SendRequestAsync<VoicePreviewRequest, VoicePreviewResponse>(
-            "/api/voice-morph/voice/preview",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var text = PreviewText ?? ResourceHelper.GetString("VoiceMorphingBlending.PreviewTextDefault", "Hello, this is a preview of the blended voice.");
+        var response = await _voiceMorphingBlendingClient.PreviewBlendAsync(VoiceAId!, VoiceBId!, BlendRatio, text, cancellationToken);
 
         if (response != null)
         {
@@ -270,21 +258,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new VoiceBlendRequest
-        {
-          VoiceAId = VoiceAId ?? "",
-          VoiceBId = VoiceBId ?? "",
-          BlendRatio = BlendRatio,
-          Text = PreviewText,
-          SaveProfile = SaveAsProfile
-        };
-
-        var response = await _backendClient.SendRequestAsync<VoiceBlendRequest, VoiceBlendResponse>(
-            "/api/voice-morph/voice/blend",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _voiceMorphingBlendingClient.BlendVoicesAsync(VoiceAId!, VoiceBId!, BlendRatio, PreviewText, SaveAsProfile, cancellationToken);
 
         if (response != null)
         {
@@ -338,22 +312,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new VoiceMorphRequest
-        {
-          SourceAudioId = SourceAudioId ?? "",
-          VoiceAId = MorphVoiceAId ?? "",
-          VoiceBId = MorphVoiceBId ?? "",
-          StartRatio = StartRatio,
-          EndRatio = EndRatio,
-          MorphSpeed = MorphSpeed
-        };
-
-        var response = await _backendClient.SendRequestAsync<VoiceMorphRequest, VoiceMorphResponse>(
-            "/api/voice-morph/voice/morph",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _voiceMorphingBlendingClient.MorphVoiceAsync(SourceAudioId!, MorphVoiceAId!, MorphVoiceBId!, StartRatio, EndRatio, MorphSpeed, cancellationToken);
 
         if (response != null)
         {
@@ -389,7 +348,8 @@ namespace VoiceStudio.App.ViewModels
       public string? Name { get; set; }
     }
 
-    private class VoicePreviewRequest
+    // Public for IVoiceMorphingBlendingClient
+    public class VoicePreviewRequest
     {
       public string? VoiceAId { get; set; }
       public string? VoiceBId { get; set; }
@@ -397,14 +357,14 @@ namespace VoiceStudio.App.ViewModels
       public string Text { get; set; } = string.Empty;
     }
 
-    private class VoicePreviewResponse
+    public class VoicePreviewResponse
     {
       public string PreviewAudioId { get; set; } = string.Empty;
       public string PreviewAudioUrl { get; set; } = string.Empty;
       public float Duration { get; set; }
     }
 
-    private class VoiceBlendRequest
+    public class VoiceBlendRequest
     {
       public string VoiceAId { get; set; } = string.Empty;
       public string VoiceBId { get; set; } = string.Empty;
@@ -413,7 +373,7 @@ namespace VoiceStudio.App.ViewModels
       public bool SaveProfile { get; set; }
     }
 
-    private class VoiceBlendResponse
+    public class VoiceBlendResponse
     {
       public string? BlendedProfileId { get; set; }
       public string? PreviewAudioId { get; set; }
@@ -421,7 +381,7 @@ namespace VoiceStudio.App.ViewModels
       public float BlendRatio { get; set; }
     }
 
-    private class VoiceMorphRequest
+    public class VoiceMorphRequest
     {
       public string SourceAudioId { get; set; } = string.Empty;
       public string VoiceAId { get; set; } = string.Empty;
@@ -431,7 +391,7 @@ namespace VoiceStudio.App.ViewModels
       public float MorphSpeed { get; set; }
     }
 
-    private class VoiceMorphResponse
+    public class VoiceMorphResponse
     {
       public string MorphedAudioId { get; set; } = string.Empty;
       public string MorphedAudioUrl { get; set; } = string.Empty;

@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Dispatching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -5,6 +6,7 @@ using Moq;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -13,7 +15,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public class LibraryViewModelTests
     {
         private IViewModelContext _context = null!;
-        private Mock<IBackendClient> _mockBackendClient = null!;
+        private Mock<ILibraryClient> _mockLibraryClient = null!;
         private Mock<IDialogService> _mockDialogService = null!;
         private DispatcherQueueController? _dispatcherController;
         private LibraryViewModel _viewModel = null!;
@@ -25,12 +27,18 @@ namespace VoiceStudio.App.Tests.ViewModels
             _dispatcherController = DispatcherQueueController.CreateOnDedicatedThread();
             var dispatcher = _dispatcherController.DispatcherQueue;
             _context = new ViewModelContext(NullLogger.Instance, dispatcher);
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockLibraryClient = new Mock<ILibraryClient>();
+            _mockLibraryClient.Setup(x => x.GetLibraryFoldersAsync(It.IsAny<string?>(), It.IsAny<System.Threading.CancellationToken>()))
+                .ReturnsAsync(new LibraryFoldersResponse { Folders = Array.Empty<LibraryFolder>() });
+            _mockLibraryClient.Setup(x => x.SearchAssetsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<System.Threading.CancellationToken>()))
+                .ReturnsAsync(new AssetSearchResponse { Assets = Array.Empty<LibraryAsset>(), Total = 0 });
+            _mockLibraryClient.Setup(x => x.GetAssetTypesAsync(It.IsAny<System.Threading.CancellationToken>()))
+                .ReturnsAsync(new AssetTypesResponse { Types = Array.Empty<AssetTypeInfo>() });
             _mockDialogService = new Mock<IDialogService>();
             _mockDialogService.Setup(d => d.ShowConfirmationAsync(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
                 .ReturnsAsync(true);
-            _viewModel = new LibraryViewModel(_context, _mockBackendClient.Object, _mockDialogService.Object);
+            _viewModel = new LibraryViewModel(_context, _mockLibraryClient.Object, _mockDialogService.Object);
         }
 
         [TestCleanup]
@@ -43,7 +51,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_InitializesWithDefaultValues()
         {
             Assert.IsNotNull(_viewModel);
-            Assert.AreEqual("library", _viewModel.PanelId);
+            Assert.AreEqual(PanelIds.Library, _viewModel.PanelId);
             Assert.AreEqual("Library", _viewModel.DisplayName);
         }
 

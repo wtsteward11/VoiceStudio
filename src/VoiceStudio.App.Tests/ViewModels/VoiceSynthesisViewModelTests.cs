@@ -35,6 +35,10 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockBackendClient = new Mock<IBackendClient>();
       _mockVoiceSynthesisService = new Mock<IVoiceSynthesisService>();
       _mockEnginesClient = new Mock<IEnginesClient>();
+      _mockQualityPipelineService = new Mock<IQualityPipelineService>();
+      _mockEnsembleService = new Mock<IEnsembleService>();
+      _mockTextAnalysisService = new Mock<ITextAnalysisService>();
+      _mockQualityHistoryService = new Mock<IQualityHistoryService>();
       _mockProfilesClient = new Mock<IProfilesClient>();
       _mockAudioPlayer = new Mock<IAudioPlayerService>();
 
@@ -103,7 +107,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestMethod]
     public void PanelId_ReturnsCorrectValue()
     {
-      Assert.AreEqual("voice_synthesis", _sut.PanelId);
+      Assert.AreEqual(VoiceStudio.Core.Panels.PanelIds.VoiceSynthesis, _sut.PanelId);
     }
 
     [TestMethod]

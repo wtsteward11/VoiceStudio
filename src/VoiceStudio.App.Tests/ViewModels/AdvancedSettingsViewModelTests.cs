@@ -48,7 +48,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
             // Assert
             Assert.IsNotNull(viewModel);
-            Assert.AreEqual("advanced-settings", viewModel.PanelId);
+            Assert.AreEqual(VoiceStudio.Core.Panels.PanelIds.AdvancedSettings, viewModel.PanelId);
         }
 
         [TestMethod]
@@ -266,7 +266,7 @@ namespace VoiceStudio.App.Tests.ViewModels
             var viewModel = CreateViewModel();
 
             // Assert
-            Assert.AreEqual("advanced-settings", viewModel.PanelId);
+            Assert.AreEqual(VoiceStudio.Core.Panels.PanelIds.AdvancedSettings, viewModel.PanelId);
         }
 
         [TestMethod]

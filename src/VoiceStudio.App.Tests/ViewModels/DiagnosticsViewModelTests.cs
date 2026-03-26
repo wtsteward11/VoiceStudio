@@ -9,6 +9,7 @@ using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Views.Panels;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -21,7 +22,7 @@ namespace VoiceStudio.App.Tests.ViewModels
   public class DiagnosticsViewModelTests
   {
     private IViewModelContext _context = null!;
-    private Mock<IBackendClient> _mockBackendClient = null!;
+    private Mock<IDiagnosticsClient> _mockDiagnosticsClient = null!;
     private DispatcherQueueController? _dispatcherController;
     private DiagnosticsViewModel _sut = null!;
 
@@ -32,9 +33,11 @@ namespace VoiceStudio.App.Tests.ViewModels
       _dispatcherController = DispatcherQueueController.CreateOnDedicatedThread();
       var dispatcher = _dispatcherController.DispatcherQueue;
       _context = new ViewModelContext(NullLogger.Instance, dispatcher);
-      _mockBackendClient = new Mock<IBackendClient>();
+      _mockDiagnosticsClient = new Mock<IDiagnosticsClient>();
+      _mockDiagnosticsClient.Setup(c => c.IsConnected).Returns(true);
+      _mockDiagnosticsClient.Setup(c => c.GetConnectionStatus()).Returns("Connected");
 
-      _sut = new DiagnosticsViewModel(_context, _mockBackendClient.Object);
+      _sut = new DiagnosticsViewModel(_context, _mockDiagnosticsClient.Object);
     }
 
     [TestCleanup]
@@ -49,7 +52,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestMethod]
     public void PanelId_ReturnsDiagnostics()
     {
-      Assert.AreEqual("diagnostics", _sut.PanelId);
+      Assert.AreEqual(PanelIds.Diagnostics, _sut.PanelId);
     }
 
     [TestMethod]
@@ -71,7 +74,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+    public void Constructor_WithNullDiagnosticsClient_ThrowsArgumentNullException()
     {
       _ = new DiagnosticsViewModel(_context, null!);
     }

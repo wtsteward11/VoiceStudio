@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml.Controls;
+using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -27,13 +28,16 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IErrorPresentationService? _errorService;
     private readonly IErrorLoggingService? _logService;
     private MultiSelectState? _multiSelectState;
+    private IEventAggregator? _eventAggregator;
+    private IContextManager? _contextManager;
+    private ISubscriptionToken? _projectChangedToken;
     private CancellationTokenSource? _pollingCts;
     private CancellationTokenSource? _disposalCts;
     private CancellationTokenSource? _selectionLoadCts;
     private bool _isPolling;
     private bool _disposed;
 
-    public string PanelId => "effectsmixer";
+    public string PanelId => PanelIds.EffectsMixer;
     public string DisplayName => ResourceHelper.GetString("Panel.EffectsMixer.DisplayName", "Effects & Mixer");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -170,6 +174,10 @@ namespace VoiceStudio.App.Views.Panels
       // Get error services
       _errorService = ServiceProvider.TryGetErrorPresentationService();
       _logService = ServiceProvider.TryGetErrorLoggingService();
+
+      // Pass 02: Resolve context/event services for project sync
+      _eventAggregator = AppServices.TryGetEventAggregator();
+      _contextManager = AppServices.TryGetContextManager();
 
       // Multi-select commands
       SelectAllChannelsCommand = new RelayCommand(SelectAllChannels, () => Channels?.Count > 0);
@@ -422,6 +430,22 @@ namespace VoiceStudio.App.Views.Panels
         var ct = _selectionLoadCts.Token;
         _ = LoadProjectSelectionDataAsync(projectId, ct);
       }
+      else
+      {
+        // Pass 02 C6: Clear stale state on project switch
+        CancelSelectionLoad();
+        EffectChains.Clear();
+        MixerPresets.Clear();
+        SelectedMixerPreset = null;
+        SelectedEffectChain = null;
+        SelectedEffect = null;
+        EffectPresets.Clear();
+        Sends.Clear();
+        Returns.Clear();
+        SubGroups.Clear();
+        MixerState = null;
+        Master = new MixerMaster();
+      }
     }
 
     partial void OnIsLoadingChanged(bool value)
@@ -521,6 +545,7 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         _logService?.LogError(ex, "LoadProjectSelectionData");
+        _toastNotificationService?.ShowToast(ToastType.Error, "Effects/Mixer sync failed", ex.Message);
       }
     }
 
@@ -542,7 +567,30 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    Task IPanelLifecycle.OnActivatedAsync(CancellationToken ct) => Task.CompletedTask;
+    async Task IPanelLifecycle.OnActivatedAsync(CancellationToken ct)
+    {
+      // Pass 02 C4: Sync SelectedProjectId from context when panel activates
+      if (_contextManager != null)
+      {
+        var activeId = _contextManager.ActiveProjectId;
+        if (SelectedProjectId != activeId)
+          SelectedProjectId = activeId;
+      }
+
+      // Pass 02 C2: Subscribe to ProjectChangedEvent for project switch propagation
+      if (_eventAggregator != null && _projectChangedToken == null)
+      {
+        _projectChangedToken = _eventAggregator.Subscribe<ProjectChangedEvent>(OnProjectChanged);
+      }
+
+      await Task.CompletedTask;
+    }
+
+    private void OnProjectChanged(ProjectChangedEvent e)
+    {
+      if (_disposed) return;
+      SelectedProjectId = e.ProjectId;
+    }
 
     async Task IPanelLifecycle.RefreshAsync(CancellationToken ct)
     {
@@ -571,6 +619,12 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (_disposed) return;
       _disposed = true;
+      if (_projectChangedToken != null)
+      {
+        _eventAggregator?.Unsubscribe(_projectChangedToken);
+        _projectChangedToken.Dispose();
+        _projectChangedToken = null;
+      }
       StopPolling();
       CancelSelectionLoad();
       _disposalCts?.Cancel();

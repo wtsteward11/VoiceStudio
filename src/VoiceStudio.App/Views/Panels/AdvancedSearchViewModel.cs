@@ -19,7 +19,7 @@ namespace VoiceStudio.App.Views.Panels
   /// </summary>
   public partial class AdvancedSearchViewModel : ObservableObject
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ISearchClient _searchClient;
 
     [ObservableProperty]
     private string searchQuery = string.Empty;
@@ -43,9 +43,9 @@ namespace VoiceStudio.App.Views.Panels
     public bool HasResults => SearchResults.Count > 0;
     public int ResultsCount => SearchResults.Count;
 
-    public AdvancedSearchViewModel(IBackendClient backendClient)
+    public AdvancedSearchViewModel(ISearchClient searchClient)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _searchClient = searchClient ?? throw new ArgumentNullException(nameof(searchClient));
       ExportResultsCommand = new RelayCommand(ExportResults, () => HasResults);
       ClearSearchCommand = new RelayCommand(ClearSearch, () => !string.IsNullOrWhiteSpace(SearchQuery) || HasResults);
 
@@ -191,7 +191,7 @@ namespace VoiceStudio.App.Views.Panels
       try
       {
         // Call backend search API with natural language support
-        var searchResponse = await _backendClient.SearchAsync(query, types: null, limit: 50);
+        var searchResponse = await _searchClient.SearchAsync(query, types: null, limit: 50);
 
         // Parse natural language query for UI filters
         var parsedQuery = ParseNaturalLanguageQuery(query);

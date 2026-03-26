@@ -32,7 +32,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var jsonString = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -85,7 +85,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<VoiceProfile>(_jsonOptions, cancellationToken)
@@ -114,7 +114,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<VoiceProfile>(_jsonOptions, cancellationToken)
@@ -148,7 +148,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<VoiceProfile>(_jsonOptions, cancellationToken)

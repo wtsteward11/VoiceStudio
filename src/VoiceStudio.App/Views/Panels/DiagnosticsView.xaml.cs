@@ -35,7 +35,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       // Wire DataContext with BackendClient from service provider
-      ViewModel = new DiagnosticsViewModel(AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(), ServiceProvider.GetBackendClient());
+      ViewModel = new DiagnosticsViewModel(AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(), AppServices.GetRequiredService<VoiceStudio.Core.Services.IDiagnosticsClient>());
       this.DataContext = ViewModel;
 
       // Initialize services
@@ -656,8 +656,8 @@ namespace VoiceStudio.App.Views.Panels
     {
       try
       {
-        var backendClient = ServiceProvider.GetBackendClient();
-        var isConnected = await backendClient.CheckHealthAsync();
+        var healthClient = ServiceProvider.GetHealthVersionClient();
+        var isConnected = await healthClient.CheckHealthAsync();
         
         if (isConnected)
           _toastService?.ShowToast(ToastType.Success, "Connection OK", "Backend connection successful");
@@ -675,9 +675,9 @@ namespace VoiceStudio.App.Views.Panels
     {
       try
       {
-        var backendClient = ServiceProvider.GetBackendClient();
+        var healthClient = ServiceProvider.GetHealthVersionClient();
         // Attempt reconnection by checking health - this will establish connection if needed
-        var isConnected = await backendClient.CheckHealthAsync();
+        var isConnected = await healthClient.CheckHealthAsync();
         if (isConnected)
           _toastService?.ShowToast(ToastType.Success, "Reconnected", "Backend connection re-established");
         else

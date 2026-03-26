@@ -1,6 +1,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Collections.ObjectModel;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.Core.Models;
 
 namespace VoiceStudio.App.Tests.ViewModels
 {
@@ -98,16 +99,16 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void MorphConfigItem_WithTargetVoices_VoiceCountDisplay_ShowsCorrectCount()
         {
             // Arrange - Create using MorphConfig inner class
-            var config = new VoiceMorphViewModel.MorphConfig
+            var config = new VoiceMorphConfig
             {
                 ConfigId = "config-001",
                 Name = "Test Config",
                 SourceAudioId = "audio-001",
-                TargetVoices = new VoiceMorphViewModel.VoiceBlend[]
+                TargetVoices = new VoiceMorphBlend[]
                 {
-                    new VoiceMorphViewModel.VoiceBlend { VoiceProfileId = "voice-1", Weight = 0.5 },
-                    new VoiceMorphViewModel.VoiceBlend { VoiceProfileId = "voice-2", Weight = 0.3 },
-                    new VoiceMorphViewModel.VoiceBlend { VoiceProfileId = "voice-3", Weight = 0.2 }
+                    new VoiceMorphBlend { VoiceProfileId = "voice-1", Weight = 0.5 },
+                    new VoiceMorphBlend { VoiceProfileId = "voice-2", Weight = 0.3 },
+                    new VoiceMorphBlend { VoiceProfileId = "voice-3", Weight = 0.2 }
                 },
                 MorphStrength = 0.8,
                 PreserveEmotion = true,
@@ -126,12 +127,12 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void MorphConfigItem_MorphStrengthDisplay_FormatsAsPercentage()
         {
             // Arrange
-            var config = new VoiceMorphViewModel.MorphConfig
+            var config = new VoiceMorphConfig
             {
                 ConfigId = "config-002",
                 Name = "Strength Test",
                 SourceAudioId = "audio-002",
-                TargetVoices = System.Array.Empty<VoiceMorphViewModel.VoiceBlend>(),
+                TargetVoices = System.Array.Empty<VoiceMorphBlend>(),
                 MorphStrength = 0.65,
                 OutputFormat = "wav"
             };
@@ -147,14 +148,14 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void MorphConfigItem_CopiesAllProperties()
         {
             // Arrange
-            var config = new VoiceMorphViewModel.MorphConfig
+            var config = new VoiceMorphConfig
             {
                 ConfigId = "config-003",
                 Name = "Full Config",
                 SourceAudioId = "audio-003",
-                TargetVoices = new VoiceMorphViewModel.VoiceBlend[]
+                TargetVoices = new VoiceMorphBlend[]
                 {
-                    new VoiceMorphViewModel.VoiceBlend { VoiceProfileId = "voice-a", Weight = 0.6 }
+                    new VoiceMorphBlend { VoiceProfileId = "voice-a", Weight = 0.6 }
                 },
                 MorphStrength = 0.9,
                 PreserveEmotion = true,
@@ -180,15 +181,15 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void MorphConfigItem_TargetVoices_AreConvertedToVoiceBlendItems()
         {
             // Arrange
-            var config = new VoiceMorphViewModel.MorphConfig
+            var config = new VoiceMorphConfig
             {
                 ConfigId = "config-004",
                 Name = "Voice Blend Test",
                 SourceAudioId = "audio-004",
-                TargetVoices = new VoiceMorphViewModel.VoiceBlend[]
+                TargetVoices = new VoiceMorphBlend[]
                 {
-                    new VoiceMorphViewModel.VoiceBlend { VoiceProfileId = "voice-x", Weight = 0.4 },
-                    new VoiceMorphViewModel.VoiceBlend { VoiceProfileId = "voice-y", Weight = 0.6 }
+                    new VoiceMorphBlend { VoiceProfileId = "voice-x", Weight = 0.4 },
+                    new VoiceMorphBlend { VoiceProfileId = "voice-y", Weight = 0.6 }
                 },
                 MorphStrength = 0.5,
                 OutputFormat = "wav"
@@ -207,13 +208,13 @@ namespace VoiceStudio.App.Tests.ViewModels
 
         #endregion
 
-        #region VoiceMorphViewModel.VoiceBlend Inner Class Tests
+        #region VoiceMorphBlend Inner Class Tests
 
         [TestMethod]
         public void VoiceBlend_DefaultValues_AreEmpty()
         {
             // Arrange & Act
-            var blend = new VoiceMorphViewModel.VoiceBlend();
+            var blend = new VoiceMorphBlend();
 
             // Assert
             Assert.AreEqual(string.Empty, blend.VoiceProfileId);
@@ -224,7 +225,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void VoiceBlend_SetProperties_PersistsValues()
         {
             // Arrange & Act
-            var blend = new VoiceMorphViewModel.VoiceBlend
+            var blend = new VoiceMorphBlend
             {
                 VoiceProfileId = "profile-123",
                 Weight = 0.85
@@ -237,13 +238,13 @@ namespace VoiceStudio.App.Tests.ViewModels
 
         #endregion
 
-        #region VoiceMorphViewModel.MorphConfig Inner Class Tests
+        #region VoiceMorphConfig Inner Class Tests
 
         [TestMethod]
         public void MorphConfig_DefaultValues_AreEmpty()
         {
             // Arrange & Act
-            var config = new VoiceMorphViewModel.MorphConfig();
+            var config = new VoiceMorphConfig();
 
             // Assert
             Assert.AreEqual(string.Empty, config.ConfigId);
@@ -261,14 +262,14 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void MorphConfig_SetAllProperties_PersistsValues()
         {
             // Arrange & Act
-            var config = new VoiceMorphViewModel.MorphConfig
+            var config = new VoiceMorphConfig
             {
                 ConfigId = "cfg-001",
                 Name = "My Morph Config",
                 SourceAudioId = "src-audio",
-                TargetVoices = new VoiceMorphViewModel.VoiceBlend[]
+                TargetVoices = new VoiceMorphBlend[]
                 {
-                    new VoiceMorphViewModel.VoiceBlend { VoiceProfileId = "v1", Weight = 1.0 }
+                    new VoiceMorphBlend { VoiceProfileId = "v1", Weight = 1.0 }
                 },
                 MorphStrength = 0.75,
                 PreserveEmotion = true,
@@ -315,12 +316,12 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void MorphConfigItem_EmptyTargetVoices_VoiceCountDisplay_ShowsZero()
         {
             // Arrange
-            var config = new VoiceMorphViewModel.MorphConfig
+            var config = new VoiceMorphConfig
             {
                 ConfigId = "empty-config",
                 Name = "Empty",
                 SourceAudioId = "audio",
-                TargetVoices = System.Array.Empty<VoiceMorphViewModel.VoiceBlend>(),
+                TargetVoices = System.Array.Empty<VoiceMorphBlend>(),
                 OutputFormat = "wav"
             };
 
@@ -335,14 +336,14 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void MorphConfigItem_SingleTargetVoice_VoiceCountDisplay_ShowsOne()
         {
             // Arrange
-            var config = new VoiceMorphViewModel.MorphConfig
+            var config = new VoiceMorphConfig
             {
                 ConfigId = "single-config",
                 Name = "Single",
                 SourceAudioId = "audio",
-                TargetVoices = new VoiceMorphViewModel.VoiceBlend[]
+                TargetVoices = new VoiceMorphBlend[]
                 {
-                    new VoiceMorphViewModel.VoiceBlend { VoiceProfileId = "solo", Weight = 1.0 }
+                    new VoiceMorphBlend { VoiceProfileId = "solo", Weight = 1.0 }
                 },
                 OutputFormat = "wav"
             };
@@ -358,12 +359,12 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void MorphConfigItem_MorphStrengthAt0_DisplaysZeroPercent()
         {
             // Arrange
-            var config = new VoiceMorphViewModel.MorphConfig
+            var config = new VoiceMorphConfig
             {
                 ConfigId = "zero-strength",
                 Name = "Zero",
                 SourceAudioId = "audio",
-                TargetVoices = System.Array.Empty<VoiceMorphViewModel.VoiceBlend>(),
+                TargetVoices = System.Array.Empty<VoiceMorphBlend>(),
                 MorphStrength = 0.0,
                 OutputFormat = "wav"
             };
@@ -379,12 +380,12 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void MorphConfigItem_MorphStrengthAt1_Displays100Percent()
         {
             // Arrange
-            var config = new VoiceMorphViewModel.MorphConfig
+            var config = new VoiceMorphConfig
             {
                 ConfigId = "full-strength",
                 Name = "Full",
                 SourceAudioId = "audio",
-                TargetVoices = System.Array.Empty<VoiceMorphViewModel.VoiceBlend>(),
+                TargetVoices = System.Array.Empty<VoiceMorphBlend>(),
                 MorphStrength = 1.0,
                 OutputFormat = "wav"
             };

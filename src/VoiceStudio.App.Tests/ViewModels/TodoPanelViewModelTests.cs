@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -17,18 +18,18 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class TodoPanelViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<ITodoPanelClient>? _mockTodoPanelClient;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockTodoPanelClient = new Mock<ITodoPanelClient>();
         }
 
         private TodoPanelViewModel CreateViewModel()
         {
-            return new TodoPanelViewModel(MockContext!, _mockBackendClient!.Object);
+            return new TodoPanelViewModel(MockContext!, _mockTodoPanelClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -41,7 +42,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
             // Assert
             Assert.IsNotNull(viewModel);
-            Assert.AreEqual("todo-panel", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.TodoPanel, viewModel.PanelId);
             Assert.IsNotNull(viewModel.Todos);
         }
 
@@ -50,11 +51,11 @@ namespace VoiceStudio.App.Tests.ViewModels
         {
             // Arrange & Act & Assert
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new TodoPanelViewModel(null!, _mockBackendClient!.Object));
+                new TodoPanelViewModel(null!, _mockTodoPanelClient!.Object));
         }
 
         [TestMethod]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullTodoPanelClient_ThrowsArgumentNullException()
         {
             // Arrange & Act & Assert
             Assert.ThrowsException<ArgumentNullException>(() =>
@@ -274,7 +275,7 @@ namespace VoiceStudio.App.Tests.ViewModels
             var viewModel = CreateViewModel();
 
             // Assert
-            Assert.AreEqual("todo-panel", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.TodoPanel, viewModel.PanelId);
         }
 
         [TestMethod]

@@ -17,6 +17,16 @@ namespace VoiceStudio.Core.Models
     public Dictionary<string, object>? Prosody { get; set; }
     public List<string>? Phonemes { get; set; }
     public string? Notes { get; set; }
+    /// <summary>Audio ID from latest segment generation. Persisted with script.</summary>
+    public string? GeneratedAudioId { get; set; }
+    /// <summary>ISO timestamp of latest generation.</summary>
+    public string? GeneratedAt { get; set; }
+    /// <summary>Profile ID used for generation.</summary>
+    public string? GenerationProfileId { get; set; }
+    /// <summary>Engine ID used for generation.</summary>
+    public string? GenerationEngineId { get; set; }
+    /// <summary>Generation status (e.g. "success", "failed").</summary>
+    public string? GenerationStatus { get; set; }
   }
 
   /// <summary>

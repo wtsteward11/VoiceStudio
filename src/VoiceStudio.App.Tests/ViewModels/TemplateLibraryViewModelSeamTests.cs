@@ -65,7 +65,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     {
       var vm = new TemplateLibraryViewModel(_context, _mockClient.Object);
       Assert.IsNotNull(vm);
-      Assert.AreEqual("template_library", vm.PanelId);
+      Assert.AreEqual(PanelIds.TemplateLibrary, vm.PanelId);
       Assert.IsNotNull(vm.LoadTemplatesCommand);
       Assert.IsNotNull(vm.CreateTemplateCommand);
       Assert.IsNotNull(vm.RefreshCommand);

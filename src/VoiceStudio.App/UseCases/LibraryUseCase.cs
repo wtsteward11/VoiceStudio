@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using VoiceStudio.Core.Services;
 using VoiceStudio.App.Logging;
+using VoiceStudio.App.Services;
+using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.UseCases
 {
@@ -15,10 +16,20 @@ namespace VoiceStudio.App.UseCases
   public class LibraryUseCase : ILibraryUseCase
   {
     private readonly IBackendClient _backendClient;
+    private readonly IContextManager _contextManager;
+    private readonly IProjectAudioClient _projectAudioClient;
+    private readonly IErrorLoggingService? _logService;
 
-    public LibraryUseCase(IBackendClient backendClient)
+    public LibraryUseCase(
+      IBackendClient backendClient,
+      IContextManager contextManager,
+      IProjectAudioClient projectAudioClient,
+      IErrorLoggingService? logService = null)
     {
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _contextManager = contextManager ?? throw new ArgumentNullException(nameof(contextManager));
+      _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
+      _logService = logService;
     }
 
     public async Task<IReadOnlyList<LibraryFolder>> ListFoldersAsync(CancellationToken cancellationToken = default)
@@ -109,7 +120,21 @@ namespace VoiceStudio.App.UseCases
       var response = await _backendClient.PostAsync<ImportFilesRequest, ImportFilesResponse>(
           "/api/library/import", request, cancellationToken);
 
-      return response?.ImportedItems ?? new List<LibraryItem>();
+      var imported = response?.ImportedItems ?? new List<LibraryItem>();
+      if (imported.Count > 0)
+      {
+        await ImportToProjectPersistence
+          .TrySaveAfterBatchLibraryImportAsync(
+            _projectAudioClient,
+            _logService,
+            _contextManager.ActiveProjectId,
+            paths,
+            imported,
+            cancellationToken)
+          .ConfigureAwait(false);
+      }
+
+      return imported;
     }
 
     public async Task<IReadOnlyList<LibraryItem>> SearchAsync(

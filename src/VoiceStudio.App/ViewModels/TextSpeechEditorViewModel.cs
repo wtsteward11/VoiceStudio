@@ -11,22 +11,23 @@ using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.Utilities;
-using EditorSessionModel = VoiceStudio.App.ViewModels.TextSpeechEditorViewModel.EditorSession;
+using EditorSessionModel = VoiceStudio.App.Services.EditorSession;
+using TextSegmentModel = VoiceStudio.App.Services.TextSegment;
 
 namespace VoiceStudio.App.ViewModels
 {
   /// <summary>
   /// ViewModel for the TextSpeechEditorView panel - Text-based speech editing.
   /// </summary>
-  public partial class TextSpeechEditorViewModel : BaseViewModel, IPanelView
+  public partial class TextSpeechEditorViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ITextSpeechEditorClient _textSpeechEditorClient;
     private readonly IProjectsClient _projectsClient;
     private readonly IProfilesClient _profilesClient;
     private readonly IAudioPlayerService _audioPlayer;
     private readonly UndoRedoService? _undoRedoService;
 
-    public string PanelId => "text-speech-editor";
+    public string PanelId => PanelIds.TextSpeechEditor;
     public string DisplayName => ResourceHelper.GetString("Panel.TextSpeechEditor.DisplayName", "Text Speech Editor");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -75,10 +76,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? previewAudioUrl;
 
-    public TextSpeechEditorViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient, IProfilesClient profilesClient, IAudioPlayerService audioPlayer)
+    public TextSpeechEditorViewModel(IViewModelContext context, ITextSpeechEditorClient textSpeechEditorClient, IProjectsClient projectsClient, IProfilesClient profilesClient, IAudioPlayerService audioPlayer)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _textSpeechEditorClient = textSpeechEditorClient ?? throw new ArgumentNullException(nameof(textSpeechEditorClient));
       _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
@@ -142,13 +143,10 @@ namespace VoiceStudio.App.ViewModels
         if (e.PropertyName is nameof(PreviewAudioId) or nameof(PreviewAudioUrl) or nameof(IsLoading))
           PlayCommand.NotifyCanExecuteChanged();
       };
-
-      // Load initial data
-      _ = LoadSessionsAsync(CancellationToken.None);
-      _ = LoadAvailableProjectsAsync(CancellationToken.None);
-      _ = LoadAvailableVoiceProfilesAsync(CancellationToken.None);
-      _ = LoadAvailableEnginesAsync(CancellationToken.None);
     }
+
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => RefreshAsync(cancellationToken);
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public IAsyncRelayCommand LoadSessionsCommand { get; }
     public IAsyncRelayCommand CreateSessionCommand { get; }
@@ -184,12 +182,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var sessions = await _backendClient.SendRequestAsync<object, EditorSession[]>(
-            "/api/edit/sessions",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var sessions = await _textSpeechEditorClient.GetSessionsAsync(cancellationToken);
 
         if (sessions != null)
         {
@@ -235,11 +228,7 @@ namespace VoiceStudio.App.ViewModels
           language = "en"
         };
 
-        var session = await _backendClient.SendRequestAsync<object, EditorSession>(
-            "/api/edit/sessions",
-            request,
-            cancellationToken
-        );
+        var session = await _textSpeechEditorClient.CreateSessionAsync(request, cancellationToken);
 
         if (session != null)
         {
@@ -254,7 +243,7 @@ namespace VoiceStudio.App.ViewModels
           {
             var action = new CreateTextSpeechSessionAction(
                 Sessions,
-                _backendClient,
+                _textSpeechEditorClient,
                 sessionItem,
                 onUndo: (s) =>
                 {
@@ -312,12 +301,7 @@ namespace VoiceStudio.App.ViewModels
           }).ToArray()
         };
 
-        var session = await _backendClient.SendRequestAsync<object, EditorSession>(
-            $"/api/edit/sessions/{Uri.EscapeDataString(SelectedSession.SessionId)}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var session = await _textSpeechEditorClient.UpdateSessionAsync(SelectedSession.SessionId, request, cancellationToken);
 
         if (session != null)
         {
@@ -356,12 +340,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/edit/sessions/{Uri.EscapeDataString(SelectedSession.SessionId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _textSpeechEditorClient.DeleteSessionAsync(SelectedSession.SessionId, cancellationToken);
 
         var sessionToDelete = SelectedSession;
         var originalIndex = Sessions.IndexOf(sessionToDelete);
@@ -375,7 +354,7 @@ namespace VoiceStudio.App.ViewModels
         {
           var action = new DeleteTextSpeechSessionAction(
               Sessions,
-              _backendClient,
+              _textSpeechEditorClient,
               sessionToDelete,
               originalIndex,
               onUndo: (s) =>
@@ -521,11 +500,7 @@ namespace VoiceStudio.App.ViewModels
           output_format = "wav"
         };
 
-        var response = await _backendClient.SendRequestAsync<object, SynthesisResponse>(
-            $"/api/edit/sessions/{Uri.EscapeDataString(SelectedSession.SessionId)}/synthesize",
-            request,
-            cancellationToken
-        );
+        var response = await _textSpeechEditorClient.SynthesizeSessionAsync(SelectedSession.SessionId, request, cancellationToken);
 
         if (response != null)
         {
@@ -567,12 +542,7 @@ namespace VoiceStudio.App.ViewModels
           engine = SelectedEngine ?? "xtts"
         };
 
-        var response = await _backendClient.SendRequestAsync<object, SSMLPreviewResponse>(
-            "/api/ssml/preview",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _textSpeechEditorClient.PreviewSynthesisAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -632,7 +602,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
       await LoadSessionsAsync(cancellationToken);
       await LoadAvailableProjectsAsync(cancellationToken);
@@ -690,7 +660,7 @@ namespace VoiceStudio.App.ViewModels
       try
       {
         // Use the new GetEnginesAsync method for direct engine discovery
-        var engines = await _backendClient.GetEnginesAsync(cancellationToken);
+        var engines = await _textSpeechEditorClient.GetEnginesAsync(cancellationToken);
         AvailableEngines.Clear();
         foreach (var engine in engines)
         {
@@ -708,44 +678,6 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Response models
-    public class EditorSession
-    {
-      public string SessionId { get; set; } = string.Empty;
-      public string? ProjectId { get; set; }
-      public string Title { get; set; } = string.Empty;
-      public TextSegment[] Segments { get; set; } = Array.Empty<TextSegment>();
-      public string? AudioId { get; set; }
-      public string Language { get; set; } = "en";
-      public string Created { get; set; } = string.Empty;
-      public string Modified { get; set; } = string.Empty;
-    }
-
-    public class TextSegment
-    {
-      public string Id { get; set; } = string.Empty;
-      public string Text { get; set; } = string.Empty;
-      public double StartTime { get; set; }
-      public double EndTime { get; set; }
-      public string? Speaker { get; set; }
-      public Dictionary<string, object>? Prosody { get; set; }
-      public string[]? Phonemes { get; set; }
-      public string? Notes { get; set; }
-    }
-
-    private class SynthesisResponse
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public double Duration { get; set; }
-      public string Message { get; set; } = string.Empty;
-    }
-
-    private class SSMLPreviewResponse
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public double Duration { get; set; }
-      public string Message { get; set; } = string.Empty;
-    }
   }
 
   // Data models
@@ -790,7 +722,7 @@ namespace VoiceStudio.App.ViewModels
     public string TimeRangeDisplay => $"{StartTime:F2}s - {EndTime:F2}s";
     public string DurationDisplay => $"{EndTime - StartTime:F2}s";
 
-    public TextSegmentItem(TextSpeechEditorViewModel.TextSegment segment)
+    public TextSegmentItem(TextSegmentModel segment)
     {
       Id = segment.Id;
       Text = segment.Text;

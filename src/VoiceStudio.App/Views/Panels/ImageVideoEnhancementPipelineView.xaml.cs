@@ -2,7 +2,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Views.Panels;
-using VoiceStudio.Core.Services;
 using System.Runtime.InteropServices.WindowsRuntime;
 
 namespace VoiceStudio.App.Views.Panels
@@ -19,7 +18,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       ViewModel = new ImageVideoEnhancementPipelineViewModel(
-          ServiceProvider.GetBackendClient()
+          ServiceProvider.GetImageVideoEnhancementPipelineClient()
       );
       this.DataContext = ViewModel;
 

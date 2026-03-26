@@ -10,6 +10,7 @@ using VoiceStudio.App.Services.Gateways;
 using VoiceStudio.App.UseCases;
 using VoiceStudio.Core.Exceptions;
 using VoiceStudio.Core.Gateways;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 namespace VoiceStudio.App.Tests.Services
 {
@@ -663,6 +664,534 @@ namespace VoiceStudio.App.Tests.Services
     }
 
     /// <summary>
+    /// Verifies MacroClient.GetMacrosAsync resolves /api/macros (PR-9 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task GetMacrosAsync_ResolvesCorrectPath()
+    {
+      string? capturedPath = null;
+      string? capturedQuery = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedPath = req.RequestUri?.AbsolutePath;
+        capturedQuery = req.RequestUri?.Query;
+        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedPath != null && capturedPath.Contains("/api/macros", StringComparison.Ordinal))
+          return JsonOk("[]");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var macroClient = CreateMacroClient(handler);
+      var result = await macroClient.GetMacrosAsync(projectId: "proj-1", CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsNotNull(capturedPath);
+      Assert.IsTrue(capturedPath.Contains("/api/macros", StringComparison.Ordinal), $"Expected path to contain /api/macros, got: {capturedPath}");
+      Assert.IsTrue(capturedQuery != null && capturedQuery.Contains("project_id=", StringComparison.Ordinal), "Query should include project_id= param");
+    }
+
+    /// <summary>
+    /// Verifies EffectChainClient.GetEffectChainsAsync resolves /api/effects/chains/{projectId} (PR-11 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task GetEffectChainsAsync_ResolvesCorrectPath()
+    {
+      string? capturedPath = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedPath = req.RequestUri?.AbsolutePath;
+        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedPath != null && capturedPath.Contains("/api/effects/chains", StringComparison.Ordinal))
+          return JsonOk("[]");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var effectChainClient = CreateEffectChainClient(handler);
+      var result = await effectChainClient.GetEffectChainsAsync(projectId: "proj-effect-1", CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsNotNull(capturedPath);
+      Assert.IsTrue(capturedPath.Contains("/api/effects/chains", StringComparison.Ordinal), $"Expected path to contain /api/effects/chains, got: {capturedPath}");
+      Assert.IsTrue(capturedPath.Contains("proj-effect-1", StringComparison.Ordinal), $"Expected path to contain projectId, got: {capturedPath}");
+    }
+
+    /// <summary>
+    /// Verifies BackupRestoreClient.GetBackupsAsync resolves /api/backup (PR-14 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task GetBackupsAsync_ResolvesCorrectPath()
+    {
+      string? capturedPath = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedPath = req.RequestUri?.AbsolutePath;
+        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedPath != null && capturedPath.Contains("/api/backup", StringComparison.Ordinal) && !capturedPath.Contains("/download", StringComparison.Ordinal))
+          return JsonOk("[]");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var backupClient = CreateBackupRestoreClient(handler);
+      var result = await backupClient.GetBackupsAsync(CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsNotNull(capturedPath);
+      Assert.IsTrue(capturedPath.Contains("/api/backup", StringComparison.Ordinal), $"Expected path to contain /api/backup, got: {capturedPath}");
+    }
+
+    /// <summary>
+    /// Verifies ModelManagerClient.GetModelsAsync resolves /api/models (PR-15 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task GetModelsAsync_ResolvesCorrectPath()
+    {
+      string? capturedPath = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedPath = req.RequestUri?.AbsolutePath;
+        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedPath != null && capturedPath.Contains("/api/models", StringComparison.Ordinal) && !capturedPath.Contains("/export", StringComparison.Ordinal) && !capturedPath.Contains("/import", StringComparison.Ordinal) && !capturedPath.Contains("/stats", StringComparison.Ordinal))
+          return JsonOk("[]");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var modelClient = CreateModelManagerClient(handler);
+      var result = await modelClient.GetModelsAsync(null, CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsNotNull(capturedPath);
+      Assert.IsTrue(capturedPath.Contains("/api/models", StringComparison.Ordinal), $"Expected path to contain /api/models, got: {capturedPath}");
+    }
+
+    /// <summary>
+    /// Verifies ModelManagerClient.GetModelAsync resolves GET /api/models/{engine}/{modelName} (PR-15 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task GetModelAsync_ResolvesCorrectPath()
+    {
+      string? capturedPath = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedPath = req.RequestUri?.AbsolutePath;
+        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedPath != null && capturedPath.Contains("/api/models/xtts/my-model", StringComparison.Ordinal) && !capturedPath.Contains("/verify", StringComparison.Ordinal) && !capturedPath.Contains("/export", StringComparison.Ordinal))
+          return JsonOk("{\"engine\":\"xtts\",\"model_name\":\"my-model\",\"version\":\"1.0\",\"model_path\":\"/models/xtts/my-model.pt\"}");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var modelClient = CreateModelManagerClient(handler);
+      var result = await modelClient.GetModelAsync("xtts", "my-model", CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsNotNull(capturedPath);
+      Assert.IsTrue(capturedPath.Contains("/api/models", StringComparison.Ordinal), $"Expected path to contain /api/models, got: {capturedPath}");
+      Assert.IsTrue(capturedPath.Contains("xtts", StringComparison.Ordinal), $"Expected path to contain engine, got: {capturedPath}");
+      Assert.IsTrue(capturedPath.Contains("my-model", StringComparison.Ordinal), $"Expected path to contain modelName, got: {capturedPath}");
+    }
+
+    /// <summary>
+    /// Verifies VideoGenClient.ListVideoEnginesAsync resolves GET /api/video/engines/list (PR-16 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task ListVideoEnginesAsync_ResolvesCorrectPath()
+    {
+      string? capturedPath = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedPath = req.RequestUri?.AbsolutePath;
+        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedPath != null && capturedPath.Contains("/api/video/engines/list", StringComparison.Ordinal))
+          return JsonOk("{\"engines\":[\"engine1\"]}");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var videoGenClient = CreateVideoGenClient(handler);
+      var result = await videoGenClient.ListVideoEnginesAsync(CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsNotNull(capturedPath);
+      Assert.IsTrue(capturedPath.Contains("/api/video/engines/list", StringComparison.Ordinal), $"Expected path to contain /api/video/engines/list, got: {capturedPath}");
+    }
+
+    /// <summary>
+    /// Verifies VideoEditClient.GetVideoInfoAsync resolves GET /api/video/edit/info with escaped path (PR-16 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task GetVideoInfoAsync_ResolvesCorrectPath()
+    {
+      string? capturedUri = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedUri = req.RequestUri?.ToString();
+        if (capturedUri != null && capturedUri.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedUri != null && capturedUri.Contains("/api/video/edit/info", StringComparison.Ordinal) && capturedUri.Contains("path=", StringComparison.Ordinal))
+          return JsonOk("{\"duration_seconds\":10,\"width\":1920,\"height\":1080,\"fps\":30,\"format\":\"mp4\"}");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var videoEditClient = CreateVideoEditClient(handler);
+      var pathWithSpecialChars = "C:\\Users\\test\\video with spaces.mp4";
+      var result = await videoEditClient.GetVideoInfoAsync(pathWithSpecialChars, CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsNotNull(capturedUri);
+      Assert.IsTrue(capturedUri.Contains("/api/video/edit/info", StringComparison.Ordinal), $"Expected URI to contain /api/video/edit/info, got: {capturedUri}");
+      Assert.IsTrue(capturedUri.Contains("path=", StringComparison.Ordinal), $"Expected URI to contain path= for query escaping, got: {capturedUri}");
+    }
+
+    /// <summary>
+    /// Verifies VideoGenClient.GenerateVideoAsync resolves POST /api/video/generate (PR-16 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task GenerateVideoAsync_ResolvesCorrectPath()
+    {
+      string? capturedPath = null;
+      HttpMethod? capturedMethod = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedPath = req.RequestUri?.AbsolutePath;
+        capturedMethod = req.Method;
+        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedPath != null && capturedPath.Contains("/api/video/generate", StringComparison.Ordinal) && req.Method == HttpMethod.Post)
+          return JsonOk("{\"video_id\":\"vid-1\",\"status\":\"completed\",\"output_path\":\"/out/video.mp4\"}");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var videoGenClient = CreateVideoGenClient(handler);
+      var request = new VideoGenerateRequest { Prompt = "test", Engine = "engine1" };
+      var result = await videoGenClient.GenerateVideoAsync(request, CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsNotNull(capturedPath);
+      Assert.AreEqual(HttpMethod.Post, capturedMethod);
+      Assert.IsTrue(capturedPath.Contains("/api/video/generate", StringComparison.Ordinal), $"Expected path to contain /api/video/generate, got: {capturedPath}");
+    }
+
+    /// <summary>
+    /// Verifies EffectChainClient.CreateEffectPresetAsync resolves POST /api/effects/presets (PR-12 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task CreateEffectPresetAsync_ResolvesCorrectPath()
+    {
+      string? capturedPath = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedPath = req.RequestUri?.AbsolutePath;
+        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedPath != null && capturedPath.Contains("/api/effects/presets", StringComparison.Ordinal) && req.Method == HttpMethod.Post)
+          return JsonOk("{\"id\":\"preset-1\",\"name\":\"Test\",\"effect_type\":\"eq\"}");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var effectChainClient = CreateEffectChainClient(handler);
+      var preset = new VoiceStudio.Core.Models.EffectPreset { Name = "Test", EffectType = "eq" };
+      var result = await effectChainClient.CreateEffectPresetAsync(preset, CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsNotNull(capturedPath);
+      Assert.IsTrue(capturedPath.Contains("/api/effects/presets", StringComparison.Ordinal), $"Expected path to contain /api/effects/presets, got: {capturedPath}");
+    }
+
+    /// <summary>
+    /// Verifies EffectChainClient.DeleteEffectPresetAsync resolves DELETE /api/effects/presets/{id} (PR-12 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task DeleteEffectPresetAsync_ResolvesCorrectPath()
+    {
+      string? capturedPath = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedPath = req.RequestUri?.AbsolutePath;
+        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedPath != null && capturedPath.Contains("/api/effects/presets", StringComparison.Ordinal) && req.Method == HttpMethod.Delete)
+          return new HttpResponseMessage(HttpStatusCode.NoContent);
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var effectChainClient = CreateEffectChainClient(handler);
+      var result = await effectChainClient.DeleteEffectPresetAsync("preset-delete-123", CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsTrue(result);
+      Assert.IsNotNull(capturedPath);
+      Assert.IsTrue(capturedPath.Contains("/api/effects/presets", StringComparison.Ordinal), $"Expected path to contain /api/effects/presets, got: {capturedPath}");
+      Assert.IsTrue(capturedPath.Contains("preset-delete-123", StringComparison.Ordinal), $"Expected path to contain presetId, got: {capturedPath}");
+    }
+
+    /// <summary>
+    /// Verifies PipelineConversationClient.GetPipelineProvidersAsync resolves GET /api/pipeline/providers (PR-13 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task GetPipelineProvidersAsync_ResolvesCorrectPath()
+    {
+      string? capturedPath = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedPath = req.RequestUri?.AbsolutePath;
+        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedPath != null && capturedPath.Contains("/api/pipeline/providers", StringComparison.Ordinal))
+          return JsonOk("{\"llm_providers\":[],\"tts_providers\":[]}");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var pipelineClient = CreatePipelineConversationClient(handler);
+      var result = await pipelineClient.GetPipelineProvidersAsync(CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsNotNull(capturedPath);
+      Assert.IsTrue(capturedPath.Contains("/api/pipeline/providers", StringComparison.Ordinal), $"Expected path to contain /api/pipeline/providers, got: {capturedPath}");
+    }
+
+    /// <summary>
+    /// Verifies PipelineConversationClient.ProcessPipelineAsync resolves POST /api/pipeline/process (PR-13 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task ProcessPipelineAsync_ResolvesCorrectPath()
+    {
+      string? capturedPath = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedPath = req.RequestUri?.AbsolutePath;
+        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedPath != null && capturedPath.Contains("/api/pipeline/process", StringComparison.Ordinal) && req.Method == HttpMethod.Post)
+          return JsonOk("{\"response\":\"test\",\"audio\":null}");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var pipelineClient = CreatePipelineConversationClient(handler);
+      var request = new VoiceStudio.App.Core.Models.PipelineRequest { Text = "Hello", Mode = "batch" };
+      var result = await pipelineClient.ProcessPipelineAsync(request, CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsNotNull(capturedPath);
+      Assert.IsTrue(capturedPath.Contains("/api/pipeline/process", StringComparison.Ordinal), $"Expected path to contain /api/pipeline/process, got: {capturedPath}");
+    }
+
+    /// <summary>
+    /// Verifies WorkflowAutomationClient.GetWorkflowsAsync resolves /api/workflows (PR-10 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task GetWorkflowsAsync_ResolvesCorrectPath()
+    {
+      string? capturedPath = null;
+      string? capturedQuery = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedPath = req.RequestUri?.AbsolutePath;
+        capturedQuery = req.RequestUri?.Query;
+        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedPath != null && capturedPath.Contains("/api/workflows", StringComparison.Ordinal))
+          return JsonOk("[]");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var workflowClient = CreateWorkflowClient(handler);
+      var result = await workflowClient.GetWorkflowsAsync(skip: 5, limit: 20, enabledOnly: false, CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsNotNull(capturedPath);
+      Assert.IsTrue(capturedPath.Contains("/api/workflows", StringComparison.Ordinal), $"Expected path to contain /api/workflows, got: {capturedPath}");
+      Assert.IsTrue(capturedQuery != null && capturedQuery.Contains("skip=", StringComparison.Ordinal), "Query should include skip= param");
+      Assert.IsTrue(capturedQuery != null && capturedQuery.Contains("limit=", StringComparison.Ordinal), "Query should include limit= param");
+    }
+
+    /// <summary>
+    /// Uses reflection to create MacroClient (internal ctor).
+    /// </summary>
+    private static IMacroClient CreateMacroClient(HttpMessageHandler inner)
+    {
+      var httpClient = new HttpClient(inner)
+      {
+        BaseAddress = new Uri("http://localhost:8000"),
+        Timeout = TimeSpan.FromSeconds(30)
+      };
+      var jsonOptions = VoiceStudio.App.Utilities.JsonSerializerOptionsFactory.BackendApi;
+      var appAssembly = typeof(VoiceStudio.App.Services.BackendClient).Assembly;
+      var pipelineType = appAssembly.GetType("VoiceStudio.App.Services.BackendClientHttpPipeline")
+        ?? throw new InvalidOperationException("BackendClientHttpPipeline type not found");
+      var pipeline = Activator.CreateInstance(pipelineType, httpClient, jsonOptions)
+        ?? throw new InvalidOperationException("Failed to create BackendClientHttpPipeline");
+      var macroType = appAssembly.GetType("VoiceStudio.App.Services.MacroClient")
+        ?? throw new InvalidOperationException("MacroClient type not found");
+      var macroClient = Activator.CreateInstance(macroType, BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { pipeline }, null)
+        ?? throw new InvalidOperationException("Failed to create MacroClient");
+      return (IMacroClient)macroClient;
+    }
+
+    /// <summary>
+    /// Uses reflection to create PipelineConversationClient (internal ctor). PR-13.
+    /// </summary>
+    private static IPipelineConversationClient CreatePipelineConversationClient(HttpMessageHandler inner)
+    {
+      var httpClient = new HttpClient(inner)
+      {
+        BaseAddress = new Uri("http://localhost:8000"),
+        Timeout = TimeSpan.FromSeconds(30)
+      };
+      var jsonOptions = VoiceStudio.App.Utilities.JsonSerializerOptionsFactory.BackendApi;
+      var appAssembly = typeof(VoiceStudio.App.Services.BackendClient).Assembly;
+      var pipelineType = appAssembly.GetType("VoiceStudio.App.Services.BackendClientHttpPipeline")
+        ?? throw new InvalidOperationException("BackendClientHttpPipeline type not found");
+      var pipeline = Activator.CreateInstance(pipelineType, httpClient, jsonOptions)
+        ?? throw new InvalidOperationException("Failed to create BackendClientHttpPipeline");
+      var pipelineClientType = appAssembly.GetType("VoiceStudio.App.Services.PipelineConversationClient")
+        ?? throw new InvalidOperationException("PipelineConversationClient type not found");
+      var pipelineClient = Activator.CreateInstance(pipelineClientType, BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { pipeline, null! }, null)
+        ?? throw new InvalidOperationException("Failed to create PipelineConversationClient");
+      return (IPipelineConversationClient)pipelineClient;
+    }
+
+    /// <summary>
+    /// Uses reflection to create WorkflowAutomationClient (internal ctor).
+    /// </summary>
+    private static IWorkflowAutomationClient CreateWorkflowClient(HttpMessageHandler inner)
+    {
+      var httpClient = new HttpClient(inner)
+      {
+        BaseAddress = new Uri("http://localhost:8000"),
+        Timeout = TimeSpan.FromSeconds(30)
+      };
+      var jsonOptions = VoiceStudio.App.Utilities.JsonSerializerOptionsFactory.BackendApi;
+      var appAssembly = typeof(VoiceStudio.App.Services.BackendClient).Assembly;
+      var pipelineType = appAssembly.GetType("VoiceStudio.App.Services.BackendClientHttpPipeline")
+        ?? throw new InvalidOperationException("BackendClientHttpPipeline type not found");
+      var pipeline = Activator.CreateInstance(pipelineType, httpClient, jsonOptions)
+        ?? throw new InvalidOperationException("Failed to create BackendClientHttpPipeline");
+      var workflowType = appAssembly.GetType("VoiceStudio.App.Services.WorkflowAutomationClient")
+        ?? throw new InvalidOperationException("WorkflowAutomationClient type not found");
+      var workflowClient = Activator.CreateInstance(workflowType, BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { pipeline }, null)
+        ?? throw new InvalidOperationException("Failed to create WorkflowAutomationClient");
+      return (IWorkflowAutomationClient)workflowClient;
+    }
+
+    /// <summary>
+    /// Uses reflection to create EffectChainClient (internal ctor). PR-11.
+    /// </summary>
+    private static IEffectChainClient CreateEffectChainClient(HttpMessageHandler inner)
+    {
+      var httpClient = new HttpClient(inner)
+      {
+        BaseAddress = new Uri("http://localhost:8000"),
+        Timeout = TimeSpan.FromSeconds(30)
+      };
+      var jsonOptions = VoiceStudio.App.Utilities.JsonSerializerOptionsFactory.BackendApi;
+      var appAssembly = typeof(VoiceStudio.App.Services.BackendClient).Assembly;
+      var pipelineType = appAssembly.GetType("VoiceStudio.App.Services.BackendClientHttpPipeline")
+        ?? throw new InvalidOperationException("BackendClientHttpPipeline type not found");
+      var pipeline = Activator.CreateInstance(pipelineType, httpClient, jsonOptions)
+        ?? throw new InvalidOperationException("Failed to create BackendClientHttpPipeline");
+      var effectChainType = appAssembly.GetType("VoiceStudio.App.Services.EffectChainClient")
+        ?? throw new InvalidOperationException("EffectChainClient type not found");
+      var effectChainClient = Activator.CreateInstance(effectChainType, BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { pipeline }, null)
+        ?? throw new InvalidOperationException("Failed to create EffectChainClient");
+      return (IEffectChainClient)effectChainClient;
+    }
+
+    /// <summary>
+    /// Uses reflection to create BackupRestoreClient (internal ctor). PR-14.
+    /// </summary>
+    private static IBackupRestoreClient CreateBackupRestoreClient(HttpMessageHandler inner)
+    {
+      var httpClient = new HttpClient(inner)
+      {
+        BaseAddress = new Uri("http://localhost:8000"),
+        Timeout = TimeSpan.FromSeconds(30)
+      };
+      var jsonOptions = VoiceStudio.App.Utilities.JsonSerializerOptionsFactory.BackendApi;
+      var appAssembly = typeof(VoiceStudio.App.Services.BackendClient).Assembly;
+      var pipelineType = appAssembly.GetType("VoiceStudio.App.Services.BackendClientHttpPipeline")
+        ?? throw new InvalidOperationException("BackendClientHttpPipeline type not found");
+      var pipeline = Activator.CreateInstance(pipelineType, httpClient, jsonOptions)
+        ?? throw new InvalidOperationException("Failed to create BackendClientHttpPipeline");
+      var backupType = appAssembly.GetType("VoiceStudio.App.Services.BackupRestoreClient")
+        ?? throw new InvalidOperationException("BackupRestoreClient type not found");
+      var backupClient = Activator.CreateInstance(backupType, BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { pipeline }, null)
+        ?? throw new InvalidOperationException("Failed to create BackupRestoreClient");
+      return (IBackupRestoreClient)backupClient;
+    }
+
+    /// <summary>
+    /// Uses reflection to create ModelManagerClient (internal ctor). PR-15.
+    /// </summary>
+    private static IModelManagerClient CreateModelManagerClient(HttpMessageHandler inner)
+    {
+      var httpClient = new HttpClient(inner)
+      {
+        BaseAddress = new Uri("http://localhost:8000"),
+        Timeout = TimeSpan.FromSeconds(30)
+      };
+      var jsonOptions = VoiceStudio.App.Utilities.JsonSerializerOptionsFactory.BackendApi;
+      var appAssembly = typeof(VoiceStudio.App.Services.BackendClient).Assembly;
+      var pipelineType = appAssembly.GetType("VoiceStudio.App.Services.BackendClientHttpPipeline")
+        ?? throw new InvalidOperationException("BackendClientHttpPipeline type not found");
+      var pipeline = Activator.CreateInstance(pipelineType, httpClient, jsonOptions)
+        ?? throw new InvalidOperationException("Failed to create BackendClientHttpPipeline");
+      var modelType = appAssembly.GetType("VoiceStudio.App.Services.ModelManagerClient")
+        ?? throw new InvalidOperationException("ModelManagerClient type not found");
+      var modelClient = Activator.CreateInstance(modelType, BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { pipeline }, null)
+        ?? throw new InvalidOperationException("Failed to create ModelManagerClient");
+      return (IModelManagerClient)modelClient;
+    }
+
+    /// <summary>
+    /// Uses reflection to create VideoGenClient (internal ctor). PR-16.
+    /// </summary>
+    private static IVideoGenClient CreateVideoGenClient(HttpMessageHandler inner)
+    {
+      var httpClient = new HttpClient(inner)
+      {
+        BaseAddress = new Uri("http://localhost:8000"),
+        Timeout = TimeSpan.FromSeconds(30)
+      };
+      var jsonOptions = VoiceStudio.App.Utilities.JsonSerializerOptionsFactory.BackendApi;
+      var appAssembly = typeof(VoiceStudio.App.Services.BackendClient).Assembly;
+      var pipelineType = appAssembly.GetType("VoiceStudio.App.Services.BackendClientHttpPipeline")
+        ?? throw new InvalidOperationException("BackendClientHttpPipeline type not found");
+      var pipeline = Activator.CreateInstance(pipelineType, httpClient, jsonOptions)
+        ?? throw new InvalidOperationException("Failed to create BackendClientHttpPipeline");
+      var videoGenType = appAssembly.GetType("VoiceStudio.App.Services.VideoGenClient")
+        ?? throw new InvalidOperationException("VideoGenClient type not found");
+      var videoGenClient = Activator.CreateInstance(videoGenType, BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { pipeline }, null)
+        ?? throw new InvalidOperationException("Failed to create VideoGenClient");
+      return (IVideoGenClient)videoGenClient;
+    }
+
+    /// <summary>
+    /// Uses reflection to create VideoEditClient (internal ctor). PR-16.
+    /// </summary>
+    private static IVideoEditClient CreateVideoEditClient(HttpMessageHandler inner)
+    {
+      var httpClient = new HttpClient(inner)
+      {
+        BaseAddress = new Uri("http://localhost:8000"),
+        Timeout = TimeSpan.FromSeconds(30)
+      };
+      var jsonOptions = VoiceStudio.App.Utilities.JsonSerializerOptionsFactory.BackendApi;
+      var appAssembly = typeof(VoiceStudio.App.Services.BackendClient).Assembly;
+      var pipelineType = appAssembly.GetType("VoiceStudio.App.Services.BackendClientHttpPipeline")
+        ?? throw new InvalidOperationException("BackendClientHttpPipeline type not found");
+      var pipeline = Activator.CreateInstance(pipelineType, httpClient, jsonOptions)
+        ?? throw new InvalidOperationException("Failed to create BackendClientHttpPipeline");
+      var videoEditType = appAssembly.GetType("VoiceStudio.App.Services.VideoEditClient")
+        ?? throw new InvalidOperationException("VideoEditClient type not found");
+      var videoEditClient = Activator.CreateInstance(videoEditType, BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { pipeline }, null)
+        ?? throw new InvalidOperationException("Failed to create VideoEditClient");
+      return (IVideoEditClient)videoEditClient;
+    }
+
+    /// <summary>
     /// Uses reflection to create ScriptEditorClient (internal ctor).
     /// </summary>
     private static IScriptEditorClient CreateScriptEditorClient(HttpMessageHandler inner)
@@ -706,6 +1235,54 @@ namespace VoiceStudio.App.Tests.Services
       var pluginClient = Activator.CreateInstance(pluginType, pipeline)
         ?? throw new InvalidOperationException("Failed to create PluginHealthClient");
       return (IPluginHealthClient)pluginClient;
+    }
+
+    /// <summary>
+    /// Verifies MixerStateClient.GetMixerStateAsync resolves GET /api/mixer/state/{projectId} (PR-17 extraction).
+    /// </summary>
+    [TestMethod]
+    public async Task GetMixerStateAsync_ResolvesCorrectPath()
+    {
+      string? capturedPath = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedPath = req.RequestUri?.AbsolutePath;
+        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedPath != null && capturedPath.Contains("/api/mixer/state/", StringComparison.Ordinal) && req.Method == HttpMethod.Get)
+          return JsonOk("{\"channels\":[],\"sends\":[],\"returns\":[],\"subgroups\":[],\"master\":null,\"presets\":[]}");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var mixerStateClient = CreateMixerStateClient(handler);
+      var result = await mixerStateClient.GetMixerStateAsync("proj-1", CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsNotNull(capturedPath);
+      Assert.IsTrue(capturedPath.Contains("/api/mixer/state/proj-1", StringComparison.Ordinal), $"Expected path to contain /api/mixer/state/proj-1, got: {capturedPath}");
+    }
+
+    /// <summary>
+    /// Uses reflection to create MixerStateClient (internal ctor). PR-17.
+    /// </summary>
+    private static IMixerStateClient CreateMixerStateClient(HttpMessageHandler inner)
+    {
+      var httpClient = new HttpClient(inner)
+      {
+        BaseAddress = new Uri("http://localhost:8000"),
+        Timeout = TimeSpan.FromSeconds(30)
+      };
+      var jsonOptions = VoiceStudio.App.Utilities.JsonSerializerOptionsFactory.BackendApi;
+      var appAssembly = typeof(VoiceStudio.App.Services.BackendClient).Assembly;
+      var pipelineType = appAssembly.GetType("VoiceStudio.App.Services.BackendClientHttpPipeline")
+        ?? throw new InvalidOperationException("BackendClientHttpPipeline type not found");
+      var pipeline = Activator.CreateInstance(pipelineType, httpClient, jsonOptions)
+        ?? throw new InvalidOperationException("Failed to create BackendClientHttpPipeline");
+      var mixerType = appAssembly.GetType("VoiceStudio.App.Services.MixerStateClient")
+        ?? throw new InvalidOperationException("MixerStateClient type not found");
+      var mixerClient = Activator.CreateInstance(mixerType, BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { pipeline }, null)
+        ?? throw new InvalidOperationException("Failed to create MixerStateClient");
+      return (IMixerStateClient)mixerClient;
     }
 
     private sealed class RetryOkDto

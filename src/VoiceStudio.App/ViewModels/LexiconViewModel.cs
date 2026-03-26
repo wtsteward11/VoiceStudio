@@ -20,9 +20,9 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the LexiconView panel - Pronunciation lexicon management.
   /// </summary>
-  public partial class LexiconViewModel : BaseViewModel, IPanelView
+  public partial class LexiconViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ILexiconClient _lexiconClient;
     private readonly UndoRedoService? _undoRedoService;
 
     public string PanelId => "lexicon";
@@ -68,10 +68,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<LexiconSearchResultItem> searchResults = new();
 
-    public LexiconViewModel(IViewModelContext context, IBackendClient backendClient)
+    public LexiconViewModel(IViewModelContext context, ILexiconClient lexiconClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _lexiconClient = lexiconClient ?? throw new ArgumentNullException(nameof(lexiconClient));
 
       // Get undo/redo service (may be null if not initialized)
       try
@@ -134,10 +134,16 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadLexiconsAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => LoadLexiconsAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => RefreshAsyncImpl(cancellationToken);
 
     public IAsyncRelayCommand LoadLexiconsCommand { get; }
     public IAsyncRelayCommand CreateLexiconCommand { get; }
@@ -169,12 +175,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var lexicons = await _backendClient.SendRequestAsync<object, Lexicon[]>(
-            "/api/lexicon/lexicons",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var lexicons = await _lexiconClient.GetLexiconsAsync(cancellationToken);
 
         if (lexicons != null)
         {
@@ -212,17 +213,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
-        {
-          name = NewLexiconName,
-          language = NewLexiconLanguage,
-          description = NewLexiconDescription
-        };
-
-        var lexicon = await _backendClient.SendRequestAsync<object, Lexicon>(
-            "/api/lexicon/lexicons",
-            request
-        );
+        var lexicon = await _lexiconClient.CreateLexiconAsync(NewLexiconName, NewLexiconLanguage, NewLexiconDescription, cancellationToken);
 
         if (lexicon != null)
         {
@@ -237,7 +228,7 @@ namespace VoiceStudio.App.ViewModels
           {
             var action = new CreateLexiconAction(
                 Lexicons,
-                _backendClient,
+                _lexiconClient,
                 lexiconItem,
                 onUndo: (l) =>
                 {
@@ -277,19 +268,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          name = SelectedLexicon.Name,
-          language = SelectedLexicon.Language,
-          description = SelectedLexicon.Description
-        };
-
-        var lexicon = await _backendClient.SendRequestAsync<object, Lexicon>(
-            $"/api/lexicon/lexicons/{Uri.EscapeDataString(SelectedLexicon.LexiconId)}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var lexicon = await _lexiconClient.UpdateLexiconAsync(SelectedLexicon.LexiconId, SelectedLexicon.Name, SelectedLexicon.Language, SelectedLexicon.Description, cancellationToken);
 
         if (lexicon != null)
         {
@@ -327,12 +306,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/lexicon/lexicons/{Uri.EscapeDataString(SelectedLexicon.LexiconId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _lexiconClient.DeleteLexiconAsync(SelectedLexicon.LexiconId, cancellationToken);
 
         var lexiconToDelete = SelectedLexicon;
         var originalIndex = Lexicons.IndexOf(lexiconToDelete);
@@ -346,7 +320,7 @@ namespace VoiceStudio.App.ViewModels
         {
           var action = new DeleteLexiconAction(
               Lexicons,
-              _backendClient,
+              _lexiconClient,
               lexiconToDelete,
               originalIndex,
               onUndo: (l) => SelectedLexicon = l,
@@ -385,12 +359,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var entries = await _backendClient.SendRequestAsync<object, LexiconEntry[]>(
-            $"/api/lexicon/lexicons/{Uri.EscapeDataString(SelectedLexicon.LexiconId)}/entries",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var entries = await _lexiconClient.GetEntriesAsync(SelectedLexicon.LexiconId, cancellationToken);
 
         if (entries != null)
         {
@@ -434,20 +403,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
-        {
-          word = NewEntryWord,
-          pronunciation = NewEntryPronunciation,
-          part_of_speech = NewEntryPartOfSpeech,
-          notes = NewEntryNotes
-        };
-
-        var entry = await _backendClient.SendRequestAsync<object, LexiconEntry>(
-            $"/api/lexicon/lexicons/{Uri.EscapeDataString(SelectedLexicon.LexiconId)}/entries",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var entry = await _lexiconClient.CreateEntryAsync(SelectedLexicon.LexiconId, NewEntryWord, NewEntryPronunciation, NewEntryPartOfSpeech, NewEntryNotes, cancellationToken);
 
         if (entry != null)
         {
@@ -463,7 +419,7 @@ namespace VoiceStudio.App.ViewModels
           {
             var action = new CreateLexiconEntryAction(
                 Entries,
-                _backendClient,
+                _lexiconClient,
                 SelectedLexicon.LexiconId,
                 entryItem,
                 onUndo: (e) =>
@@ -503,20 +459,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          word = SelectedEntry.Word,
-          pronunciation = SelectedEntry.Pronunciation,
-          part_of_speech = SelectedEntry.PartOfSpeech,
-          notes = SelectedEntry.Notes
-        };
-
-        var entry = await _backendClient.SendRequestAsync<object, LexiconEntry>(
-            $"/api/lexicon/lexicons/{Uri.EscapeDataString(SelectedLexicon.LexiconId)}/entries/{Uri.EscapeDataString(SelectedEntry.Word)}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var entry = await _lexiconClient.UpdateEntryAsync(SelectedLexicon.LexiconId, SelectedEntry.Word, SelectedEntry.Pronunciation, SelectedEntry.PartOfSpeech, SelectedEntry.Notes, cancellationToken);
 
         if (entry != null)
         {
@@ -554,12 +497,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/lexicon/lexicons/{Uri.EscapeDataString(SelectedLexicon.LexiconId)}/entries/{Uri.EscapeDataString(SelectedEntry.Word)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _lexiconClient.DeleteEntryAsync(SelectedLexicon.LexiconId, SelectedEntry.Word, cancellationToken);
 
         var entryToDelete = SelectedEntry;
         var originalIndex = Entries.IndexOf(entryToDelete);
@@ -571,7 +509,7 @@ namespace VoiceStudio.App.ViewModels
         {
           var action = new DeleteLexiconEntryAction(
               Entries,
-              _backendClient,
+              _lexiconClient,
               SelectedLexicon.LexiconId,
               entryToDelete,
               originalIndex,
@@ -611,17 +549,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          query = SearchQuery
-        };
-
-        var response = await _backendClient.SendRequestAsync<object, LexiconSearchResponse>(
-            "/api/lexicon/search",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _lexiconClient.SearchAsync(SearchQuery, cancellationToken);
 
         if (response != null)
         {
@@ -647,7 +575,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task RefreshAsyncImpl(CancellationToken cancellationToken)
     {
       await LoadLexiconsAsync(cancellationToken);
       if (SelectedLexicon != null)

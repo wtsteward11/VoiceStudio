@@ -32,7 +32,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         // Backend returns paginated response: {"items": [...], "pagination": {...}}
@@ -65,7 +65,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<Project>(_jsonOptions, cancellationToken)
@@ -90,7 +90,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<Project>(_jsonOptions, cancellationToken)
@@ -122,7 +122,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         return await response.Content.ReadFromJsonAsync<Project>(_jsonOptions, cancellationToken)

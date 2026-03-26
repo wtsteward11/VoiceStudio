@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -39,9 +40,16 @@ namespace VoiceStudio.App.ViewModels
     private ISubscriptionToken? _profileCreatedToken;
     private ISubscriptionToken? _synthesisCompletedToken;
 
-    public string PanelId => "library";
+    public string PanelId => PanelIds.Library;
     public string DisplayName => ResourceHelper.GetString("Panel.Library.DisplayName", "Library");
     public PanelRegion Region => PanelRegion.Left;
+
+    /// <summary>Product trust Pass 01 slice 2: Library import vs drag-drop→project scope until A4 §12.</summary>
+    public string ImportDragDropScopeFootnote =>
+        ResourceHelper.GetString(
+            "Library.Pass01.ImportDragDropScopeFootnote",
+            "Importing into the library (single or batch) is not the same as dragging library items onto the project: project audio copy from drag-drop is deferred until product sign-off (Workflow 5 Option A §12). "
+            + "Closed paths today follow Pass 05 Option A (for example transcribe-with-project); do not assume every library action copies into the open project.");
 
     [ObservableProperty]
     private ObservableCollection<LibraryFolder> folders = new();
@@ -84,11 +92,13 @@ namespace VoiceStudio.App.ViewModels
 
     private readonly Action? _triggerImport;
 
-    private CancellationTokenSource? _searchDebounceCts;
+    private readonly IDispatcherTimer? _searchDebounceTimer;
     private const int SearchDebounceMs = 300;
 
     private readonly CancellationTokenSource _disposalCts = new();
     private CancellationTokenSource? _loadAssetsCts;
+    private int _loadingCount;
+    private EventHandler<VoiceStudio.App.Services.SelectionChangedEventArgs>? _selectionChangedHandler;
 
     public LibraryViewModel(IViewModelContext context, ILibraryClient libraryClient, IDialogService dialogService, Action? triggerImport = null)
         : base(context)
@@ -164,8 +174,8 @@ namespace VoiceStudio.App.ViewModels
       UseSynthesisVoiceCommand = new RelayCommand<LibraryAsset>(UseSynthesisVoice, CanUseSynthesisVoice);
       PlayAssetCommand = new RelayCommand<LibraryAsset>(PlayAsset, CanPlayAsset);
 
-      // Subscribe to selection changes
-      _multiSelectService.SelectionChanged += (_, e) =>
+      // Subscribe to selection changes (stored for Dispose unsubscribe)
+      _selectionChangedHandler = (_, e) =>
       {
         if (e.PanelId == PanelId)
         {
@@ -174,17 +184,12 @@ namespace VoiceStudio.App.ViewModels
           OnPropertyChanged(nameof(HasMultipleAssetSelection));
         }
       };
+      _multiSelectService.SelectionChanged += _selectionChangedHandler;
 
       // Initialize EventAggregator and ContextManager for cross-panel coordination
       _eventAggregator = AppServices.TryGetEventAggregator();
       _contextManager = AppServices.TryGetContextManager();
-      if (_eventAggregator != null)
-      {
-        _profileSelectedToken = _eventAggregator.Subscribe<ProfileSelectedEvent>(OnProfileSelected);
-        _assetAddedToken = _eventAggregator.Subscribe<AssetAddedEvent>(OnAssetAdded);
-        _profileCreatedToken = _eventAggregator.Subscribe<ProfileCreatedEvent>(OnProfileCreatedRefresh);
-        _synthesisCompletedToken = _eventAggregator.Subscribe<SynthesisCompletedEvent>(OnSynthesisCompleted);
-      }
+      // Subscriptions are created in EnsureEventSubscriptions (called from OnActivatedAsync)
 
       // Update ShowEmptyState when Assets, IsLoading, or ErrorMessage changes
       Assets.CollectionChanged += (_, __) => OnPropertyChanged(nameof(ShowEmptyState));
@@ -197,6 +202,15 @@ namespace VoiceStudio.App.ViewModels
           RetryOnErrorCommand.NotifyCanExecuteChanged();
         }
       };
+
+      // Search debounce: UI-thread timer (no Task.Run), linked to disposal
+      _searchDebounceTimer = Dispatcher.CreateTimer();
+      if (_searchDebounceTimer != null)
+      {
+        _searchDebounceTimer.Interval = TimeSpan.FromMilliseconds(SearchDebounceMs);
+        _searchDebounceTimer.IsRepeating = false;
+        _searchDebounceTimer.Tick += OnSearchDebounceTick;
+      }
     }
 
     /// <summary>
@@ -218,7 +232,7 @@ namespace VoiceStudio.App.ViewModels
     {
       System.Diagnostics.Debug.WriteLine(
           $"LibraryViewModel: Asset added - {e.AssetId} ({e.AssetType}) from {e.SourcePanelId}");
-      _ = LoadAssetsAsync(_disposalCts.Token);
+      _ = CoalescedLoadAssetsAsync();
     }
 
     /// <summary>
@@ -229,7 +243,7 @@ namespace VoiceStudio.App.ViewModels
     {
       System.Diagnostics.Debug.WriteLine(
           $"LibraryViewModel: Profile created - {e.ProfileId} ({e.ProfileName}) from {e.SourcePanelId}");
-      _ = LoadAssetsAsync(_disposalCts.Token);
+      _ = CoalescedLoadAssetsAsync();
     }
 
     /// <summary>
@@ -240,7 +254,18 @@ namespace VoiceStudio.App.ViewModels
     {
       System.Diagnostics.Debug.WriteLine(
           $"LibraryViewModel: Synthesis completed - {e.AudioId} from {e.SourcePanelId}");
-      _ = LoadAssetsAsync(_disposalCts.Token);
+      _ = CoalescedLoadAssetsAsync();
+    }
+
+    /// <summary>
+    /// Coalesces event-triggered asset reloads: cancels prior reload, starts new one.
+    /// </summary>
+    private async Task CoalescedLoadAssetsAsync()
+    {
+      _loadAssetsCts?.Cancel();
+      _loadAssetsCts?.Dispose();
+      _loadAssetsCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      await LoadAssetsAsync(_loadAssetsCts.Token);
     }
 
     public IRelayCommand ImportFromEmptyStateCommand { get; }
@@ -271,13 +296,64 @@ namespace VoiceStudio.App.ViewModels
     public IRelayCommand<LibraryAsset> PlayAssetCommand { get; }
 
     /// <inheritdoc />
-    public Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
     {
-      // Load initial data when panel becomes active (ADR-047: no constructor fire-and-forget)
-      _ = LoadAssetTypesAsync(cancellationToken);
-      _ = LoadFoldersAsync(cancellationToken);
-      _ = LoadAssetsAsync(cancellationToken);
-      return Task.CompletedTask;
+      // Subscribe first so no events are missed during the load window
+      EnsureEventSubscriptions();
+
+      // Load initial data when panel becomes active (real lifecycle: await, not fire-and-forget)
+      await LoadAssetTypesAsync(cancellationToken);
+      cancellationToken.ThrowIfCancellationRequested();
+      await LoadFoldersAsync(cancellationToken);
+      cancellationToken.ThrowIfCancellationRequested();
+      await LoadAssetsAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Ensures event subscriptions exist. Called on activation; re-subscribes after deactivation.
+    /// </summary>
+    private void EnsureEventSubscriptions()
+    {
+      if (_eventAggregator == null) return;
+      if (_profileSelectedToken != null) return; // Already subscribed
+
+      _profileSelectedToken = _eventAggregator.Subscribe<ProfileSelectedEvent>(OnProfileSelected);
+      _assetAddedToken = _eventAggregator.Subscribe<AssetAddedEvent>(OnAssetAdded);
+      _profileCreatedToken = _eventAggregator.Subscribe<ProfileCreatedEvent>(OnProfileCreatedRefresh);
+      _synthesisCompletedToken = _eventAggregator.Subscribe<SynthesisCompletedEvent>(OnSynthesisCompleted);
+    }
+
+    /// <summary>
+    /// Navigates to and selects an asset by ID. Used by INavigatablePanel search-result focus.
+    /// </summary>
+    public async Task<bool> NavigateToAssetAsync(string itemId, CancellationToken ct)
+    {
+      if (string.IsNullOrEmpty(itemId))
+        return false;
+
+      var match = Assets.FirstOrDefault(a => a.Id == itemId || (a.AudioId != null && a.AudioId == itemId));
+      if (match != null)
+      {
+        SelectedAsset = match;
+        _multiSelectState?.SetSingle(match.Id);
+        UpdateAssetSelectionProperties();
+        _multiSelectService?.OnSelectionChanged(PanelId, _multiSelectState!);
+        return true;
+      }
+
+      await LoadAssetsAsync(ct);
+      ct.ThrowIfCancellationRequested();
+      match = Assets.FirstOrDefault(a => a.Id == itemId || (a.AudioId != null && a.AudioId == itemId));
+      if (match != null)
+      {
+        SelectedAsset = match;
+        _multiSelectState?.SetSingle(match.Id);
+        UpdateAssetSelectionProperties();
+        _multiSelectService?.OnSelectionChanged(PanelId, _multiSelectState!);
+        return true;
+      }
+
+      return false;
     }
 
     /// <inheritdoc />
@@ -304,16 +380,29 @@ namespace VoiceStudio.App.ViewModels
         _loadAssetsCts?.Cancel();
         _loadAssetsCts?.Dispose();
         _loadAssetsCts = null;
-        _searchDebounceCts?.Cancel();
-        _searchDebounceCts?.Dispose();
-        _searchDebounceCts = null;
+        _searchDebounceTimer?.Stop();
+        if (_searchDebounceTimer != null)
+          _searchDebounceTimer.Tick -= OnSearchDebounceTick;
+        if (_selectionChangedHandler != null && _multiSelectService != null)
+        {
+          _multiSelectService.SelectionChanged -= _selectionChangedHandler;
+          _selectionChangedHandler = null;
+        }
+        _profileSelectedToken?.Dispose();
+        _profileSelectedToken = null;
+        _assetAddedToken?.Dispose();
+        _assetAddedToken = null;
+        _profileCreatedToken?.Dispose();
+        _profileCreatedToken = null;
+        _synthesisCompletedToken?.Dispose();
+        _synthesisCompletedToken = null;
       }
       base.Dispose(disposing);
     }
 
     private async Task LoadFoldersAsync(CancellationToken cancellationToken)
     {
-      IsLoading = true;
+      IncrementLoading();
       ErrorMessage = null;
 
       try
@@ -336,7 +425,7 @@ namespace VoiceStudio.App.ViewModels
       }
       finally
       {
-        IsLoading = false;
+        DecrementLoading();
       }
     }
 
@@ -345,11 +434,27 @@ namespace VoiceStudio.App.ViewModels
       await SearchAssetsAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Pure logic: returns true if filter state changed between search start and result application.
+    /// Extracted for deterministic unit testing without command/debounce/threading.
+    /// </summary>
+    internal static bool HasFilterStateChanged(
+        string? queryAtStart, string? folderIdAtStart, string? assetTypeAtStart,
+        string? currentQuery, string? currentFolderId, string? currentAssetType)
+    {
+      return currentQuery != queryAtStart
+          || currentFolderId != folderIdAtStart
+          || currentAssetType != assetTypeAtStart;
+    }
+
     private async Task SearchAssetsAsync(CancellationToken cancellationToken = default)
     {
+      var queryAtStart = SearchQuery;
+      var folderIdAtStart = SelectedFolder?.Id;
+      var assetTypeAtStart = SelectedAssetType;
       try
       {
-        IsLoading = true;
+        IncrementLoading();
         ErrorMessage = null;
 
         var response = await _libraryClient.SearchAssetsAsync(
@@ -357,6 +462,12 @@ namespace VoiceStudio.App.ViewModels
             SelectedAssetType,
             SelectedFolder?.Id,
             cancellationToken);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Staleness guard: do not apply results if filter state changed during search
+        if (HasFilterStateChanged(queryAtStart, folderIdAtStart, assetTypeAtStart, SearchQuery, SelectedFolder?.Id, SelectedAssetType))
+          return;
 
         Assets.Clear();
         if (response?.Assets != null)
@@ -380,13 +491,25 @@ namespace VoiceStudio.App.ViewModels
       }
       finally
       {
-        IsLoading = false;
+        DecrementLoading();
       }
+    }
+
+    private void IncrementLoading()
+    {
+      if (System.Threading.Interlocked.Increment(ref _loadingCount) == 1)
+        IsLoading = true;
+    }
+
+    private void DecrementLoading()
+    {
+      if (System.Threading.Interlocked.Decrement(ref _loadingCount) == 0)
+        IsLoading = false;
     }
 
     private async Task CreateFolderAsync(CancellationToken cancellationToken)
     {
-      IsLoading = true;
+      IncrementLoading();
       ErrorMessage = null;
 
       try
@@ -446,7 +569,7 @@ namespace VoiceStudio.App.ViewModels
       }
       finally
       {
-        IsLoading = false;
+        DecrementLoading();
       }
     }
 
@@ -455,7 +578,7 @@ namespace VoiceStudio.App.ViewModels
       if (asset == null)
         return;
 
-      IsLoading = true;
+      IncrementLoading();
       ErrorMessage = null;
 
       try
@@ -506,7 +629,7 @@ namespace VoiceStudio.App.ViewModels
       }
       finally
       {
-        IsLoading = false;
+        DecrementLoading();
       }
     }
 
@@ -554,21 +677,17 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSearchQueryChanged(string? value)
     {
-      _searchDebounceCts?.Cancel();
-      _searchDebounceCts = new CancellationTokenSource();
-      var cts = _searchDebounceCts;
-      _ = Task.Run(async () =>
-      {
-        try
-        {
-          await Task.Delay(SearchDebounceMs, cts.Token);
-          Dispatcher.TryEnqueue(() => _ = SearchAssetsAsync(cts.Token));
-        }
-        catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "LibraryViewModel.OnSearchQueryChanged");
-      }
-      });
+      _searchDebounceTimer?.Stop();
+      _searchDebounceTimer?.Start();
+    }
+
+    private void OnSearchDebounceTick(object? sender, object e)
+    {
+      if (_disposalCts.IsCancellationRequested) return;
+      _loadAssetsCts?.Cancel();
+      _loadAssetsCts?.Dispose();
+      _loadAssetsCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = SearchAssetsAsync(_loadAssetsCts.Token);
     }
 
     partial void OnSelectedAssetTypeChanged(string? value)
@@ -593,6 +712,16 @@ namespace VoiceStudio.App.ViewModels
         if (_contextManager != null)
         {
           _contextManager.SetActiveAsset(value.Id, value.Type ?? "unknown", value.Name, InteractionIntent.Navigation);
+          // Publish transport context so main Play targets this asset when playable
+          if (CanPlayAsset(value))
+          {
+            var playbackId = GetPlaybackAudioId(value) ?? value.Id;
+            _contextManager.SetCurrentPlayable(playbackId, TransportSource.Library, value.Name);
+          }
+          else
+          {
+            _contextManager.SetCurrentPlayable(null, null, null);
+          }
         }
         else
         {
@@ -601,8 +730,9 @@ namespace VoiceStudio.App.ViewModels
       }
       else if (_contextManager != null)
       {
-        // Clear the active asset when deselected
+        // Clear the active asset and transport when deselected
         _contextManager.SetActiveAsset(null, null, null);
+        _contextManager.SetCurrentPlayable(null, null, null);
       }
     }
 
@@ -726,7 +856,8 @@ namespace VoiceStudio.App.ViewModels
 
     /// <summary>
     /// Play the selected audio asset.
-    /// Prefers direct IAudioPlayerService call for immediate playback; falls back to event for cross-panel workflows.
+    /// Primary path: direct IAudioPlayerService call (service is eagerly resolved at startup).
+    /// Fallback: event/workflow path only when _audioPlayer is null (defensive; e.g. tests).
     /// </summary>
     private async void PlayAsset(LibraryAsset? asset)
     {
@@ -734,7 +865,9 @@ namespace VoiceStudio.App.ViewModels
 
       System.Diagnostics.Debug.WriteLine($"LibraryViewModel: PlayAsset - {asset.Id} ({asset.Name})");
 
-      // Primary path: direct playback when service available (no event subscription dependency)
+      var playbackId = GetPlaybackAudioId(asset) ?? asset.Id;
+
+      // Primary path: direct playback (IAudioPlayerService eagerly resolved at app startup)
       if (_audioPlayer != null)
       {
         try
@@ -746,11 +879,11 @@ namespace VoiceStudio.App.ViewModels
             _toastNotificationService?.ShowToast(ToastType.Success, "Playing", $"Now playing: {asset.Name}");
             return;
           }
-          if (!string.IsNullOrEmpty(asset.Id))
+          if (!string.IsNullOrEmpty(playbackId))
           {
             var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
                 ?? "http://localhost:8000";
-            await _audioPlayer.PlayBackendAudioIdAsync(asset.Id, baseUrl, () =>
+            await _audioPlayer.PlayBackendAudioIdAsync(playbackId, baseUrl, () =>
               _toastNotificationService?.ShowToast(ToastType.Info, "Playback Complete", $"Finished playing {asset.Name}"));
             _toastNotificationService?.ShowToast(ToastType.Success, "Playing", $"Now playing: {asset.Name}");
             return;
@@ -764,15 +897,46 @@ namespace VoiceStudio.App.ViewModels
         }
       }
 
-      // Fallback: event path for cross-panel workflows or when service unavailable
+      // Defensive fallback: event path only when IAudioPlayerService is unavailable (e.g. unit tests)
       if (_workflowCoordinator != null)
       {
-        await _workflowCoordinator.StartPlayFromLibraryAsync(asset.Id, asset.Path ?? string.Empty, asset.Name);
+        await _workflowCoordinator.StartPlayFromLibraryAsync(playbackId, asset.Path ?? string.Empty, asset.Name);
       }
       else
       {
-        _eventAggregator?.Publish(new PlaybackRequestedEvent(PanelId, asset.Id, asset.Path ?? string.Empty, asset.Name));
+        _eventAggregator?.Publish(new PlaybackRequestedEvent(PanelId, playbackId, asset.Path ?? string.Empty, asset.Name));
       }
+    }
+
+    /// <summary>
+    /// Extracts a string from metadata value (handles string and JsonElement from System.Text.Json).
+    /// </summary>
+    private static string? GetStringFromMetadata(object? v)
+    {
+      if (v == null) return null;
+      if (v is string s) return string.IsNullOrEmpty(s) ? null : s;
+#if NET6_0_OR_GREATER
+      if (v is System.Text.Json.JsonElement je && je.ValueKind == System.Text.Json.JsonValueKind.String)
+        return je.GetString();
+#endif
+      return v.ToString();
+    }
+
+    /// <summary>
+    /// Returns the backend-playable audio ID for a library asset.
+    /// Prefers first-class AudioId; falls back to metadata["upload_id"]; otherwise asset.Id.
+    /// </summary>
+    private static string? GetPlaybackAudioId(LibraryAsset asset)
+    {
+      if (asset == null) return null;
+      if (!string.IsNullOrEmpty(asset.AudioId))
+        return asset.AudioId;
+      if (asset.Metadata != null && asset.Metadata.TryGetValue("upload_id", out var v))
+      {
+        var uploadId = GetStringFromMetadata(v);
+        if (!string.IsNullOrEmpty(uploadId)) return uploadId;
+      }
+      return asset.Id;
     }
 
     private bool CanPlayAsset(LibraryAsset? asset)
@@ -877,7 +1041,7 @@ namespace VoiceStudio.App.ViewModels
 
       cancellationToken.ThrowIfCancellationRequested();
 
-      IsLoading = true;
+      IncrementLoading();
       ErrorMessage = null;
 
       try
@@ -964,7 +1128,7 @@ namespace VoiceStudio.App.ViewModels
       }
       finally
       {
-        IsLoading = false;
+        DecrementLoading();
       }
     }
 
@@ -1118,5 +1282,8 @@ namespace VoiceStudio.App.ViewModels
     public long Size { get; set; }
     public double? Duration { get; set; }
     public string? ThumbnailUrl { get; set; }
+    /// <summary>Backend-playable audio ID (first-class; preferred over metadata.upload_id).</summary>
+    [JsonPropertyName("audio_id")]
+    public string? AudioId { get; set; }
   }
 }

@@ -16,18 +16,18 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class AnalyticsDashboardViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IAnalyticsDashboardClient>? _mockAnalyticsClient;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockAnalyticsClient = new Mock<IAnalyticsDashboardClient>();
         }
 
         private AnalyticsDashboardViewModel CreateViewModel()
         {
-            return new AnalyticsDashboardViewModel(MockContext!, _mockBackendClient!.Object);
+            return new AnalyticsDashboardViewModel(MockContext!, _mockAnalyticsClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -49,7 +49,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new AnalyticsDashboardViewModel(null!, _mockBackendClient!.Object));
+                new AnalyticsDashboardViewModel(null!, _mockAnalyticsClient!.Object));
         }
 
         [TestMethod]

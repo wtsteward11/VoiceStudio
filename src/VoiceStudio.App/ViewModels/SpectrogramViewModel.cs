@@ -7,6 +7,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using SpectrogramConfigRequest = VoiceStudio.Core.Services.SpectrogramConfigRequest;
+using SpectrogramDataRequest = VoiceStudio.Core.Services.SpectrogramDataRequest;
+using SpectrogramRange = VoiceStudio.Core.Services.SpectrogramRange;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Utilities;
 
@@ -15,12 +18,12 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the SpectrogramView panel - Advanced spectrogram visualization.
   /// </summary>
-  public partial class SpectrogramViewModel : BaseViewModel, IPanelView
+  public partial class SpectrogramViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ISpectrogramClient _spectrogramClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
-    public string PanelId => "spectrogram";
+    public string PanelId => PanelIds.Spectrogram;
     public string DisplayName => ResourceHelper.GetString("Panel.Spectrogram.DisplayName", "Spectrogram");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -69,10 +72,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool showMagnitude = true;
 
-    public SpectrogramViewModel(IViewModelContext context, IBackendClient backendClient)
+    public SpectrogramViewModel(IViewModelContext context, ISpectrogramClient spectrogramClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _spectrogramClient = spectrogramClient ?? throw new ArgumentNullException(nameof(spectrogramClient));
 
       // Get services (may be null if not initialized)
       try
@@ -105,10 +108,16 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("LoadColorSchemes");
         await LoadColorSchemesAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadColorSchemesAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => LoadColorSchemesAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => LoadColorSchemesAsync(cancellationToken);
 
     public IAsyncRelayCommand LoadSpectrogramCommand { get; }
     public IAsyncRelayCommand UpdateConfigCommand { get; }
@@ -128,36 +137,19 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        queryParams.Add("window_size", WindowSize.ToString());
-        queryParams.Add("hop_length", HopLength.ToString());
-        queryParams.Add("n_fft", NFft.ToString());
-        if (!double.IsNaN(FrequencyMin))
-          queryParams.Add("frequency_min", FrequencyMin.ToString());
-        if (!double.IsNaN(FrequencyMax))
-          queryParams.Add("frequency_max", FrequencyMax.ToString());
-        if (!double.IsNaN(TimeStart))
-          queryParams.Add("time_start", TimeStart.ToString());
-        if (!double.IsNaN(TimeEnd))
-          queryParams.Add("time_end", TimeEnd.ToString());
-        queryParams.Add("log_scale", LogScale.ToString().ToLower());
+        var request = new SpectrogramDataRequest
+        {
+          WindowSize = WindowSize,
+          HopLength = HopLength,
+          NFft = NFft,
+          FrequencyMin = double.IsNaN(FrequencyMin) ? null : FrequencyMin,
+          FrequencyMax = double.IsNaN(FrequencyMax) ? null : FrequencyMax,
+          TimeStart = double.IsNaN(TimeStart) ? null : TimeStart,
+          TimeEnd = double.IsNaN(TimeEnd) ? null : TimeEnd,
+          LogScale = LogScale
+        };
 
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = $"/api/spectrogram/data/{Uri.EscapeDataString(SelectedAudioId)}";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var data = await _backendClient.SendRequestAsync<object, SpectrogramData>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var data = await _spectrogramClient.GetSpectrogramDataAsync(SelectedAudioId, request, cancellationToken);
 
         if (data != null)
         {
@@ -195,34 +187,25 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var config = new
+        var config = new SpectrogramConfigRequest
         {
-          audio_id = SelectedAudioId,
-          window_size = WindowSize,
-          hop_length = HopLength,
-          n_fft = NFft,
-          frequency_range = (!double.IsNaN(FrequencyMin) || !double.IsNaN(FrequencyMax)) ? new
-          {
-            min = double.IsNaN(FrequencyMin) ? 0.0 : FrequencyMin,
-            max = double.IsNaN(FrequencyMax) ? 22050.0 : FrequencyMax
-          } : null,
-          time_range = (!double.IsNaN(TimeStart) || !double.IsNaN(TimeEnd)) ? new
-          {
-            start = double.IsNaN(TimeStart) ? 0.0 : TimeStart,
-            end = double.IsNaN(TimeEnd) ? 10.0 : TimeEnd
-          } : null,
-          color_scheme = SelectedColorScheme,
-          show_phase = ShowPhase,
-          show_magnitude = ShowMagnitude,
-          log_scale = LogScale
+          AudioId = SelectedAudioId,
+          WindowSize = WindowSize,
+          HopLength = HopLength,
+          NFft = NFft,
+          FrequencyRange = (!double.IsNaN(FrequencyMin) || !double.IsNaN(FrequencyMax))
+            ? new SpectrogramRange { Min = double.IsNaN(FrequencyMin) ? 0.0 : FrequencyMin, Max = double.IsNaN(FrequencyMax) ? 22050.0 : FrequencyMax }
+            : null,
+          TimeRange = (!double.IsNaN(TimeStart) || !double.IsNaN(TimeEnd))
+            ? new SpectrogramRange { Min = double.IsNaN(TimeStart) ? 0.0 : TimeStart, Max = double.IsNaN(TimeEnd) ? 10.0 : TimeEnd }
+            : null,
+          ColorScheme = SelectedColorScheme,
+          ShowPhase = ShowPhase,
+          ShowMagnitude = ShowMagnitude,
+          LogScale = LogScale
         };
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/spectrogram/config/{Uri.EscapeDataString(SelectedAudioId)}",
-            config,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        await _spectrogramClient.UpdateConfigAsync(SelectedAudioId, config, cancellationToken);
 
         await LoadSpectrogramAsync(cancellationToken);
         StatusMessage = ResourceHelper.GetString("Spectrogram.ConfigurationUpdated", "Configuration updated");
@@ -259,12 +242,12 @@ namespace VoiceStudio.App.ViewModels
 
         // In a real implementation, this would open a file picker
         // and download the exported image
-        var response = await _backendClient.SendRequestAsync<object, SpectrogramExportResponse>(
-            $"/api/spectrogram/export/{Uri.EscapeDataString(SelectedAudioId)}?format=png&width=1920&height=1080",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _spectrogramClient.ExportSpectrogramAsync(
+            SelectedAudioId,
+            format: "png",
+            width: 1920,
+            height: 1080,
+            cancellationToken);
 
         StatusMessage = ResourceHelper.GetString("Spectrogram.ExportInitiated", "Spectrogram export initiated");
         if (response != null)
@@ -301,12 +284,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, ColorSchemesResponse>(
-            "/api/spectrogram/color-schemes",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _spectrogramClient.GetColorSchemesAsync(cancellationToken);
 
         AvailableColorSchemes.Clear();
         if (response?.Schemes != null)
@@ -340,26 +318,6 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Response models
-    private class ColorSchemesResponse
-    {
-      public ColorScheme[] Schemes { get; set; } = Array.Empty<ColorScheme>();
-    }
-
-    private class ColorScheme
-    {
-      public string Id { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public string Description { get; set; } = string.Empty;
-    }
-
-    private class SpectrogramExportResponse
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public string Format { get; set; } = string.Empty;
-      public int Width { get; set; }
-      public int Height { get; set; }
-    }
   }
 
   // Data models

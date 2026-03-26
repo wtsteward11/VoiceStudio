@@ -22,11 +22,11 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class VoiceQuickCloneViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IVoiceQuickCloneClient _voiceQuickCloneClient;
     private readonly IEventAggregator? _eventAggregator;
     private ISubscriptionToken? _cloneReferenceSubscription;
 
-    public string PanelId => "voice-quick-clone";
+    public string PanelId => PanelIds.VoiceQuickClone;
     public string DisplayName => ResourceHelper.GetString("Panel.VoiceQuickClone.DisplayName", "Quick Clone");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -63,10 +63,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool isProcessing;
 
-    public VoiceQuickCloneViewModel(IViewModelContext context, IBackendClient backendClient)
+    public VoiceQuickCloneViewModel(IViewModelContext context, IVoiceQuickCloneClient voiceQuickCloneClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _voiceQuickCloneClient = voiceQuickCloneClient ?? throw new ArgumentNullException(nameof(voiceQuickCloneClient));
       
       // Subscribe to CloneReferenceSelectedEvent for inter-panel workflow
       _eventAggregator = AppServices.TryGetEventAggregator();
@@ -254,7 +254,7 @@ namespace VoiceStudio.App.ViewModels
         };
 
         // Call the clone endpoint
-        var cloneResponse = await _backendClient.CloneVoiceAsync(
+        var cloneResponse = await _voiceQuickCloneClient.CloneVoiceAsync(
             audioStream,
             cloneRequest,
             cancellationToken

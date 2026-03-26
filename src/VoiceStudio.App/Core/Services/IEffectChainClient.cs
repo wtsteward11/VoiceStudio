@@ -12,10 +12,13 @@ namespace VoiceStudio.Core.Services
   public interface IEffectChainClient
   {
     Task<List<EffectChain>> GetEffectChainsAsync(string projectId, CancellationToken cancellationToken = default);
+    Task<EffectChain> GetEffectChainAsync(string projectId, string chainId, CancellationToken cancellationToken = default);
     Task<EffectChain> CreateEffectChainAsync(string projectId, EffectChain chain, CancellationToken cancellationToken = default);
     Task<EffectChain> UpdateEffectChainAsync(string projectId, string chainId, EffectChain chain, CancellationToken cancellationToken = default);
     Task<bool> DeleteEffectChainAsync(string projectId, string chainId, CancellationToken cancellationToken = default);
     Task<EffectProcessResponse> ProcessAudioWithChainAsync(string projectId, string chainId, string audioId, string? outputFilename = null, CancellationToken cancellationToken = default);
     Task<List<EffectPreset>> GetEffectPresetsAsync(string? effectType = null, CancellationToken cancellationToken = default);
+    Task<EffectPreset> CreateEffectPresetAsync(EffectPreset preset, CancellationToken cancellationToken = default);
+    Task<bool> DeleteEffectPresetAsync(string presetId, CancellationToken cancellationToken = default);
   }
 }

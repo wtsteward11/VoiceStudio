@@ -17,9 +17,10 @@ namespace VoiceStudio.App.Views.Panels
 {
   public partial class AnalyzerViewModel : ObservableObject, IPanelView, IDisposable
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IAnalyzerClient _analyzerClient;
     private readonly IAudioVisualizationService _audioVisualizationService;
     private readonly IAudioPlayerService? _audioPlayer;
+    private readonly IContextManager? _contextManager;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly IErrorLoggingService? _errorLoggingService;
     private bool _disposed;
@@ -27,7 +28,7 @@ namespace VoiceStudio.App.Views.Panels
     // Store event handler for proper unsubscription
     private EventHandler<double>? _positionChangedHandler;
 
-    public string PanelId => "analyzer";
+    public string PanelId => PanelIds.Analyzer;
     public string DisplayName => ResourceHelper.GetString("Panel.Analyzer.DisplayName", "Analyzer");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -89,11 +90,12 @@ namespace VoiceStudio.App.Views.Panels
     public Visibility IsOtherTab => SelectedTab != "Waveform" && SelectedTab != "Spectral" && SelectedTab != "Radar" && SelectedTab != "Loudness" && SelectedTab != "Phase" && SelectedTab != "AudioOrbs" ? Visibility.Visible : Visibility.Collapsed;
     public Visibility IsWaveformOrSpectralTab => (SelectedTab == "Waveform" || SelectedTab == "Spectral") ? Visibility.Visible : Visibility.Collapsed;
 
-    public AnalyzerViewModel(IBackendClient backendClient, IAudioVisualizationService audioVisualizationService, IAudioPlayerService? audioPlayer = null)
+    public AnalyzerViewModel(IAnalyzerClient analyzerClient, IAudioVisualizationService audioVisualizationService, IAudioPlayerService? audioPlayer = null)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _analyzerClient = analyzerClient ?? throw new ArgumentNullException(nameof(analyzerClient));
       _audioVisualizationService = audioVisualizationService ?? throw new ArgumentNullException(nameof(audioVisualizationService));
       _audioPlayer = audioPlayer;
+      _contextManager = AppServices.TryGetContextManager();
 
       // Get services (may be null if not initialized)
       try
@@ -160,6 +162,18 @@ namespace VoiceStudio.App.Views.Panels
     public IAsyncRelayCommand LoadVisualizationCommand { get; }
 
     /// <summary>
+    /// Navigates to and loads an audio by ID for analysis. Used by INavigatablePanel search-result focus.
+    /// </summary>
+    public Task<bool> NavigateToAudioAsync(string itemId, CancellationToken ct)
+    {
+      if (string.IsNullOrEmpty(itemId))
+        return Task.FromResult(false);
+
+      SelectedAudioId = itemId;
+      return Task.FromResult(true);
+    }
+
+    /// <summary>
     /// Command to browse for and upload an audio file for analysis.
     /// </summary>
     public IAsyncRelayCommand BrowseAndUploadCommand { get; }
@@ -190,6 +204,12 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnSelectedAudioIdChanged(string? value)
     {
       LoadVisualizationCommand.NotifyCanExecuteChanged();
+
+      // Publish transport context so main Play can target this audio
+      _contextManager?.SetCurrentPlayable(
+        !string.IsNullOrWhiteSpace(value) ? value : null,
+        !string.IsNullOrWhiteSpace(value) ? TransportSource.Analyzer : null,
+        !string.IsNullOrWhiteSpace(value) ? "Analyzer" : null);
 
       // Auto-load when audio is selected
       if (!string.IsNullOrWhiteSpace(value))
@@ -230,7 +250,7 @@ namespace VoiceStudio.App.Views.Panels
         ErrorMessage = null;
 
         // Upload file to backend
-        var response = await _backendClient.UploadAudioFileAsync(file.Path, cancellationToken);
+        var response = await _analyzerClient.UploadAudioFileAsync(file.Path, cancellationToken);
 
         // Set the audio ID - this will auto-trigger visualization loading
         SelectedAudioId = response.Id;
@@ -302,7 +322,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           try
           {
-            var radarData = await _backendClient.GetRadarDataAsync(SelectedAudioId, cancellationToken);
+            var radarData = await _analyzerClient.GetRadarDataAsync(SelectedAudioId, cancellationToken);
             if (radarData != null)
             {
               RadarData = radarData;
@@ -324,7 +344,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           try
           {
-            var loudnessData = await _backendClient.GetLoudnessDataAsync(SelectedAudioId, windowSize: 0.4, cancellationToken);
+            var loudnessData = await _analyzerClient.GetLoudnessDataAsync(SelectedAudioId, windowSize: 0.4, cancellationToken);
             LoudnessData = loudnessData;
 
             // Convert to individual properties for LoudnessChartControl binding
@@ -387,7 +407,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           try
           {
-            var phaseData = await _backendClient.GetPhaseDataAsync(SelectedAudioId, windowSize: 0.1, cancellationToken);
+            var phaseData = await _analyzerClient.GetPhaseDataAsync(SelectedAudioId, windowSize: 0.1, cancellationToken);
             if (phaseData != null)
             {
               PhaseData = phaseData;

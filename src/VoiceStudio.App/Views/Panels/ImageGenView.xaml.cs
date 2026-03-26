@@ -20,8 +20,9 @@ namespace VoiceStudio.App.Views.Panels
     public ImageGenView()
     {
       this.InitializeComponent();
-      var backendClient = VoiceStudio.App.Services.ServiceProvider.GetBackendClient();
-      ViewModel = new ImageGenViewModel(AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(), backendClient);
+      ViewModel = new ImageGenViewModel(
+        AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
+        ServiceProvider.GetImageGenClient());
       this.DataContext = ViewModel;
 
       // Initialize services

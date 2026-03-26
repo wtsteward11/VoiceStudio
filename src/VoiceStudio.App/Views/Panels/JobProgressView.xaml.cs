@@ -20,7 +20,8 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new JobProgressViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient()
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IJobProgressApiClient>(),
+          AppServices.GetService<VoiceStudio.Core.Services.IWebSocketService>()
       );
       DataContext = ViewModel;
 

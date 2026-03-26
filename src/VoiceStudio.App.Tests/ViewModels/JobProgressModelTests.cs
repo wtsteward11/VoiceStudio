@@ -1,5 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Collections.Generic;
+using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -12,7 +13,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void Job_DefaultValues()
         {
-            var job = new JobProgressViewModel.Job();
+            var job = new Job();
 
             Assert.AreEqual(string.Empty, job.Id);
             Assert.AreEqual(string.Empty, job.Name);
@@ -35,7 +36,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void Job_PropertiesSetCorrectly()
         {
-            var job = new JobProgressViewModel.Job
+            var job = new Job
             {
                 Id = "job123",
                 Name = "Synthesis Job",
@@ -78,7 +79,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void JobSummary_DefaultValues()
         {
-            var summary = new JobProgressViewModel.JobSummary();
+            var summary = new JobSummary();
 
             Assert.AreEqual(0, summary.Total);
             Assert.AreEqual(0, summary.Pending);
@@ -93,7 +94,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void JobSummary_PropertiesSetCorrectly()
         {
-            var summary = new JobProgressViewModel.JobSummary
+            var summary = new JobSummary
             {
                 Total = 100,
                 Pending = 10,
@@ -125,7 +126,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void JobItem_CreatedFromJob()
         {
-            var job = new JobProgressViewModel.Job
+            var job = new Job
             {
                 Id = "j1",
                 Name = "Test Job",
@@ -161,7 +162,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void JobItem_ProgressDisplay_FormatsAsPercent()
         {
-            var job = new JobProgressViewModel.Job { Progress = 0.5 };
+            var job = new Job { Progress = 0.5 };
             var item = new JobProgressViewModel.JobItem(job);
 
             Assert.AreEqual("50.0%", item.ProgressDisplay);
@@ -170,7 +171,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void JobItem_ProgressDisplay_ZeroPercent()
         {
-            var job = new JobProgressViewModel.Job { Progress = 0.0 };
+            var job = new Job { Progress = 0.0 };
             var item = new JobProgressViewModel.JobItem(job);
 
             Assert.AreEqual("0.0%", item.ProgressDisplay);
@@ -179,7 +180,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void JobItem_ProgressDisplay_HundredPercent()
         {
-            var job = new JobProgressViewModel.Job { Progress = 1.0 };
+            var job = new Job { Progress = 1.0 };
             var item = new JobProgressViewModel.JobItem(job);
 
             Assert.AreEqual("100.0%", item.ProgressDisplay);
@@ -188,7 +189,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void JobItem_StepDisplay_WithStepInfo()
         {
-            var job = new JobProgressViewModel.Job
+            var job = new Job
             {
                 TotalSteps = 5,
                 CurrentStepIndex = 2
@@ -201,7 +202,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void JobItem_StepDisplay_NullWhenNoStepInfo()
         {
-            var job = new JobProgressViewModel.Job
+            var job = new Job
             {
                 TotalSteps = null,
                 CurrentStepIndex = null
@@ -214,7 +215,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void JobItem_EstimatedTimeRemaining_Seconds()
         {
-            var job = new JobProgressViewModel.Job { EstimatedTimeRemaining = 45 };
+            var job = new Job { EstimatedTimeRemaining = 45 };
             var item = new JobProgressViewModel.JobItem(job);
 
             Assert.AreEqual("45s", item.EstimatedTimeRemaining);
@@ -223,7 +224,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void JobItem_EstimatedTimeRemaining_Minutes()
         {
-            var job = new JobProgressViewModel.Job { EstimatedTimeRemaining = 150 };
+            var job = new Job { EstimatedTimeRemaining = 150 };
             var item = new JobProgressViewModel.JobItem(job);
 
             Assert.AreEqual("2m 30s", item.EstimatedTimeRemaining);
@@ -232,7 +233,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void JobItem_EstimatedTimeRemaining_Hours()
         {
-            var job = new JobProgressViewModel.Job { EstimatedTimeRemaining = 3750 };
+            var job = new Job { EstimatedTimeRemaining = 3750 };
             var item = new JobProgressViewModel.JobItem(job);
 
             Assert.AreEqual("1h 2m", item.EstimatedTimeRemaining);
@@ -241,7 +242,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void JobItem_EstimatedTimeRemaining_NullWhenNoEstimate()
         {
-            var job = new JobProgressViewModel.Job { EstimatedTimeRemaining = null };
+            var job = new Job { EstimatedTimeRemaining = null };
             var item = new JobProgressViewModel.JobItem(job);
 
             Assert.IsNull(item.EstimatedTimeRemaining);
@@ -250,7 +251,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void JobItem_ErrorMessage_FromJob()
         {
-            var job = new JobProgressViewModel.Job { ErrorMessage = "Connection failed" };
+            var job = new Job { ErrorMessage = "Connection failed" };
             var item = new JobProgressViewModel.JobItem(job);
 
             Assert.AreEqual("Connection failed", item.ErrorMessage);

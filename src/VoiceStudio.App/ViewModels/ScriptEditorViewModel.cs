@@ -19,16 +19,20 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the ScriptEditorView panel - Advanced script editor for voice synthesis.
   /// </summary>
-  public partial class ScriptEditorViewModel : BaseViewModel, IPanelView
+  public partial class ScriptEditorViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IScriptEditorClient _scriptEditorClient;
     private readonly IDialogService _dialogService;
+    private readonly IVoiceSynthesisService? _voiceSynthesisService;
+    private readonly IAudioPlayerService? _audioPlayerService;
     private readonly UndoRedoService? _undoRedoService;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly MultiSelectService _multiSelectService;
     private MultiSelectState? _multiSelectState;
+    private EventHandler<VoiceStudio.App.Services.SelectionChangedEventArgs>? _selectionChangedHandler;
+    private bool _selectionSubscribed;
 
-    public string PanelId => "script-editor";
+    public string PanelId => PanelIds.ScriptEditor;
     public string DisplayName => ResourceHelper.GetString("Panel.ScriptEditor.DisplayName", "Script Editor");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -63,13 +67,36 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool hasMultipleScriptSelection;
 
+    /// <summary>
+    /// Segments to display in the segments list. Returns SelectedScript.Segments when a script is selected,
+    /// otherwise an empty collection. Use this for null-safe binding.
+    /// </summary>
+    public ObservableCollection<ScriptSegment> DisplaySegments =>
+        SelectedScript?.Segments ?? _emptySegments;
+
+    private static readonly ObservableCollection<ScriptSegment> _emptySegments = new();
+
     public bool IsScriptSelected(string scriptId) => _multiSelectState?.SelectedIds.Contains(scriptId) ?? false;
 
-    public ScriptEditorViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService)
+    partial void OnSelectedScriptChanged(ScriptItem? value)
+    {
+        NewScriptName = value?.Name ?? string.Empty;
+        NewScriptDescription = value?.Description ?? string.Empty;
+        OnPropertyChanged(nameof(DisplaySegments));
+    }
+
+    public ScriptEditorViewModel(
+        IViewModelContext context,
+        IScriptEditorClient scriptEditorClient,
+        IDialogService dialogService,
+        IVoiceSynthesisService? voiceSynthesisService = null,
+        IAudioPlayerService? audioPlayerService = null)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _scriptEditorClient = scriptEditorClient ?? throw new ArgumentNullException(nameof(scriptEditorClient));
       _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+      _voiceSynthesisService = voiceSynthesisService;
+      _audioPlayerService = audioPlayerService;
 
       // Get undo/redo service (may be null if not initialized)
       try
@@ -118,11 +145,6 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("DeleteScript");
         await DeleteScriptAsync(script, ct);
       }, (script) => script != null && !IsLoading);
-      SynthesizeScriptCommand = new EnhancedAsyncRelayCommand<ScriptItem>(async (script, ct) =>
-      {
-        using var profiler = PerformanceProfiler.StartCommand("SynthesizeScript");
-        await SynthesizeScriptAsync(script, ct);
-      }, (script) => script != null && !IsLoading);
       AddSegmentCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("AddSegment");
@@ -133,6 +155,18 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("RemoveSegment");
         await RemoveSegmentAsync(segment, ct);
       }, (segment) => segment != null && !IsLoading);
+      GenerateSegmentCommand = new EnhancedAsyncRelayCommand<ScriptSegment>(async (segment, ct) =>
+      {
+        using var profiler = PerformanceProfiler.StartCommand("GenerateSegment");
+        await GenerateSegmentAsync(segment, ct);
+      }, (segment) => segment != null && !IsLoading && _voiceSynthesisService != null
+          && !string.IsNullOrEmpty(segment.VoiceProfileId)
+          && !string.IsNullOrWhiteSpace(segment.Text));
+      PlaySegmentCommand = new EnhancedAsyncRelayCommand<ScriptSegment>(async (segment, ct) =>
+      {
+        using var profiler = PerformanceProfiler.StartCommand("PlaySegment");
+        await PlaySegmentAsync(segment, ct);
+      }, (segment) => segment != null && !string.IsNullOrEmpty(segment.GeneratedAudioId) && _audioPlayerService != null);
       RefreshCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
@@ -148,8 +182,8 @@ namespace VoiceStudio.App.ViewModels
         await DeleteSelectedScriptsAsync(ct);
       }, () => SelectedScriptCount > 0 && !IsLoading);
 
-      // Subscribe to selection changes
-      _multiSelectService.SelectionChanged += (_, e) =>
+      // Selection subscription moved to OnActivatedAsync; unsubscribe in OnDeactivatedAsync
+      _selectionChangedHandler = (_, e) =>
       {
         if (e.PanelId == PanelId)
         {
@@ -158,24 +192,73 @@ namespace VoiceStudio.App.ViewModels
           OnPropertyChanged(nameof(HasMultipleScriptSelection));
         }
       };
-
-      // Load initial data
-      _ = LoadScriptsAsync(CancellationToken.None);
     }
+
+    async Task IPanelLifecycle.OnActivatedAsync(CancellationToken ct)
+    {
+      if (_selectionChangedHandler != null && !_selectionSubscribed)
+      {
+        _multiSelectService.SelectionChanged += _selectionChangedHandler;
+        _selectionSubscribed = true;
+      }
+      await LoadScriptsAsync(ct);
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken ct)
+    {
+      if (_selectionChangedHandler != null && _selectionSubscribed)
+      {
+        _multiSelectService.SelectionChanged -= _selectionChangedHandler;
+        _selectionSubscribed = false;
+      }
+      return Task.CompletedTask;
+    }
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken ct) => await RefreshAsync(ct);
 
     public IAsyncRelayCommand LoadScriptsCommand { get; }
     public IAsyncRelayCommand CreateScriptCommand { get; }
     public IAsyncRelayCommand<ScriptItem> UpdateScriptCommand { get; }
     public IAsyncRelayCommand<ScriptItem> DeleteScriptCommand { get; }
-    public IAsyncRelayCommand<ScriptItem> SynthesizeScriptCommand { get; }
     public IAsyncRelayCommand AddSegmentCommand { get; }
     public IAsyncRelayCommand<ScriptSegment> RemoveSegmentCommand { get; }
+    public IAsyncRelayCommand<ScriptSegment> GenerateSegmentCommand { get; }
+    public IAsyncRelayCommand<ScriptSegment> PlaySegmentCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
 
     // Multi-select commands
     public IRelayCommand SelectAllScriptsCommand { get; }
     public IRelayCommand ClearScriptSelectionCommand { get; }
     public IAsyncRelayCommand DeleteSelectedScriptsCommand { get; }
+
+    /// <summary>
+    /// Navigates to and selects a script by ID. Used by INavigatablePanel search-result focus.
+    /// </summary>
+    public async Task<bool> NavigateToScriptAsync(string itemId, CancellationToken ct)
+    {
+      if (string.IsNullOrEmpty(itemId))
+        return false;
+
+      var script = await _scriptEditorClient.GetScriptAsync(itemId, ct);
+      if (script == null)
+        return false;
+
+      SelectedProjectId = script.ProjectId;
+      await LoadScriptsAsync(ct);
+      ct.ThrowIfCancellationRequested();
+
+      var match = Scripts.FirstOrDefault(s => s.Id == itemId);
+      if (match != null)
+      {
+        SelectedScript = match;
+        _multiSelectState?.SetSingle(match.Id);
+        UpdateScriptSelectionProperties();
+        _multiSelectService?.OnSelectionChanged(PanelId, _multiSelectState!);
+        return true;
+      }
+
+      return false;
+    }
 
     private async Task LoadScriptsAsync(CancellationToken cancellationToken)
     {
@@ -184,7 +267,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var scripts = await _backendClient.GetScriptsAsync(SelectedProjectId, SearchQuery, cancellationToken);
+        var scripts = await _scriptEditorClient.GetScriptsAsync(SelectedProjectId, SearchQuery, cancellationToken);
 
         Scripts.Clear();
         if (scripts != null)
@@ -242,7 +325,7 @@ namespace VoiceStudio.App.ViewModels
           ProjectId = SelectedProjectId
         };
 
-        var created = await _backendClient.CreateScriptAsync(request, cancellationToken);
+        var created = await _scriptEditorClient.CreateScriptAsync(request, cancellationToken);
 
         if (created != null)
         {
@@ -255,7 +338,7 @@ namespace VoiceStudio.App.ViewModels
           {
             var action = new CreateScriptAction(
                 Scripts,
-                _backendClient,
+                _scriptEditorClient,
                 scriptItem,
                 onUndo: (s) =>
                 {
@@ -302,23 +385,31 @@ namespace VoiceStudio.App.ViewModels
 
         var request = new ScriptUpdateRequest
         {
-          Name = script.Name,
-          Description = script.Description,
+          Name = NewScriptName ?? script.Name,
+          Description = NewScriptDescription ?? script.Description,
           Segments = script.Segments.ToList(),
           Metadata = script.Metadata
         };
 
-        var updated = await _backendClient.UpdateScriptAsync(script.Id, request, cancellationToken);
+        var updated = await _scriptEditorClient.UpdateScriptAsync(script.Id, request, cancellationToken);
 
-        if (updated != null)
+        if (updated == null)
         {
-          script.UpdateFrom(updated);
+          ErrorMessage = ResourceHelper.GetString("ScriptEditor.PersistFailed", "Failed to persist changes.");
+          return;
         }
 
+        var selectedScriptId = SelectedScript?.Id;
+        var selectedSegmentId = SelectedSegment?.Id;
+
         await LoadScriptsAsync(cancellationToken);
+
+        SelectedScript = Scripts.FirstOrDefault(s => s.Id == selectedScriptId);
+        SelectedSegment = SelectedScript?.Segments.FirstOrDefault(s => s.Id == selectedSegmentId);
+
         StatusMessage = ResourceHelper.GetString("ScriptEditor.ScriptUpdated", "Script updated");
         _toastNotificationService?.ShowSuccess(
-            ResourceHelper.FormatString("ScriptEditor.ScriptUpdatedDetail", script.Name),
+            ResourceHelper.FormatString("ScriptEditor.ScriptUpdatedDetail", NewScriptName ?? script.Name),
             ResourceHelper.GetString("Toast.Title.ScriptUpdated", "Script Updated"));
       }
       catch (Exception ex)
@@ -344,7 +435,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.DeleteScriptAsync(script.Id, cancellationToken);
+        await _scriptEditorClient.DeleteScriptAsync(script.Id, cancellationToken);
         var scriptToDelete = script;
         var originalIndex = Scripts.IndexOf(script);
         Scripts.Remove(script);
@@ -358,7 +449,7 @@ namespace VoiceStudio.App.ViewModels
         {
           var action = new DeleteScriptAction(
               Scripts,
-              _backendClient,
+              _scriptEditorClient,
               scriptToDelete,
               originalIndex,
               onUndo: (s) => SelectedScript = s,
@@ -392,35 +483,6 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task SynthesizeScriptAsync(ScriptItem? script, CancellationToken cancellationToken = default)
-    {
-      if (script == null)
-        return;
-
-      try
-      {
-        IsLoading = true;
-        ErrorMessage = null;
-
-        var response = await _backendClient.SynthesizeScriptAsync(script.Id, cancellationToken);
-        StatusMessage = ResourceHelper.FormatString("ScriptEditor.ScriptSynthesized", response.AudioId);
-        _toastNotificationService?.ShowSuccess(
-            ResourceHelper.FormatString("ScriptEditor.ScriptSynthesizedDetail", script.Name, response.AudioId),
-            ResourceHelper.GetString("Toast.Title.ScriptSynthesized", "Script Synthesized"));
-      }
-      catch (Exception ex)
-      {
-        ErrorMessage = ResourceHelper.FormatString("ScriptEditor.SynthesizeScriptFailed", ex.Message);
-        _toastNotificationService?.ShowError(
-            ResourceHelper.FormatString("ScriptEditor.SynthesizeScriptFailed", ex.Message),
-            ResourceHelper.GetString("Toast.Title.SynthesisFailed", "Synthesis Failed"));
-      }
-      finally
-      {
-        IsLoading = false;
-      }
-    }
-
     private async Task AddSegmentAsync(CancellationToken cancellationToken)
     {
       if (SelectedScript == null)
@@ -441,12 +503,13 @@ namespace VoiceStudio.App.ViewModels
           VoiceProfileId = null
         };
 
-        var updated = await _backendClient.AddSegmentToScriptAsync(SelectedScript.Id, segment, cancellationToken);
+        var updated = await _scriptEditorClient.AddSegmentToScriptAsync(SelectedScript.Id, segment, cancellationToken);
 
         if (updated != null)
         {
+          var previousSegmentId = SelectedSegment?.Id;
           SelectedScript.UpdateFrom(updated);
-          // Find the newly added segment (should be the last one or match by ID)
+          SelectedSegment = SelectedScript.Segments.FirstOrDefault(s => s.Id == previousSegmentId);
           var addedSegment = SelectedScript.Segments.FirstOrDefault(s => s.Id == segment.Id) ?? SelectedScript.Segments.LastOrDefault();
 
           // Register undo action
@@ -455,7 +518,7 @@ namespace VoiceStudio.App.ViewModels
             var action = new AddScriptSegmentAction(
                 SelectedScript,
                 addedSegment,
-                _backendClient,
+                _scriptEditorClient,
                 onUndo: (seg) =>
                 {
                   if (SelectedSegment?.Id == seg.Id)
@@ -497,7 +560,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.RemoveSegmentFromScriptAsync(SelectedScript.Id, segment.Id, cancellationToken);
+        await _scriptEditorClient.RemoveSegmentFromScriptAsync(SelectedScript.Id, segment.Id, cancellationToken);
         var segmentToRemove = segment;
         var originalIndex = SelectedScript.Segments.IndexOf(segment);
         SelectedScript.Segments.Remove(segment);
@@ -512,7 +575,7 @@ namespace VoiceStudio.App.ViewModels
           var action = new RemoveScriptSegmentAction(
               SelectedScript,
               segmentToRemove,
-              _backendClient,
+              _scriptEditorClient,
               originalIndex,
               onUndo: (seg) => SelectedSegment = seg,
               onRedo: (seg) =>
@@ -540,6 +603,165 @@ namespace VoiceStudio.App.ViewModels
       finally
       {
         IsLoading = false;
+      }
+    }
+
+    private async Task GenerateSegmentAsync(ScriptSegment? segment, CancellationToken cancellationToken)
+    {
+      if (segment == null || _voiceSynthesisService == null)
+        return;
+
+      var text = segment.Text?.Trim();
+      if (string.IsNullOrWhiteSpace(text))
+      {
+        ErrorMessage = ResourceHelper.GetString("ScriptEditor.SegmentTextRequired", "Segment has no text to synthesize");
+        return;
+      }
+
+      var profileId = segment.VoiceProfileId;
+      if (string.IsNullOrEmpty(profileId))
+      {
+        ErrorMessage = ResourceHelper.GetString("ScriptEditor.VoiceProfileRequired", "No voice profile assigned to segment. Assign a profile or create one.");
+        return;
+      }
+
+      IsLoading = true;
+      ErrorMessage = null;
+
+      try
+      {
+        var request = ScriptEditorSynthesisRequestBuilder.Build(
+          segment,
+          SelectedScript?.Metadata,
+          text,
+          profileId);
+
+        var response = await _voiceSynthesisService.SynthesizeVoiceAsync(request, cancellationToken);
+
+        if (response != null && !string.IsNullOrEmpty(response.AudioId) && SelectedScript != null)
+        {
+          var generatedAt = DateTime.UtcNow.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
+          var segmentsForUpdate = SelectedScript.Segments.Select(s =>
+          {
+            if (s.Id == segment.Id)
+            {
+              return new ScriptSegment
+              {
+                Id = s.Id,
+                Text = s.Text,
+                StartTime = s.StartTime,
+                EndTime = s.EndTime,
+                Speaker = s.Speaker,
+                VoiceProfileId = s.VoiceProfileId,
+                Prosody = s.Prosody,
+                Phonemes = s.Phonemes,
+                Notes = s.Notes,
+                GeneratedAudioId = response.AudioId,
+                GeneratedAt = generatedAt,
+                GenerationProfileId = profileId,
+                GenerationEngineId = request.Engine,
+                GenerationStatus = "success"
+              };
+            }
+            return s;
+          }).ToList();
+
+          // Shared edit buffer: persist visible fields so unsaved edits are not clobbered
+          var updateRequest = new ScriptUpdateRequest
+          {
+            Name = NewScriptName ?? SelectedScript.Name,
+            Description = NewScriptDescription ?? SelectedScript.Description,
+            Segments = segmentsForUpdate,
+            Metadata = SelectedScript.Metadata
+          };
+          var updated = await _scriptEditorClient.UpdateScriptAsync(SelectedScript.Id, updateRequest, cancellationToken);
+          if (updated != null)
+          {
+            var selectedScriptId = SelectedScript?.Id;
+            var selectedSegmentId = segment.Id;
+            await LoadScriptsAsync(cancellationToken);
+            SelectedScript = Scripts.FirstOrDefault(s => s.Id == selectedScriptId);
+            SelectedSegment = SelectedScript?.Segments.FirstOrDefault(s => s.Id == selectedSegmentId);
+            StatusMessage = ResourceHelper.FormatString("ScriptEditor.SegmentGenerated", response.AudioId);
+            _toastNotificationService?.ShowSuccess(
+                ResourceHelper.FormatString("ScriptEditor.SegmentGeneratedDetail", response.AudioId),
+                ResourceHelper.GetString("Toast.Title.SegmentGenerated", "Segment Generated"));
+          }
+          else
+          {
+            ErrorMessage = ResourceHelper.GetString("ScriptEditor.PersistFailed", "Failed to persist generated output.");
+          }
+        }
+        else if (response == null || string.IsNullOrEmpty(response.AudioId))
+        {
+          ErrorMessage = ResourceHelper.GetString(
+            "ScriptEditor.SynthesisReturnedNoAudioId",
+            "Synthesis completed but no audio was returned. Nothing was saved.");
+          _toastNotificationService?.ShowWarning(
+            ErrorMessage,
+            ResourceHelper.GetString("Toast.Title.SegmentGenerateIncomplete", "Generate Incomplete"));
+        }
+        else
+        {
+          // Audio returned but no script context to persist (should be rare; avoids silent no-op).
+          ErrorMessage = ResourceHelper.GetString(
+            "ScriptEditor.SynthesisNoScriptContext",
+            "Generated audio could not be saved because no script is selected.");
+          _toastNotificationService?.ShowWarning(
+            ErrorMessage,
+            ResourceHelper.GetString("Toast.Title.SegmentGenerateIncomplete", "Generate Incomplete"));
+        }
+      }
+      catch (OperationCanceledException)
+      {
+        return;
+      }
+      catch (Exception ex)
+      {
+        ErrorMessage = ResourceHelper.FormatString("ScriptEditor.GenerateSegmentFailed", ex.Message);
+        _toastNotificationService?.ShowError(
+            ResourceHelper.GetString("Toast.Title.GenerateSegmentFailed", "Generate Failed"),
+            ex.Message);
+      }
+      finally
+      {
+        IsLoading = false;
+      }
+    }
+
+    /// <summary>
+    /// Plays the generated audio for a segment. Segment playback is local to Script Editor per
+    /// docs/design/SCRIPT_EDITOR_PLAYBACK_POLICY.md.
+    /// </summary>
+    private async Task PlaySegmentAsync(ScriptSegment? segment, CancellationToken cancellationToken)
+    {
+      if (segment == null || _audioPlayerService == null || string.IsNullOrEmpty(segment.GeneratedAudioId))
+        return;
+
+      var baseUrl = BackendPlaybackBaseUrl.Resolve(AppServices.GetService<BackendClientConfig>());
+
+      try
+      {
+        await _audioPlayerService.PlayBackendAudioIdAsync(
+            segment.GeneratedAudioId,
+            baseUrl,
+            () => _toastNotificationService?.ShowSuccess(
+                ResourceHelper.GetString("Toast.Title.PlaybackComplete", "Playback Complete"),
+                ResourceHelper.GetString("ScriptEditor.PlaybackComplete", "Finished playing segment")));
+        _toastNotificationService?.ShowSuccess(
+            ResourceHelper.GetString("Toast.Title.Playing", "Playing"),
+            ResourceHelper.GetString("ScriptEditor.PlayingSegment", "Playing generated segment"));
+      }
+      catch (OperationCanceledException)
+      {
+        return;
+      }
+      catch (Exception ex)
+      {
+        ErrorMessage = ResourceHelper.FormatString("ScriptEditor.PlaySegmentFailed", ex.Message);
+        _toastNotificationService?.ShowError(
+            ResourceHelper.GetString("Toast.Title.PlaybackFailed", "Playback Failed"),
+            ex.Message);
       }
     }
 
@@ -641,7 +863,7 @@ namespace VoiceStudio.App.ViewModels
             var script = Scripts.FirstOrDefault(s => s.Id == scriptId);
             if (script != null)
             {
-              await _backendClient.DeleteScriptAsync(scriptId, cancellationToken);
+              await _scriptEditorClient.DeleteScriptAsync(scriptId, cancellationToken);
               scriptsToDelete.Add(script);
               Scripts.Remove(script);
               if (SelectedScript?.Id == scriptId)

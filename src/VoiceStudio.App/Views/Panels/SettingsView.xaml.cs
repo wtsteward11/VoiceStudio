@@ -18,13 +18,13 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       var settingsService = AppServices.GetSettingsService();
-      var backendClient = AppServices.GetBackendClient();
+      var settingsClient = AppServices.GetRequiredService<ISettingsClient>();
       var pluginManager = AppServices.GetService<PluginManager>();
       var context = AppServices.GetViewModelContext();
       ViewModel = new SettingsViewModel(
           context,
           settingsService,
-          backendClient,
+          settingsClient,
           pluginManager,
           AppServices.GetService<ITelemetryService>());
       this.DataContext = ViewModel;

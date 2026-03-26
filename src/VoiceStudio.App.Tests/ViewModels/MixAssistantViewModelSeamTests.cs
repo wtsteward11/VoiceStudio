@@ -54,6 +54,18 @@ namespace VoiceStudio.App.Tests.ViewModels
       _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
     }
 
+    /// <summary>
+    /// Invariant: constructor must not call any client methods before activation.
+    /// Prevents constructor fire-and-forget regression (RETAINED_ASYNC_RULE, ADR-047).
+    /// </summary>
+    [TestMethod]
+    public void Constructor_DoesNotCallClient_BeforeActivation()
+    {
+      _ = new MixAssistantViewModel(_context, _mockMixClient.Object, _mockProjectsClient.Object);
+      _mockMixClient.Verify(x => x.GetSuggestionsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+      _mockProjectsClient.Verify(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [TestMethod]
     public void Constructor_WithIMixAssistantClient_CreatesInstance()
     {

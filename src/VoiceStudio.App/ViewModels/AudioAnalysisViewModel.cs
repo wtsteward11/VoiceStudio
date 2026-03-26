@@ -21,7 +21,7 @@ namespace VoiceStudio.App.ViewModels
     private readonly ToastNotificationService? _toastNotificationService;
     private CancellationTokenSource? _selectedAudioLoadCts;
 
-    public string PanelId => "audio-analysis";
+    public string PanelId => PanelIds.AudioAnalysis;
     public string DisplayName => ResourceHelper.GetString("Panel.AudioAnalysis.DisplayName", "Audio Analysis");
     public PanelRegion Region => PanelRegion.Right;
 

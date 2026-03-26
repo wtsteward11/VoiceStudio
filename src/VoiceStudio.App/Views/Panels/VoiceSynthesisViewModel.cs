@@ -36,7 +36,7 @@ namespace VoiceStudio.App.Views.Panels
   // GAP-005: Updated to inherit from BaseViewModel for standardized error handling
   public partial class VoiceSynthesisViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    public string PanelId => "voice_synthesis";
+    public string PanelId => PanelIds.VoiceSynthesis;
     public string DisplayName => ResourceHelper.GetString("Panel.VoiceSynthesis.DisplayName", "Voice Synthesis");
     public PanelRegion Region => PanelRegion.Center;
     private readonly IVoiceSynthesisService _voiceSynthesisService;
@@ -278,10 +278,8 @@ namespace VoiceStudio.App.Views.Panels
         _toastNotificationService = null;
       }
 
-      // Subscribe to ProfileSelectedEvent from Profiles panel (Panel Communication Matrix)
+      // EventAggregator for ProfileSelectedEvent (subscription in OnActivatedAsync per lifecycle rule)
       _eventAggregator = AppServices.TryGetEventAggregator();
-      if (_eventAggregator != null)
-        _profileSelectedToken = _eventAggregator.Subscribe<ProfileSelectedEvent>(OnProfileSelected);
 
       // Get error presentation service
       _errorService = ServiceProvider.TryGetErrorPresentationService();
@@ -883,7 +881,15 @@ namespace VoiceStudio.App.Views.Panels
     }
 
     /// <inheritdoc />
-    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    /// <summary>Subscribe to ProfileSelectedEvent (Fix 3: lifecycle rule - subscribe on activate).</summary>
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _profileSelectedToken?.Dispose();
+      _profileSelectedToken = null;
+      if (_eventAggregator != null)
+        _profileSelectedToken = _eventAggregator.Subscribe<ProfileSelectedEvent>(OnProfileSelected);
+      return Task.CompletedTask;
+    }
 
     /// <inheritdoc />
     public async Task RefreshAsync(CancellationToken cancellationToken = default) =>
@@ -1147,6 +1153,14 @@ namespace VoiceStudio.App.Views.Panels
       if (string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl))
         return;
 
+      // Own global transport so main Play routes here
+      if (!string.IsNullOrEmpty(LastSynthesizedAudioId))
+      {
+        var ctx = AppServices.TryGetContextManager();
+        if (ctx != null)
+          ctx.SetCurrentPlayable(LastSynthesizedAudioId, TransportSource.Synthesis, SelectedProfile?.Name ?? "Synthesis");
+      }
+
       IsLoading = true;
       ErrorMessage = null;
       HasError = false;
@@ -1285,14 +1299,17 @@ namespace VoiceStudio.App.Views.Panels
         return;
       }
 
-      // C.3: Publish AddToTimelineEvent for direct clip addition
+      // C.3: Publish AddToTimelineEvent for direct clip addition (Pass 01: include ProfileId)
       var clipName = $"Synthesis - {SelectedProfile?.Name ?? "Unknown"}";
       eventAggregator.Publish(new AddToTimelineEvent(
           PanelId,
           LastSynthesizedAudioId,
           LastSynthesizedAudioUrl ?? "",
           LastSynthesizedDuration,
-          clipName));
+          clipName,
+          targetTrackIndex: null,
+          insertPosition: null,
+          profileId: SelectedProfile?.Id));
 
       // Also publish AssetAddedEvent so Library knows
       eventAggregator.Publish(new AssetAddedEvent(

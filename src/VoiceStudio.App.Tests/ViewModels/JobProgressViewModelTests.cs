@@ -1,12 +1,10 @@
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.UI.Dispatching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Services;
+using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -20,41 +18,29 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class JobProgressViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IJobProgressApiClient>? _mockJobProgressApiClient;
         private JobProgressViewModel? _viewModel;
-        private static IViewModelContext? _testContext;
+        private IViewModelContext? _testContext;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
-
-            // JobProgressViewModel requires a real DispatcherQueue (from BaseViewModel)
-            _testContext ??= CreateTestViewModelContext();
-
-            // No WebSocket - ViewModel will use polling fallback
-            _mockBackendClient.Setup(x => x.WebSocketService).Returns((IWebSocketService?)null);
-            _mockBackendClient.Setup(x => x.IsConnected).Returns(true);
+            TestAppServicesHelper.EnsureInitialized();
+            _testContext = AppServices.GetService<IViewModelContext>()
+                ?? throw new InvalidOperationException("IViewModelContext not registered by TestAppServicesHelper");
+            _mockJobProgressApiClient = new Mock<IJobProgressApiClient>();
 
             // Default: return empty jobs and summary
-            _mockBackendClient
-                .Setup(x => x.SendRequestAsync<object, JobProgressViewModel.Job[]>(
-                    It.Is<string>(s => s.StartsWith("/api/jobs") && !s.Contains("/summary")),
-                    null,
-                    It.IsAny<HttpMethod>(),
-                    It.IsAny<CancellationToken>()))
-                .ReturnsAsync(Array.Empty<JobProgressViewModel.Job>());
+            _mockJobProgressApiClient
+                .Setup(x => x.GetJobsAsync(null, null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Array.Empty<Job>());
 
-            _mockBackendClient
-                .Setup(x => x.SendRequestAsync<object, JobProgressViewModel.JobSummary>(
-                    "/api/jobs/summary",
-                    null,
-                    It.IsAny<HttpMethod>(),
-                    It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new JobProgressViewModel.JobSummary());
+            _mockJobProgressApiClient
+                .Setup(x => x.GetJobSummaryAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new JobSummary());
 
-            _viewModel = new JobProgressViewModel(_testContext, _mockBackendClient.Object);
+            _viewModel = new JobProgressViewModel(_testContext, _mockJobProgressApiClient.Object, null);
         }
 
         [TestCleanup]
@@ -62,15 +48,9 @@ namespace VoiceStudio.App.Tests.ViewModels
         {
             _viewModel?.Dispose();
             _viewModel = null;
-            _mockBackendClient = null;
+            _testContext = null;
+            _mockJobProgressApiClient = null;
             base.TestCleanup();
-        }
-
-        private static IViewModelContext CreateTestViewModelContext()
-        {
-            var dispatcher = DispatcherQueue.GetForCurrentThread()
-                ?? DispatcherQueueController.CreateOnDedicatedThread().DispatcherQueue;
-            return new ViewModelContext(NullLogger.Instance, dispatcher);
         }
 
         #region Initialization Tests
@@ -85,7 +65,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullJobProgressApiClient_ThrowsArgumentNullException()
         {
             // Arrange & Act
             _ = new JobProgressViewModel(_testContext!, null!);
@@ -94,7 +74,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void PanelId_ReturnsJobProgress()
         {
-            Assert.AreEqual("job_progress", _viewModel!.PanelId);
+            Assert.AreEqual(PanelIds.JobProgress, _viewModel!.PanelId);
         }
 
         [TestMethod]
@@ -144,7 +124,7 @@ namespace VoiceStudio.App.Tests.ViewModels
             // Arrange
             var backendJobs = new[]
             {
-                new JobProgressViewModel.Job
+                new Job
                 {
                     Id = "job-1",
                     Name = "Synthesis Job",
@@ -155,12 +135,8 @@ namespace VoiceStudio.App.Tests.ViewModels
                 }
             };
 
-            _mockBackendClient!
-                .Setup(x => x.SendRequestAsync<object, JobProgressViewModel.Job[]>(
-                    It.Is<string>(s => s.StartsWith("/api/jobs") && !s.Contains("/summary")),
-                    null,
-                    It.IsAny<HttpMethod>(),
-                    It.IsAny<CancellationToken>()))
+            _mockJobProgressApiClient!
+                .Setup(x => x.GetJobsAsync(null, null, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(backendJobs);
 
             // Act - execute Refresh (which calls LoadJobs + LoadSummary)
@@ -179,7 +155,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public async Task CancelJob_WhenCalled_InvokesBackendAndRefreshes()
         {
             // Arrange
-            var jobItem = new JobProgressViewModel.JobItem(new JobProgressViewModel.Job
+            var jobItem = new JobProgressViewModel.JobItem(new Job
             {
                 Id = "job-to-cancel",
                 Name = "Cancel Me",
@@ -189,13 +165,9 @@ namespace VoiceStudio.App.Tests.ViewModels
             });
             _viewModel!.Jobs.Add(jobItem);
 
-            _mockBackendClient!
-                .Setup(x => x.SendRequestAsync<object, object>(
-                    "/api/jobs/job-to-cancel/cancel",
-                    null,
-                    It.IsAny<HttpMethod>(),
-                    It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new object())
+            _mockJobProgressApiClient!
+                .Setup(x => x.CancelJobAsync("job-to-cancel", It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask)
                 .Verifiable();
 
             // Act
@@ -203,19 +175,15 @@ namespace VoiceStudio.App.Tests.ViewModels
             await Task.Delay(150);
 
             // Assert
-            _mockBackendClient.Verify(
-                x => x.SendRequestAsync<object, object>(
-                    "/api/jobs/job-to-cancel/cancel",
-                    null,
-                    It.IsAny<HttpMethod>(),
-                    It.IsAny<CancellationToken>()),
+            _mockJobProgressApiClient.Verify(
+                x => x.CancelJobAsync("job-to-cancel", It.IsAny<CancellationToken>()),
                 Times.Once);
         }
 
         [TestMethod]
         public void CancelJobCommand_CanExecute_WhenJobProvidedAndNotLoading()
         {
-            var job = new JobProgressViewModel.JobItem(new JobProgressViewModel.Job { Id = "j1" });
+            var job = new JobProgressViewModel.JobItem(new Job { Id = "j1" });
             Assert.IsTrue(_viewModel!.CancelJobCommand.CanExecute(job));
         }
 
@@ -230,7 +198,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         {
             var panelView = _viewModel as IPanelView;
             Assert.IsNotNull(panelView);
-            Assert.AreEqual("job_progress", panelView.PanelId);
+            Assert.AreEqual(PanelIds.JobProgress, panelView.PanelId);
             Assert.AreEqual(PanelRegion.Right, panelView.Region);
         }
 
@@ -244,7 +212,7 @@ namespace VoiceStudio.App.Tests.ViewModels
             // Arrange - jobs with different states
             var backendJobs = new[]
             {
-                new JobProgressViewModel.Job
+                new Job
                 {
                     Id = "job-pending",
                     Name = "Pending Job",
@@ -253,7 +221,7 @@ namespace VoiceStudio.App.Tests.ViewModels
                     Progress = 0.0,
                     Created = "2026-02-09T10:00:00Z"
                 },
-                new JobProgressViewModel.Job
+                new Job
                 {
                     Id = "job-completed",
                     Name = "Completed Job",
@@ -263,7 +231,7 @@ namespace VoiceStudio.App.Tests.ViewModels
                     ResultId = "result-123",
                     Created = "2026-02-09T09:00:00Z"
                 },
-                new JobProgressViewModel.Job
+                new Job
                 {
                     Id = "job-failed",
                     Name = "Failed Job",
@@ -275,12 +243,8 @@ namespace VoiceStudio.App.Tests.ViewModels
                 }
             };
 
-            _mockBackendClient!
-                .Setup(x => x.SendRequestAsync<object, JobProgressViewModel.Job[]>(
-                    It.Is<string>(s => s.StartsWith("/api/jobs") && !s.Contains("/summary")),
-                    null,
-                    It.IsAny<HttpMethod>(),
-                    It.IsAny<CancellationToken>()))
+            _mockJobProgressApiClient!
+                .Setup(x => x.GetJobsAsync(null, null, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(backendJobs);
 
             // Act

@@ -17,6 +17,7 @@ using Windows.ApplicationModel.DataTransfer;
 using Windows.UI.Core;
 using Windows.UI;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading;
@@ -24,7 +25,7 @@ using System.Threading.Tasks;
 
 namespace VoiceStudio.App.Views.Panels
 {
-  public sealed partial class TimelineView : UserControl
+  public sealed partial class TimelineView : UserControl, INavigatablePanel
   {
     public TimelineViewModel ViewModel { get; }
     private bool _isDragging;
@@ -1033,6 +1034,36 @@ namespace VoiceStudio.App.Views.Panels
         ViewModel.SeekToPositionCommand.Execute(segment.PositionPixels);
         e.Handled = true;
       }
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> NavigateToItemAsync(
+        string itemId,
+        string resultType,
+        CancellationToken ct,
+        IReadOnlyDictionary<string, object>? searchMetadata = null)
+    {
+      var type = resultType?.ToLowerInvariant() ?? string.Empty;
+      if (type == "project")
+        return await ViewModel.NavigateToProjectAsync(itemId, ct);
+      if (type == "project_audio" || type == "audio")
+      {
+        // Audio ID may be "projectId:filename"; extract project ID for navigation
+        var projectId = itemId.Contains(':') ? itemId.Substring(0, itemId.IndexOf(':')) : itemId;
+        return await ViewModel.NavigateToProjectAsync(projectId, ct);
+      }
+
+      if (type == "marker")
+      {
+        string? projectId = null;
+        if (searchMetadata != null && searchMetadata.TryGetValue("project_id", out var pid) && pid != null)
+          projectId = pid.ToString();
+        if (!string.IsNullOrEmpty(projectId))
+          return await ViewModel.NavigateToProjectAsync(projectId, ct);
+        return false;
+      }
+
+      return false;
     }
   }
 }

@@ -12,14 +12,16 @@ using Windows.Foundation;
 using Windows.System;
 using Windows.ApplicationModel.DataTransfer;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Threading;
 using System.Threading.Tasks;
 using SelectionChangedEventArgsAlias = Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs;
 using MultiSelectSelectionChangedEventArgs = VoiceStudio.App.Services.SelectionChangedEventArgs;
 
 namespace VoiceStudio.App.Views.Panels
 {
-  public sealed partial class ProfilesView : UserControl
+  public sealed partial class ProfilesView : UserControl, INavigatablePanel
   {
     /// <summary>
     /// ViewModel is set by PanelRegistry via DataContext (DI path). Do not construct in View.
@@ -618,6 +620,19 @@ namespace VoiceStudio.App.Views.Panels
           _ => (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["VSQ.Accent.YellowBrush"]
         };
       }
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> NavigateToItemAsync(
+        string itemId,
+        string resultType,
+        CancellationToken ct,
+        IReadOnlyDictionary<string, object>? searchMetadata = null)
+    {
+      _ = searchMetadata;
+      if (!string.Equals(resultType, "profile", StringComparison.OrdinalIgnoreCase))
+        return false;
+      return await ViewModel.NavigateToProfileAsync(itemId, ct);
     }
   }
 }

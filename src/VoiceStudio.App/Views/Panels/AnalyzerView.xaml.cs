@@ -1,14 +1,22 @@
 using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using Microsoft.UI.Xaml;
 using Windows.ApplicationModel.DataTransfer;
 
 namespace VoiceStudio.App.Views.Panels
 {
-  public sealed partial class AnalyzerView : UserControl
+  /// <summary>
+  /// Analyzer panel for audio visualization and analysis.
+  /// Implements INavigatablePanel for search-result focus (audio by ID).
+  /// </summary>
+  public sealed partial class AnalyzerView : UserControl, INavigatablePanel
   {
     public AnalyzerViewModel ViewModel { get; }
     private ContextMenuService? _contextMenuService;
@@ -19,7 +27,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       // Wire DataContext with BackendClient and AudioPlayerService
       ViewModel = new AnalyzerViewModel(
-          ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<IAnalyzerClient>(),
           AppServices.GetRequiredService<IAudioVisualizationService>(),
           ServiceProvider.GetAudioPlayerService()
       );
@@ -197,6 +205,20 @@ namespace VoiceStudio.App.Views.Panels
       {
         SpectrogramControl.ZoomLevel = 1.0;
       }
+    }
+
+    /// <inheritdoc />
+    public Task<bool> NavigateToItemAsync(
+        string itemId,
+        string resultType,
+        CancellationToken ct,
+        IReadOnlyDictionary<string, object>? searchMetadata = null)
+    {
+      _ = searchMetadata;
+      var type = resultType?.ToLowerInvariant() ?? string.Empty;
+      if (type != "audio" && type != "project_audio")
+        return Task.FromResult(false);
+      return ViewModel.NavigateToAudioAsync(itemId, ct);
     }
   }
 }

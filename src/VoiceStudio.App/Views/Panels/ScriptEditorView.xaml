@@ -4,25 +4,177 @@
     xmlns:controls="using:VoiceStudio.App.Controls"
     xmlns:local="using:VoiceStudio.App.Views.Panels"
     x:DataType="local:ScriptEditorView">
-    <Grid x:Name="ScriptEditorView_Root" 
+    <Grid x:Name="ScriptEditorView_Root"
           AutomationProperties.AutomationId="ScriptEditorView_Root"
           Background="{StaticResource VSQ.Panel.Background}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" 
-                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}" 
+        <!-- Header -->
+        <Border Grid.Row="0"
+                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
                 Padding="{StaticResource VSQ.Spacing.Medium}">
-            <TextBlock Text="Script Editor" 
-                       FontSize="{StaticResource VSQ.FontSize.Title}" 
-                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE70F;" FontSize="20"/>
+                    <TextBlock Text="Script Editor"
+                               FontWeight="SemiBold"
+                               FontSize="{StaticResource VSQ.FontSize.Title}"
+                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                    <Button Command="{x:Bind ViewModel.RefreshCommand}"
+                            ToolTipService.ToolTip="Refresh"
+                            AutomationProperties.AutomationId="ScriptEditorView_RefreshButton">
+                        <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+                    </Button>
+                    <Button Click="HelpButton_Click" ToolTipService.ToolTip="Help"
+                            AutomationProperties.AutomationId="ScriptEditorView_HelpButton">
+                        <FontIcon Glyph="&#xE897;" FontSize="14"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
         </Border>
 
-        <controls:HelpOverlay x:Name="HelpOverlay" 
-                              Grid.RowSpan="2"
-                              IsVisible="False" 
-                              Visibility="Collapsed" />
+        <!-- Content -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="240"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Script List Panel -->
+            <Border Grid.Column="0" BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="0,0,1,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <ComboBox Grid.Row="0" ItemsSource="{x:Bind ViewModel.AvailableProjects, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedProjectId, Mode=TwoWay}"
+                              HorizontalAlignment="Stretch" Margin="8"
+                              PlaceholderText="Select project..."
+                              AutomationProperties.AutomationId="ScriptEditorView_ProjectComboBox"/>
+
+                    <TextBox Grid.Row="1" Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             PlaceholderText="Search scripts..." Margin="8,0,8,8"
+                             AutomationProperties.AutomationId="ScriptEditorView_SearchBox"/>
+
+                    <ListView Grid.Row="2" ItemsSource="{x:Bind ViewModel.Scripts, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.SelectedScript, Mode=TwoWay}"
+                              RightTapped="Script_RightTapped"
+                              AutomationProperties.AutomationId="ScriptEditorView_ScriptsList">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Padding="4" Spacing="2">
+                                    <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding Description}" FontSize="10" Opacity="0.6"
+                                               MaxLines="1" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                    <Button Grid.Row="3" Command="{x:Bind ViewModel.CreateScriptCommand}"
+                            Content="New Script" HorizontalAlignment="Stretch" Margin="8"
+                            Style="{StaticResource AccentButtonStyle}"
+                            AutomationProperties.AutomationId="ScriptEditorView_CreateButton"/>
+                </Grid>
+            </Border>
+
+            <!-- Script Detail Panel -->
+            <ScrollViewer Grid.Column="1">
+                <StackPanel Padding="16" Spacing="12">
+
+                    <!-- Script Info -->
+                    <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
+                        <StackPanel Spacing="8">
+                            <TextBox Header="Name" Text="{x:Bind ViewModel.NewScriptName, Mode=TwoWay}"
+                                     AutomationProperties.AutomationId="ScriptEditorView_ScriptName"/>
+                            <TextBox Header="Description" Text="{x:Bind ViewModel.NewScriptDescription, Mode=TwoWay}"
+                                     AcceptsReturn="True" TextWrapping="Wrap" MinHeight="48"
+                                     AutomationProperties.AutomationId="ScriptEditorView_ScriptDescription"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Segments -->
+                    <Border Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}" Padding="12">
+                        <StackPanel Spacing="8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Segments" FontWeight="SemiBold" FontSize="13"
+                                           Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                                <Button Grid.Column="1" Command="{x:Bind ViewModel.AddSegmentCommand}"
+                                        ToolTipService.ToolTip="Add segment"
+                                        AutomationProperties.AutomationId="ScriptEditorView_AddSegmentButton">
+                                    <FontIcon Glyph="&#xE710;" FontSize="12"/>
+                                </Button>
+                            </Grid>
+                            <ListView ItemsSource="{x:Bind ViewModel.DisplaySegments, Mode=OneWay}"
+                                      SelectedItem="{x:Bind ViewModel.SelectedSegment, Mode=TwoWay}"
+                                      RightTapped="Segment_RightTapped"
+                                      AutomationProperties.AutomationId="ScriptEditorView_SegmentsList">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{StaticResource VSQ.Panel.Background}"
+                                                CornerRadius="4" Padding="8" Margin="0,2">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding Text}" FontSize="12" TextWrapping="Wrap" MaxLines="3"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="{Binding VoiceProfileId}" FontSize="10" Opacity="0.5"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Actions -->
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Command="{x:Bind ViewModel.UpdateScriptCommand}" CommandParameter="{x:Bind ViewModel.SelectedScript, Mode=OneWay}"
+                                Content="Save" AutomationProperties.AutomationId="ScriptEditorView_SaveButton"/>
+                        <Button Command="{x:Bind ViewModel.DeleteScriptCommand}" CommandParameter="{x:Bind ViewModel.SelectedScript, Mode=OneWay}"
+                                Content="Delete" AutomationProperties.AutomationId="ScriptEditorView_DeleteButton"/>
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Padding="8,4"
+                Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
+                BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Width="16" Height="16"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                           FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                           VerticalAlignment="Center" Margin="8,0,0,0"
+                           AutomationProperties.AutomationId="ScriptEditorView_StatusText"/>
+            </Grid>
+        </Border>
+
+        <controls:HelpOverlay x:Name="HelpOverlay" Grid.RowSpan="3" IsVisible="False" Visibility="Collapsed"/>
     </Grid>
 </UserControl>

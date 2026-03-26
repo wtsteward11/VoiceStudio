@@ -26,7 +26,7 @@ namespace VoiceStudio.App.ViewModels
     private readonly IErrorPresentationService? _errorService;
     private readonly IErrorLoggingService? _logService;
 
-    public string PanelId => "quality-dashboard";
+    public string PanelId => PanelIds.QualityDashboard;
     public string DisplayName => ResourceHelper.GetString("Panel.QualityDashboard.DisplayName", "Quality Dashboard");
     public PanelRegion Region => PanelRegion.Center;
 

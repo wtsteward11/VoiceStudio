@@ -14,7 +14,8 @@ namespace VoiceStudio.App.Tests.Services.IPC
     [TestClass]
     public class RequestSignerTests
     {
-        private const string TestSecretKeyBase64 = "dGVzdF9zZWNyZXRfa2V5XzMyX2J5dGVzX2xvbmchIQ==";
+        // 32-byte key (minimum for RequestSigner)
+        private const string TestSecretKeyBase64 = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=";
         private byte[] _testSecretKey = null!;
 
         [TestInitialize]

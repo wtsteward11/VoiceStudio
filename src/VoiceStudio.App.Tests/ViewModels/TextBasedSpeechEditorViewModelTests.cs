@@ -20,7 +20,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     {
         private static readonly List<string> ExpectedEngines = new() { "xtts", "chatterbox", "tortoise" };
 
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<ITextBasedSpeechEditorClient>? _mockEditorClient;
         private Mock<IProfilesClient>? _mockProfilesClient;
         private TextBasedSpeechEditorViewModel? _viewModel;
 
@@ -28,8 +28,8 @@ namespace VoiceStudio.App.Tests.ViewModels
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
-            _mockBackendClient
+            _mockEditorClient = new Mock<ITextBasedSpeechEditorClient>();
+            _mockEditorClient
                 .Setup(x => x.GetEnginesAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(ExpectedEngines);
             _mockProfilesClient = new Mock<IProfilesClient>();
@@ -43,14 +43,14 @@ namespace VoiceStudio.App.Tests.ViewModels
         public override void TestCleanup()
         {
             _viewModel = null;
-            _mockBackendClient = null;
+            _mockEditorClient = null;
             _mockProfilesClient = null;
             base.TestCleanup();
         }
 
         private TextBasedSpeechEditorViewModel CreateViewModel()
         {
-            return new TextBasedSpeechEditorViewModel(MockContext!, _mockBackendClient!.Object, _mockProfilesClient!.Object);
+            return new TextBasedSpeechEditorViewModel(MockContext!, _mockEditorClient!.Object, _mockProfilesClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -68,12 +68,12 @@ namespace VoiceStudio.App.Tests.ViewModels
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
-            _ = new TextBasedSpeechEditorViewModel(null!, _mockBackendClient!.Object, _mockProfilesClient!.Object);
+            _ = new TextBasedSpeechEditorViewModel(null!, _mockEditorClient!.Object, _mockProfilesClient!.Object);
         }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullEditorClient_ThrowsArgumentNullException()
         {
             _ = new TextBasedSpeechEditorViewModel(MockContext!, null!, _mockProfilesClient!.Object);
         }
@@ -82,7 +82,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullProfilesClient_ThrowsArgumentNullException()
         {
-            _ = new TextBasedSpeechEditorViewModel(MockContext!, _mockBackendClient!.Object, null!);
+            _ = new TextBasedSpeechEditorViewModel(MockContext!, _mockEditorClient!.Object, null!);
         }
 
         #endregion

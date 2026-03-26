@@ -16,9 +16,9 @@ namespace VoiceStudio.App.Views.Panels
 {
   public partial class ImageGenViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IImageGenClient _imageGenClient;
 
-    public string PanelId => "image_gen";
+    public string PanelId => PanelIds.ImageGen;
     public string DisplayName => ResourceHelper.GetString("Panel.ImageGeneration.DisplayName", "Image Generation");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -137,10 +137,10 @@ namespace VoiceStudio.App.Views.Panels
       HasGeneratedImages = value.Count > 0;
     }
 
-    public ImageGenViewModel(IViewModelContext context, IBackendClient backendClient)
+    public ImageGenViewModel(IViewModelContext context, IImageGenClient imageGenClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _imageGenClient = imageGenClient ?? throw new ArgumentNullException(nameof(imageGenClient));
       LoadQualityPresets();
     }
 
@@ -332,12 +332,7 @@ namespace VoiceStudio.App.Views.Panels
           EnhancementStrength = EnablePreprocessing ? (int)EnhancementStrength : 0
         };
 
-        var response = await _backendClient.SendRequestAsync<ImageGenModels.ImageGenerateRequest, ImageGenModels.ImageGenerateResponse>(
-            "/api/image/generate",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _imageGenClient.GenerateAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -395,12 +390,7 @@ namespace VoiceStudio.App.Views.Panels
           Scale = scale
         };
 
-        var response = await _backendClient.SendRequestAsync<ImageGenModels.ImageUpscaleRequest, ImageGenModels.ImageUpscaleResponse>(
-            "/api/image/upscale",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _imageGenClient.UpscaleAsync(request, cancellationToken);
 
         if (response != null)
         {

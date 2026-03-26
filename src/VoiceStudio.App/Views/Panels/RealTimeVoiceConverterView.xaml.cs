@@ -23,7 +23,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new RealTimeVoiceConverterViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IRealTimeVoiceConverterClient>(),
           ServiceProvider.GetProfilesClient(),
           AppServices.TryGetWebSocketClientFactory()
       );
@@ -63,6 +63,7 @@ namespace VoiceStudio.App.Views.Panels
     private void RealTimeVoiceConverterView_KeyboardNavigation_Loaded(object _, RoutedEventArgs __)
     {
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      ViewModel.InitializeAsync();
     }
 
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)

@@ -495,7 +495,7 @@ public partial class SynthesisViewModel : BaseViewModel
                 Progress = 100;
                 StatusMessage = "Synthesis complete";
                 
-                // Publish event for cross-panel integration (C.3: Synthesis to Timeline)
+                // Publish event for cross-panel integration (C.3: Synthesis to Timeline; Pass 01: ProfileId)
                 var eventAggregator = AppServices.TryGetEventAggregator();
                 eventAggregator?.Publish(new SynthesisCompletedEvent(
                     "synthesis-panel",
@@ -504,7 +504,8 @@ public partial class SynthesisViewModel : BaseViewModel
                     synthesisResult.Duration,
                     synthesisResult.Text,
                     synthesisResult.Voice,
-                    synthesisResult.Engine));
+                    synthesisResult.Engine,
+                    profileId: SelectedVoice?.Id));
             }
             else
             {
@@ -606,7 +607,8 @@ public partial class SynthesisViewModel : BaseViewModel
             CurrentResult.Duration,
             $"Synthesis: {CurrentResult.Text?.Substring(0, Math.Min(30, CurrentResult.Text?.Length ?? 0))}...",
             targetTrackIndex: null,
-            insertPosition: null));
+            insertPosition: null,
+            profileId: SelectedVoice?.Id));
 
         StatusMessage = "Added to timeline";
     }
@@ -629,7 +631,8 @@ public partial class SynthesisViewModel : BaseViewModel
             result.Duration,
             $"Synthesis: {result.Text?.Substring(0, Math.Min(30, result.Text?.Length ?? 0))}...",
             targetTrackIndex: null,
-            insertPosition: null));
+            insertPosition: null,
+            profileId: SelectedVoice?.Id));
     }
 
     #endregion

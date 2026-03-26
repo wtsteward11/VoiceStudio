@@ -25,7 +25,7 @@ namespace VoiceStudio.App.ViewModels
     private readonly UndoRedoService? _undoRedoService;
     private bool _isInitialized;
 
-    public string PanelId => "emotion-control";
+    public string PanelId => PanelIds.EmotionControl;
     public string DisplayName => ResourceHelper.GetString("Panel.EmotionControl.DisplayName", "Emotion Control");
     public PanelRegion Region => PanelRegion.Right;
 

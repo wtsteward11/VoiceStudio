@@ -16,18 +16,18 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class KeyboardShortcutsViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IKeyboardShortcutsClient>? _mockKeyboardShortcutsClient;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockKeyboardShortcutsClient = new Mock<IKeyboardShortcutsClient>();
         }
 
         private KeyboardShortcutsViewModel CreateViewModel()
         {
-            return new KeyboardShortcutsViewModel(MockContext!, _mockBackendClient!.Object);
+            return new KeyboardShortcutsViewModel(MockContext!, _mockKeyboardShortcutsClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -50,11 +50,11 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new KeyboardShortcutsViewModel(null!, _mockBackendClient!.Object));
+                new KeyboardShortcutsViewModel(null!, _mockKeyboardShortcutsClient!.Object));
         }
 
         [TestMethod]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
                 new KeyboardShortcutsViewModel(MockContext!, null!));

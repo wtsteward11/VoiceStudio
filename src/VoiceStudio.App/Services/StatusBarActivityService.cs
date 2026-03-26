@@ -12,15 +12,15 @@ namespace VoiceStudio.App.Services
   /// </summary>
   public class StatusBarActivityService
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IHealthVersionClient _healthVersionClient;
     private readonly OperationQueueService? _operationQueueService;
     private bool _isMonitoring;
 
     public event EventHandler<ActivityStatusChangedEventArgs>? ActivityStatusChanged;
 
-    public StatusBarActivityService(IBackendClient backendClient, OperationQueueService? operationQueueService = null)
+    public StatusBarActivityService(IHealthVersionClient healthVersionClient, OperationQueueService? operationQueueService = null)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _healthVersionClient = healthVersionClient ?? throw new ArgumentNullException(nameof(healthVersionClient));
       _operationQueueService = operationQueueService;
     }
 
@@ -113,7 +113,7 @@ namespace VoiceStudio.App.Services
         try
         {
           // Check network status
-          var isConnected = await _backendClient.CheckHealthAsync(System.Threading.CancellationToken.None);
+          var isConnected = await _healthVersionClient.CheckHealthAsync(System.Threading.CancellationToken.None);
           UpdateNetworkStatus(isConnected ? NetworkStatus.Connected : NetworkStatus.Disconnected);
 
           // Check queued operations

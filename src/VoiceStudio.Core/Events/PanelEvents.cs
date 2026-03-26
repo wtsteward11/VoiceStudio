@@ -213,6 +213,31 @@ namespace VoiceStudio.Core.Events
     }
   }
 
+  /// <summary>
+  /// Published after a backup restore API succeeds so panels can reload on-disk-backed state (Pass 06).
+  /// </summary>
+  public sealed class BackupRestoredEvent : PanelEventBase
+  {
+    public bool RestoreProjects { get; }
+    public bool RestoreProfiles { get; }
+    public bool RestoreSettings { get; }
+    public bool RestoreModels { get; }
+
+    public BackupRestoredEvent(
+      string sourcePanelId,
+      bool restoreProjects,
+      bool restoreProfiles,
+      bool restoreSettings,
+      bool restoreModels)
+      : base(sourcePanelId)
+    {
+      RestoreProjects = restoreProjects;
+      RestoreProfiles = restoreProfiles;
+      RestoreSettings = restoreSettings;
+      RestoreModels = restoreModels;
+    }
+  }
+
   #endregion
 
   #region Job Events
@@ -446,6 +471,8 @@ namespace VoiceStudio.Core.Events
     public TimeSpan Duration { get; }
     public string? VoiceName { get; }
     public string? EngineName { get; }
+    /// <summary>Voice profile ID for timeline clip creation.</summary>
+    public string? ProfileId { get; }
 
     public SynthesisCompletedEvent(
       string sourcePanelId,
@@ -455,6 +482,7 @@ namespace VoiceStudio.Core.Events
       string? text = null,
       string? voiceName = null,
       string? engineName = null,
+      string? profileId = null,
       InteractionIntent intent = InteractionIntent.BackgroundProcess)
       : base(sourcePanelId, intent)
     {
@@ -464,6 +492,7 @@ namespace VoiceStudio.Core.Events
       Text = text;
       VoiceName = voiceName;
       EngineName = engineName;
+      ProfileId = profileId;
     }
   }
 
@@ -479,6 +508,8 @@ namespace VoiceStudio.Core.Events
     public TimeSpan Duration { get; }
     public int? TargetTrackIndex { get; }
     public TimeSpan? InsertPosition { get; }
+    /// <summary>Voice profile ID for clip creation. Backend requires non-empty.</summary>
+    public string? ProfileId { get; }
 
     public AddToTimelineEvent(
       string sourcePanelId,
@@ -487,7 +518,8 @@ namespace VoiceStudio.Core.Events
       TimeSpan duration,
       string? clipName = null,
       int? targetTrackIndex = null,
-      TimeSpan? insertPosition = null)
+      TimeSpan? insertPosition = null,
+      string? profileId = null)
       : base(sourcePanelId)
     {
       AudioId = audioId;
@@ -496,6 +528,7 @@ namespace VoiceStudio.Core.Events
       ClipName = clipName;
       TargetTrackIndex = targetTrackIndex;
       InsertPosition = insertPosition;
+      ProfileId = profileId;
     }
   }
 

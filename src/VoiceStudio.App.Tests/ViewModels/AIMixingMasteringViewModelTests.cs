@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -16,18 +17,18 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class AIMixingMasteringViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IAIMixingClient>? _mockAIMixingClient;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockAIMixingClient = new Mock<IAIMixingClient>();
         }
 
         private AIMixingMasteringViewModel CreateViewModel()
         {
-            return new AIMixingMasteringViewModel(MockContext!, _mockBackendClient!.Object);
+            return new AIMixingMasteringViewModel(MockContext!, _mockAIMixingClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -40,7 +41,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
             // Assert
             Assert.IsNotNull(viewModel);
-            Assert.AreEqual("ai-mixing-mastering", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.AIMixingMastering, viewModel.PanelId);
             Assert.IsNotNull(viewModel.AvailableModes);
             Assert.IsNotNull(viewModel.Suggestions);
         }
@@ -49,11 +50,11 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new AIMixingMasteringViewModel(null!, _mockBackendClient!.Object));
+                new AIMixingMasteringViewModel(null!, _mockAIMixingClient!.Object));
         }
 
         [TestMethod]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullAIMixingClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
                 new AIMixingMasteringViewModel(MockContext!, null!));
@@ -254,7 +255,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void PanelId_ReturnsCorrectValue()
         {
             var viewModel = CreateViewModel();
-            Assert.AreEqual("ai-mixing-mastering", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.AIMixingMastering, viewModel.PanelId);
         }
 
         [TestMethod]

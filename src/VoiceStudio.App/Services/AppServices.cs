@@ -22,6 +22,15 @@ namespace VoiceStudio.App.Services
   /// Static DI facade used by ServiceProvider shim and Views/ViewModels.
   /// Initialize() must be called at app startup (e.g. from App constructor via ServiceProvider.Initialize()).
   /// </summary>
+  /// <remarks>
+  /// <para><b>Registration order (do not reorder lightly):</b> Core infrastructure (config, HttpClient, correlation,
+  /// metrics, coordinator, degradation) → BackendClient + domain facades → panel services → UI services.
+  /// BackendClient builds its own <c>HttpClient</c> with handler chain; the singleton <c>HttpClient</c> here is for
+  /// probes and other call sites — not the same instance as <see cref="IBackendClient"/>.</para>
+  /// <para><b>Cluster boundaries (readability only; no split until a transport/DI extraction requires it):</b>
+  /// See <c>docs/design/APPSERVICES_SPLIT_PLAN.md</c> — Group A core domain, B timeline, C synthesis/quality,
+  /// D panel facades, E integration, F realtime, G stores, H utilities.</para>
+  /// </remarks>
   public static class AppServices
   {
     private static IServiceProvider? _provider;
@@ -54,6 +63,7 @@ namespace VoiceStudio.App.Services
     public static void Initialize()
     {
       var services = new ServiceCollection();
+      // Order: infrastructure first — facades depend on BackendClientConfig, ICorrelationIdProvider, IRequestCoordinator, etc.
       RegisterCoreInfrastructure(services);
       RegisterBackendFacades(services);
       RegisterPanelServices(services);
@@ -99,12 +109,17 @@ namespace VoiceStudio.App.Services
     /// </summary>
     private static void RegisterBackendFacades(IServiceCollection services)
     {
-      services.AddSingleton<IBackendClient>(sp => new BackendClient(
+      // PR-3: Shared BackendHttpContext for BackendClient and PluginHealthClient (same retry/circuit policy)
+      services.AddSingleton<BackendHttpContext>(sp => new BackendHttpContext(
         sp.GetRequiredService<BackendClientConfig>(),
         sp.GetRequiredService<ICorrelationIdProvider>(),
         sp.GetRequiredService<IRequestMetricsService>(),
-        sp.GetRequiredService<IRequestCoordinator>(),
         sp.GetService<GracefulDegradationService>()));
+
+      services.AddSingleton<IBackendClient>(sp => new BackendClient(
+        sp.GetRequiredService<BackendHttpContext>(),
+        sp.GetRequiredService<BackendClientConfig>(),
+        sp.GetRequiredService<IRequestCoordinator>()));
 
       // Profiles domain facade (Block 4.3)
       services.AddSingleton<IProfilesClient, ProfilesClient>();
@@ -187,6 +202,8 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IImportWorkflowService>(sp => new ImportWorkflowService(
           sp.GetRequiredService<ILibraryClient>(),
           sp.GetRequiredService<IContextManager>(),
+          sp.GetRequiredService<IProjectAudioClient>(),
+          sp.GetService<IErrorLoggingService>(),
           sp.GetService<IEventAggregator>()));
 
       // Real-time voice converter facade (RealTimeVoiceConverterViewModel hardening)
@@ -216,11 +233,11 @@ namespace VoiceStudio.App.Services
       // Settings facade (SettingsViewModel hardening)
       services.AddSingleton<ISettingsClient, SettingsClient>();
 
-      // Macro facade (MacroViewModel hardening)
-      services.AddSingleton<IMacroClient, MacroClient>();
+      // Macro facade (PR-9: owns HTTP via pipeline; no IBackendClient delegation)
+      services.AddSingleton<IMacroClient>(sp => new MacroClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
 
-      // Model manager facade (ModelManagerViewModel hardening)
-      services.AddSingleton<IModelManagerClient, ModelManagerClient>();
+      // Model manager facade (PR-15: owns HTTP via pipeline; no IBackendClient delegation)
+      services.AddSingleton<IModelManagerClient>(sp => new ModelManagerClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
 
       // Job progress API facade (JobProgressViewModel hardening)
       services.AddSingleton<IJobProgressApiClient, JobProgressApiClient>();
@@ -231,17 +248,26 @@ namespace VoiceStudio.App.Services
       // Ensemble synthesis facade (EnsembleSynthesisViewModel migration)
       services.AddSingleton<IEnsembleSynthesisClient, EnsembleSynthesisClient>();
 
-      // Global search facade (GlobalSearchViewModel migration)
-      services.AddSingleton<ISearchClient, SearchClient>();
+      // Global search facade (PR-4: SearchClient owns HTTP via pipeline)
+      services.AddSingleton<ISearchClient>(sp => new SearchClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
 
-      // Backup/restore facade (BackupRestoreViewModel migration)
-      services.AddSingleton<IBackupRestoreClient, BackupRestoreClient>();
+      // Health/version facade (PR-5: extracted from BackendClient)
+      services.AddSingleton<IHealthVersionClient>(sp => new HealthVersionClient(sp.GetRequiredService<BackendHttpContext>()));
+
+      // Telemetry/diagnostics facade (PR-6: extracted from BackendClient)
+      services.AddSingleton<ITelemetryClient>(sp => new TelemetryClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
+
+      // Connection status facade (PR-8: extracted from IBackendClient; no HTTP)
+      services.AddSingleton<IConnectionStatusClient>(sp => new ConnectionStatusClient(sp.GetRequiredService<BackendHttpContext>()));
+
+      // Backup/restore facade (PR-14: owns HTTP via pipeline; no IBackendClient delegation)
+      services.AddSingleton<IBackupRestoreClient>(sp => new BackupRestoreClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
 
       // API key manager facade (APIKeyManagerViewModel migration)
       services.AddSingleton<IAPIKeyManagerClient, APIKeyManagerClient>();
 
-      // Script editor facade (ScriptEditorViewModel migration)
-      services.AddSingleton<IScriptEditorClient, ScriptEditorClient>();
+      // Script editor facade (PR-7: owns HTTP via pipeline; no IBackendClient delegation)
+      services.AddSingleton<IScriptEditorClient>(sp => new ScriptEditorClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
 
       // Automation facade (AutomationViewModel migration)
       services.AddSingleton<IAutomationClient, AutomationClient>();
@@ -263,7 +289,7 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IImageGenClient, ImageGenClient>();
       services.AddSingleton<ISpectrogramClient, SpectrogramClient>();
       services.AddSingleton<ISpatialAudioClient, SpatialAudioClient>();
-      services.AddSingleton<IPluginHealthClient, PluginHealthClient>();
+      services.AddSingleton<IPluginHealthClient>(sp => new PluginHealthClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
       services.AddSingleton<IProfileHealthClient, ProfileHealthClient>();
       services.AddSingleton<ISonographyClient, SonographyClient>();
       services.AddSingleton<ILexiconClient, LexiconClient>();
@@ -278,7 +304,7 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IVoiceMorphingBlendingClient, VoiceMorphingBlendingClient>();
       services.AddSingleton<IVoiceBrowserClient, VoiceBrowserClient>();
       services.AddSingleton<IVoiceQuickCloneClient, VoiceQuickCloneClient>();
-      services.AddSingleton<IWorkflowAutomationClient, WorkflowAutomationClient>();
+      services.AddSingleton<IWorkflowAutomationClient>(sp => new WorkflowAutomationClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
       services.AddSingleton<IAIMixingClient, AIMixingClient>();
       services.AddSingleton<IAIProductionAssistantClient, AIProductionAssistantClient>();
       services.AddSingleton<IAdvancedSpectrogramClient, AdvancedSpectrogramClient>();
@@ -289,17 +315,17 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IGPUStatusClient, GPUStatusClient>();
       services.AddSingleton<IMCPDashboardClient, MCPDashboardClient>();
       services.AddSingleton<IMultilingualSupportClient, MultilingualSupportClient>();
-      services.AddSingleton<IPipelineConversationClient, PipelineConversationClient>();
+      services.AddSingleton<IPipelineConversationClient>(sp => new PipelineConversationClient(sp.GetRequiredService<BackendHttpContext>().Pipeline, sp.GetService<IWebSocketService>()));
       services.AddSingleton<IRealTimeAudioVisualizerClient, RealTimeAudioVisualizerClient>();
       services.AddSingleton<ISpatialStageClient, SpatialStageClient>();
       services.AddSingleton<ITextHighlightingClient, TextHighlightingClient>();
-      services.AddSingleton<IVideoEditClient, VideoEditClient>();
-      services.AddSingleton<IVideoGenClient, VideoGenClient>();
+      services.AddSingleton<IVideoEditClient>(sp => new VideoEditClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
+      services.AddSingleton<IVideoGenClient>(sp => new VideoGenClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
       services.AddSingleton<IAdvancedRealTimeVisualizationClient, AdvancedRealTimeVisualizationClient>();
       services.AddSingleton<IAudioMonitoringDashboardClient, AudioMonitoringDashboardClient>();
       services.AddSingleton<IEffectsMeterClient, EffectsMeterClient>();
-      services.AddSingleton<IEffectChainClient, EffectChainClient>();
-      services.AddSingleton<IMixerStateClient, MixerStateClient>();
+      services.AddSingleton<IEffectChainClient>(sp => new EffectChainClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
+      services.AddSingleton<IMixerStateClient>(sp => new MixerStateClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
       services.AddSingleton<IImageVideoEnhancementPipelineClient, ImageVideoEnhancementPipelineClient>();
       services.AddSingleton<ISLODashboardClient, SLODashboardClient>();
 
@@ -346,6 +372,13 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IContextManager>(sp => new ContextManager(
           sp.GetRequiredService<IEventAggregator>(),
           sp.GetService<AppStateStore>()));
+
+      // Library use case (batch import + P05-Persist-A3 project persistence); requires IContextManager
+      services.AddSingleton<ILibraryUseCase>(sp => new LibraryUseCase(
+          sp.GetRequiredService<IBackendClient>(),
+          sp.GetRequiredService<IContextManager>(),
+          sp.GetRequiredService<IProjectAudioClient>(),
+          sp.GetService<IErrorLoggingService>()));
 
       // Layout and Workspace services (Panel Architecture Phase 3)
       services.AddSingleton<ILayoutService, LayoutService>();
@@ -460,6 +493,7 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<StatusBarCoordinator>();
       services.AddSingleton<TransportShortcutCoordinator>(sp =>
           new TransportShortcutCoordinator(sp.GetService<IGlobalTransportOrchestrator>()));
+      services.AddSingleton<StartupRetryCoordinator>();
       services.AddSingleton<KeyboardShortcutService>();
       services.AddSingleton<IUnifiedCommandRegistry>(sp =>
         new UnifiedCommandRegistry(
@@ -613,6 +647,8 @@ namespace VoiceStudio.App.Services
     public static IProfilesClient GetProfilesClient() => GetRequiredService<IProfilesClient>();
     public static IEnginesClient GetEnginesClient() => GetRequiredService<IEnginesClient>();
     public static ISearchClient GetSearchClient() => GetRequiredService<ISearchClient>();
+    public static IHealthVersionClient GetHealthVersionClient() => GetRequiredService<IHealthVersionClient>();
+    public static ITelemetryClient GetTelemetryClient() => GetRequiredService<ITelemetryClient>();
     public static IBackupRestoreClient GetBackupRestoreClient() => GetRequiredService<IBackupRestoreClient>();
     public static IAPIKeyManagerClient GetAPIKeyManagerClient() => GetRequiredService<IAPIKeyManagerClient>();
     public static IScriptEditorClient GetScriptEditorClient() => GetRequiredService<IScriptEditorClient>();

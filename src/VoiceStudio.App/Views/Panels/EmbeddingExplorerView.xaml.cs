@@ -24,8 +24,9 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new EmbeddingExplorerViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IEmbeddingExplorerClient>(),
           AppServices.GetProjectsClient(),
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IProjectAudioClient>(),
           ServiceProvider.GetProfilesClient()
       );
       DataContext = ViewModel;
@@ -401,6 +402,7 @@ namespace VoiceStudio.App.Views.Panels
     private void EmbeddingExplorerView_KeyboardNavigation_Loaded(object sender, RoutedEventArgs e)
     {
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      ViewModel.InitializeAsync();
     }
   }
 }

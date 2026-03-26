@@ -22,8 +22,8 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       ViewModel = new TodoPanelViewModel(
-          AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient()
+          AppServices.GetViewModelContext(),
+          AppServices.GetTodoPanelClient()
       );
       DataContext = ViewModel;
 

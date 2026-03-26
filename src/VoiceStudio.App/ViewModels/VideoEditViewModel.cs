@@ -20,10 +20,11 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public class VideoEditViewModel : BaseViewModel, IPanelView
   {
-    public string PanelId => "video-edit";
+    public string PanelId => PanelIds.VideoEdit;
     public string DisplayName => ResourceHelper.GetString("Panel.VideoEdit.DisplayName", "Video Editing");
     public PanelRegion Region => PanelRegion.Center;
-    private readonly IBackendClient _backendClient;
+    private readonly IVideoEditClient _videoEditClient;
+    private CancellationTokenSource? _loadVideoInfoCts;
 
     private string? _selectedVideoPath;
     private double _videoDuration;
@@ -39,10 +40,10 @@ namespace VoiceStudio.App.ViewModels
     private ObservableCollection<string> _qualityPresets = new();
     private string? _selectedQuality;
 
-    public VideoEditViewModel(IViewModelContext context, IBackendClient backendClient)
+    public VideoEditViewModel(IViewModelContext context, IVideoEditClient videoEditClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _videoEditClient = videoEditClient ?? throw new ArgumentNullException(nameof(videoEditClient));
 
       Effects = new ObservableCollection<string>
             {
@@ -117,7 +118,11 @@ namespace VoiceStudio.App.ViewModels
         {
           if (!string.IsNullOrWhiteSpace(value))
           {
-            _ = LoadVideoInfoAsync();
+            _loadVideoInfoCts?.Cancel();
+            _loadVideoInfoCts = new CancellationTokenSource();
+            var cts = _loadVideoInfoCts;
+            var pathForStaleness = value;
+            _ = LoadVideoInfoForSelectionAsync(pathForStaleness, cts.Token);
           }
           else
           {
@@ -328,28 +333,41 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task LoadVideoInfoAsync(CancellationToken cancellationToken = default)
+    private async Task LoadVideoInfoForSelectionAsync(string pathForStaleness, CancellationToken cancellationToken)
     {
-      if (string.IsNullOrWhiteSpace(SelectedVideoPath))
+      if (string.IsNullOrWhiteSpace(pathForStaleness))
         return;
 
       try
       {
         IsLoading = true;
-        var info = await _backendClient.GetVideoInfoAsync(SelectedVideoPath, cancellationToken);
+        var info = await _videoEditClient.GetVideoInfoAsync(pathForStaleness, cancellationToken);
+
+        if (SelectedVideoPath != pathForStaleness)
+          return;
+
         VideoDuration = info.Duration;
         TrimStart = 0;
         TrimEnd = info.Duration;
       }
       catch (Exception ex)
       {
-        ErrorMessage = ResourceHelper.FormatString("VideoEdit.LoadVideoInfoFailed", ex.Message);
+        if (SelectedVideoPath == pathForStaleness)
+          ErrorMessage = ResourceHelper.FormatString("VideoEdit.LoadVideoInfoFailed", ex.Message);
         await HandleErrorAsync(ex, "Loading video info", showDialog: false);
       }
       finally
       {
-        IsLoading = false;
+        if (SelectedVideoPath == pathForStaleness)
+          IsLoading = false;
       }
+    }
+
+    private async Task LoadVideoInfoAsync(CancellationToken cancellationToken = default)
+    {
+      if (string.IsNullOrWhiteSpace(SelectedVideoPath))
+        return;
+      await LoadVideoInfoForSelectionAsync(SelectedVideoPath, cancellationToken);
     }
 
     private async Task TrimVideoAsync(CancellationToken cancellationToken)
@@ -371,7 +389,7 @@ namespace VoiceStudio.App.ViewModels
           EndTime = TrimEnd
         };
 
-        var response = await _backendClient.EditVideoAsync(request, cancellationToken);
+        var response = await _videoEditClient.EditVideoAsync(request, cancellationToken);
 
         if (response.Success && !string.IsNullOrWhiteSpace(response.OutputPath))
         {
@@ -469,7 +487,7 @@ namespace VoiceStudio.App.ViewModels
           SplitTime = TrimStart
         };
 
-        var response = await _backendClient.EditVideoAsync(request, cancellationToken);
+        var response = await _videoEditClient.EditVideoAsync(request, cancellationToken);
 
         if (response.Success)
         {
@@ -512,7 +530,7 @@ namespace VoiceStudio.App.ViewModels
           Effect = SelectedEffect
         };
 
-        var response = await _backendClient.EditVideoAsync(request, cancellationToken);
+        var response = await _videoEditClient.EditVideoAsync(request, cancellationToken);
 
         if (response.Success && !string.IsNullOrWhiteSpace(response.OutputPath))
         {
@@ -555,7 +573,7 @@ namespace VoiceStudio.App.ViewModels
           Duration = 1.0 // Default 1 second transition
         };
 
-        var response = await _backendClient.EditVideoAsync(request, cancellationToken);
+        var response = await _videoEditClient.EditVideoAsync(request, cancellationToken);
 
         if (response.Success && !string.IsNullOrWhiteSpace(response.OutputPath))
         {
@@ -601,7 +619,7 @@ namespace VoiceStudio.App.ViewModels
           Quality = ExportQuality
         };
 
-        var response = await _backendClient.EditVideoAsync(request, cancellationToken);
+        var response = await _videoEditClient.EditVideoAsync(request, cancellationToken);
 
         if (response.Success && !string.IsNullOrWhiteSpace(response.OutputPath))
         {

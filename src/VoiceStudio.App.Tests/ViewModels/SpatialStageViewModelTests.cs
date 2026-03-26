@@ -18,19 +18,21 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class SpatialStageViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<ISpatialStageClient>? _mockSpatialStageClient;
         private Mock<IProjectsClient>? _mockProjectsClient;
+        private Mock<IProjectAudioClient>? _mockProjectAudioClient;
         private SpatialStageViewModel? _viewModel;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockSpatialStageClient = new Mock<ISpatialStageClient>();
             _mockProjectsClient = new Mock<IProjectsClient>();
             _mockProjectsClient
                 .Setup(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<Project>());
+            _mockProjectAudioClient = new Mock<IProjectAudioClient>();
             _viewModel = CreateViewModel();
         }
 
@@ -38,14 +40,15 @@ namespace VoiceStudio.App.Tests.ViewModels
         public override void TestCleanup()
         {
             _viewModel = null;
-            _mockBackendClient = null;
+            _mockSpatialStageClient = null;
             _mockProjectsClient = null;
+            _mockProjectAudioClient = null;
             base.TestCleanup();
         }
 
         private SpatialStageViewModel CreateViewModel()
         {
-            return new SpatialStageViewModel(MockContext!, _mockBackendClient!.Object, _mockProjectsClient!.Object);
+            return new SpatialStageViewModel(MockContext!, _mockSpatialStageClient!.Object, _mockProjectsClient!.Object, _mockProjectAudioClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -62,21 +65,28 @@ namespace VoiceStudio.App.Tests.ViewModels
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
-            _ = new SpatialStageViewModel(null!, _mockBackendClient!.Object, _mockProjectsClient!.Object);
+            _ = new SpatialStageViewModel(null!, _mockSpatialStageClient!.Object, _mockProjectsClient!.Object, _mockProjectAudioClient!.Object);
         }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullSpatialStageClient_ThrowsArgumentNullException()
         {
-            _ = new SpatialStageViewModel(MockContext!, null!, _mockProjectsClient!.Object);
+            _ = new SpatialStageViewModel(MockContext!, null!, _mockProjectsClient!.Object, _mockProjectAudioClient!.Object);
         }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullProjectsClient_ThrowsArgumentNullException()
         {
-            _ = new SpatialStageViewModel(MockContext!, _mockBackendClient!.Object, null!);
+            _ = new SpatialStageViewModel(MockContext!, _mockSpatialStageClient!.Object, null!, _mockProjectAudioClient!.Object);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
+        public void Constructor_WithNullProjectAudioClient_ThrowsArgumentNullException()
+        {
+            _ = new SpatialStageViewModel(MockContext!, _mockSpatialStageClient!.Object, _mockProjectsClient!.Object, null!);
         }
 
         #endregion

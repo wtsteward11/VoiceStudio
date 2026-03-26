@@ -16,7 +16,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new VoiceStyleTransferViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient(),
+          ServiceProvider.GetVoiceStyleTransferClient(),
           ServiceProvider.GetProfilesClient()
       );
       DataContext = ViewModel;

@@ -12,13 +12,17 @@ namespace VoiceStudio.App.Tests.UseCases
   public class LibraryUseCaseTests
   {
     private Mock<IBackendClient> _mockBackendClient = null!;
+    private Mock<IContextManager> _mockContext = null!;
+    private Mock<IProjectAudioClient> _mockProjectAudio = null!;
     private LibraryUseCase _useCase = null!;
 
     [TestInitialize]
     public void Setup()
     {
       _mockBackendClient = new Mock<IBackendClient>();
-      _useCase = new LibraryUseCase(_mockBackendClient.Object);
+      _mockContext = new Mock<IContextManager>();
+      _mockProjectAudio = new Mock<IProjectAudioClient>();
+      _useCase = new LibraryUseCase(_mockBackendClient.Object, _mockContext.Object, _mockProjectAudio.Object);
     }
 
     [TestMethod]

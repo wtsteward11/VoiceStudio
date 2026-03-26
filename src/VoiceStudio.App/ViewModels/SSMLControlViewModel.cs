@@ -28,7 +28,7 @@ namespace VoiceStudio.App.ViewModels
     private readonly string _backendBaseUrl;
     private bool _isInitialized;
 
-    public string PanelId => "ssml-control";
+    public string PanelId => PanelIds.SSMLControl;
     public string DisplayName => ResourceHelper.GetString("Panel.SSMLControl.DisplayName", "SSML Editor");
     public PanelRegion Region => PanelRegion.Center;
 

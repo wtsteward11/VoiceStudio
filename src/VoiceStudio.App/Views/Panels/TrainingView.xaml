@@ -9,6 +9,7 @@
   <Grid ColumnSpacing="12" RowSpacing="12" Padding="12" AutomationProperties.AutomationId="TrainingView_Root">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
     <Grid.ColumnDefinitions>
@@ -25,7 +26,16 @@
       Margin="0,0,0,8"
       AutomationProperties.AutomationId="TrainingView_SimulationModeInfoBar" />
 
-    <StackPanel Grid.Row="1" Grid.Column="0" Spacing="10">
+    <TextBlock Grid.Row="1" Grid.ColumnSpan="2"
+      AutomationProperties.AutomationId="TrainingView_SurfaceMaturityFootnote"
+      Text="{x:Bind ViewModel.SurfaceMaturityFootnote, Mode=OneWay}"
+      TextWrapping="WrapWholeWords"
+      FontSize="11"
+      Opacity="0.85"
+      Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+      Margin="0,0,0,8" />
+
+    <StackPanel Grid.Row="2" Grid.Column="0" Spacing="10">
       <TextBlock Text="Datasets" FontSize="16" FontWeight="SemiBold" />
       <ListView x:Name="DatasetsListView"
         AutomationProperties.AutomationId="TrainingView_DatasetsListView"
@@ -57,7 +67,7 @@
         AutomationProperties.AutomationId="TrainingView_CreateDatasetButton" />
     </StackPanel>
 
-    <StackPanel Grid.Row="1" Grid.Column="1" Spacing="10">
+    <StackPanel Grid.Row="2" Grid.Column="1" Spacing="10">
       <TextBlock Text="Training Jobs" FontSize="16" FontWeight="SemiBold" />
       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
         <ComboBox x:Name="StatusFilter" MinWidth="100" SelectionChanged="StatusFilter_SelectionChanged"
@@ -96,6 +106,6 @@
     </StackPanel>
 
     <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed"
-      Grid.RowSpan="2" Grid.ColumnSpan="2" />
+      Grid.RowSpan="3" Grid.ColumnSpan="2" />
   </Grid>
 </UserControl>

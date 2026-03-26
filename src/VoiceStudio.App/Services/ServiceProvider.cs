@@ -34,6 +34,8 @@ namespace VoiceStudio.App.Services
     public static IHelpClient GetHelpClient() => AppServices.GetHelpClient();
     public static ITodoPanelClient GetTodoPanelClient() => AppServices.GetTodoPanelClient();
     public static ISearchClient GetSearchClient() => AppServices.GetSearchClient();
+    public static IHealthVersionClient GetHealthVersionClient() => AppServices.GetHealthVersionClient();
+    public static ITelemetryClient GetTelemetryClient() => AppServices.GetTelemetryClient();
     public static IAIMixingClient GetAIMixingClient() => AppServices.GetAIMixingClient();
     public static IAIProductionAssistantClient GetAIProductionAssistantClient() => AppServices.GetAIProductionAssistantClient();
     public static IAdvancedSpectrogramClient GetAdvancedSpectrogramClient() => AppServices.GetAdvancedSpectrogramClient();
@@ -186,5 +188,6 @@ namespace VoiceStudio.App.Services
     public static IViewModelContext GetViewModelContext() => AppServices.GetViewModelContext();
     public static BackendProcessManager GetBackendProcessManager() => AppServices.GetBackendProcessManager();
     public static BackendProcessManager? TryGetBackendProcessManager() => AppServices.TryGetBackendProcessManager();
+    public static IStartupStateService GetStartupStateService() => AppServices.GetStartupStateService();
   }
 }

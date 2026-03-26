@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
@@ -23,7 +24,7 @@ namespace VoiceStudio.App.Views.Panels
     /// </summary>
     public partial class SLODashboardViewModel : BaseViewModel, IPanelView
     {
-        private readonly IBackendClient _backendClient;
+        private readonly ISLODashboardClient _sloClient;
 
         /// <inheritdoc/>
         public string PanelId => "slo_dashboard";
@@ -82,14 +83,14 @@ namespace VoiceStudio.App.Views.Panels
         /// Initializes a new instance of the SLODashboardViewModel.
         /// </summary>
         /// <param name="context">The ViewModel context.</param>
-        /// <param name="backendClient">The backend client.</param>
+        /// <param name="sloClient">The SLO dashboard client.</param>
         public SLODashboardViewModel(
             IViewModelContext context,
-            IBackendClient backendClient)
+            ISLODashboardClient sloClient)
             : base(context)
         {
-            _backendClient = backendClient
-                ?? throw new ArgumentNullException(nameof(backendClient));
+            _sloClient = sloClient
+                ?? throw new ArgumentNullException(nameof(sloClient));
 
             RefreshCommand = new AsyncRelayCommand(LoadSloDataAsync);
         }
@@ -106,15 +107,14 @@ namespace VoiceStudio.App.Views.Panels
 
             try
             {
-                var response = await _backendClient.GetAsync<SloDataResponse>(
-                    "/api/v1/diagnostics/slo");
+                var response = await _sloClient.GetSloDataAsync();
 
                 if (response?.Slos != null)
                 {
                     SloMetrics.Clear();
-                    foreach (var slo in response.Slos)
+                    foreach (var dto in response.Slos)
                     {
-                        SloMetrics.Add(slo);
+                        SloMetrics.Add(SloMetric.FromDto(dto));
                     }
                 }
 
@@ -177,6 +177,21 @@ namespace VoiceStudio.App.Views.Panels
     /// </summary>
     public partial class SloMetric : ObservableObject
     {
+        /// <summary>Creates a SloMetric from API DTO.</summary>
+        public static SloMetric FromDto(SloMetricDto dto)
+        {
+            if (dto == null) throw new ArgumentNullException(nameof(dto));
+            return new SloMetric
+            {
+                Name = dto.Name ?? string.Empty,
+                CurrentValue = dto.CurrentValue,
+                Target = dto.Target,
+                WarningThreshold = dto.WarningThreshold,
+                Unit = dto.Unit ?? string.Empty,
+                MetricType = dto.MetricType ?? string.Empty
+            };
+        }
+
         /// <summary>Gets or sets the SLO name.</summary>
         [ObservableProperty]
         private string name = string.Empty;
@@ -282,15 +297,4 @@ namespace VoiceStudio.App.Views.Panels
         public SolidColorBrush StatusBadgeBackground => StatusColor;
     }
 
-    /// <summary>
-    /// Response model for SLO data API.
-    /// </summary>
-    public class SloDataResponse
-    {
-        /// <summary>Gets or sets the SLO metrics list.</summary>
-        public List<SloMetric> Slos { get; set; } = new();
-
-        /// <summary>Gets or sets the timestamp.</summary>
-        public DateTime Timestamp { get; set; }
-    }
 }

@@ -91,6 +91,14 @@ namespace VoiceStudio.App.Services
     }
 
     /// <inheritdoc />
+    public async Task<EmotionPreset> UpdatePresetAsync(string presetId, EmotionPresetUpdateRequest request, CancellationToken ct = default)
+    {
+      var preset = await _backend.UpdateEmotionPresetAsync(presetId, request, ct).ConfigureAwait(false);
+      _coordinator.Invalidate(PresetsKey);
+      return preset;
+    }
+
+    /// <inheritdoc />
     public async Task DeletePresetAsync(string presetId, CancellationToken ct = default)
     {
       await _backend.SendRequestAsync<object, object>(

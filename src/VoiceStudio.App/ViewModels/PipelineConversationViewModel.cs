@@ -20,7 +20,7 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class PipelineConversationViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IPipelineConversationClient _client;
     private readonly IWebSocketClientFactory? _webSocketClientFactory;
     private readonly PipelineStreamingWebSocketClient? _streamingClient;
     private ObservableCollection<ConversationMessageItem>? _messagesHooked;
@@ -94,11 +94,11 @@ namespace VoiceStudio.App.ViewModels
     // GAP-009: Updated to use IWebSocketClientFactory for DI
     public PipelineConversationViewModel(
         IViewModelContext context,
-        IBackendClient backendClient,
+        IPipelineConversationClient client,
         IWebSocketClientFactory? webSocketClientFactory = null)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
       _webSocketClientFactory = webSocketClientFactory;
 
       // F-01 gate: pipeline_streaming disabled until /api/pipeline/stream wiring is complete
@@ -119,10 +119,10 @@ namespace VoiceStudio.App.ViewModels
           _streamingClient.SessionStateChanged += OnSessionStateChanged;
         }
       }
-      else if (backendClient.WebSocketService != null)
+      else if (client.WebSocketService != null)
       {
         // Fallback for backward compatibility
-        _streamingClient = new PipelineStreamingWebSocketClient(backendClient.WebSocketService);
+        _streamingClient = new PipelineStreamingWebSocketClient(client.WebSocketService);
         _streamingClient.TokenReceived += OnTokenReceived;
         _streamingClient.AudioReceived += OnAudioReceived;
         _streamingClient.StreamComplete += OnStreamComplete;
@@ -191,7 +191,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var providers = await _backendClient.GetPipelineProvidersAsync(cancellationToken);
+        var providers = await _client.GetPipelineProvidersAsync(cancellationToken);
 
         AvailableLlmProviders.Clear();
         foreach (var p in providers.LlmProviders)
@@ -335,7 +335,7 @@ namespace VoiceStudio.App.ViewModels
         EnableFunctionCalling = true
       };
 
-      var response = await _backendClient.ProcessPipelineAsync(request, cancellationToken);
+      var response = await _client.ProcessPipelineAsync(request, cancellationToken);
 
       Messages.Add(new ConversationMessageItem
       {

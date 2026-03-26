@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
@@ -19,11 +20,11 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class AIProductionAssistantViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IAIProductionAssistantClient _client;
     private ObservableCollection<ChatMessageItem>? _messagesHooked;
     private ObservableCollection<string>? _suggestionsHooked;
 
-    public string PanelId => "ai-production-assistant";
+    public string PanelId => PanelIds.AIProductionAssistant;
     public string DisplayName => ResourceHelper.GetString("Panel.AIProductionAssistant.DisplayName", "AI Assistant");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -54,10 +55,10 @@ namespace VoiceStudio.App.ViewModels
     public Visibility SuggestionsVisibility =>
         Suggestions.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
-    public AIProductionAssistantViewModel(IViewModelContext context, IBackendClient backendClient)
+    public AIProductionAssistantViewModel(IViewModelContext context, IAIProductionAssistantClient client)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
 
       SendQueryCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -205,19 +206,14 @@ namespace VoiceStudio.App.ViewModels
         }
 
         // Send query to backend
-        var request = new AssistantQueryRequest
+        var request = new AIProductionAssistantQueryRequest
         {
           Query = CurrentQuery,
           SessionId = CurrentSessionId,
           Context = AppContext?.ToDictionary()
         };
 
-        var response = await _backendClient.SendRequestAsync<AssistantQueryRequest, AssistantQueryResponse>(
-            "/api/assistant/query",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _client.SendQueryAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -278,7 +274,7 @@ namespace VoiceStudio.App.ViewModels
         var actionData = SelectedMessage.ActionData;
         var actionType = actionData.ContainsKey("action") ? actionData["action"]?.ToString() : "";
 
-        var request = new AssistantExecuteRequest
+        var request = new AIProductionAssistantExecuteRequest
         {
           SessionId = CurrentSessionId ?? "",
           ActionId = Guid.NewGuid().ToString(),
@@ -286,12 +282,7 @@ namespace VoiceStudio.App.ViewModels
           Parameters = actionData
         };
 
-        var response = await _backendClient.SendRequestAsync<AssistantExecuteRequest, AssistantExecuteResponse>(
-            "/api/assistant/execute",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _client.ExecuteActionAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -333,12 +324,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var context = await _backendClient.SendRequestAsync<object, AssistantContextResponse>(
-            "/api/assistant/context",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var context = await _client.GetContextAsync(cancellationToken);
 
         if (context != null)
         {
@@ -384,48 +370,6 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Request/Response models
-    private class AssistantQueryRequest
-    {
-      public string Query { get; set; } = string.Empty;
-      public string? SessionId { get; set; }
-      public Dictionary<string, object>? Context { get; set; }
-    }
-
-    private class AssistantQueryResponse
-    {
-      public string SessionId { get; set; } = string.Empty;
-      public string Response { get; set; } = string.Empty;
-      public string MessageId { get; set; } = string.Empty;
-      public Dictionary<string, object>? ActionData { get; set; }
-      public List<string> Suggestions { get; set; } = new();
-      public float Confidence { get; set; }
-    }
-
-    private class AssistantExecuteRequest
-    {
-      public string SessionId { get; set; } = string.Empty;
-      public string ActionId { get; set; } = string.Empty;
-      public string ActionType { get; set; } = string.Empty;
-      public Dictionary<string, object> Parameters { get; set; } = new();
-    }
-
-    private class AssistantExecuteResponse
-    {
-      public bool Success { get; set; }
-      public Dictionary<string, object>? Result { get; set; }
-      public string Message { get; set; } = string.Empty;
-      public string? Error { get; set; }
-    }
-
-    public class AssistantContextResponse
-    {
-      public List<string> OpenPanels { get; set; } = new();
-      public string? CurrentProject { get; set; }
-      public string? ActiveAudioId { get; set; }
-      public List<string> AvailableProfiles { get; set; } = new();
-      public List<string> RecentOperations { get; set; } = new();
-    }
   }
 
   // Data models
@@ -454,7 +398,7 @@ namespace VoiceStudio.App.ViewModels
     public List<string> AvailableProfiles { get; set; } = new();
     public List<string> RecentOperations { get; set; } = new();
 
-    public AssistantContextItem(AIProductionAssistantViewModel.AssistantContextResponse response)
+    public AssistantContextItem(AIProductionAssistantContextResponse response)
     {
       OpenPanels = response.OpenPanels;
       CurrentProject = response.CurrentProject;

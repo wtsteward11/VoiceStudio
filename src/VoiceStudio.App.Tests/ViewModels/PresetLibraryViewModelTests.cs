@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -42,7 +43,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
             // Assert
             Assert.IsNotNull(viewModel);
-            Assert.AreEqual("preset_library", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.PresetLibrary, viewModel.PanelId);
             Assert.IsNotNull(viewModel.Presets);
             Assert.IsNotNull(viewModel.AvailablePresetTypes);
             Assert.IsNotNull(viewModel.AvailableCategories);
@@ -203,7 +204,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void PanelId_ReturnsCorrectValue()
         {
             var viewModel = CreateViewModel();
-            Assert.AreEqual("preset_library", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.PresetLibrary, viewModel.PanelId);
         }
 
         [TestMethod]

@@ -19,7 +19,7 @@ namespace VoiceStudio.App.ViewModels
   {
     private readonly IAdvancedSettingsClient _advancedSettingsClient;
 
-    public string PanelId => "advanced-settings";
+    public string PanelId => PanelIds.AdvancedSettings;
     public string DisplayName => ResourceHelper.GetString("Panel.AdvancedSettings.DisplayName", "Advanced Settings");
     public PanelRegion Region => PanelRegion.Center;
 

@@ -22,7 +22,7 @@ namespace VoiceStudio.App.ViewModels
     public string PanelId => "profile-health-dashboard";
     public string DisplayName => ResourceHelper.GetString("Panel.ProfileHealthDashboard.DisplayName", "Profile Health Dashboard");
     public PanelRegion Region => PanelRegion.Center;
-    private readonly IBackendClient _backendClient;
+    private readonly IProfileHealthClient _profileHealthClient;
     private readonly IProfilesClient _profilesClient;
 
     [ObservableProperty]
@@ -52,10 +52,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private int criticalProfiles;
 
-    public ProfileHealthDashboardViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient)
+    public ProfileHealthDashboardViewModel(IViewModelContext context, IProfileHealthClient profileHealthClient, IProfilesClient profilesClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _profileHealthClient = profileHealthClient ?? throw new ArgumentNullException(nameof(profileHealthClient));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       RefreshCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -113,7 +113,7 @@ namespace VoiceStudio.App.ViewModels
           // Check for degradation
           try
           {
-            var degradation = await _backendClient.GetQualityDegradationAsync(
+            var degradation = await _profileHealthClient.GetQualityDegradationAsync(
                 profile.Id,
                 timeWindowDays: 7,
                 degradationThresholdPercent: 10.0,
@@ -145,7 +145,7 @@ namespace VoiceStudio.App.ViewModels
             }
 
             // Get quality baseline
-            var baseline = await _backendClient.GetQualityBaselineAsync(profile.Id, timePeriodDays: 30, cancellationToken);
+            var baseline = await _profileHealthClient.GetQualityBaselineAsync(profile.Id, timePeriodDays: 30, cancellationToken);
             if (baseline != null)
             {
               healthItem.BaselineQuality = baseline.BaselineQualityScore;
@@ -154,7 +154,7 @@ namespace VoiceStudio.App.ViewModels
             }
 
             // Get quality trends
-            var trends = await _backendClient.GetQualityTrendsAsync(profile.Id, timeRange: "30d", cancellationToken);
+            var trends = await _profileHealthClient.GetQualityTrendsAsync(profile.Id, timeRange: "30d", cancellationToken);
             if (trends != null)
             {
               healthItem.Trend = trends.OverallTrend ?? "stable";
@@ -208,7 +208,7 @@ namespace VoiceStudio.App.ViewModels
       try
       {
         // Re-check degradation
-        var degradation = await _backendClient.GetQualityDegradationAsync(
+        var degradation = await _profileHealthClient.GetQualityDegradationAsync(
             SelectedProfile.ProfileId,
             timeWindowDays: 7,
             degradationThresholdPercent: 10.0,
@@ -237,7 +237,7 @@ namespace VoiceStudio.App.ViewModels
         }
 
         // Update baseline
-        var baseline = await _backendClient.GetQualityBaselineAsync(SelectedProfile.ProfileId, timePeriodDays: 30, cancellationToken);
+        var baseline = await _profileHealthClient.GetQualityBaselineAsync(SelectedProfile.ProfileId, timePeriodDays: 30, cancellationToken);
         if (baseline != null)
         {
           SelectedProfile.BaselineQuality = baseline.BaselineQualityScore;
@@ -248,7 +248,7 @@ namespace VoiceStudio.App.ViewModels
         }
 
         // Update trends
-        var trends = await _backendClient.GetQualityTrendsAsync(SelectedProfile.ProfileId, timeRange: "30d", cancellationToken);
+        var trends = await _profileHealthClient.GetQualityTrendsAsync(SelectedProfile.ProfileId, timeRange: "30d", cancellationToken);
         if (trends != null)
         {
           SelectedProfile.Trend = trends.OverallTrend ?? "stable";

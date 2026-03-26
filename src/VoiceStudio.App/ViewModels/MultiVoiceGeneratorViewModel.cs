@@ -9,23 +9,23 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VoiceStudio.App.Logging;
+using VoiceStudio.App.Services;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
 using Windows.Storage;
 using Windows.Storage.Pickers;
-using VoiceGenerationResultDataModel = VoiceStudio.App.ViewModels.MultiVoiceGeneratorViewModel.VoiceGenerationResultData;
 
 namespace VoiceStudio.App.ViewModels
 {
   /// <summary>
   /// ViewModel for the MultiVoiceGeneratorView panel - Generate multiple voice synthesis jobs simultaneously.
   /// </summary>
-  public partial class MultiVoiceGeneratorViewModel : BaseViewModel, IPanelView
+  public partial class MultiVoiceGeneratorViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IMultiVoiceGeneratorClient _multiVoiceClient;
 
-    public string PanelId => "multi-voice-generator";
+    public string PanelId => PanelIds.MultiVoiceGenerator;
     public string DisplayName => ResourceHelper.GetString("Panel.MultiVoiceGenerator.DisplayName", "Multi-Voice Generator");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -82,10 +82,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<string> selectedAudioIdsForComparison = new();
 
-    public MultiVoiceGeneratorViewModel(IViewModelContext context, IBackendClient backendClient)
+    public MultiVoiceGeneratorViewModel(IViewModelContext context, IMultiVoiceGeneratorClient multiVoiceClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _multiVoiceClient = multiVoiceClient ?? throw new ArgumentNullException(nameof(multiVoiceClient));
 
       AddToQueueCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -137,9 +137,17 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       });
-
-      _ = LoadEnginesAsync(new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token);
     }
+
+    Task IPanelLifecycle.OnActivatedAsync(CancellationToken ct)
+    {
+      _ = LoadEnginesAsync(ct);
+      return Task.CompletedTask;
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken ct) => Task.CompletedTask;
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken ct) => await RefreshAsync(ct);
 
     public IAsyncRelayCommand AddToQueueCommand { get; }
     public IAsyncRelayCommand RemoveFromQueueCommand { get; }
@@ -289,14 +297,7 @@ namespace VoiceStudio.App.ViewModels
           // Read CSV content
           var csvContent = await FileIO.ReadTextAsync(file);
 
-          // Send to backend for parsing
-          var importRequest = new Dictionary<string, object> { { "csv_content", csvContent } };
-          var response = await _backendClient.SendRequestAsync<Dictionary<string, object>, CSVImportResponse>(
-              "/api/voice/multi/import",
-              importRequest,
-              System.Net.Http.HttpMethod.Post,
-              cancellationToken
-          );
+          var response = await _multiVoiceClient.ImportCSVAsync(csvContent, cancellationToken);
 
           if (response?.Items != null)
           {
@@ -358,13 +359,7 @@ namespace VoiceStudio.App.ViewModels
         {
           cancellationToken.ThrowIfCancellationRequested();
 
-          // Get CSV from backend
-          var response = await _backendClient.SendRequestAsync<object, CSVExportResponse>(
-              $"/api/voice/multi/export?job_id={Uri.EscapeDataString(CurrentJobId ?? "")}",
-              new { },
-              System.Net.Http.HttpMethod.Post,
-              cancellationToken
-          );
+          var response = await _multiVoiceClient.ExportCSVAsync(CurrentJobId ?? "", cancellationToken);
 
           if (response != null && !string.IsNullOrWhiteSpace(response.CsvContent))
           {
@@ -421,16 +416,11 @@ namespace VoiceStudio.App.ViewModels
 
         var request = new MultiVoiceGenerateRequest
         {
-          Name = CurrentJobName,
+          Name = CurrentJobName!,
           Items = items
         };
 
-        var response = await _backendClient.SendRequestAsync<MultiVoiceGenerateRequest, MultiVoiceGenerateResponse>(
-            "/api/voice/multi/generate",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _multiVoiceClient.GenerateAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -468,30 +458,23 @@ namespace VoiceStudio.App.ViewModels
         {
           await Task.Delay(1000, cancellationToken); // Poll every second
 
-          var status = await _backendClient.SendRequestAsync<object, MultiVoiceJobStatusResponse>(
-              $"/api/voice/multi/{Uri.EscapeDataString(CurrentJobId)}/status",
-              null,
-              System.Net.Http.HttpMethod.Get,
-              cancellationToken
-          );
+          var status = await _multiVoiceClient.GetJobStatusAsync(CurrentJobId!, cancellationToken);
 
           if (status != null)
           {
             JobProgress = status.Progress;
             JobStatus = status.Status;
 
-            // Update queue items with status
-            foreach (var statusItem in status.Items)
+            // Update queue items with status (match by index; backend preserves order)
+            for (var i = 0; i < status.Items.Count && i < GenerationQueue.Count; i++)
             {
-              var queueItem = GenerationQueue.FirstOrDefault(q => q.ItemId == statusItem.ItemId);
-              if (queueItem != null)
-              {
-                queueItem.Status = statusItem.Status;
-                queueItem.Progress = statusItem.Progress;
-                queueItem.AudioId = statusItem.AudioId;
-                queueItem.AudioUrl = statusItem.AudioUrl;
-                queueItem.QualityScore = statusItem.QualityScore;
-              }
+              var statusItem = status.Items[i];
+              var queueItem = GenerationQueue[i];
+              queueItem.Status = statusItem.Status;
+              queueItem.Progress = statusItem.Progress;
+              queueItem.AudioId = statusItem.AudioId;
+              queueItem.AudioUrl = statusItem.AudioUrl;
+              queueItem.QualityScore = statusItem.QualityScore;
             }
 
             if (status.Status == "completed")
@@ -542,12 +525,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var status = await _backendClient.SendRequestAsync<object, MultiVoiceJobStatusResponse>(
-            $"/api/voice/multi/{Uri.EscapeDataString(CurrentJobId)}/status",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var status = await _multiVoiceClient.GetJobStatusAsync(CurrentJobId!, cancellationToken);
 
         if (status != null)
         {
@@ -582,12 +560,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var results = await _backendClient.SendRequestAsync<object, MultiVoiceResultsResponse>(
-            $"/api/voice/multi/{Uri.EscapeDataString(CurrentJobId)}/results",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var results = await _multiVoiceClient.GetResultsAsync(CurrentJobId!, cancellationToken);
 
         if (results != null)
         {
@@ -631,12 +604,7 @@ namespace VoiceStudio.App.ViewModels
           ComparisonType = "quality"
         };
 
-        var response = await _backendClient.SendRequestAsync<MultiVoiceCompareRequest, MultiVoiceCompareResponse>(
-            "/api/voice/multi/compare",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _multiVoiceClient.CompareVoicesAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -660,7 +628,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var engines = await _backendClient.GetEnginesAsync(cancellationToken);
+        var engines = await _multiVoiceClient.GetEnginesAsync(cancellationToken);
         AvailableEngines.Clear();
         foreach (var eng in engines)
           AvailableEngines.Add(eng);
@@ -678,108 +646,6 @@ namespace VoiceStudio.App.ViewModels
         await LoadResultsAsync(cancellationToken);
       }
       StatusMessage = ResourceHelper.GetString("MultiVoiceGenerator.Refreshed", "Refreshed");
-    }
-
-    // Request/Response models
-    private class MultiVoiceGenerateRequest
-    {
-      public string Name { get; set; } = string.Empty;
-      public List<Dictionary<string, object>> Items { get; set; } = new();
-    }
-
-    private class MultiVoiceGenerateResponse
-    {
-      public string JobId { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public int TotalItems { get; set; }
-      public string Status { get; set; } = string.Empty;
-    }
-
-    private class MultiVoiceJobStatusResponse
-    {
-      public string JobId { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public string Status { get; set; } = string.Empty;
-      public float Progress { get; set; }
-      public int TotalItems { get; set; }
-      public int CompletedCount { get; set; }
-      public int FailedCount { get; set; }
-      public List<VoiceGenerationStatusItem> Items { get; set; } = new();
-    }
-
-    private class VoiceGenerationStatusItem
-    {
-      public string ItemId { get; set; } = string.Empty;
-      public string ProfileId { get; set; } = string.Empty;
-      public string Text { get; set; } = string.Empty;
-      public string Engine { get; set; } = string.Empty;
-      public string QualityMode { get; set; } = string.Empty;
-      public string Language { get; set; } = string.Empty;
-      public string? Emotion { get; set; }
-      public string Status { get; set; } = string.Empty;
-      public float Progress { get; set; }
-      public string? AudioId { get; set; }
-      public string? AudioUrl { get; set; }
-      public float? QualityScore { get; set; }
-      public Dictionary<string, object>? QualityMetrics { get; set; }
-      public string? ErrorMessage { get; set; }
-    }
-
-    private class MultiVoiceResultsResponse
-    {
-      public string JobId { get; set; } = string.Empty;
-      public List<VoiceGenerationResultData> Items { get; set; } = new();
-    }
-
-    public class VoiceGenerationResultData
-    {
-      public string ItemId { get; set; } = string.Empty;
-      public string ProfileId { get; set; } = string.Empty;
-      public string Text { get; set; } = string.Empty;
-      public string Engine { get; set; } = string.Empty;
-      public string QualityMode { get; set; } = string.Empty;
-      public string Language { get; set; } = string.Empty;
-      public string? Emotion { get; set; }
-      public string? AudioId { get; set; }
-      public string? AudioUrl { get; set; }
-      public float? QualityScore { get; set; }
-      public Dictionary<string, object>? QualityMetrics { get; set; }
-    }
-
-    private class CSVImportResponse
-    {
-      public List<CSVItem> Items { get; set; } = new();
-      public int Count { get; set; }
-    }
-
-    private class CSVItem
-    {
-      public string ProfileId { get; set; } = string.Empty;
-      public string Text { get; set; } = string.Empty;
-      public string Engine { get; set; } = string.Empty;
-      public string QualityMode { get; set; } = string.Empty;
-      public string Language { get; set; } = string.Empty;
-      public string? Emotion { get; set; }
-    }
-
-    private class CSVExportResponse
-    {
-      public string JobId { get; set; } = string.Empty;
-      public string CsvContent { get; set; } = string.Empty;
-      public string Filename { get; set; } = string.Empty;
-    }
-
-    private class MultiVoiceCompareRequest
-    {
-      public List<string> AudioIds { get; set; } = new();
-      public string ComparisonType { get; set; } = "quality";
-    }
-
-    private class MultiVoiceCompareResponse
-    {
-      public List<Dictionary<string, object>> Comparisons { get; set; } = new();
-      public string? BestAudioId { get; set; }
-      public float? BestScore { get; set; }
     }
   }
 
@@ -821,7 +687,7 @@ namespace VoiceStudio.App.ViewModels
     public string QualityScoreDisplay => QualityScore.HasValue ? $"{QualityScore.Value:F2}" : "N/A";
     public string TextPreview => Text.Length > 50 ? Text.Substring(0, 50) + "..." : Text;
 
-    public VoiceGenerationResultItem(VoiceGenerationResultDataModel data)
+    public VoiceGenerationResultItem(MultiVoiceResultItem data)
     {
       ItemId = data.ItemId;
       ProfileId = data.ProfileId;

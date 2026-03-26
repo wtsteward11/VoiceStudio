@@ -13,7 +13,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateScriptAction : IUndoableAction
   {
     private readonly ObservableCollection<ScriptItem> _scripts;
-    private readonly IBackendClient _backendClient;
+    private readonly IScriptEditorClient _scriptEditorClient;
     private readonly ScriptItem _script;
     private readonly Action<ScriptItem>? _onUndo;
     private readonly Action<ScriptItem>? _onRedo;
@@ -22,13 +22,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateScriptAction(
         ObservableCollection<ScriptItem> scripts,
-        IBackendClient backendClient,
+        IScriptEditorClient scriptEditorClient,
         ScriptItem script,
         Action<ScriptItem>? onUndo = null,
         Action<ScriptItem>? onRedo = null)
     {
       _scripts = scripts ?? throw new ArgumentNullException(nameof(scripts));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _scriptEditorClient = scriptEditorClient ?? throw new ArgumentNullException(nameof(scriptEditorClient));
       _script = script ?? throw new ArgumentNullException(nameof(script));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -60,7 +60,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteScriptAction : IUndoableAction
   {
     private readonly ObservableCollection<ScriptItem> _scripts;
-    private readonly IBackendClient _backendClient;
+    private readonly IScriptEditorClient _scriptEditorClient;
     private readonly ScriptItem _script;
     private readonly int _originalIndex;
     private readonly Action<ScriptItem>? _onUndo;
@@ -70,14 +70,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteScriptAction(
         ObservableCollection<ScriptItem> scripts,
-        IBackendClient backendClient,
+        IScriptEditorClient scriptEditorClient,
         ScriptItem script,
         int originalIndex,
         Action<ScriptItem>? onUndo = null,
         Action<ScriptItem>? onRedo = null)
     {
       _scripts = scripts ?? throw new ArgumentNullException(nameof(scripts));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _scriptEditorClient = scriptEditorClient ?? throw new ArgumentNullException(nameof(scriptEditorClient));
       _script = script ?? throw new ArgumentNullException(nameof(script));
       _originalIndex = originalIndex;
       _onUndo = onUndo;
@@ -118,7 +118,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   {
     private readonly ScriptItem _script;
     private readonly ScriptSegment _segment;
-    private readonly IBackendClient _backendClient;
+    private readonly IScriptEditorClient _scriptEditorClient;
     private readonly int _originalIndex;
     private readonly Action<ScriptSegment>? _onUndo;
     private readonly Action<ScriptSegment>? _onRedo;
@@ -128,13 +128,13 @@ namespace VoiceStudio.App.Services.UndoableActions
     public AddScriptSegmentAction(
         ScriptItem script,
         ScriptSegment segment,
-        IBackendClient backendClient,
+        IScriptEditorClient scriptEditorClient,
         Action<ScriptSegment>? onUndo = null,
         Action<ScriptSegment>? onRedo = null)
     {
       _script = script ?? throw new ArgumentNullException(nameof(script));
       _segment = segment ?? throw new ArgumentNullException(nameof(segment));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _scriptEditorClient = scriptEditorClient ?? throw new ArgumentNullException(nameof(scriptEditorClient));
       _originalIndex = _script.Segments.IndexOf(_segment);
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -173,7 +173,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   {
     private readonly ScriptItem _script;
     private readonly ScriptSegment _segment;
-    private readonly IBackendClient _backendClient;
+    private readonly IScriptEditorClient _scriptEditorClient;
     private readonly int _originalIndex;
     private readonly Action<ScriptSegment>? _onUndo;
     private readonly Action<ScriptSegment>? _onRedo;
@@ -183,14 +183,14 @@ namespace VoiceStudio.App.Services.UndoableActions
     public RemoveScriptSegmentAction(
         ScriptItem script,
         ScriptSegment segment,
-        IBackendClient backendClient,
+        IScriptEditorClient scriptEditorClient,
         int originalIndex,
         Action<ScriptSegment>? onUndo = null,
         Action<ScriptSegment>? onRedo = null)
     {
       _script = script ?? throw new ArgumentNullException(nameof(script));
       _segment = segment ?? throw new ArgumentNullException(nameof(segment));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _scriptEditorClient = scriptEditorClient ?? throw new ArgumentNullException(nameof(scriptEditorClient));
       _originalIndex = originalIndex;
       _onUndo = onUndo;
       _onRedo = onRedo;

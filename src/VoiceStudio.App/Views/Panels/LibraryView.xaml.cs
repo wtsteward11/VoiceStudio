@@ -9,11 +9,13 @@ using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using System.Threading;
 using Windows.Foundation;
 using Windows.System;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
 using System;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
@@ -24,8 +26,9 @@ namespace VoiceStudio.App.Views.Panels
 {
   /// <summary>
   /// LibraryView panel for asset library browsing and management.
+  /// Implements INavigatablePanel for search-result focus (audio, project_audio).
   /// </summary>
-  public sealed partial class LibraryView : UserControl
+  public sealed partial class LibraryView : UserControl, INavigatablePanel
   {
     public LibraryViewModel ViewModel { get; }
 
@@ -43,7 +46,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new LibraryViewModel(
           AppServices.GetRequiredService<IViewModelContext>(),
-          ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<ILibraryClient>(),
           AppServices.GetRequiredService<IDialogService>(),
           triggerImport: () =>
           {
@@ -1575,6 +1578,20 @@ namespace VoiceStudio.App.Views.Panels
         return DropPosition.After;
       else
         return DropPosition.On;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> NavigateToItemAsync(
+        string itemId,
+        string resultType,
+        CancellationToken ct,
+        IReadOnlyDictionary<string, object>? searchMetadata = null)
+    {
+      _ = searchMetadata;
+      var type = resultType?.ToLowerInvariant() ?? string.Empty;
+      if (type != "audio" && type != "project_audio")
+        return false;
+      return await ViewModel.NavigateToAssetAsync(itemId, ct);
     }
   }
 }

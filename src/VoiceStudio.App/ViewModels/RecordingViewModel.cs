@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Core.Models;
@@ -16,17 +17,19 @@ namespace VoiceStudio.App.ViewModels
   /// ViewModel for the RecordingView panel.
   /// Supports both local microphone recording (via NAudio) and backend-based recording.
   /// </summary>
-  public partial class RecordingViewModel : BaseViewModel, IPanelView
+  public partial class RecordingViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IRecordingClient _recordingClient;
+    private readonly IProjectAudioClient _projectAudioClient;
     private readonly IAudioPlayerService _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly IErrorPresentationService? _errorService;
     private readonly IErrorLoggingService? _logService;
     private readonly IDispatcherTimer _statusTimer;
     private readonly MicrophoneRecordingService _microphoneService;
+    private ISubscriptionToken? _projectChangedToken;
 
-    public string PanelId => "recording";
+    public string PanelId => PanelIds.Recording;
     public string DisplayName => ResourceHelper.GetString("Panel.Recording.DisplayName", "Recording");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -97,10 +100,15 @@ namespace VoiceStudio.App.ViewModels
             24
         };
 
-    public RecordingViewModel(IViewModelContext context, IBackendClient backendClient, IAudioPlayerService audioPlayer)
+    public RecordingViewModel(
+        IViewModelContext context,
+        IRecordingClient recordingClient,
+        IProjectAudioClient projectAudioClient,
+        IAudioPlayerService audioPlayer)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _recordingClient = recordingClient ?? throw new ArgumentNullException(nameof(recordingClient));
+      _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
       // Get services using helper (reduces code duplication)
@@ -157,15 +165,48 @@ namespace VoiceStudio.App.ViewModels
         if (e.PropertyName is nameof(RecordedAudioId) or nameof(RecordedAudioUrl) or nameof(IsLoading))
           PlayCommand.NotifyCanExecuteChanged();
       };
-
-      // Load devices on initialization
-      var loadCt = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
-      _ = LoadDevicesAsync(loadCt).ContinueWith(t =>
-      {
-        if (t.IsFaulted)
-          _logService?.LogError(t.Exception?.InnerException ?? new Exception("LoadDevices failed"), "LoadDevices");
-      }, TaskScheduler.Default);
     }
+
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      SyncProjectFromContext();
+      EnsureProjectChangedSubscription();
+      await LoadDevicesAsync(cancellationToken);
+    }
+
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <summary>Pass 05 C1: align with active project from <see cref="IContextManager"/>.</summary>
+    private void SyncProjectFromContext()
+    {
+      var ctx = AppServices.TryGetContextManager();
+      if (ctx == null)
+        return;
+      var activeId = ctx.ActiveProjectId;
+      if (ProjectId != activeId)
+        ProjectId = activeId;
+    }
+
+    private void EnsureProjectChangedSubscription()
+    {
+      if (_projectChangedToken != null)
+        return;
+      var agg = AppServices.TryGetEventAggregator();
+      if (agg == null)
+        return;
+      _projectChangedToken = agg.Subscribe<ProjectChangedEvent>(OnProjectChanged);
+    }
+
+    private void OnProjectChanged(ProjectChangedEvent e)
+    {
+      Dispatcher.TryEnqueue(() =>
+      {
+        if (ProjectId != e.ProjectId)
+          ProjectId = e.ProjectId;
+      });
+    }
+
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => LoadDevicesAsync(cancellationToken);
 
     public EnhancedAsyncRelayCommand StartRecordingCommand { get; }
     public EnhancedAsyncRelayCommand StopRecordingCommand { get; }
@@ -252,17 +293,8 @@ namespace VoiceStudio.App.ViewModels
           try
           {
             // Upload the recorded file to backend
-            var uploadResult = await _backendClient.UploadAudioFileAsync(recordingPath);
-            RecordedAudioId = uploadResult.Id;
-            RecordedAudioUrl = uploadResult.Path;
-
-            // Publish event to refresh Library
-            var eventAggregator = AppServices.TryGetEventAggregator();
-            eventAggregator?.Publish(new VoiceStudio.Core.Events.AssetAddedEvent(
-                "recording-panel",
-                uploadResult.Id,
-                "audio",
-                recordingPath));
+            var uploadResult = await _recordingClient.UploadAudioFileAsync(recordingPath);
+            await ApplyPostLibraryUploadSuccessAsync(uploadResult, recordingPath, cancellationToken).ConfigureAwait(false);
           }
           catch (Exception uploadEx)
           {
@@ -296,6 +328,40 @@ namespace VoiceStudio.App.ViewModels
       {
         IsLoading = false;
       }
+    }
+
+    /// <summary>
+    /// Pass 05 Option C: seam-tested wiring after a recording file is uploaded to the library (IDs, project save, transport, <see cref="AssetAddedEvent"/>).
+    /// Matches the success path inside <see cref="StopRecordingAsync"/> after <see cref="IRecordingClient.UploadAudioFileAsync"/>.
+    /// Public for seam tests (WinUI project may not emit <c>InternalsVisibleTo</c> to test assembly reliably).
+    /// </summary>
+    public async Task ApplyPostLibraryUploadSuccessAsync(
+        AudioUploadResponse uploadResult,
+        string recordingPath,
+        CancellationToken cancellationToken)
+    {
+      ArgumentNullException.ThrowIfNull(uploadResult);
+      RecordedAudioId = uploadResult.Id;
+      RecordedAudioUrl = uploadResult.Path;
+
+      await RecordingToProjectPersistence.TrySaveAfterUploadAsync(
+          _projectAudioClient,
+          _logService,
+          ProjectId,
+          uploadResult.Id,
+          recordingPath,
+          cancellationToken).ConfigureAwait(false);
+
+      var ctx = AppServices.TryGetContextManager();
+      if (ctx != null)
+        ctx.SetCurrentPlayable(uploadResult.Id, TransportSource.Recording, "Recording");
+
+      var eventAggregator = AppServices.TryGetEventAggregator();
+      eventAggregator?.Publish(new AssetAddedEvent(
+          "recording-panel",
+          uploadResult.Id,
+          "audio",
+          recordingPath));
     }
 
     private async Task CancelRecordingAsync(CancellationToken cancellationToken)
@@ -363,12 +429,19 @@ namespace VoiceStudio.App.ViewModels
       if (string.IsNullOrEmpty(RecordedAudioId) && string.IsNullOrEmpty(RecordedAudioUrl))
         return;
 
+      // Own global transport so main Play routes here
+      if (!string.IsNullOrEmpty(RecordedAudioId))
+      {
+        var ctx = AppServices.TryGetContextManager();
+        if (ctx != null)
+          ctx.SetCurrentPlayable(RecordedAudioId, TransportSource.Recording, "Recording");
+      }
+
       try
       {
         if (!string.IsNullOrEmpty(RecordedAudioId))
         {
-          var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
-              ?? "http://localhost:8000";
+          var baseUrl = BackendPlaybackBaseUrl.Resolve(AppServices.GetService<BackendClientConfig>());
           await _audioPlayer.PlayBackendAudioIdAsync(RecordedAudioId, baseUrl);
         }
         else if (!string.IsNullOrEmpty(RecordedAudioUrl))
@@ -397,12 +470,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, RecordingDevicesResponse>(
-            "/api/recording/devices",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _recordingClient.GetRecordingDevicesAsync(cancellationToken);
 
         AvailableDevices.Clear();
         if (response?.Devices != null)
@@ -528,17 +596,6 @@ namespace VoiceStudio.App.ViewModels
       public double Duration { get; set; }
     }
 
-    private class RecordingDevicesResponse
-    {
-      public RecordingDevice[] Devices { get; set; } = Array.Empty<RecordingDevice>();
-    }
-
-    private class RecordingDevice
-    {
-      public string Id { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-    }
-
     /// <summary>
     /// Notify commands when IsRecording changes to update their CanExecute state.
     /// </summary>
@@ -553,6 +610,12 @@ namespace VoiceStudio.App.ViewModels
     {
       if (disposing)
       {
+        if (_projectChangedToken != null)
+        {
+          AppServices.TryGetEventAggregator()?.Unsubscribe(_projectChangedToken);
+          _projectChangedToken = null;
+        }
+
         _statusTimer.Stop();
         _statusTimer.Tick -= StatusTimer_Tick;
 

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.Views.Panels;
+using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -371,6 +372,8 @@ namespace VoiceStudio.App.Tests.ViewModels
       _sut.LastSynthesizedAudioId = "a1";
       _sut.LastSynthesizedAudioUrl = "http://localhost/audio.wav";
       _sut.LastSynthesizedDuration = 1.0;
+      _sut.SelectedProfileId = "p1";
+      _sut.SynthesisText = "Test text";
 
       await _sut.AddClipToTrackCommand.ExecuteAsync(null);
 
@@ -379,6 +382,108 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockClipService.Verify(
           x => x.CreateClipAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AudioClip>(), It.IsAny<CancellationToken>()),
           Times.Once);
+    }
+
+    /// <summary>
+    /// Pass 01: CreateClipAsync receives clip with ProfileId when adding via AddClipToTrackCommand.
+    /// </summary>
+    [TestMethod]
+    [TestCategory("WorkflowCoherence")]
+    public async Task AddClipToTrack_PassesProfileIdToCreateClipAsync()
+    {
+      var project = new Project { Id = "proj-1", Name = "Test Project" };
+      var track = new AudioTrack { Id = "t1", Name = "Track 1", ProjectId = "proj-1" };
+      var returnedClip = new AudioClip { Id = "c1", Name = "Clip 1", ProfileId = "profile-123", AudioId = "a1", Duration = TimeSpan.FromSeconds(1), StartTime = 0 };
+
+      _mockClipService.Setup(x => x.CreateClipAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AudioClip>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(returnedClip);
+
+      _sut.Projects.Add(project);
+      _sut.Tracks.Add(track);
+      _sut.SelectedProject = project;
+      _sut.SelectedTrack = track;
+      _sut.LastSynthesizedAudioId = "a1";
+      _sut.LastSynthesizedAudioUrl = "http://localhost/audio.wav";
+      _sut.LastSynthesizedDuration = 1.0;
+      _sut.SelectedProfileId = "profile-123";
+      _sut.SynthesisText = "Hello";
+
+      await _sut.AddClipToTrackCommand.ExecuteAsync(null);
+
+      await Task.Delay(300);
+
+      _mockClipService.Verify(
+          x => x.CreateClipAsync("proj-1", "t1", It.Is<AudioClip>(c => c.ProfileId == "profile-123"), It.IsAny<CancellationToken>()),
+          Times.Once);
+    }
+
+    #endregion
+
+    #region Pass 06 backup restore coherence
+
+    [TestMethod]
+    [TestCategory("SeamAware")]
+    public async Task ApplyBackupRestoredAsync_WhenPreviousProjectMissing_ClearsSelectedProject()
+    {
+      var oldProject = new Project { Id = "proj-old", Name = "Old" };
+      _sut.Projects.Add(oldProject);
+      _sut.SelectedProject = oldProject;
+
+      _mockProjectsClient.Reset();
+      _mockProjectsClient
+          .Setup(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<Project> { new Project { Id = "proj-new", Name = "New" } });
+
+      await _sut.ApplyBackupRestoredAsync(
+          new BackupRestoredEvent(PanelIds.BackupRestore, restoreProjects: true, restoreProfiles: false, restoreSettings: false, restoreModels: false),
+          CancellationToken.None);
+
+      Assert.IsNull(_sut.SelectedProject);
+      _mockProjectsClient.Verify(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [TestMethod]
+    [TestCategory("SeamAware")]
+    public async Task ApplyBackupRestoredAsync_WhenPreviousProjectStillPresent_PreservesSelectionById()
+    {
+      var oldProject = new Project { Id = "proj-1", Name = "Same" };
+      _sut.Projects.Add(oldProject);
+      _sut.SelectedProject = oldProject;
+
+      var refreshed = new Project { Id = "proj-1", Name = "Same Updated" };
+      _mockProjectsClient.Reset();
+      _mockProjectsClient
+          .Setup(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<Project> { refreshed });
+
+      await _sut.ApplyBackupRestoredAsync(
+          new BackupRestoredEvent(PanelIds.BackupRestore, true, false, false, false),
+          CancellationToken.None);
+
+      Assert.IsNotNull(_sut.SelectedProject);
+      Assert.AreEqual("proj-1", _sut.SelectedProject.Id);
+      Assert.AreEqual("Same Updated", _sut.SelectedProject.Name);
+    }
+
+    [TestMethod]
+    [TestCategory("SeamAware")]
+    public async Task ApplyBackupRestoredAsync_WhenRestoreProjectsFalse_DoesNotReloadProjects_RefreshesProfilesWhenRequested()
+    {
+      _mockProjectsClient.Reset();
+      _mockProfilesClient.Reset();
+      _mockProjectsClient
+          .Setup(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<Project>());
+      _mockProfilesClient
+          .Setup(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<VoiceProfile>());
+
+      await _sut.ApplyBackupRestoredAsync(
+          new BackupRestoredEvent(PanelIds.BackupRestore, restoreProjects: false, restoreProfiles: true, restoreSettings: false, restoreModels: false),
+          CancellationToken.None);
+
+      _mockProjectsClient.Verify(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()), Times.Never);
+      _mockProfilesClient.Verify(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion

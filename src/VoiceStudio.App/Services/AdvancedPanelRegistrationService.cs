@@ -22,7 +22,7 @@ namespace VoiceStudio.App.Services
       // Panel 1: Text-Based Speech Editor (Pro)
       registry.Register(new PanelDescriptor
       {
-        PanelId = "TextSpeechEditor",
+        PanelId = PanelIds.TextSpeechEditor,
         DisplayName = "Text Speech Editor",
         Region = PanelRegion.Center,
         ViewType = typeof(TextSpeechEditorView),
@@ -34,7 +34,7 @@ namespace VoiceStudio.App.Services
       // Panel 2: Prosody & Phoneme Control (Advanced)
       registry.Register(new PanelDescriptor
       {
-        PanelId = "Prosody",
+        PanelId = PanelIds.Prosody,
         DisplayName = "Prosody",
         Region = PanelRegion.Right,
         ViewType = typeof(ProsodyView),
@@ -46,7 +46,7 @@ namespace VoiceStudio.App.Services
       // Panel 3: Spatial Audio (Pro)
       registry.Register(new PanelDescriptor
       {
-        PanelId = "SpatialAudio",
+        PanelId = PanelIds.SpatialAudio,
         DisplayName = "Spatial Audio",
         Region = PanelRegion.Center,
         ViewType = typeof(SpatialAudioView),
@@ -58,7 +58,7 @@ namespace VoiceStudio.App.Services
       // Panel 4: AI Mixing & Mastering Assistant (Pro)
       registry.Register(new PanelDescriptor
       {
-        PanelId = "AIMixingMastering",
+        PanelId = PanelIds.AIMixingMastering,
         DisplayName = "AI Mixing & Mastering",
         Region = PanelRegion.Right,
         ViewType = typeof(AIMixingMasteringView),
@@ -70,7 +70,7 @@ namespace VoiceStudio.App.Services
       // Panel 5: Voice Style Transfer (Pro)
       registry.Register(new PanelDescriptor
       {
-        PanelId = "VoiceStyleTransfer",
+        PanelId = PanelIds.VoiceStyleTransfer,
         DisplayName = "Style Transfer",
         Region = PanelRegion.Center,
         ViewType = typeof(VoiceStyleTransferView),
@@ -82,7 +82,7 @@ namespace VoiceStudio.App.Services
       // Panel 6: Speaker Embedding Explorer (Technical)
       registry.Register(new PanelDescriptor
       {
-        PanelId = "EmbeddingExplorer",
+        PanelId = PanelIds.EmbeddingExplorer,
         DisplayName = "Embedding Explorer",
         Region = PanelRegion.Center,
         ViewType = typeof(EmbeddingExplorerView),
@@ -94,7 +94,7 @@ namespace VoiceStudio.App.Services
       // Panel 7: AI Production Assistant (Meta)
       registry.Register(new PanelDescriptor
       {
-        PanelId = "ai-production-assistant",
+        PanelId = PanelIds.AIProductionAssistant,
         DisplayName = "AI Production Assistant",
         Region = PanelRegion.Right,
         ViewType = typeof(AIProductionAssistantView),
@@ -106,7 +106,7 @@ namespace VoiceStudio.App.Services
       // Panel 8: Pronunciation Lexicon (Advanced)
       registry.Register(new PanelDescriptor
       {
-        PanelId = "PronunciationLexicon",
+        PanelId = PanelIds.PronunciationLexicon,
         DisplayName = "Pronunciation Lexicon",
         Region = PanelRegion.Right,
         ViewType = typeof(PronunciationLexiconView),
@@ -118,7 +118,7 @@ namespace VoiceStudio.App.Services
       // Panel 9: Voice Morphing/Blending (Pro)
       registry.Register(new PanelDescriptor
       {
-        PanelId = "VoiceMorphingBlending",
+        PanelId = PanelIds.VoiceMorphingBlending,
         DisplayName = "Voice Blending",
         Region = PanelRegion.Center,
         ViewType = typeof(VoiceMorphingBlendingView),
@@ -130,7 +130,7 @@ namespace VoiceStudio.App.Services
       // Panel 10: Plugin Gallery
       registry.Register(new PanelDescriptor
       {
-        PanelId = "plugin-gallery",
+        PanelId = PanelIds.PluginGallery,
         DisplayName = "Plugin Gallery",
         Region = PanelRegion.Center,
         ViewType = typeof(PluginGalleryView),
@@ -142,7 +142,7 @@ namespace VoiceStudio.App.Services
       // Panel 11: Theme Editor
       registry.Register(new PanelDescriptor
       {
-        PanelId = "ThemeEditor",
+        PanelId = PanelIds.ThemeEditor,
         DisplayName = "Theme Editor",
         Region = PanelRegion.Right,
         ViewType = typeof(ThemeEditorView),

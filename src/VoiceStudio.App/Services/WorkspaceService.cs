@@ -49,11 +49,11 @@ public class WorkspaceService : IWorkspaceService
             KeyboardShortcut = "Ctrl+1",
             Panels = new List<PanelPlacement>
             {
-                new() { PanelId = "library", Region = PanelRegion.Left, Order = 0, IsVisible = true },
-                new() { PanelId = "profiles", Region = PanelRegion.Left, Order = 1, IsVisible = true },
-                new() { PanelId = "synthesis", Region = PanelRegion.Center, Order = 0, IsVisible = true },
-                new() { PanelId = "timeline", Region = PanelRegion.Bottom, Order = 0, IsVisible = true },
-                new() { PanelId = "output", Region = PanelRegion.Right, Order = 0, IsVisible = true }
+                new() { PanelId = PanelIds.Library, Region = PanelRegion.Left, Order = 0, IsVisible = true },
+                new() { PanelId = PanelIds.Profiles, Region = PanelRegion.Left, Order = 1, IsVisible = true },
+                new() { PanelId = PanelIds.VoiceSynthesis, Region = PanelRegion.Center, Order = 0, IsVisible = true },
+                new() { PanelId = PanelIds.Timeline, Region = PanelRegion.Bottom, Order = 0, IsVisible = true },
+                new() { PanelId = PanelIds.EffectsMixer, Region = PanelRegion.Right, Order = 0, IsVisible = true }
             }
         },
         new WorkspaceDefinition
@@ -66,10 +66,10 @@ public class WorkspaceService : IWorkspaceService
             KeyboardShortcut = "Ctrl+2",
             Panels = new List<PanelPlacement>
             {
-                new() { PanelId = "library", Region = PanelRegion.Left, Order = 0, IsVisible = true, RelativeWidth = 0.25 },
-                new() { PanelId = "cloning", Region = PanelRegion.Center, Order = 0, IsVisible = true },
-                new() { PanelId = "profiles", Region = PanelRegion.Right, Order = 0, IsVisible = true, RelativeWidth = 0.25 },
-                new() { PanelId = "training", Region = PanelRegion.Bottom, Order = 0, IsVisible = true }
+                new() { PanelId = PanelIds.Library, Region = PanelRegion.Left, Order = 0, IsVisible = true, RelativeWidth = 0.25 },
+                new() { PanelId = PanelIds.VoiceCloningWizard, Region = PanelRegion.Center, Order = 0, IsVisible = true },
+                new() { PanelId = PanelIds.Profiles, Region = PanelRegion.Right, Order = 0, IsVisible = true, RelativeWidth = 0.25 },
+                new() { PanelId = PanelIds.Training, Region = PanelRegion.Bottom, Order = 0, IsVisible = true }
             }
         },
         new WorkspaceDefinition
@@ -82,10 +82,10 @@ public class WorkspaceService : IWorkspaceService
             KeyboardShortcut = "Ctrl+3",
             Panels = new List<PanelPlacement>
             {
-                new() { PanelId = "library", Region = PanelRegion.Left, Order = 0, IsVisible = true, RelativeWidth = 0.2 },
-                new() { PanelId = "timeline", Region = PanelRegion.Center, Order = 0, IsVisible = true },
-                new() { PanelId = "waveform", Region = PanelRegion.Center, Order = 1, IsVisible = true },
-                new() { PanelId = "output", Region = PanelRegion.Right, Order = 0, IsVisible = true, RelativeWidth = 0.2 }
+                new() { PanelId = PanelIds.Library, Region = PanelRegion.Left, Order = 0, IsVisible = true, RelativeWidth = 0.2 },
+                new() { PanelId = PanelIds.Timeline, Region = PanelRegion.Center, Order = 0, IsVisible = true },
+                new() { PanelId = PanelIds.AudioAnalysis, Region = PanelRegion.Center, Order = 1, IsVisible = true },
+                new() { PanelId = PanelIds.EffectsMixer, Region = PanelRegion.Right, Order = 0, IsVisible = true, RelativeWidth = 0.2 }
             }
         },
         new WorkspaceDefinition
@@ -98,8 +98,8 @@ public class WorkspaceService : IWorkspaceService
             KeyboardShortcut = "Ctrl+4",
             Panels = new List<PanelPlacement>
             {
-                new() { PanelId = "synthesis", Region = PanelRegion.Center, Order = 0, IsVisible = true },
-                new() { PanelId = "output", Region = PanelRegion.Right, Order = 0, IsVisible = true, RelativeWidth = 0.3 }
+                new() { PanelId = PanelIds.VoiceSynthesis, Region = PanelRegion.Center, Order = 0, IsVisible = true },
+                new() { PanelId = PanelIds.EffectsMixer, Region = PanelRegion.Right, Order = 0, IsVisible = true, RelativeWidth = 0.3 }
             }
         }
     };

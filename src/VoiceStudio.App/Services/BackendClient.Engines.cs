@@ -33,7 +33,7 @@ namespace VoiceStudio.App.Services
 
         if (!response.IsSuccessStatusCode)
         {
-          throw await CreateExceptionFromResponseAsync(response);
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
         }
 
         var result = await response.Content.ReadFromJsonAsync<EnginesListResponse>(_jsonOptions, cancellationToken)

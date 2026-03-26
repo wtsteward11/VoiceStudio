@@ -16,7 +16,7 @@ namespace VoiceStudio.App.Views.Panels
   /// </summary>
   public partial class AdvancedRealTimeVisualizationViewModel : ObservableObject
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IAdvancedRealTimeVisualizationClient _client;
     private System.Threading.Timer? _updateTimer;
     private bool _isUpdating;
     private bool _isSubscribedToPlayback;
@@ -80,9 +80,9 @@ namespace VoiceStudio.App.Views.Panels
     public bool Is3DVisualization => VisualizationType == "3D Spectrogram" || VisualizationType == "Frequency Waterfall";
     public bool IsParticleVisualizer => VisualizationType == "Particle Visualizer";
 
-    public AdvancedRealTimeVisualizationViewModel(IBackendClient backendClient)
+    public AdvancedRealTimeVisualizationViewModel(IAdvancedRealTimeVisualizationClient client)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
       SavePresetCommand = new RelayCommand(SavePreset, () => !string.IsNullOrWhiteSpace(VisualizationType));
       ResetViewCommand = new RelayCommand(ResetView);
 
@@ -284,16 +284,7 @@ namespace VoiceStudio.App.Views.Panels
         // Fetch audio visualization data from backend
         try
         {
-          var request = new
-          {
-            visualization_type = VisualizationType.ToLower(),
-            update_rate = UpdateRate
-          };
-
-          var response = await _backendClient.SendRequestAsync<object, Dictionary<string, object>>(
-              "/api/visualization/get-data",
-              request
-          );
+          var response = await _client.GetVisualizationDataAsync(VisualizationType, UpdateRate);
 
           if (response != null)
           {
@@ -312,35 +303,13 @@ namespace VoiceStudio.App.Views.Panels
         // If synced with playback, get current playback position
         if (SyncWithPlayback && _isSubscribedToPlayback)
         {
-          AudioPosition = await GetCurrentPlaybackPositionAsync();
+          AudioPosition = await _client.GetPlaybackPositionAsync();
         }
       }
       finally
       {
         _isUpdating = false;
       }
-    }
-
-    private async Task<TimeSpan> GetCurrentPlaybackPositionAsync()
-    {
-      try
-      {
-        var response = await _backendClient.SendRequestAsync<object, Dictionary<string, object>>(
-            "/api/audio/playback-position",
-            new { }
-        );
-
-        if (response != null && response.TryGetValue("position_seconds", out var posObj) && posObj != null && double.TryParse(posObj.ToString(), out var seconds))
-        {
-          return TimeSpan.FromSeconds(seconds);
-        }
-      }
-      catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "AdvancedRealTimeVisualizationViewModel.Task");
-      }
-
-      return TimeSpan.Zero;
     }
 
     public void Dispose()

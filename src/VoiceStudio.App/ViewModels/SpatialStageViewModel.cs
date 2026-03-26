@@ -5,20 +5,21 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
-using SpatialConfigModel = VoiceStudio.App.ViewModels.SpatialStageViewModel.SpatialConfig;
 
 namespace VoiceStudio.App.ViewModels
 {
   /// <summary>
   /// ViewModel for the SpatialStageView panel - Spatial audio positioning.
   /// </summary>
-  public partial class SpatialStageViewModel : BaseViewModel, IPanelView
+  public partial class SpatialStageViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ISpatialStageClient _client;
     private readonly IProjectsClient _projectsClient;
+    private readonly IProjectAudioClient _projectAudioClient;
 
     public string PanelId => "spatial-stage";
     public string DisplayName => ResourceHelper.GetString("Panel.SpatialStage.DisplayName", "Spatial Audio");
@@ -66,11 +67,12 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool enableHrtf = true;
 
-    public SpatialStageViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient)
+    public SpatialStageViewModel(IViewModelContext context, ISpatialStageClient client, IProjectsClient projectsClient, IProjectAudioClient projectAudioClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
       _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
+      _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
 
       LoadConfigsCommand = new AsyncRelayCommand(LoadConfigsAsync);
       CreateConfigCommand = new AsyncRelayCommand(CreateConfigAsync);
@@ -80,10 +82,6 @@ namespace VoiceStudio.App.ViewModels
       PreviewSpatialCommand = new AsyncRelayCommand(PreviewSpatialAsync);
       LoadAudioFilesCommand = new AsyncRelayCommand(LoadAudioFilesAsync);
       RefreshCommand = new AsyncRelayCommand(RefreshAsync);
-
-      // Load initial data
-      _ = LoadConfigsAsync(CancellationToken.None);
-      _ = LoadAudioFilesAsync(CancellationToken.None);
     }
 
     public IAsyncRelayCommand LoadConfigsCommand { get; }
@@ -94,6 +92,18 @@ namespace VoiceStudio.App.ViewModels
     public IAsyncRelayCommand PreviewSpatialCommand { get; }
     public IAsyncRelayCommand LoadAudioFilesCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
+
+    Task IPanelLifecycle.OnActivatedAsync(CancellationToken cancellationToken)
+    {
+      return RefreshAsync(cancellationToken);
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    Task IPanelLifecycle.RefreshAsync(CancellationToken cancellationToken)
+    {
+      return RefreshAsync(cancellationToken);
+    }
 
     partial void OnSelectedConfigChanged(SpatialConfigItem? value)
     {
@@ -120,17 +130,12 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var configs = await _backendClient.SendRequestAsync<object, SpatialConfig[]>(
-            "/api/spatial-audio/configs",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var list = await _client.GetConfigsAsync(cancellationToken);
 
-        if (configs != null)
+        if (list != null)
         {
           Configs.Clear();
-          foreach (var config in configs)
+          foreach (var config in list)
           {
             Configs.Add(new SpatialConfigItem(config));
           }
@@ -138,7 +143,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -169,27 +174,22 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new SpatialConfigCreateRequest
         {
-          name = ConfigName,
-          audio_id = SelectedAudioId,
-          x = PositionX,
-          y = PositionY,
-          z = PositionZ,
-          distance = Distance,
-          room_size = RoomSize,
-          reverb_amount = ReverbAmount,
-          occlusion = Occlusion,
-          doppler = EnableDoppler,
-          hrtf = EnableHrtf
+          Name = ConfigName,
+          AudioId = SelectedAudioId,
+          X = PositionX,
+          Y = PositionY,
+          Z = PositionZ,
+          Distance = Distance,
+          RoomSize = RoomSize,
+          ReverbAmount = ReverbAmount,
+          Occlusion = Occlusion,
+          Doppler = EnableDoppler,
+          Hrtf = EnableHrtf
         };
 
-        var config = await _backendClient.SendRequestAsync<object, SpatialConfig>(
-            "/api/spatial-audio/configs",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var config = await _client.CreateConfigAsync(request, cancellationToken);
 
         if (config != null)
         {
@@ -201,7 +201,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -226,27 +226,22 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new SpatialConfigUpdateRequest
         {
-          name = ConfigName,
-          audio_id = SelectedAudioId,
-          x = PositionX,
-          y = PositionY,
-          z = PositionZ,
-          distance = Distance,
-          room_size = RoomSize,
-          reverb_amount = ReverbAmount,
-          occlusion = Occlusion,
-          doppler = EnableDoppler,
-          hrtf = EnableHrtf
+          Name = ConfigName,
+          AudioId = SelectedAudioId,
+          X = PositionX,
+          Y = PositionY,
+          Z = PositionZ,
+          Distance = Distance,
+          RoomSize = RoomSize,
+          ReverbAmount = ReverbAmount,
+          Occlusion = Occlusion,
+          Doppler = EnableDoppler,
+          Hrtf = EnableHrtf
         };
 
-        var config = await _backendClient.SendRequestAsync<object, SpatialConfig>(
-            $"/api/spatial-audio/configs/{Uri.EscapeDataString(SelectedConfig.ConfigId)}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var config = await _client.UpdateConfigAsync(SelectedConfig.ConfigId, request, cancellationToken);
 
         if (config != null)
         {
@@ -259,7 +254,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -284,12 +279,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/spatial-audio/configs/{Uri.EscapeDataString(SelectedConfig.ConfigId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _client.DeleteConfigAsync(SelectedConfig.ConfigId, cancellationToken);
 
         Configs.Remove(SelectedConfig);
         SelectedConfig = null;
@@ -297,7 +287,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -322,18 +312,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          config_id = SelectedConfig.ConfigId,
-          output_format = "wav"
-        };
-
-        var response = await _backendClient.SendRequestAsync<object, SpatialApplyResponse>(
-            "/api/spatial-audio/apply",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _client.ApplySpatialAsync(SelectedConfig.ConfigId, "wav", cancellationToken);
 
         if (response != null)
         {
@@ -342,7 +321,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -367,12 +346,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, SpatialPreviewResponse>(
-            $"/api/spatial-audio/preview?audio_id={Uri.EscapeDataString(SelectedAudioId)}&x={PositionX}&y={PositionY}&z={PositionZ}&distance={Distance}",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _client.PreviewSpatialAsync(SelectedAudioId, PositionX, PositionY, PositionZ, Distance, cancellationToken);
 
         if (response != null)
         {
@@ -381,7 +355,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -406,7 +380,7 @@ namespace VoiceStudio.App.ViewModels
         foreach (var project in projects)
         {
           cancellationToken.ThrowIfCancellationRequested();
-          var audioFiles = await _backendClient.ListProjectAudioAsync(project.Id, cancellationToken);
+          var audioFiles = await _projectAudioClient.ListProjectAudioAsync(project.Id, cancellationToken);
           foreach (var audioFile in audioFiles)
           {
             if (!string.IsNullOrEmpty(audioFile.AudioId))
@@ -424,7 +398,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -442,45 +416,8 @@ namespace VoiceStudio.App.ViewModels
       await LoadAudioFilesAsync(cancellationToken);
       StatusMessage = ResourceHelper.GetString("SpatialStage.Refreshed", "Refreshed");
     }
-
-    // Response models
-    public class SpatialConfig
-    {
-      public string ConfigId { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public string AudioId { get; set; } = string.Empty;
-      public SpatialPosition Position { get; set; } = new();
-      public double RoomSize { get; set; }
-      public double ReverbAmount { get; set; }
-      public double Occlusion { get; set; }
-      public bool Doppler { get; set; }
-      public bool Hrtf { get; set; }
-    }
-
-    public class SpatialPosition
-    {
-      public double X { get; set; }
-      public double Y { get; set; }
-      public double Z { get; set; }
-      public double Distance { get; set; }
-    }
-
-    private class SpatialApplyResponse
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public string ConfigApplied { get; set; } = string.Empty;
-      public string Message { get; set; } = string.Empty;
-    }
-
-    private class SpatialPreviewResponse
-    {
-      public string PreviewUrl { get; set; } = string.Empty;
-      public SpatialPosition Position { get; set; } = new();
-      public string Message { get; set; } = string.Empty;
-    }
   }
 
-  // Data models
   public class SpatialConfigItem : ObservableObject
   {
     public string ConfigId { get; set; }
@@ -497,7 +434,7 @@ namespace VoiceStudio.App.ViewModels
     public bool EnableHrtf { get; set; }
     public string PositionDisplay => ResourceHelper.FormatString("SpatialStage.PositionDisplay", PositionX, PositionY, PositionZ);
 
-    public SpatialConfigItem(SpatialConfigModel config)
+    public SpatialConfigItem(SpatialConfigInfo config)
     {
       ConfigId = config.ConfigId;
       Name = config.Name;

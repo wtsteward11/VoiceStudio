@@ -19,7 +19,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       ViewModel = new AdvancedSearchViewModel(
-          ServiceProvider.GetBackendClient()
+          ServiceProvider.GetSearchClient()
       );
       this.DataContext = ViewModel;
 

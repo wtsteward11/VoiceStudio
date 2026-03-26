@@ -23,7 +23,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new MultiVoiceGeneratorViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient()
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IMultiVoiceGeneratorClient>()
       );
       DataContext = ViewModel;
 

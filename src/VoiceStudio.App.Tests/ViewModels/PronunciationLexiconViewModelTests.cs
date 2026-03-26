@@ -8,6 +8,7 @@ using System.Threading;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
 using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -19,25 +20,27 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class PronunciationLexiconViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IPronunciationLexiconClient>? _mockLexiconClient;
         private Mock<IProfilesClient>? _mockProfilesClient;
+        private Mock<IVoiceSynthesisService>? _mockVoiceSynthesisService;
         private IAudioPlayerService? _audioPlayerService;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockLexiconClient = new Mock<IPronunciationLexiconClient>();
             _mockProfilesClient = new Mock<IProfilesClient>();
             _mockProfilesClient
                 .Setup(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<VoiceProfile>());
+            _mockVoiceSynthesisService = new Mock<IVoiceSynthesisService>();
             _audioPlayerService = new AudioPlayerService(new System.Net.Http.HttpClient());
         }
 
         private PronunciationLexiconViewModel CreateViewModel()
         {
-            return new PronunciationLexiconViewModel(MockContext!, _mockBackendClient!.Object, _mockProfilesClient!.Object, _audioPlayerService!);
+            return new PronunciationLexiconViewModel(MockContext!, _mockLexiconClient!.Object, _mockProfilesClient!.Object, _mockVoiceSynthesisService!.Object, _audioPlayerService!);
         }
 
         #region Construction and Initialization Tests
@@ -50,7 +53,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
             // Assert
             Assert.IsNotNull(viewModel);
-            Assert.AreEqual("pronunciation-lexicon", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.PronunciationLexicon, viewModel.PanelId);
             Assert.IsNotNull(viewModel.Entries);
             Assert.IsNotNull(viewModel.AvailableLanguages);
         }
@@ -59,21 +62,21 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new PronunciationLexiconViewModel(null!, _mockBackendClient!.Object, _mockProfilesClient!.Object, _audioPlayerService!));
+                new PronunciationLexiconViewModel(null!, _mockLexiconClient!.Object, _mockProfilesClient!.Object, _mockVoiceSynthesisService!.Object, _audioPlayerService!));
         }
 
         [TestMethod]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullLexiconClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new PronunciationLexiconViewModel(MockContext!, null!, _mockProfilesClient!.Object, _audioPlayerService!));
+                new PronunciationLexiconViewModel(MockContext!, null!, _mockProfilesClient!.Object, _mockVoiceSynthesisService!.Object, _audioPlayerService!));
         }
 
         [TestMethod]
         public void Constructor_WithNullProfilesClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new PronunciationLexiconViewModel(MockContext!, _mockBackendClient!.Object, null!, _audioPlayerService!));
+                new PronunciationLexiconViewModel(MockContext!, _mockLexiconClient!.Object, null!, _mockVoiceSynthesisService!.Object, _audioPlayerService!));
         }
 
         [TestMethod]
@@ -291,7 +294,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void PanelId_ReturnsCorrectValue()
         {
             var viewModel = CreateViewModel();
-            Assert.AreEqual("pronunciation-lexicon", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.PronunciationLexicon, viewModel.PanelId);
         }
 
         [TestMethod]

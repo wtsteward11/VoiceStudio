@@ -9,6 +9,7 @@ using VoiceStudio.App.Core.Models;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.App.UseCases;
 using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
 
@@ -84,7 +85,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
       // Assert
       Assert.IsNotNull(_viewModel, "ProfilesViewModel should be created");
-      Assert.AreEqual("profiles", _viewModel.PanelId, "Panel ID should be 'profiles'");
+      Assert.AreEqual(PanelIds.Profiles, _viewModel.PanelId, "Panel ID should be 'profiles'");
       Assert.IsNotNull(_viewModel.LoadProfilesCommand, "LoadProfilesCommand should exist");
       Assert.IsNotNull(_viewModel.CreateProfileCommand, "CreateProfileCommand should exist");
     }
@@ -166,7 +167,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
       // Assert
       Assert.IsNotNull(panelView, "ProfilesViewModel should implement IPanelView");
-      Assert.AreEqual("profiles", panelView.PanelId, "Panel ID should match");
+      Assert.AreEqual(PanelIds.Profiles, panelView.PanelId, "Panel ID should match");
       Assert.IsNotNull(panelView.DisplayName, "Display name should not be null");
     }
 

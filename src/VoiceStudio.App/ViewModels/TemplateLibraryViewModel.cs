@@ -27,7 +27,7 @@ namespace VoiceStudio.App.ViewModels
     private readonly IDispatcherTimer? _searchDebounceTimer;
     private const int SearchDebounceMs = 300;
 
-    public string PanelId => "template_library";
+    public string PanelId => PanelIds.TemplateLibrary;
     public string DisplayName => ResourceHelper.GetString("Panel.TemplateLibrary.DisplayName", "Template Library");
     public PanelRegion Region => PanelRegion.Right;
 

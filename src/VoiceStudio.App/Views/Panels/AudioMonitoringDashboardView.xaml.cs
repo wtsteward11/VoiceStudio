@@ -1,7 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VoiceStudio.App.Services;
-using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -17,7 +16,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       ViewModel = new AudioMonitoringDashboardViewModel(
-          ServiceProvider.GetBackendClient()
+          ServiceProvider.GetAudioMonitoringDashboardClient()
       );
       this.DataContext = ViewModel;
 

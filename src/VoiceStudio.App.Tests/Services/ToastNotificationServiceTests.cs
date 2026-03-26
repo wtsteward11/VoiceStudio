@@ -10,8 +10,11 @@ namespace VoiceStudio.App.Tests.Services
   /// <summary>
   /// Integration tests for ToastNotificationService (IDEA 11: Toast Notification System).
   /// Tests toast notification display and management.
+  /// Uses [TestCategory("UI")] because tests create XAML (StackPanel, ToastNotificationService).
+  /// Excluded from Services shard to avoid testhost crash/hang in full harness (Stage 13).
   /// </summary>
   [TestClass]
+  [TestCategory("UI")]
   public class ToastNotificationServiceTests : TestBase
   {
     private StackPanel? _container;

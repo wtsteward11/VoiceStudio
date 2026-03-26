@@ -22,6 +22,7 @@ namespace VoiceStudio.App.Tests.ViewModels
   {
     private IViewModelContext _context = null!;
     private Mock<IRecordingClient> _mockRecordingClient = null!;
+    private Mock<IProjectAudioClient> _mockProjectAudioClient = null!;
     private Mock<IAudioPlayerService> _mockAudioPlayer = null!;
     private DispatcherQueueController? _dispatcherController;
     private RecordingViewModel _sut = null!;
@@ -34,6 +35,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       var dispatcher = _dispatcherController.DispatcherQueue;
       _context = new ViewModelContext(NullLogger.Instance, dispatcher);
       _mockRecordingClient = new Mock<IRecordingClient>();
+      _mockProjectAudioClient = new Mock<IProjectAudioClient>();
       _mockAudioPlayer = new Mock<IAudioPlayerService>();
       _mockAudioPlayer.Setup(x => x.PlayBackendAudioIdAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Action>()))
           .Returns(Task.CompletedTask);
@@ -42,7 +44,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockAudioPlayer.Setup(x => x.PlayUrlAsync(It.IsAny<string>(), It.IsAny<Action>()))
           .Returns(Task.CompletedTask);
 
-      _sut = new RecordingViewModel(_context, _mockRecordingClient.Object, _mockAudioPlayer.Object);
+      _sut = new RecordingViewModel(_context, _mockRecordingClient.Object, _mockProjectAudioClient.Object, _mockAudioPlayer.Object);
     }
 
     [TestCleanup]
@@ -84,7 +86,14 @@ namespace VoiceStudio.App.Tests.ViewModels
     [ExpectedException(typeof(ArgumentNullException))]
     public void Constructor_WithNullRecordingClient_ThrowsArgumentNullException()
     {
-      _ = new RecordingViewModel(_context, null!, _mockAudioPlayer.Object);
+      _ = new RecordingViewModel(_context, null!, _mockProjectAudioClient.Object, _mockAudioPlayer.Object);
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public void Constructor_WithNullProjectAudioClient_ThrowsArgumentNullException()
+    {
+      _ = new RecordingViewModel(_context, _mockRecordingClient.Object, null!, _mockAudioPlayer.Object);
     }
 
     /// <summary>
@@ -93,7 +102,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestMethod]
     public void Dispose_CanBeCalledMultipleTimes()
     {
-      var vm = new RecordingViewModel(_context, _mockRecordingClient.Object, _mockAudioPlayer.Object);
+      var vm = new RecordingViewModel(_context, _mockRecordingClient.Object, _mockProjectAudioClient.Object, _mockAudioPlayer.Object);
       vm.Dispose();
       vm.Dispose();
     }

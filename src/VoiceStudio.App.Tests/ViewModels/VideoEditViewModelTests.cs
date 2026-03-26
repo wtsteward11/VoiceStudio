@@ -1,10 +1,13 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
+using System.Threading;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -16,18 +19,21 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class VideoEditViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IVideoEditClient>? _mockVideoEditClient;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockVideoEditClient = new Mock<IVideoEditClient>();
+            _mockVideoEditClient
+                .Setup(x => x.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new VideoInfo { Duration = 60.0 });
         }
 
         private VideoEditViewModel CreateViewModel()
         {
-            return new VideoEditViewModel(MockContext!, _mockBackendClient!.Object);
+            return new VideoEditViewModel(MockContext!, _mockVideoEditClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -40,7 +46,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
             // Assert
             Assert.IsNotNull(viewModel);
-            Assert.AreEqual("video-edit", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.VideoEdit, viewModel.PanelId);
             Assert.IsNotNull(viewModel.Effects);
             Assert.IsNotNull(viewModel.Transitions);
             Assert.IsNotNull(viewModel.ExportFormats);
@@ -50,11 +56,11 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new VideoEditViewModel(null!, _mockBackendClient!.Object));
+                new VideoEditViewModel(null!, _mockVideoEditClient!.Object));
         }
 
         [TestMethod]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullVideoEditClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
                 new VideoEditViewModel(MockContext!, null!));
@@ -212,7 +218,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void PanelId_ReturnsCorrectValue()
         {
             var viewModel = CreateViewModel();
-            Assert.AreEqual("video-edit", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.VideoEdit, viewModel.PanelId);
         }
 
         [TestMethod]

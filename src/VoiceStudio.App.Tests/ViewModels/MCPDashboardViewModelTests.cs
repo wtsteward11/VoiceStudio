@@ -5,6 +5,8 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -16,18 +18,18 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class MCPDashboardViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IMCPDashboardClient>? _mockClient;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockClient = new Mock<IMCPDashboardClient>();
         }
 
         private MCPDashboardViewModel CreateViewModel()
         {
-            return new MCPDashboardViewModel(MockContext!, _mockBackendClient!.Object);
+            return new MCPDashboardViewModel(MockContext!, _mockClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -40,7 +42,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
             // Assert
             Assert.IsNotNull(viewModel);
-            Assert.AreEqual("mcp-dashboard", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.MCPDashboard, viewModel.PanelId);
             Assert.IsNotNull(viewModel.Servers);
             Assert.IsNotNull(viewModel.ServerOperations);
             Assert.IsNotNull(viewModel.AvailableServerTypes);
@@ -50,11 +52,11 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new MCPDashboardViewModel(null!, _mockBackendClient!.Object));
+                new MCPDashboardViewModel(null!, _mockClient!.Object));
         }
 
         [TestMethod]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
                 new MCPDashboardViewModel(MockContext!, null!));
@@ -167,7 +169,7 @@ namespace VoiceStudio.App.Tests.ViewModels
             };
 
             // Act
-            var serverModel = new MCPDashboardViewModel.MCPServer
+            var serverModel = new MCPServerInfo
             {
                 ServerId = "server-1",
                 Name = "Test Server",
@@ -209,7 +211,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void PanelId_ReturnsCorrectValue()
         {
             var viewModel = CreateViewModel();
-            Assert.AreEqual("mcp-dashboard", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.MCPDashboard, viewModel.PanelId);
         }
 
         [TestMethod]

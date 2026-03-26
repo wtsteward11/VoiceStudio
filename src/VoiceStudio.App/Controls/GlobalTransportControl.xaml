@@ -1,0 +1,28 @@
+<UserControl x:Class="VoiceStudio.App.Controls.GlobalTransportControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <Button x:Name="PlayPauseButton" MinWidth="28" MinHeight="24" Padding="4,0"
+            ToolTipService.ToolTip="Play/Pause" Click="PlayPauseButton_Click"
+            AutomationProperties.AutomationId="Transport_PlayPause">
+            <FontIcon x:Name="PlayPauseIcon" Glyph="&#xE768;" FontSize="12" FontFamily="Segoe Fluent Icons" />
+        </Button>
+        <Button x:Name="StopButton" MinWidth="28" MinHeight="24" Padding="4,0"
+            ToolTipService.ToolTip="Stop" Click="StopButton_Click"
+            AutomationProperties.AutomationId="Transport_Stop">
+            <FontIcon Glyph="&#xE71A;" FontSize="12" FontFamily="Segoe Fluent Icons" />
+        </Button>
+        <Rectangle Width="1" Height="16" Fill="{StaticResource VSQ.Panel.BorderBrush}" VerticalAlignment="Center" />
+        <TextBlock x:Name="CurrentMediaTitle" Text="No media selected" FontSize="11"
+            Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+            AutomationProperties.AutomationId="Transport_CurrentMediaTitle" />
+        <TextBlock Text="|" FontSize="10" Foreground="{StaticResource VSQ.Panel.BorderBrush}" VerticalAlignment="Center" />
+        <TextBlock x:Name="SourcePanelLabel" Text="—" FontSize="10"
+            Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+            AutomationProperties.AutomationId="Transport_SourcePanel" />
+        <TextBlock Text="|" FontSize="10" Foreground="{StaticResource VSQ.Panel.BorderBrush}" VerticalAlignment="Center" />
+        <TextBlock x:Name="StatusLabel" Text="No media selected" FontSize="10"
+            Foreground="{StaticResource VSQ.Accent.CyanBrush}"
+            AutomationProperties.AutomationId="Transport_Status" />
+    </StackPanel>
+</UserControl>

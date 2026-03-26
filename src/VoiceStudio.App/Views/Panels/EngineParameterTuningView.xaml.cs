@@ -18,7 +18,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       ViewModel = new EngineParameterTuningViewModel(
-          ServiceProvider.GetBackendClient()
+          ServiceProvider.GetEngineParameterTuningClient()
       );
       this.DataContext = ViewModel;
 

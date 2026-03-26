@@ -17,11 +17,13 @@ namespace VoiceStudio.App.Tests.ViewModels
   public class EffectsMixerViewModelTests
   {
     private Mock<IBackendClient> _mockBackendClient = null!;
+    private Mock<IEffectChainClient> _mockEffectChainClient = null!;
 
     [TestInitialize]
     public void Setup()
     {
       _mockBackendClient = new Mock<IBackendClient>();
+      _mockEffectChainClient = new Mock<IEffectChainClient>();
     }
 
     #region Effect Chain Management Tests
@@ -36,12 +38,12 @@ namespace VoiceStudio.App.Tests.ViewModels
                 new EffectChain { Id = "chain-2", Name = "Voice Enhancement", ProjectId = "proj-1" }
             };
 
-      _mockBackendClient
+      _mockEffectChainClient
           .Setup(x => x.GetEffectChainsAsync("proj-1", It.IsAny<CancellationToken>()))
           .ReturnsAsync(expectedChains);
 
       // Act
-      var result = await _mockBackendClient.Object.GetEffectChainsAsync("proj-1", CancellationToken.None);
+      var result = await _mockEffectChainClient.Object.GetEffectChainsAsync("proj-1", CancellationToken.None);
 
       // Assert
       Assert.AreEqual(2, result.Count);
@@ -64,12 +66,12 @@ namespace VoiceStudio.App.Tests.ViewModels
                 }
       };
 
-      _mockBackendClient
+      _mockEffectChainClient
           .Setup(x => x.GetEffectChainAsync("proj-1", "chain-123", It.IsAny<CancellationToken>()))
           .ReturnsAsync(expectedChain);
 
       // Act
-      var result = await _mockBackendClient.Object.GetEffectChainAsync("proj-1", "chain-123", CancellationToken.None);
+      var result = await _mockEffectChainClient.Object.GetEffectChainAsync("proj-1", "chain-123", CancellationToken.None);
 
       // Assert
       Assert.IsNotNull(result);
@@ -94,12 +96,12 @@ namespace VoiceStudio.App.Tests.ViewModels
         Effects = new List<Effect>()
       };
 
-      _mockBackendClient
+      _mockEffectChainClient
           .Setup(x => x.CreateEffectChainAsync("proj-1", newChain, It.IsAny<CancellationToken>()))
           .ReturnsAsync(createdChain);
 
       // Act
-      var result = await _mockBackendClient.Object.CreateEffectChainAsync("proj-1", newChain, CancellationToken.None);
+      var result = await _mockEffectChainClient.Object.CreateEffectChainAsync("proj-1", newChain, CancellationToken.None);
 
       // Assert
       Assert.IsNotNull(result);
@@ -121,12 +123,12 @@ namespace VoiceStudio.App.Tests.ViewModels
                 }
       };
 
-      _mockBackendClient
+      _mockEffectChainClient
           .Setup(x => x.UpdateEffectChainAsync("proj-1", "chain-update", updatedChain, It.IsAny<CancellationToken>()))
           .ReturnsAsync(updatedChain);
 
       // Act
-      var result = await _mockBackendClient.Object.UpdateEffectChainAsync("proj-1", "chain-update", updatedChain, CancellationToken.None);
+      var result = await _mockEffectChainClient.Object.UpdateEffectChainAsync("proj-1", "chain-update", updatedChain, CancellationToken.None);
 
       // Assert
       Assert.IsNotNull(result);
@@ -138,12 +140,12 @@ namespace VoiceStudio.App.Tests.ViewModels
     public async Task DeleteEffectChainAsync_ReturnsTrue_OnSuccess()
     {
       // Arrange
-      _mockBackendClient
+      _mockEffectChainClient
           .Setup(x => x.DeleteEffectChainAsync("proj-1", "chain-delete", It.IsAny<CancellationToken>()))
           .ReturnsAsync(true);
 
       // Act
-      var result = await _mockBackendClient.Object.DeleteEffectChainAsync("proj-1", "chain-delete", CancellationToken.None);
+      var result = await _mockEffectChainClient.Object.DeleteEffectChainAsync("proj-1", "chain-delete", CancellationToken.None);
 
       // Assert
       Assert.IsTrue(result);
@@ -163,12 +165,12 @@ namespace VoiceStudio.App.Tests.ViewModels
         Success = true
       };
 
-      _mockBackendClient
+      _mockEffectChainClient
           .Setup(x => x.ProcessAudioWithChainAsync("proj-1", "chain-1", "audio-input", null, It.IsAny<CancellationToken>()))
           .ReturnsAsync(expectedResponse);
 
       // Act
-      var result = await _mockBackendClient.Object.ProcessAudioWithChainAsync("proj-1", "chain-1", "audio-input", null, CancellationToken.None);
+      var result = await _mockEffectChainClient.Object.ProcessAudioWithChainAsync("proj-1", "chain-1", "audio-input", null, CancellationToken.None);
 
       // Assert
       Assert.IsNotNull(result);
@@ -181,13 +183,13 @@ namespace VoiceStudio.App.Tests.ViewModels
     {
       // Arrange
       string? capturedFilename = null;
-      _mockBackendClient
+      _mockEffectChainClient
           .Setup(x => x.ProcessAudioWithChainAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
           .Callback<string, string, string, string?, CancellationToken>((proj, chain, audio, filename, ct) => capturedFilename = filename)
           .ReturnsAsync(new EffectProcessResponse { Success = true });
 
       // Act
-      await _mockBackendClient.Object.ProcessAudioWithChainAsync("proj-1", "chain-1", "audio-input", "output.wav", CancellationToken.None);
+      await _mockEffectChainClient.Object.ProcessAudioWithChainAsync("proj-1", "chain-1", "audio-input", "output.wav", CancellationToken.None);
 
       // Assert
       Assert.AreEqual("output.wav", capturedFilename);
@@ -208,12 +210,12 @@ namespace VoiceStudio.App.Tests.ViewModels
                 new EffectPreset { Id = "preset-3", Name = "Room Reverb", EffectType = "reverb" }
             };
 
-      _mockBackendClient
+      _mockEffectChainClient
           .Setup(x => x.GetEffectPresetsAsync(null, It.IsAny<CancellationToken>()))
           .ReturnsAsync(expectedPresets);
 
       // Act
-      var result = await _mockBackendClient.Object.GetEffectPresetsAsync(null, CancellationToken.None);
+      var result = await _mockEffectChainClient.Object.GetEffectPresetsAsync(null, CancellationToken.None);
 
       // Assert
       Assert.AreEqual(3, result.Count);
@@ -229,12 +231,12 @@ namespace VoiceStudio.App.Tests.ViewModels
                 new EffectPreset { Id = "eq-2", Name = "Bright", EffectType = "eq" }
             };
 
-      _mockBackendClient
+      _mockEffectChainClient
           .Setup(x => x.GetEffectPresetsAsync("eq", It.IsAny<CancellationToken>()))
           .ReturnsAsync(eqPresets);
 
       // Act
-      var result = await _mockBackendClient.Object.GetEffectPresetsAsync("eq", CancellationToken.None);
+      var result = await _mockEffectChainClient.Object.GetEffectPresetsAsync("eq", CancellationToken.None);
 
       // Assert
       Assert.AreEqual(2, result.Count);
@@ -258,12 +260,12 @@ namespace VoiceStudio.App.Tests.ViewModels
         EffectType = "eq"
       };
 
-      _mockBackendClient
+      _mockEffectChainClient
           .Setup(x => x.CreateEffectPresetAsync(newPreset, It.IsAny<CancellationToken>()))
           .ReturnsAsync(createdPreset);
 
       // Act
-      var result = await _mockBackendClient.Object.CreateEffectPresetAsync(newPreset, CancellationToken.None);
+      var result = await _mockEffectChainClient.Object.CreateEffectPresetAsync(newPreset, CancellationToken.None);
 
       // Assert
       Assert.IsNotNull(result);
@@ -275,12 +277,12 @@ namespace VoiceStudio.App.Tests.ViewModels
     public async Task DeleteEffectPresetAsync_ReturnsTrue_OnSuccess()
     {
       // Arrange
-      _mockBackendClient
+      _mockEffectChainClient
           .Setup(x => x.DeleteEffectPresetAsync("preset-delete", It.IsAny<CancellationToken>()))
           .ReturnsAsync(true);
 
       // Act
-      var result = await _mockBackendClient.Object.DeleteEffectPresetAsync("preset-delete", CancellationToken.None);
+      var result = await _mockEffectChainClient.Object.DeleteEffectPresetAsync("preset-delete", CancellationToken.None);
 
       // Assert
       Assert.IsTrue(result);

@@ -12,7 +12,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateMarkerAction : IUndoableAction
   {
     private readonly ObservableCollection<MarkerItem> _markers;
-    private readonly IBackendClient _backendClient;
+    private readonly IMarkerManagerClient _markerManagerClient;
     private readonly MarkerItem _marker;
     private readonly Action<MarkerItem>? _onUndo;
     private readonly Action<MarkerItem>? _onRedo;
@@ -21,13 +21,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateMarkerAction(
         ObservableCollection<MarkerItem> markers,
-        IBackendClient backendClient,
+        IMarkerManagerClient markerManagerClient,
         MarkerItem marker,
         Action<MarkerItem>? onUndo = null,
         Action<MarkerItem>? onRedo = null)
     {
       _markers = markers ?? throw new ArgumentNullException(nameof(markers));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _markerManagerClient = markerManagerClient ?? throw new ArgumentNullException(nameof(markerManagerClient));
       _marker = marker ?? throw new ArgumentNullException(nameof(marker));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -59,7 +59,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteMarkerAction : IUndoableAction
   {
     private readonly ObservableCollection<MarkerItem> _markers;
-    private readonly IBackendClient _backendClient;
+    private readonly IMarkerManagerClient _markerManagerClient;
     private readonly MarkerItem _marker;
     private readonly int _originalIndex;
     private readonly Action<MarkerItem>? _onUndo;
@@ -69,14 +69,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteMarkerAction(
         ObservableCollection<MarkerItem> markers,
-        IBackendClient backendClient,
+        IMarkerManagerClient markerManagerClient,
         MarkerItem marker,
         int originalIndex,
         Action<MarkerItem>? onUndo = null,
         Action<MarkerItem>? onRedo = null)
     {
       _markers = markers ?? throw new ArgumentNullException(nameof(markers));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _markerManagerClient = markerManagerClient ?? throw new ArgumentNullException(nameof(markerManagerClient));
       _marker = marker ?? throw new ArgumentNullException(nameof(marker));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

@@ -21,8 +21,8 @@ namespace VoiceStudio.App.Views.Panels
     public VideoGenView()
     {
       this.InitializeComponent();
-      var backendClient = VoiceStudio.App.Services.ServiceProvider.GetBackendClient();
-      ViewModel = new VideoGenViewModel(AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(), backendClient);
+      var videoGenClient = VoiceStudio.App.Services.ServiceProvider.GetVideoGenClient();
+      ViewModel = new VideoGenViewModel(AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(), videoGenClient);
       this.DataContext = ViewModel;
 
       // Initialize services

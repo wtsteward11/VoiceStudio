@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
@@ -14,9 +15,10 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the AdvancedWaveformVisualizationView panel - Advanced waveform visualization.
   /// </summary>
-  public partial class AdvancedWaveformVisualizationViewModel : BaseViewModel, IPanelView
+  public partial class AdvancedWaveformVisualizationViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IAdvancedWaveformClient _waveformClient;
+    private readonly IProjectAudioClient _projectAudioClient;
     private readonly IProjectsClient _projectsClient;
 
     public string PanelId => "advanced-waveform-visualization";
@@ -89,10 +91,15 @@ namespace VoiceStudio.App.ViewModels
       OnPropertyChanged(nameof(WaveformSamples));
     }
 
-    public AdvancedWaveformVisualizationViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient)
+    public AdvancedWaveformVisualizationViewModel(
+      IViewModelContext context,
+      IAdvancedWaveformClient waveformClient,
+      IProjectAudioClient projectAudioClient,
+      IProjectsClient projectsClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _waveformClient = waveformClient ?? throw new ArgumentNullException(nameof(waveformClient));
+      _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
       _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
 
       LoadAudioFilesCommand = new EnhancedAsyncRelayCommand(async (ct) =>
@@ -120,10 +127,18 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadAudioFilesAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _ = LoadAudioFilesAsync(cancellationToken);
+      return Task.CompletedTask;
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken ct) => Task.CompletedTask;
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken ct) => await RefreshAsync(ct);
 
     public IAsyncRelayCommand LoadAudioFilesCommand { get; }
     public IAsyncRelayCommand LoadWaveformDataCommand { get; }
@@ -144,7 +159,7 @@ namespace VoiceStudio.App.ViewModels
         foreach (var project in projects)
         {
           cancellationToken.ThrowIfCancellationRequested();
-          var audioFiles = await _backendClient.ListProjectAudioAsync(project.Id, cancellationToken);
+          var audioFiles = await _projectAudioClient.ListProjectAudioAsync(project.Id, cancellationToken);
           foreach (var audioFile in audioFiles)
           {
             if (!string.IsNullOrEmpty(audioFile.Filename))
@@ -174,7 +189,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task LoadWaveformDataAsync(CancellationToken _)
+    private async Task LoadWaveformDataAsync(CancellationToken cancellationToken)
     {
       if (string.IsNullOrEmpty(SelectedAudioId))
       {
@@ -187,29 +202,12 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (ZoomLevel != 1.0)
-          queryParams.Add("zoom_level", ZoomLevel.ToString());
-        if (TimeStart.HasValue)
-          queryParams.Add("time_start", TimeStart.Value.ToString());
-        if (TimeEnd.HasValue)
-          queryParams.Add("time_end", TimeEnd.Value.ToString());
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = $"/api/waveform/data/{Uri.EscapeDataString(SelectedAudioId)}";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var data = await _backendClient.SendRequestAsync<object, WaveformData>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get
-        );
+        var data = await _waveformClient.GetWaveformDataAsync(
+            SelectedAudioId,
+            ZoomLevel != 1.0 ? ZoomLevel : null,
+            TimeStart,
+            TimeEnd,
+            cancellationToken);
 
         if (data != null)
         {
@@ -239,28 +237,21 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var config = new
+        var request = new AdvancedWaveformConfigRequest
         {
-          audio_id = SelectedAudioId,
-          zoom_level = ZoomLevel,
-          show_channels = SelectedChannels.ToArray(),
-          show_rms = ShowRms,
-          show_peak = ShowPeak,
-          show_zero_crossings = ShowZeroCrossings,
-          color_scheme = SelectedColorScheme,
-          time_range = TimeStart.HasValue && TimeEnd.HasValue ? new
-          {
-            start = TimeStart.Value,
-            end = TimeEnd.Value
-          } : null
+          AudioId = SelectedAudioId,
+          ZoomLevel = ZoomLevel,
+          ShowChannels = SelectedChannels.ToArray(),
+          ShowRms = ShowRms,
+          ShowPeak = ShowPeak,
+          ShowZeroCrossings = ShowZeroCrossings,
+          ColorScheme = SelectedColorScheme,
+          TimeRange = TimeStart.HasValue && TimeEnd.HasValue
+            ? new AdvancedWaveformTimeRange { Start = TimeStart.Value, End = TimeEnd.Value }
+            : null
         };
 
-        var updated = await _backendClient.SendRequestAsync<object, WaveformConfig>(
-            $"/api/waveform/config/{Uri.EscapeDataString(SelectedAudioId)}",
-            config,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var updated = await _waveformClient.UpdateConfigAsync(SelectedAudioId, request, cancellationToken);
 
         if (updated != null)
         {
@@ -295,12 +286,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var analysis = await _backendClient.SendRequestAsync<object, WaveformAnalysis>(
-            $"/api/waveform/analysis/{Uri.EscapeDataString(SelectedAudioId)}",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var analysis = await _waveformClient.GetAnalysisAsync(SelectedAudioId, cancellationToken);
 
         if (analysis != null)
         {
@@ -346,52 +332,9 @@ namespace VoiceStudio.App.ViewModels
         _ = LoadWaveformDataAsync(CancellationToken.None);
       }
     }
-
-    // Response models
-    private class WaveformConfig
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public double ZoomLevel { get; set; } = 1.0;
-      public int[] ShowChannels { get; set; } = Array.Empty<int>();
-      public bool ShowRms { get; set; } = true;
-      public bool ShowPeak { get; set; } = true;
-      public bool ShowZeroCrossings { get; set; }
-      public string ColorScheme { get; set; } = "default";
-      public TimeRange? TimeRange { get; set; }
-    }
-
-    private class TimeRange
-    {
-      public double Start { get; set; }
-      public double End { get; set; }
-    }
   }
 
-  // Data models
-  public class WaveformData
-  {
-    public string AudioId { get; set; } = string.Empty;
-    public int SampleRate { get; set; }
-    public int Channels { get; set; }
-    public double Duration { get; set; }
-    public double[][] Samples { get; set; } = Array.Empty<double[]>();
-    public double[]? RmsValues { get; set; }
-    public double[]? PeakValues { get; set; }
-    public int[]? ZeroCrossings { get; set; }
-    public double[] TimePoints { get; set; } = Array.Empty<double>();
-  }
-
-  public class WaveformAnalysis
-  {
-    public string AudioId { get; set; } = string.Empty;
-    public double PeakAmplitude { get; set; }
-    public double RmsAmplitude { get; set; }
-    public double DynamicRange { get; set; }
-    public double CrestFactor { get; set; }
-    public double ZeroCrossingRate { get; set; }
-    public double DcOffset { get; set; }
-  }
-
+  // Data models (UI presentation)
   public class WaveformDataItem : ObservableObject
   {
     public string AudioId { get; set; }
@@ -406,7 +349,7 @@ namespace VoiceStudio.App.ViewModels
     public string DurationDisplay => $"{Duration:F2}s";
     public string SampleRateDisplay => $"{SampleRate} Hz";
 
-    public WaveformDataItem(WaveformData data)
+    public WaveformDataItem(AdvancedWaveformData data)
     {
       AudioId = data.AudioId;
       SampleRate = data.SampleRate;
@@ -434,7 +377,7 @@ namespace VoiceStudio.App.ViewModels
     public string DynamicRangeDisplay => $"{DynamicRange:F1} dB";
     public string CrestFactorDisplay => $"{CrestFactor:F2}";
 
-    public WaveformAnalysisItem(WaveformAnalysis analysis)
+    public WaveformAnalysisItem(AdvancedWaveformAnalysis analysis)
     {
       AudioId = analysis.AudioId;
       PeakAmplitude = analysis.PeakAmplitude;

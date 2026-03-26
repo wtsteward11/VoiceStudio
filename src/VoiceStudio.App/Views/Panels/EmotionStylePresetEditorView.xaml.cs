@@ -18,12 +18,12 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       ViewModel = new EmotionStylePresetEditorViewModel(
-          ServiceProvider.GetBackendClient(),
+          AppServices.GetEmotionControlClient(),
           AppServices.GetRequiredService<IVoiceSynthesisService>()
       );
       this.DataContext = ViewModel;
 
-      // Setup keyboard navigation
+      this.Loaded += (_, __) => _ = ViewModel.LoadPresetsAsync();
       this.Loaded += EmotionStylePresetEditorView_KeyboardNavigation_Loaded;
 
       // Setup Escape key to close help overlay

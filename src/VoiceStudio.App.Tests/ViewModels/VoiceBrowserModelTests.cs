@@ -1,5 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
 
 namespace VoiceStudio.App.Tests.ViewModels

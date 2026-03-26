@@ -10,18 +10,19 @@ using Microsoft.UI.Xaml;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
+using VoiceStudio.App.Services;
 
 namespace VoiceStudio.App.ViewModels
 {
   /// <summary>
   /// ViewModel for the APIKeyManagerView panel - API key management.
   /// </summary>
-  public partial class APIKeyManagerViewModel : BaseViewModel, IPanelView
+  public partial class APIKeyManagerViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IAPIKeyManagerClient _apiKeyManagerClient;
     private ObservableCollection<APIKeyItem>? _apiKeysHooked;
 
-    public string PanelId => "api-key-manager";
+    public string PanelId => PanelIds.APIKeyManager;
     public string DisplayName => ResourceHelper.GetString("Panel.APIKeyManager.DisplayName", "API Key Manager");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -58,10 +59,10 @@ namespace VoiceStudio.App.ViewModels
     public Visibility SelectedKeyVisibility =>
         SelectedKey != null ? Visibility.Visible : Visibility.Collapsed;
 
-    public APIKeyManagerViewModel(IViewModelContext context, IBackendClient backendClient)
+    public APIKeyManagerViewModel(IViewModelContext context, IAPIKeyManagerClient apiKeyManagerClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _apiKeyManagerClient = apiKeyManagerClient ?? throw new ArgumentNullException(nameof(apiKeyManagerClient));
 
       LoadKeysCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -99,10 +100,6 @@ namespace VoiceStudio.App.ViewModels
         await LoadServicesAsync(ct);
       });
 
-      // Load initial data
-      _ = LoadKeysAsync(CancellationToken.None);
-      _ = LoadServicesAsync(CancellationToken.None);
-
       HookApiKeysCollection(ApiKeys);
 
       PropertyChanged += (_, e) =>
@@ -113,6 +110,17 @@ namespace VoiceStudio.App.ViewModels
         }
       };
     }
+
+    Task IPanelLifecycle.OnActivatedAsync(CancellationToken ct)
+    {
+      _ = LoadKeysAsync(ct);
+      _ = LoadServicesAsync(ct);
+      return Task.CompletedTask;
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken ct) => Task.CompletedTask;
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken ct) => await RefreshAsync(ct);
 
     public IAsyncRelayCommand LoadKeysCommand { get; }
     public IAsyncRelayCommand CreateKeyCommand { get; }
@@ -179,12 +187,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var keys = await _backendClient.SendRequestAsync<object, APIKeyResponse[]>(
-            "/api/api-keys",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var keys = await _apiKeyManagerClient.GetKeysAsync(cancellationToken);
 
         if (keys != null)
         {
@@ -239,12 +242,7 @@ namespace VoiceStudio.App.ViewModels
           Description = NewDescription
         };
 
-        var key = await _backendClient.SendRequestAsync<APIKeyCreateRequest, APIKeyResponse>(
-            "/api/api-keys",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var key = await _apiKeyManagerClient.CreateKeyAsync(request, cancellationToken);
 
         if (key != null)
         {
@@ -301,12 +299,7 @@ namespace VoiceStudio.App.ViewModels
           IsActive = SelectedKey.IsActive
         };
 
-        var key = await _backendClient.SendRequestAsync<APIKeyUpdateRequest, APIKeyResponse>(
-            $"/api/api-keys/{Uri.EscapeDataString(SelectedKey.KeyId)}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var key = await _apiKeyManagerClient.UpdateKeyAsync(SelectedKey.KeyId, request, cancellationToken);
 
         if (key != null)
         {
@@ -355,12 +348,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/api-keys/{Uri.EscapeDataString(SelectedKey.KeyId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _apiKeyManagerClient.DeleteKeyAsync(SelectedKey.KeyId, cancellationToken);
 
         ApiKeys.Remove(SelectedKey);
         SelectedKey = null;
@@ -394,12 +382,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var result = await _backendClient.SendRequestAsync<object, APIKeyValidationResult>(
-            $"/api/api-keys/{Uri.EscapeDataString(SelectedKey.KeyId)}/validate",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var result = await _apiKeyManagerClient.ValidateKeyAsync(SelectedKey.KeyId, cancellationToken);
 
         if (result != null)
         {
@@ -441,12 +424,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var services = await _backendClient.SendRequestAsync<object, string[]>(
-            "/api/api-keys/services/list",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var services = await _apiKeyManagerClient.GetSupportedServicesAsync(cancellationToken);
 
         if (services != null)
         {
@@ -463,39 +441,6 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Request models
-    private class APIKeyCreateRequest
-    {
-      public string ServiceName { get; set; } = string.Empty;
-      public string KeyValue { get; set; } = string.Empty;
-      public string? Description { get; set; }
-    }
-
-    private class APIKeyUpdateRequest
-    {
-      public string? KeyValue { get; set; }
-      public string? Description { get; set; }
-      public bool? IsActive { get; set; }
-    }
-
-    private class APIKeyResponse
-    {
-      public string KeyId { get; set; } = string.Empty;
-      public string ServiceName { get; set; } = string.Empty;
-      public string KeyValueMasked { get; set; } = string.Empty;
-      public string? Description { get; set; }
-      public string CreatedAt { get; set; } = string.Empty;
-      public string? LastUsed { get; set; }
-      public bool IsActive { get; set; }
-      public int UsageCount { get; set; }
-    }
-
-    private class APIKeyValidationResult
-    {
-      public bool Valid { get; set; }
-      public string? Message { get; set; }
-      public string? LastUsed { get; set; }
-    }
   }
 
   // Data model

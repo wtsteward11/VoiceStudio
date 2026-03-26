@@ -2,6 +2,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Services;
@@ -107,6 +108,36 @@ namespace VoiceStudio.App.Tests.ViewModels
       var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
       vm.Dispose();
       vm.Dispose(); // Idempotent
+    }
+
+    /// <summary>
+    /// Pass 02 C6: SelectedProjectId set to null clears stale state (effect chains, mixer presets, etc).
+    /// Prevents data from previous project leaking into cleared state.
+    /// </summary>
+    [TestMethod]
+    public async Task SelectedProjectId_SetToNull_ClearsStaleState()
+    {
+      _mockEffectChainClient
+          .Setup(x => x.GetEffectChainsAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<EffectChain> { new EffectChain { Id = "c1", Name = "Chain 1", ProjectId = "proj-1" } });
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerStateAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync((MixerState?)null);
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerPresetsAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<MixerPreset> { new MixerPreset { Id = "p1", Name = "Preset 1", ProjectId = "proj-1" } });
+
+      var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
+      vm.SelectedProjectId = "proj-1";
+      await Task.Delay(150);
+
+      Assert.IsTrue(vm.EffectChains.Count > 0 || vm.MixerPresets.Count > 0, "Load should have populated at least one collection");
+
+      vm.SelectedProjectId = null;
+      Assert.AreEqual(0, vm.EffectChains.Count);
+      Assert.AreEqual(0, vm.MixerPresets.Count);
+      Assert.IsNull(vm.SelectedEffectChain);
+      Assert.IsNull(vm.MixerState);
     }
   }
 }

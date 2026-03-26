@@ -15,6 +15,7 @@ namespace VoiceStudio.App.Commands
     {
         private readonly IUnifiedCommandRegistry _registry;
         private readonly IAudioPlayerService _audioPlayer;
+        private readonly IGlobalTransportOrchestrator? _orchestrator;
         private readonly ToastNotificationService? _toastService;
         private readonly Services.MicrophoneRecordingService _recordingService;
 
@@ -33,11 +34,13 @@ namespace VoiceStudio.App.Commands
         public PlaybackOperationsHandler(
             IUnifiedCommandRegistry registry,
             IAudioPlayerService audioPlayer,
-            ToastNotificationService? toastService = null)
+            ToastNotificationService? toastService = null,
+            IGlobalTransportOrchestrator? orchestrator = null)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
             _toastService = toastService;
+            _orchestrator = orchestrator;
 
             // Initialize microphone recording service
             _recordingService = new Services.MicrophoneRecordingService();
@@ -55,7 +58,7 @@ namespace VoiceStudio.App.Commands
 
         private void RegisterCommands()
         {
-            // playback.play
+            // playback.play - delegates to global transport (Transport Coherence Wave 3 Task 8). No KeyboardShortcut; MainWindow owns Space.
             _registry.Register(
                 new CommandDescriptor
                 {
@@ -63,11 +66,10 @@ namespace VoiceStudio.App.Commands
                     Title = "Play",
                     Description = "Play or resume audio playback",
                     Category = "Playback",
-                    Icon = "▶️",
-                    KeyboardShortcut = "Space"
+                    Icon = "▶️"
                 },
                 async (param, ct) => await PlayAsync(ct),
-                _ => !_isPlaying || _isPaused
+                _ => true
             );
 
             // playback.pause
@@ -99,7 +101,7 @@ namespace VoiceStudio.App.Commands
                 _ => true
             );
 
-            // playback.stop
+            // playback.stop - delegates to global transport (Transport Coherence Wave 3 Task 8). No KeyboardShortcut; MainWindow owns Escape.
             _registry.Register(
                 new CommandDescriptor
                 {
@@ -107,11 +109,10 @@ namespace VoiceStudio.App.Commands
                     Title = "Stop",
                     Description = "Stop audio playback",
                     Category = "Playback",
-                    Icon = "⏹️",
-                    KeyboardShortcut = "Escape"
+                    Icon = "⏹️"
                 },
                 async (param, ct) => await StopAsync(ct),
-                _ => _isPlaying || _isPaused
+                _ => true
             );
 
             // playback.record
@@ -218,18 +219,19 @@ namespace VoiceStudio.App.Commands
 
         public async Task PlayAsync(CancellationToken ct = default)
         {
+            // Delegate to global transport orchestrator (Transport Coherence Wave 3 Task 8)
+            if (_orchestrator != null)
+            {
+                await _orchestrator.TogglePlaybackAsync();
+                return;
+            }
+
             try
             {
                 if (_isPaused)
-                {
-                    // Resume playback
                     _audioPlayer.Resume();
-                }
                 else
-                {
-                    // Start/Resume playback - Resume also starts if stopped
                     _audioPlayer.Resume();
-                }
 
                 _isPlaying = true;
                 _isPaused = false;
@@ -279,6 +281,14 @@ namespace VoiceStudio.App.Commands
 
         public async Task StopAsync(CancellationToken ct = default)
         {
+            // Delegate to global transport orchestrator (Transport Coherence Wave 3 Task 8)
+            if (_orchestrator != null)
+            {
+                _orchestrator.StopPlayback();
+                await Task.CompletedTask;
+                return;
+            }
+
             try
             {
                 _audioPlayer.Stop();

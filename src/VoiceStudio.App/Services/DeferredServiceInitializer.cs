@@ -221,12 +221,12 @@ namespace VoiceStudio.App.Services
                 "BackendHealthCheck",
                 async ct =>
                 {
-                    var backendClient = serviceProvider.GetService(typeof(IBackendClient)) as IBackendClient;
-                    if (backendClient != null)
+                    var healthClient = serviceProvider.GetService(typeof(IHealthVersionClient)) as IHealthVersionClient;
+                    if (healthClient != null)
                     {
                         try
                         {
-                            await backendClient.CheckHealthAsync(ct);
+                            await healthClient.CheckHealthAsync(ct);
                         }
                         // ALLOWED: empty catch - Backend may not be running yet, acceptable
                         catch

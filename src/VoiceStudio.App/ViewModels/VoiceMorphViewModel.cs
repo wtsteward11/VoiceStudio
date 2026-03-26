@@ -6,24 +6,25 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
-using MorphConfigModel = VoiceStudio.App.ViewModels.VoiceMorphViewModel.MorphConfig;
-using VoiceBlendModel = VoiceStudio.App.ViewModels.VoiceMorphViewModel.VoiceBlend;
 
 namespace VoiceStudio.App.ViewModels
 {
   /// <summary>
   /// ViewModel for the VoiceMorphView panel - Voice morphing and blending.
   /// </summary>
-  public partial class VoiceMorphViewModel : BaseViewModel, IPanelView
+  public partial class VoiceMorphViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IVoiceMorphClient _voiceMorphClient;
+    private readonly IProjectAudioClient _projectAudioClient;
     private readonly IProjectsClient _projectsClient;
     private readonly IProfilesClient _profilesClient;
+    private readonly CancellationTokenSource _disposalCts = new();
 
-    public string PanelId => "voice-morph";
+    public string PanelId => PanelIds.VoiceMorph;
     public string DisplayName => ResourceHelper.GetString("Panel.VoiceMorph.DisplayName", "Voice Morphing");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -66,10 +67,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool preserveProsody = true;
 
-    public VoiceMorphViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient, IProfilesClient profilesClient)
+    public VoiceMorphViewModel(IViewModelContext context, IVoiceMorphClient voiceMorphClient, IProjectAudioClient projectAudioClient, IProjectsClient projectsClient, IProfilesClient profilesClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _voiceMorphClient = voiceMorphClient ?? throw new ArgumentNullException(nameof(voiceMorphClient));
+      _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
       _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
@@ -121,13 +123,33 @@ namespace VoiceStudio.App.ViewModels
       RefreshCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
-        await RefreshAsync(ct);
+        await RefreshCoreAsync(ct);
       }, () => !IsLoading);
+    }
 
-      // Load initial data
-      _ = LoadConfigsAsync(CancellationToken.None);
-      _ = LoadAudioFilesAsync(CancellationToken.None);
-      _ = LoadVoiceProfilesAsync(CancellationToken.None);
+    /// <inheritdoc />
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      using var linked = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token, cancellationToken);
+      await LoadConfigsAsync(linked.Token);
+      await LoadAudioFilesAsync(linked.Token);
+      await LoadVoiceProfilesAsync(linked.Token);
+    }
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => RefreshCoreAsync(cancellationToken);
+
+    protected override void Dispose(bool disposing)
+    {
+      if (disposing)
+      {
+        _disposalCts.Cancel();
+        _disposalCts.Dispose();
+      }
+      base.Dispose(disposing);
     }
 
     public IAsyncRelayCommand LoadConfigsCommand { get; }
@@ -165,12 +187,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var configs = await _backendClient.SendRequestAsync<object, MorphConfig[]>(
-            "/api/voice-morph/configs",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var configs = await _voiceMorphClient.GetConfigsAsync(cancellationToken).ConfigureAwait(false);
 
         if (configs != null)
         {
@@ -216,27 +233,16 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          name = ConfigName,
-          source_audio_id = SelectedSourceAudioId,
-          target_voices = TargetVoices.Select(v => new
-          {
-            voice_profile_id = v.VoiceProfileId,
-            weight = v.Weight
-          }).ToArray(),
-          morph_strength = MorphStrength,
-          preserve_emotion = PreserveEmotion,
-          preserve_prosody = PreserveProsody,
-          output_format = "wav"
-        };
-
-        var config = await _backendClient.SendRequestAsync<object, MorphConfig>(
-            "/api/voice-morph/configs",
-            request,
-            System.Net.Http.HttpMethod.Post,
+        var targetVoices = TargetVoices.Select(v => (v.VoiceProfileId, v.Weight)).ToList();
+        var config = await _voiceMorphClient.CreateConfigAsync(
+            ConfigName,
+            SelectedSourceAudioId!,
+            targetVoices,
+            MorphStrength,
+            PreserveEmotion,
+            PreserveProsody,
             cancellationToken
-        );
+        ).ConfigureAwait(false);
 
         if (config != null)
         {
@@ -273,27 +279,17 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
-        {
-          name = ConfigName,
-          source_audio_id = SelectedSourceAudioId,
-          target_voices = TargetVoices.Select(v => new
-          {
-            voice_profile_id = v.VoiceProfileId,
-            weight = v.Weight
-          }).ToArray(),
-          morph_strength = MorphStrength,
-          preserve_emotion = PreserveEmotion,
-          preserve_prosody = PreserveProsody,
-          output_format = "wav"
-        };
-
-        var config = await _backendClient.SendRequestAsync<object, MorphConfig>(
-            $"/api/voice-morph/configs/{Uri.EscapeDataString(SelectedConfig.ConfigId)}",
-            request,
-            System.Net.Http.HttpMethod.Put,
+        var targetVoices = TargetVoices.Select(v => (v.VoiceProfileId, v.Weight)).ToList();
+        var config = await _voiceMorphClient.UpdateConfigAsync(
+            SelectedConfig.ConfigId,
+            ConfigName,
+            SelectedSourceAudioId ?? string.Empty,
+            targetVoices,
+            MorphStrength,
+            PreserveEmotion,
+            PreserveProsody,
             cancellationToken
-        );
+        ).ConfigureAwait(false);
 
         if (config != null)
         {
@@ -327,12 +323,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/voice-morph/configs/{Uri.EscapeDataString(SelectedConfig.ConfigId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _voiceMorphClient.DeleteConfigAsync(SelectedConfig.ConfigId, cancellationToken).ConfigureAwait(false);
 
         Configs.Remove(SelectedConfig);
         SelectedConfig = null;
@@ -403,21 +394,11 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          config_id = SelectedConfig.ConfigId
-        };
-
-        var response = await _backendClient.SendRequestAsync<object, MorphApplyResponse>(
-            "/api/voice-morph/apply",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _voiceMorphClient.ApplyMorphAsync(SelectedConfig.ConfigId, cancellationToken).ConfigureAwait(false);
 
         if (response != null)
         {
-          StatusMessage = ResourceHelper.FormatString("VoiceMorph.VoiceMorphingApplied", response.AudioId);
+          StatusMessage = ResourceHelper.FormatString("VoiceMorph.VoiceMorphingApplied", response.AudioId ?? "");
         }
       }
       catch (OperationCanceledException)
@@ -447,7 +428,7 @@ namespace VoiceStudio.App.ViewModels
         foreach (var project in projects)
         {
           cancellationToken.ThrowIfCancellationRequested();
-          var audioFiles = await _backendClient.ListProjectAudioAsync(project.Id, cancellationToken);
+          var audioFiles = await _projectAudioClient.ListProjectAudioAsync(project.Id, cancellationToken);
           foreach (var audioFile in audioFiles)
           {
             if (!string.IsNullOrEmpty(audioFile.AudioId))
@@ -505,7 +486,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task RefreshCoreAsync(CancellationToken cancellationToken)
     {
       await LoadConfigsAsync(cancellationToken);
       await LoadAudioFilesAsync(cancellationToken);
@@ -513,31 +494,6 @@ namespace VoiceStudio.App.ViewModels
       StatusMessage = ResourceHelper.GetString("VoiceMorph.Refreshed", "Refreshed");
     }
 
-    // Response models
-    public class MorphConfig
-    {
-      public string ConfigId { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public string SourceAudioId { get; set; } = string.Empty;
-      public VoiceBlend[] TargetVoices { get; set; } = Array.Empty<VoiceBlend>();
-      public double MorphStrength { get; set; }
-      public bool PreserveEmotion { get; set; }
-      public bool PreserveProsody { get; set; }
-      public string OutputFormat { get; set; } = "wav";
-    }
-
-    public class VoiceBlend
-    {
-      public string VoiceProfileId { get; set; } = string.Empty;
-      public double Weight { get; set; }
-    }
-
-    private class MorphApplyResponse
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public string ConfigApplied { get; set; } = string.Empty;
-      public string Message { get; set; } = string.Empty;
-    }
   }
 
   // Data models
@@ -554,13 +510,13 @@ namespace VoiceStudio.App.ViewModels
     public string MorphStrengthDisplay => $"{MorphStrength:P0}";
     public string VoiceCountDisplay => $"{TargetVoices.Count} voice(s)";
 
-    public MorphConfigItem(MorphConfigModel config)
+    public MorphConfigItem(VoiceMorphConfig config)
     {
       ConfigId = config.ConfigId;
       Name = config.Name;
       SourceAudioId = config.SourceAudioId;
       TargetVoices = new ObservableCollection<VoiceBlendItem>(
-          config.TargetVoices.Select(v => new VoiceBlendItem((VoiceBlendModel)v))
+          (config.TargetVoices ?? Array.Empty<VoiceMorphBlend>()).Select(v => new VoiceBlendItem(v))
       );
       MorphStrength = config.MorphStrength;
       PreserveEmotion = config.PreserveEmotion;
@@ -575,7 +531,7 @@ namespace VoiceStudio.App.ViewModels
     public double Weight { get; set; }
     public string WeightDisplay => $"{Weight:P0}";
 
-    public VoiceBlendItem(VoiceBlendModel blend)
+    public VoiceBlendItem(VoiceMorphBlend blend)
     {
       VoiceProfileId = blend.VoiceProfileId;
       Weight = blend.Weight;

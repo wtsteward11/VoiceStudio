@@ -71,7 +71,7 @@ namespace VoiceStudio.App.Tests.Services
       {
         try
         {
-          await Task.Delay(5000, ct);
+          await Task.Delay(500, ct);
         }
         catch (OperationCanceledException)
         {

@@ -20,11 +20,12 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class PronunciationLexiconViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IPronunciationLexiconClient _lexiconClient;
     private readonly IProfilesClient _profilesClient;
+    private readonly IVoiceSynthesisService _voiceSynthesisService;
     private readonly IAudioPlayerService _audioPlayer;
 
-    public string PanelId => "pronunciation-lexicon";
+    public string PanelId => PanelIds.PronunciationLexicon;
     public string DisplayName => ResourceHelper.GetString("Panel.PronunciationLexicon.DisplayName", "Pronunciation Lexicon");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -70,11 +71,12 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool isValid = true;
 
-    public PronunciationLexiconViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient, IAudioPlayerService audioPlayer)
+    public PronunciationLexiconViewModel(IViewModelContext context, IPronunciationLexiconClient lexiconClient, IProfilesClient profilesClient, IVoiceSynthesisService voiceSynthesisService, IAudioPlayerService audioPlayer)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _lexiconClient = lexiconClient ?? throw new ArgumentNullException(nameof(lexiconClient));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
+      _voiceSynthesisService = voiceSynthesisService ?? throw new ArgumentNullException(nameof(voiceSynthesisService));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
       LoadEntriesCommand = new AsyncRelayCommand(LoadEntriesAsync);
@@ -155,11 +157,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var entries = await _backendClient.SendRequestAsync<object, List<LexiconEntryResponse>>(
-            $"/api/lexicon/list?language={SelectedLanguage}",
-            null,
-            System.Net.Http.HttpMethod.Get
-        );
+        var entries = await _lexiconClient.GetEntriesAsync(SelectedLanguage);
 
         if (entries != null)
         {
@@ -203,17 +201,12 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new LexiconEntryRequest
-        {
-          Word = NewWord,
-          Pronunciation = NewPronunciation,
-          Language = SelectedLanguage ?? "en"
-        };
-
-        var response = await _backendClient.SendRequestAsync<LexiconEntryRequest, LexiconEntryResponse>(
-            "/api/lexicon/add",
-            request,
-            System.Net.Http.HttpMethod.Post
+        var response = await _lexiconClient.AddEntryAsync(
+            NewWord,
+            NewPronunciation,
+            SelectedLanguage ?? "en",
+            null,
+            null
         );
 
         if (response != null)
@@ -254,17 +247,12 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new LexiconEntryRequest
-        {
-          Word = SelectedEntry.Word,
-          Pronunciation = NewPronunciation,
-          Language = SelectedEntry.Language
-        };
-
-        var response = await _backendClient.SendRequestAsync<LexiconEntryRequest, LexiconEntryResponse>(
-            "/api/lexicon/update",
-            request,
-            System.Net.Http.HttpMethod.Put
+        var response = await _lexiconClient.UpdateEntryAsync(
+            SelectedEntry.Word,
+            NewPronunciation,
+            SelectedEntry.Language,
+            SelectedEntry.PartOfSpeech,
+            SelectedEntry.Notes
         );
 
         if (response != null)
@@ -301,11 +289,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.SendRequestAsync<object, Dictionary<string, object>>(
-            $"/api/lexicon/remove/{Uri.EscapeDataString(SelectedEntry.Word)}",
-            null,
-            System.Net.Http.HttpMethod.Delete
-        );
+        await _lexiconClient.DeleteEntryAsync(SelectedEntry.Word);
 
         Entries.Remove(SelectedEntry);
         SelectedEntry = null;
@@ -335,17 +319,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new PhonemeEstimateRequest
-        {
-          Word = NewWord,
-          Language = SelectedLanguage ?? "en"
-        };
-
-        var response = await _backendClient.SendRequestAsync<PhonemeEstimateRequest, PhonemeEstimateResponse>(
-            "/api/lexicon/phoneme",
-            request,
-            System.Net.Http.HttpMethod.Post
-        );
+        var response = await _lexiconClient.EstimatePhonemesAsync(NewWord, SelectedLanguage ?? "en");
 
         if (response != null)
         {
@@ -394,11 +368,7 @@ namespace VoiceStudio.App.ViewModels
           Text = SelectedEntry.Word,
           Language = SelectedLanguage ?? "en",
         };
-        var synthResponse = await _backendClient.SendRequestAsync<VoiceSynthesisRequest, VoiceSynthesisResponse>(
-            "/api/voice/synthesize",
-            synthRequest,
-            System.Net.Http.HttpMethod.Post
-        );
+        var synthResponse = await _voiceSynthesisService.SynthesizeVoiceAsync(synthRequest);
         if (synthResponse != null)
         {
           TestAudioId = synthResponse.AudioId;
@@ -610,19 +580,12 @@ namespace VoiceStudio.App.ViewModels
 
           try
           {
-            var request = new LexiconEntryRequest
-            {
-              Word = entryData.Word,
-              Pronunciation = entryData.Pronunciation,
-              Language = entryData.Language ?? SelectedLanguage ?? "en",
-              PartOfSpeech = entryData.PartOfSpeech,
-              Notes = entryData.Notes
-            };
-
-            var response = await _backendClient.SendRequestAsync<LexiconEntryRequest, LexiconEntryResponse>(
-                "/api/lexicon/add",
-                request,
-                System.Net.Http.HttpMethod.Post
+            var response = await _lexiconClient.AddEntryAsync(
+                entryData.Word,
+                entryData.Pronunciation,
+                entryData.Language ?? SelectedLanguage ?? "en",
+                entryData.PartOfSpeech,
+                entryData.Notes
             );
 
             if (response != null)
@@ -699,7 +662,7 @@ namespace VoiceStudio.App.ViewModels
       public string Language { get; set; } = "en";
     }
 
-    private class PhonemeEstimateResponse
+    public class PhonemeEstimateResponse
     {
       public string Word { get; set; } = string.Empty;
       public string Pronunciation { get; set; } = string.Empty;

@@ -62,6 +62,114 @@ namespace VoiceStudio.App.Tests.Services
             Assert.IsNull(_contextManager.ActiveProjectName);
             Assert.IsNull(_contextManager.ActiveAssetId);
             Assert.IsNull(_contextManager.ActiveEngineId);
+            Assert.IsNull(_contextManager.CurrentPlayableAudioId);
+            Assert.IsNull(_contextManager.CurrentPlayableSource);
+            Assert.IsNull(_contextManager.CurrentPlayableTitle);
+        }
+
+        #endregion
+
+        #region SetCurrentPlayable / Transport Ownership Tests (Global Transport UX Plan Task 13)
+
+        [TestMethod]
+        public void SetCurrentPlayable_WithLibrary_UpdatesTransportContext()
+        {
+            _contextManager.SetCurrentPlayable("audio-123", TransportSource.Library, "My Audio");
+            Assert.AreEqual("audio-123", _contextManager.CurrentPlayableAudioId);
+            Assert.AreEqual(TransportSource.Library, _contextManager.CurrentPlayableSource);
+            Assert.AreEqual("My Audio", _contextManager.CurrentPlayableTitle);
+        }
+
+        [TestMethod]
+        public void SetCurrentPlayable_WithNull_ClearsTransportContext()
+        {
+            _contextManager.SetCurrentPlayable("audio-123", TransportSource.Library, "My Audio");
+            _contextManager.SetCurrentPlayable(null, null, null);
+            Assert.IsNull(_contextManager.CurrentPlayableAudioId);
+            Assert.IsNull(_contextManager.CurrentPlayableSource);
+            Assert.IsNull(_contextManager.CurrentPlayableTitle);
+        }
+
+        [TestMethod]
+        public void SetCurrentPlayable_LibrarySelectionBeatsIdleTimeline_LastWriterWins()
+        {
+            _contextManager.SetCurrentPlayable("timeline-1", TransportSource.Timeline, "Timeline");
+            _contextManager.SetCurrentPlayable("lib-1", TransportSource.Library, "Library Asset");
+            Assert.AreEqual("lib-1", _contextManager.CurrentPlayableAudioId);
+            Assert.AreEqual(TransportSource.Library, _contextManager.CurrentPlayableSource);
+        }
+
+        [TestMethod]
+        public void SetCurrentPlayable_TimelineOverwritesLibrary_WhenTimelineSetsAfter()
+        {
+            _contextManager.SetCurrentPlayable("lib-1", TransportSource.Library, "Library Asset");
+            _contextManager.SetCurrentPlayable("timeline-1", TransportSource.Timeline, "Timeline");
+            Assert.AreEqual("timeline-1", _contextManager.CurrentPlayableAudioId);
+            Assert.AreEqual(TransportSource.Timeline, _contextManager.CurrentPlayableSource);
+        }
+
+        [TestMethod]
+        public void SetCurrentPlayable_NoSelectedPlayable_ResultsInNullTransport()
+        {
+            Assert.IsNull(_contextManager.CurrentPlayableAudioId);
+            Assert.IsNull(_contextManager.CurrentPlayableSource);
+            _contextManager.SetCurrentPlayable("x", TransportSource.Library, "X");
+            _contextManager.SetCurrentPlayable(null, null, null);
+            Assert.IsNull(_contextManager.CurrentPlayableAudioId);
+        }
+
+        [TestMethod]
+        public void SetCurrentPlayable_SameValues_DoesNotRaiseContextChanged()
+        {
+            var changedCount = 0;
+            _contextManager.ContextChanged += (_, _) => changedCount++;
+            _contextManager.SetCurrentPlayable("id", TransportSource.Library, "Title");
+            var afterFirst = changedCount;
+            _contextManager.SetCurrentPlayable("id", TransportSource.Library, "Title");
+            Assert.AreEqual(afterFirst, changedCount, "Same values should not raise ContextChanged again");
+        }
+
+        [TestMethod]
+        public void SetCurrentPlayable_TimelineOwnsTransport_WhenTimelineSets()
+        {
+            _contextManager.SetCurrentPlayable("timeline-1", TransportSource.Timeline, "Timeline");
+            Assert.AreEqual("timeline-1", _contextManager.CurrentPlayableAudioId);
+            Assert.AreEqual(TransportSource.Timeline, _contextManager.CurrentPlayableSource);
+        }
+
+        [TestMethod]
+        public void SetCurrentPlayable_StoppingTimelineDoesNotPermanentlySwallowLibrary_LibraryReclaimsAfterClear()
+        {
+            _contextManager.SetCurrentPlayable("lib-1", TransportSource.Library, "Library Asset");
+            _contextManager.SetCurrentPlayable("timeline-1", TransportSource.Timeline, "Timeline");
+            _contextManager.SetCurrentPlayable(null, null, null);
+            _contextManager.SetCurrentPlayable("lib-2", TransportSource.Library, "Library Asset 2");
+            Assert.AreEqual("lib-2", _contextManager.CurrentPlayableAudioId);
+            Assert.AreEqual(TransportSource.Library, _contextManager.CurrentPlayableSource);
+        }
+
+        [TestMethod]
+        public void SetCurrentPlayable_WithSynthesis_UpdatesTransportContext()
+        {
+            _contextManager.SetCurrentPlayable("synth-1", TransportSource.Synthesis, "Synthesized");
+            Assert.AreEqual("synth-1", _contextManager.CurrentPlayableAudioId);
+            Assert.AreEqual(TransportSource.Synthesis, _contextManager.CurrentPlayableSource);
+        }
+
+        [TestMethod]
+        public void SetCurrentPlayable_WithRecording_UpdatesTransportContext()
+        {
+            _contextManager.SetCurrentPlayable("rec-1", TransportSource.Recording, "Recording");
+            Assert.AreEqual("rec-1", _contextManager.CurrentPlayableAudioId);
+            Assert.AreEqual(TransportSource.Recording, _contextManager.CurrentPlayableSource);
+        }
+
+        [TestMethod]
+        public void SetCurrentPlayable_WithAnalyzer_UpdatesTransportContext()
+        {
+            _contextManager.SetCurrentPlayable("analyzer-1", TransportSource.Analyzer, "Analyzer");
+            Assert.AreEqual("analyzer-1", _contextManager.CurrentPlayableAudioId);
+            Assert.AreEqual(TransportSource.Analyzer, _contextManager.CurrentPlayableSource);
         }
 
         #endregion

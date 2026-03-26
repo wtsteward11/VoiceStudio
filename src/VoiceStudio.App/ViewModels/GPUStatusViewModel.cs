@@ -6,22 +6,22 @@ using System.Threading.Tasks;
 using System.Timers;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
-using GPUDeviceModel = VoiceStudio.App.ViewModels.GPUStatusViewModel.GPUDevice;
 
 namespace VoiceStudio.App.ViewModels
 {
   /// <summary>
   /// ViewModel for the GPUStatusView panel - GPU monitoring.
   /// </summary>
-  public partial class GPUStatusViewModel : BaseViewModel, IPanelView
+  public partial class GPUStatusViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IGPUStatusClient _gpuStatusClient;
     private System.Timers.Timer? _refreshTimer;
 
-    public string PanelId => "gpu-status";
+    public string PanelId => PanelIds.GPUStatus;
     public string DisplayName => ResourceHelper.GetString("Panel.GPUStatus.DisplayName", "GPU Status");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -46,10 +46,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private int refreshIntervalSeconds = 5;
 
-    public GPUStatusViewModel(IViewModelContext context, IBackendClient backendClient)
+    public GPUStatusViewModel(IViewModelContext context, IGPUStatusClient gpuStatusClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _gpuStatusClient = gpuStatusClient ?? throw new ArgumentNullException(nameof(gpuStatusClient));
 
       LoadGPUStatusCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -62,15 +62,22 @@ namespace VoiceStudio.App.ViewModels
         await RefreshAsync(ct);
       }, () => !IsLoading);
 
-      // Load initial data
-      _ = LoadGPUStatusAsync(CancellationToken.None);
-
-      // Setup auto-refresh
       SetupAutoRefresh();
     }
 
     public IAsyncRelayCommand LoadGPUStatusCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _ = LoadGPUStatusAsync(cancellationToken);
+      return Task.CompletedTask;
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken ct) => Task.CompletedTask;
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken ct) => await RefreshAsync(ct);
 
     partial void OnAutoRefreshChanged(bool value)
     {
@@ -139,12 +146,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var status = await _backendClient.SendRequestAsync<object, GPUStatus>(
-            "/api/gpu-status",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var status = await _gpuStatusClient.GetStatusAsync(cancellationToken);
 
         if (status != null)
         {
@@ -196,34 +198,9 @@ namespace VoiceStudio.App.ViewModels
         await HandleErrorAsync(ex, "Refresh");
       }
     }
-
-    // Response models
-    private class GPUStatus
-    {
-      public GPUDevice[] Devices { get; set; } = Array.Empty<GPUDevice>();
-      public int TotalDevices { get; set; }
-      public int AvailableDevices { get; set; }
-      public string? PrimaryDevice { get; set; }
-    }
-
-    public class GPUDevice
-    {
-      public string DeviceId { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public string Vendor { get; set; } = string.Empty;
-      public int MemoryTotalMb { get; set; }
-      public int MemoryUsedMb { get; set; }
-      public int MemoryFreeMb { get; set; }
-      public double UtilizationPercent { get; set; }
-      public double? TemperatureCelsius { get; set; }
-      public double? PowerUsageWatts { get; set; }
-      public string? DriverVersion { get; set; }
-      public string? ComputeCapability { get; set; }
-      public bool IsAvailable { get; set; }
-    }
   }
 
-  // Data models
+  // Presentation model for display (ObservableObject)
   public class GPUDeviceItem : ObservableObject
   {
     public string DeviceId { get; set; }
@@ -261,7 +238,7 @@ namespace VoiceStudio.App.ViewModels
     public string PowerDisplay => PowerUsageWatts.HasValue ? $"{PowerUsageWatts:F1}W" : "N/A";
     public string StatusDisplay => IsAvailable ? "Available" : "Unavailable";
 
-    public GPUDeviceItem(GPUDeviceModel device)
+    public GPUDeviceItem(GPUStatusDevice device)
     {
       DeviceId = device.DeviceId;
       Name = device.Name;

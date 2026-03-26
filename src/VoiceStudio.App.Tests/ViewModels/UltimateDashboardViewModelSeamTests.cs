@@ -45,12 +45,23 @@ namespace VoiceStudio.App.Tests.ViewModels
       _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
     }
 
+    /// <summary>
+    /// Invariant: constructor must not call any client methods before activation.
+    /// Prevents constructor fire-and-forget regression (RETAINED_ASYNC_RULE, ADR-047).
+    /// </summary>
+    [TestMethod]
+    public void Constructor_DoesNotCallClient_BeforeActivation()
+    {
+      _ = new UltimateDashboardViewModel(_context, _mockClient.Object);
+      _mockClient.Verify(x => x.GetDashboardAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [TestMethod]
     public void Constructor_WithIUltimateDashboardClient_CreatesInstance()
     {
       var vm = new UltimateDashboardViewModel(_context, _mockClient.Object);
       Assert.IsNotNull(vm);
-      Assert.AreEqual("ultimate-dashboard", vm.PanelId);
+      Assert.AreEqual(PanelIds.UltimateDashboard, vm.PanelId);
       Assert.IsNotNull(vm.LoadDashboardCommand);
       Assert.IsNotNull(vm.RefreshCommand);
     }

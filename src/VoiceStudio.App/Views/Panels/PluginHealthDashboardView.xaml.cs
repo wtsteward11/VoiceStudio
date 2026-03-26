@@ -21,11 +21,11 @@ namespace VoiceStudio.App.Views.Panels
             this.InitializeComponent();
 
             // Get dependencies from service locator
-            var backendClient = AppServices.GetBackendClient();
+            var pluginHealthClient = AppServices.GetPluginHealthClient();
             var context = AppServices.GetViewModelContext();
 
             // Create ViewModel
-            ViewModel = new PluginHealthDashboardViewModel(context, backendClient);
+            ViewModel = new PluginHealthDashboardViewModel(context, pluginHealthClient);
             this.DataContext = ViewModel;
 
             // Initialize toast service

@@ -840,6 +840,36 @@
   <data name="BackupRestore.BackupRestoredSuccess" xml:space="preserve">
     <value>Backup '{0}' restored successfully</value>
   </data>
+  <data name="BackupRestore.RestoreSessionCompleteMessage" xml:space="preserve">
+    <value>Backup '{0}' was restored to disk. Project and profile lists in this session were refreshed where that data was part of the restore. Files from the backup merge into existing data folders (files not in the backup may remain). Settings were not included in this restore (or you left them unchecked); the Settings panel may still show previous values until you choose Load Settings or restart the app. Other areas may behave similarly.</value>
+  </data>
+  <data name="BackupRestore.RestoreSessionCompleteMessageSettingsRestored" xml:space="preserve">
+    <value>Backup '{0}' was restored to disk. Project and profile lists in this session were refreshed where that data was part of the restore. The Settings panel was reloaded from disk because settings were included in the restore. Files from the backup merge into existing data folders (files not in the backup may remain). Other panels may still show older values until you open them again.</value>
+  </data>
+  <data name="BackupRestore.RestoreSessionCompleteMessageModelsRestored" xml:space="preserve">
+    <value>Backup '{0}' was restored to disk. Project and profile lists in this session were refreshed where that data was part of the restore. Models were included — large model folders can take time to copy; disk state should match the backup once the operation completes. Files from the backup merge into existing data folders (files not in the backup may remain). Open the Models panel or related views to confirm lists after restore.</value>
+  </data>
+  <data name="BackupRestore.RestoreSessionCompleteMessageSettingsAndModelsRestored" xml:space="preserve">
+    <value>Backup '{0}' was restored to disk. Settings were reloaded from disk, and models were included in the restore (large copies may take several minutes). Project and profile lists were refreshed where that data was part of the restore. Files from the backup merge into existing data folders (files not in the backup may remain).</value>
+  </data>
+  <data name="BackupRestore.RestoreBusyDetailDefault" xml:space="preserve">
+    <value>Restoring backup…</value>
+  </data>
+  <data name="BackupRestore.RestoreBusyDetailWithModels" xml:space="preserve">
+    <value>Restoring backup… Copying models can take several minutes. You can cancel to stop the request (the server may still finish writing).</value>
+  </data>
+  <data name="BackupRestore.RestoreCancelledMessage" xml:space="preserve">
+    <value>Restore cancelled.</value>
+  </data>
+  <data name="BackupRestore.CancelRestore" xml:space="preserve">
+    <value>Cancel restore</value>
+  </data>
+  <data name="BackupRestore.RestoreMergeExpectationHint" xml:space="preserve">
+    <value>Before you restore: files from the backup are merged into your existing VoiceStudio data folders (profiles, projects, settings, and models). They overwrite matching paths where names line up; other files already on disk may remain. This is not a complete wipe or replacement of those folders.</value>
+  </data>
+  <data name="BackupRestore.RestoreDiskOnlyPartialRefresh" xml:space="preserve">
+    <value>Backup '{0}' was written to disk, but refreshing open panels failed: {1}. Try restarting the app or use Refresh on individual panels.</value>
+  </data>
   <data name="BackupRestore.RestoreBackupFailed" xml:space="preserve">
     <value>Failed to restore backup: {0}</value>
   </data>
@@ -1155,6 +1185,10 @@
   </data>
   <data name="Training.NotAvailable" xml:space="preserve">
     <value>N/A</value>
+  </data>
+  <!-- Product trust Pass 01 slice 3: main Training panel not workflow-pass-closed (matrix §2) -->
+  <data name="Training.Pass01.SurfaceMaturityFootnote" xml:space="preserve">
+    <value>Training is available here, but this workflow is not closed under a workflow-coherence pass (no §8 proof). Treat datasets and jobs as partial—do not assume full production training lifecycle coverage.</value>
   </data>
 
   <!-- Diagnostics Messages -->
@@ -2018,6 +2052,33 @@
   </data>
   <data name="ScriptEditor.PartialDeleteWarning" xml:space="preserve">
     <value>Some scripts could not be deleted ({0}/{1} succeeded)</value>
+  </data>
+  <data name="ScriptEditor.SegmentTextRequired" xml:space="preserve">
+    <value>Segment has no text to synthesize</value>
+  </data>
+  <data name="ScriptEditor.VoiceProfileRequired" xml:space="preserve">
+    <value>No voice profile assigned to segment. Assign a profile or create one.</value>
+  </data>
+  <data name="ScriptEditor.SegmentGenerated" xml:space="preserve">
+    <value>Segment generated: {0}</value>
+  </data>
+  <data name="ScriptEditor.SegmentGeneratedDetail" xml:space="preserve">
+    <value>Audio ID: {0}</value>
+  </data>
+  <data name="ScriptEditor.GenerateSegmentFailed" xml:space="preserve">
+    <value>Failed to generate segment: {0}</value>
+  </data>
+  <data name="ScriptEditor.SynthesisReturnedNoAudioId" xml:space="preserve">
+    <value>Synthesis completed but no audio was returned. Nothing was saved.</value>
+  </data>
+  <data name="Toast.Title.SegmentGenerateIncomplete" xml:space="preserve">
+    <value>Generate Incomplete</value>
+  </data>
+  <data name="ScriptEditor.SynthesisNoScriptContext" xml:space="preserve">
+    <value>Generated audio could not be saved because no script is selected.</value>
+  </data>
+  <data name="ScriptEditor.GenerateMenuDisabledHelp" xml:space="preserve">
+    <value>Requires segment text and an assigned voice profile.</value>
   </data>
 
   <!-- Tag Manager Messages -->
@@ -3062,6 +3123,12 @@
   </data>
   <data name="Toast.Title.ScriptSynthesized" xml:space="preserve">
     <value>Script Synthesized</value>
+  </data>
+  <data name="Toast.Title.SegmentGenerated" xml:space="preserve">
+    <value>Segment Generated</value>
+  </data>
+  <data name="Toast.Title.GenerateSegmentFailed" xml:space="preserve">
+    <value>Generate Failed</value>
   </data>
   <data name="Toast.Title.SynthesisFailed" xml:space="preserve">
     <value>Synthesis Failed</value>
@@ -4503,6 +4570,60 @@
   </data>
   <data name="AnalyticsDashboard.Refreshed" xml:space="preserve">
     <value>Refreshed</value>
+  </data>
+
+  <!-- Transcribe panel — Pass 05 slice 1 validation -->
+  <data name="Transcribe.MissingAudioId" xml:space="preserve">
+    <value>Enter a backend audio id before transcribing or loading transcriptions.</value>
+  </data>
+  <data name="Transcribe.MissingAudioIdTitle" xml:space="preserve">
+    <value>Audio id required</value>
+  </data>
+  <!-- Transcribe panel — Pass 05 slice 2 C2 handoff -->
+  <data name="Transcribe.AudioIdPrefilled" xml:space="preserve">
+    <value>Audio id set from recording or import. You can change it before transcribing.</value>
+  </data>
+  <data name="Transcribe.AudioIdPrefilledTitle" xml:space="preserve">
+    <value>Audio id ready</value>
+  </data>
+  <!-- Product trust Pass 01 slice 1: drag-drop/batch ≠ transcribe project-copy until A4 §12 -->
+  <data name="Transcribe.Pass01.PersistenceScopeFootnote" xml:space="preserve">
+    <value>Dragging or dropping library items onto the project may not copy audio to the project yet. With a project selected, transcribing library audio can copy to project audio (Pass 05 Option A paths)—not all import paths behave the same until batch/drag-drop is separately enabled.</value>
+  </data>
+  <!-- Product trust Pass 01 slice 2: Library import ≠ drag-drop project copy until A4 §12 -->
+  <data name="Library.Pass01.ImportDragDropScopeFootnote" xml:space="preserve">
+    <value>Importing into the library (single or batch) is not the same as dragging library items onto the project: project audio copy from drag-drop is deferred until product sign-off (Workflow 5 Option A §12). Closed paths today follow Pass 05 Option A (for example transcribe-with-project); do not assume every library action copies into the open project.</value>
+  </data>
+  <!-- Transcribe panel — Pass 05 slice 3 C3 Option B semantics -->
+  <data name="Transcribe.C3.TranscribeCompleteTitle" xml:space="preserve">
+    <value>Transcription complete</value>
+  </data>
+  <data name="Transcribe.C3.TranscribeCompleteDetail" xml:space="preserve">
+    <value>Transcribed with {0}. Source audio remains a library asset; this step does not add it to project audio. Creating a transcript does not save source audio to the project.</value>
+  </data>
+  <data name="Transcribe.C3.AudioPersistenceHint" xml:space="preserve">
+    <value>Source audio remains a library asset; transcribing does not add it to project audio.</value>
+  </data>
+  <data name="Transcribe.A1.TranscribeCompleteDetailWithProjectCopy" xml:space="preserve">
+    <value>Transcribed with {0}. Source audio was also added to project audio.</value>
+  </data>
+  <data name="Transcribe.A1.TranscribeCompleteDetailProjectCopyFailed" xml:space="preserve">
+    <value>Transcribed with {0}. The transcript is ready; copying source audio to the project failed. Check logs.</value>
+  </data>
+  <data name="Transcribe.A1.AudioPersistenceHintProjectCopy" xml:space="preserve">
+    <value>Source audio is in the library and was copied to project audio.</value>
+  </data>
+  <data name="Transcribe.A1.AudioPersistenceHintProjectCopyFailed" xml:space="preserve">
+    <value>Transcript is ready; source audio could not be copied to the project. See logs.</value>
+  </data>
+  <data name="Transcribe.C3.SendToTimelineTitle" xml:space="preserve">
+    <value>Sent to Timeline</value>
+  </data>
+  <data name="Transcribe.C3.SendToTimelineDetail" xml:space="preserve">
+    <value>Transcript overlay loads on the Timeline; it does not persist source audio to the project.</value>
+  </data>
+  <data name="Transcribe.C3.SendToTimelineHint" xml:space="preserve">
+    <value>Timeline shows a transcript overlay only; source audio is not saved to the project from this action.</value>
   </data>
 
 </root>

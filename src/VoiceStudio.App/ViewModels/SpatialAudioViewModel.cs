@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -15,9 +14,9 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class SpatialAudioViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ISpatialAudioClient _spatialAudioClient;
 
-    public string PanelId => "spatial-audio";
+    public string PanelId => PanelIds.SpatialAudio;
     public string DisplayName => ResourceHelper.GetString("Panel.SpatialAudio.DisplayName", "Spatial Audio");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -69,10 +68,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool isPreviewing;
 
-    public SpatialAudioViewModel(IViewModelContext context, IBackendClient backendClient)
+    public SpatialAudioViewModel(IViewModelContext context, ISpatialAudioClient spatialAudioClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _spatialAudioClient = spatialAudioClient ?? throw new ArgumentNullException(nameof(spatialAudioClient));
 
       SetPositionCommand = new AsyncRelayCommand(SetPositionAsync, () => !string.IsNullOrWhiteSpace(AudioId));
       ConfigureEnvironmentCommand = new AsyncRelayCommand(ConfigureEnvironmentAsync);
@@ -125,11 +124,7 @@ namespace VoiceStudio.App.ViewModels
           Distance = Distance
         };
 
-        var response = await _backendClient.SendRequestAsync<SpatialPositionRequest, SpatialConfigResponse>(
-            "/api/spatial-audio/position",
-            request,
-            System.Net.Http.HttpMethod.Post
-        );
+        var response = await _spatialAudioClient.SetPositionAsync(request);
 
         if (response != null)
         {
@@ -161,11 +156,7 @@ namespace VoiceStudio.App.ViewModels
           Doppler = EnableDoppler
         };
 
-        var response = await _backendClient.SendRequestAsync<SpatialEnvironmentRequest, Dictionary<string, object>>(
-            "/api/spatial-audio/environment",
-            request,
-            System.Net.Http.HttpMethod.Post
-        );
+        var response = await _spatialAudioClient.ConfigureEnvironmentAsync(request);
 
         if (response != null)
         {
@@ -213,11 +204,7 @@ namespace VoiceStudio.App.ViewModels
           }
         };
 
-        var response = await _backendClient.SendRequestAsync<SpatialProcessRequest, SpatialProcessResponse>(
-            "/api/spatial-audio/process",
-            request,
-            System.Net.Http.HttpMethod.Post
-        );
+        var response = await _spatialAudioClient.ProcessAudioAsync(request);
 
         if (response != null)
         {
@@ -248,12 +235,7 @@ namespace VoiceStudio.App.ViewModels
         IsPreviewing = true;
         ErrorMessage = null;
 
-        // Preview uses the preview endpoint
-        var response = await _backendClient.SendRequestAsync<object, Dictionary<string, object>>(
-            $"/api/spatial-audio/preview?audio_id={Uri.EscapeDataString(AudioId)}&x={PositionX}&y={PositionY}&z={PositionZ}&distance={Distance}",
-            null,
-            System.Net.Http.HttpMethod.Post
-        );
+        var response = await _spatialAudioClient.PreviewAsync(AudioId, PositionX, PositionY, PositionZ, Distance);
 
         StatusMessage = ResourceHelper.GetString("SpatialAudio.PreviewStarted", "Preview started (requires spatial audio libraries)");
       }
@@ -334,60 +316,6 @@ namespace VoiceStudio.App.ViewModels
       StatusMessage = ResourceHelper.GetString("SpatialAudio.ResetToDefaults", "Reset to defaults");
 
       return Task.CompletedTask;
-    }
-
-    // Request/Response models
-    private class SpatialPositionRequest
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public float X { get; set; }
-      public float Y { get; set; }
-      public float Z { get; set; }
-      public float Distance { get; set; }
-    }
-
-    private class SpatialConfigResponse
-    {
-      public string ConfigId { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public SpatialPositionData Position { get; set; } = new();
-    }
-
-    private class SpatialPositionData
-    {
-      public float X { get; set; }
-      public float Y { get; set; }
-      public float Z { get; set; }
-      public float Distance { get; set; }
-    }
-
-    private class SpatialEnvironmentRequest
-    {
-      public float RoomSize { get; set; }
-      public string Material { get; set; } = string.Empty;
-      public float ReverbAmount { get; set; }
-      public bool Doppler { get; set; }
-    }
-
-    private class SpatialProcessRequest
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public SpatialPositionData? Position { get; set; }
-      public SpatialEnvironmentData? Environment { get; set; }
-    }
-
-    private class SpatialEnvironmentData
-    {
-      public float RoomSize { get; set; }
-      public string Material { get; set; } = string.Empty;
-      public float ReverbAmount { get; set; }
-      public bool Doppler { get; set; }
-    }
-
-    private class SpatialProcessResponse
-    {
-      public string ProcessedAudioId { get; set; } = string.Empty;
-      public string ProcessedAudioUrl { get; set; } = string.Empty;
     }
   }
 }

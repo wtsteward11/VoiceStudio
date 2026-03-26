@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
 using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -19,7 +20,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class TextSpeechEditorViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<ITextSpeechEditorClient>? _mockTextSpeechEditorClient;
         private Mock<IProjectsClient>? _mockProjectsClient;
         private Mock<IProfilesClient>? _mockProfilesClient;
         private Mock<IAudioPlayerService>? _mockAudioPlayer;
@@ -28,7 +29,9 @@ namespace VoiceStudio.App.Tests.ViewModels
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockTextSpeechEditorClient = new Mock<ITextSpeechEditorClient>();
+            _mockTextSpeechEditorClient.Setup(x => x.GetSessionsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<EditorSession>());
+            _mockTextSpeechEditorClient.Setup(x => x.GetEnginesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<string>());
             _mockProjectsClient = new Mock<IProjectsClient>();
             _mockProjectsClient
                 .Setup(x => x.GetProjectsAsync(It.IsAny<CancellationToken>()))
@@ -44,7 +47,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
         private TextSpeechEditorViewModel CreateViewModel()
         {
-            return new TextSpeechEditorViewModel(MockContext!, _mockBackendClient!.Object, _mockProjectsClient!.Object, _mockProfilesClient!.Object, _mockAudioPlayer!.Object);
+            return new TextSpeechEditorViewModel(MockContext!, _mockTextSpeechEditorClient!.Object, _mockProjectsClient!.Object, _mockProfilesClient!.Object, _mockAudioPlayer!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -57,7 +60,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
             // Assert
             Assert.IsNotNull(viewModel);
-            Assert.AreEqual("text-speech-editor", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.TextSpeechEditor, viewModel.PanelId);
             Assert.IsNotNull(viewModel.Sessions);
             Assert.IsNotNull(viewModel.Segments);
         }
@@ -66,11 +69,11 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new TextSpeechEditorViewModel(null!, _mockBackendClient!.Object, _mockProjectsClient!.Object, _mockProfilesClient!.Object, _mockAudioPlayer!.Object));
+                new TextSpeechEditorViewModel(null!, _mockTextSpeechEditorClient!.Object, _mockProjectsClient!.Object, _mockProfilesClient!.Object, _mockAudioPlayer!.Object));
         }
 
         [TestMethod]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullTextSpeechEditorClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
                 new TextSpeechEditorViewModel(MockContext!, null!, _mockProjectsClient!.Object, _mockProfilesClient!.Object, _mockAudioPlayer!.Object));
@@ -80,14 +83,14 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullProjectsClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new TextSpeechEditorViewModel(MockContext!, _mockBackendClient!.Object, null!, _mockProfilesClient!.Object, _mockAudioPlayer!.Object));
+                new TextSpeechEditorViewModel(MockContext!, _mockTextSpeechEditorClient!.Object, null!, _mockProfilesClient!.Object, _mockAudioPlayer!.Object));
         }
 
         [TestMethod]
         public void Constructor_WithNullProfilesClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new TextSpeechEditorViewModel(MockContext!, _mockBackendClient!.Object, _mockProjectsClient!.Object, null!, _mockAudioPlayer!.Object));
+                new TextSpeechEditorViewModel(MockContext!, _mockTextSpeechEditorClient!.Object, _mockProjectsClient!.Object, null!, _mockAudioPlayer!.Object));
         }
 
         [TestMethod]
@@ -278,11 +281,11 @@ namespace VoiceStudio.App.Tests.ViewModels
             };
 
             // Act
-            var session = new TextSpeechEditorViewModel.EditorSession
+            var session = new EditorSession
             {
                 SessionId = "session-1",
                 Title = "Test Session",
-                Segments = Array.Empty<TextSpeechEditorViewModel.TextSegment>(),
+                Segments = Array.Empty<TextSegment>(),
                 Language = "en",
                 Created = DateTime.UtcNow.ToString("O"),
                 Modified = DateTime.UtcNow.ToString("O")
@@ -301,7 +304,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void PanelId_ReturnsCorrectValue()
         {
             var viewModel = CreateViewModel();
-            Assert.AreEqual("text-speech-editor", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.TextSpeechEditor, viewModel.PanelId);
         }
 
         [TestMethod]

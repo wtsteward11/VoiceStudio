@@ -23,7 +23,7 @@ namespace VoiceStudio.App.Services
       // Core synthesis panels
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "VoiceSynthesis",
+        PanelId = PanelIds.VoiceSynthesis,
         DisplayName = "Voice Synthesis",
         Region = PanelRegion.Center,
         ViewType = typeof(VoiceSynthesisView),
@@ -35,7 +35,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "EnsembleSynthesis",
+        PanelId = PanelIds.EnsembleSynthesis,
         DisplayName = "Ensemble Synthesis",
         Region = PanelRegion.Center,
         ViewType = typeof(EnsembleSynthesisView),
@@ -47,7 +47,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "BatchProcessing",
+        PanelId = PanelIds.BatchProcessing,
         DisplayName = "Batch Processing",
         Region = PanelRegion.Center,
         ViewType = typeof(BatchProcessingView),
@@ -60,7 +60,7 @@ namespace VoiceStudio.App.Services
       // Training panels
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "TrainingDatasetEditor",
+        PanelId = PanelIds.TrainingDatasetEditor,
         DisplayName = "Training Dataset Editor",
         Region = PanelRegion.Center,
         ViewType = typeof(TrainingDatasetEditorView),
@@ -72,7 +72,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "ModelManager",
+        PanelId = PanelIds.ModelManager,
         DisplayName = "Model Manager",
         Region = PanelRegion.Center,
         ViewType = typeof(ModelManagerView),
@@ -84,7 +84,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "Training",
+        PanelId = PanelIds.Training,
         DisplayName = "Training",
         Region = PanelRegion.Left,
         ViewType = typeof(TrainingView),
@@ -97,7 +97,7 @@ namespace VoiceStudio.App.Services
       // Audio processing panels
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "Transcribe",
+        PanelId = PanelIds.Transcribe,
         DisplayName = "Transcribe",
         Region = PanelRegion.Center,
         ViewType = typeof(TranscribeView),
@@ -109,7 +109,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "Recording",
+        PanelId = PanelIds.Recording,
         DisplayName = "Recording",
         Region = PanelRegion.Right,
         ViewType = typeof(RecordingView),
@@ -121,7 +121,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "AudioAnalysis",
+        PanelId = PanelIds.AudioAnalysis,
         DisplayName = "Audio Analysis",
         Region = PanelRegion.Center,
         ViewType = typeof(AudioAnalysisView),
@@ -133,7 +133,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "QualityControl",
+        PanelId = PanelIds.QualityControl,
         DisplayName = "Quality Control",
         Region = PanelRegion.Right,
         ViewType = typeof(QualityControlView),
@@ -146,7 +146,7 @@ namespace VoiceStudio.App.Services
       // Navigation panels
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "Timeline",
+        PanelId = PanelIds.Timeline,
         DisplayName = "Timeline",
         Region = PanelRegion.Center,
         ViewType = typeof(TimelineView),
@@ -158,7 +158,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "Profiles",
+        PanelId = PanelIds.Profiles,
         DisplayName = "Profiles",
         Region = PanelRegion.Left,
         ViewType = typeof(ProfilesView),
@@ -170,7 +170,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "Library",
+        PanelId = PanelIds.Library,
         DisplayName = "Library",
         Region = PanelRegion.Left,
         ViewType = typeof(LibraryView),
@@ -183,7 +183,7 @@ namespace VoiceStudio.App.Services
       // Effect panels
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "EffectsMixer",
+        PanelId = PanelIds.EffectsMixer,
         DisplayName = "Effects Mixer",
         Region = PanelRegion.Right,
         ViewType = typeof(EffectsMixerView),
@@ -195,7 +195,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "Analyzer",
+        PanelId = PanelIds.Analyzer,
         DisplayName = "Analyzer",
         Region = PanelRegion.Right,
         ViewType = typeof(AnalyzerView),
@@ -207,7 +207,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "VoiceMorph",
+        PanelId = PanelIds.VoiceMorph,
         DisplayName = "Voice Morph",
         Region = PanelRegion.Center,
         ViewType = typeof(VoiceMorphView),
@@ -219,7 +219,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "EmotionControl",
+        PanelId = PanelIds.EmotionControl,
         DisplayName = "Emotion Control",
         Region = PanelRegion.Right,
         ViewType = typeof(EmotionControlView),
@@ -232,7 +232,7 @@ namespace VoiceStudio.App.Services
       // Utility panels
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "Diagnostics",
+        PanelId = PanelIds.Diagnostics,
         DisplayName = "Diagnostics",
         Region = PanelRegion.Bottom,
         ViewType = typeof(DiagnosticsView),
@@ -244,7 +244,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "Settings",
+        PanelId = PanelIds.Settings,
         DisplayName = "Settings",
         Region = PanelRegion.Right,
         ViewType = typeof(SettingsView),
@@ -256,7 +256,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "Help",
+        PanelId = PanelIds.Help,
         DisplayName = "Help",
         Region = PanelRegion.Right,
         ViewType = typeof(HelpView),
@@ -269,7 +269,7 @@ namespace VoiceStudio.App.Services
       // Advanced panels
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "SSMLControl",
+        PanelId = PanelIds.SSMLControl,
         DisplayName = "SSML Control",
         Region = PanelRegion.Right,
         ViewType = typeof(SSMLControlView),
@@ -282,7 +282,7 @@ namespace VoiceStudio.App.Services
       // Voice cloning panels
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "VoiceQuickClone",
+        PanelId = PanelIds.VoiceQuickClone,
         DisplayName = "Quick Clone",
         Region = PanelRegion.Center,
         ViewType = typeof(VoiceQuickCloneView),
@@ -295,7 +295,7 @@ namespace VoiceStudio.App.Services
       // Quality panels
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "QualityDashboard",
+        PanelId = PanelIds.QualityDashboard,
         DisplayName = "Quality Dashboard",
         Region = PanelRegion.Center,
         ViewType = typeof(QualityDashboardView),
@@ -307,7 +307,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "QualityBenchmark",
+        PanelId = PanelIds.QualityBenchmark,
         DisplayName = "Quality Benchmark",
         Region = PanelRegion.Center,
         ViewType = typeof(QualityBenchmarkView),
@@ -320,7 +320,7 @@ namespace VoiceStudio.App.Services
       // Image/Video panels
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "ImageGen",
+        PanelId = PanelIds.ImageGen,
         DisplayName = "Image Generation",
         Region = PanelRegion.Center,
         ViewType = typeof(ImageGenView),
@@ -332,7 +332,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "VideoGen",
+        PanelId = PanelIds.VideoGen,
         DisplayName = "Video Generation",
         Region = PanelRegion.Center,
         ViewType = typeof(VideoGenView),
@@ -344,7 +344,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "DeepfakeCreator",
+        PanelId = PanelIds.DeepfakeCreator,
         DisplayName = "Deepfake Creator",
         Region = PanelRegion.Center,
         ViewType = typeof(DeepfakeCreatorView),
@@ -357,7 +357,7 @@ namespace VoiceStudio.App.Services
       // Script/Scene panels
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "DatasetQA",
+        PanelId = PanelIds.DatasetQA,
         DisplayName = "Dataset QA",
         Region = PanelRegion.Center,
         ViewType = typeof(DatasetQAView),
@@ -367,10 +367,10 @@ namespace VoiceStudio.App.Services
         Keywords = new[] { "dataset", "QA", "quality", "review" }
       });
 
-      // F-10: Hidden - /api/script-editor is archived
+      // F-10: Restored - /api/script-editor unarchived with file-based persistence (Fix 2)
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "ScriptEditor",
+        PanelId = PanelIds.ScriptEditor,
         DisplayName = "Script Editor",
         Region = PanelRegion.Center,
         ViewType = typeof(ScriptEditorView),
@@ -378,12 +378,12 @@ namespace VoiceStudio.App.Services
         MenuCategory = "Editing",
         Maturity = PanelMaturity.Stable,
         Keywords = new[] { "script", "editor", "text", "dialogue" },
-        IsVisible = false
+        IsVisible = true
       });
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "SceneBuilder",
+        PanelId = PanelIds.SceneBuilder,
         DisplayName = "Scene Builder",
         Region = PanelRegion.Center,
         ViewType = typeof(SceneBuilderView),
@@ -396,7 +396,7 @@ namespace VoiceStudio.App.Services
       // Automation panels
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "Macro",
+        PanelId = PanelIds.Macro,
         DisplayName = "Macro",
         Region = PanelRegion.Bottom,
         ViewType = typeof(MacroView),
@@ -408,7 +408,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "WorkflowAutomation",
+        PanelId = PanelIds.WorkflowAutomation,
         DisplayName = "Workflow Automation",
         Region = PanelRegion.Center,
         ViewType = typeof(WorkflowAutomationView),
@@ -421,7 +421,7 @@ namespace VoiceStudio.App.Services
       // Settings panels
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "AdvancedSettings",
+        PanelId = PanelIds.AdvancedSettings,
         DisplayName = "Advanced Settings",
         Region = PanelRegion.Right,
         ViewType = typeof(AdvancedSettingsView),
@@ -433,7 +433,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "APIKeyManager",
+        PanelId = PanelIds.APIKeyManager,
         DisplayName = "API Key Manager",
         Region = PanelRegion.Right,
         ViewType = typeof(APIKeyManagerView),
@@ -445,7 +445,7 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "GPUStatus",
+        PanelId = PanelIds.GPUStatus,
         DisplayName = "GPU Status",
         Region = PanelRegion.Right,
         ViewType = typeof(GPUStatusView),
@@ -458,7 +458,7 @@ namespace VoiceStudio.App.Services
       // F-10: Hidden - /api/todo-panel is archived
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "TodoPanel",
+        PanelId = PanelIds.TodoPanel,
         DisplayName = "Todo Panel",
         Region = PanelRegion.Right,
         ViewType = typeof(TodoPanelView),
@@ -472,7 +472,7 @@ namespace VoiceStudio.App.Services
       // F-10: Hidden - /api/text-highlighting is archived
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "TextHighlighting",
+        PanelId = PanelIds.TextHighlighting,
         DisplayName = "Text Highlighting",
         Region = PanelRegion.Center,
         ViewType = typeof(TextHighlightingView),
@@ -486,7 +486,7 @@ namespace VoiceStudio.App.Services
       // F-10: Hidden - /api/ultimate-dashboard is archived
       RegisterIfNotExists(registry, new PanelDescriptor
       {
-        PanelId = "UltimateDashboard",
+        PanelId = PanelIds.UltimateDashboard,
         DisplayName = "Ultimate Dashboard",
         Region = PanelRegion.Center,
         ViewType = typeof(UltimateDashboardView),

@@ -12,6 +12,7 @@ namespace VoiceStudio.App.Services.Stores
   /// </summary>
   public partial class SystemStore : ObservableObject
   {
+    private readonly IConnectionStatusClient _connectionStatus;
     private readonly IBackendClient _backendClient;
     private readonly StateCacheService? _stateCacheService;
 
@@ -51,8 +52,9 @@ namespace VoiceStudio.App.Services.Stores
     [ObservableProperty]
     private int consecutiveFailures;
 
-    public SystemStore(IBackendClient backendClient, StateCacheService? stateCacheService = null)
+    public SystemStore(IConnectionStatusClient connectionStatus, IBackendClient backendClient, StateCacheService? stateCacheService = null)
     {
+      _connectionStatus = connectionStatus ?? throw new ArgumentNullException(nameof(connectionStatus));
       _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
       _stateCacheService = stateCacheService;
 
@@ -91,8 +93,8 @@ namespace VoiceStudio.App.Services.Stores
       try
       {
         // Try a simple health check or lightweight endpoint
-        // For now, we'll use the circuit breaker state as an indicator
-        IsBackendConnected = _backendClient.IsConnected;
+        // Use IConnectionStatusClient (PR-8: extracted from IBackendClient)
+        IsBackendConnected = _connectionStatus.IsConnected;
         LastBackendCheck = DateTime.UtcNow;
 
         LastUpdated = DateTime.UtcNow;

@@ -28,12 +28,14 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class VoiceCloningWizardViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IVoiceCloningWizardClient _wizardClient;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly IEventAggregator? _eventAggregator;
     private ISubscriptionToken? _cloneReferenceSubscription;
 
-    public string PanelId => "voice-cloning-wizard";
+    private readonly CancellationTokenSource _disposalCts = new();
+
+    public string PanelId => PanelIds.VoiceCloningWizard;
     public string DisplayName => ResourceHelper.GetString("Panel.VoiceCloningWizard.DisplayName", "Voice Cloning Wizard");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -103,10 +105,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? device;
 
-    public VoiceCloningWizardViewModel(IViewModelContext context, IBackendClient backendClient)
+    public VoiceCloningWizardViewModel(IViewModelContext context, IVoiceCloningWizardClient wizardClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _wizardClient = wizardClient ?? throw new ArgumentNullException(nameof(wizardClient));
 
       // Get services using helper (reduces code duplication)
       _toastNotificationService = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetToastNotificationService());
@@ -153,8 +155,15 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("CancelWizard");
         await CancelWizardAsync(ct);
       });
+    }
 
-      _ = LoadEnginesAsync(new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token);
+    /// <summary>
+    /// Initialize wizard data. Call from View Loaded event (ADR-047).
+    /// Uses _disposalCts so disposal cancels in-flight load.
+    /// </summary>
+    public void InitializeAsync()
+    {
+      _ = LoadEnginesAsync(_disposalCts.Token);
     }
 
     public IAsyncRelayCommand BrowseAudioCommand { get; }
@@ -254,7 +263,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var engines = await _backendClient.GetEnginesAsync(cancellationToken);
+        var engines = await _wizardClient.GetEnginesAsync(cancellationToken);
         AvailableEngines.Clear();
         foreach (var eng in engines)
           AvailableEngines.Add(eng);
@@ -344,17 +353,12 @@ namespace VoiceStudio.App.ViewModels
 
         foreach (var audioId in UploadedAudioIds)
         {
-          var request = new AudioValidationRequest
+          var request = new VoiceCloningAudioValidationRequest
           {
             AudioId = audioId
           };
 
-          var validation = await _backendClient.SendRequestAsync<AudioValidationRequest, AudioValidationResponse>(
-              "/api/voice/clone/wizard/validate-audio",
-              request,
-              System.Net.Http.HttpMethod.Post,
-              cancellationToken
-          );
+          var validation = await _wizardClient.ValidateAudioAsync(request, cancellationToken);
 
           if (validation != null)
           {
@@ -413,15 +417,7 @@ namespace VoiceStudio.App.ViewModels
       {
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Use the centralized IBackendClient for file upload
-        var uploadResponse = await _backendClient.UploadFileWithProgressAsync<AudioUploadResponse>(
-            "/api/audio/upload",
-            file.Path,
-            "file",
-            additionalData: null,
-            progress: null,
-            timeout: null,
-            cancellationToken);
+        var uploadResponse = await _wizardClient.UploadAudioFileAsync(file.Path, cancellationToken);
 
         return uploadResponse?.AudioId;
       }
@@ -511,7 +507,7 @@ namespace VoiceStudio.App.ViewModels
 
         UploadedAudioId = UploadedAudioIds.FirstOrDefault();
 
-        var request = new WizardStartRequest
+        var request = new VoiceCloningWizardStartRequest
         {
           ReferenceAudioId = UploadedAudioId ?? string.Empty,
           Engine = SelectedEngine ?? "xtts",
@@ -520,25 +516,14 @@ namespace VoiceStudio.App.ViewModels
           ProfileDescription = ProfileDescription
         };
 
-        var response = await _backendClient.SendRequestAsync<WizardStartRequest, WizardStartResponse>(
-            "/api/voice/clone/wizard/start",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _wizardClient.StartWizardAsync(request, cancellationToken);
 
         if (response != null)
         {
           WizardJobId = response.JobId;
           CurrentStep = 3;
 
-          // Start processing
-          await _backendClient.SendRequestAsync<object, object>(
-              $"/api/voice/clone/wizard/{WizardJobId}/process",
-              null,
-              System.Net.Http.HttpMethod.Post,
-              cancellationToken
-          );
+          await _wizardClient.StartWizardProcessAsync(response.JobId, cancellationToken);
 
           // Poll for status (with linked cancellation token)
           _toastNotificationService?.ShowSuccess(
@@ -580,12 +565,7 @@ namespace VoiceStudio.App.ViewModels
         {
           await Task.Delay(1000, cancellationToken); // Poll every second
 
-          var status = await _backendClient.SendRequestAsync<object, WizardStatusResponse>(
-              $"/api/voice/clone/wizard/{WizardJobId}/status",
-              null,
-              System.Net.Http.HttpMethod.Get,
-              cancellationToken
-          );
+          var status = await _wizardClient.GetWizardStatusAsync(WizardJobId, cancellationToken);
 
           if (status != null)
           {
@@ -683,19 +663,14 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new WizardFinalizeRequest
+        var request = new VoiceCloningWizardFinalizeRequest
         {
           JobId = wizardJobIdValue,
           ProfileName = profileNameValue,
           ProfileDescription = ProfileDescription
         };
 
-        var response = await _backendClient.SendRequestAsync<WizardFinalizeRequest, WizardFinalizeResponse>(
-            $"/api/voice/clone/wizard/{wizardJobIdValue}/finalize",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _wizardClient.FinalizeWizardAsync(wizardJobIdValue, request, cancellationToken);
 
         if (response?.Success == true)
         {
@@ -755,12 +730,7 @@ namespace VoiceStudio.App.ViewModels
         {
           try
           {
-            await _backendClient.SendRequestAsync<object, object>(
-                $"/api/voice/clone/wizard/{WizardJobId}",
-                null,
-                System.Net.Http.HttpMethod.Delete,
-                cancellationToken
-            );
+            await _wizardClient.CancelWizardAsync(WizardJobId, cancellationToken);
           }
           catch (Exception ex)
           {
@@ -872,83 +842,14 @@ namespace VoiceStudio.App.ViewModels
     {
       if (disposing)
       {
+        _disposalCts.Cancel();
+        _disposalCts.Dispose();
         _cloneReferenceSubscription?.Dispose();
         _cloneReferenceSubscription = null;
       }
       base.Dispose(disposing);
     }
 
-    // Request/Response models
-    private class AudioValidationRequest
-    {
-      public string AudioId { get; set; } = string.Empty;
-    }
-
-    public class AudioValidationResponse
-    {
-      public bool IsValid { get; set; }
-      public double Duration { get; set; }
-      public int SampleRate { get; set; }
-      public int Channels { get; set; }
-      public string[] Issues { get; set; } = Array.Empty<string>();
-      public string[] Recommendations { get; set; } = Array.Empty<string>();
-      public double? QualityScore { get; set; }
-    }
-
-    private class WizardStartRequest
-    {
-      public string ReferenceAudioId { get; set; } = string.Empty;
-      public string Engine { get; set; } = "xtts";
-      public string QualityMode { get; set; } = "standard";
-      public string ProfileName { get; set; } = string.Empty;
-      public string? ProfileDescription { get; set; }
-    }
-
-    private class WizardStartResponse
-    {
-      public string JobId { get; set; } = string.Empty;
-      public int Step { get; set; }
-      public string Status { get; set; } = string.Empty;
-    }
-
-    private class WizardStatusResponse
-    {
-      public string JobId { get; set; } = string.Empty;
-      public int Step { get; set; }
-      public string Status { get; set; } = string.Empty;
-      public float Progress { get; set; }
-      public string? ProfileId { get; set; }
-      public Dictionary<string, object>? QualityMetrics { get; set; }
-      public string? TestSynthesisAudioUrl { get; set; }
-      public string? ErrorMessage { get; set; }
-
-      [JsonPropertyName("device")]
-      public string? Device { get; set; }
-
-      [JsonPropertyName("candidate_metrics")]
-      public List<CandidateMetricDto>? CandidateMetrics { get; set; }
-    }
-
-    private class WizardFinalizeRequest
-    {
-      public string JobId { get; set; } = string.Empty;
-      public string? ProfileName { get; set; }
-      public string? ProfileDescription { get; set; }
-    }
-
-    private class WizardFinalizeResponse
-    {
-      public string ProfileId { get; set; } = string.Empty;
-      public string ProfileName { get; set; } = string.Empty;
-      public bool Success { get; set; }
-    }
-
-    private class AudioUploadResponse
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public string? FileName { get; set; }
-      public long? FileSize { get; set; }
-    }
   }
 
   // Data models
@@ -967,7 +868,7 @@ namespace VoiceStudio.App.ViewModels
     public string SampleRateDisplay => $"{SampleRate} Hz";
     public string ChannelsDisplay => Channels == 1 ? "Mono" : $"{Channels} channels";
 
-    public AudioValidationItem(VoiceCloningWizardViewModel.AudioValidationResponse validation)
+    public AudioValidationItem(VoiceCloningAudioValidationResponse validation)
     {
       IsValid = validation.IsValid;
       Duration = validation.Duration;

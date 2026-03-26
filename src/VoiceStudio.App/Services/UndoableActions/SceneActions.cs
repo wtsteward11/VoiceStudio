@@ -12,7 +12,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateSceneAction : IUndoableAction
   {
     private readonly ObservableCollection<SceneItem> _scenes;
-    private readonly IBackendClient _backendClient;
+    private readonly ISceneBuilderClient _sceneBuilderClient;
     private readonly SceneItem _scene;
     private readonly Action<SceneItem>? _onUndo;
     private readonly Action<SceneItem>? _onRedo;
@@ -21,13 +21,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateSceneAction(
         ObservableCollection<SceneItem> scenes,
-        IBackendClient backendClient,
+        ISceneBuilderClient sceneBuilderClient,
         SceneItem scene,
         Action<SceneItem>? onUndo = null,
         Action<SceneItem>? onRedo = null)
     {
       _scenes = scenes ?? throw new ArgumentNullException(nameof(scenes));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _sceneBuilderClient = sceneBuilderClient ?? throw new ArgumentNullException(nameof(sceneBuilderClient));
       _scene = scene ?? throw new ArgumentNullException(nameof(scene));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -59,7 +59,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteSceneAction : IUndoableAction
   {
     private readonly ObservableCollection<SceneItem> _scenes;
-    private readonly IBackendClient _backendClient;
+    private readonly ISceneBuilderClient _sceneBuilderClient;
     private readonly SceneItem _scene;
     private readonly int _originalIndex;
     private readonly Action<SceneItem>? _onUndo;
@@ -69,14 +69,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteSceneAction(
         ObservableCollection<SceneItem> scenes,
-        IBackendClient backendClient,
+        ISceneBuilderClient sceneBuilderClient,
         SceneItem scene,
         int originalIndex,
         Action<SceneItem>? onUndo = null,
         Action<SceneItem>? onRedo = null)
     {
       _scenes = scenes ?? throw new ArgumentNullException(nameof(scenes));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _sceneBuilderClient = sceneBuilderClient ?? throw new ArgumentNullException(nameof(sceneBuilderClient));
       _scene = scene ?? throw new ArgumentNullException(nameof(scene));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

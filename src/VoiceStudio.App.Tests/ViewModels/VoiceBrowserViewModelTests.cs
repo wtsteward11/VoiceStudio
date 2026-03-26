@@ -1,11 +1,10 @@
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.UI.Dispatching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using VoiceStudio.App.Services;
+using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -15,22 +14,23 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class VoiceBrowserViewModelTests
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IVoiceBrowserClient>? _mockVoiceBrowserClient;
         private Mock<IAudioPlayerService>? _mockAudioPlayer;
-        private static IViewModelContext? _sharedContext;
+        private IViewModelContext? _context;
         private VoiceBrowserViewModel? _viewModel;
 
         [TestInitialize]
         public void Setup()
         {
-            _mockBackendClient = new Mock<IBackendClient>();
+            TestAppServicesHelper.EnsureInitialized();
+            _context = AppServices.GetService<IViewModelContext>();
+            _mockVoiceBrowserClient = new Mock<IVoiceBrowserClient>();
             _mockAudioPlayer = new Mock<IAudioPlayerService>();
             _mockAudioPlayer.Setup(x => x.PlayBackendAudioIdAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Action?>())).Returns(Task.CompletedTask);
-            _sharedContext ??= CreateTestViewModelContext();
             SetupVoiceSearchResponse(Array.Empty<VoiceProfileSummary>(), 0);
             SetupLanguagesResponse(Array.Empty<string>());
             SetupTagsResponse(Array.Empty<string>());
-            _viewModel = new VoiceBrowserViewModel(_sharedContext, _mockBackendClient.Object, _mockAudioPlayer.Object);
+            _viewModel = new VoiceBrowserViewModel(_context!, _mockVoiceBrowserClient.Object, _mockAudioPlayer.Object);
         }
 
         [TestCleanup]
@@ -38,32 +38,25 @@ namespace VoiceStudio.App.Tests.ViewModels
         {
             _viewModel?.Dispose();
             _viewModel = null;
-            _mockBackendClient = null;
-        }
-
-        private static IViewModelContext CreateTestViewModelContext()
-        {
-            var dispatcher = DispatcherQueue.GetForCurrentThread()
-                ?? DispatcherQueueController.CreateOnDedicatedThread().DispatcherQueue;
-            return new ViewModelContext(NullLogger.Instance, dispatcher);
+            _mockVoiceBrowserClient = null;
         }
 
         private void SetupVoiceSearchResponse(VoiceProfileSummary[] voices, int total)
         {
-            var response = new VoiceBrowserViewModel.VoiceSearchResponse { Voices = voices, Total = total, Limit = 50, Offset = 0 };
-            _mockBackendClient!.Setup(x => x.SendRequestAsync<object, VoiceBrowserViewModel.VoiceSearchResponse>(It.Is<string>(s => s.Contains("/api/voice-browser/voices")), It.IsAny<object>(), It.IsAny<HttpMethod>(), It.IsAny<CancellationToken>())).ReturnsAsync(response);
+            var response = new VoiceSearchResponse { Voices = voices, Total = total, Limit = 50, Offset = 0 };
+            _mockVoiceBrowserClient!.Setup(x => x.SearchVoicesAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<double>(), It.IsAny<string[]?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(response);
         }
 
         private void SetupLanguagesResponse(string[] languages)
         {
-            var response = new VoiceBrowserViewModel.LanguagesResponse { Languages = languages };
-            _mockBackendClient!.Setup(x => x.SendRequestAsync<object, VoiceBrowserViewModel.LanguagesResponse>(It.Is<string>(s => s.Contains("/api/voice-browser/languages")), It.IsAny<object>(), It.IsAny<HttpMethod>(), It.IsAny<CancellationToken>())).ReturnsAsync(response);
+            var response = new LanguagesResponse { Languages = languages };
+            _mockVoiceBrowserClient!.Setup(x => x.GetLanguagesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(response);
         }
 
         private void SetupTagsResponse(string[] tags)
         {
-            var response = new VoiceBrowserViewModel.TagsResponse { Tags = tags };
-            _mockBackendClient!.Setup(x => x.SendRequestAsync<object, VoiceBrowserViewModel.TagsResponse>(It.Is<string>(s => s.Contains("/api/voice-browser/tags")), It.IsAny<object>(), It.IsAny<HttpMethod>(), It.IsAny<CancellationToken>())).ReturnsAsync(response);
+            var response = new TagsResponse { Tags = tags };
+            _mockVoiceBrowserClient!.Setup(x => x.GetTagsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(response);
         }
 
         [TestMethod]
@@ -78,16 +71,16 @@ namespace VoiceStudio.App.Tests.ViewModels
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullVoiceBrowserClient_ThrowsArgumentNullException()
         {
-            _ = new VoiceBrowserViewModel(_sharedContext!, null!, _mockAudioPlayer!.Object);
+            _ = new VoiceBrowserViewModel(_context!, null!, _mockAudioPlayer!.Object);
         }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullAudioPlayer_ThrowsArgumentNullException()
         {
-            _ = new VoiceBrowserViewModel(_sharedContext!, _mockBackendClient!.Object, null!);
+            _ = new VoiceBrowserViewModel(_context!, _mockVoiceBrowserClient!.Object, null!);
         }
 
         [TestMethod]

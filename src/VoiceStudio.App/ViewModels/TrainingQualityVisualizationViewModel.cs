@@ -16,10 +16,11 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the TrainingQualityVisualizationView panel - Training quality metrics visualization.
   /// </summary>
-  public partial class TrainingQualityVisualizationViewModel : BaseViewModel, IPanelView
+  public partial class TrainingQualityVisualizationViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ITrainingClient _trainingClient;
     private readonly ToastNotificationService? _toastNotificationService;
+    private CancellationTokenSource? _selectionLoadCts;
 
     public string PanelId => "training-quality-visualization";
     public string DisplayName => ResourceHelper.GetString("Panel.TrainingQualityVisualization.DisplayName", "Training Quality Visualization");
@@ -64,10 +65,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? statusMessage;
 
-    public TrainingQualityVisualizationViewModel(IViewModelContext context, IBackendClient backendClient)
+    public TrainingQualityVisualizationViewModel(IViewModelContext context, ITrainingClient trainingClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _trainingClient = trainingClient ?? throw new ArgumentNullException(nameof(trainingClient));
 
       try
       {
@@ -86,16 +87,26 @@ namespace VoiceStudio.App.ViewModels
       LoadQualityHistoryCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("LoadQualityHistory");
-        await LoadQualityHistoryAsync(ct);
+        var jobId = SelectedTrainingJobId;
+        if (!string.IsNullOrEmpty(jobId))
+          await LoadQualityHistoryForSelectionAsync(jobId, ct);
       }, () => !string.IsNullOrEmpty(SelectedTrainingJobId) && !IsLoading);
       RefreshCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      _ = LoadTrainingJobsAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      await LoadTrainingJobsAsync(cancellationToken);
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    Task IPanelLifecycle.RefreshAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
 
     public IAsyncRelayCommand LoadTrainingJobsCommand { get; }
     public IAsyncRelayCommand LoadQualityHistoryCommand { get; }
@@ -104,10 +115,14 @@ namespace VoiceStudio.App.ViewModels
     partial void OnSelectedTrainingJobIdChanged(string? value)
     {
       LoadQualityHistoryCommand.NotifyCanExecuteChanged();
-      if (!string.IsNullOrEmpty(value))
-      {
-        _ = LoadQualityHistoryAsync(CancellationToken.None);
-      }
+      _selectionLoadCts?.Cancel();
+      _selectionLoadCts?.Dispose();
+      if (string.IsNullOrEmpty(value))
+        return;
+      var jobId = value;
+      _selectionLoadCts = new CancellationTokenSource();
+      var cts = _selectionLoadCts;
+      _ = LoadQualityHistoryForSelectionAsync(jobId, cts.Token);
     }
 
     private async Task LoadTrainingJobsAsync(CancellationToken cancellationToken)
@@ -117,7 +132,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var jobs = await _backendClient.ListTrainingJobsAsync(null, null, cancellationToken);
+        var jobs = await _trainingClient.ListTrainingJobsAsync(null, null, cancellationToken);
 
         AvailableTrainingJobs.Clear();
         foreach (var job in jobs)
@@ -142,7 +157,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task LoadQualityHistoryAsync(CancellationToken cancellationToken)
+    private async Task LoadQualityHistoryForSelectionAsync(string jobId, CancellationToken cancellationToken)
     {
       try
       {
@@ -151,13 +166,10 @@ namespace VoiceStudio.App.ViewModels
         HasData = false;
         QualityHistory.Clear();
 
-        if (string.IsNullOrEmpty(SelectedTrainingJobId))
-        {
-          ErrorMessage = ResourceHelper.GetString("TrainingQualityVisualization.TrainingJobRequired", "Please select a training job");
-          return;
-        }
+        var history = await _trainingClient.GetTrainingQualityHistoryAsync(jobId, limit: 1000, cancellationToken);
 
-        var history = await _backendClient.GetTrainingQualityHistoryAsync(SelectedTrainingJobId, limit: 1000, cancellationToken);
+        if (SelectedTrainingJobId != jobId)
+          return;
 
         QualityHistory.Clear();
         foreach (var metrics in history.OrderBy(m => m.Epoch))
@@ -210,10 +222,9 @@ namespace VoiceStudio.App.ViewModels
       try
       {
         await LoadTrainingJobsAsync(cancellationToken);
-        if (!string.IsNullOrEmpty(SelectedTrainingJobId))
-        {
-          await LoadQualityHistoryAsync(cancellationToken);
-        }
+        var jobId = SelectedTrainingJobId;
+        if (!string.IsNullOrEmpty(jobId))
+          await LoadQualityHistoryForSelectionAsync(jobId, cancellationToken);
       }
       catch (OperationCanceledException)
       {

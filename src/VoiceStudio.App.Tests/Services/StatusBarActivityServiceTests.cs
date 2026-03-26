@@ -16,7 +16,7 @@ namespace VoiceStudio.App.Tests.Services;
 [TestClass]
 public class StatusBarActivityServiceTests : TestBase
 {
-    private Mock<IBackendClient> _mockBackendClient = null!;
+    private Mock<IHealthVersionClient> _mockHealthVersionClient = null!;
     private Mock<OperationQueueService> _mockOperationQueue = null!;
     private StatusBarActivityService _service = null!;
 
@@ -24,9 +24,10 @@ public class StatusBarActivityServiceTests : TestBase
     public override void TestInitialize()
     {
         base.TestInitialize();
-        _mockBackendClient = new Mock<IBackendClient>();
+        _mockHealthVersionClient = new Mock<IHealthVersionClient>();
+        _mockHealthVersionClient.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _mockOperationQueue = new Mock<OperationQueueService> { CallBase = false };
-        _service = new StatusBarActivityService(_mockBackendClient.Object, _mockOperationQueue.Object);
+        _service = new StatusBarActivityService(_mockHealthVersionClient.Object, _mockOperationQueue.Object);
     }
 
     [TestCleanup]
@@ -34,7 +35,7 @@ public class StatusBarActivityServiceTests : TestBase
     {
         _service.StopMonitoring();
         _service = null!;
-        _mockBackendClient = null!;
+        _mockHealthVersionClient = null!;
         _mockOperationQueue = null!;
         base.TestCleanup();
     }
@@ -42,7 +43,7 @@ public class StatusBarActivityServiceTests : TestBase
     #region Constructor Tests
 
     [TestMethod]
-    public void Constructor_NullBackendClient_ThrowsArgumentNullException()
+    public void Constructor_NullHealthVersionClient_ThrowsArgumentNullException()
     {
         // Act & Assert
         Assert.ThrowsException<ArgumentNullException>(() => new StatusBarActivityService(null!));
@@ -52,7 +53,7 @@ public class StatusBarActivityServiceTests : TestBase
     public void Constructor_NullOperationQueue_Succeeds()
     {
         // Act
-        var service = new StatusBarActivityService(_mockBackendClient.Object, null);
+        var service = new StatusBarActivityService(_mockHealthVersionClient.Object, null);
 
         // Assert
         Assert.IsNotNull(service);
@@ -300,6 +301,23 @@ public class StatusBarActivityServiceTests : TestBase
     #endregion
 
     #region StartMonitoring / StopMonitoring Tests
+
+    [TestMethod]
+    public async Task StartMonitoring_CallsHealthVersionClient_WhenMonitoring()
+    {
+        // Arrange - mock already set up in TestInitialize
+        _mockHealthVersionClient.Invocations.Clear();
+
+        // Act - start monitoring; MonitorLoop calls CheckHealthAsync on first iteration
+        _service.StartMonitoring();
+        await Task.Delay(TimeSpan.FromSeconds(2.5));
+        _service.StopMonitoring();
+
+        // Assert - CheckHealthAsync was invoked by the monitoring loop
+        _mockHealthVersionClient.Verify(
+            x => x.CheckHealthAsync(It.IsAny<CancellationToken>()),
+            Times.AtLeastOnce);
+    }
 
     [TestMethod]
     public void StartMonitoring_CalledTwice_DoesNotThrow()

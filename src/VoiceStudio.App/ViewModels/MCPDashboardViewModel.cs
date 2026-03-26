@@ -20,7 +20,7 @@ namespace VoiceStudio.App.ViewModels
     private readonly IMCPDashboardClient _client;
     private CancellationTokenSource? _selectedServerOperationsCts;
 
-    public string PanelId => "mcp-dashboard";
+    public string PanelId => PanelIds.MCPDashboard;
     public string DisplayName => ResourceHelper.GetString("Panel.MCPDashboard.DisplayName", "MCP Dashboard");
     public PanelRegion Region => PanelRegion.Center;
 

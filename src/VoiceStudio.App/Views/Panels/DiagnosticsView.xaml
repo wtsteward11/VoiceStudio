@@ -3,6 +3,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:VoiceStudio.App.Controls"
     xmlns:local="using:VoiceStudio.App.Views.Panels"
+    xmlns:diag="using:VoiceStudio.App.Services"
     x:DataType="local:DiagnosticsView">
     <Grid Background="{StaticResource VSQ.Window.Background}" AutomationProperties.AutomationId="DiagnosticsView_Root">
         <Grid.RowDefinitions>
@@ -542,7 +543,7 @@
                                       Grid.Row="1"
                                       SelectionMode="Single">
                                 <ListView.ItemTemplate>
-                                    <DataTemplate x:DataType="local:TraceEntry">
+                                    <DataTemplate x:DataType="diag:TraceEntry">
                                         <Grid Padding="4,8" MinHeight="40">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="200"/>
@@ -585,7 +586,7 @@
                                                     </ItemsControl.ItemsPanel>
                                                     <!-- GAP-CS-004: Added x:DataType for compile-time binding validation -->
                                                     <ItemsControl.ItemTemplate>
-                                                        <DataTemplate x:DataType="local:SpanEntry">
+                                                        <DataTemplate x:DataType="diag:SpanEntry">
                                                             <Border Width="{Binding WidthPercent}" 
                                                                     Height="12"
                                                                     Background="{Binding StatusColor}"

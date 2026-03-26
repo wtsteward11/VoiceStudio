@@ -20,7 +20,7 @@ namespace VoiceStudio.App.ViewModels
     private readonly IImageSearchClient _imageSearchClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
-    public string PanelId => "image-search";
+    public string PanelId => PanelIds.ImageSearch;
     public string DisplayName => ResourceHelper.GetString("Panel.ImageSearch.DisplayName", "Image Search");
     public PanelRegion Region => PanelRegion.Center;
 

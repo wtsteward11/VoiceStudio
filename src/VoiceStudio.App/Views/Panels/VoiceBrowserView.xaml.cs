@@ -21,7 +21,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new VoiceBrowserViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
+          AppServices.GetVoiceBrowserClient(),
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IAudioPlayerService>()
       );
       DataContext = ViewModel;

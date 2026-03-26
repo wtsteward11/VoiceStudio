@@ -14,12 +14,13 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the SonographyVisualizationView panel - Sonography (waterfall/3D spectrogram) visualization.
   /// </summary>
-  public partial class SonographyVisualizationViewModel : BaseViewModel, IPanelView
+  public partial class SonographyVisualizationViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ISonographyClient _sonographyClient;
     private readonly IProjectsClient _projectsClient;
+    private readonly IProjectAudioClient _projectAudioClient;
 
-    public string PanelId => "sonography-visualization";
+    public string PanelId => PanelIds.Sonography;
     public string DisplayName => ResourceHelper.GetString("Panel.SonographyVisualization.DisplayName", "Sonography Visualization");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -65,11 +66,12 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private SonographyDataItem? sonographyData;
 
-    public SonographyVisualizationViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient)
+    public SonographyVisualizationViewModel(IViewModelContext context, ISonographyClient sonographyClient, IProjectsClient projectsClient, IProjectAudioClient projectAudioClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _sonographyClient = sonographyClient ?? throw new ArgumentNullException(nameof(sonographyClient));
       _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
+      _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
 
       GenerateSonographyCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -96,12 +98,17 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadPerspectivesAsync(CancellationToken.None);
-      _ = LoadColorSchemesAsync(CancellationToken.None);
-      _ = LoadAudioFilesAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) =>
+      RefreshAsyncImpl(cancellationToken);
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => RefreshAsyncImpl(cancellationToken);
 
     public IAsyncRelayCommand GenerateSonographyCommand { get; }
     public IAsyncRelayCommand LoadPerspectivesCommand { get; }
@@ -122,21 +129,14 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          audio_id = SelectedAudioId,
-          time_window = TimeWindow,
-          overlap = Overlap,
-          frequency_resolution = FrequencyResolution,
-          time_resolution = TimeResolution,
-          color_scheme = SelectedColorScheme,
-          perspective = SelectedPerspective
-        };
-
-        var data = await _backendClient.SendRequestAsync<object, SonographyData>(
-            "/api/sonography/generate",
-            request,
-            System.Net.Http.HttpMethod.Post,
+        var data = await _sonographyClient.GenerateAsync(
+            SelectedAudioId,
+            TimeWindow,
+            Overlap,
+            FrequencyResolution,
+            TimeResolution,
+            SelectedColorScheme,
+            SelectedPerspective,
             cancellationToken
         );
 
@@ -164,12 +164,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, PerspectivesResponse>(
-            "/api/sonography/perspectives",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _sonographyClient.GetPerspectivesAsync(cancellationToken);
 
         if (response?.Perspectives != null)
         {
@@ -190,12 +185,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, ColorSchemesResponse>(
-            "/api/sonography/color-schemes",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _sonographyClient.GetColorSchemesAsync(cancellationToken);
 
         if (response?.ColorSchemes != null)
         {
@@ -229,7 +219,7 @@ namespace VoiceStudio.App.ViewModels
         foreach (var project in projects)
         {
           cancellationToken.ThrowIfCancellationRequested();
-          var audioFiles = await _backendClient.ListProjectAudioAsync(project.Id, cancellationToken);
+          var audioFiles = await _projectAudioClient.ListProjectAudioAsync(project.Id, cancellationToken);
           foreach (var audioFile in audioFiles)
           {
             if (!string.IsNullOrEmpty(audioFile.AudioId))
@@ -259,7 +249,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task RefreshAsyncImpl(CancellationToken cancellationToken)
     {
       try
       {
@@ -278,28 +268,6 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Response models
-    private class PerspectivesResponse
-    {
-      public PerspectiveInfo[] Perspectives { get; set; } = Array.Empty<PerspectiveInfo>();
-    }
-
-    private class PerspectiveInfo
-    {
-      public string Id { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-    }
-
-    private class ColorSchemesResponse
-    {
-      public ColorSchemeInfo[] ColorSchemes { get; set; } = Array.Empty<ColorSchemeInfo>();
-    }
-
-    private class ColorSchemeInfo
-    {
-      public string Id { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-    }
   }
 
   // Data models

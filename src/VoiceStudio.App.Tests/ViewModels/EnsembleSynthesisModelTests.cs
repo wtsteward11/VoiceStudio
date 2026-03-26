@@ -12,7 +12,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EnsembleJobStatus_DefaultValues()
         {
-            var status = new EnsembleJobStatus();
+            var status = new VoiceStudio.App.Services.EnsembleJobStatus();
 
             Assert.AreEqual(string.Empty, status.JobId);
             Assert.AreEqual(string.Empty, status.Status);
@@ -30,7 +30,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void EnsembleJobStatus_PropertiesSetCorrectly()
         {
             var audioIds = new[] { "audio1", "audio2" };
-            var status = new EnsembleJobStatus
+            var status = new VoiceStudio.App.Services.EnsembleJobStatus
             {
                 JobId = "job123",
                 Status = "running",
@@ -56,7 +56,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EnsembleJobStatus_ErrorCanBeSet()
         {
-            var status = new EnsembleJobStatus { Error = "Job failed" };
+            var status = new VoiceStudio.App.Services.EnsembleJobStatus { Error = "Job failed" };
             Assert.AreEqual("Job failed", status.Error);
         }
 
@@ -112,7 +112,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EnsembleJobItem_CreatedFromJobStatus()
         {
-            var status = new EnsembleJobStatus
+            var status = new VoiceStudio.App.Services.EnsembleJobStatus
             {
                 JobId = "job456",
                 Status = "completed",
@@ -141,7 +141,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EnsembleJobItem_ProgressDisplay_FormatsAsPercent()
         {
-            var status = new EnsembleJobStatus { Progress = 0.75 };
+            var status = new VoiceStudio.App.Services.EnsembleJobStatus { Progress = 0.75 };
             var item = new EnsembleJobItem(status);
 
             Assert.AreEqual("75%", item.ProgressDisplay);
@@ -150,7 +150,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EnsembleJobItem_ProgressDisplay_ZeroPercent()
         {
-            var status = new EnsembleJobStatus { Progress = 0 };
+            var status = new VoiceStudio.App.Services.EnsembleJobStatus { Progress = 0 };
             var item = new EnsembleJobItem(status);
 
             Assert.AreEqual("0%", item.ProgressDisplay);
@@ -159,7 +159,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EnsembleJobItem_ProgressDisplay_HundredPercent()
         {
-            var status = new EnsembleJobStatus { Progress = 1.0 };
+            var status = new VoiceStudio.App.Services.EnsembleJobStatus { Progress = 1.0 };
             var item = new EnsembleJobItem(status);
 
             Assert.AreEqual("100%", item.ProgressDisplay);
@@ -168,7 +168,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EnsembleJobItem_VoicesDisplay_FormatsCorrectly()
         {
-            var status = new EnsembleJobStatus
+            var status = new VoiceStudio.App.Services.EnsembleJobStatus
             {
                 CompletedVoices = 3,
                 TotalVoices = 10
@@ -181,7 +181,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EnsembleJobItem_VoicesDisplay_AllCompleted()
         {
-            var status = new EnsembleJobStatus
+            var status = new VoiceStudio.App.Services.EnsembleJobStatus
             {
                 CompletedVoices = 5,
                 TotalVoices = 5
@@ -194,7 +194,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EnsembleJobItem_VoicesDisplay_NoneCompleted()
         {
-            var status = new EnsembleJobStatus
+            var status = new VoiceStudio.App.Services.EnsembleJobStatus
             {
                 CompletedVoices = 0,
                 TotalVoices = 5
@@ -207,7 +207,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void EnsembleJobItem_ErrorFromStatus()
         {
-            var status = new EnsembleJobStatus { Error = "Connection timeout" };
+            var status = new VoiceStudio.App.Services.EnsembleJobStatus { Error = "Connection timeout" };
             var item = new EnsembleJobItem(status);
 
             Assert.AreEqual("Connection timeout", item.Error);

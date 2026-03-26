@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 
 namespace VoiceStudio.App.Services;
@@ -32,9 +33,10 @@ public sealed class StartupDiagnosticsWriter : IStartupDiagnosticsWriter
             };
             _writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] STARTUP SESSION START");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Silent failure - diagnostics are best-effort; do not crash startup
+            // Diagnostics are best-effort; do not crash startup
+            Debug.WriteLine($"[StartupDiagnosticsWriter] BeginSession failed: {ex.Message}");
         }
     }
 
@@ -44,9 +46,9 @@ public sealed class StartupDiagnosticsWriter : IStartupDiagnosticsWriter
         {
             _writer?.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {key}={value}");
         }
-        catch
+        catch (Exception ex)
         {
-            // Best-effort
+            Debug.WriteLine($"[StartupDiagnosticsWriter] Log failed: {ex.Message}");
         }
     }
 
@@ -56,9 +58,9 @@ public sealed class StartupDiagnosticsWriter : IStartupDiagnosticsWriter
         {
             _writer?.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] FAILURE category={category} message={message}");
         }
-        catch
+        catch (Exception ex)
         {
-            // Best-effort
+            Debug.WriteLine($"[StartupDiagnosticsWriter] LogFailure failed: {ex.Message}");
         }
     }
 
@@ -70,9 +72,9 @@ public sealed class StartupDiagnosticsWriter : IStartupDiagnosticsWriter
             _writer?.Dispose();
             _writer = null;
         }
-        catch
+        catch (Exception ex)
         {
-            // Best-effort
+            Debug.WriteLine($"[StartupDiagnosticsWriter] EndSession failed: {ex.Message}");
         }
     }
 }

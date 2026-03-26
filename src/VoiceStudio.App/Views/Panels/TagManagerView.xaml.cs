@@ -28,7 +28,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new TagManagerViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
+          AppServices.GetTagManagerClient(),
           AppServices.GetRequiredService<IDialogService>()
       );
       DataContext = ViewModel;
@@ -52,8 +52,8 @@ namespace VoiceStudio.App.Views.Panels
         }
       };
 
-      // Setup keyboard navigation
-      this.Loaded += TagManagerView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and load tags (ILifecyclePanelView; not constructor — RETAINED_ASYNC_RULE)
+      this.Loaded += TagManagerView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -323,9 +323,13 @@ namespace VoiceStudio.App.Views.Panels
         return DropPosition.On;
     }
 
-    private void TagManagerView_KeyboardNavigation_Loaded(object _, RoutedEventArgs __)
+    private void TagManagerView_Loaded(object _, RoutedEventArgs __)
     {
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      if (ViewModel is VoiceStudio.Core.Panels.ILifecyclePanelView lifecycle)
+      {
+        _ = lifecycle.OnActivatedAsync();
+      }
     }
   }
 }

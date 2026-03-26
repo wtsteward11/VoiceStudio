@@ -21,7 +21,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new ModelManagerViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient()
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IModelManagerClient>()
       );
       this.DataContext = ViewModel;
 

@@ -20,14 +20,14 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class RealTimeVoiceConverterViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IRealTimeVoiceConverterClient _realtimeClient;
     private readonly IProfilesClient _profilesClient;
     private readonly IWebSocketClientFactory? _webSocketClientFactory;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly RealtimeVoiceWebSocketClient? _webSocketClient;
     private DispatcherQueue? _dispatcherQueue;
 
-    public string PanelId => "realtime-voice-converter";
+    public string PanelId => PanelIds.RealTimeConverter;
     public string DisplayName => ResourceHelper.GetString("Panel.RealTimeVoiceConverter.DisplayName", "Real-Time Voice Converter");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -102,12 +102,12 @@ namespace VoiceStudio.App.ViewModels
     // GAP-009: Updated to use IWebSocketClientFactory for DI
     public RealTimeVoiceConverterViewModel(
         IViewModelContext context,
-        IBackendClient backendClient,
+        IRealTimeVoiceConverterClient realtimeClient,
         IProfilesClient profilesClient,
         IWebSocketClientFactory? webSocketClientFactory = null)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _realtimeClient = realtimeClient ?? throw new ArgumentNullException(nameof(realtimeClient));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _webSocketClientFactory = webSocketClientFactory;
       _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
@@ -138,10 +138,10 @@ namespace VoiceStudio.App.ViewModels
           _webSocketClient.LatencyInfoReceived += OnLatencyInfoReceived;
         }
       }
-      else if (_backendClient.WebSocketService != null)
+      else if (_realtimeClient.WebSocketService != null)
       {
         // Fallback for backward compatibility
-        _webSocketClient = new RealtimeVoiceWebSocketClient(_backendClient.WebSocketService);
+        _webSocketClient = new RealtimeVoiceWebSocketClient(_realtimeClient.WebSocketService);
         _webSocketClient.AudioDataReceived += OnAudioDataReceived;
         _webSocketClient.StatusChanged += OnConversionStatusChanged;
         _webSocketClient.QualityMetricsUpdated += OnQualityMetricsUpdated;
@@ -184,12 +184,18 @@ namespace VoiceStudio.App.ViewModels
         await RefreshAsync(ct);
       }, () => !IsLoading);
 
-      // Load initial data
-      _ = LoadSessionsAsync(CancellationToken.None);
-      _ = LoadProfilesAsync(CancellationToken.None);
-
       // Initialize monitoring timer (fallback if WebSocket not available)
       InitializeMonitoringTimer();
+    }
+
+    /// <summary>
+    /// Initialize panel data. Call from View Loaded event (ADR-047: no constructor fire-and-forget).
+    /// </summary>
+    public void InitializeAsync()
+    {
+      var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+      _ = LoadSessionsAsync(cts.Token);
+      _ = LoadProfilesAsync(cts.Token);
     }
 
     private void InitializeMonitoringTimer()
@@ -230,12 +236,7 @@ namespace VoiceStudio.App.ViewModels
         {
           try
           {
-            var latencyResponse = await _backendClient.SendRequestAsync<object, RealtimeLatencyInfo>(
-                $"/api/realtime-converter/{Uri.EscapeDataString(sessionId)}/latency",
-                null,
-                System.Net.Http.HttpMethod.Get,
-                cancellationToken
-            );
+            var latencyResponse = await _realtimeClient.GetLatencyAsync(sessionId, cancellationToken);
 
             if (latencyResponse != null)
             {
@@ -306,12 +307,7 @@ namespace VoiceStudio.App.ViewModels
         // Try to get quality metrics from backend endpoint
         try
         {
-          var metricsResponse = await _backendClient.SendRequestAsync<object, RealtimeQualityMetrics>(
-              $"/api/realtime-converter/{Uri.EscapeDataString(sessionId)}/quality",
-              null,
-              System.Net.Http.HttpMethod.Get,
-              cancellationToken
-          );
+          var metricsResponse = await _realtimeClient.GetQualityMetricsAsync(sessionId, cancellationToken);
 
           if (metricsResponse != null)
           {
@@ -546,18 +542,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          source_profile_id = sourceProfileId,
-          target_profile_id = targetProfileId
-        };
-
-        var response = await _backendClient.SendRequestAsync<object, ConverterStartResponse>(
-            "/api/realtime-converter/start",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _realtimeClient.StartSessionAsync(sourceProfileId, targetProfileId, cancellationToken);
 
         if (response != null)
         {
@@ -616,12 +601,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/realtime-converter/{Uri.EscapeDataString(sessionId)}/stop",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _realtimeClient.StopSessionAsync(sessionId, cancellationToken);
 
         IsStreaming = false;
         IsPaused = false;
@@ -672,12 +652,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/realtime-converter/{Uri.EscapeDataString(sessionId)}/pause",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _realtimeClient.PauseSessionAsync(sessionId, cancellationToken);
 
         IsPaused = true;
         StatusMessage = ResourceHelper.GetString("RealTimeVoiceConverter.SessionPaused", "Session paused");
@@ -720,12 +695,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/realtime-converter/{Uri.EscapeDataString(sessionId)}/resume",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _realtimeClient.ResumeSessionAsync(sessionId, cancellationToken);
 
         IsPaused = false;
         StatusMessage = ResourceHelper.GetString("RealTimeVoiceConverter.SessionResumed", "Session resumed");
@@ -763,12 +733,7 @@ namespace VoiceStudio.App.ViewModels
 
         try
         {
-          var sessionsList = await _backendClient.SendRequestAsync<object, ConverterSessionListResponse>(
-              "/api/realtime-converter",
-              null,
-              System.Net.Http.HttpMethod.Get,
-              cancellationToken: cancellationToken
-          );
+          var sessionsList = await _realtimeClient.GetSessionsAsync(cancellationToken);
 
           if (sessionsList?.Sessions != null)
           {
@@ -785,12 +750,7 @@ namespace VoiceStudio.App.ViewModels
           var sessionId = selectedSession?.SessionId;
           if (!string.IsNullOrWhiteSpace(sessionId))
           {
-            var session = await _backendClient.SendRequestAsync<object, ConverterSession>(
-                $"/api/realtime-converter/{Uri.EscapeDataString(sessionId)}",
-                null,
-                System.Net.Http.HttpMethod.Get,
-                cancellationToken
-            );
+            var session = await _realtimeClient.GetSessionAsync(sessionId, cancellationToken);
 
             if (session != null)
             {
@@ -816,11 +776,6 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private class ConverterSessionListResponse
-    {
-      public List<ConverterSession> Sessions { get; set; } = new();
-    }
-
     private async Task DeleteSessionAsync(ConverterSessionItem? session, CancellationToken cancellationToken)
     {
       if (session == null)
@@ -831,12 +786,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/realtime-converter/{session.SessionId}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _realtimeClient.DeleteSessionAsync(session.SessionId, cancellationToken);
 
         Sessions.Remove(session);
         StatusMessage = ResourceHelper.GetString("RealTimeVoiceConverter.SessionDeleted", "Session deleted");
@@ -915,24 +865,11 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Response models
-    private class ConverterStartResponse
-    {
-      public string SessionId { get; set; } = string.Empty;
-      public string Message { get; set; } = string.Empty;
-    }
   }
 
-  // Data models
-  public class ConverterSession
-  {
-    public string SessionId { get; set; } = string.Empty;
-    public string SourceProfileId { get; set; } = string.Empty;
-    public string TargetProfileId { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
-    public string Created { get; set; } = string.Empty;
-  }
-
+  /// <summary>
+  /// UI wrapper for ConverterSession with observable properties.
+  /// </summary>
   public class ConverterSessionItem : ObservableObject
   {
     public string SessionId { get; set; }

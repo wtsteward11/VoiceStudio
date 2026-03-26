@@ -16,15 +16,16 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the JobProgressView panel - Unified job progress monitor.
   /// </summary>
-  public partial class JobProgressViewModel : BaseViewModel, IPanelView
+  public partial class JobProgressViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IJobProgressApiClient _jobProgressApiClient;
     private readonly JobProgressWebSocketClient? _webSocketClient;
     private CancellationTokenSource? _pollingCts;
     private bool _isPolling;
+    private bool _hasActivated;
     private DispatcherQueue? _dispatcherQueue;
 
-    public string PanelId => "job_progress";
+    public string PanelId => PanelIds.JobProgress;
     public string DisplayName => ResourceHelper.GetString("Panel.JobProgress.DisplayName", "Job Progress");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -52,21 +53,20 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool autoRefresh = true;
 
-    public JobProgressViewModel(IViewModelContext context, IBackendClient backendClient)
+    public JobProgressViewModel(IViewModelContext context, IJobProgressApiClient jobProgressApiClient, IWebSocketService? webSocketService = null)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _jobProgressApiClient = jobProgressApiClient ?? throw new ArgumentNullException(nameof(jobProgressApiClient));
       _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
-      // Initialize WebSocket client if available
-      if (_backendClient.WebSocketService != null)
+      // Initialize WebSocket client if available (ConnectAsync deferred to OnActivatedAsync)
+      if (webSocketService != null)
       {
-        _webSocketClient = new JobProgressWebSocketClient(_backendClient.WebSocketService);
+        _webSocketClient = new JobProgressWebSocketClient(webSocketService);
         _webSocketClient.ProgressUpdated += OnJobProgressUpdated;
         _webSocketClient.StatusChanged += OnJobStatusChanged;
         _webSocketClient.JobCompleted += OnJobCompleted;
         _webSocketClient.JobFailed += OnJobFailed;
-        _ = _webSocketClient.ConnectAsync();
       }
 
       LoadJobsCommand = new EnhancedAsyncRelayCommand(async (ct) =>
@@ -127,19 +127,34 @@ namespace VoiceStudio.App.ViewModels
       AvailableStatuses.Add("cancelled");
       AvailableStatuses.Add("paused");
 
-      SelectedJobType = ResourceHelper.GetString("JobProgress.FilterAll", "All");
-      SelectedStatus = ResourceHelper.GetString("JobProgress.FilterAll", "All");
+      selectedJobType = ResourceHelper.GetString("JobProgress.FilterAll", "All");
+      selectedStatus = ResourceHelper.GetString("JobProgress.FilterAll", "All");
 
-      // Load initial data
-      _ = LoadSummaryAsync(CancellationToken.None);
-      _ = LoadJobsAsync(CancellationToken.None);
+      // No constructor fire-and-forget (ADR-047). Initial load deferred to OnActivatedAsync.
+    }
 
-      // Start polling as fallback (WebSocket is primary, polling is backup)
-      if (_webSocketClient == null)
+    async Task IPanelLifecycle.OnActivatedAsync(CancellationToken cancellationToken)
+    {
+      _hasActivated = true;
+      await LoadSummaryAsync(cancellationToken);
+      await LoadJobsAsync(cancellationToken);
+      if (_webSocketClient != null)
+      {
+        _ = _webSocketClient.ConnectAsync();
+      }
+      else
       {
         StartPolling();
       }
     }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken cancellationToken)
+    {
+      StopPolling();
+      return Task.CompletedTask;
+    }
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken cancellationToken) => await RefreshAsync(cancellationToken);
 
     private void OnJobProgressUpdated(object? sender, JobProgressUpdate update)
     {
@@ -283,27 +298,10 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
         var allFilter = ResourceHelper.GetString("Filter.All", "All");
-        if (!string.IsNullOrEmpty(SelectedJobType) && SelectedJobType != allFilter)
-          queryParams.Add("job_type", SelectedJobType);
-        if (!string.IsNullOrEmpty(SelectedStatus) && SelectedStatus != allFilter)
-          queryParams.Add("status", SelectedStatus);
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/jobs";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var jobs = await _backendClient.SendRequestAsync<object, Job[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
+        var jobs = await _jobProgressApiClient.GetJobsAsync(
+            string.IsNullOrEmpty(SelectedJobType) || SelectedJobType == allFilter ? null : SelectedJobType,
+            string.IsNullOrEmpty(SelectedStatus) || SelectedStatus == allFilter ? null : SelectedStatus,
             cancellationToken
         );
 
@@ -341,12 +339,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        Summary = await _backendClient.SendRequestAsync<object, JobSummary>(
-            "/api/jobs/summary",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        Summary = await _jobProgressApiClient.GetJobSummaryAsync(cancellationToken);
       }
       catch (Exception ex)
       {
@@ -364,12 +357,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/jobs/{job.Id}/cancel",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _jobProgressApiClient.CancelJobAsync(job.Id, cancellationToken);
 
         await LoadJobsAsync(cancellationToken);
         await LoadSummaryAsync(cancellationToken);
@@ -399,12 +387,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/jobs/{job.Id}/pause",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _jobProgressApiClient.PauseJobAsync(job.Id, cancellationToken);
 
         await LoadJobsAsync(cancellationToken);
         StatusMessage = $"Job '{job.Name}' paused";
@@ -433,12 +416,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/jobs/{job.Id}/resume",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _jobProgressApiClient.ResumeJobAsync(job.Id, cancellationToken);
 
         await LoadJobsAsync(cancellationToken);
         StatusMessage = ResourceHelper.FormatString("JobProgress.JobResumed", job.Name);
@@ -463,12 +441,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/jobs/{job.Id}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _jobProgressApiClient.DeleteJobAsync(job.Id, cancellationToken);
 
         Jobs.Remove(job);
         await LoadSummaryAsync(cancellationToken);
@@ -495,12 +468,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.SendRequestAsync<object, object>(
-            "/api/jobs",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _jobProgressApiClient.ClearCompletedJobsAsync(cancellationToken);
 
         await LoadJobsAsync(cancellationToken);
         await LoadSummaryAsync(cancellationToken);
@@ -542,11 +510,15 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSelectedJobTypeChanged(string? value)
     {
+      if (!_hasActivated)
+        return;
       _ = LoadJobsAsync(CancellationToken.None);
     }
 
     partial void OnSelectedStatusChanged(string? value)
     {
+      if (!_hasActivated)
+        return;
       _ = LoadJobsAsync(CancellationToken.None);
     }
 
@@ -597,36 +569,6 @@ namespace VoiceStudio.App.ViewModels
     }
 
     // Data models
-    public class Job
-    {
-      public string Id { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public string Type { get; set; } = string.Empty;
-      public string Status { get; set; } = string.Empty;
-      public double Progress { get; set; }
-      public string? CurrentStep { get; set; }
-      public int? TotalSteps { get; set; }
-      public int? CurrentStepIndex { get; set; }
-      public string Created { get; set; } = string.Empty;
-      public string? Started { get; set; }
-      public string? Completed { get; set; }
-      public int? EstimatedTimeRemaining { get; set; }
-      public string? ErrorMessage { get; set; }
-      public string? ResultId { get; set; }
-      public System.Collections.Generic.Dictionary<string, object> Metadata { get; set; } = new();
-    }
-
-    public class JobSummary
-    {
-      public int Total { get; set; }
-      public int Pending { get; set; }
-      public int Running { get; set; }
-      public int Completed { get; set; }
-      public int Failed { get; set; }
-      public int Cancelled { get; set; }
-      public System.Collections.Generic.Dictionary<string, int> ByType { get; set; } = new();
-    }
-
     public class JobItem : ObservableObject
     {
       public string Id { get; set; }

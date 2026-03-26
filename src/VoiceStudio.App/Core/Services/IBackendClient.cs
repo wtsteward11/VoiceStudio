@@ -15,34 +15,14 @@ namespace VoiceStudio.Core.Services
     /// </summary>
     IWebSocketService? WebSocketService { get; }
 
-    /// <summary>
-    /// Gets the current connection status.
-    /// </summary>
-    bool IsConnected { get; }
+    // Connection status — use IConnectionStatusClient (PR-8)
 
     Task<TResponse> SendRequestAsync<TRequest, TResponse>(string endpoint, TRequest request, CancellationToken cancellationToken = default);
     Task<TResponse?> SendRequestAsync<TRequest, TResponse>(string endpoint, TRequest? request, System.Net.Http.HttpMethod httpMethod, CancellationToken cancellationToken = default) where TResponse : class;
     Task<TResponse> SendMcpOperationAsync<TRequest, TResponse>(string operation, TRequest payload, CancellationToken cancellationToken = default);
 
-    // Health check
-    Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default);
-    Task<Telemetry> GetTelemetryAsync(CancellationToken cancellationToken = default);
-
-    // API Version validation
-    /// <summary>
-    /// Checks API version compatibility with the backend.
-    /// </summary>
-    Task<VoiceStudio.App.Services.ApiVersionCheckResult> CheckApiVersionAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Gets version information from the backend.
-    /// </summary>
-    Task<VoiceStudio.App.Services.ApiVersionInfo?> GetApiVersionInfoAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Validates API version on startup and logs warnings if there are compatibility issues.
-    /// </summary>
-    Task<bool> ValidateApiVersionOnStartupAsync(CancellationToken cancellationToken = default);
+    // Health check — use IHealthVersionClient for CheckHealthAsync
+    // Telemetry — use ITelemetryClient for GetTelemetryAsync (PR-6)
 
     // Voice cloning endpoints
     Task<VoiceSynthesisResponse> SynthesizeVoiceAsync(VoiceSynthesisRequest request, CancellationToken cancellationToken = default);
@@ -171,58 +151,7 @@ namespace VoiceStudio.Core.Services
     Task<TimelineMarker> UpdateMarkerAsync(string projectId, string markerId, MarkerUpdateRequest request, CancellationToken cancellationToken = default);
     Task<bool> DeleteMarkerAsync(string projectId, string markerId, CancellationToken cancellationToken = default);
 
-    // Macro management
-    Task<List<Macro>> GetMacrosAsync(string? projectId = null, CancellationToken cancellationToken = default);
-    Task<Macro> GetMacroAsync(string macroId, CancellationToken cancellationToken = default);
-    Task<Macro> CreateMacroAsync(Macro macro, CancellationToken cancellationToken = default);
-    Task<Macro> UpdateMacroAsync(string macroId, Macro macro, CancellationToken cancellationToken = default);
-    Task<bool> DeleteMacroAsync(string macroId, CancellationToken cancellationToken = default);
-    Task<bool> ExecuteMacroAsync(string macroId, CancellationToken cancellationToken = default);
-    Task<MacroExecutionStatus> GetMacroExecutionStatusAsync(string macroId, CancellationToken cancellationToken = default);
-
-    // Automation curves
-    Task<List<AutomationCurve>> GetAutomationCurvesAsync(string trackId, CancellationToken cancellationToken = default);
-    Task<AutomationCurve> CreateAutomationCurveAsync(AutomationCurve curve, CancellationToken cancellationToken = default);
-    Task<AutomationCurve> UpdateAutomationCurveAsync(string curveId, AutomationCurve curve, CancellationToken cancellationToken = default);
-    Task<bool> DeleteAutomationCurveAsync(string curveId, CancellationToken cancellationToken = default);
-
-    // Workflow management (IDEA 33)
-    Task<List<Workflow>> GetWorkflowsAsync(int skip = 0, int limit = 100, bool enabledOnly = false, CancellationToken cancellationToken = default);
-    Task<Workflow> GetWorkflowAsync(string workflowId, CancellationToken cancellationToken = default);
-    Task<Workflow> CreateWorkflowAsync(WorkflowCreateRequest request, CancellationToken cancellationToken = default);
-    Task<Workflow> UpdateWorkflowAsync(string workflowId, WorkflowUpdateRequest request, CancellationToken cancellationToken = default);
-    Task<bool> DeleteWorkflowAsync(string workflowId, CancellationToken cancellationToken = default);
-    Task<WorkflowExecutionResult> ExecuteWorkflowAsync(string workflowId, Dictionary<string, object>? inputData = null, CancellationToken cancellationToken = default);
-
-    // Model management
-    Task<List<ModelInfo>> GetModelsAsync(string? engine = null, CancellationToken cancellationToken = default);
-    Task<ModelInfo> GetModelAsync(string engine, string modelName, CancellationToken cancellationToken = default);
-    Task<ModelInfo> RegisterModelAsync(string engine, string modelName, string modelPath, string? version = null, Dictionary<string, object>? metadata = null, CancellationToken cancellationToken = default);
-    Task<ModelVerifyResponse> VerifyModelAsync(string engine, string modelName, CancellationToken cancellationToken = default);
-    Task<ModelInfo> UpdateModelChecksumAsync(string engine, string modelName, CancellationToken cancellationToken = default);
-    Task<bool> DeleteModelAsync(string engine, string modelName, CancellationToken cancellationToken = default);
-    Task<StorageStats> GetStorageStatsAsync(CancellationToken cancellationToken = default);
-
-    // Model export/import
-    Task<Stream> ExportModelAsync(string engine, string modelName, CancellationToken cancellationToken = default);
-    Task<ModelInfo> ImportModelAsync(Stream modelArchive, string? engine = null, CancellationToken cancellationToken = default);
-
-    // Telemetry and diagnostics (GetTelemetryAsync is defined in Health check section above)
-
-    // Effects chain management
-    Task<List<EffectChain>> GetEffectChainsAsync(string projectId, CancellationToken cancellationToken = default);
-    Task<EffectChain> GetEffectChainAsync(string projectId, string chainId, CancellationToken cancellationToken = default);
-    Task<EffectChain> CreateEffectChainAsync(string projectId, EffectChain chain, CancellationToken cancellationToken = default);
-    Task<EffectChain> UpdateEffectChainAsync(string projectId, string chainId, EffectChain chain, CancellationToken cancellationToken = default);
-    Task<bool> DeleteEffectChainAsync(string projectId, string chainId, CancellationToken cancellationToken = default);
-    Task<EffectProcessResponse> ProcessAudioWithChainAsync(string projectId, string chainId, string audioId, string? outputFilename = null, CancellationToken cancellationToken = default);
-
-    // Effect presets
-    Task<List<EffectPreset>> GetEffectPresetsAsync(string? effectType = null, CancellationToken cancellationToken = default);
-    Task<EffectPreset> CreateEffectPresetAsync(EffectPreset preset, CancellationToken cancellationToken = default);
-    Task<bool> DeleteEffectPresetAsync(string presetId, CancellationToken cancellationToken = default);
-
-    // Batch processing
+    // Batch processing (effect preset methods extracted to IEffectChainClient PR-12)
     Task<BatchJob> CreateBatchJobAsync(BatchJobRequest request, CancellationToken cancellationToken = default);
     Task<List<BatchJob>> GetBatchJobsAsync(string? projectId = null, JobStatus? status = null, CancellationToken cancellationToken = default);
 
@@ -260,46 +189,12 @@ namespace VoiceStudio.Core.Services
     Task<MultiEngineEnsembleResponse> CreateMultiEngineEnsembleAsync(MultiEngineEnsembleRequest request, CancellationToken cancellationToken = default);
     Task<MultiEngineEnsembleStatus> GetMultiEngineEnsembleStatusAsync(string jobId, CancellationToken cancellationToken = default);
 
-    // Mixer management
-    Task<MixerState> GetMixerStateAsync(string projectId, CancellationToken cancellationToken = default);
-    Task<MixerState> UpdateMixerStateAsync(string projectId, MixerState state, CancellationToken cancellationToken = default);
-    Task<MixerState> ResetMixerStateAsync(string projectId, CancellationToken cancellationToken = default);
-
-    // Mixer sends/returns
-    Task<MixerSend> CreateMixerSendAsync(string projectId, MixerSend send, CancellationToken cancellationToken = default);
-    Task<MixerSend> UpdateMixerSendAsync(string projectId, string sendId, MixerSend send, CancellationToken cancellationToken = default);
-    Task<bool> DeleteMixerSendAsync(string projectId, string sendId, CancellationToken cancellationToken = default);
-    Task<MixerReturn> CreateMixerReturnAsync(string projectId, MixerReturn returnBus, CancellationToken cancellationToken = default);
-    Task<MixerReturn> UpdateMixerReturnAsync(string projectId, string returnId, MixerReturn returnBus, CancellationToken cancellationToken = default);
-    Task<bool> DeleteMixerReturnAsync(string projectId, string returnId, CancellationToken cancellationToken = default);
-
-    // Mixer sub-groups
-    Task<MixerSubGroup> CreateMixerSubGroupAsync(string projectId, MixerSubGroup subgroup, CancellationToken cancellationToken = default);
-    Task<MixerSubGroup> UpdateMixerSubGroupAsync(string projectId, string subgroupId, MixerSubGroup subgroup, CancellationToken cancellationToken = default);
-    Task<bool> DeleteMixerSubGroupAsync(string projectId, string subgroupId, CancellationToken cancellationToken = default);
-
-    // Mixer master
-    Task<MixerMaster> UpdateMixerMasterAsync(string projectId, MixerMaster master, CancellationToken cancellationToken = default);
+    // Mixer management — extracted to IMixerStateClient / MixerStateClient (PR-17)
 
     // Channel routing
     Task<ChannelRouting> UpdateChannelRoutingAsync(string projectId, string channelId, ChannelRouting routing, CancellationToken cancellationToken = default);
 
-    // Mixer presets
-    Task<List<MixerPreset>> GetMixerPresetsAsync(string projectId, CancellationToken cancellationToken = default);
-    Task<MixerPreset> GetMixerPresetAsync(string projectId, string presetId, CancellationToken cancellationToken = default);
-    Task<MixerPreset> CreateMixerPresetAsync(string projectId, MixerPreset preset, CancellationToken cancellationToken = default);
-    Task<MixerPreset> UpdateMixerPresetAsync(string projectId, string presetId, MixerPreset preset, CancellationToken cancellationToken = default);
-    Task<bool> DeleteMixerPresetAsync(string projectId, string presetId, CancellationToken cancellationToken = default);
-    Task<MixerState> ApplyMixerPresetAsync(string projectId, string presetId, CancellationToken cancellationToken = default);
-
-    // Backup and restore
-    Task<List<BackupInfo>> GetBackupsAsync(CancellationToken cancellationToken = default);
-    Task<BackupInfo> GetBackupAsync(string backupId, CancellationToken cancellationToken = default);
-    Task<BackupInfo> CreateBackupAsync(BackupCreateRequest request, CancellationToken cancellationToken = default);
-    Task<Stream> DownloadBackupAsync(string backupId, CancellationToken cancellationToken = default);
-    Task<RestoreResponse> RestoreBackupAsync(string backupId, RestoreRequest request, CancellationToken cancellationToken = default);
-    Task<BackupInfo> UploadBackupAsync(Stream backupFile, string? name = null, CancellationToken cancellationToken = default);
-    Task<bool> DeleteBackupAsync(string backupId, CancellationToken cancellationToken = default);
+    // Backup and restore — use IBackupRestoreClient (PR-14)
 
     // Settings management
     Task<SettingsData> GetSettingsAsync(CancellationToken cancellationToken = default);
@@ -313,15 +208,7 @@ namespace VoiceStudio.Core.Services
     Task<TResponse> PostAsync<TRequest, TResponse>(string endpoint, TRequest request, CancellationToken cancellationToken = default);
     Task<TResponse> PutAsync<TRequest, TResponse>(string endpoint, TRequest request, CancellationToken cancellationToken = default);
 
-    // Script editor endpoints
-    Task<List<Script>> GetScriptsAsync(string? projectId = null, string? search = null, CancellationToken cancellationToken = default);
-    Task<Script> GetScriptAsync(string scriptId, CancellationToken cancellationToken = default);
-    Task<Script> CreateScriptAsync(ScriptCreateRequest request, CancellationToken cancellationToken = default);
-    Task<Script> UpdateScriptAsync(string scriptId, ScriptUpdateRequest request, CancellationToken cancellationToken = default);
-    Task<bool> DeleteScriptAsync(string scriptId, CancellationToken cancellationToken = default);
-    Task<Script> AddSegmentToScriptAsync(string scriptId, ScriptSegment segment, CancellationToken cancellationToken = default);
-    Task<bool> RemoveSegmentFromScriptAsync(string scriptId, string segmentId, CancellationToken cancellationToken = default);
-    Task<ScriptSynthesisResponse> SynthesizeScriptAsync(string scriptId, CancellationToken cancellationToken = default);
+    // Script editor — use IScriptEditorClient (PR-7)
 
     // Quality management endpoints
     Task<Dictionary<string, QualityPresetInfo>> GetQualityPresetsAsync(CancellationToken cancellationToken = default);
@@ -376,13 +263,7 @@ namespace VoiceStudio.Core.Services
     Task<QualityPredictionResponse> PredictQualityAsync(QualityPredictionRequest request, CancellationToken cancellationToken = default);
     Task<QualityInsightsResponse> GetQualityInsightsAsync(List<Dictionary<string, object>> qualityData, int timePeriodDays = 30, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Performs a global search across all panels and content types.
-    /// Implements IDEA 5: Global Search with Panel Context.
-    /// </summary>
-    Task<SearchResponse> SearchAsync(string query, string? types = null, int limit = 50, CancellationToken cancellationToken = default);
-
-    // Emotion preset management endpoints
+    // Emotion preset management
     Task<List<EmotionPreset>> GetEmotionPresetsAsync(CancellationToken cancellationToken = default);
     Task<EmotionPreset> GetEmotionPresetAsync(string presetId, CancellationToken cancellationToken = default);
     Task<EmotionPreset> CreateEmotionPresetAsync(EmotionPresetCreateRequest request, CancellationToken cancellationToken = default);
@@ -400,35 +281,14 @@ namespace VoiceStudio.Core.Services
     Task<List<TrainingDataset>> GetTrainingDatasetsAsync(CancellationToken cancellationToken = default);
     Task<TrainingDataset> GetTrainingDatasetAsync(string datasetId, CancellationToken cancellationToken = default);
 
-    // Video generation
-    Task<List<string>> ListVideoEnginesAsync(CancellationToken cancellationToken = default);
-    Task<VideoGenerateResponse> GenerateVideoAsync(VideoGenerateRequest request, CancellationToken cancellationToken = default);
-    Task<VideoUpscaleResponse> UpscaleVideoAsync(VideoUpscaleRequest request, CancellationToken cancellationToken = default);
-    Task<VideoInfo> GetVideoInfoAsync(string videoPath, CancellationToken cancellationToken = default);
-    Task<VideoEditResponse> EditVideoAsync(VideoEditRequest request, CancellationToken cancellationToken = default);
+    // Video generation — ListVideoEnginesAsync, GenerateVideoAsync, UpscaleVideoAsync, GetVideoInfoAsync, EditVideoAsync extracted to IVideoGenClient/IVideoEditClient (PR-16)
 
-    // Voice AI Pipeline
-    Task<VoiceStudio.App.Core.Models.PipelineProvidersResponse> GetPipelineProvidersAsync(CancellationToken cancellationToken = default);
-    Task<VoiceStudio.App.Core.Models.PipelineResponse> ProcessPipelineAsync(VoiceStudio.App.Core.Models.PipelineRequest request, CancellationToken cancellationToken = default);
+    // Voice AI Pipeline — GetPipelineProvidersAsync, ProcessPipelineAsync extracted to IPipelineConversationClient (PR-13)
 
     // Base address property
     System.Uri? BaseAddress { get; }
 
-    // Plugin Health Dashboard endpoints (Phase 4)
-    /// <summary>
-    /// Gets the plugin health dashboard data with system and per-plugin health summaries.
-    /// </summary>
-    Task<PluginHealthDashboardResponse?> GetPluginHealthDashboardAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Gets detailed metrics for a specific plugin.
-    /// </summary>
-    Task<PluginMetricsResponse?> GetPluginMetricsAsync(string pluginId, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Exports all plugin metrics in the specified format.
-    /// </summary>
-    Task<string> ExportPluginMetricsAsync(string format = "json", CancellationToken cancellationToken = default);
+    // Plugin Health Dashboard — PR-3: use IPluginHealthClient instead.
   }
 
   // Plugin Health Dashboard Models

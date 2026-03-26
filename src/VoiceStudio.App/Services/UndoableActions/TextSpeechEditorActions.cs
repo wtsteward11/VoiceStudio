@@ -12,7 +12,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateTextSpeechSessionAction : IUndoableAction
   {
     private readonly ObservableCollection<EditorSessionItem> _sessions;
-    private readonly IBackendClient _backendClient;
+    private readonly ITextSpeechEditorClient _client;
     private readonly EditorSessionItem _session;
     private readonly Action<EditorSessionItem>? _onUndo;
     private readonly Action<EditorSessionItem>? _onRedo;
@@ -21,13 +21,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateTextSpeechSessionAction(
         ObservableCollection<EditorSessionItem> sessions,
-        IBackendClient backendClient,
+        ITextSpeechEditorClient client,
         EditorSessionItem session,
         Action<EditorSessionItem>? onUndo = null,
         Action<EditorSessionItem>? onRedo = null)
     {
       _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
       _session = session ?? throw new ArgumentNullException(nameof(session));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -59,7 +59,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteTextSpeechSessionAction : IUndoableAction
   {
     private readonly ObservableCollection<EditorSessionItem> _sessions;
-    private readonly IBackendClient _backendClient;
+    private readonly ITextSpeechEditorClient _client;
     private readonly EditorSessionItem _session;
     private readonly int _originalIndex;
     private readonly Action<EditorSessionItem>? _onUndo;
@@ -69,14 +69,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteTextSpeechSessionAction(
         ObservableCollection<EditorSessionItem> sessions,
-        IBackendClient backendClient,
+        ITextSpeechEditorClient client,
         EditorSessionItem session,
         int originalIndex,
         Action<EditorSessionItem>? onUndo = null,
         Action<EditorSessionItem>? onRedo = null)
     {
       _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
       _session = session ?? throw new ArgumentNullException(nameof(session));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

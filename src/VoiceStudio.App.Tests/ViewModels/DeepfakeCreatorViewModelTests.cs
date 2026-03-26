@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -16,18 +17,18 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class DeepfakeCreatorViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IDeepfakeCreatorClient>? _mockDeepfakeClient;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockDeepfakeClient = new Mock<IDeepfakeCreatorClient>();
         }
 
         private DeepfakeCreatorViewModel CreateViewModel()
         {
-            return new DeepfakeCreatorViewModel(MockContext!, _mockBackendClient!.Object);
+            return new DeepfakeCreatorViewModel(MockContext!, _mockDeepfakeClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -40,7 +41,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
             // Assert
             Assert.IsNotNull(viewModel);
-            Assert.AreEqual("deepfake-creator", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.DeepfakeCreator, viewModel.PanelId);
         }
 
         [TestMethod]
@@ -62,7 +63,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
-            _ = new DeepfakeCreatorViewModel(null!, _mockBackendClient!.Object);
+            _ = new DeepfakeCreatorViewModel(null!, _mockDeepfakeClient!.Object);
         }
 
         #endregion
@@ -215,7 +216,7 @@ namespace VoiceStudio.App.Tests.ViewModels
             var viewModel = CreateViewModel();
 
             // Assert
-            Assert.AreEqual("deepfake-creator", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.DeepfakeCreator, viewModel.PanelId);
         }
 
         [TestMethod]

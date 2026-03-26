@@ -23,9 +23,10 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new VoiceMorphViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
+          AppServices.GetVoiceMorphClient(),
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IProjectAudioClient>(),
           AppServices.GetProjectsClient(),
-          ServiceProvider.GetProfilesClient()
+          AppServices.GetProfilesClient()
       );
       DataContext = ViewModel;
 

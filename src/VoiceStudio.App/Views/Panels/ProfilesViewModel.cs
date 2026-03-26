@@ -15,6 +15,7 @@ using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using Windows.Storage;
 using Windows.Storage.Pickers;
+using Microsoft.UI.Dispatching;
 using VoiceStudio.App.Logging;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Events;
@@ -27,6 +28,7 @@ namespace VoiceStudio.App.Views.Panels
   {
     private readonly IProfilesClient _profilesClient;
     private ISubscriptionToken? _profileCreatedToken;
+    private ISubscriptionToken? _backupRestoredToken;
     private readonly IProfilesUseCase _profilesUseCase;
     private readonly IAudioPlayerService _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
@@ -44,7 +46,7 @@ namespace VoiceStudio.App.Views.Panels
     public Func<Task<string?>>? GetProfileNameFromUser { get; set; }
     private const int FilterDebounceMs = 300;
 
-    public string PanelId => "profiles";
+    public string PanelId => PanelIds.Profiles;
     public string DisplayName => ResourceHelper.GetString("Panel.Profiles.DisplayName", "Profiles");
     public PanelRegion Region => PanelRegion.Left;
 
@@ -390,6 +392,8 @@ namespace VoiceStudio.App.Views.Panels
       // GAP-B05: Subscribe to ProfileCreatedEvent to refresh list when new profiles
       // are created in other panels (e.g., TrainingView, VoiceCloningWizard)
       _profileCreatedToken = _eventAggregator?.Subscribe<ProfileCreatedEvent>(OnProfileCreatedRefresh);
+      _backupRestoredToken = _eventAggregator?.Subscribe<BackupRestoredEvent>(
+          async evt => await RunOnDispatcherQueueAsync(() => ApplyBackupRestoredAsync(evt, CancellationToken.None)));
 
       // Update ShowEmptyState when FilteredCount or ErrorMessage changes
       PropertyChanged += (_, e) =>
@@ -408,12 +412,87 @@ namespace VoiceStudio.App.Views.Panels
     {
       _profileCreatedToken?.Dispose();
       _profileCreatedToken = null;
+      _backupRestoredToken?.Dispose();
+      _backupRestoredToken = null;
       return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Pass 06: Refresh profiles after backup restore; reconcile selection with disk.
+    /// Public for seam tests (same <c>InternalsVisibleTo</c> limitation as <see cref="TimelineViewModel"/>).
+    /// </summary>
+    public async Task ApplyBackupRestoredAsync(BackupRestoredEvent evt, CancellationToken cancellationToken)
+    {
+      if (!evt.RestoreProfiles)
+        return;
+
+      var previousId = SelectedProfile?.Id;
+      await LoadProfilesAsync(cancellationToken);
+      if (string.IsNullOrEmpty(previousId))
+        SelectedProfile = null;
+      else
+        SelectedProfile = Profiles.FirstOrDefault(p => p.Id == previousId);
+    }
+
+    private static async Task RunOnDispatcherQueueAsync(Func<Task> work)
+    {
+      var dq = DispatcherQueue.GetForCurrentThread();
+      if (dq == null || dq.HasThreadAccess)
+      {
+        await work().ConfigureAwait(true);
+        return;
+      }
+
+      var tcs = new TaskCompletionSource<object?>();
+      dq.TryEnqueue(() => _ = RunAsync());
+      async Task RunAsync()
+      {
+        try
+        {
+          await work().ConfigureAwait(true);
+          tcs.TrySetResult(null);
+        }
+        catch (Exception ex)
+        {
+          tcs.TrySetException(ex);
+        }
+      }
+
+      await tcs.Task.ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task RefreshAsync(CancellationToken cancellationToken = default) =>
         await LoadProfilesAsync(cancellationToken);
+
+    /// <summary>
+    /// Navigates to and selects a profile by ID. Used by INavigatablePanel search-result focus.
+    /// </summary>
+    /// <param name="itemId">Profile ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True if the profile was found and selected; false otherwise.</returns>
+    public async Task<bool> NavigateToProfileAsync(string itemId, CancellationToken ct)
+    {
+      if (string.IsNullOrEmpty(itemId))
+        return false;
+
+      var match = Profiles.FirstOrDefault(p => p.Id == itemId);
+      if (match != null)
+      {
+        SelectedProfile = match;
+        return true;
+      }
+
+      await LoadProfilesAsync(ct);
+      match = Profiles.FirstOrDefault(p => p.Id == itemId);
+      if (match != null)
+      {
+        SelectedProfile = match;
+        return true;
+      }
+
+      return false;
+    }
 
     /// <summary>
     /// Handles ProfileCreatedEvent by refreshing the profiles list.
@@ -429,15 +508,22 @@ namespace VoiceStudio.App.Views.Panels
       System.Diagnostics.Debug.WriteLine(
         $"[ProfilesViewModel] ProfileCreatedEvent received from {evt.SourcePanelId}: {evt.ProfileId}");
 
-      // P0-C: Skip reload if profile already in local collection (prevents request storm)
+      // P0-C: Profile already listed — select it so Training completion (W7-C1) gives a coherent next step
       if (Profiles.Any(p => p.Id == evt.ProfileId))
       {
-        System.Diagnostics.Debug.WriteLine($"[ProfilesViewModel] Profile {evt.ProfileId} already in collection, skipping reload");
+        SelectedProfile = Profiles.First(p => p.Id == evt.ProfileId);
+        System.Diagnostics.Debug.WriteLine($"[ProfilesViewModel] Profile {evt.ProfileId} already in collection — selected (W7-C1)");
         return;
       }
 
-      // GAP-I15: Refresh profile list on the UI thread using disposal token
-      Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()?.TryEnqueue(async () => await LoadProfilesAsync(_disposalCts.Token));
+      // GAP-I15 / W7-C1: Reload then select the new profile so context + synthesis see it without manual hunt
+      Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()?.TryEnqueue(async () =>
+      {
+        await LoadProfilesAsync(_disposalCts.Token);
+        var match = Profiles.FirstOrDefault(p => p.Id == evt.ProfileId);
+        if (match != null)
+          SelectedProfile = match;
+      });
     }
 
     public EnhancedAsyncRelayCommand LoadProfilesCommand { get; }

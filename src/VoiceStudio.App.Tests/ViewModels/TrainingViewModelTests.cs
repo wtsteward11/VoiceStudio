@@ -15,6 +15,7 @@ namespace VoiceStudio.App.Tests.ViewModels
   /// <summary>
   /// Transport-mock tests for training backend contract.
   /// Tests IBackendClient directly; does not instantiate TrainingViewModel with ITrainingClient.
+  /// Model list/detail contract tests use IModelManagerClient (PR-15 extraction).
   /// See docs/governance/TEST_CLASSIFICATION.md. Cannot support "TrainingViewModel migration complete" claims.
   /// </summary>
   [TestClass]
@@ -22,6 +23,7 @@ namespace VoiceStudio.App.Tests.ViewModels
   public class TrainingViewModelTests
   {
     private Mock<IBackendClient> _mockBackendClient = null!;
+    private Mock<IModelManagerClient> _mockModelManagerClient = null!;
     private IViewModelContext _context = null!;
     private DispatcherQueueController? _dispatcherController;
 
@@ -29,6 +31,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public void Setup()
     {
       _mockBackendClient = new Mock<IBackendClient>();
+      _mockModelManagerClient = new Mock<IModelManagerClient>();
       _dispatcherController = DispatcherQueueController.CreateOnDedicatedThread();
       var dispatcher = _dispatcherController.DispatcherQueue;
       _context = new ViewModelContext(NullLogger.Instance, dispatcher);
@@ -37,10 +40,6 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockBackendClient
           .Setup(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()))
           .ReturnsAsync(new List<VoiceProfile>());
-
-      _mockBackendClient
-          .Setup(x => x.GetModelsAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-          .ReturnsAsync(new List<ModelInfo>());
     }
 
     [TestCleanup]
@@ -200,18 +199,18 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestMethod]
     public async Task GetModelsAsync_ReturnsListOfModels()
     {
-      // Arrange
+      // Arrange - model contract tests use IModelManagerClient (PR-15)
       var expectedModels = new List<ModelInfo>
             {
                 new ModelInfo { Engine = "xtts", ModelName = "model1", Version = "1.0" },
                 new ModelInfo { Engine = "xtts", ModelName = "model2", Version = "2.0" },
             };
-      _mockBackendClient
+      _mockModelManagerClient
           .Setup(x => x.GetModelsAsync("xtts", It.IsAny<CancellationToken>()))
           .ReturnsAsync(expectedModels);
 
       // Act
-      var result = await _mockBackendClient.Object.GetModelsAsync("xtts", CancellationToken.None);
+      var result = await _mockModelManagerClient.Object.GetModelsAsync("xtts", CancellationToken.None);
 
       // Assert
       Assert.AreEqual(2, result.Count);
@@ -222,8 +221,8 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestMethod]
     public async Task GetModelAsync_ReturnsModelInfo()
     {
-      // Arrange
-      _mockBackendClient
+      // Arrange - model contract tests use IModelManagerClient (PR-15)
+      _mockModelManagerClient
           .Setup(x => x.GetModelAsync("xtts", "my-model", It.IsAny<CancellationToken>()))
           .ReturnsAsync(new ModelInfo
           {
@@ -234,7 +233,7 @@ namespace VoiceStudio.App.Tests.ViewModels
           });
 
       // Act
-      var result = await _mockBackendClient.Object.GetModelAsync("xtts", "my-model", CancellationToken.None);
+      var result = await _mockModelManagerClient.Object.GetModelAsync("xtts", "my-model", CancellationToken.None);
 
       // Assert
       Assert.IsNotNull(result);

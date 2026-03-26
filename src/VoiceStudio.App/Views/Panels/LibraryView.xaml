@@ -31,6 +31,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
             
@@ -42,10 +43,19 @@
                             QueryIcon="Find"
                             Margin="{StaticResource VSQ.Spacing.Small}"
                             AutomationProperties.AutomationId="LibraryView_SearchBox" />
+
+            <TextBlock Grid.Row="1"
+                       AutomationProperties.AutomationId="LibraryView_ImportDragDropScopeFootnote"
+                       Text="{x:Bind ViewModel.ImportDragDropScopeFootnote, Mode=OneWay}"
+                       Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                       FontSize="10"
+                       Opacity="0.9"
+                       TextWrapping="WrapWholeWords"
+                       Margin="12,0,12,4" />
             
             <!-- Folders List (collapsible) - TRAP 5: DataTemplate for folders -->
             <ListView x:Name="FoldersListView"
-                      Grid.Row="1"
+                      Grid.Row="2"
                       ItemsSource="{x:Bind ViewModel.Folders, Mode=OneWay}"
                       SelectedItem="{x:Bind ViewModel.SelectedFolder, Mode=TwoWay}"
                       Visibility="{x:Bind ViewModel.ShowFolders, Mode=OneWay}"
@@ -73,7 +83,7 @@
             
             <!-- Assets List with Context Menu -->
             <ListView x:Name="AssetsListView"
-                      Grid.Row="2"
+                      Grid.Row="3"
                       ItemsSource="{x:Bind ViewModel.Assets, Mode=OneWay}"
                       SelectedItem="{x:Bind ViewModel.SelectedAsset, Mode=TwoWay}"
                       Background="{StaticResource VSQ.Panel.Background.DarkerBrush}"
@@ -119,9 +129,9 @@
             </ListView>
             
             <!-- Empty state overlay (populated in code-behind) -->
-            <Grid x:Name="LibraryEmptyStateOverlay" Grid.Row="0" Grid.RowSpan="3" Visibility="Collapsed" />
+            <Grid x:Name="LibraryEmptyStateOverlay" Grid.Row="0" Grid.RowSpan="4" Visibility="Collapsed" />
 
-            <Canvas x:Name="DragDropCanvas" Grid.RowSpan="3" IsHitTestVisible="False" Background="Transparent"
+            <Canvas x:Name="DragDropCanvas" Grid.RowSpan="4" IsHitTestVisible="False" Background="Transparent"
                     AutomationProperties.AutomationId="LibraryView_DragDropCanvas" />
         </Grid>
 

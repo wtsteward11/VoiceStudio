@@ -15,6 +15,8 @@ using VoiceStudio.Core.Models;
 using CoreSettingsData = VoiceStudio.Core.Models.SettingsData;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using VoiceStudio.Core.Events;
+using Microsoft.UI.Dispatching;
 using Windows.UI;
 
 namespace VoiceStudio.App.ViewModels
@@ -22,15 +24,17 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for settings panel.
   /// </summary>
-  public partial class SettingsViewModel : BaseViewModel, IPanelView
+  public partial class SettingsViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    public string PanelId => "settings";
+    public string PanelId => PanelIds.Settings;
     public string DisplayName => ResourceHelper.GetString("Panel.Settings.DisplayName", "Settings");
     public PanelRegion Region => PanelRegion.Floating;
     private readonly ISettingsService _settingsService;
-    private readonly IBackendClient _backendClient;
+    private readonly ISettingsClient _settingsClient;
     private readonly PluginManager? _pluginManager;
     private readonly ITelemetryService? _telemetryService;
+    private readonly IEventAggregator? _eventAggregator;
+    private ISubscriptionToken? _backupRestoredToken;
 
     // General Settings
     [ObservableProperty]
@@ -227,18 +231,21 @@ namespace VoiceStudio.App.ViewModels
             "voice_ai"
         };
 
+    /// <param name="eventAggregator">Optional; defaults to <see cref="AppServices.TryGetEventAggregator"/>. When non-null, Pass 06 slice 2 subscribes in <see cref="OnActivatedAsync"/> and disposes in <see cref="OnDeactivatedAsync"/>.</param>
     public SettingsViewModel(
         IViewModelContext context,
         ISettingsService settingsService,
-        IBackendClient backendClient,
+        ISettingsClient settingsClient,
         PluginManager? pluginManager = null,
-        ITelemetryService? telemetryService = null)
+        ITelemetryService? telemetryService = null,
+        IEventAggregator? eventAggregator = null)
         : base(context)
     {
       _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _settingsClient = settingsClient ?? throw new ArgumentNullException(nameof(settingsClient));
       _pluginManager = pluginManager;
       _telemetryService = telemetryService;
+      _eventAggregator = eventAggregator ?? AppServices.TryGetEventAggregator();
 
       // Initialize commands in primary constructor so all construction paths have them
       LoadSettingsCommand = new EnhancedAsyncRelayCommand(async (ct) =>
@@ -266,24 +273,95 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("RefreshDependencyStatus");
         await RefreshDependencyStatusAsync(ct);
       });
+    }
 
-      // Load plugins on initialization
-      _ = LoadPluginsAsync();
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      EnsureBackupRestoredSubscription();
+      await LoadPluginsAsync();
+      await RefreshDependencyStatusAsync(cancellationToken);
+    }
 
-      // Load dependency status on initialization
-      _ = RefreshDependencyStatusAsync(CancellationToken.None);
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default)
+    {
+      ReleaseBackupRestoredSubscription();
+      return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Pass 06 slice 2: subscribe while panel is active so deactivate/reactivate cycles restore event delivery.
+    /// </summary>
+    private void EnsureBackupRestoredSubscription()
+    {
+      if (_eventAggregator == null || _backupRestoredToken != null)
+        return;
+
+      _backupRestoredToken = _eventAggregator.Subscribe<BackupRestoredEvent>(
+          async evt => await RunOnDispatcherQueueAsync(() => ApplyBackupRestoredAsync(evt, CancellationToken.None)));
+    }
+
+    private void ReleaseBackupRestoredSubscription()
+    {
+      _backupRestoredToken?.Dispose();
+      _backupRestoredToken = null;
+    }
+
+    /// <summary>
+    /// Pass 06 slice 2: reload settings from disk after backup restore when settings were included.
+    /// Public for seam tests.
+    /// </summary>
+    public async Task ApplyBackupRestoredAsync(BackupRestoredEvent evt, CancellationToken cancellationToken)
+    {
+      if (!evt.RestoreSettings)
+        return;
+
+      await LoadSettingsAsync(cancellationToken);
+    }
+
+    private static async Task RunOnDispatcherQueueAsync(Func<Task> work)
+    {
+      var dq = DispatcherQueue.GetForCurrentThread();
+      if (dq == null || dq.HasThreadAccess)
+      {
+        await work().ConfigureAwait(true);
+        return;
+      }
+
+      var tcs = new TaskCompletionSource<object?>();
+      dq.TryEnqueue(() => _ = RunAsync());
+      async Task RunAsync()
+      {
+        try
+        {
+          await work().ConfigureAwait(true);
+          tcs.TrySetResult(null);
+        }
+        catch (Exception ex)
+        {
+          tcs.TrySetException(ex);
+        }
+      }
+
+      await tcs.Task.ConfigureAwait(false);
+    }
+
+    public async Task RefreshAsync(CancellationToken cancellationToken = default)
+    {
+      await LoadPluginsAsync();
+      await RefreshDependencyStatusAsync(cancellationToken);
     }
 
     public SettingsViewModel(
         ISettingsService settingsService,
-        IBackendClient? backendClient = null,
+        ISettingsClient? settingsClient = null,
         PluginManager? pluginManager = null)
         : this(
               AppServices.GetRequiredService<IViewModelContext>(),
               settingsService,
-              backendClient ?? AppServices.GetBackendClient(),
+              settingsClient ?? AppServices.GetRequiredService<ISettingsClient>(),
               pluginManager ?? AppServices.GetService<PluginManager>(),
-              AppServices.GetService<ITelemetryService>())
+              AppServices.GetService<ITelemetryService>(),
+              eventAggregator: null)
     {
       // Commands are initialized in the primary constructor
     }
@@ -751,12 +829,7 @@ namespace VoiceStudio.App.ViewModels
             try
             {
               System.Diagnostics.Debug.WriteLine($"[DEP-CHECK] Attempt {attempt}/{maxRetries}...");
-              response = await _backendClient.SendRequestAsync<object, Dictionary<string, object>>(
-                  "/api/settings/check/dependencies",
-                  null,
-                  System.Net.Http.HttpMethod.Get,
-                  cancellationToken
-              );
+              response = await _settingsClient.CheckDependenciesAsync(cancellationToken);
               break;
             }
             catch (Exception ex)

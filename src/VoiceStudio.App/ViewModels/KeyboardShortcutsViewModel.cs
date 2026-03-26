@@ -16,10 +16,12 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the KeyboardShortcutsView panel - Keyboard shortcuts editor.
   /// </summary>
-  public partial class KeyboardShortcutsViewModel : BaseViewModel, IPanelView
+  public partial class KeyboardShortcutsViewModel : BaseViewModel, ILifecyclePanelView
   {
-    private readonly IBackendClient _backendClient;
-    private CancellationTokenSource? _searchDebounceCts;
+    private readonly IKeyboardShortcutsClient _shortcutsClient;
+    private readonly CancellationTokenSource _disposalCts = new();
+    private CancellationTokenSource? _loadCts;
+    private readonly IDispatcherTimer? _searchDebounceTimer;
     private const int SearchDebounceMs = 300;
 
     public string PanelId => "keyboard_shortcuts";
@@ -56,10 +58,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? conflictMessage;
 
-    public KeyboardShortcutsViewModel(IViewModelContext context, IBackendClient backendClient)
+    public KeyboardShortcutsViewModel(IViewModelContext context, IKeyboardShortcutsClient shortcutsClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _shortcutsClient = shortcutsClient ?? throw new ArgumentNullException(nameof(shortcutsClient));
 
       LoadShortcutsCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -104,9 +106,38 @@ namespace VoiceStudio.App.ViewModels
         await CheckConflictAsync(ct);
       });
 
-      // Load initial data
-      _ = LoadCategoriesAsync(CancellationToken.None);
-      _ = LoadShortcutsAsync(CancellationToken.None);
+      _searchDebounceTimer = Dispatcher.CreateTimer();
+      if (_searchDebounceTimer != null)
+      {
+        _searchDebounceTimer.Interval = TimeSpan.FromMilliseconds(SearchDebounceMs);
+        _searchDebounceTimer.IsRepeating = false;
+        _searchDebounceTimer.Tick += OnSearchDebounceTick;
+      }
+    }
+
+    /// <inheritdoc />
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _loadCts?.Cancel();
+      _loadCts?.Dispose();
+      using var linked = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token, cancellationToken);
+      await LoadCategoriesAsync(linked.Token);
+      await LoadShortcutsAsync(linked.Token);
+    }
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => LoadShortcutsAsync(cancellationToken);
+
+    private void OnSearchDebounceTick(object? sender, object e)
+    {
+      if (_disposalCts.IsCancellationRequested) return;
+      _loadCts?.Cancel();
+      _loadCts?.Dispose();
+      _loadCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = SearchShortcutsAsync(_loadCts.Token);
     }
 
     public IAsyncRelayCommand LoadShortcutsCommand { get; }
@@ -122,33 +153,18 @@ namespace VoiceStudio.App.ViewModels
 
     private async Task LoadShortcutsAsync(CancellationToken cancellationToken)
     {
+      var categorySnapshot = SelectedCategory;
+      var panelSnapshot = SelectedPanelId;
+
       IsLoading = true;
       ErrorMessage = null;
 
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (!string.IsNullOrEmpty(SelectedCategory))
-          queryParams.Add("category", SelectedCategory);
-        if (!string.IsNullOrEmpty(SelectedPanelId))
-          queryParams.Add("panel_id", SelectedPanelId);
+        var shortcuts = await _shortcutsClient.GetShortcutsAsync(categorySnapshot, panelSnapshot, cancellationToken);
 
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/shortcuts";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var shortcuts = await _backendClient.SendRequestAsync<object, KeyboardShortcut[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        if (SelectedCategory != categorySnapshot || SelectedPanelId != panelSnapshot)
+          return;
 
         Shortcuts.Clear();
         if (shortcuts != null)
@@ -190,20 +206,8 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          key = shortcut.Key,
-          key_code = shortcut.KeyCode,
-          modifiers = shortcut.Modifiers,
-          description = shortcut.Description
-        };
-
-        var updated = await _backendClient.SendRequestAsync<object, KeyboardShortcut>(
-            $"/api/shortcuts/{shortcut.Id}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var request = new { key = shortcut.Key, key_code = shortcut.KeyCode, modifiers = shortcut.Modifiers, description = shortcut.Description };
+        var updated = await _shortcutsClient.UpdateShortcutAsync(shortcut.Id, request, cancellationToken);
 
         if (updated != null)
         {
@@ -238,12 +242,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var reset = await _backendClient.SendRequestAsync<object, KeyboardShortcut>(
-            $"/api/shortcuts/{shortcut.Id}/reset",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var reset = await _shortcutsClient.ResetShortcutAsync(shortcut.Id, cancellationToken);
 
         if (reset != null)
         {
@@ -275,12 +274,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            "/api/shortcuts/reset-all",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _shortcutsClient.ResetAllAsync(cancellationToken);
 
         await LoadShortcutsAsync(cancellationToken);
         StatusMessage = ResourceHelper.GetString("KeyboardShortcuts.AllShortcutsReset", "All shortcuts reset to defaults");
@@ -343,19 +337,8 @@ namespace VoiceStudio.App.ViewModels
           return;
         }
 
-        var request = new
-        {
-          key = EditingKey,
-          key_code = keyCode,
-          modifiers = modifiers
-        };
-
-        var updated = await _backendClient.SendRequestAsync<object, KeyboardShortcut>(
-            $"/api/shortcuts/{SelectedShortcut.Id}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var request = new { key = EditingKey, key_code = keyCode, modifiers };
+        var updated = await _shortcutsClient.UpdateShortcutAsync(SelectedShortcut.Id, request, cancellationToken);
 
         if (updated != null)
         {
@@ -392,29 +375,7 @@ namespace VoiceStudio.App.ViewModels
         var modifiers = parts.Take(parts.Count - 1).ToList();
         var keyCode = parts.Last();
 
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        queryParams.Add("key_code", keyCode);
-        foreach (var mod in modifiers)
-        {
-          queryParams.Add("modifiers", mod);
-        }
-        if (SelectedShortcut != null)
-        {
-          queryParams.Add("exclude_id", SelectedShortcut.Id);
-        }
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var response = await _backendClient.SendRequestAsync<object, ConflictCheckResponse>(
-            $"/api/shortcuts/check-conflict?{queryString}",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _shortcutsClient.CheckConflictAsync(keyCode, modifiers.ToArray(), SelectedShortcut?.Id, cancellationToken);
 
         if (response?.HasConflict == true)
         {
@@ -439,12 +400,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, ShortcutCategoriesResponse>(
-            "/api/shortcuts/categories",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _shortcutsClient.GetCategoriesAsync(cancellationToken);
 
         AvailableCategories.Clear();
         if (response?.Categories != null)
@@ -468,43 +424,41 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSelectedCategoryChanged(string? value)
     {
-      _ = LoadShortcutsAsync(CancellationToken.None);
+      _loadCts?.Cancel();
+      _loadCts?.Dispose();
+      _loadCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = LoadShortcutsAsync(_loadCts.Token);
     }
 
     partial void OnSelectedPanelIdChanged(string? value)
     {
-      _ = LoadShortcutsAsync(CancellationToken.None);
+      _loadCts?.Cancel();
+      _loadCts?.Dispose();
+      _loadCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = LoadShortcutsAsync(_loadCts.Token);
     }
 
     partial void OnSearchQueryChanged(string? value)
     {
-      _searchDebounceCts?.Cancel();
-      _searchDebounceCts = new CancellationTokenSource();
-      var cts = _searchDebounceCts;
-      _ = Task.Run(async () =>
+      _searchDebounceTimer?.Stop();
+      _searchDebounceTimer?.Start();
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+      if (disposing)
       {
-        try
-        {
-          await Task.Delay(SearchDebounceMs, cts.Token);
-          Dispatcher.TryEnqueue(() => _ = SearchShortcutsAsync(cts.Token));
-        }
-        catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "KeyboardShortcutsViewModel.OnSearchQueryChanged");
+        _searchDebounceTimer?.Stop();
+        if (_searchDebounceTimer != null)
+          _searchDebounceTimer.Tick -= OnSearchDebounceTick;
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = null;
+        _disposalCts.Cancel();
+        _disposalCts.Dispose();
       }
-      });
-    }
-
-    // Response models
-    private class ConflictCheckResponse
-    {
-      public bool HasConflict { get; set; }
-      public KeyboardShortcut? ConflictingShortcut { get; set; }
-    }
-
-    private class ShortcutCategoriesResponse
-    {
-      public string[] Categories { get; set; } = Array.Empty<string>();
+      base.Dispose(disposing);
     }
   }
 

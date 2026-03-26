@@ -4,6 +4,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Views.Panels;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -12,7 +13,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public class ModelManagerViewModelTests
     {
         private IViewModelContext _context = null!;
-        private Mock<IBackendClient> _mockBackendClient = null!;
+        private Mock<IModelManagerClient> _mockModelManagerClient = null!;
         private DispatcherQueueController? _dispatcherController;
         private ModelManagerViewModel _viewModel = null!;
 
@@ -22,8 +23,8 @@ namespace VoiceStudio.App.Tests.ViewModels
             _dispatcherController = DispatcherQueueController.CreateOnDedicatedThread();
             var dispatcher = _dispatcherController.DispatcherQueue;
             _context = new ViewModelContext(NullLogger.Instance, dispatcher);
-            _mockBackendClient = new Mock<IBackendClient>();
-            _viewModel = new ModelManagerViewModel(_context, _mockBackendClient.Object);
+            _mockModelManagerClient = new Mock<IModelManagerClient>();
+            _viewModel = new ModelManagerViewModel(_context, _mockModelManagerClient.Object);
         }
 
         [TestCleanup]
@@ -36,7 +37,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_InitializesWithDefaultValues()
         {
             Assert.IsNotNull(_viewModel);
-            Assert.AreEqual("model_manager", _viewModel.PanelId);
+            Assert.AreEqual(PanelIds.ModelManager, _viewModel.PanelId);
             Assert.AreEqual("Model Manager", _viewModel.DisplayName);
             Assert.IsFalse(_viewModel.IsLoading);
         }

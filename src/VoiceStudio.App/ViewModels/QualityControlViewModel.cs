@@ -21,7 +21,7 @@ namespace VoiceStudio.App.ViewModels
   {
     private readonly IQualityControlClient _qualityClient;
 
-    public string PanelId => "quality_control";
+    public string PanelId => PanelIds.QualityControl;
     public string DisplayName => ResourceHelper.GetString("Panel.QualityControl.DisplayName", "Quality Control");
     public PanelRegion Region => PanelRegion.Right;
 

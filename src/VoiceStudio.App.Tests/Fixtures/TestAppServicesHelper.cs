@@ -21,25 +21,23 @@ namespace VoiceStudio.App.Tests.Fixtures
         /// <summary>
         /// Ensures AppServices is initialized with test-appropriate services.
         /// This method is idempotent and thread-safe.
+        /// Re-initializes when DegradedModeIntegrationTests or similar replace AppServices with
+        /// a minimal provider (no IEventAggregator), so WorkflowCoordinatorServiceTests and
+        /// other event-based tests receive a valid EventAggregator regardless of test order.
         /// </summary>
         public static void EnsureInitialized()
         {
-            if (_initialized)
-                return;
-
             lock (_lock)
             {
-                if (_initialized)
-                    return;
-
-                // Check if already properly initialized (with MultiSelectService)
-                // We specifically check for MultiSelectService because that's the critical service
-                // that most ViewModels require and was missing in previous test setups.
+                // Always check for required services first. DegradedModeIntegrationTests replaces
+                // AppServices with a minimal provider; we must re-initialize when EventAggregator
+                // is missing. Do NOT early-return on _initialized — that would skip this check.
                 try
                 {
                     var existingContext = AppServices.GetService<IViewModelContext>();
                     var existingMultiSelect = AppServices.GetService<MultiSelectService>();
-                    if (existingContext != null && existingMultiSelect != null)
+                    var existingEventAggregator = AppServices.GetService<IEventAggregator>();
+                    if (existingContext != null && existingMultiSelect != null && existingEventAggregator != null)
                     {
                         _initialized = true;
                         return;
@@ -92,14 +90,13 @@ namespace VoiceStudio.App.Tests.Fixtures
         /// Cleans up the dispatcher controller.
         /// Call this in [AssemblyCleanup] or at the end of test runs.
         /// Note: AppServices cannot be reset, so tests share the same instance.
+        /// Hardened: Skip ShutdownQueueAsync to avoid testhost crash during teardown (Stage 13 full-harness fix).
+        /// The dispatcher thread is abandoned; process exit will terminate it. ShutdownQueueAsync was
+        /// causing testhost process crash when run after many tests (Services shard, full harness).
         /// </summary>
         public static void Cleanup()
         {
-            if (_dispatcherController != null)
-            {
-                _dispatcherController.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
-                _dispatcherController = null;
-            }
+            _dispatcherController = null;
         }
     }
 }

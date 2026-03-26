@@ -11,6 +11,7 @@ using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -57,12 +58,24 @@ namespace VoiceStudio.App.Tests.ViewModels
       _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
     }
 
+    /// <summary>
+    /// Invariant: constructor must not call any client methods before activation.
+    /// Prevents constructor fire-and-forget regression (RETAINED_ASYNC_RULE, ADR-047).
+    /// </summary>
+    [TestMethod]
+    public void Constructor_DoesNotCallClient_BeforeActivation()
+    {
+      _ = new TrainingViewModel(_context, _mockTrainingClient.Object);
+      _mockTrainingClient.Verify(x => x.ListDatasetsAsync(It.IsAny<CancellationToken>()), Times.Never);
+      _mockTrainingClient.Verify(x => x.ListTrainingJobsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [TestMethod]
     public void Constructor_WithITrainingClient_CreatesInstance()
     {
       var vm = new TrainingViewModel(_context, _mockTrainingClient.Object);
       Assert.IsNotNull(vm);
-      Assert.AreEqual("training", vm.PanelId);
+      Assert.AreEqual(PanelIds.Training, vm.PanelId);
       Assert.IsNotNull(vm.LoadDatasetsCommand);
       Assert.IsNotNull(vm.LoadTrainingJobsCommand);
       vm.Dispose();
@@ -102,6 +115,23 @@ namespace VoiceStudio.App.Tests.ViewModels
         _mockTrainingClient.Verify(
             x => x.ListTrainingJobsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
             Times.Once);
+      }
+      finally
+      {
+        vm.Dispose();
+      }
+    }
+
+    /// <summary>Product trust Pass 01 slice 3: Training surface discloses partial / not workflow-pass-closed.</summary>
+    [TestMethod]
+    public void SurfaceMaturityFootnote_DisclosesPartialAndWorkflowHonesty()
+    {
+      var vm = new TrainingViewModel(_context, _mockTrainingClient.Object);
+      try
+      {
+        var text = vm.SurfaceMaturityFootnote;
+        StringAssert.Contains(text, "partial", StringComparison.OrdinalIgnoreCase);
+        StringAssert.Contains(text, "workflow", StringComparison.OrdinalIgnoreCase);
       }
       finally
       {

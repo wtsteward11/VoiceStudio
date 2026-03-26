@@ -24,7 +24,7 @@ namespace VoiceStudio.App.Views.Panels
 {
   public partial class MacroViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IMacroClient _macroClient;
     private readonly IDialogService _dialogService;
     private readonly UndoRedoService? _undoRedoService;
     private readonly ToastNotificationService? _toastNotificationService;
@@ -32,7 +32,7 @@ namespace VoiceStudio.App.Views.Panels
     private MultiSelectState? _macroMultiSelectState;
     private MultiSelectState? _automationCurveMultiSelectState;
 
-    public string PanelId => "macro";
+    public string PanelId => PanelIds.Macro;
     public string DisplayName => ResourceHelper.GetString("Panel.Macros.DisplayName", "Macros");
     public PanelRegion Region => PanelRegion.Bottom;
 
@@ -125,10 +125,10 @@ namespace VoiceStudio.App.Views.Panels
         return ResourceHelper.FormatString("Macro.TimeRemainingSeconds", remaining.TotalSeconds);
     }
 
-    public MacroViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService)
+    public MacroViewModel(IViewModelContext context, IMacroClient macroClient, IDialogService dialogService)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _macroClient = macroClient ?? throw new ArgumentNullException(nameof(macroClient));
       _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
       // Get optional services using helper (reduces code duplication)
@@ -262,7 +262,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var macrosList = await _backendClient.GetMacrosAsync(SelectedProjectId, cancellationToken);
+        var macrosList = await _macroClient.GetMacrosAsync(SelectedProjectId, cancellationToken);
 
         Macros.Clear();
         foreach (var macro in macrosList)
@@ -310,7 +310,7 @@ namespace VoiceStudio.App.Views.Panels
           Modified = DateTime.UtcNow
         };
 
-        var createdMacro = await _backendClient.CreateMacroAsync(macro, cancellationToken);
+        var createdMacro = await _macroClient.CreateMacroAsync(macro, cancellationToken);
         Macros.Add(createdMacro);
 
         // Register undo action
@@ -318,7 +318,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           var action = new CreateMacroAction(
               Macros,
-              _backendClient,
+              _macroClient,
               createdMacro,
               onUndo: (m) =>
               {
@@ -372,7 +372,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var success = await _backendClient.DeleteMacroAsync(macroId, cancellationToken);
+        var success = await _macroClient.DeleteMacroAsync(macroId, cancellationToken);
         if (success)
         {
           var macroToDelete = Macros.FirstOrDefault(m => m.Id == macroId);
@@ -391,7 +391,7 @@ namespace VoiceStudio.App.Views.Panels
             {
               var action = new DeleteMacroAction(
                   Macros,
-                  _backendClient,
+                  _macroClient,
                   deletedMacro,
                   originalIndex,
                   onUndo: (m) => SelectedMacro = m,
@@ -443,7 +443,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           try
           {
-            await _backendClient.ExecuteMacroAsync(macroId, cancellationToken);
+            await _macroClient.ExecuteMacroAsync(macroId, cancellationToken);
           }
           catch (Exception ex)
           {
@@ -485,7 +485,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           try
           {
-            var status = await _backendClient.GetMacroExecutionStatusAsync(macroId, _statusPollingCts.Token);
+            var status = await _macroClient.GetMacroExecutionStatusAsync(macroId, _statusPollingCts.Token);
 
             // Update on UI thread using DispatcherQueue
             var dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
@@ -562,7 +562,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var curves = await _backendClient.GetAutomationCurvesAsync(SelectedTrackId, cancellationToken);
+        var curves = await _macroClient.GetAutomationCurvesAsync(SelectedTrackId, cancellationToken);
 
         AutomationCurves.Clear();
         foreach (var curve in curves)
@@ -612,7 +612,7 @@ namespace VoiceStudio.App.Views.Panels
           Points = new List<VoiceStudio.Core.Models.AutomationPoint>()
         };
 
-        var createdCurve = await _backendClient.CreateAutomationCurveAsync(curve, cancellationToken);
+        var createdCurve = await _macroClient.CreateAutomationCurveAsync(curve, cancellationToken);
         AutomationCurves.Add(createdCurve);
         SelectedAutomationCurve = createdCurve;
 
@@ -621,7 +621,7 @@ namespace VoiceStudio.App.Views.Panels
         // {
         //     var action = new CreateAutomationCurveAction(
         //         AutomationCurves,
-        //         _backendClient,
+        //         _macroClient,
         //         createdCurve,
         //         onUndo: (c) =>
         //         {
@@ -694,7 +694,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var success = await _backendClient.DeleteAutomationCurveAsync(curveId, cancellationToken);
+        var success = await _macroClient.DeleteAutomationCurveAsync(curveId, cancellationToken);
         if (success)
         {
           var curveToDelete = AutomationCurves.FirstOrDefault(c => c.Id == curveId);
@@ -713,7 +713,7 @@ namespace VoiceStudio.App.Views.Panels
             // {
             //     var action = new DeleteAutomationCurveAction(
             //         AutomationCurves,
-            //         _backendClient,
+            //         _macroClient,
             //         deletedCurve,
             //         originalIndex,
             //         onUndo: (c) =>
@@ -851,7 +851,7 @@ namespace VoiceStudio.App.Views.Panels
           var macro = Macros.FirstOrDefault(m => m.Id == macroId);
           if (macro != null)
           {
-            var success = await _backendClient.DeleteMacroAsync(macroId, cancellationToken);
+            var success = await _macroClient.DeleteMacroAsync(macroId, cancellationToken);
             if (success)
             {
               deletedMacros.Add(macro);
@@ -981,7 +981,7 @@ namespace VoiceStudio.App.Views.Panels
           var curve = AutomationCurves.FirstOrDefault(c => c.Id == curveId);
           if (curve != null)
           {
-            var success = await _backendClient.DeleteAutomationCurveAsync(curveId, cancellationToken);
+            var success = await _macroClient.DeleteAutomationCurveAsync(curveId, cancellationToken);
             if (success)
             {
               deletedCurves.Add(curve);

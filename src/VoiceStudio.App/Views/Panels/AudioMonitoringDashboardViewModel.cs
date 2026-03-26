@@ -19,7 +19,7 @@ namespace VoiceStudio.App.Views.Panels
   /// </summary>
   public partial class AudioMonitoringDashboardViewModel : ObservableObject
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IAudioMonitoringDashboardClient _client;
     private CancellationTokenSource? _pollingCts;
     private bool _isPolling;
     private double _maxPeakSeen = double.MinValue;
@@ -103,9 +103,9 @@ namespace VoiceStudio.App.Views.Panels
     public bool HasMultiChannel => ChannelMeters.Count > 1;
     public bool HasAlerts => Alerts.Count > 0;
 
-    public AudioMonitoringDashboardViewModel(IBackendClient backendClient)
+    public AudioMonitoringDashboardViewModel(IAudioMonitoringDashboardClient client)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
       LoadAudioCommand = new AsyncRelayCommand(LoadAudioAsync, () => !string.IsNullOrWhiteSpace(AudioId));
       ToggleRealTimeCommand = new RelayCommand(ToggleRealTime, () => !string.IsNullOrWhiteSpace(AudioId));
       ResetCommand = new RelayCommand(Reset);
@@ -198,7 +198,7 @@ namespace VoiceStudio.App.Views.Panels
         // Load loudness data for LUFS
         try
         {
-          var loudnessData = await _backendClient.GetLoudnessDataAsync(AudioId);
+          var loudnessData = await _client.GetLoudnessDataAsync(AudioId);
           if (loudnessData?.IntegratedLufs.HasValue == true)
           {
             LufsLevel = loudnessData.IntegratedLufs.Value;
@@ -225,7 +225,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var meters = await _backendClient.GetAudioMetersAsync(AudioId);
+        var meters = await _client.GetAudioMetersAsync(AudioId);
 
         if (meters != null)
         {

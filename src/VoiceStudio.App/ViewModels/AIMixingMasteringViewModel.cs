@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
@@ -19,11 +20,11 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class AIMixingMasteringViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IAIMixingClient _aimixingClient;
     private readonly ToastNotificationService? _toastNotificationService;
     private ObservableCollection<AIMixingMixSuggestionItem>? _suggestionsHooked;
 
-    public string PanelId => "ai-mixing-mastering";
+    public string PanelId => PanelIds.AIMixingMastering;
     public string DisplayName => ResourceHelper.GetString("Panel.AIMixingMastering.DisplayName", "AI Mixing & Mastering");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -96,10 +97,10 @@ namespace VoiceStudio.App.ViewModels
     public Visibility ProcessedAudioVisibility =>
         string.IsNullOrWhiteSpace(ProcessedAudioId) ? Visibility.Collapsed : Visibility.Visible;
 
-    public AIMixingMasteringViewModel(IViewModelContext context, IBackendClient backendClient)
+    public AIMixingMasteringViewModel(IViewModelContext context, IAIMixingClient aimixingClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _aimixingClient = aimixingClient ?? throw new ArgumentNullException(nameof(aimixingClient));
 
       // Get toast notification service (may be null if not initialized)
       try
@@ -225,11 +226,7 @@ namespace VoiceStudio.App.ViewModels
           AnalysisProgress = (i + 1) / 10.0f;
         }
 
-        var response = await _backendClient.SendRequestAsync<object, MixAnalysisResponse>(
-            $"/api/mix-assistant/mix/analyze?project_id={Uri.EscapeDataString(ProjectId ?? "")}",
-            null,
-            System.Net.Http.HttpMethod.Post
-        );
+        var response = await _aimixingClient.AnalyzeMixAsync(ProjectId ?? "");
 
         if (response?.Suggestions != null)
         {
@@ -277,11 +274,7 @@ namespace VoiceStudio.App.ViewModels
           ApplyAll = false
         };
 
-        var response = await _backendClient.SendRequestAsync<MixApplyRequest, MixApplyResponse>(
-            "/api/mix-assistant/mix/apply",
-            request,
-            System.Net.Http.HttpMethod.Post
-        );
+        var response = await _aimixingClient.ApplyMixAsync(request);
 
         if (response != null)
         {
@@ -322,11 +315,7 @@ namespace VoiceStudio.App.ViewModels
           ApplyAll = true
         };
 
-        var response = await _backendClient.SendRequestAsync<MixApplyRequest, MixApplyResponse>(
-            "/api/mix-assistant/mix/apply",
-            request,
-            System.Net.Http.HttpMethod.Post
-        );
+        var response = await _aimixingClient.ApplyMixAsync(request);
 
         if (response != null)
         {
@@ -388,11 +377,7 @@ namespace VoiceStudio.App.ViewModels
           TargetFormat = SelectedTargetFormat
         };
 
-        var response = await _backendClient.SendRequestAsync<MasteringAnalysisRequest, MasteringAnalysisResponse>(
-            "/api/mix-assistant/master/analyze",
-            request,
-            System.Net.Http.HttpMethod.Post
-        );
+        var response = await _aimixingClient.AnalyzeMasteringAsync(request);
 
         if (response != null)
         {
@@ -440,11 +425,7 @@ namespace VoiceStudio.App.ViewModels
           Settings = settings
         };
 
-        var response = await _backendClient.SendRequestAsync<MasteringApplyRequest, MasteringApplyResponse>(
-            "/api/mix-assistant/master/apply",
-            request,
-            System.Net.Http.HttpMethod.Post
-        );
+        var response = await _aimixingClient.ApplyMasteringAsync(request);
 
         if (response != null)
         {
@@ -475,73 +456,6 @@ namespace VoiceStudio.App.ViewModels
       StatusMessage = ResourceHelper.GetString("AIMixingMastering.Refreshed", "Refreshed");
     }
 
-    // Request/Response models
-    private class MixAnalysisResponse
-    {
-      public List<MixSuggestionData>? Suggestions { get; set; }
-    }
-
-    public class MixSuggestionData
-    {
-      public string SuggestionId { get; set; } = string.Empty;
-      public string Category { get; set; } = string.Empty;
-      public string Priority { get; set; } = string.Empty;
-      public string Description { get; set; } = string.Empty;
-      public float? CurrentValue { get; set; }
-      public float? SuggestedValue { get; set; }
-      public float Confidence { get; set; }
-    }
-
-    private class MixApplyRequest
-    {
-      public List<string> SuggestionIds { get; set; } = new();
-      public bool ApplyAll { get; set; }
-    }
-
-    private class MixApplyResponse
-    {
-      public int Applied { get; set; }
-      public string Message { get; set; } = string.Empty;
-    }
-
-    private class MasteringAnalysisRequest
-    {
-      public string ProjectId { get; set; } = string.Empty;
-      public float TargetLoudness { get; set; }
-      public string TargetFormat { get; set; } = string.Empty;
-    }
-
-    public class MasteringAnalysisResponse
-    {
-      public string ProjectId { get; set; } = string.Empty;
-      public float CurrentLoudness { get; set; }
-      public float TargetLoudness { get; set; }
-      public float PeakLevel { get; set; }
-      public float DynamicRange { get; set; }
-      public Dictionary<string, float>? FrequencyBalance { get; set; }
-      public List<Dictionary<string, object>>? Suggestions { get; set; }
-    }
-
-    private class MasteringApplyRequest
-    {
-      public string ProjectId { get; set; } = string.Empty;
-      public MasteringSettingsData Settings { get; set; } = new();
-    }
-
-    private class MasteringSettingsData
-    {
-      public float Loudness { get; set; }
-      public float PeakLimit { get; set; }
-    }
-
-    private class MasteringApplyResponse
-    {
-      public string ProjectId { get; set; } = string.Empty;
-      public string OutputAudioId { get; set; } = string.Empty;
-      public string OutputAudioUrl { get; set; } = string.Empty;
-      public float FinalLoudness { get; set; }
-      public string Message { get; set; } = string.Empty;
-    }
   }
 
   // Data models
@@ -564,7 +478,7 @@ namespace VoiceStudio.App.ViewModels
         : "";
     public Visibility ValueChangeVisibility => string.IsNullOrEmpty(ValueChangeDisplay) ? Visibility.Collapsed : Visibility.Visible;
 
-    public AIMixingMixSuggestionItem(AIMixingMasteringViewModel.MixSuggestionData data)
+    public AIMixingMixSuggestionItem(MixSuggestionData data)
     {
       SuggestionId = data.SuggestionId;
       Category = data.Category;
@@ -592,7 +506,7 @@ namespace VoiceStudio.App.ViewModels
     public bool LoudnessMet => Math.Abs(CurrentLoudness - TargetLoudness) < 1.0f;
     public Visibility LoudnessMetVisibility => LoudnessMet ? Visibility.Visible : Visibility.Collapsed;
 
-    public MixReportCardItem(AIMixingMasteringViewModel.MasteringAnalysisResponse response)
+    public MixReportCardItem(MasteringAnalysisResponse response)
     {
       ProjectId = response.ProjectId;
       CurrentLoudness = response.CurrentLoudness;

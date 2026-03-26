@@ -17,7 +17,7 @@ namespace VoiceStudio.App.Views.Panels
   /// </summary>
   public partial class EmotionStylePresetEditorViewModel : ObservableObject
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IEmotionControlClient _emotionClient;
     private readonly IVoiceSynthesisService _voiceSynthesisService;
 
     [ObservableProperty]
@@ -65,17 +65,23 @@ namespace VoiceStudio.App.Views.Panels
             { "calm", new EmotionInfo { Name = "Calm", Description = "Peaceful, relaxed tone" } }
         };
 
-    public EmotionStylePresetEditorViewModel(IBackendClient backendClient, IVoiceSynthesisService voiceSynthesisService)
+    public EmotionStylePresetEditorViewModel(IEmotionControlClient emotionClient, IVoiceSynthesisService voiceSynthesisService)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _emotionClient = emotionClient ?? throw new ArgumentNullException(nameof(emotionClient));
       _voiceSynthesisService = voiceSynthesisService ?? throw new ArgumentNullException(nameof(voiceSynthesisService));
       CreatePresetCommand = new AsyncRelayCommand(CreatePresetAsync, () => !string.IsNullOrWhiteSpace(PresetName));
       SavePresetCommand = new AsyncRelayCommand(SavePresetAsync, () => SelectedPreset != null && !string.IsNullOrWhiteSpace(PresetName));
       DeletePresetCommand = new AsyncRelayCommand(DeletePresetAsync, () => SelectedPreset != null);
       PreviewPresetCommand = new AsyncRelayCommand(PreviewPresetAsync, () => !string.IsNullOrWhiteSpace(PreviewText));
       ApplyToSynthesisCommand = new RelayCommand(ApplyToSynthesis, () => SelectedPreset != null);
+    }
 
-      _ = LoadPresetsAsync();
+    /// <summary>
+    /// Load presets from backend. Call from view Loaded event (no constructor FAF per ADR-047).
+    /// </summary>
+    public async Task LoadPresetsAsync()
+    {
+      await LoadPresetsInternalAsync();
     }
 
     public IAsyncRelayCommand CreatePresetCommand { get; }
@@ -132,11 +138,11 @@ namespace VoiceStudio.App.Views.Panels
       PreviewPresetCommand.NotifyCanExecuteChanged();
     }
 
-    private async Task LoadPresetsAsync()
+    private async Task LoadPresetsInternalAsync()
     {
       try
       {
-        var backendPresets = await _backendClient.GetEmotionPresetsAsync();
+        var backendPresets = await _emotionClient.GetPresetsAsync();
 
         Presets.Clear();
         foreach (var backendPreset in backendPresets)
@@ -267,7 +273,7 @@ namespace VoiceStudio.App.Views.Panels
 
         // Save to backend
         var createRequest = ConvertToBackendCreateRequest(newPreset);
-        var backendPreset = await _backendClient.CreateEmotionPresetAsync(createRequest);
+        var backendPreset = await _emotionClient.CreatePresetAsync(createRequest);
 
         // Update with backend ID
         newPreset.Id = backendPreset.PresetId;
@@ -307,7 +313,7 @@ namespace VoiceStudio.App.Views.Panels
 
         // Update in backend
         var updateRequest = ConvertToBackendUpdateRequest(SelectedPreset);
-        await _backendClient.UpdateEmotionPresetAsync(SelectedPreset.Id, updateRequest);
+        await _emotionClient.UpdatePresetAsync(SelectedPreset.Id, updateRequest);
 
         OnPropertyChanged(nameof(Presets));
       }
@@ -326,7 +332,7 @@ namespace VoiceStudio.App.Views.Panels
       try
       {
         // Delete from backend
-        await _backendClient.DeleteEmotionPresetAsync(SelectedPreset.Id);
+        await _emotionClient.DeletePresetAsync(SelectedPreset.Id);
 
         Presets.Remove(SelectedPreset);
         SelectedPreset = null;

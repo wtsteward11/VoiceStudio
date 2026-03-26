@@ -17,7 +17,7 @@ namespace VoiceStudio.App.Views.Panels
   /// </summary>
   public partial class ImageVideoEnhancementPipelineViewModel : ObservableObject
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IImageVideoEnhancementPipelineClient _client;
 
     [ObservableProperty]
     private string contentType = "Image";
@@ -58,9 +58,9 @@ namespace VoiceStudio.App.Views.Panels
     public bool HasPipelineSteps => PipelineSteps.Count > 0;
     public bool HasSelectedFiles => SelectedFiles.Count > 0;
 
-    public ImageVideoEnhancementPipelineViewModel(IBackendClient backendClient)
+    public ImageVideoEnhancementPipelineViewModel(IImageVideoEnhancementPipelineClient client)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
       SavePresetCommand = new RelayCommand(SavePreset, () => PipelineSteps.Count > 0);
       ApplyPipelineCommand = new AsyncRelayCommand(ApplyPipelineAsync, () => PipelineSteps.Count > 0);
       SelectFilesCommand = new AsyncRelayCommand(SelectFilesAsync);
@@ -308,18 +308,12 @@ namespace VoiceStudio.App.Views.Panels
         {
           try
           {
-            var request = new
-            {
-              content_type = ContentType.ToLower(),
-              file_path = file.Path,
-              steps = stepIds,
-              parameters = stepParams,
-              batch_mode = BatchMode
-            };
-
-            await _backendClient.SendRequestAsync<object, object>(
-                "/api/enhancement/apply-pipeline",
-                request
+            await _client.ApplyPipelineAsync(
+                ContentType,
+                file.Path,
+                stepIds,
+                stepParams,
+                BatchMode
             );
 
             StatusMessage = $"Processed {file.Name}...";
@@ -415,18 +409,11 @@ namespace VoiceStudio.App.Views.Panels
             var stepIds = PipelineSteps.Select(s => s.EnhancementId).ToList();
             var stepParams = PipelineSteps.ToDictionary(s => s.EnhancementId, s => s.Parameters);
 
-            var request = new
-            {
-              content_type = ContentType.ToLower(),
-              file_path = file.Path,
-              steps = stepIds,
-              parameters = stepParams,
-              preview = true
-            };
-
-            var response = await _backendClient.SendRequestAsync<object, Dictionary<string, object>>(
-                "/api/enhancement/preview-pipeline",
-                request
+            var response = await _client.PreviewPipelineAsync(
+                ContentType,
+                file.Path,
+                stepIds,
+                stepParams
             );
 
             if (response != null)

@@ -120,8 +120,7 @@ namespace VoiceStudio.App.Tests.Fixtures
 
         private static void ConfigureDefaultBackendClientMock(Mock<IBackendClient> mock)
         {
-            // Configure common backend client responses
-            mock.Setup(x => x.IsConnected).Returns(true);
+            // IBackendClient no longer has IsConnected (PR-8: extracted to IConnectionStatusClient)
         }
 
         private void RemoveService<T>() where T : class

@@ -7,8 +7,15 @@ using Microsoft.UI.Xaml.Media;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
+using VoiceStudio.App.Utilities;
+using VoiceStudio.Core.Panels;
+using VoiceStudio.Core.Services;
+using Microsoft.UI.Xaml.Automation;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Windows.System;
 using ScriptItemModel = VoiceStudio.App.ViewModels.ScriptItem;
 using ScriptSegmentModel = VoiceStudio.Core.Models.ScriptSegment;
@@ -17,8 +24,9 @@ namespace VoiceStudio.App.Views.Panels
 {
   /// <summary>
   /// Script Editor View - Advanced script editor for voice synthesis.
+  /// Implements INavigatablePanel for search-result focus (script by ID).
   /// </summary>
-  public sealed partial class ScriptEditorView : UserControl
+  public sealed partial class ScriptEditorView : UserControl, INavigatablePanel
   {
     public ScriptEditorViewModel ViewModel { get; }
     private ContextMenuService? _contextMenuService;
@@ -32,8 +40,10 @@ namespace VoiceStudio.App.Views.Panels
       InitializeComponent();
       ViewModel = new ScriptEditorViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient(),
-          AppServices.GetRequiredService<IDialogService>()
+          ServiceProvider.GetScriptEditorClient(),
+          AppServices.GetRequiredService<IDialogService>(),
+          AppServices.GetRequiredService<IVoiceSynthesisService>(),
+          AppServices.GetService<IAudioPlayerService>()
       );
       DataContext = ViewModel;
 
@@ -179,10 +189,7 @@ namespace VoiceStudio.App.Views.Panels
           {
             var menu = new MenuFlyout();
 
-            var synthesizeItem = new MenuFlyoutItem { Text = "Synthesize" };
-            synthesizeItem.Click += async (_, _) => await HandleScriptMenuClick("Synthesize", script);
-            menu.Items.Add(synthesizeItem);
-
+            // Script-level synthesize disabled (backend returns 501). Use segment "Generate" instead.
             var editItem = new MenuFlyoutItem { Text = "Edit" };
             editItem.Click += async (_, _) => await HandleScriptMenuClick("Edit", script);
             menu.Items.Add(editItem);
@@ -222,6 +229,28 @@ namespace VoiceStudio.App.Views.Panels
           {
             var menu = new MenuFlyout();
 
+            var canGenerate = ViewModel.GenerateSegmentCommand.CanExecute(segment);
+            var generateItem = new MenuFlyoutItem { Text = "Generate", IsEnabled = canGenerate };
+            generateItem.Click += async (_, _) => await HandleSegmentMenuClick("Generate", segment);
+            if (!canGenerate)
+            {
+              var hint = ResourceHelper.GetString(
+                  "ScriptEditor.GenerateMenuDisabledHelp",
+                  "Requires segment text and an assigned voice profile.");
+              AutomationProperties.SetHelpText(generateItem, hint);
+            }
+
+            menu.Items.Add(generateItem);
+
+            if (!string.IsNullOrEmpty(segment.GeneratedAudioId))
+            {
+              var playItem = new MenuFlyoutItem { Text = "Play" };
+              playItem.Click += async (_, _) => await HandleSegmentMenuClick("Play", segment);
+              menu.Items.Add(playItem);
+            }
+
+            menu.Items.Add(new MenuFlyoutSeparator());
+
             var duplicateItem = new MenuFlyoutItem { Text = "Duplicate" };
             duplicateItem.Click += async (_, _) => await HandleSegmentMenuClick("Duplicate", segment);
             menu.Items.Add(duplicateItem);
@@ -245,13 +274,6 @@ namespace VoiceStudio.App.Views.Panels
       {
         switch (action.ToLower())
         {
-          case "synthesize":
-            if (ViewModel.SynthesizeScriptCommand.CanExecute(script))
-            {
-              await ViewModel.SynthesizeScriptCommand.ExecuteAsync(script);
-              _toastService?.ShowToast(ToastType.Success, "Synthesizing", $"Synthesizing script '{script.Name}'");
-            }
-            break;
           case "edit":
             ViewModel.SelectedScript = script;
             _toastService?.ShowToast(ToastType.Info, "Edit Script", $"Editing script '{script.Name}'");
@@ -299,6 +321,18 @@ namespace VoiceStudio.App.Views.Panels
       {
         switch (action.ToLower())
         {
+          case "generate":
+            if (ViewModel.GenerateSegmentCommand.CanExecute(segment))
+            {
+              await ViewModel.GenerateSegmentCommand.ExecuteAsync(segment);
+            }
+            break;
+          case "play":
+            if (ViewModel.PlaySegmentCommand.CanExecute(segment))
+            {
+              await ViewModel.PlaySegmentCommand.ExecuteAsync(segment);
+            }
+            break;
           case "duplicate":
             if (ViewModel.SelectedScript != null)
             {
@@ -470,6 +504,19 @@ namespace VoiceStudio.App.Views.Panels
     private void ScriptEditorView_KeyboardNavigation_Loaded(object _, RoutedEventArgs __)
     {
       KeyboardNavigationHelper.SetupTabNavigation(this);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> NavigateToItemAsync(
+        string itemId,
+        string resultType,
+        CancellationToken ct,
+        IReadOnlyDictionary<string, object>? searchMetadata = null)
+    {
+      _ = searchMetadata;
+      if (!string.Equals(resultType, "script", StringComparison.OrdinalIgnoreCase))
+        return false;
+      return await ViewModel.NavigateToScriptAsync(itemId, ct);
     }
   }
 }

@@ -6,6 +6,7 @@ using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Views.Panels;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -14,7 +15,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public class MacroViewModelTests
     {
     private IViewModelContext _context = null!;
-    private Mock<IBackendClient> _mockBackendClient = null!;
+    private Mock<IMacroClient> _mockMacroClient = null!;
     private Mock<IDialogService> _mockDialogService = null!;
     private DispatcherQueueController? _dispatcherController;
     private MacroViewModel _viewModel = null!;
@@ -26,12 +27,12 @@ namespace VoiceStudio.App.Tests.ViewModels
       _dispatcherController = DispatcherQueueController.CreateOnDedicatedThread();
       var dispatcher = _dispatcherController.DispatcherQueue;
       _context = new ViewModelContext(NullLogger.Instance, dispatcher);
-      _mockBackendClient = new Mock<IBackendClient>();
+      _mockMacroClient = new Mock<IMacroClient>();
       _mockDialogService = new Mock<IDialogService>();
       _mockDialogService
           .Setup(x => x.ShowConfirmationAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
           .ReturnsAsync(true);
-      _viewModel = new MacroViewModel(_context, _mockBackendClient.Object, _mockDialogService.Object);
+      _viewModel = new MacroViewModel(_context, _mockMacroClient.Object, _mockDialogService.Object);
     }
 
         [TestCleanup]
@@ -44,7 +45,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_InitializesWithDefaultValues()
         {
             Assert.IsNotNull(_viewModel);
-            Assert.AreEqual("macro", _viewModel.PanelId);
+            Assert.AreEqual(PanelIds.Macro, _viewModel.PanelId);
             Assert.AreEqual("Macros", _viewModel.DisplayName);
             Assert.IsFalse(_viewModel.IsLoading);
         }

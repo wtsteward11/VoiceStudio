@@ -16,7 +16,7 @@ namespace VoiceStudio.App.Views.Panels
   /// </summary>
   public partial class WorkflowAutomationViewModel : ObservableObject
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IWorkflowAutomationClient _workflowClient;
     private string? _currentWorkflowId;
 
     [ObservableProperty]
@@ -53,9 +53,9 @@ namespace VoiceStudio.App.Views.Panels
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
-    public WorkflowAutomationViewModel(IBackendClient backendClient)
+    public WorkflowAutomationViewModel(IWorkflowAutomationClient workflowClient)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _workflowClient = workflowClient ?? throw new ArgumentNullException(nameof(workflowClient));
       CreateWorkflowCommand = new RelayCommand(CreateWorkflow, () => !string.IsNullOrWhiteSpace(WorkflowName));
       SaveWorkflowCommand = new AsyncRelayCommand(SaveWorkflowAsync, () => !string.IsNullOrWhiteSpace(WorkflowName) && WorkflowSteps.Count > 0);
       TestWorkflowCommand = new AsyncRelayCommand(TestWorkflowAsync, () => WorkflowSteps.Count > 0);
@@ -197,12 +197,12 @@ namespace VoiceStudio.App.Views.Panels
             Steps = WorkflowSteps.ToList(),
             Variables = Variables.ToList()
           };
-          workflow = await _backendClient.UpdateWorkflowAsync(_currentWorkflowId, updateRequest);
+          workflow = await _workflowClient.UpdateWorkflowAsync(_currentWorkflowId, updateRequest);
         }
         else
         {
           // Create new workflow
-          workflow = await _backendClient.CreateWorkflowAsync(request);
+          workflow = await _workflowClient.CreateWorkflowAsync(request);
           _currentWorkflowId = workflow.Id;
         }
 
@@ -245,7 +245,7 @@ namespace VoiceStudio.App.Views.Panels
         }
 
         // Execute workflow with test data
-        var result = await _backendClient.ExecuteWorkflowAsync(_currentWorkflowId!, testInputData);
+        var result = await _workflowClient.ExecuteWorkflowAsync(_currentWorkflowId!, testInputData);
         LastExecutionResult = result;
 
         if (result.Status == "completed")
@@ -295,7 +295,7 @@ namespace VoiceStudio.App.Views.Panels
         }
 
         // Execute workflow
-        var result = await _backendClient.ExecuteWorkflowAsync(_currentWorkflowId!, inputData);
+        var result = await _workflowClient.ExecuteWorkflowAsync(_currentWorkflowId!, inputData);
         LastExecutionResult = result;
 
         if (result.Status == "completed")

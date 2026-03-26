@@ -26,7 +26,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new TextSpeechEditorViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.ITextSpeechEditorClient>(),
           AppServices.GetProjectsClient(),
           ServiceProvider.GetProfilesClient(),
           VoiceStudio.App.Services.ServiceProvider.GetAudioPlayerService()
@@ -304,12 +304,12 @@ namespace VoiceStudio.App.Views.Panels
       if (session is EditorSessionItem originalSession)
       {
         var duplicate = new EditorSessionItem(
-            new TextSpeechEditorViewModel.EditorSession
+            new EditorSession
             {
               SessionId = Guid.NewGuid().ToString(),
               ProjectId = originalSession.ProjectId,
               Title = $"{originalSession.Title} (Copy)",
-              Segments = originalSession.Segments.Select(s => new TextSpeechEditorViewModel.TextSegment
+              Segments = originalSession.Segments.Select(s => new TextSegment
               {
                 Id = Guid.NewGuid().ToString(),
                 Text = s.Text,
@@ -392,7 +392,7 @@ namespace VoiceStudio.App.Views.Panels
       if (segment is TextSegmentItem originalSegment && ViewModel.SelectedSession != null)
       {
         var duplicate = new TextSegmentItem(
-            new TextSpeechEditorViewModel.TextSegment
+            new TextSegment
             {
               Id = Guid.NewGuid().ToString(),
               Text = originalSegment.Text,

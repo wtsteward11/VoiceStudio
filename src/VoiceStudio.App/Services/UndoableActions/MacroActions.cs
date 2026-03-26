@@ -12,7 +12,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateMacroAction : IUndoableAction
   {
     private readonly ObservableCollection<Macro> _macros;
-    private readonly IBackendClient _backendClient;
+    private readonly IMacroClient _client;
     private readonly Macro _macro;
     private readonly Action<Macro>? _onUndo;
     private readonly Action<Macro>? _onRedo;
@@ -21,13 +21,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateMacroAction(
         ObservableCollection<Macro> macros,
-        IBackendClient backendClient,
+        IMacroClient client,
         Macro macro,
         Action<Macro>? onUndo = null,
         Action<Macro>? onRedo = null)
     {
       _macros = macros ?? throw new ArgumentNullException(nameof(macros));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
       _macro = macro ?? throw new ArgumentNullException(nameof(macro));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -59,7 +59,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteMacroAction : IUndoableAction
   {
     private readonly ObservableCollection<Macro> _macros;
-    private readonly IBackendClient _backendClient;
+    private readonly IMacroClient _client;
     private readonly Macro _macro;
     private readonly int _originalIndex;
     private readonly Action<Macro>? _onUndo;
@@ -69,14 +69,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteMacroAction(
         ObservableCollection<Macro> macros,
-        IBackendClient backendClient,
+        IMacroClient client,
         Macro macro,
         int originalIndex,
         Action<Macro>? onUndo = null,
         Action<Macro>? onRedo = null)
     {
       _macros = macros ?? throw new ArgumentNullException(nameof(macros));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
       _macro = macro ?? throw new ArgumentNullException(nameof(macro));
       _originalIndex = originalIndex;
       _onUndo = onUndo;
@@ -116,7 +116,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateAutomationCurveMacroAction : IUndoableAction
   {
     private readonly ObservableCollection<AutomationCurve> _curves;
-    private readonly IBackendClient _backendClient;
+    private readonly IMacroClient _client;
     private readonly AutomationCurve _curve;
     private readonly Action<AutomationCurve>? _onUndo;
     private readonly Action<AutomationCurve>? _onRedo;
@@ -125,13 +125,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateAutomationCurveMacroAction(
         ObservableCollection<AutomationCurve> curves,
-        IBackendClient backendClient,
+        IMacroClient client,
         AutomationCurve curve,
         Action<AutomationCurve>? onUndo = null,
         Action<AutomationCurve>? onRedo = null)
     {
       _curves = curves ?? throw new ArgumentNullException(nameof(curves));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
       _curve = curve ?? throw new ArgumentNullException(nameof(curve));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -163,7 +163,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteAutomationCurveMacroAction : IUndoableAction
   {
     private readonly ObservableCollection<AutomationCurve> _curves;
-    private readonly IBackendClient _backendClient;
+    private readonly IMacroClient _client;
     private readonly AutomationCurve _curve;
     private readonly int _originalIndex;
     private readonly Action<AutomationCurve>? _onUndo;
@@ -173,14 +173,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteAutomationCurveMacroAction(
         ObservableCollection<AutomationCurve> curves,
-        IBackendClient backendClient,
+        IMacroClient client,
         AutomationCurve curve,
         int originalIndex,
         Action<AutomationCurve>? onUndo = null,
         Action<AutomationCurve>? onRedo = null)
     {
       _curves = curves ?? throw new ArgumentNullException(nameof(curves));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
       _curve = curve ?? throw new ArgumentNullException(nameof(curve));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

@@ -20,7 +20,7 @@ namespace VoiceStudio.App.Views.Panels
 {
   public partial class DiagnosticsViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IDiagnosticsClient _diagnosticsClient;
     private readonly IErrorLoggingService? _errorLoggingService;
     private readonly IAnalyticsService? _analyticsService;
     private readonly IFeatureFlagsService? _featureFlagsService;
@@ -32,7 +32,7 @@ namespace VoiceStudio.App.Views.Panels
     private long _peakMemoryBytes;
     private readonly List<BudgetViolationEventArgs> _budgetViolations = new();
 
-    public string PanelId => "diagnostics";
+    public string PanelId => PanelIds.Diagnostics;
     public string DisplayName => ResourceHelper.GetString("Panel.Diagnostics.DisplayName", "Diagnostics");
     public PanelRegion Region => PanelRegion.Bottom;
 
@@ -266,10 +266,10 @@ namespace VoiceStudio.App.Views.Panels
     public bool IsLogSelected(string logId) => _logsMultiSelectState?.SelectedIds.Contains(logId) ?? false;
     public bool IsErrorLogSelected(string errorLogId) => _errorLogsMultiSelectState?.SelectedIds.Contains(errorLogId) ?? false;
 
-    public DiagnosticsViewModel(IViewModelContext context, IBackendClient backendClient)
+    public DiagnosticsViewModel(IViewModelContext context, IDiagnosticsClient diagnosticsClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _diagnosticsClient = diagnosticsClient ?? throw new ArgumentNullException(nameof(diagnosticsClient));
 
       // Get error logging service using helper (reduces code duplication)
       _errorLoggingService = ServiceInitializationHelper.TryGetService(() => ServiceProvider.GetErrorLoggingService());
@@ -514,11 +514,11 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var healthy = await _backendClient.CheckHealthAsync(cancellationToken);
+        var healthy = await _diagnosticsClient.CheckHealthAsync(cancellationToken);
         IsHealthy = healthy;
 
         // Update connection status
-        IsConnected = _backendClient.IsConnected;
+        IsConnected = _diagnosticsClient.IsConnected;
         UpdateConnectionStatus();
 
         HealthStatus = healthy ? "Backend API is healthy" : "Backend API is not responding";
@@ -563,43 +563,16 @@ namespace VoiceStudio.App.Views.Panels
 
     private void UpdateConnectionStatus()
     {
-      if (!IsConnected)
-      {
-        ConnectionStatus = "Offline";
-      }
-      else
-      {
-        // Try to get circuit breaker state if available
-        try
-        {
-          if (_backendClient is Services.BackendClient client)
-          {
-            var circuitState = client.CircuitState;
-            ConnectionStatus = circuitState switch
-            {
-              Utilities.CircuitState.Open => "Circuit Open (Temporarily Unavailable)",
-              Utilities.CircuitState.HalfOpen => "Testing Connection...",
-              Utilities.CircuitState.Closed => "Connected",
-              _ => "Connected"
-            };
-          }
-          else
-          {
-            ConnectionStatus = IsHealthy ? "Connected" : "Disconnected";
-          }
-        }
-        catch
-        {
-          ConnectionStatus = IsHealthy ? "Connected" : "Disconnected";
-        }
-      }
+      ConnectionStatus = _diagnosticsClient.GetConnectionStatus();
     }
 
     private async Task LoadTelemetryAsync(CancellationToken cancellationToken)
     {
       try
       {
-        Telemetry = await _backendClient.GetTelemetryAsync(cancellationToken);
+        Telemetry = await _diagnosticsClient.GetTelemetryAsync(cancellationToken);
+        if (Telemetry == null)
+          return;
 
         // Update individual properties for UI binding
         CpuUsage = Telemetry.CpuPct ?? 0.0;
@@ -610,7 +583,7 @@ namespace VoiceStudio.App.Views.Panels
         UpdateVramWarning();
 
         // Update connection status
-        IsConnected = _backendClient.IsConnected;
+        IsConnected = _diagnosticsClient.IsConnected;
         UpdateConnectionStatus();
 
         // Update memory metrics
@@ -1173,9 +1146,7 @@ namespace VoiceStudio.App.Views.Panels
       try
       {
         // Request traces from backend
-        var response = await _backendClient.GetAsync<TraceListResponse>(
-            "/api/v1/diagnostics/traces",
-            CancellationToken.None);
+        var response = await _diagnosticsClient.GetTracesAsync(CancellationToken.None);
 
         if (response?.Traces != null)
         {
@@ -2024,82 +1995,5 @@ namespace VoiceStudio.App.Views.Panels
         : CorrelationId;
 
     public string FormattedEntry => $"[{Timestamp:HH:mm:ss}] {ShortId} ({Source})";
-  }
-
-  /// <summary>
-  /// Represents a span within a trace for timeline visualization.
-  /// Phase 5.1.3: Distributed Tracing Visualization
-  /// </summary>
-  public class SpanEntry : ObservableObject
-  {
-    public string SpanId { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public double DurationMs { get; set; }
-    public string Status { get; set; } = "Unknown";
-    public string? ParentSpanId { get; set; }
-
-    /// <summary>Gets the visual width percentage for timeline bar.</summary>
-    public double WidthPercent => Math.Max(8, Math.Min(100, DurationMs / 10.0));
-
-    /// <summary>Gets the status color for visualization.</summary>
-    public string StatusColor => Status switch
-    {
-      "OK" or "Success" => "#4CAF50",
-      "Error" => "#F44336",
-      "Pending" => "#FFC107",
-      _ => "#2196F3"
-    };
-
-    /// <summary>Gets the tooltip text for the span.</summary>
-    public string TooltipText => $"{Name}: {DurationMs:F0}ms ({Status})";
-  }
-
-  /// <summary>
-  /// Represents a distributed trace entry for timeline visualization.
-  /// Phase 5.1.3: Distributed Tracing Visualization
-  /// </summary>
-  public class TraceEntry : ObservableObject
-  {
-    public string TraceId { get; set; } = string.Empty;
-    public DateTime StartTime { get; set; }
-    public double DurationMs { get; set; }
-    public string Status { get; set; } = "Unknown";
-    public string OperationName { get; set; } = string.Empty;
-    public ObservableCollection<SpanEntry> Spans { get; set; } = new();
-
-    /// <summary>Gets the shortened trace ID for display.</summary>
-    public string ShortTraceId => TraceId.Length > 12
-        ? $"{TraceId[..12]}..."
-        : TraceId;
-
-    /// <summary>Gets the formatted start time.</summary>
-    public string StartTimeFormatted => StartTime.ToString("HH:mm:ss.fff");
-
-    /// <summary>Gets the formatted duration string.</summary>
-    public string DurationFormatted => DurationMs < 1000
-        ? $"{DurationMs:F0}ms"
-        : $"{DurationMs / 1000:F2}s";
-
-    /// <summary>Gets the duration as a percentage for progress bar (scaled for visibility).</summary>
-    public double DurationPercent => Math.Min(100, DurationMs / 50.0);
-
-    /// <summary>Gets the status color for visualization.</summary>
-    public string StatusColor => Status switch
-    {
-      "Success" or "OK" => "#4CAF50",
-      "Error" => "#F44336",
-      "Pending" => "#FFC107",
-      _ => "#9E9E9E"
-    };
-  }
-
-  /// <summary>
-  /// Response model for trace list API.
-  /// Phase 5.1.3: Distributed Tracing Visualization
-  /// </summary>
-  public class TraceListResponse
-  {
-    public List<TraceEntry> Traces { get; set; } = new();
-    public int TotalCount { get; set; }
   }
 }

@@ -53,12 +53,25 @@ namespace VoiceStudio.App.Tests.ViewModels
       _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
     }
 
+    /// <summary>
+    /// Invariant: constructor must not call any client methods before activation.
+    /// Prevents constructor fire-and-forget regression (RETAINED_ASYNC_RULE, ADR-047).
+    /// </summary>
+    [TestMethod]
+    public void Constructor_DoesNotCallClient_BeforeActivation()
+    {
+      _ = new ImageSearchViewModel(_context, _mockClient.Object);
+      _mockClient.Verify(x => x.GetSourcesAsync(It.IsAny<CancellationToken>()), Times.Never);
+      _mockClient.Verify(x => x.GetCategoriesAsync(It.IsAny<CancellationToken>()), Times.Never);
+      _mockClient.Verify(x => x.GetColorsAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [TestMethod]
     public void Constructor_WithIImageSearchClient_CreatesInstance()
     {
       var vm = new ImageSearchViewModel(_context, _mockClient.Object);
       Assert.IsNotNull(vm);
-      Assert.AreEqual("image-search", vm.PanelId);
+      Assert.AreEqual(PanelIds.ImageSearch, vm.PanelId);
       Assert.IsNotNull(vm.SearchCommand);
       Assert.IsNotNull(vm.LoadSourcesCommand);
       Assert.IsNotNull(vm.LoadCategoriesCommand);

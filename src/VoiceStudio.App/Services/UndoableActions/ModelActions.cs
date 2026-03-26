@@ -12,7 +12,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteModelAction : IUndoableAction
   {
     private readonly ObservableCollection<ModelInfo> _models;
-    private readonly IBackendClient _backendClient;
+    private readonly IModelManagerClient _client;
     private readonly ModelInfo _model;
     private readonly int _originalIndex;
     private readonly Action<ModelInfo>? _onUndo;
@@ -22,14 +22,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteModelAction(
         ObservableCollection<ModelInfo> models,
-        IBackendClient backendClient,
+        IModelManagerClient client,
         ModelInfo model,
         int originalIndex,
         Action<ModelInfo>? onUndo = null,
         Action<ModelInfo>? onRedo = null)
     {
       _models = models ?? throw new ArgumentNullException(nameof(models));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
       _model = model ?? throw new ArgumentNullException(nameof(model));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

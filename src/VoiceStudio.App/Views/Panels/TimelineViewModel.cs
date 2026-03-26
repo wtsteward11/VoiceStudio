@@ -13,6 +13,7 @@ using VoiceStudio.App.Controls;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.Utilities;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using VoiceStudio.App.Logging;
 using VoiceStudio.App.ViewModels;
@@ -21,7 +22,7 @@ using VoiceStudio.Core.Events;
 namespace VoiceStudio.App.Views.Panels
 {
   // GAP-005: Updated to inherit from BaseViewModel for standardized error handling
-  public partial class TimelineViewModel : BaseViewModel, IPanelView, IPanelLifecycle
+  public partial class TimelineViewModel : BaseViewModel, IPanelView, IPanelLifecycle, ITimelineTransportController
   {
     private readonly ITimelineSynthesisService _synthesisService;
     private readonly ITimelineClipService _clipService;
@@ -33,10 +34,12 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IProfilesClient _profilesClient;
     private readonly IDialogService _dialogService;
     private IEventAggregator? _eventAggregator;
+    private IContextManager? _contextManager;
     private ISubscriptionToken? _navigateToken;
     private ISubscriptionToken? _addToTimelineToken;
     private ISubscriptionToken? _transcriptionCompletedToken;
     private ISubscriptionToken? _synthesisCompletedToken;
+    private ISubscriptionToken? _backupRestoredToken;
     private readonly IAudioPlayerService _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly UndoRedoService? _undoRedoService;
@@ -45,7 +48,7 @@ namespace VoiceStudio.App.Views.Panels
     private readonly ISettingsService? _settingsService;
     private readonly RecentProjectsService? _recentProjectsService;
 
-    public string PanelId => "timeline";
+    public string PanelId => PanelIds.Timeline;
     public string DisplayName => ResourceHelper.GetString("Panel.Timeline.DisplayName", "Timeline");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -509,12 +512,15 @@ namespace VoiceStudio.App.Views.Panels
 
       // Subscribe to cross-panel events (Audit X-3, X-6, C.3, C.4; GAP-W2)
       _eventAggregator = AppServices.TryGetEventAggregator();
+      _contextManager = AppServices.TryGetContextManager();
       if (_eventAggregator != null)
       {
         _navigateToken = _eventAggregator.Subscribe<NavigateToEvent>(OnNavigateToTimeline);
         _addToTimelineToken = _eventAggregator.Subscribe<AddToTimelineEvent>(OnAddToTimeline);
         _transcriptionCompletedToken = _eventAggregator.Subscribe<TranscriptionCompletedEvent>(OnTranscriptionCompleted);
         _synthesisCompletedToken = _eventAggregator.Subscribe<SynthesisCompletedEvent>(OnSynthesisCompleted);
+        _backupRestoredToken = _eventAggregator.Subscribe<BackupRestoredEvent>(
+            async evt => await RunOnDispatcherQueueAsync(() => ApplyBackupRestoredAsync(evt, CancellationToken.None)));
       }
 
       // Load preview settings
@@ -589,7 +595,7 @@ namespace VoiceStudio.App.Views.Panels
 
     /// <summary>
     /// GAP-W2: Handle SynthesisCompletedEvent for auto-add to timeline when synthesis completes.
-    /// Converts to AddToTimelineEvent and reuses existing add logic.
+    /// Converts to AddToTimelineEvent and reuses existing add logic. Pass 01: ProfileId for backend.
     /// </summary>
     private void OnSynthesisCompleted(SynthesisCompletedEvent e)
     {
@@ -598,7 +604,10 @@ namespace VoiceStudio.App.Views.Panels
           e.AudioId,
           e.AudioPath,
           e.Duration,
-          clipName: $"Synthesis - {e.VoiceName ?? "Unknown"}");
+          clipName: $"Synthesis - {e.VoiceName ?? "Unknown"}",
+          targetTrackIndex: null,
+          insertPosition: null,
+          profileId: e.ProfileId);
       OnAddToTimeline(addEvent);
     }
 
@@ -658,7 +667,62 @@ namespace VoiceStudio.App.Views.Panels
       _transcriptionCompletedToken = null;
       _synthesisCompletedToken?.Dispose();
       _synthesisCompletedToken = null;
+      _backupRestoredToken?.Dispose();
+      _backupRestoredToken = null;
       return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Pass 06: Reload project/profile lists after backup restore; reconcile active project with disk.
+    /// Public for seam tests (<c>VoiceStudio.App</c> uses <c>GenerateAssemblyInfo=false</c>, so <c>InternalsVisibleTo</c> is not emitted from the csproj).
+    /// </summary>
+    public async Task ApplyBackupRestoredAsync(BackupRestoredEvent evt, CancellationToken cancellationToken)
+    {
+      if (evt.RestoreProjects)
+      {
+        var previousId = SelectedProject?.Id;
+        await LoadProjectsAsync(cancellationToken);
+        if (string.IsNullOrEmpty(previousId))
+        {
+          SelectedProject = null;
+        }
+        else
+        {
+          SelectedProject = Projects.FirstOrDefault(p => p.Id == previousId);
+        }
+      }
+
+      if (evt.RestoreProfiles)
+      {
+        await LoadProfilesAsync(cancellationToken);
+      }
+    }
+
+    private static async Task RunOnDispatcherQueueAsync(Func<Task> work)
+    {
+      var dq = DispatcherQueue.GetForCurrentThread();
+      if (dq == null || dq.HasThreadAccess)
+      {
+        await work().ConfigureAwait(true);
+        return;
+      }
+
+      var tcs = new TaskCompletionSource<object?>();
+      dq.TryEnqueue(() => _ = RunAsync());
+      async Task RunAsync()
+      {
+        try
+        {
+          await work().ConfigureAwait(true);
+          tcs.TrySetResult(null);
+        }
+        catch (Exception ex)
+        {
+          tcs.TrySetException(ex);
+        }
+      }
+
+      await tcs.Task.ConfigureAwait(false);
     }
 
     private async Task AddTrackAndClipAsync(AddToTimelineEvent e)
@@ -675,7 +739,9 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         _logService?.LogError(ex, "AddTrackAndClip");
-        _toastNotificationService?.ShowError("Failed to add clip to timeline", "Error");
+        _toastNotificationService?.ShowError(
+            "Insertion failed",
+            $"Could not add track or clip: {ErrorHandler.GetUserFriendlyMessage(ex)}");
       }
     }
 
@@ -688,17 +754,42 @@ namespace VoiceStudio.App.Views.Panels
             ? track.Clips.Max(c => c.EndTime)
             : 0.0;
 
+        // Pass 01: ProfileId required by backend; fallback to IContextManager when event has none
+        var profileId = e.ProfileId;
+        if (string.IsNullOrWhiteSpace(profileId))
+        {
+          var ctx = AppServices.TryGetContextManager();
+          profileId = ctx?.ActiveProfileId ?? "";
+        }
+
+        if (string.IsNullOrWhiteSpace(profileId))
+        {
+          _toastNotificationService?.ShowWarning(
+              "Voice profile required",
+              "Select a voice profile in Profiles or Synthesis panel, then add to timeline.");
+          return;
+        }
+
         var newClip = new AudioClip
         {
           Id = Guid.NewGuid().ToString(),
           Name = e.ClipName ?? $"Clip {track.Clips.Count + 1}",
           AudioId = e.AudioId,
           AudioUrl = e.AudioPath,
+          ProfileId = profileId ?? "",
           StartTime = startTime,
           Duration = e.Duration
         };
 
         track.Clips.Add(newClip);
+
+        // Pass 01: Select the newly inserted clip so user can find it immediately
+        if (_multiSelectState != null)
+        {
+          _multiSelectState.SetSingle(newClip.Id);
+          UpdateClipSelectionProperties();
+          _multiSelectService.OnSelectionChanged(PanelId, _multiSelectState);
+        }
 
         // Register undo action
         if (_undoRedoService != null)
@@ -711,20 +802,34 @@ namespace VoiceStudio.App.Views.Panels
             $"'{newClip.Name}' added to {track.Name}",
             "Clip Added");
 
-        // Save to backend asynchronously (best effort)
+        // Save to backend asynchronously (Pass 01: workflow-step-specific failure handling)
         if (SelectedProject != null)
         {
-          _ = _clipService.CreateClipAsync(
-              SelectedProject.Id,
-              track.Id,
-              newClip,
-              CancellationToken.None);
+          _ = PersistClipToBackendAsync(SelectedProject.Id, track.Id, newClip);
         }
       }
       catch (Exception ex)
       {
         _logService?.LogError(ex, "AddClipToTrack");
-        _toastNotificationService?.ShowError("Failed to add clip", "Error");
+        _toastNotificationService?.ShowError(
+            "Insertion failed",
+            $"Could not add clip to timeline: {ErrorHandler.GetUserFriendlyMessage(ex)}");
+      }
+    }
+
+    /// <summary>Pass 01: Persist clip to backend with workflow-step-specific error handling.</summary>
+    private async Task PersistClipToBackendAsync(string projectId, string trackId, AudioClip clip)
+    {
+      try
+      {
+        await _clipService.CreateClipAsync(projectId, trackId, clip, CancellationToken.None);
+      }
+      catch (Exception ex)
+      {
+        _logService?.LogError(ex, "PersistClipToBackend");
+        _toastNotificationService?.ShowError(
+            "Clip saved locally but failed to save to project",
+            $"Project sync failed: {ErrorHandler.GetUserFriendlyMessage(ex)}");
       }
     }
 
@@ -993,6 +1098,35 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    /// <summary>
+    /// Navigates to and selects a project by ID. Used by INavigatablePanel search-result focus.
+    /// </summary>
+    /// <param name="itemId">Project ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True if the project was found and selected; false otherwise.</returns>
+    public async Task<bool> NavigateToProjectAsync(string itemId, CancellationToken ct)
+    {
+      if (string.IsNullOrEmpty(itemId))
+        return false;
+
+      var match = Projects.FirstOrDefault(p => p.Id == itemId);
+      if (match != null)
+      {
+        SelectedProject = match;
+        return true;
+      }
+
+      await LoadProjectsAsync(ct);
+      match = Projects.FirstOrDefault(p => p.Id == itemId);
+      if (match != null)
+      {
+        SelectedProject = match;
+        return true;
+      }
+
+      return false;
+    }
+
     private async Task CreateProjectAsync(string? name, CancellationToken cancellationToken)
     {
       if (string.IsNullOrWhiteSpace(name))
@@ -1222,6 +1356,15 @@ namespace VoiceStudio.App.Views.Panels
 
         IsPlaying = true;
 
+        // Own global transport so main Play routes here
+        var ctx = AppServices.TryGetContextManager();
+        if (ctx != null)
+        {
+          var audioId = LastSynthesizedAudioId ?? "timeline";
+          var title = SelectedProject != null ? $"Timeline: {SelectedProject.Name}" : "Timeline";
+          ctx.SetCurrentPlayable(audioId, TransportSource.Timeline, title);
+        }
+
         // Load visualization data for synthesized audio
         if (!string.IsNullOrWhiteSpace(LastSynthesizedAudioId))
         {
@@ -1287,6 +1430,26 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    // ITimelineTransportController: decouples orchestration from UI-tree lookup
+    Task ITimelineTransportController.PlayAsync()
+    {
+      if (PlayAudioCommand.CanExecute(null))
+        return PlayAudioCommand.ExecuteAsync(null);
+      return Task.CompletedTask;
+    }
+
+    void ITimelineTransportController.Pause()
+    {
+      if (PauseAudioCommand.CanExecute(null))
+        PauseAudioCommand.Execute(null);
+    }
+
+    void ITimelineTransportController.Stop()
+    {
+      if (StopAudioCommand.CanExecute(null))
+        StopAudioCommand.Execute(null);
+    }
+
     partial void OnSelectedProjectChanged(Project? value)
     {
       SynthesizeCommand.NotifyCanExecuteChanged();
@@ -1295,6 +1458,9 @@ namespace VoiceStudio.App.Views.Panels
       PlayProjectAudioCommand.NotifyCanExecuteChanged();
       PasteClipCommand.NotifyCanExecuteChanged();
       DuplicateClipCommand.NotifyCanExecuteChanged();
+
+      // Pass 02: Sync project selection to context so EffectsMixer receives ProjectChangedEvent
+      _contextManager?.SetActiveProject(value?.Id, value != null ? (value.Name ?? ResourceHelper.GetString("Project.Unnamed", "Unnamed Project")) : null, InteractionIntent.Navigation);
 
       if (value != null)
       {
@@ -1762,6 +1928,15 @@ namespace VoiceStudio.App.Views.Panels
           });
           IsPlaying = true;
           PlayProjectAudioCommand.NotifyCanExecuteChanged();
+
+          // Own global transport so main Play routes here
+          var ctx = AppServices.TryGetContextManager();
+          if (ctx != null)
+          {
+            var audioId = SelectedProject != null ? $"{SelectedProject.Id}:{filename}" : filename ?? "timeline";
+            var title = SelectedProject != null ? $"Timeline: {SelectedProject.Name}" : "Timeline";
+            ctx.SetCurrentPlayable(audioId, TransportSource.Timeline, title);
+          }
 
           // Load visualization data for the audio file
           var ct = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;

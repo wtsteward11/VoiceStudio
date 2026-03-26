@@ -16,9 +16,9 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the VoiceBrowserView panel - Voice browser and discovery.
   /// </summary>
-  public partial class VoiceBrowserViewModel : BaseViewModel, IPanelView
+  public partial class VoiceBrowserViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IVoiceBrowserClient _voiceBrowserClient;
     private readonly IAudioPlayerService _audioPlayer;
     private CancellationTokenSource? _searchDebounceCts;
     private const int SearchDebounceMs = 300;
@@ -63,10 +63,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private int pageSize = 50;
 
-    public VoiceBrowserViewModel(IViewModelContext context, IBackendClient backendClient, IAudioPlayerService audioPlayer)
+    public VoiceBrowserViewModel(IViewModelContext context, IVoiceBrowserClient voiceBrowserClient, IAudioPlayerService audioPlayer)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _voiceBrowserClient = voiceBrowserClient ?? throw new ArgumentNullException(nameof(voiceBrowserClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
       SearchCommand = new EnhancedAsyncRelayCommand(async (ct) =>
@@ -111,10 +111,35 @@ namespace VoiceStudio.App.ViewModels
           PlayCommand.NotifyCanExecuteChanged();
       };
 
-      // Load initial data
-      _ = LoadLanguagesAsync(CancellationToken.None);
-      _ = LoadTagsCommandAsync(CancellationToken.None);
-      _ = SearchVoicesAsync(CancellationToken.None);
+      // No constructor fire-and-forget — load from View Loaded via OnActivatedAsync (RETAINED_ASYNC_RULE)
+    }
+
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => LoadInitialDataAsync(cancellationToken);
+
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public async Task RefreshAsync(CancellationToken cancellationToken = default)
+    {
+      try
+      {
+        await SearchVoicesAsync(cancellationToken);
+        StatusMessage = ResourceHelper.GetString("VoiceBrowser.SearchRefreshed", "Search refreshed");
+      }
+      catch (OperationCanceledException)
+      {
+        return;
+      }
+      catch (Exception ex)
+      {
+        await HandleErrorAsync(ex, "Refresh");
+      }
+    }
+
+    private async Task LoadInitialDataAsync(CancellationToken cancellationToken)
+    {
+      await LoadLanguagesAsync(cancellationToken);
+      await LoadTagsCommandAsync(cancellationToken);
+      await SearchVoicesAsync(cancellationToken);
     }
 
     public IAsyncRelayCommand SearchCommand { get; }
@@ -141,35 +166,15 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (!string.IsNullOrWhiteSpace(SearchQuery))
-          queryParams.Add("query", SearchQuery);
-        if (!string.IsNullOrEmpty(SelectedLanguage))
-          queryParams.Add("language", SelectedLanguage);
-        if (!string.IsNullOrEmpty(SelectedGender))
-          queryParams.Add("gender", SelectedGender);
-        if (MinQualityScore > 0.0)
-          queryParams.Add("min_quality_score", MinQualityScore.ToString());
-        if (SelectedTags.Count > 0)
-          queryParams.Add("tags", string.Join(",", SelectedTags));
-        queryParams.Add("limit", PageSize.ToString());
-        queryParams.Add("offset", (CurrentPage * PageSize).ToString());
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/voice-browser/voices";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var response = await _backendClient.SendRequestAsync<object, VoiceSearchResponse>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
+        var response = await _voiceBrowserClient.SearchVoicesAsync(
+          query: string.IsNullOrWhiteSpace(SearchQuery) ? null : SearchQuery,
+          language: SelectedLanguage,
+          gender: SelectedGender,
+          minQualityScore: MinQualityScore,
+          tags: SelectedTags.Count > 0 ? SelectedTags.ToArray() : null,
+          limit: PageSize,
+          offset: CurrentPage * PageSize,
+          cancellationToken: cancellationToken
         );
 
         if (response != null)
@@ -201,12 +206,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, LanguagesResponse>(
-            "/api/voice-browser/languages",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _voiceBrowserClient.GetLanguagesAsync(cancellationToken);
 
         if (response?.Languages != null)
         {
@@ -231,12 +231,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, TagsResponse>(
-            "/api/voice-browser/tags",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _voiceBrowserClient.GetTagsAsync(cancellationToken);
 
         if (response?.Tags != null)
         {
@@ -254,23 +249,6 @@ namespace VoiceStudio.App.ViewModels
       catch (Exception ex)
       {
         await HandleErrorAsync(ex, "LoadTags");
-      }
-    }
-
-    private async Task RefreshAsync(CancellationToken cancellationToken)
-    {
-      try
-      {
-        await SearchVoicesAsync(cancellationToken);
-        StatusMessage = ResourceHelper.GetString("VoiceBrowser.SearchRefreshed", "Search refreshed");
-      }
-      catch (OperationCanceledException)
-      {
-        return; // User cancelled
-      }
-      catch (Exception ex)
-      {
-        await HandleErrorAsync(ex, "Refresh");
       }
     }
 
@@ -306,9 +284,9 @@ namespace VoiceStudio.App.ViewModels
           Dispatcher.TryEnqueue(() => _ = SearchVoicesAsync(cts.Token));
         }
         catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "VoiceBrowserViewModel.OnSearchQueryChanged");
-      }
+        {
+          ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "VoiceBrowserViewModel.OnSearchQueryChanged");
+        }
       });
     }
 
@@ -329,43 +307,11 @@ namespace VoiceStudio.App.ViewModels
       CurrentPage = 0;
       _ = SearchVoicesAsync(CancellationToken.None);
     }
-
-    // Response models (public for testability)
-    public class VoiceSearchResponse
-    {
-      public VoiceProfileSummary[] Voices { get; set; } = Array.Empty<VoiceProfileSummary>();
-      public int Total { get; set; }
-      public int Limit { get; set; }
-      public int Offset { get; set; }
-    }
-
-    public class LanguagesResponse
-    {
-      public string[] Languages { get; set; } = Array.Empty<string>();
-    }
-
-    public class TagsResponse
-    {
-      public string[] Tags { get; set; } = Array.Empty<string>();
-    }
   }
 
-  // Data models
-  public class VoiceProfileSummary
-  {
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public string Language { get; set; } = string.Empty;
-    public string? Gender { get; set; }
-    public string? AgeRange { get; set; }
-    public double QualityScore { get; set; }
-    public int SampleCount { get; set; }
-    public string[] Tags { get; set; } = Array.Empty<string>();
-    public string? PreviewAudioId { get; set; }
-    public string Created { get; set; } = string.Empty;
-  }
-
+  /// <summary>
+  /// UI wrapper for VoiceProfileSummary with observable properties.
+  /// </summary>
   public class VoiceProfileSummaryItem : ObservableObject
   {
     public string Id { get; set; }

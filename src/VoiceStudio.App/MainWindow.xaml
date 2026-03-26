@@ -4,12 +4,14 @@
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:controls="using:VoiceStudio.App.Controls"
   xmlns:views="using:VoiceStudio.App.Views">
-  <Grid Background="{StaticResource VSQ.Window.Background}">
+  <Grid Background="{StaticResource VSQ.Window.Background}" x:Name="RootGrid">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <!-- Menu bar -->
       <RowDefinition Height="48" />
       <!-- Toolbar -->
+      <RowDefinition Height="Auto" />
+      <!-- Global transport strip -->
       <RowDefinition Height="*" />
       <!-- Workspace -->
       <RowDefinition Height="Auto" />
@@ -21,8 +23,16 @@
     <ContentControl x:Name="MenuBarHost" Grid.Row="0" HorizontalAlignment="Stretch" Margin="8,2,8,0" />
     <!-- Top command toolbar -->
     <controls:CustomizableToolbar Grid.Row="1" Margin="8,0,8,4" x:Name="CommandToolbar" />
+    <!-- Global transport strip: current media, source, status -->
+    <Border Grid.Row="2" Height="28" Margin="8,0,8,2" Padding="8,0"
+      Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+      BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="0,0,0,1"
+      CornerRadius="4,4,0,0">
+      <controls:GlobalTransportControl x:Name="GlobalTransportControl" />
+    </Border>
     <!-- Main workspace -->
-    <Grid Grid.Row="2" Margin="8,0,8,4" x:Name="WorkspaceGrid">
+    <Grid Grid.Row="3" Margin="8,0,8,4" x:Name="WorkspaceGrid"
+      AutomationProperties.AutomationId="MainWindow_WorkspaceGrid">
       <Grid.RowDefinitions>
         <RowDefinition x:Name="TopRow" Height="4*" />
         <RowDefinition Height="4" />
@@ -112,8 +122,10 @@
         </StackPanel>
       </Border>
       <!-- Left / Center / Right PanelHosts -->
-      <controls:PanelHost Grid.Row="0" Grid.Column="1" Margin="4,0,4,4" x:Name="LeftPanelHost" />
-      <controls:PanelHost Grid.Row="0" Grid.Column="3" Margin="0,0,4,4" x:Name="CenterPanelHost" />
+      <controls:PanelHost Grid.Row="0" Grid.Column="1" Margin="4,0,4,4" x:Name="LeftPanelHost"
+        AutomationProperties.AutomationId="MainWindow_LeftPanelHost" />
+      <controls:PanelHost Grid.Row="0" Grid.Column="3" Margin="0,0,4,4" x:Name="CenterPanelHost"
+        AutomationProperties.AutomationId="MainWindow_CenterPanelHost" />
       <controls:PanelHost Grid.Row="0" Grid.Column="5" Margin="0,0,0,4" x:Name="RightPanelHost" />
       <!-- Vertical splitter gutters (resizable via pointer drag - see MainWindow.xaml.cs) -->
       <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="2" Width="4"
@@ -136,11 +148,11 @@
       <controls:PanelHost Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="5" x:Name="BottomPanelHost" />
     </Grid>
     <!-- Degraded mode banner (429/backend stress) -->
-    <InfoBar x:Name="DegradedModeBanner" Grid.Row="3" IsOpen="False" IsClosable="True"
+    <InfoBar x:Name="DegradedModeBanner" Grid.Row="4" IsOpen="False" IsClosable="True"
       Severity="Warning" Margin="8,4,8,0"
       AutomationProperties.AutomationId="MainWindow_DegradedModeBanner" />
     <!-- Status bar -->
-    <Border Grid.Row="4" Height="26" Background="{StaticResource VSQ.StatusBar.BackgroundBrush}"
+    <Border Grid.Row="5" Height="26" Background="{StaticResource VSQ.StatusBar.BackgroundBrush}"
       BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="1,1,1,0">
       <Grid Margin="8,0,8,0">
         <Grid.ColumnDefinitions>
@@ -166,11 +178,15 @@
           <Border x:Name="EngineIndicator" Width="8" Height="8"
             CornerRadius="{StaticResource VSQ.CornerRadius.Small}"
             Background="{StaticResource VSQ.StatusIndicator.SuccessBrush}"
-            ToolTipService.ToolTip="Engine: Ready">
+            ToolTipService.ToolTip="Engine: Starting…">
           </Border>
         </StackPanel>
-        <TextBlock Grid.Column="1" x:Name="StatusText" Text="Ready" VerticalAlignment="Center"
-          AutomationProperties.AutomationId="StatusBar_StatusText" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
+          <TextBlock x:Name="StatusText" Text="Starting…" AutomationProperties.AutomationId="StatusBar_StatusText" />
+          <TextBlock x:Name="CurrentMediaStatusText" Text="" FontSize="10"
+            Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+            AutomationProperties.AutomationId="StatusBar_CurrentMedia" />
+        </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
           HorizontalAlignment="Center">
           <TextBlock Text="Job:" Margin="0,0,4,0" />
@@ -198,21 +214,35 @@
       </Grid>
     </Border>
     <!-- Toast Notification Container (IDEA 11) -->
-    <StackPanel x:Name="ToastContainer" Grid.Row="2" HorizontalAlignment="Right"
+    <StackPanel x:Name="ToastContainer" Grid.Row="3" HorizontalAlignment="Right"
       VerticalAlignment="Bottom" Margin="0,0,16,80" Spacing="0" MaxWidth="400" />
     <!-- Global Search Overlay (IDEA 5) -->
-    <Grid x:Name="GlobalSearchOverlay" Grid.Row="2"
+    <Grid x:Name="GlobalSearchOverlay" Grid.Row="3"
       Background="{StaticResource VSQ.Overlay.BackgroundBrush}" Visibility="Collapsed"
       Tapped="GlobalSearchOverlay_Tapped">
       <views:GlobalSearchView x:Name="GlobalSearchView" HorizontalAlignment="Center"
         VerticalAlignment="Top" Margin="0,100,0,0" />
     </Grid>
     <!-- Collaboration Indicators (IDEA 25) -->
-    <Border x:Name="CollaborationPanel" Grid.Row="2" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0"
+    <Border x:Name="CollaborationPanel" Grid.Row="3" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0"
       Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
       BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="1" CornerRadius="8"
       Padding="8" Width="280" MaxHeight="400" Visibility="Collapsed">
       <controls:CollaborationIndicator x:Name="CollaborationIndicator" CloseRequested="CollaborationIndicator_CloseRequested" />
+    </Border>
+    <!-- Startup overlay: visible by default until backend ready (Task 3: show before content) -->
+    <Border x:Name="StartupOverlay" Grid.Row="0" Grid.RowSpan="6"
+      Background="{StaticResource VSQ.Overlay.BackgroundBrush}"
+      Visibility="Visible"
+      AutomationProperties.AutomationId="MainWindow_StartupOverlay">
+      <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16">
+        <ProgressRing x:Name="StartupProgressRing" IsActive="True" Width="48" Height="48" />
+        <TextBlock x:Name="StartupOverlayMessage" Text="Starting VoiceStudio services…"
+          FontSize="16" HorizontalAlignment="Center" />
+        <Button x:Name="StartupRetryButton" Content="Retry" Visibility="Collapsed"
+          AutomationProperties.AutomationId="StartupOverlay_RetryButton"
+          Click="StartupRetryButton_Click" />
+      </StackPanel>
     </Border>
   </Grid>
 </Window>

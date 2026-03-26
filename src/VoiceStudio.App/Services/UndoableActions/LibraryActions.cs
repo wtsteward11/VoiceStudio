@@ -4,6 +4,7 @@ using System.Linq;
 using System.Collections.Generic;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.App.Services;
 
 namespace VoiceStudio.App.Services.UndoableActions
 {
@@ -13,7 +14,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateLibraryFolderAction : IUndoableAction
   {
     private readonly ObservableCollection<LibraryFolder> _folders;
-    private readonly IBackendClient _backendClient;
+    private readonly ILibraryClient _libraryClient;
     private readonly LibraryFolder _folder;
     private readonly Action<LibraryFolder>? _onUndo;
     private readonly Action<LibraryFolder>? _onRedo;
@@ -22,13 +23,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateLibraryFolderAction(
         ObservableCollection<LibraryFolder> folders,
-        IBackendClient backendClient,
+        ILibraryClient libraryClient,
         LibraryFolder folder,
         Action<LibraryFolder>? onUndo = null,
         Action<LibraryFolder>? onRedo = null)
     {
       _folders = folders ?? throw new ArgumentNullException(nameof(folders));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _libraryClient = libraryClient ?? throw new ArgumentNullException(nameof(libraryClient));
       _folder = folder ?? throw new ArgumentNullException(nameof(folder));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -62,7 +63,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteLibraryAssetAction : IUndoableAction
   {
     private readonly ObservableCollection<LibraryAsset> _assets;
-    private readonly IBackendClient _backendClient;
+    private readonly ILibraryClient _libraryClient;
     private readonly LibraryAsset _asset;
     private readonly int _originalIndex;
     private readonly Action<LibraryAsset>? _onUndo;
@@ -72,13 +73,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteLibraryAssetAction(
         ObservableCollection<LibraryAsset> assets,
-        IBackendClient backendClient,
+        ILibraryClient libraryClient,
         LibraryAsset asset,
         Action<LibraryAsset>? onUndo = null,
         Action<LibraryAsset>? onRedo = null)
     {
       _assets = assets ?? throw new ArgumentNullException(nameof(assets));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _libraryClient = libraryClient ?? throw new ArgumentNullException(nameof(libraryClient));
       _asset = asset ?? throw new ArgumentNullException(nameof(asset));
       _originalIndex = assets.IndexOf(asset);
       _onUndo = onUndo;
@@ -120,7 +121,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class BatchDeleteLibraryAssetsAction : IUndoableAction
   {
     private readonly ObservableCollection<LibraryAsset> _assets;
-    private readonly IBackendClient _backendClient;
+    private readonly ILibraryClient _libraryClient;
     private readonly List<(LibraryAsset Asset, int Index)> _deletedAssets;
     private readonly Action<IEnumerable<LibraryAsset>>? _onUndo;
     private readonly Action<IEnumerable<LibraryAsset>>? _onRedo;
@@ -129,13 +130,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public BatchDeleteLibraryAssetsAction(
         ObservableCollection<LibraryAsset> assets,
-        IBackendClient backendClient,
+        ILibraryClient libraryClient,
         IEnumerable<LibraryAsset> assetsToDelete,
         Action<IEnumerable<LibraryAsset>>? onUndo = null,
         Action<IEnumerable<LibraryAsset>>? onRedo = null)
     {
       _assets = assets ?? throw new ArgumentNullException(nameof(assets));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _libraryClient = libraryClient ?? throw new ArgumentNullException(nameof(libraryClient));
       _deletedAssets = assetsToDelete?.Select(a => (a, assets.IndexOf(a))).ToList()
           ?? throw new ArgumentNullException(nameof(assetsToDelete));
       _onUndo = onUndo;

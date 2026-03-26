@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
@@ -17,12 +18,12 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the UpscalingView panel - Image and video upscaling.
   /// </summary>
-  public partial class UpscalingViewModel : BaseViewModel, IPanelView
+  public partial class UpscalingViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IUpscalingClient _upscalingClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
-    public string PanelId => "upscaling";
+    public string PanelId => PanelIds.Upscaling;
     public string DisplayName => ResourceHelper.GetString("Panel.Upscaling.DisplayName", "Upscaling");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -65,10 +66,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool isUploading;
 
-    public UpscalingViewModel(IViewModelContext context, IBackendClient backendClient)
+    public UpscalingViewModel(IViewModelContext context, IUpscalingClient upscalingClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _upscalingClient = upscalingClient ?? throw new ArgumentNullException(nameof(upscalingClient));
 
       // Get services (may be null if not initialized)
       try
@@ -104,13 +105,13 @@ namespace VoiceStudio.App.ViewModels
       RefreshCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
-        await RefreshAsync(ct);
+        await RefreshAsyncInternal(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadEnginesAsync(CancellationToken.None);
-      _ = LoadJobsAsync(CancellationToken.None);
     }
+
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => RefreshAsync(cancellationToken);
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task RefreshAsync(CancellationToken cancellationToken) => RefreshAsyncInternal(cancellationToken);
 
     public IAsyncRelayCommand LoadEnginesCommand { get; }
     public IAsyncRelayCommand UpscaleCommand { get; }
@@ -184,26 +185,14 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var engines = await _backendClient.SendRequestAsync<object, UpscalingEngine[]>(
-            "/api/upscaling/engines",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var engines = await _upscalingClient.GetEnginesAsync(cancellationToken);
 
         if (engines != null)
         {
           AvailableEngines.Clear();
           foreach (var engine in engines)
           {
-            AvailableEngines.Add(new UpscalingEngineItem(
-                engine.EngineId,
-                engine.Name,
-                engine.Description,
-                engine.SupportedTypes,
-                engine.SupportedScales,
-                engine.IsAvailable
-            ));
+            AvailableEngines.Add(new UpscalingEngineItem(engine));
           }
 
           // Select first available engine for current media type
@@ -266,15 +255,14 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var upscaleRequest = new UpscalingUpscaleRequest
         {
-          media_type = SelectedMediaType,
-          engine = SelectedEngine.EngineId,
-          scale_factor = SelectedScaleFactor,
-          output_format = OutputFormat
+          MediaType = SelectedMediaType,
+          Engine = SelectedEngine.EngineId,
+          ScaleFactor = SelectedScaleFactor,
+          OutputFormat = OutputFormat
         };
-
-        var jobResponse = await UploadFileAndUpscaleAsync(SelectedFilePath, request, cancellationToken);
+        var jobResponse = await UploadFileAndUpscaleAsync(SelectedFilePath, upscaleRequest, cancellationToken);
 
         if (jobResponse != null)
         {
@@ -302,29 +290,15 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task<UpscalingJobResponse?> UploadFileAndUpscaleAsync(string filePath, object requestData, CancellationToken cancellationToken = default)
+    private async Task<UpscalingJobResponse?> UploadFileAndUpscaleAsync(string filePath, UpscalingUpscaleRequest request, CancellationToken cancellationToken = default)
     {
       IsUploading = true;
       UploadProgress = 0.0;
 
       try
       {
-        var requestJson = System.Text.Json.JsonSerializer.Serialize(requestData);
-        var additionalData = new Dictionary<string, string>
-        {
-          { "request", requestJson }
-        };
-
         var progress = new Progress<double>(p => UploadProgress = p);
-
-        return await _backendClient.UploadFileWithProgressAsync<UpscalingJobResponse>(
-            "/api/upscaling/upscale",
-            filePath,
-            "file",
-            additionalData,
-            progress,
-            TimeSpan.FromMinutes(30),
-            cancellationToken);
+        return await _upscalingClient.UploadAndUpscaleAsync(filePath, request, progress, cancellationToken);
       }
       finally
       {
@@ -340,29 +314,14 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var jobs = await _backendClient.SendRequestAsync<object, UpscalingJob[]>(
-            "/api/upscaling/jobs",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var jobs = await _upscalingClient.GetJobsAsync(cancellationToken);
 
         if (jobs != null)
         {
           UpscalingJobs.Clear();
           foreach (var job in jobs)
           {
-            UpscalingJobs.Add(new UpscalingJobItem(
-                job.JobId,
-                job.Status,
-                job.Progress,
-                job.OutputFile,
-                job.OriginalWidth,
-                job.OriginalHeight,
-                job.UpscaledWidth,
-                job.UpscaledHeight,
-                job.ErrorMessage
-            ));
+            UpscalingJobs.Add(new UpscalingJobItem(job));
           }
         }
       }
@@ -392,12 +351,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/upscaling/jobs/{Uri.EscapeDataString(SelectedJob.JobId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _upscalingClient.DeleteJobAsync(SelectedJob.JobId, cancellationToken);
 
         UpscalingJobs.Remove(SelectedJob);
         SelectedJob = null;
@@ -420,7 +374,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task RefreshAsyncInternal(CancellationToken cancellationToken)
     {
       try
       {
@@ -438,35 +392,6 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Request/Response models
-    private class UpscalingJobResponse
-    {
-      public string JobId { get; set; } = string.Empty;
-      public string Status { get; set; } = string.Empty;
-    }
-
-    private class UpscalingEngine
-    {
-      public string EngineId { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public string Description { get; set; } = string.Empty;
-      public string[] SupportedTypes { get; set; } = Array.Empty<string>();
-      public double[] SupportedScales { get; set; } = Array.Empty<double>();
-      public bool IsAvailable { get; set; }
-    }
-
-    private class UpscalingJob
-    {
-      public string JobId { get; set; } = string.Empty;
-      public string Status { get; set; } = string.Empty;
-      public double Progress { get; set; }
-      public string? OutputFile { get; set; }
-      public int? OriginalWidth { get; set; }
-      public int? OriginalHeight { get; set; }
-      public int? UpscaledWidth { get; set; }
-      public int? UpscaledHeight { get; set; }
-      public string? ErrorMessage { get; set; }
-    }
   }
 
   // Data models
@@ -482,14 +407,14 @@ namespace VoiceStudio.App.ViewModels
     public string DisplayName => $"{Name} ({string.Join(", ", SupportedTypes)})";
     public string ScalesDisplay => string.Join("×, ", SupportedScales) + "×";
 
-    public UpscalingEngineItem(string engineId, string name, string description, string[] supportedTypes, double[] supportedScales, bool isAvailable)
+    public UpscalingEngineItem(UpscalingEngineResponse engine)
     {
-      EngineId = engineId;
-      Name = name;
-      Description = description;
-      SupportedTypes = supportedTypes;
-      SupportedScales = supportedScales;
-      IsAvailable = isAvailable;
+      EngineId = engine.EngineId;
+      Name = engine.Name;
+      Description = engine.Description;
+      SupportedTypes = engine.SupportedTypes;
+      SupportedScales = engine.SupportedScales;
+      IsAvailable = engine.IsAvailable;
     }
   }
 
@@ -510,17 +435,17 @@ namespace VoiceStudio.App.ViewModels
         ? $"{OriginalWidth}×{OriginalHeight} → {UpscaledWidth}×{UpscaledHeight}"
         : ResourceHelper.GetString("Upscaling.Unknown", "Unknown");
 
-    public UpscalingJobItem(string jobId, string status, double progress, string? outputFile, int? originalWidth, int? originalHeight, int? upscaledWidth, int? upscaledHeight, string? errorMessage)
+    public UpscalingJobItem(UpscalingJobResponse job)
     {
-      JobId = jobId;
-      Status = status;
-      Progress = progress;
-      OutputFile = outputFile;
-      OriginalWidth = originalWidth;
-      OriginalHeight = originalHeight;
-      UpscaledWidth = upscaledWidth;
-      UpscaledHeight = upscaledHeight;
-      ErrorMessage = errorMessage;
+      JobId = job.JobId;
+      Status = job.Status;
+      Progress = job.Progress;
+      OutputFile = job.OutputFile;
+      OriginalWidth = job.OriginalWidth;
+      OriginalHeight = job.OriginalHeight;
+      UpscaledWidth = job.UpscaledWidth;
+      UpscaledHeight = job.UpscaledHeight;
+      ErrorMessage = job.ErrorMessage;
     }
   }
 }

@@ -2,7 +2,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Views.Panels;
-using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -18,7 +17,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       ViewModel = new AdvancedRealTimeVisualizationViewModel(
-          ServiceProvider.GetBackendClient()
+          ServiceProvider.GetAdvancedRealTimeVisualizationClient()
       );
       this.DataContext = ViewModel;
 

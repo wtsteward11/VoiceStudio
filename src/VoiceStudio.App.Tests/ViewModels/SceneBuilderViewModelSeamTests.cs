@@ -8,6 +8,7 @@ using Moq;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -45,12 +46,23 @@ namespace VoiceStudio.App.Tests.ViewModels
       _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
     }
 
+    /// <summary>
+    /// Invariant: constructor must not call any client methods before activation.
+    /// Prevents constructor fire-and-forget regression (RETAINED_ASYNC_RULE, ADR-047).
+    /// </summary>
+    [TestMethod]
+    public void Constructor_DoesNotCallClient_BeforeActivation()
+    {
+      _ = new SceneBuilderViewModel(_context, _mockClient.Object);
+      _mockClient.Verify(x => x.GetScenesAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [TestMethod]
     public void Constructor_WithISceneBuilderClient_CreatesInstance()
     {
       var vm = new SceneBuilderViewModel(_context, _mockClient.Object);
       Assert.IsNotNull(vm);
-      Assert.AreEqual("scene-builder", vm.PanelId);
+      Assert.AreEqual(PanelIds.SceneBuilder, vm.PanelId);
       Assert.IsNotNull(vm.LoadScenesCommand);
       Assert.IsNotNull(vm.CreateSceneCommand);
       Assert.IsNotNull(vm.UpdateSceneCommand);

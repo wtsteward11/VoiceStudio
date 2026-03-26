@@ -25,7 +25,7 @@ namespace VoiceStudio.App.ViewModels
     private CancellationTokenSource? _filterDebounceCts;
     private const int FilterDebounceMs = 300;
 
-    public string PanelId => "pluginmanagement";
+    public string PanelId => PanelIds.PluginManagement;
     public string DisplayName => ResourceHelper.GetString("Panel.PluginManagement.DisplayName", "Plugin Management");
     public PanelRegion Region => PanelRegion.Right;
 

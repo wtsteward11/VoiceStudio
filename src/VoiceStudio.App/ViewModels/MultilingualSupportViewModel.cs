@@ -5,23 +5,23 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Utilities;
-using SupportedLanguagesResponseModel = VoiceStudio.App.ViewModels.MultilingualSupportViewModel.SupportedLanguagesResponse;
 
 namespace VoiceStudio.App.ViewModels
 {
   /// <summary>
   /// ViewModel for the MultilingualSupportView panel - Multi-language interface.
   /// </summary>
-  public partial class MultilingualSupportViewModel : BaseViewModel, IPanelView
+  public partial class MultilingualSupportViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IMultilingualSupportClient _client;
     private readonly ToastNotificationService? _toastNotificationService;
 
-    public string PanelId => "multilingual-support";
+    public string PanelId => PanelIds.Multilingual;
     public string DisplayName => ResourceHelper.GetString("Panel.MultilingualSupport.DisplayName", "Multilingual Support");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -58,19 +58,17 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<MultilingualAudioItem> synthesizedAudios = new();
 
-    public MultilingualSupportViewModel(IViewModelContext context, IBackendClient backendClient)
+    public MultilingualSupportViewModel(IViewModelContext context, IMultilingualSupportClient client)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
 
-      // Get services (may be null if not initialized)
       try
       {
         _toastNotificationService = AppServices.TryGetToastNotificationService();
       }
       catch
       {
-        // Services may not be initialized yet - that's okay
         _toastNotificationService = null;
       }
 
@@ -94,15 +92,24 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadSupportedLanguagesAsync(CancellationToken.None);
     }
 
     public IAsyncRelayCommand LoadSupportedLanguagesCommand { get; }
     public IAsyncRelayCommand TranslateCommand { get; }
     public IAsyncRelayCommand SynthesizeCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
+
+    Task IPanelLifecycle.OnActivatedAsync(CancellationToken cancellationToken)
+    {
+      return LoadSupportedLanguagesAsync(cancellationToken);
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    Task IPanelLifecycle.RefreshAsync(CancellationToken cancellationToken)
+    {
+      return RefreshAsync(cancellationToken);
+    }
 
     private async Task LoadSupportedLanguagesAsync(CancellationToken cancellationToken)
     {
@@ -111,12 +118,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, SupportedLanguagesResponse>(
-            "/api/multilingual/supported",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _client.GetSupportedLanguagesAsync(cancellationToken);
 
         if (response?.Languages != null)
         {
@@ -132,7 +134,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -158,32 +160,19 @@ namespace VoiceStudio.App.ViewModels
         return;
       }
 
+      var targetLang = SelectedTargetLanguages.FirstOrDefault();
+      if (string.IsNullOrEmpty(targetLang))
+      {
+        ErrorMessage = ResourceHelper.GetString("MultilingualSupport.TargetLanguageRequired", "Target language must be selected");
+        return;
+      }
+
       IsLoading = true;
       ErrorMessage = null;
 
       try
       {
-        // Translate to the first selected target language
-        var targetLang = SelectedTargetLanguages.FirstOrDefault();
-        if (string.IsNullOrEmpty(targetLang))
-        {
-          ErrorMessage = ResourceHelper.GetString("MultilingualSupport.TargetLanguageRequired", "Target language must be selected");
-          return;
-        }
-
-        var request = new
-        {
-          text = Text,
-          source_language = SourceLanguage,
-          target_language = targetLang
-        };
-
-        var response = await _backendClient.SendRequestAsync<object, TranslationResponse>(
-            "/api/multilingual/translate",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _client.TranslateAsync(Text, SourceLanguage, targetLang, cancellationToken);
 
         if (response != null)
         {
@@ -196,7 +185,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -227,22 +216,17 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
+        var request = new MultilingualSynthesisRequest
         {
-          text = Text,
-          source_language = AutoDetectLanguage ? null : SourceLanguage,
-          target_languages = SelectedTargetLanguages.ToArray(),
-          profile_ids = new System.Collections.Generic.Dictionary<string, string>(),
-          preserve_emotion = PreserveEmotion,
-          preserve_style = PreserveStyle
+          Text = Text,
+          SourceLanguage = AutoDetectLanguage ? null : SourceLanguage,
+          TargetLanguages = SelectedTargetLanguages.ToArray(),
+          ProfileIds = new System.Collections.Generic.Dictionary<string, string>(),
+          PreserveEmotion = PreserveEmotion,
+          PreserveStyle = PreserveStyle
         };
 
-        var response = await _backendClient.SendRequestAsync<object, MultilingualSynthesisResponse>(
-            "/api/multilingual/synthesize",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _client.SynthesizeAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -267,7 +251,7 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
@@ -291,49 +275,21 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
         await HandleErrorAsync(ex, "Refresh");
       }
     }
-
-    // Response models
-    public class SupportedLanguagesResponse
-    {
-      public LanguageInfo[] Languages { get; set; } = Array.Empty<LanguageInfo>();
-
-      public class LanguageInfo
-      {
-        public string Code { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-      }
-    }
-
-    private class TranslationResponse
-    {
-      public string TranslatedText { get; set; } = string.Empty;
-      public string SourceLanguage { get; set; } = string.Empty;
-      public string TargetLanguage { get; set; } = string.Empty;
-      public double Confidence { get; set; }
-    }
-
-    private class MultilingualSynthesisResponse
-    {
-      public System.Collections.Generic.Dictionary<string, string> AudioIds { get; set; } = new();
-      public string? DetectedLanguage { get; set; }
-      public string Message { get; set; } = string.Empty;
-    }
   }
 
-  // Data models
   public class LanguageItem : ObservableObject
   {
     public string Code { get; set; }
     public string Name { get; set; }
 
-    public LanguageItem(SupportedLanguagesResponseModel.LanguageInfo info)
+    public LanguageItem(LanguageInfo info)
     {
       Code = info.Code;
       Name = info.Name;

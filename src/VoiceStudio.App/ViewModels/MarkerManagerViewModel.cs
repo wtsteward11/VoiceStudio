@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -17,16 +18,16 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the MarkerManagerView panel - Timeline markers management.
   /// </summary>
-  public partial class MarkerManagerViewModel : BaseViewModel, IPanelView
+  public partial class MarkerManagerViewModel : BaseViewModel, IPanelView, ILifecyclePanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IMarkerManagerClient _markerManagerClient;
     private readonly IDialogService _dialogService;
     private readonly UndoRedoService? _undoRedoService;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly MultiSelectService _multiSelectService;
     private MultiSelectState? _multiSelectState;
 
-    public string PanelId => "marker-manager";
+    public string PanelId => PanelIds.MarkerManager;
     public string DisplayName => ResourceHelper.GetString("Panel.MarkerManager.DisplayName", "Marker Manager");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -66,10 +67,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? statusMessage;
 
-    public MarkerManagerViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService)
+    public MarkerManagerViewModel(IViewModelContext context, IMarkerManagerClient markerManagerClient, IDialogService dialogService)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _markerManagerClient = markerManagerClient ?? throw new ArgumentNullException(nameof(markerManagerClient));
       _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
       // Get undo/redo service (may be null if not initialized)
@@ -122,8 +123,39 @@ namespace VoiceStudio.App.ViewModels
         }
       };
 
-      // Load initial data
-      _ = LoadMarkersAsync();
+      // No constructor fire-and-forget — load from View Loaded via OnActivatedAsync (RETAINED_ASYNC_RULE)
+    }
+
+    /// <inheritdoc />
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      await LoadCategoriesAsync(cancellationToken);
+      await LoadMarkersAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public async Task RefreshAsync(CancellationToken cancellationToken = default)
+    {
+      try
+      {
+        await LoadMarkersAsync(cancellationToken);
+        await LoadCategoriesAsync(cancellationToken);
+        StatusMessage = ResourceHelper.GetString("MarkerManager.MarkersRefreshed", "Markers refreshed");
+        _toastNotificationService?.ShowSuccess(
+            ResourceHelper.GetString("MarkerManager.MarkersRefreshedSuccessfully", "Markers refreshed successfully"),
+            ResourceHelper.GetString("Toast.Title.Refreshed", "Refreshed"));
+      }
+      catch (Exception ex)
+      {
+        ErrorLoggingService?.LogError(ex, "Refresh");
+        ErrorMessage = ResourceHelper.FormatString("MarkerManager.RefreshFailed", ex.Message);
+        _toastNotificationService?.ShowError(
+            ResourceHelper.GetString("Toast.Title.RefreshFailed", "Refresh Failed"),
+            ex.Message);
+      }
     }
 
     public IAsyncRelayCommand LoadMarkersCommand { get; }
@@ -138,34 +170,14 @@ namespace VoiceStudio.App.ViewModels
     public IRelayCommand ClearMarkerSelectionCommand { get; }
     public IAsyncRelayCommand DeleteSelectedMarkersCommand { get; }
 
-    private async Task LoadMarkersAsync()
+    private async Task LoadMarkersAsync(CancellationToken cancellationToken = default)
     {
       try
       {
         IsLoading = true;
         ErrorMessage = null;
 
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (!string.IsNullOrEmpty(SelectedProjectId))
-          queryParams.Add("project_id", SelectedProjectId);
-        if (!string.IsNullOrEmpty(SelectedCategory))
-          queryParams.Add("category", SelectedCategory);
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/markers";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var markers = await _backendClient.SendRequestAsync<object, Marker[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get
-        );
+        var markers = await _markerManagerClient.GetMarkersAsync(SelectedProjectId, SelectedCategory, cancellationToken);
 
         Markers.Clear();
         if (markers != null)
@@ -197,7 +209,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task CreateMarkerAsync()
+    private async Task CreateMarkerAsync(CancellationToken cancellationToken = default)
     {
       if (string.IsNullOrEmpty(SelectedProjectId))
       {
@@ -210,20 +222,8 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
-        {
-          name = ResourceHelper.GetString("MarkerManager.NewMarker", "New Marker"),
-          time = 0.0,
-          color = "#00FFFF",
-          category = SelectedCategory,
-          description = "",
-          project_id = SelectedProjectId
-        };
-
-        var created = await _backendClient.SendRequestAsync<object, Marker>(
-            "/api/markers",
-            request
-        );
+        var name = ResourceHelper.GetString("MarkerManager.NewMarker", "New Marker");
+        var created = await _markerManagerClient.CreateMarkerAsync(SelectedProjectId!, name, 0.0, "#00FFFF", SelectedCategory, "", cancellationToken);
 
         if (created != null)
         {
@@ -236,7 +236,7 @@ namespace VoiceStudio.App.ViewModels
           {
             var action = new CreateMarkerAction(
                 Markers,
-                _backendClient,
+                _markerManagerClient,
                 markerItem,
                 onUndo: (m) =>
                 {
@@ -269,7 +269,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task UpdateMarkerAsync(MarkerItem? marker)
+    private async Task UpdateMarkerAsync(MarkerItem? marker, CancellationToken cancellationToken = default)
     {
       if (marker == null)
         return;
@@ -279,27 +279,14 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
-        {
-          name = marker.Name,
-          time = marker.Time,
-          color = marker.Color,
-          category = marker.Category,
-          description = marker.Description
-        };
-
-        var updated = await _backendClient.SendRequestAsync<object, Marker>(
-            $"/api/markers/{marker.Id}",
-            request,
-            System.Net.Http.HttpMethod.Put
-        );
+        var updated = await _markerManagerClient.UpdateMarkerAsync(marker.Id, marker.Name, marker.Time, marker.Color, marker.Category, marker.Description, cancellationToken);
 
         if (updated != null)
         {
           marker.UpdateFrom(updated);
         }
 
-        await LoadMarkersAsync();
+        await LoadMarkersAsync(cancellationToken);
         StatusMessage = ResourceHelper.GetString("MarkerManager.MarkerUpdated", "Marker updated");
         _toastNotificationService?.ShowSuccess(
             ResourceHelper.FormatString("MarkerManager.MarkerUpdatedDetail", marker.Name),
@@ -319,7 +306,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task DeleteMarkerAsync(MarkerItem? marker)
+    private async Task DeleteMarkerAsync(MarkerItem? marker, CancellationToken cancellationToken = default)
     {
       if (marker == null)
         return;
@@ -329,11 +316,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/markers/{marker.Id}",
-            null,
-            System.Net.Http.HttpMethod.Delete
-        );
+        await _markerManagerClient.DeleteMarkerAsync(marker.Id, cancellationToken);
 
         var markerToDelete = marker;
         var originalIndex = Markers.IndexOf(marker);
@@ -348,7 +331,7 @@ namespace VoiceStudio.App.ViewModels
         {
           var action = new DeleteMarkerAction(
               Markers,
-              _backendClient,
+              _markerManagerClient,
               markerToDelete,
               originalIndex,
               onUndo: (m) => SelectedMarker = m,
@@ -382,18 +365,14 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task LoadCategoriesAsync()
+    private async Task LoadCategoriesAsync(CancellationToken cancellationToken = default)
     {
       if (string.IsNullOrEmpty(SelectedProjectId))
         return;
 
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, MarkerCategoriesResponse>(
-            $"/api/markers/categories/list?project_id={Uri.EscapeDataString(SelectedProjectId)}",
-            null,
-            System.Net.Http.HttpMethod.Get
-        );
+        var response = await _markerManagerClient.GetCategoriesAsync(SelectedProjectId, cancellationToken);
 
         AvailableCategories.Clear();
         if (response?.Categories != null)
@@ -411,26 +390,6 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync()
-    {
-      try
-      {
-        await LoadMarkersAsync();
-        await LoadCategoriesAsync();
-        StatusMessage = ResourceHelper.GetString("MarkerManager.MarkersRefreshed", "Markers refreshed");
-        _toastNotificationService?.ShowSuccess(
-            ResourceHelper.GetString("MarkerManager.MarkersRefreshedSuccessfully", "Markers refreshed successfully"),
-            ResourceHelper.GetString("Toast.Title.Refreshed", "Refreshed"));
-      }
-      catch (Exception ex)
-      {
-        ErrorLoggingService?.LogError(ex, "Refresh");
-        ErrorMessage = ResourceHelper.FormatString("MarkerManager.RefreshFailed", ex.Message);
-        _toastNotificationService?.ShowError(
-            ResourceHelper.GetString("Toast.Title.RefreshFailed", "Refresh Failed"),
-            ex.Message);
-      }
-    }
 
     partial void OnSelectedProjectIdChanged(string? value)
     {
@@ -502,7 +461,7 @@ namespace VoiceStudio.App.ViewModels
       DeleteSelectedMarkersCommand.NotifyCanExecuteChanged();
     }
 
-    private async Task DeleteSelectedMarkersAsync()
+    private async Task DeleteSelectedMarkersAsync(CancellationToken cancellationToken = default)
     {
       if (_multiSelectState == null || _multiSelectState.SelectedIds.Count == 0)
         return;
@@ -531,11 +490,7 @@ namespace VoiceStudio.App.ViewModels
         {
           try
           {
-            await _backendClient.SendRequestAsync<object, object>(
-                $"/api/markers/{Uri.EscapeDataString(markerId)}",
-                null,
-                System.Net.Http.HttpMethod.Delete
-            );
+            await _markerManagerClient.DeleteMarkerAsync(markerId, cancellationToken);
 
             var marker = Markers.FirstOrDefault(m => m.Id == markerId);
             if (marker != null)
@@ -602,8 +557,8 @@ namespace VoiceStudio.App.ViewModels
       DeleteSelectedMarkersCommand.NotifyCanExecuteChanged();
     }
 
-    // Response models
-    private class MarkerCategoriesResponse
+    // Response models (public for IMarkerManagerClient)
+    public class MarkerCategoriesResponse
     {
       public string[] Categories { get; set; } = Array.Empty<string>();
     }

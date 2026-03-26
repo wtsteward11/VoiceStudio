@@ -24,7 +24,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new SpectrogramViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient()
+          ServiceProvider.GetSpectrogramClient()
       );
       DataContext = ViewModel;
 

@@ -16,13 +16,13 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the TodoPanelView panel - Todo/task management.
   /// </summary>
-  public partial class TodoPanelViewModel : BaseViewModel, IPanelView
+  public partial class TodoPanelViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ITodoPanelClient _todoPanelClient;
     private readonly IErrorPresentationService? _errorService;
     private readonly IErrorLoggingService? _logService;
 
-    public string PanelId => "todo-panel";
+    public string PanelId => PanelIds.TodoPanel;
     public string DisplayName => ResourceHelper.GetString("Panel.TodoPanel.DisplayName", "Todo Panel");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -80,10 +80,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool isCreatingTodo;
 
-    public TodoPanelViewModel(IViewModelContext context, IBackendClient backendClient)
+    public TodoPanelViewModel(IViewModelContext context, ITodoPanelClient todoPanelClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _todoPanelClient = todoPanelClient ?? throw new ArgumentNullException(nameof(todoPanelClient));
 
       // Get error services
       _errorService = ServiceProvider.TryGetErrorPresentationService();
@@ -136,33 +136,16 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       });
-
-      // Load initial data
-      var loadCt = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
-      _ = LoadTodosAsync(loadCt).ContinueWith(t =>
-      {
-        if (t.IsFaulted)
-          _logService?.LogError(t.Exception?.InnerException ?? new Exception("LoadTodos failed"), "LoadTodos");
-      }, TaskScheduler.Default);
-
-      _ = LoadCategoriesAsync(loadCt).ContinueWith(t =>
-      {
-        if (t.IsFaulted)
-          _logService?.LogError(t.Exception?.InnerException ?? new Exception("LoadCategories failed"), "LoadCategories");
-      }, TaskScheduler.Default);
-
-      _ = LoadTagsAsync(loadCt).ContinueWith(t =>
-      {
-        if (t.IsFaulted)
-          _logService?.LogError(t.Exception?.InnerException ?? new Exception("LoadTags failed"), "LoadTags");
-      }, TaskScheduler.Default);
-
-      _ = LoadSummaryAsync(loadCt).ContinueWith(t =>
-      {
-        if (t.IsFaulted)
-          _logService?.LogError(t.Exception?.InnerException ?? new Exception("LoadSummary failed"), "LoadSummary");
-      }, TaskScheduler.Default);
     }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => RefreshAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => RefreshAsyncImpl(cancellationToken);
 
     public IAsyncRelayCommand LoadTodosCommand { get; }
     public IAsyncRelayCommand CreateTodoCommand { get; }
@@ -236,36 +219,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var queryParams = new List<string>();
-        if (!string.IsNullOrWhiteSpace(FilterStatus))
-        {
-          queryParams.Add($"status={Uri.EscapeDataString(FilterStatus)}");
-        }
-        if (!string.IsNullOrWhiteSpace(FilterPriority))
-        {
-          queryParams.Add($"priority={Uri.EscapeDataString(FilterPriority)}");
-        }
-        if (!string.IsNullOrWhiteSpace(FilterCategory))
-        {
-          queryParams.Add($"category={Uri.EscapeDataString(FilterCategory)}");
-        }
-        if (!string.IsNullOrWhiteSpace(FilterTag))
-        {
-          queryParams.Add($"tag={Uri.EscapeDataString(FilterTag)}");
-        }
-
-        var url = "/api/todo-panel";
-        if (queryParams.Count > 0)
-        {
-          url += "?" + string.Join("&", queryParams);
-        }
-
-        var todos = await _backendClient.SendRequestAsync<object, Todo[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var todos = await _todoPanelClient.GetTodosAsync(FilterStatus, FilterPriority, FilterCategory, FilterTag, cancellationToken);
 
         if (todos != null)
         {
@@ -327,7 +281,7 @@ namespace VoiceStudio.App.ViewModels
               .ToList();
         }
 
-        var request = new TodoCreateRequest
+        var request = new VoiceStudio.Core.Services.TodoCreateRequest
         {
           Title = NewTodoTitle,
           Description = NewTodoDescription,
@@ -337,12 +291,7 @@ namespace VoiceStudio.App.ViewModels
           DueDate = NewTodoDueDate
         };
 
-        var todo = await _backendClient.SendRequestAsync<TodoCreateRequest, Todo>(
-            "/api/todo-panel",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var todo = await _todoPanelClient.CreateTodoAsync(request, cancellationToken);
 
         if (todo != null)
         {
@@ -405,7 +354,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new TodoUpdateRequest
+        var request = new VoiceStudio.Core.Services.TodoUpdateRequest
         {
           Title = SelectedTodo.Title,
           Description = SelectedTodo.Description,
@@ -416,12 +365,7 @@ namespace VoiceStudio.App.ViewModels
           DueDate = SelectedTodo.DueDate
         };
 
-        var todo = await _backendClient.SendRequestAsync<TodoUpdateRequest, Todo>(
-            $"/api/todo-panel/{Uri.EscapeDataString(SelectedTodo.TodoId)}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var todo = await _todoPanelClient.UpdateTodoAsync(SelectedTodo.TodoId, request, cancellationToken);
 
         if (todo != null)
         {
@@ -476,12 +420,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/todo-panel/{Uri.EscapeDataString(SelectedTodo.TodoId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _todoPanelClient.DeleteTodoAsync(SelectedTodo.TodoId, cancellationToken);
 
         Todos.Remove(SelectedTodo);
         SelectedTodo = null;
@@ -510,12 +449,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var categories = await _backendClient.SendRequestAsync<object, string[]>(
-            "/api/todo-panel/categories/list",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var categories = await _todoPanelClient.GetCategoriesAsync(cancellationToken);
 
         if (categories != null)
         {
@@ -543,12 +477,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var tags = await _backendClient.SendRequestAsync<object, string[]>(
-            "/api/todo-panel/tags/list",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var tags = await _todoPanelClient.GetTagsAsync(cancellationToken);
 
         if (tags != null)
         {
@@ -569,12 +498,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var summary = await _backendClient.SendRequestAsync<object, TodoSummary>(
-            "/api/todo-panel/stats/summary",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var summary = await _todoPanelClient.GetSummaryAsync(cancellationToken);
 
         if (summary != null)
         {
@@ -598,7 +522,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task RefreshAsyncImpl(CancellationToken cancellationToken)
     {
       await LoadTodosAsync(cancellationToken);
       await LoadCategoriesAsync(cancellationToken);

@@ -24,7 +24,7 @@ namespace VoiceStudio.App.Views.Panels
 {
   public partial class BatchProcessingViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IBatchProcessingClient _batchClient;
     private readonly IDialogService _dialogService;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly UndoRedoService? _undoRedoService;
@@ -33,6 +33,15 @@ namespace VoiceStudio.App.Views.Panels
     private CancellationTokenSource? _pollingCts;
     private bool _isPolling;
 
+    // GAP-I15: Disposal token for fire-and-forget operations
+    private readonly CancellationTokenSource _disposalCts = new();
+
+    // Cancellation for selected-job quality report; cancelled when selection changes to prevent stale data
+    private CancellationTokenSource? _selectedJobLoadCts;
+
+    // Cancellation for filter/project-triggered LoadJobsAsync; cancelled when filter or project changes to prevent stale data
+    private CancellationTokenSource? _loadJobsCts;
+
     // Phase 3: WebSocket client for real-time job progress updates
     private readonly JobProgressWebSocketClient? _jobProgressClient;
     private bool _isWebSocketConnected;
@@ -40,7 +49,7 @@ namespace VoiceStudio.App.Views.Panels
     // Phase 4: EventAggregator for cross-panel synchronization
     private readonly IEventAggregator? _eventAggregator;
 
-    public string PanelId => "batch_processing";
+    public string PanelId => PanelIds.BatchProcessing;
     public string DisplayName => ResourceHelper.GetString("Panel.BatchProcessing.DisplayName", "Batch Processing");
     public PanelRegion Region => PanelRegion.Bottom;
 
@@ -121,10 +130,10 @@ namespace VoiceStudio.App.Views.Panels
             "tortoise"
         };
 
-    public BatchProcessingViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService)
+    public BatchProcessingViewModel(IViewModelContext context, IBatchProcessingClient batchClient, IDialogService dialogService)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _batchClient = batchClient ?? throw new ArgumentNullException(nameof(batchClient));
       _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
       // Get multi-select service
@@ -137,9 +146,9 @@ namespace VoiceStudio.App.Views.Panels
       {
         _toastNotificationService = AppServices.TryGetToastNotificationService();
       }
-      catch
+      catch (Exception ex)
       {
-        // Service may not be initialized yet - that's okay
+        System.Diagnostics.Debug.WriteLine($"BatchProcessingViewModel: ToastNotificationService not available: {ex.Message}");
         _toastNotificationService = null;
       }
 
@@ -148,9 +157,9 @@ namespace VoiceStudio.App.Views.Panels
       {
         _undoRedoService = AppServices.TryGetUndoRedoService();
       }
-      catch
+      catch (Exception ex)
       {
-        // Service may not be initialized yet - that's okay
+        System.Diagnostics.Debug.WriteLine($"BatchProcessingViewModel: UndoRedoService not available: {ex.Message}");
         _undoRedoService = null;
       }
 
@@ -168,9 +177,9 @@ namespace VoiceStudio.App.Views.Panels
           }
         }
       }
-      catch
+      catch (Exception ex)
       {
-        // WebSocket service may not be available - fall back to polling
+        System.Diagnostics.Debug.WriteLine($"BatchProcessingViewModel: WebSocket service not available, fallback to polling: {ex.Message}");
         _jobProgressClient = null;
       }
 
@@ -179,9 +188,9 @@ namespace VoiceStudio.App.Views.Panels
       {
         _eventAggregator = AppServices.TryGetEventAggregator();
       }
-      catch
+      catch (Exception ex)
       {
-        // EventAggregator service may not be available
+        System.Diagnostics.Debug.WriteLine($"BatchProcessingViewModel: EventAggregator not available: {ex.Message}");
         _eventAggregator = null;
       }
 
@@ -285,12 +294,18 @@ namespace VoiceStudio.App.Views.Panels
 
     partial void OnFilterStatusChanged(JobStatus? value)
     {
-      _ = LoadJobsAsync(CancellationToken.None);
+      _loadJobsCts?.Cancel();
+      _loadJobsCts?.Dispose();
+      _loadJobsCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = LoadJobsAsync(_loadJobsCts.Token);
     }
 
     partial void OnSelectedProjectIdChanged(string? value)
     {
-      _ = LoadJobsAsync(CancellationToken.None);
+      _loadJobsCts?.Cancel();
+      _loadJobsCts?.Dispose();
+      _loadJobsCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = LoadJobsAsync(_loadJobsCts.Token);
       CreateJobCommand.NotifyCanExecuteChanged();
     }
 
@@ -429,8 +444,8 @@ namespace VoiceStudio.App.Views.Panels
           _toastNotificationService?.ShowSuccess($"Job '{job.Name}' completed successfully");
         }
 
-        // Refresh quality statistics when a job completes
-        await LoadQualityStatisticsAsync(CancellationToken.None);
+        // Refresh quality statistics when a job completes (use _disposalCts so disposal cancels)
+        await LoadQualityStatisticsAsync(_disposalCts.Token);
       });
     }
 
@@ -481,8 +496,8 @@ namespace VoiceStudio.App.Views.Panels
         {
           _isPolling = true;
           // Load once, then rely on WebSocket for updates
-          _ = LoadJobsAsync(CancellationToken.None);
-          _ = LoadQueueStatusAsync(CancellationToken.None);
+          _ = LoadJobsAsync(_disposalCts.Token);
+          _ = LoadQueueStatusAsync(_disposalCts.Token);
         }
         return;
       }
@@ -541,7 +556,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var jobsList = await _backendClient.GetBatchJobsAsync(SelectedProjectId, FilterStatus, cancellationToken);
+        var jobsList = await _batchClient.GetBatchJobsAsync(SelectedProjectId, FilterStatus, cancellationToken);
 
         Jobs.Clear();
         foreach (var job in jobsList.OrderByDescending(j => j.Created))
@@ -592,7 +607,7 @@ namespace VoiceStudio.App.Views.Panels
           EnhanceQuality = EnhanceQuality // IDEA 57
         };
 
-        var job = await _backendClient.CreateBatchJobAsync(request, cancellationToken);
+        var job = await _batchClient.CreateBatchJobAsync(request, cancellationToken);
 
         Jobs.Insert(0, job);
         SelectedJob = job;
@@ -602,7 +617,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           var action = new CreateBatchJobAction(
               Jobs,
-              _backendClient,
+              _batchClient,
               job,
               onUndo: (j) =>
               {
@@ -659,7 +674,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var success = await _backendClient.DeleteBatchJobAsync(job.Id, cancellationToken);
+        var success = await _batchClient.DeleteBatchJobAsync(job.Id, cancellationToken);
         if (success)
         {
           var originalIndex = Jobs.IndexOf(job);
@@ -676,7 +691,7 @@ namespace VoiceStudio.App.Views.Panels
           {
             var action = new DeleteBatchJobAction(
                 Jobs,
-                _backendClient,
+                _batchClient,
                 job,
                 originalIndex,
                 onUndo: (j) => SelectedJob = j,
@@ -726,7 +741,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var updatedJob = await _backendClient.StartBatchJobAsync(job.Id, cancellationToken);
+        var updatedJob = await _batchClient.StartBatchJobAsync(job.Id, cancellationToken);
 
         // Update job in collection
         var index = Jobs.IndexOf(job);
@@ -772,7 +787,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var updatedJob = await _backendClient.CancelBatchJobAsync(job.Id, cancellationToken);
+        var updatedJob = await _batchClient.CancelBatchJobAsync(job.Id, cancellationToken);
 
         // Update job in collection
         var index = Jobs.IndexOf(job);
@@ -809,7 +824,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       try
       {
-        QueueStatus = await _backendClient.GetBatchQueueStatusAsync(cancellationToken);
+        QueueStatus = await _batchClient.GetBatchQueueStatusAsync(cancellationToken);
       }
       catch (OperationCanceledException)
       {
@@ -983,10 +998,16 @@ namespace VoiceStudio.App.Views.Panels
 
     partial void OnSelectedJobChanged(BatchJob? value)
     {
-      // Auto-load quality report when job is selected (IDEA 57)
+      // Cancel any in-flight load for the previous selection to prevent stale data overwrite
+      _selectedJobLoadCts?.Cancel();
+      _selectedJobLoadCts?.Dispose();
+      _selectedJobLoadCts = null;
+
       if (value != null && value.Status == JobStatus.Completed)
       {
-        _ = LoadQualityReportAsync(value, System.Threading.CancellationToken.None);
+        _selectedJobLoadCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+        var token = _selectedJobLoadCts.Token;
+        _ = LoadQualityReportAsync(value, token);
       }
       else
       {
@@ -1006,19 +1027,26 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var report = await _backendClient.GetBatchQualityReportAsync(job.Id, cancellationToken);
-        SelectedJobQualityReport = report;
-        HasQualityReport = report != null;
+        var report = await _batchClient.GetBatchQualityReportAsync(job.Id, cancellationToken);
+        // Staleness guard: only apply if selection has not changed
+        if (SelectedJob?.Id == job.Id)
+        {
+          SelectedJobQualityReport = report;
+          HasQualityReport = report != null;
+        }
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return; // User cancelled or selection changed
       }
       catch (Exception ex)
       {
         await HandleErrorAsync(ex, "LoadQualityReport");
-        SelectedJobQualityReport = null;
-        HasQualityReport = false;
+        if (SelectedJob?.Id == job.Id)
+        {
+          SelectedJobQualityReport = null;
+          HasQualityReport = false;
+        }
       }
       finally
       {
@@ -1032,7 +1060,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        QualityStatistics = await _backendClient.GetBatchQualityStatisticsAsync(SelectedProjectId, FilterStatus, cancellationToken);
+        QualityStatistics = await _batchClient.GetBatchQualityStatisticsAsync(SelectedProjectId, FilterStatus, cancellationToken);
       }
       catch (OperationCanceledException)
       {
@@ -1064,7 +1092,7 @@ namespace VoiceStudio.App.Views.Panels
           QualityMode = null
         };
 
-        var retryJob = await _backendClient.RetryBatchJobWithQualityAsync(job.Id, request, cancellationToken);
+        var retryJob = await _batchClient.RetryBatchJobWithQualityAsync(job.Id, request, cancellationToken);
 
         // Add to jobs list
         Jobs.Insert(0, retryJob);
@@ -1084,6 +1112,31 @@ namespace VoiceStudio.App.Views.Panels
       {
         IsLoading = false;
       }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+      if (disposing)
+      {
+        _isPolling = false;
+        _disposalCts.Cancel();
+        _disposalCts.Dispose();
+        _selectedJobLoadCts?.Cancel();
+        _selectedJobLoadCts?.Dispose();
+        _selectedJobLoadCts = null;
+        _loadJobsCts?.Cancel();
+        _loadJobsCts?.Dispose();
+        _loadJobsCts = null;
+        _pollingCts?.Cancel();
+        _pollingCts?.Dispose();
+        _pollingCts = null;
+        if (_jobProgressClient != null)
+        {
+          UnsubscribeFromWebSocketEvents();
+          _jobProgressClient.Dispose();
+        }
+      }
+      base.Dispose(disposing);
     }
   }
 }

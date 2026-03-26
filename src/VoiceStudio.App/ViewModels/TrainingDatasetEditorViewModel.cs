@@ -20,11 +20,11 @@ namespace VoiceStudio.App.ViewModels
   public partial class TrainingDatasetEditorViewModel : BaseViewModel, IPanelView
   {
     private readonly ITrainingClient _trainingClient;
-    private readonly IBackendClient _backendClient;
+    private readonly ITrainingDatasetEditorClient _datasetEditorClient;
     private readonly UndoRedoService? _undoRedoService;
     private readonly ToastNotificationService? _toastNotificationService;
 
-    public string PanelId => "training-dataset-editor";
+    public string PanelId => PanelIds.TrainingDatasetEditor;
     public string DisplayName => ResourceHelper.GetString("Panel.TrainingDatasetEditor.DisplayName", "Dataset Editor");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -55,11 +55,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<string> validationWarnings = new();
 
-    public TrainingDatasetEditorViewModel(IViewModelContext context, ITrainingClient trainingClient, IBackendClient backendClient)
+    public TrainingDatasetEditorViewModel(IViewModelContext context, ITrainingClient trainingClient, ITrainingDatasetEditorClient datasetEditorClient)
         : base(context)
     {
       _trainingClient = trainingClient ?? throw new ArgumentNullException(nameof(trainingClient));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _datasetEditorClient = datasetEditorClient ?? throw new ArgumentNullException(nameof(datasetEditorClient));
 
       // Get undo/redo service (may be null if not initialized)
       try
@@ -89,9 +89,14 @@ namespace VoiceStudio.App.ViewModels
       RemoveAudioCommand = new AsyncRelayCommand<DatasetAudioFileItem>(RemoveAudioAsync);
       ValidateCommand = new AsyncRelayCommand(ValidateDatasetAsync);
       RefreshCommand = new AsyncRelayCommand(RefreshAsync);
+    }
 
-      // Load initial data
-      _ = LoadAvailableDatasetsAsync(CancellationToken.None);
+    /// <summary>
+    /// Initialize dataset list. Call from View Loaded event (ADR-047).
+    /// </summary>
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+      await LoadAvailableDatasetsAsync(cancellationToken);
     }
 
     public IAsyncRelayCommand LoadDatasetCommand { get; }
@@ -146,12 +151,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var detail = await _backendClient.SendRequestAsync<object, DatasetDetail>(
-            $"/api/dataset-editor/{Uri.EscapeDataString(SelectedDatasetId)}",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var detail = await _datasetEditorClient.GetDatasetDetailAsync(SelectedDatasetId, cancellationToken);
 
         if (detail != null)
         {
@@ -197,19 +197,12 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          audio_id = NewAudioId,
-          transcript = NewTranscript,
-          order = (int?)null
-        };
-
-        var updated = await _backendClient.SendRequestAsync<object, DatasetDetail>(
-            $"/api/dataset-editor/{Uri.EscapeDataString(SelectedDatasetId)}/audio",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var updated = await _datasetEditorClient.AddAudioAsync(
+            SelectedDatasetId,
+            NewAudioId,
+            NewTranscript,
+            null,
+            cancellationToken);
 
         if (updated != null)
         {
@@ -226,7 +219,7 @@ namespace VoiceStudio.App.ViewModels
             var action = new AddDatasetAudioAction(
                 DatasetDetail,
                 addedAudioFile,
-                _backendClient,
+                _datasetEditorClient,
                 onUndo: (af) =>
                 {
                   if (SelectedAudioFile?.Id == af.Id)
@@ -277,18 +270,12 @@ namespace VoiceStudio.App.ViewModels
         var originalTranscript = audioFile.Transcript;
         var originalOrder = audioFile.Order;
 
-        var request = new
-        {
-          transcript = audioFile.Transcript,
-          order = audioFile.Order
-        };
-
-        var updated = await _backendClient.SendRequestAsync<object, DatasetDetail>(
-            $"/api/dataset-editor/{Uri.EscapeDataString(SelectedDatasetId)}/audio/{Uri.EscapeDataString(audioFile.Id)}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var updated = await _datasetEditorClient.UpdateAudioAsync(
+            SelectedDatasetId,
+            audioFile.Id,
+            audioFile.Transcript,
+            audioFile.Order,
+            cancellationToken);
 
         if (updated != null)
         {
@@ -309,7 +296,7 @@ namespace VoiceStudio.App.ViewModels
               var action = new UpdateDatasetAudioAction(
                   DatasetDetail,
                   audioFileInDetail,
-                  _backendClient,
+                  _datasetEditorClient,
                   originalTranscript ?? string.Empty,
                   originalOrder,
                   newTranscript ?? string.Empty,
@@ -359,12 +346,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var updated = await _backendClient.SendRequestAsync<object, DatasetDetail>(
-            $"/api/dataset-editor/{Uri.EscapeDataString(SelectedDatasetId)}/audio/{Uri.EscapeDataString(audioFile.Id)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        var updated = await _datasetEditorClient.RemoveAudioAsync(SelectedDatasetId, audioFile.Id, cancellationToken);
 
         if (updated != null)
         {
@@ -383,7 +365,7 @@ namespace VoiceStudio.App.ViewModels
             var action = new RemoveDatasetAudioAction(
                 DatasetDetail,
                 audioFileToRemove,
-                _backendClient,
+                _datasetEditorClient,
                 originalIndex,
                 onUndo: (af) => SelectedAudioFile = af,
                 onRedo: (af) =>
@@ -432,11 +414,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var response = await _backendClient.SendRequestAsync<object, DatasetValidateResponse>(
-            $"/api/dataset-editor/{Uri.EscapeDataString(SelectedDatasetId)}/validate",
-            null,
-            System.Net.Http.HttpMethod.Post
-        );
+        var response = await _datasetEditorClient.ValidateDatasetAsync(SelectedDatasetId, cancellationToken);
 
         if (response != null)
         {
@@ -516,15 +494,16 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Response models
-    private class DatasetValidateResponse
-    {
-      public bool Valid { get; set; }
-      public string[] Errors { get; set; } = Array.Empty<string>();
-      public string[] Warnings { get; set; } = Array.Empty<string>();
-      public double TotalDuration { get; set; }
-      public int TotalFiles { get; set; }
-    }
+  }
+
+  // Response models (public for ITrainingDatasetEditorClient)
+  public class DatasetValidateResponse
+  {
+    public bool Valid { get; set; }
+    public string[] Errors { get; set; } = Array.Empty<string>();
+    public string[] Warnings { get; set; } = Array.Empty<string>();
+    public double TotalDuration { get; set; }
+    public int TotalFiles { get; set; }
   }
 
   // Data models

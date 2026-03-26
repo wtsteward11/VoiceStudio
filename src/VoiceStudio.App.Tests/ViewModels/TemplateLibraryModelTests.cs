@@ -1,6 +1,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Collections.Generic;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.Core.Models;
 
 namespace VoiceStudio.App.Tests.ViewModels
 {
@@ -12,7 +13,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void Template_DefaultValues()
         {
-            var template = new Template();
+            var template = new TemplateLibraryTemplate();
 
             Assert.AreEqual(string.Empty, template.Id);
             Assert.AreEqual(string.Empty, template.Name);
@@ -37,7 +38,7 @@ namespace VoiceStudio.App.Tests.ViewModels
             var projectData = new Dictionary<string, object> { { "key1", "value1" } };
             var tags = new List<string> { "tag1", "tag2" };
 
-            var template = new Template
+            var template = new TemplateLibraryTemplate
             {
                 Id = "template123",
                 Name = "My Template",
@@ -76,7 +77,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void TemplateItem_CreatedFromTemplate()
         {
-            var template = new Template
+            var template = new TemplateLibraryTemplate
             {
                 Id = "t1",
                 Name = "Test Template",
@@ -105,7 +106,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void TemplateItem_UpdateFrom_UpdatesProperties()
         {
-            var original = new Template
+            var original = new TemplateLibraryTemplate
             {
                 Id = "t1",
                 Name = "Original Name",
@@ -116,7 +117,7 @@ namespace VoiceStudio.App.Tests.ViewModels
             };
             var item = new TemplateItem(original);
 
-            var updated = new Template
+            var updated = new TemplateLibraryTemplate
             {
                 Name = "Updated Name",
                 Category = "Cat2",
@@ -138,7 +139,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void TemplateItem_NullablePropertiesAllowNull()
         {
-            var template = new Template
+            var template = new TemplateLibraryTemplate
             {
                 Id = "t1",
                 Name = "Name",

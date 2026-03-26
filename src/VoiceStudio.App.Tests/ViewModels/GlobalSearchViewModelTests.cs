@@ -17,22 +17,22 @@ namespace VoiceStudio.App.Tests.ViewModels
   [TestClass]
   public class GlobalSearchViewModelTests : TestBase
   {
-    private MockBackendClient? _mockBackendClient;
+    private MockSearchClient? _mockSearchClient;
     private GlobalSearchViewModel? _viewModel;
 
     [TestInitialize]
     public override void TestInitialize()
     {
       base.TestInitialize();
-      _mockBackendClient = new MockBackendClient();
-      _viewModel = new GlobalSearchViewModel(_mockBackendClient);
+      _mockSearchClient = new MockSearchClient();
+      _viewModel = new GlobalSearchViewModel(_mockSearchClient);
     }
 
     [TestCleanup]
     public override void TestCleanup()
     {
       _viewModel = null;
-      _mockBackendClient = null;
+      _mockSearchClient = null;
       base.TestCleanup();
     }
 
@@ -48,7 +48,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       // Assert
       Assert.AreEqual(0, _viewModel.Results.Count);
       Assert.AreEqual(0, _viewModel.TotalResults);
-      Assert.AreEqual(0, _mockBackendClient!.SearchCallCount);
+      Assert.AreEqual(0, _mockSearchClient!.SearchCallCount);
     }
 
     [TestMethod]
@@ -63,14 +63,14 @@ namespace VoiceStudio.App.Tests.ViewModels
       // Assert
       Assert.AreEqual(0, _viewModel.Results.Count);
       Assert.AreEqual(0, _viewModel.TotalResults);
-      Assert.AreEqual(0, _mockBackendClient!.SearchCallCount);
+      Assert.AreEqual(0, _mockSearchClient!.SearchCallCount);
     }
 
     [TestMethod]
     public async Task SearchAsync_ValidQuery_SearchesBackend()
     {
       // Arrange
-      _mockBackendClient!.SearchResponse = new SearchResponse
+      _mockSearchClient!.SearchResponse = new SearchResponse
       {
         Results = new List<SearchResultItem>
                 {
@@ -87,8 +87,8 @@ namespace VoiceStudio.App.Tests.ViewModels
       // Assert - explicit SearchAsync() yields 1 backend call; debounce would add another if Dispatcher ran
       Assert.AreEqual(1, _viewModel.Results.Count);
       Assert.AreEqual(1, _viewModel.TotalResults);
-      Assert.AreEqual(1, _mockBackendClient.SearchCallCount);
-      Assert.AreEqual("test", _mockBackendClient.LastSearchQuery);
+      Assert.AreEqual(1, _mockSearchClient.SearchCallCount);
+      Assert.AreEqual("test", _mockSearchClient.LastSearchQuery);
     }
 
     [TestMethod]
@@ -100,7 +100,7 @@ namespace VoiceStudio.App.Tests.ViewModels
                 new SearchResultItem { Id = "1", Title = "Result 1", Type = "profile" },
                 new SearchResultItem { Id = "2", Title = "Result 2", Type = "project" }
             };
-      _mockBackendClient!.SearchResponse = new SearchResponse
+      _mockSearchClient!.SearchResponse = new SearchResponse
       {
         Results = results,
         TotalResults = 2,
@@ -124,7 +124,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     {
       // Arrange
       var firstResult = new SearchResultItem { Id = "1", Title = "First Result", Type = "profile" };
-      _mockBackendClient!.SearchResponse = new SearchResponse
+      _mockSearchClient!.SearchResponse = new SearchResponse
       {
         Results = new List<SearchResultItem> { firstResult },
         TotalResults = 1,
@@ -145,7 +145,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public async Task SearchAsync_Error_SetsErrorMessage()
     {
       // Arrange
-      _mockBackendClient!.SearchException = new Exception("Backend error");
+      _mockSearchClient!.SearchException = new Exception("Backend error");
       _viewModel!.SearchQuery = "test";
 
       // Act
@@ -163,7 +163,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     {
       // Arrange
       // First, do a successful search
-      _mockBackendClient!.SearchResponse = new SearchResponse
+      _mockSearchClient!.SearchResponse = new SearchResponse
       {
         Results = new List<SearchResultItem> { new SearchResultItem { Id = "1", Title = "Result", Type = "profile" } },
         TotalResults = 1,
@@ -173,7 +173,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       await _viewModel.SearchAsync();
 
       // Now cause an error
-      _mockBackendClient.SearchException = new Exception("Backend error");
+      _mockSearchClient.SearchException = new Exception("Backend error");
       _viewModel.SearchQuery = "error";
 
       // Act
@@ -191,8 +191,8 @@ namespace VoiceStudio.App.Tests.ViewModels
     {
       // Arrange
       var blocker = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-      _mockBackendClient!.SearchBlocker = blocker;
-      _mockBackendClient!.SearchResponse = new SearchResponse
+      _mockSearchClient!.SearchBlocker = blocker;
+      _mockSearchClient!.SearchResponse = new SearchResponse
       {
         Results = new List<SearchResultItem>(),
         TotalResults = 0,
@@ -226,7 +226,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public async Task OnSearchQueryChanged_DebouncesSearch()
     {
       // Arrange
-      _mockBackendClient!.SearchResponse = new SearchResponse
+      _mockSearchClient!.SearchResponse = new SearchResponse
       {
         Results = new List<SearchResultItem>(),
         TotalResults = 0,
@@ -238,7 +238,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
       // Assert: within 100ms, debounce has not fired yet (no backend call)
       await Task.Delay(100);
-      Assert.AreEqual(0, _mockBackendClient.SearchCallCount, "Debounce should delay search; no call within 100ms");
+      Assert.AreEqual(0, _mockSearchClient.SearchCallCount, "Debounce should delay search; no call within 100ms");
     }
 
   }

@@ -12,7 +12,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateBatchJobAction : IUndoableAction
   {
     private readonly ObservableCollection<BatchJob> _jobs;
-    private readonly IBackendClient _backendClient;
+    private readonly IBatchProcessingClient _batchClient;
     private readonly BatchJob _job;
     private readonly Action<BatchJob>? _onUndo;
     private readonly Action<BatchJob>? _onRedo;
@@ -21,13 +21,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateBatchJobAction(
         ObservableCollection<BatchJob> jobs,
-        IBackendClient backendClient,
+        IBatchProcessingClient batchClient,
         BatchJob job,
         Action<BatchJob>? onUndo = null,
         Action<BatchJob>? onRedo = null)
     {
       _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _batchClient = batchClient ?? throw new ArgumentNullException(nameof(batchClient));
       _job = job ?? throw new ArgumentNullException(nameof(job));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -59,7 +59,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteBatchJobAction : IUndoableAction
   {
     private readonly ObservableCollection<BatchJob> _jobs;
-    private readonly IBackendClient _backendClient;
+    private readonly IBatchProcessingClient _batchClient;
     private readonly BatchJob _job;
     private readonly int _originalIndex;
     private readonly Action<BatchJob>? _onUndo;
@@ -69,14 +69,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteBatchJobAction(
         ObservableCollection<BatchJob> jobs,
-        IBackendClient backendClient,
+        IBatchProcessingClient batchClient,
         BatchJob job,
         int originalIndex,
         Action<BatchJob>? onUndo = null,
         Action<BatchJob>? onRedo = null)
     {
       _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _batchClient = batchClient ?? throw new ArgumentNullException(nameof(batchClient));
       _job = job ?? throw new ArgumentNullException(nameof(job));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

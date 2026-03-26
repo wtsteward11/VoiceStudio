@@ -20,8 +20,8 @@ namespace VoiceStudio.App.Views.Panels
     public VideoEditView()
     {
       this.InitializeComponent();
-      var backendClient = VoiceStudio.App.Services.ServiceProvider.GetBackendClient();
-      ViewModel = new VideoEditViewModel(AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(), backendClient);
+      var videoEditClient = VoiceStudio.App.Services.ServiceProvider.GetVideoEditClient();
+      ViewModel = new VideoEditViewModel(AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(), videoEditClient);
       this.DataContext = ViewModel;
 
       // Initialize services

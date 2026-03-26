@@ -90,14 +90,37 @@ namespace VoiceStudio.App
         }
 
         var outIdx = Array.FindIndex(args, a => string.Equals(a, "--out", StringComparison.OrdinalIgnoreCase));
+        var hasIconLaunchSmoke = HasFlag(args, "--icon-launch-smoke") || HasFlag(args, "--smoke-icon");
         if (outIdx >= 0 && outIdx + 1 < args.Length)
         {
-          Environment.SetEnvironmentVariable("VOICE_STUDIO_UI_SELF_TEST_OUT", args[outIdx + 1]);
+          if (hasIconLaunchSmoke)
+            Environment.SetEnvironmentVariable("VOICE_STUDIO_ICON_LAUNCH_SMOKE_OUT", args[outIdx + 1]);
+          else
+            Environment.SetEnvironmentVariable("VOICE_STUDIO_UI_SELF_TEST_OUT", args[outIdx + 1]);
         }
 
         if (HasFlag(args, "--smoke-exit"))
         {
           Environment.SetEnvironmentVariable("VOICE_STUDIO_SMOKE_EXIT", "1");
+        }
+
+        // Icon-launch smoke: normal path (MainWindow + overlay, StartBackendWithTracking).
+        // Do NOT set VOICE_STUDIO_SMOKE_UI — we exercise the icon path, not the awaited path.
+        if (hasIconLaunchSmoke)
+        {
+          Environment.SetEnvironmentVariable("VOICE_STUDIO_ICON_LAUNCH_SMOKE", "1");
+        }
+
+        // Failure-path smoke: expect BackendFailed (e.g. port occupied). App writes summary and exits.
+        if (HasFlag(args, "--smoke-failure-port"))
+        {
+          Environment.SetEnvironmentVariable("VOICE_STUDIO_SMOKE_FAILURE_PORT", "1");
+        }
+
+        // Failure-path smoke: expect BackendFailed (runtime/app root invalid). App writes summary and exits.
+        if (HasFlag(args, "--smoke-failure-runtime") || HasFlag(args, "--smoke-failure-app-root"))
+        {
+          Environment.SetEnvironmentVariable("VOICE_STUDIO_SMOKE_FAILURE_RUNTIME", "1");
         }
       }
       catch (Exception ex)

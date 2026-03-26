@@ -18,9 +18,9 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the TagManagerView panel - Tag management.
   /// </summary>
-  public partial class TagManagerViewModel : BaseViewModel, IPanelView
+  public partial class TagManagerViewModel : BaseViewModel, IPanelView, ILifecyclePanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ITagManagerClient _tagManagerClient;
     private readonly IDialogService _dialogService;
     private readonly UndoRedoService? _undoRedoService;
     private readonly ToastNotificationService? _toastNotificationService;
@@ -29,7 +29,7 @@ namespace VoiceStudio.App.ViewModels
     private CancellationTokenSource? _searchDebounceCts;
     private const int SearchDebounceMs = 300;
 
-    public string PanelId => "tag_manager";
+    public string PanelId => PanelIds.TagManager;
     public string DisplayName => ResourceHelper.GetString("Panel.TagManager.DisplayName", "Tag Manager");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -72,10 +72,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? editingDescription;
 
-    public TagManagerViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService)
+    public TagManagerViewModel(IViewModelContext context, ITagManagerClient tagManagerClient, IDialogService dialogService)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _tagManagerClient = tagManagerClient ?? throw new ArgumentNullException(nameof(tagManagerClient));
       _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
       // Get undo/redo service (may be null if not initialized)
@@ -132,10 +132,21 @@ namespace VoiceStudio.App.ViewModels
         }
       };
 
-      // Load initial data
-      _ = LoadCategoriesAsync(CancellationToken.None);
-      _ = LoadTagsAsync(CancellationToken.None);
+      // No constructor fire-and-forget — load from View Loaded via OnActivatedAsync (RETAINED_ASYNC_RULE)
     }
+
+    /// <inheritdoc />
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      await LoadCategoriesAsync(cancellationToken);
+      await LoadTagsAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => LoadTagsAsync(cancellationToken);
 
     public IAsyncRelayCommand LoadTagsCommand { get; }
     public IAsyncRelayCommand SearchTagsCommand { get; }
@@ -160,28 +171,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (!string.IsNullOrEmpty(SelectedCategory))
-          queryParams.Add("category", SelectedCategory);
-        if (!string.IsNullOrEmpty(SearchQuery))
-          queryParams.Add("search", SearchQuery);
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/tags";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var tags = await _backendClient.SendRequestAsync<object, Tag[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var tags = await _tagManagerClient.GetTagsAsync(SelectedCategory, SearchQuery, cancellationToken);
 
         Tags.Clear();
         if (tags != null)
@@ -224,20 +214,8 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          name = ResourceHelper.GetString("TagManager.NewTag", "New Tag"),
-          category = (string?)null,
-          color = (string?)null,
-          description = (string?)null
-        };
-
-        var created = await _backendClient.SendRequestAsync<object, Tag>(
-            "/api/tags",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var name = ResourceHelper.GetString("TagManager.NewTag", "New Tag");
+        var created = await _tagManagerClient.CreateTagAsync(name, null, null, null, cancellationToken);
 
         if (created != null)
         {
@@ -250,7 +228,7 @@ namespace VoiceStudio.App.ViewModels
           {
             var action = new CreateTagAction(
                 Tags,
-                _backendClient,
+                _tagManagerClient,
                 tagItem,
                 onUndo: (t) =>
                 {
@@ -295,20 +273,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          name = tag.Name,
-          category = tag.Category,
-          color = tag.Color,
-          description = tag.Description
-        };
-
-        var updated = await _backendClient.SendRequestAsync<object, Tag>(
-            $"/api/tags/{tag.Id}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var updated = await _tagManagerClient.UpdateTagAsync(tag.Id, tag.Name ?? string.Empty, tag.Category, tag.Color, tag.Description, cancellationToken);
 
         if (updated != null)
         {
@@ -345,11 +310,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/tags/{tag.Id}",
-            null,
-            System.Net.Http.HttpMethod.Delete
-        );
+        await _tagManagerClient.DeleteTagAsync(tag.Id, cancellationToken);
 
         var tagToDelete = tag;
         var originalIndex = Tags.IndexOf(tag);
@@ -364,7 +325,7 @@ namespace VoiceStudio.App.ViewModels
         {
           var action = new DeleteTagAction(
               Tags,
-              _backendClient,
+              _tagManagerClient,
               tagToDelete,
               originalIndex,
               onUndo: (t) => SelectedTag = t,
@@ -432,19 +393,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
-        {
-          name = EditingName,
-          category = EditingCategory,
-          color = EditingColor,
-          description = EditingDescription
-        };
-
-        var updated = await _backendClient.SendRequestAsync<object, Tag>(
-            $"/api/tags/{SelectedTag.Id}",
-            request,
-            System.Net.Http.HttpMethod.Put
-        );
+        var updated = await _tagManagerClient.UpdateTagAsync(SelectedTag.Id, EditingName, EditingCategory, EditingColor, EditingDescription, cancellationToken);
 
         if (updated != null)
         {
@@ -481,12 +430,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/tags/merge?source_tag_id={sourceTag.Id}&target_tag_id={SelectedTag.Id}",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _tagManagerClient.MergeTagsAsync(sourceTag.Id, SelectedTag.Id, cancellationToken);
 
         await LoadTagsAsync(cancellationToken);
         StatusMessage = ResourceHelper.FormatString("TagManager.TagsMerged", SelectedTag.Name);
@@ -512,12 +456,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, TagCategoriesResponse>(
-            "/api/tags/categories/list",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _tagManagerClient.GetCategoriesAsync(cancellationToken);
 
         AvailableCategories.Clear();
         if (response?.Categories != null)
@@ -648,10 +587,7 @@ namespace VoiceStudio.App.ViewModels
 
           try
           {
-            await _backendClient.SendRequestAsync<object, object>(
-                $"/api/tags/{Uri.EscapeDataString(tagId)}",
-                null,
-                System.Net.Http.HttpMethod.Delete,
+            await _tagManagerClient.DeleteTagAsync(tagId,
                 cancellationToken
             );
 
@@ -724,8 +660,8 @@ namespace VoiceStudio.App.ViewModels
       DeleteSelectedTagsCommand.NotifyCanExecuteChanged();
     }
 
-    // Response models
-    private class TagCategoriesResponse
+    // Response models (public for ITagManagerClient)
+    public class TagCategoriesResponse
     {
       public string[] Categories { get; set; } = Array.Empty<string>();
     }

@@ -16,7 +16,7 @@ namespace VoiceStudio.App.Views.Panels
   /// </summary>
   public partial class TagOrganizationViewModel : ObservableObject
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ITagOrganizationClient _tagOrganizationClient;
     private readonly IProfilesClient _profilesClient;
 
     [ObservableProperty]
@@ -38,9 +38,9 @@ namespace VoiceStudio.App.Views.Panels
     public bool IsHierarchyView => ViewMode == "Hierarchy";
     public bool IsListView => ViewMode == "List";
 
-    public TagOrganizationViewModel(IBackendClient backendClient, IProfilesClient profilesClient)
+    public TagOrganizationViewModel(ITagOrganizationClient tagOrganizationClient, IProfilesClient profilesClient)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _tagOrganizationClient = tagOrganizationClient ?? throw new ArgumentNullException(nameof(tagOrganizationClient));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       RefreshCommand = new AsyncRelayCommand(RefreshAsync);
     }
@@ -62,8 +62,7 @@ namespace VoiceStudio.App.Views.Panels
       try
       {
         // Update tag name via backend API
-        var request = new { tag_id = tagId, new_name = newName };
-        await _backendClient.SendRequestAsync<object, object>("/api/tags/update", request);
+        await _tagOrganizationClient.UpdateTagAsync(tagId, newName);
         await RefreshAsync();
       }
       catch (Exception ex)

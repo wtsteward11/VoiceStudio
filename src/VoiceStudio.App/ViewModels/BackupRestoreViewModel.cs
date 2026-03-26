@@ -6,9 +6,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using VoiceStudio.App.Logging;
 using VoiceStudio.App.Utilities;
 using Windows.Storage;
 using Windows.Storage.Pickers;
@@ -18,13 +20,18 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the BackupRestoreView panel - Backup and restore system.
   /// </summary>
-  public partial class BackupRestoreViewModel : BaseViewModel, IPanelView
+  public partial class BackupRestoreViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IBackupRestoreClient _backupRestoreClient;
+    private readonly IEventAggregator? _eventAggregator;
+    private readonly EnhancedAsyncRelayCommand<BackupItem> _restoreBackupCommandImpl;
 
-    public string PanelId => "backup_restore";
+    public string PanelId => PanelIds.BackupRestore;
     public string DisplayName => ResourceHelper.GetString("Panel.BackupRestore.DisplayName", "Backup & Restore");
     public PanelRegion Region => PanelRegion.Right;
+
+    /// <summary>Label for slice 3 cancel button (resource-backed).</summary>
+    public string CancelRestoreButtonText => ResourceHelper.GetString("BackupRestore.CancelRestore", "Cancel restore");
 
     [ObservableProperty]
     private ObservableCollection<BackupItem> backups = new();
@@ -68,10 +75,29 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool restoreModels;
 
-    public BackupRestoreViewModel(IViewModelContext context, IBackendClient backendClient)
+    /// <summary>Pass 06 slice 3: shown while restore RPC is in flight (shorter vs models hint).</summary>
+    [ObservableProperty]
+    private string? restoreBusyDetail;
+
+    /// <summary>
+    /// Pass 06 slice 4 (D4): always-visible merge expectation — restore merges into existing data dirs; not a full wipe.
+    /// </summary>
+    public string RestoreMergeExpectationHint =>
+        ResourceHelper.GetString(
+            "BackupRestore.RestoreMergeExpectationHint",
+            "Before you restore: files from the backup are merged into your existing VoiceStudio data folders "
+            + "(profiles, projects, settings, and models). They overwrite matching paths where names line up; other files already on disk may remain. "
+            + "This is not a complete wipe or replacement of those folders.");
+
+    /// <param name="eventAggregator">Optional; when present, <see cref="BackupRestoredEvent"/> is published after a successful restore (Pass 06).</param>
+    public BackupRestoreViewModel(
+        IViewModelContext context,
+        IBackupRestoreClient backupRestoreClient,
+        IEventAggregator? eventAggregator = null)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _backupRestoreClient = backupRestoreClient ?? throw new ArgumentNullException(nameof(backupRestoreClient));
+      _eventAggregator = eventAggregator;
 
       LoadBackupsCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -88,11 +114,15 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("DownloadBackup");
         await DownloadBackupAsync(backup, ct);
       });
-      RestoreBackupCommand = new EnhancedAsyncRelayCommand<BackupItem>(async (backup, ct) =>
+      _restoreBackupCommandImpl = new EnhancedAsyncRelayCommand<BackupItem>(async (backup, ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("RestoreBackup");
         await RestoreBackupAsync(backup, ct);
       });
+      RestoreBackupCommand = _restoreBackupCommandImpl;
+      CancelRestoreCommand = new RelayCommand(
+          () => _restoreBackupCommandImpl.Cancel(),
+          () => IsRestoring);
       DeleteBackupCommand = new EnhancedAsyncRelayCommand<BackupItem>(async (backup, ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("DeleteBackup");
@@ -103,15 +133,24 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("UploadBackup");
         await UploadBackupAsync(ct);
       });
-
-      // Load initial data
-      _ = LoadBackupsAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) =>
+      LoadBackupsAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) =>
+      LoadBackupsAsync(cancellationToken);
 
     public IAsyncRelayCommand LoadBackupsCommand { get; }
     public IAsyncRelayCommand CreateBackupCommand { get; }
     public IAsyncRelayCommand<BackupItem> DownloadBackupCommand { get; }
     public IAsyncRelayCommand<BackupItem> RestoreBackupCommand { get; }
+    public IRelayCommand CancelRestoreCommand { get; }
     public IAsyncRelayCommand<BackupItem> DeleteBackupCommand { get; }
     public IAsyncRelayCommand UploadBackupCommand { get; }
 
@@ -122,7 +161,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var backups = await _backendClient.GetBackupsAsync(cancellationToken);
+        var backups = await _backupRestoreClient.GetBackupsAsync(cancellationToken);
 
         Backups.Clear();
         if (backups != null)
@@ -172,7 +211,7 @@ namespace VoiceStudio.App.ViewModels
           Description = BackupDescription
         };
 
-        var created = await _backendClient.CreateBackupAsync(createRequest, cancellationToken);
+        var created = await _backupRestoreClient.CreateBackupAsync(createRequest, cancellationToken);
 
         if (created != null)
         {
@@ -216,7 +255,7 @@ namespace VoiceStudio.App.ViewModels
       try
       {
         // Get download stream from backend
-        await using var stream = await _backendClient.DownloadBackupAsync(backup.Id, cancellationToken);
+        await using var stream = await _backupRestoreClient.DownloadBackupAsync(backup.Id, cancellationToken);
 
         // Show file save picker
         var savePicker = new FileSavePicker();
@@ -266,6 +305,13 @@ namespace VoiceStudio.App.ViewModels
       IsLoading = true;
       IsRestoring = true;
       ErrorMessage = null;
+      RestoreBusyDetail = RestoreModels
+          ? ResourceHelper.GetString(
+              "BackupRestore.RestoreBusyDetailWithModels",
+              "Restoring backup… Copying models can take several minutes. You can cancel to stop the request (the server may still finish writing).")
+          : ResourceHelper.GetString(
+              "BackupRestore.RestoreBusyDetailDefault",
+              "Restoring backup…");
 
       try
       {
@@ -278,13 +324,41 @@ namespace VoiceStudio.App.ViewModels
           RestoreModels = RestoreModels
         };
 
-        await _backendClient.RestoreBackupAsync(backup.Id, request, cancellationToken);
+        await _backupRestoreClient.RestoreBackupAsync(backup.Id, request, cancellationToken);
 
-        StatusMessage = ResourceHelper.FormatString("BackupRestore.BackupRestoredSuccess", backup.Name);
+        if (_eventAggregator != null)
+        {
+          try
+          {
+            await _eventAggregator.PublishAsync(new BackupRestoredEvent(
+                PanelIds.BackupRestore,
+                RestoreProjects,
+                RestoreProfiles,
+                RestoreSettings,
+                RestoreModels));
+          }
+          catch (Exception ex)
+          {
+            ErrorLogger.LogWarning(
+                $"Post-restore session refresh failed: {ex.Message}",
+                "BackupRestoreViewModel.RestoreBackupAsync");
+            StatusMessage = ResourceHelper.FormatString(
+                "BackupRestore.RestoreDiskOnlyPartialRefresh",
+                backup.Name,
+                ex.Message);
+            return;
+          }
+        }
+
+        var sessionKey = ResolveRestoreSessionCompleteResourceKey(RestoreSettings, RestoreModels);
+        StatusMessage = ResourceHelper.FormatString(sessionKey, backup.Name);
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        StatusMessage = ResourceHelper.GetString(
+            "BackupRestore.RestoreCancelledMessage",
+            "Restore cancelled.");
+        return;
       }
       catch (Exception ex)
       {
@@ -293,9 +367,35 @@ namespace VoiceStudio.App.ViewModels
       }
       finally
       {
+        RestoreBusyDetail = null;
         IsLoading = false;
         IsRestoring = false;
       }
+    }
+
+    private static string ResolveRestoreSessionCompleteResourceKey(bool restoreSettings, bool restoreModels)
+    {
+      if (restoreSettings && restoreModels)
+      {
+        return "BackupRestore.RestoreSessionCompleteMessageSettingsAndModelsRestored";
+      }
+
+      if (restoreSettings)
+      {
+        return "BackupRestore.RestoreSessionCompleteMessageSettingsRestored";
+      }
+
+      if (restoreModels)
+      {
+        return "BackupRestore.RestoreSessionCompleteMessageModelsRestored";
+      }
+
+      return "BackupRestore.RestoreSessionCompleteMessage";
+    }
+
+    partial void OnIsRestoringChanged(bool value)
+    {
+      CancelRestoreCommand.NotifyCanExecuteChanged();
     }
 
     private async Task DeleteBackupAsync(BackupItem? backup, CancellationToken cancellationToken)
@@ -308,7 +408,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.DeleteBackupAsync(backup.Id, cancellationToken);
+        await _backupRestoreClient.DeleteBackupAsync(backup.Id, cancellationToken);
 
         Backups.Remove(backup);
         StatusMessage = ResourceHelper.FormatString("BackupRestore.BackupDeleted", backup.Name);
@@ -360,7 +460,7 @@ namespace VoiceStudio.App.ViewModels
           await using var fileStream = await file.OpenStreamForReadAsync();
 
           // Upload backup
-          var uploadedBackup = await _backendClient.UploadBackupAsync(fileStream, file.Name, cancellationToken);
+          var uploadedBackup = await _backupRestoreClient.UploadBackupAsync(fileStream, file.Name, cancellationToken);
 
           // Refresh backups list
           await LoadBackupsAsync(cancellationToken);

@@ -22,13 +22,14 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for video generation panel.
   /// </summary>
-  public class VideoGenViewModel : BaseViewModel, IPanelView
+  public class VideoGenViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    public string PanelId => "video-gen";
+    public string PanelId => PanelIds.VideoGen;
     public string DisplayName => ResourceHelper.GetString("Panel.VideoGen.DisplayName", "Video Generation");
     public PanelRegion Region => PanelRegion.Center;
-    private readonly IBackendClient _backendClient;
+    private readonly IVideoGenClient _videoGenClient;
     private readonly ToastNotificationService? _toastNotificationService;
+    private CancellationTokenSource? _qualityMetricsCts;
 
     private string _selectedEngine = string.Empty;
     private string _prompt = string.Empty;
@@ -57,10 +58,10 @@ namespace VoiceStudio.App.ViewModels
     private string _enhancementMethod = "None";
     private double _enhancementStrength = 50.0;
 
-    public VideoGenViewModel(IViewModelContext context, IBackendClient backendClient)
+    public VideoGenViewModel(IViewModelContext context, IVideoGenClient videoGenClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _videoGenClient = videoGenClient ?? throw new ArgumentNullException(nameof(videoGenClient));
 
       // Get services using helper (reduces code duplication)
       _toastNotificationService = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetToastNotificationService());
@@ -92,16 +93,23 @@ namespace VoiceStudio.App.ViewModels
       AutoOptimizeQualityCommand = new RelayCommand(AutoOptimizeQuality, () => !IsLoading);
 
       LoadQualityPresets();
-
-      // Load engines asynchronously
-      _ = LoadEnginesAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      await LoadEnginesAsync(cancellationToken);
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken ct) => Task.CompletedTask;
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken ct) => await LoadEnginesAsync(ct);
 
     private async Task LoadEnginesAsync(CancellationToken cancellationToken)
     {
       try
       {
-        var engines = await _backendClient.ListVideoEnginesAsync(cancellationToken);
+        var engines = await _videoGenClient.ListVideoEnginesAsync(cancellationToken);
         Engines.Clear();
         foreach (var engine in engines)
         {
@@ -255,7 +263,11 @@ namespace VoiceStudio.App.ViewModels
           ((EnhancedAsyncRelayCommand)UpscaleCommand).NotifyCanExecuteChanged();
           if (value != null)
           {
-            LoadVideoQualityMetrics(value);
+            _qualityMetricsCts?.Cancel();
+            _qualityMetricsCts = new CancellationTokenSource();
+            var cts = _qualityMetricsCts;
+            var videoForStaleness = value;
+            _ = LoadVideoQualityMetricsForSelectionAsync(videoForStaleness, cts.Token);
           }
           else
           {
@@ -484,26 +496,19 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private void LoadVideoQualityMetrics(GeneratedVideo video)
+    private async Task LoadVideoQualityMetricsForSelectionAsync(GeneratedVideo videoForStaleness, CancellationToken cancellationToken)
     {
-      VideoResolution = ResourceHelper.FormatString("VideoGen.VideoResolutionFormat", video.Width, video.Height);
-      VideoFrameRate = video.Fps;
+      ArgumentNullException.ThrowIfNull(videoForStaleness);
 
-      _ = LoadVideoQualityMetricsAsync(video, CancellationToken.None);
-    }
-
-    private async Task LoadVideoQualityMetricsAsync(GeneratedVideo video, CancellationToken cancellationToken)
-    {
-      ArgumentNullException.ThrowIfNull(video);
+      VideoResolution = ResourceHelper.FormatString("VideoGen.VideoResolutionFormat", videoForStaleness.Width, videoForStaleness.Height);
+      VideoFrameRate = videoForStaleness.Fps;
 
       try
       {
-        var metricsResponse = await _backendClient.SendRequestAsync<object, VideoQualityMetricsResponse>(
-            $"/api/video/{video.VideoId}/quality",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var metricsResponse = await _videoGenClient.GetVideoQualityMetricsAsync(videoForStaleness.VideoId, cancellationToken);
+
+        if (SelectedVideo?.VideoId != videoForStaleness.VideoId)
+          return;
 
         if (metricsResponse != null)
         {
@@ -514,14 +519,17 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (OperationCanceledException)
       {
-        return; // User cancelled
+        return;
       }
       catch (Exception ex)
       {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "VideoGenViewModel.LoadVideoQualityMetricsAsync");
+        if (SelectedVideo?.VideoId == videoForStaleness.VideoId)
+          ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "VideoGenViewModel.LoadVideoQualityMetricsAsync");
       }
 
-      CalculateQualityMetricsFromProperties(video);
+      if (SelectedVideo?.VideoId != videoForStaleness.VideoId)
+        return;
+      CalculateQualityMetricsFromProperties(videoForStaleness);
     }
 
     private void CalculateQualityMetricsFromProperties(GeneratedVideo video)
@@ -532,12 +540,6 @@ namespace VoiceStudio.App.ViewModels
 
       VideoClarity = (resolutionScore * 0.5) + (fpsScore * 0.3) + (bitrateScore * 0.2);
       VideoCompression = Math.Max(0.0, Math.Min(100.0, 100.0 - (Bitrate / 20.0 * 50.0)));
-    }
-
-    private class VideoQualityMetricsResponse
-    {
-      public double Clarity { get; set; }
-      public double Compression { get; set; }
     }
 
     private void AutoOptimizeQuality()
@@ -580,7 +582,7 @@ namespace VoiceStudio.App.ViewModels
           EnhancementStrength = EnablePreprocessing ? (int)EnhancementStrength : 0
         };
 
-        var response = await _backendClient.GenerateVideoAsync(request, cancellationToken);
+        var response = await _videoGenClient.GenerateVideoAsync(request, cancellationToken);
 
         var video = new GeneratedVideo
         {
@@ -727,7 +729,7 @@ namespace VoiceStudio.App.ViewModels
           Scale = 2 // Default 2x upscale
         };
 
-        var response = await _backendClient.UpscaleVideoAsync(request, cancellationToken);
+        var response = await _videoGenClient.UpscaleVideoAsync(request, cancellationToken);
 
         // Update the selected video with upscaled version
         SelectedVideo.VideoId = response.VideoId;

@@ -1,5 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Collections.Generic;
+using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -7,12 +8,12 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class MultiVoiceGeneratorModelTests
     {
-        #region VoiceGenerationResultData Model Tests
+        #region MultiVoiceResultItem Model Tests
 
         [TestMethod]
-        public void VoiceGenerationResultData_DefaultValues()
+        public void MultiVoiceResultItem_DefaultValues()
         {
-            var data = new MultiVoiceGeneratorViewModel.VoiceGenerationResultData();
+            var data = new MultiVoiceResultItem();
 
             Assert.AreEqual(string.Empty, data.ItemId);
             Assert.AreEqual(string.Empty, data.ProfileId);
@@ -28,10 +29,10 @@ namespace VoiceStudio.App.Tests.ViewModels
         }
 
         [TestMethod]
-        public void VoiceGenerationResultData_PropertiesSetCorrectly()
+        public void MultiVoiceResultItem_PropertiesSetCorrectly()
         {
             var metrics = new Dictionary<string, object> { { "mos", 4.5 } };
-            var data = new MultiVoiceGeneratorViewModel.VoiceGenerationResultData
+            var data = new MultiVoiceResultItem
             {
                 ItemId = "item1",
                 ProfileId = "profile1",

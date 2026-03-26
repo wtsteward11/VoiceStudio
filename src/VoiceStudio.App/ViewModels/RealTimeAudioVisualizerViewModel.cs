@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
@@ -16,9 +17,9 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class RealTimeAudioVisualizerViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IRealTimeAudioVisualizerClient _client;
 
-    public string PanelId => "realtime-audio-visualizer";
+    public string PanelId => PanelIds.RealTimeVisualizer;
     public string DisplayName => ResourceHelper.GetString("Panel.RealTimeAudioVisualizer.DisplayName", "Real-Time Audio Visualizer");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -58,10 +59,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<VisualizerFrameItem> frames = new();
 
-    public RealTimeAudioVisualizerViewModel(IViewModelContext context, IBackendClient backendClient)
+    public RealTimeAudioVisualizerViewModel(IViewModelContext context, IRealTimeAudioVisualizerClient client)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
 
       StartSessionCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -97,22 +98,17 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new VisualizerStartRequest
         {
-          visualization_type = VisualizationType,
-          update_rate = UpdateRate,
-          fft_size = FftSize,
-          window_type = WindowType,
-          show_phase = ShowPhase,
-          color_scheme = SelectedColorScheme
+          VisualizationType = VisualizationType,
+          UpdateRate = UpdateRate,
+          FftSize = FftSize,
+          WindowType = WindowType,
+          ShowPhase = ShowPhase,
+          ColorScheme = SelectedColorScheme
         };
 
-        var response = await _backendClient.SendRequestAsync<object, VisualizerStartResponse>(
-            "/api/realtime-visualizer/start",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _client.StartSessionAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -148,12 +144,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/realtime-visualizer/{Uri.EscapeDataString(SessionId)}/stop",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _client.StopSessionAsync(SessionId, cancellationToken);
 
         IsStreaming = false;
         StatusMessage = ResourceHelper.GetString("RealTimeAudioVisualizer.SessionStopped", "Session stopped");
@@ -185,12 +176,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/realtime-visualizer/{Uri.EscapeDataString(SessionId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _client.DeleteSessionAsync(SessionId, cancellationToken);
 
         SessionId = null;
         IsStreaming = false;
@@ -228,12 +214,6 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Response models
-    private class VisualizerStartResponse
-    {
-      public string SessionId { get; set; } = string.Empty;
-      public string Message { get; set; } = string.Empty;
-    }
   }
 
   // Data models

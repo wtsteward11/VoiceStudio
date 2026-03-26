@@ -4,6 +4,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -13,7 +14,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     {
         private IViewModelContext _context = null!;
         private Mock<ISettingsService> _mockSettingsService = null!;
-        private Mock<IBackendClient> _mockBackendClient = null!;
+        private Mock<ISettingsClient> _mockSettingsClient = null!;
         private DispatcherQueueController? _dispatcherController;
         private SettingsViewModel _viewModel = null!;
 
@@ -24,11 +25,11 @@ namespace VoiceStudio.App.Tests.ViewModels
             var dispatcher = _dispatcherController.DispatcherQueue;
             _context = new ViewModelContext(NullLogger.Instance, dispatcher);
             _mockSettingsService = new Mock<ISettingsService>();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockSettingsClient = new Mock<ISettingsClient>();
             _viewModel = new SettingsViewModel(
                 _context,
                 _mockSettingsService.Object,
-                _mockBackendClient.Object);
+                _mockSettingsClient.Object);
         }
 
         [TestCleanup]
@@ -41,7 +42,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_InitializesWithDefaultValues()
         {
             Assert.IsNotNull(_viewModel);
-            Assert.AreEqual("settings", _viewModel.PanelId);
+            Assert.AreEqual(PanelIds.Settings, _viewModel.PanelId);
             Assert.AreEqual("Settings", _viewModel.DisplayName);
         }
 

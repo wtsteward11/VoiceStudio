@@ -41,6 +41,29 @@ public class ContextChangedEventArgs : EventArgs
 }
 
 /// <summary>
+/// Event arguments for transport context changes (audioId, source, title).
+/// Used when SetCurrentPlayable is called; allows listeners to react without polling.
+/// </summary>
+public sealed class TransportContextChangedEventArgs : EventArgs
+{
+    /// <summary>Backend audio ID for PlayBackendAudioIdAsync.</summary>
+    public string? AudioId { get; }
+
+    /// <summary>Typed source that owns the current playable.</summary>
+    public TransportSource? Source { get; }
+
+    /// <summary>Display title for the current playable.</summary>
+    public string? Title { get; }
+
+    public TransportContextChangedEventArgs(string? audioId, TransportSource? source, string? title)
+    {
+        AudioId = audioId;
+        Source = source;
+        Title = title;
+    }
+}
+
+/// <summary>
 /// Centralized manager for active/selected state across panels.
 /// Provides a single source of truth for cross-panel coordination.
 /// </summary>
@@ -88,6 +111,22 @@ public interface IContextManager
     /// </summary>
     string? ActiveJobId { get; }
 
+    /// <summary>
+    /// Backend audio ID for the current playable (used by PlayBackendAudioIdAsync).
+    /// Set when a panel publishes "I own current playable."
+    /// </summary>
+    string? CurrentPlayableAudioId { get; }
+
+    /// <summary>
+    /// Typed source that owns the current playable.
+    /// </summary>
+    TransportSource? CurrentPlayableSource { get; }
+
+    /// <summary>
+    /// Display title for the current playable.
+    /// </summary>
+    string? CurrentPlayableTitle { get; }
+
     #endregion
 
     #region State Setters
@@ -117,6 +156,14 @@ public interface IContextManager
     /// </summary>
     void SetActiveJob(string? jobId, InteractionIntent intent = InteractionIntent.BackgroundProcess);
 
+    /// <summary>
+    /// Sets the current playable for global transport. Pass null for all args to clear.
+    /// </summary>
+    /// <param name="audioId">Backend audio ID for PlayBackendAudioIdAsync.</param>
+    /// <param name="source">Typed transport source.</param>
+    /// <param name="title">Display title.</param>
+    void SetCurrentPlayable(string? audioId, TransportSource? source, string? title);
+
     #endregion
 
     #region State Selectors
@@ -144,6 +191,11 @@ public interface IContextManager
     /// Raised when any context property changes.
     /// </summary>
     event EventHandler<ContextChangedEventArgs>? ContextChanged;
+
+    /// <summary>
+    /// Raised when transport context changes (SetCurrentPlayable). Carries full payload.
+    /// </summary>
+    event EventHandler<TransportContextChangedEventArgs>? TransportContextChanged;
 
     /// <summary>
     /// Raised when view state changes in a linked panel.

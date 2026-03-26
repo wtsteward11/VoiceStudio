@@ -22,7 +22,6 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       ViewModel = new MiniTimelineViewModel(
-          ServiceProvider.GetBackendClient(),
           ServiceProvider.GetAudioPlayerService()
       );
       this.DataContext = ViewModel;

@@ -12,7 +12,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateTagAction : IUndoableAction
   {
     private readonly ObservableCollection<TagItem> _tags;
-    private readonly IBackendClient _backendClient;
+    private readonly ITagManagerClient _tagManagerClient;
     private readonly TagItem _tag;
     private readonly Action<TagItem>? _onUndo;
     private readonly Action<TagItem>? _onRedo;
@@ -21,13 +21,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateTagAction(
         ObservableCollection<TagItem> tags,
-        IBackendClient backendClient,
+        ITagManagerClient tagManagerClient,
         TagItem tag,
         Action<TagItem>? onUndo = null,
         Action<TagItem>? onRedo = null)
     {
       _tags = tags ?? throw new ArgumentNullException(nameof(tags));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _tagManagerClient = tagManagerClient ?? throw new ArgumentNullException(nameof(tagManagerClient));
       _tag = tag ?? throw new ArgumentNullException(nameof(tag));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -59,7 +59,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteTagAction : IUndoableAction
   {
     private readonly ObservableCollection<TagItem> _tags;
-    private readonly IBackendClient _backendClient;
+    private readonly ITagManagerClient _tagManagerClient;
     private readonly TagItem _tag;
     private readonly int _originalIndex;
     private readonly Action<TagItem>? _onUndo;
@@ -69,14 +69,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteTagAction(
         ObservableCollection<TagItem> tags,
-        IBackendClient backendClient,
+        ITagManagerClient tagManagerClient,
         TagItem tag,
         int originalIndex,
         Action<TagItem>? onUndo = null,
         Action<TagItem>? onRedo = null)
     {
       _tags = tags ?? throw new ArgumentNullException(nameof(tags));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _tagManagerClient = tagManagerClient ?? throw new ArgumentNullException(nameof(tagManagerClient));
       _tag = tag ?? throw new ArgumentNullException(nameof(tag));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

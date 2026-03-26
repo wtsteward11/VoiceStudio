@@ -27,6 +27,7 @@ namespace VoiceStudio.App.Views.Panels
     private readonly UndoRedoService? _undoRedoService;
     private readonly MultiSelectService _multiSelectService;
     private MultiSelectState? _multiSelectState;
+    private EventHandler<VoiceStudio.App.Services.SelectionChangedEventArgs>? _selectionChangedHandler;
     private CancellationTokenSource? _pollingCts;
     private bool _isPolling;
     private bool _isInitialized;
@@ -44,9 +45,15 @@ namespace VoiceStudio.App.Views.Panels
     // Phase 4: EventAggregator for cross-panel synchronization
     private readonly IEventAggregator? _eventAggregator;
 
-    public string PanelId => "training";
+    public string PanelId => PanelIds.Training;
     public string DisplayName => ResourceHelper.GetString("Panel.Training.DisplayName", "Training");
     public PanelRegion Region => PanelRegion.Bottom;
+
+    /// <summary>Product trust Pass 01 slice 3: main Training panel is partial — not workflow-pass-closed (matrix §2).</summary>
+    public string SurfaceMaturityFootnote =>
+        ResourceHelper.GetString(
+            "Training.Pass01.SurfaceMaturityFootnote",
+            "Training is available here, but this workflow is not closed under a workflow-coherence pass (no §8 proof). Treat datasets and jobs as partial—do not assume full production training lifecycle coverage.");
 
     [ObservableProperty]
     private ObservableCollection<TrainingDataset> datasets = new();
@@ -343,8 +350,8 @@ namespace VoiceStudio.App.Views.Panels
       SelectAllTrainingJobsCommand = new RelayCommand(SelectAllTrainingJobs, () => TrainingJobs?.Count > 0);
       ClearTrainingJobSelectionCommand = new RelayCommand(ClearTrainingJobSelection);
 
-      // Subscribe to selection changes
-      _multiSelectService.SelectionChanged += (s, e) =>
+      // Subscribe to selection changes (Phase 4: store handler for Dispose unsubscribe)
+      _selectionChangedHandler = (s, e) =>
       {
         if (e.PanelId == PanelId)
         {
@@ -356,6 +363,7 @@ namespace VoiceStudio.App.Views.Panels
           OnPropertyChanged(nameof(HasMultipleTrainingJobSelection));
         }
       };
+      _multiSelectService.SelectionChanged += _selectionChangedHandler;
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
@@ -1397,6 +1405,11 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (disposing)
       {
+        if (_selectionChangedHandler != null && _multiSelectService != null)
+        {
+          _multiSelectService.SelectionChanged -= _selectionChangedHandler;
+          _selectionChangedHandler = null;
+        }
         _disposalCts.Cancel();
         _disposalCts.Dispose();
         _selectedJobLoadCts?.Cancel();

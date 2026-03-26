@@ -28,7 +28,7 @@ namespace VoiceStudio.App.ViewModels
     private bool _isInitialized;
     private const int SearchDebounceMs = 300;
 
-    public string PanelId => "preset_library";
+    public string PanelId => PanelIds.PresetLibrary;
     public string DisplayName => ResourceHelper.GetString("Panel.PresetLibrary.DisplayName", "Preset Library");
     public PanelRegion Region => PanelRegion.Right;
 

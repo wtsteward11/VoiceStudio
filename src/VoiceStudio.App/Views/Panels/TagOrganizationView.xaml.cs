@@ -21,7 +21,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       ViewModel = new TagOrganizationViewModel(
-          ServiceProvider.GetBackendClient(),
+          ServiceProvider.GetTagOrganizationClient(),
           ServiceProvider.GetProfilesClient()
       );
       this.DataContext = ViewModel;

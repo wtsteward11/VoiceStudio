@@ -24,7 +24,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new DeepfakeCreatorViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient()
+          VoiceStudio.App.Services.ServiceProvider.GetDeepfakeCreatorClient()
       );
       DataContext = ViewModel;
 

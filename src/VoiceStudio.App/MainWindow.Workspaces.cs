@@ -51,6 +51,22 @@ namespace VoiceStudio.App
             }
         }
 
+        /// <summary>
+        /// Runs InitializePanelsAsync when backend is ready. Defers panel load until BackendReady
+        /// to avoid backend-dependent ViewModels fetching during startup (Round 4 Task 1).
+        /// Round 5 Task 3: Uses StartupGatingHelper.WaitForBackendReadyThenAsync (testable; completes on BackendFailed to avoid deadlock).
+        /// </summary>
+        private Task RunPanelInitWhenReadyAsync(
+            Controls.PanelHost? leftPanelHost,
+            Controls.PanelHost? centerPanelHost,
+            Controls.PanelHost? rightPanelHost,
+            Controls.PanelHost? bottomPanelHost)
+        {
+            var startupState = ServiceProvider.GetStartupStateService();
+            return StartupGatingHelper.WaitForBackendReadyThenAsync(startupState, () =>
+                InitializePanelsAsync(leftPanelHost, centerPanelHost, rightPanelHost, bottomPanelHost));
+        }
+
         private async Task InitializePanelsAsync(
           Controls.PanelHost? leftPanelHost,
           Controls.PanelHost? centerPanelHost,

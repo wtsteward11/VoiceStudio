@@ -12,7 +12,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class CreateAutomationCurveAction : IUndoableAction
   {
     private readonly ObservableCollection<AutomationCurveItem> _curves;
-    private readonly IBackendClient _backendClient;
+    private readonly IAutomationClient _automationClient;
     private readonly AutomationCurveItem _curve;
     private readonly Action<AutomationCurveItem>? _onUndo;
     private readonly Action<AutomationCurveItem>? _onRedo;
@@ -21,13 +21,13 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public CreateAutomationCurveAction(
         ObservableCollection<AutomationCurveItem> curves,
-        IBackendClient backendClient,
+        IAutomationClient automationClient,
         AutomationCurveItem curve,
         Action<AutomationCurveItem>? onUndo = null,
         Action<AutomationCurveItem>? onRedo = null)
     {
       _curves = curves ?? throw new ArgumentNullException(nameof(curves));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _automationClient = automationClient ?? throw new ArgumentNullException(nameof(automationClient));
       _curve = curve ?? throw new ArgumentNullException(nameof(curve));
       _onUndo = onUndo;
       _onRedo = onRedo;
@@ -59,7 +59,7 @@ namespace VoiceStudio.App.Services.UndoableActions
   public class DeleteAutomationCurveAction : IUndoableAction
   {
     private readonly ObservableCollection<AutomationCurveItem> _curves;
-    private readonly IBackendClient _backendClient;
+    private readonly IAutomationClient _automationClient;
     private readonly AutomationCurveItem _curve;
     private readonly int _originalIndex;
     private readonly Action<AutomationCurveItem>? _onUndo;
@@ -69,14 +69,14 @@ namespace VoiceStudio.App.Services.UndoableActions
 
     public DeleteAutomationCurveAction(
         ObservableCollection<AutomationCurveItem> curves,
-        IBackendClient backendClient,
+        IAutomationClient automationClient,
         AutomationCurveItem curve,
         int originalIndex,
         Action<AutomationCurveItem>? onUndo = null,
         Action<AutomationCurveItem>? onRedo = null)
     {
       _curves = curves ?? throw new ArgumentNullException(nameof(curves));
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _automationClient = automationClient ?? throw new ArgumentNullException(nameof(automationClient));
       _curve = curve ?? throw new ArgumentNullException(nameof(curve));
       _originalIndex = originalIndex;
       _onUndo = onUndo;

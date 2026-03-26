@@ -27,7 +27,7 @@ namespace VoiceStudio.App.ViewModels
     private readonly IDispatcherTimer? _searchDebounceTimer;
     private const int SearchDebounceMs = 300;
 
-    public string PanelId => "scene-builder";
+    public string PanelId => PanelIds.SceneBuilder;
     public string DisplayName => ResourceHelper.GetString("Panel.SceneBuilder.DisplayName", "Scene Builder");
     public PanelRegion Region => PanelRegion.Center;
 

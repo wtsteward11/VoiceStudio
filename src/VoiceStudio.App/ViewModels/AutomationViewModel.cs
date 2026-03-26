@@ -16,13 +16,13 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the AutomationView panel - Automation curve editor.
   /// </summary>
-  public partial class AutomationViewModel : BaseViewModel, IPanelView
+  public partial class AutomationViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IAutomationClient _automationClient;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly UndoRedoService? _undoRedoService;
 
-    public string PanelId => "automation";
+    public string PanelId => PanelIds.Automation;
     public string DisplayName => ResourceHelper.GetString("Panel.Automation.DisplayName", "Automation");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -47,10 +47,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool isEditing;
 
-    public AutomationViewModel(IViewModelContext context, IBackendClient backendClient)
+    public AutomationViewModel(IViewModelContext context, IAutomationClient automationClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _automationClient = automationClient ?? throw new ArgumentNullException(nameof(automationClient));
 
       // Get services (may be null if not initialized)
       try
@@ -95,25 +95,24 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadCurvesAsync(CancellationToken.None);
-      _ = LoadTracksAsync(CancellationToken.None);
     }
+
+    Task IPanelLifecycle.OnActivatedAsync(CancellationToken ct)
+    {
+      _ = LoadCurvesAsync(ct);
+      _ = LoadTracksAsync(ct);
+      return Task.CompletedTask;
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken ct) => Task.CompletedTask;
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken ct) => await RefreshAsync(ct);
 
     private async Task LoadTracksAsync(CancellationToken cancellationToken)
     {
       try
       {
-        // Load tracks from the current project
-        // Note: This assumes we have a current project context
-        // For now, we'll try to get tracks from the automation API
-        var tracks = await _backendClient.SendRequestAsync<object, TrackInfo[]>(
-            "/api/automation/tracks",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var tracks = await _automationClient.GetTracksAsync(cancellationToken);
 
         AvailableTracks.Clear();
         if (tracks != null)
@@ -146,28 +145,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (!string.IsNullOrEmpty(SelectedTrackId))
-          queryParams.Add("track_id", SelectedTrackId);
-        if (!string.IsNullOrEmpty(SelectedParameterId))
-          queryParams.Add("parameter_id", SelectedParameterId);
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/automation";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var curves = await _backendClient.SendRequestAsync<object, AutomationCurve[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var curves = await _automationClient.GetCurvesAsync(SelectedTrackId, SelectedParameterId, cancellationToken);
 
         Curves.Clear();
         if (curves != null)
@@ -205,20 +183,15 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
+        var request = new AutomationCreateRequest
         {
-          name = $"{SelectedParameterId} automation",
-          parameter_id = SelectedParameterId,
-          track_id = SelectedTrackId,
-          interpolation = "linear"
+          Name = $"{SelectedParameterId} automation",
+          ParameterId = SelectedParameterId,
+          TrackId = SelectedTrackId,
+          Interpolation = "linear"
         };
 
-        var created = await _backendClient.SendRequestAsync<object, AutomationCurve>(
-            "/api/automation",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var created = await _automationClient.CreateCurveAsync(request, cancellationToken);
 
         if (created != null)
         {
@@ -235,7 +208,7 @@ namespace VoiceStudio.App.ViewModels
           {
             var action = new CreateAutomationCurveAction(
                 Curves,
-                _backendClient,
+                _automationClient,
                 curveItem,
                 onUndo: (c) =>
                 {
@@ -273,27 +246,22 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new AutomationUpdateRequest
         {
-          name = curve.Name,
-          points = curve.Points.Select(p => new
+          Name = curve.Name,
+          Points = curve.Points.Select(p => new AutomationPointDto
           {
-            time = p.Time,
-            value = p.Value,
-            bezier_handle_in_x = p.BezierHandleInX,
-            bezier_handle_in_y = p.BezierHandleInY,
-            bezier_handle_out_x = p.BezierHandleOutX,
-            bezier_handle_out_y = p.BezierHandleOutY
-          }).ToArray(),
-          interpolation = curve.Interpolation
+            Time = p.Time,
+            Value = p.Value,
+            BezierHandleInX = p.BezierHandleInX,
+            BezierHandleInY = p.BezierHandleInY,
+            BezierHandleOutX = p.BezierHandleOutX,
+            BezierHandleOutY = p.BezierHandleOutY
+          }).ToList(),
+          Interpolation = curve.Interpolation
         };
 
-        var updated = await _backendClient.SendRequestAsync<object, AutomationCurve>(
-            $"/api/automation/{curve.Id}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var updated = await _automationClient.UpdateCurveAsync(curve.Id, request, cancellationToken);
 
         if (updated != null)
         {
@@ -330,12 +298,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/automation/{curve.Id}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _automationClient.DeleteCurveAsync(curve.Id, cancellationToken);
 
         var curveToDelete = curve;
         var originalIndex = Curves.IndexOf(curveToDelete);
@@ -350,7 +313,7 @@ namespace VoiceStudio.App.ViewModels
         {
           var action = new DeleteAutomationCurveAction(
               Curves,
-              _backendClient,
+              _automationClient,
               curveToDelete,
               originalIndex,
               onUndo: (c) => SelectedCurve = c,
@@ -385,12 +348,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, TrackParametersResponse>(
-            $"/api/automation/tracks/{SelectedTrackId}/parameters",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _automationClient.GetTrackParametersAsync(SelectedTrackId!, cancellationToken);
 
         AvailableParameters.Clear();
         if (response?.Parameters != null)
@@ -446,17 +404,6 @@ namespace VoiceStudio.App.ViewModels
       _ = LoadCurvesAsync(CancellationToken.None);
     }
 
-    // Response models
-    private class TrackParametersResponse
-    {
-      public ParameterInfo[] Parameters { get; set; } = Array.Empty<ParameterInfo>();
-    }
-
-    private class TrackInfo
-    {
-      public string Id { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-    }
   }
 
   // Data models

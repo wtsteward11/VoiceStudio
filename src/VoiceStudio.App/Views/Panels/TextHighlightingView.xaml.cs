@@ -23,8 +23,9 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new TextHighlightingViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
-          AppServices.GetProjectsClient()
+          AppServices.GetTextHighlightingClient(),
+          AppServices.GetProjectsClient(),
+          AppServices.GetProjectAudioClient()
       );
       DataContext = ViewModel;
 

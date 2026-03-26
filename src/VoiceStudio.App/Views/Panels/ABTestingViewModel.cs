@@ -25,7 +25,7 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IProfilesClient _profilesClient;
     private readonly IAudioPlayerService _audioPlayer;
 
-    public string PanelId => "ab_testing";
+    public string PanelId => PanelIds.ABTesting;
     public string DisplayName => ResourceHelper.GetString("Panel.ABTesting.DisplayName", "A/B Testing");
     public PanelRegion Region => PanelRegion.Center;
 

@@ -20,10 +20,10 @@ namespace VoiceStudio.App.Views.Panels
 {
   public partial class ModelManagerViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IModelManagerClient _modelManagerClient;
     private readonly UndoRedoService? _undoRedoService;
 
-    public string PanelId => "model_manager";
+    public string PanelId => PanelIds.ModelManager;
     public string DisplayName => ResourceHelper.GetString("Panel.ModelManager.DisplayName", "Model Manager");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -69,10 +69,10 @@ namespace VoiceStudio.App.Views.Panels
             "svd"
         };
 
-    public ModelManagerViewModel(IViewModelContext context, IBackendClient backendClient)
+    public ModelManagerViewModel(IViewModelContext context, IModelManagerClient modelManagerClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _modelManagerClient = modelManagerClient ?? throw new ArgumentNullException(nameof(modelManagerClient));
 
       // Get undo/redo service (may be null if not initialized)
       try
@@ -116,7 +116,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var modelsList = await _backendClient.GetModelsAsync(SelectedEngine, cancellationToken);
+        var modelsList = await _modelManagerClient.GetModelsAsync(SelectedEngine, cancellationToken);
 
         Models.Clear();
         foreach (var model in modelsList.OrderBy(m => m.Engine).ThenBy(m => m.ModelName))
@@ -157,7 +157,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var result = await _backendClient.VerifyModelAsync(model.Engine, model.ModelName, cancellationToken);
+        var result = await _modelManagerClient.VerifyModelAsync(model.Engine, model.ModelName, cancellationToken);
 
         if (result.IsValid)
         {
@@ -196,7 +196,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var updated = await _backendClient.UpdateModelChecksumAsync(model.Engine, model.ModelName, cancellationToken);
+        var updated = await _modelManagerClient.UpdateModelChecksumAsync(model.Engine, model.ModelName, cancellationToken);
 
         // Update the model in the list
         var index = Models.IndexOf(model);
@@ -233,7 +233,7 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        await _backendClient.DeleteModelAsync(model.Engine, model.ModelName, cancellationToken);
+        await _modelManagerClient.DeleteModelAsync(model.Engine, model.ModelName, cancellationToken);
 
         // Track original index before removal
         var originalIndex = Models.IndexOf(model);
@@ -258,7 +258,7 @@ namespace VoiceStudio.App.Views.Panels
         {
           var action = new DeleteModelAction(
               Models,
-              _backendClient,
+              _modelManagerClient,
               model,
               originalIndex,
               onUndo: (m) => SelectedModel = m,
@@ -291,7 +291,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       try
       {
-        StorageStats = await _backendClient.GetStorageStatsAsync(cancellationToken);
+        StorageStats = await _modelManagerClient.GetStorageStatsAsync(cancellationToken);
       }
       catch (OperationCanceledException)
       {
@@ -329,7 +329,7 @@ namespace VoiceStudio.App.Views.Panels
       try
       {
         // Get export stream from backend
-        await using var stream = await _backendClient.ExportModelAsync(model.Engine, model.ModelName, cancellationToken);
+        await using var stream = await _modelManagerClient.ExportModelAsync(model.Engine, model.ModelName, cancellationToken);
 
         // Show file save picker
         var savePicker = new FileSavePicker();
@@ -387,7 +387,7 @@ namespace VoiceStudio.App.Views.Panels
           await using var fileStream = await file.OpenStreamForReadAsync();
 
           // Import model
-          var importedModel = await _backendClient.ImportModelAsync(fileStream, cancellationToken: cancellationToken);
+          var importedModel = await _modelManagerClient.ImportModelAsync(fileStream, cancellationToken: cancellationToken);
 
           // Refresh models list
           await LoadModelsAsync(cancellationToken);

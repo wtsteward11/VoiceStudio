@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -16,18 +17,24 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class APIKeyManagerViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IAPIKeyManagerClient>? _mockApiKeyManagerClient;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockApiKeyManagerClient = new Mock<IAPIKeyManagerClient>();
+            _mockApiKeyManagerClient
+                .Setup(x => x.GetKeysAsync(It.IsAny<System.Threading.CancellationToken>()))
+                .ReturnsAsync(Array.Empty<APIKeyResponse>());
+            _mockApiKeyManagerClient
+                .Setup(x => x.GetSupportedServicesAsync(It.IsAny<System.Threading.CancellationToken>()))
+                .ReturnsAsync(Array.Empty<string>());
         }
 
         private APIKeyManagerViewModel CreateViewModel()
         {
-            return new APIKeyManagerViewModel(MockContext!, _mockBackendClient!.Object);
+            return new APIKeyManagerViewModel(MockContext!, _mockApiKeyManagerClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -40,7 +47,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
             // Assert
             Assert.IsNotNull(viewModel);
-            Assert.AreEqual("api-key-manager", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.APIKeyManager, viewModel.PanelId);
             Assert.IsNotNull(viewModel.ApiKeys);
             Assert.IsNotNull(viewModel.SupportedServices);
         }
@@ -49,11 +56,11 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new APIKeyManagerViewModel(null!, _mockBackendClient!.Object));
+                new APIKeyManagerViewModel(null!, _mockApiKeyManagerClient!.Object));
         }
 
         [TestMethod]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullApiKeyManagerClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
                 new APIKeyManagerViewModel(MockContext!, null!));
@@ -229,7 +236,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void PanelId_ReturnsCorrectValue()
         {
             var viewModel = CreateViewModel();
-            Assert.AreEqual("api-key-manager", viewModel.PanelId);
+            Assert.AreEqual(PanelIds.APIKeyManager, viewModel.PanelId);
         }
 
         [TestMethod]

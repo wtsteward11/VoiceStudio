@@ -8,22 +8,23 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VoiceStudio.App.Logging;
+using VoiceStudio.App.Services;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
-using TranscriptionSegmentDataModel = VoiceStudio.App.ViewModels.TextBasedSpeechEditorViewModel.TranscriptionSegmentData;
-using AlignSegmentDataModel = VoiceStudio.App.ViewModels.TextBasedSpeechEditorViewModel.AlignSegmentData;
-using AlignWordDataModel = VoiceStudio.App.ViewModels.TextBasedSpeechEditorViewModel.AlignWordData;
-using WordTimestampDataModel = VoiceStudio.App.ViewModels.TextBasedSpeechEditorViewModel.WordTimestampData;
+using TranscriptionSegmentDataModel = VoiceStudio.App.Services.TextEditTranscriptionSegmentData;
+using AlignSegmentDataModel = VoiceStudio.App.Services.AlignSegmentData;
+using AlignWordDataModel = VoiceStudio.App.Services.AlignWordData;
+using WordTimestampDataModel = VoiceStudio.App.Services.TextEditWordTimestampData;
 
 namespace VoiceStudio.App.ViewModels
 {
   /// <summary>
   /// ViewModel for the TextBasedSpeechEditorView panel - Edit audio by editing its transcript.
   /// </summary>
-  public partial class TextBasedSpeechEditorViewModel : BaseViewModel, IPanelView
+  public partial class TextBasedSpeechEditorViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ITextBasedSpeechEditorClient _editorClient;
     private readonly IProfilesClient _profilesClient;
 
     public string PanelId => "text-based-speech-editor";
@@ -96,10 +97,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? finalAudioUrl;
 
-    public TextBasedSpeechEditorViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient)
+    public TextBasedSpeechEditorViewModel(IViewModelContext context, ITextBasedSpeechEditorClient editorClient, IProfilesClient profilesClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _editorClient = editorClient ?? throw new ArgumentNullException(nameof(editorClient));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
       LoadAudioCommand = new EnhancedAsyncRelayCommand(async (ct) =>
@@ -152,9 +153,10 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      _ = LoadEnginesAsync(new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token);
     }
+
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => RefreshAsync(cancellationToken);
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public IAsyncRelayCommand LoadAudioCommand { get; }
     public IAsyncRelayCommand TranscribeCommand { get; }
@@ -244,7 +246,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new TranscriptionRequest
+        var request = new TextEditTranscriptionRequest
         {
           AudioId = AudioId,
           Engine = "whisper",
@@ -252,12 +254,7 @@ namespace VoiceStudio.App.ViewModels
           WordTimestamps = true
         };
 
-        var response = await _backendClient.SendRequestAsync<TranscriptionRequest, TranscriptionResponse>(
-            "/api/transcribe/",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _editorClient.TranscribeAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -275,22 +272,10 @@ namespace VoiceStudio.App.ViewModels
           }
 
           // Create edit session
-          var sessionRequest = new Dictionary<string, object>
-                    {
-                        { "audio_id", AudioId },
-                        { "transcript", OriginalTranscript }
-                    };
-
-          var sessionResponse = await _backendClient.SendRequestAsync<Dictionary<string, object>, Dictionary<string, object>>(
-              "/api/edit/session/create",
-              sessionRequest,
-              System.Net.Http.HttpMethod.Post,
-              cancellationToken
-          );
-
-          if (sessionResponse?.ContainsKey("session_id") == true)
+          var sessionResponse = await _editorClient.CreateEditSessionAsync(AudioId, OriginalTranscript, cancellationToken);
+          if (sessionResponse?.SessionId != null)
           {
-            EditSessionId = sessionResponse["session_id"]?.ToString();
+            EditSessionId = sessionResponse.SessionId;
           }
 
           StatusMessage = ResourceHelper.GetString("TextBasedSpeechEditor.TranscriptionCompleted", "Transcription completed");
@@ -325,12 +310,7 @@ namespace VoiceStudio.App.ViewModels
           Language = "en"
         };
 
-        var response = await _backendClient.SendRequestAsync<AlignRequest, AlignResponse>(
-            "/api/edit/align",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _editorClient.AlignAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -408,12 +388,7 @@ namespace VoiceStudio.App.ViewModels
           QualityMode = SelectedQualityMode ?? "standard"
         };
 
-        var response = await _backendClient.SendRequestAsync<ReplaceWordRequest, ReplaceWordResponse>(
-            "/api/edit/replace-word",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _editorClient.ReplaceWordAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -461,11 +436,7 @@ namespace VoiceStudio.App.ViewModels
           QualityMode = SelectedQualityMode ?? "standard"
         };
 
-        var response = await _backendClient.SendRequestAsync<InsertTextRequest, InsertTextResponse>(
-            "/api/edit/insert-text",
-            request,
-            System.Net.Http.HttpMethod.Post
-        );
+        var response = await _editorClient.InsertTextAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -507,12 +478,7 @@ namespace VoiceStudio.App.ViewModels
           FillerWords = FillerWords.ToList()
         };
 
-        var response = await _backendClient.SendRequestAsync<RemoveFillerWordsRequest, RemoveFillerWordsResponse>(
-            "/api/edit/remove-filler-words",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _editorClient.RemoveFillerWordsAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -552,12 +518,7 @@ namespace VoiceStudio.App.ViewModels
           SessionId = EditSessionId
         };
 
-        var response = await _backendClient.SendRequestAsync<ApplyEditsRequest, ApplyEditsResponse>(
-            "/api/edit/apply",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _editorClient.ApplyEditsAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -601,7 +562,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var engines = await _backendClient.GetEnginesAsync(cancellationToken);
+        var engines = await _editorClient.GetEnginesAsync(cancellationToken);
         AvailableEngines.Clear();
         foreach (var eng in engines)
           AvailableEngines.Add(eng);
@@ -610,7 +571,7 @@ namespace VoiceStudio.App.ViewModels
       catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "TextBasedSpeechEditorViewModel.LoadEnginesAsync"); }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
       try
       {
@@ -626,130 +587,6 @@ namespace VoiceStudio.App.ViewModels
       {
         await HandleErrorAsync(ex, "Refresh");
       }
-    }
-
-    // Request/Response models
-    private class TranscriptionRequest
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public string Engine { get; set; } = "whisper";
-      public string? Language { get; set; }
-      public bool WordTimestamps { get; set; }
-    }
-
-    private class TranscriptionResponse
-    {
-      public string Text { get; set; } = string.Empty;
-      public List<TranscriptionSegmentData>? Segments { get; set; }
-    }
-
-    public class TranscriptionSegmentData
-    {
-      public string Text { get; set; } = string.Empty;
-      public double Start { get; set; }
-      public double End { get; set; }
-      public List<WordTimestampData>? Words { get; set; }
-    }
-
-    public class WordTimestampData
-    {
-      public string Word { get; set; } = string.Empty;
-      public double Start { get; set; }
-      public double End { get; set; }
-      public double? Confidence { get; set; }
-    }
-
-    private class AlignRequest
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public string Transcript { get; set; } = string.Empty;
-      public string Language { get; set; } = "en";
-    }
-
-    private class AlignResponse
-    {
-      public List<AlignSegmentData> Segments { get; set; } = new();
-      public float AlignmentConfidence { get; set; }
-    }
-
-    public class AlignSegmentData
-    {
-      public string Text { get; set; } = string.Empty;
-      public float StartTime { get; set; }
-      public float EndTime { get; set; }
-      public List<AlignWordData> Words { get; set; } = new();
-    }
-
-    public class AlignWordData
-    {
-      public string Word { get; set; } = string.Empty;
-      public float StartTime { get; set; }
-      public float EndTime { get; set; }
-      public float Confidence { get; set; }
-    }
-
-    private class ReplaceWordRequest
-    {
-      public string SessionId { get; set; } = string.Empty;
-      public int SegmentIndex { get; set; }
-      public int WordIndex { get; set; }
-      public string NewText { get; set; } = string.Empty;
-      public string ProfileId { get; set; } = string.Empty;
-      public string Engine { get; set; } = "xtts";
-      public string QualityMode { get; set; } = "standard";
-    }
-
-    private class ReplaceWordResponse
-    {
-      public string ReplacedAudioId { get; set; } = string.Empty;
-      public string ReplacedAudioUrl { get; set; } = string.Empty;
-      public float Duration { get; set; }
-      public List<TranscriptionSegmentData> UpdatedSegments { get; set; } = new();
-    }
-
-    private class InsertTextRequest
-    {
-      public string SessionId { get; set; } = string.Empty;
-      public float Position { get; set; }
-      public string Text { get; set; } = string.Empty;
-      public string ProfileId { get; set; } = string.Empty;
-      public string Engine { get; set; } = "xtts";
-      public string QualityMode { get; set; } = "standard";
-    }
-
-    private class InsertTextResponse
-    {
-      public string InsertedAudioId { get; set; } = string.Empty;
-      public string InsertedAudioUrl { get; set; } = string.Empty;
-      public float Duration { get; set; }
-      public List<TranscriptionSegmentData> NewSegments { get; set; } = new();
-    }
-
-    private class RemoveFillerWordsRequest
-    {
-      public string SessionId { get; set; } = string.Empty;
-      public List<string> FillerWords { get; set; } = new();
-    }
-
-    private class RemoveFillerWordsResponse
-    {
-      public string UpdatedTranscript { get; set; } = string.Empty;
-      public int RemovedCount { get; set; }
-      public List<string> RemovedWords { get; set; } = new();
-    }
-
-    private class ApplyEditsRequest
-    {
-      public string SessionId { get; set; } = string.Empty;
-      public string? OutputName { get; set; }
-    }
-
-    private class ApplyEditsResponse
-    {
-      public string FinalAudioId { get; set; } = string.Empty;
-      public string FinalAudioUrl { get; set; } = string.Empty;
-      public float Duration { get; set; }
-      public int EditCount { get; set; }
     }
   }
 

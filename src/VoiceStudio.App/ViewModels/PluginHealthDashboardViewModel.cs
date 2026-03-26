@@ -27,7 +27,7 @@ namespace VoiceStudio.App.ViewModels
         public string DisplayName => ResourceHelper.GetString("Panel.PluginHealthDashboard.DisplayName", "Plugin Health Dashboard");
         public PanelRegion Region => PanelRegion.Center;
 
-        private readonly IBackendClient _backendClient;
+        private readonly IPluginHealthClient _pluginHealthClient;
 
         [ObservableProperty]
         private ObservableCollection<PluginHealthItem> plugins = new();
@@ -103,10 +103,10 @@ namespace VoiceStudio.App.ViewModels
 
         private CancellationTokenSource? _autoRefreshCts;
 
-        public PluginHealthDashboardViewModel(IViewModelContext context, IBackendClient backendClient)
+        public PluginHealthDashboardViewModel(IViewModelContext context, IPluginHealthClient pluginHealthClient)
             : base(context)
         {
-            _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+            _pluginHealthClient = pluginHealthClient ?? throw new ArgumentNullException(nameof(pluginHealthClient));
 
             RefreshCommand = new EnhancedAsyncRelayCommand(async (ct) =>
             {
@@ -180,7 +180,7 @@ namespace VoiceStudio.App.ViewModels
 
             try
             {
-                var response = await _backendClient.GetPluginHealthDashboardAsync(cancellationToken);
+                var response = await _pluginHealthClient.GetDashboardAsync(cancellationToken);
 
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -261,7 +261,7 @@ namespace VoiceStudio.App.ViewModels
         {
             try
             {
-                var details = await _backendClient.GetPluginMetricsAsync(pluginId, cancellationToken);
+                var details = await _pluginHealthClient.GetMetricsAsync(pluginId, cancellationToken);
 
                 if (details == null)
                     return;
@@ -415,7 +415,7 @@ namespace VoiceStudio.App.ViewModels
 
             try
             {
-                var metrics = await _backendClient.ExportPluginMetricsAsync("json", cancellationToken);
+                var metrics = await _pluginHealthClient.ExportMetricsAsync("json", cancellationToken);
 
                 if (!string.IsNullOrEmpty(metrics))
                 {

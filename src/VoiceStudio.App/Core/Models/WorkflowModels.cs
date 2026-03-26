@@ -63,6 +63,18 @@ namespace VoiceStudio.Core.Models
   }
 
   /// <summary>
+  /// Request for workflow execution (backend expects workflow_id, input_data).
+  /// </summary>
+  public class WorkflowExecuteRequest
+  {
+    [System.Text.Json.Serialization.JsonPropertyName("workflow_id")]
+    public string WorkflowId { get; set; } = string.Empty;
+
+    [System.Text.Json.Serialization.JsonPropertyName("input_data")]
+    public Dictionary<string, object>? InputData { get; set; }
+  }
+
+  /// <summary>
   /// Result of workflow execution.
   /// </summary>
   public class WorkflowExecutionResult

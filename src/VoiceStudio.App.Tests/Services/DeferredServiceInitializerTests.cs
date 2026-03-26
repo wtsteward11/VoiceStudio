@@ -1,10 +1,13 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.Services;
 
@@ -89,6 +92,36 @@ public class DeferredServiceInitializerTests : TestBase
 
         // Assert
         Assert.IsTrue(_initializer.IsInitialized);
+    }
+
+    [TestMethod]
+    public async Task BackendHealthCheck_InvokesIHealthVersionClient_WhenRegistered()
+    {
+        // Arrange - replicate BackendHealthCheck registration pattern from CreateDeferredServiceInitializer
+        var mockHealth = new Mock<IHealthVersionClient>();
+        mockHealth.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        var services = new ServiceCollection();
+        services.AddSingleton(mockHealth.Object);
+        var provider = services.BuildServiceProvider();
+
+        var initializer = new DeferredServiceInitializer();
+        initializer.RegisterAsync(
+            "BackendHealthCheck",
+            async ct =>
+            {
+                var healthClient = provider.GetService(typeof(IHealthVersionClient)) as IHealthVersionClient;
+                if (healthClient != null)
+                {
+                    await healthClient.CheckHealthAsync(ct);
+                }
+            },
+            ServicePriority.Normal);
+
+        // Act
+        await initializer.InitializeAllAsync();
+
+        // Assert - IHealthVersionClient.CheckHealthAsync was invoked
+        mockHealth.Verify(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [TestMethod]

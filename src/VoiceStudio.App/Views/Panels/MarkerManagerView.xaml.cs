@@ -27,7 +27,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new MarkerManagerViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          VoiceStudio.App.Services.ServiceProvider.GetBackendClient(),
+          AppServices.GetMarkerManagerClient(),
           AppServices.GetRequiredService<IDialogService>()
       );
       DataContext = ViewModel;
@@ -51,8 +51,8 @@ namespace VoiceStudio.App.Views.Panels
         }
       };
 
-      // Setup keyboard navigation
-      this.Loaded += MarkerManagerView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and load markers (ILifecyclePanelView; not constructor — RETAINED_ASYNC_RULE)
+      this.Loaded += MarkerManagerView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -321,9 +321,13 @@ namespace VoiceStudio.App.Views.Panels
         return DropPosition.On;
     }
 
-    private void MarkerManagerView_KeyboardNavigation_Loaded(object _, RoutedEventArgs __)
+    private void MarkerManagerView_Loaded(object _, RoutedEventArgs __)
     {
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      if (ViewModel is VoiceStudio.Core.Panels.ILifecyclePanelView lifecycle)
+      {
+        _ = lifecycle.OnActivatedAsync();
+      }
     }
   }
 }

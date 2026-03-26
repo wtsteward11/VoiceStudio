@@ -1984,6 +1984,33 @@
   <data name="ScriptEditor.PartialDeleteWarning" xml:space="preserve">
     <value>Some scripts could not be deleted ({0}/{1} succeeded)</value>
   </data>
+  <data name="ScriptEditor.SegmentTextRequired" xml:space="preserve">
+    <value>Segment has no text to synthesize</value>
+  </data>
+  <data name="ScriptEditor.VoiceProfileRequired" xml:space="preserve">
+    <value>No voice profile assigned to segment. Assign a profile or create one.</value>
+  </data>
+  <data name="ScriptEditor.SegmentGenerated" xml:space="preserve">
+    <value>Segment generated: {0}</value>
+  </data>
+  <data name="ScriptEditor.SegmentGeneratedDetail" xml:space="preserve">
+    <value>Audio ID: {0}</value>
+  </data>
+  <data name="ScriptEditor.GenerateSegmentFailed" xml:space="preserve">
+    <value>Failed to generate segment: {0}</value>
+  </data>
+  <data name="ScriptEditor.SynthesisReturnedNoAudioId" xml:space="preserve">
+    <value>Synthesis completed but no audio was returned. Nothing was saved.</value>
+  </data>
+  <data name="Toast.Title.SegmentGenerateIncomplete" xml:space="preserve">
+    <value>Generate Incomplete</value>
+  </data>
+  <data name="ScriptEditor.SynthesisNoScriptContext" xml:space="preserve">
+    <value>Generated audio could not be saved because no script is selected.</value>
+  </data>
+  <data name="ScriptEditor.GenerateMenuDisabledHelp" xml:space="preserve">
+    <value>Requires segment text and an assigned voice profile.</value>
+  </data>
 
   <!-- Tag Manager Messages -->
   <data name="TagManager.TagsLoaded" xml:space="preserve">
@@ -2918,6 +2945,12 @@
   </data>
   <data name="Toast.Title.ScriptSynthesized" xml:space="preserve">
     <value>Script Synthesized</value>
+  </data>
+  <data name="Toast.Title.SegmentGenerated" xml:space="preserve">
+    <value>Segment Generated</value>
+  </data>
+  <data name="Toast.Title.GenerateSegmentFailed" xml:space="preserve">
+    <value>Generate Failed</value>
   </data>
   <data name="Toast.Title.SynthesisFailed" xml:space="preserve">
     <value>Synthesis Failed</value>

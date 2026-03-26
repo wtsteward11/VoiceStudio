@@ -2,9 +2,12 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Collections.ObjectModel;
+using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -16,14 +19,16 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class UpscalingViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<IUpscalingClient>? _mockUpscalingClient;
         private UpscalingViewModel? _viewModel;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockUpscalingClient = new Mock<IUpscalingClient>();
+            _mockUpscalingClient.Setup(x => x.GetEnginesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<UpscalingEngineResponse>());
+            _mockUpscalingClient.Setup(x => x.GetJobsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<UpscalingJobResponse>());
             _viewModel = CreateViewModel();
         }
 
@@ -31,13 +36,13 @@ namespace VoiceStudio.App.Tests.ViewModels
         public override void TestCleanup()
         {
             _viewModel = null;
-            _mockBackendClient = null;
+            _mockUpscalingClient = null;
             base.TestCleanup();
         }
 
         private UpscalingViewModel CreateViewModel()
         {
-            return new UpscalingViewModel(MockContext!, _mockBackendClient!.Object);
+            return new UpscalingViewModel(MockContext!, _mockUpscalingClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -57,12 +62,12 @@ namespace VoiceStudio.App.Tests.ViewModels
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
-            _ = new UpscalingViewModel(null!, _mockBackendClient!.Object);
+            _ = new UpscalingViewModel(null!, _mockUpscalingClient!.Object);
         }
 
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullUpscalingClient_ThrowsArgumentNullException()
         {
             _ = new UpscalingViewModel(MockContext!, null!);
         }
@@ -74,7 +79,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void PanelId_ReturnsUpscaling()
         {
-            Assert.AreEqual("upscaling", _viewModel!.PanelId);
+            Assert.AreEqual(PanelIds.Upscaling, _viewModel!.PanelId);
         }
 
         [TestMethod]

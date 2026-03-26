@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
@@ -14,9 +15,10 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the AdvancedSpectrogramVisualizationView panel - Advanced spectrogram with multiple view types.
   /// </summary>
-  public partial class AdvancedSpectrogramVisualizationViewModel : BaseViewModel, IPanelView
+  public partial class AdvancedSpectrogramVisualizationViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IAdvancedSpectrogramClient _spectrogramClient;
+    private readonly IProjectAudioClient _projectAudioClient;
     private readonly IProjectsClient _projectsClient;
 
     public string PanelId => "advanced-spectrogram-visualization";
@@ -80,10 +82,15 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string comparisonType = "difference";
 
-    public AdvancedSpectrogramVisualizationViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient)
+    public AdvancedSpectrogramVisualizationViewModel(
+      IViewModelContext context,
+      IAdvancedSpectrogramClient spectrogramClient,
+      IProjectAudioClient projectAudioClient,
+      IProjectsClient projectsClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _spectrogramClient = spectrogramClient ?? throw new ArgumentNullException(nameof(spectrogramClient));
+      _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
       _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
 
       LoadViewTypesCommand = new AsyncRelayCommand(() => LoadViewTypesAsync(CancellationToken.None));
@@ -91,11 +98,19 @@ namespace VoiceStudio.App.ViewModels
       CompareSpectrogramsCommand = new AsyncRelayCommand(CompareSpectrogramsAsync);
       LoadAudioFilesCommand = new AsyncRelayCommand(() => LoadAudioFilesAsync(CancellationToken.None));
       RefreshCommand = new AsyncRelayCommand(RefreshAsync);
-
-      // Load initial data
-      _ = LoadViewTypesAsync(CancellationToken.None);
-      _ = LoadAudioFilesAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _ = LoadViewTypesAsync(cancellationToken);
+      _ = LoadAudioFilesAsync(cancellationToken);
+      return Task.CompletedTask;
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken ct) => Task.CompletedTask;
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken ct) => await RefreshAsync(ct);
 
     public IAsyncRelayCommand LoadViewTypesCommand { get; }
     public IAsyncRelayCommand GenerateSpectrogramCommand { get; }
@@ -110,12 +125,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, ViewTypesResponse>(
-            "/api/advanced-spectrogram/view-types",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _spectrogramClient.GetViewTypesAsync(cancellationToken);
 
         if (response?.ViewTypes != null)
         {
@@ -153,32 +163,25 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
+        var request = new AdvancedSpectrogramGenerateRequest
         {
-          audio_id = SelectedAudioId,
-          view_type = SelectedViewType,
-          window_size = WindowSize,
-          hop_length = HopLength,
-          n_fft = NFFT,
-          frequency_range = (FrequencyMin.HasValue || FrequencyMax.HasValue) ? new
-          {
-            min = FrequencyMin,
-            max = FrequencyMax
-          } : null,
-          time_range = (TimeStart.HasValue || TimeEnd.HasValue) ? new
-          {
-            start = TimeStart,
-            end = TimeEnd
-          } : null,
-          color_scheme = SelectedColorScheme,
-          apply_filters = ApplyFilters,
-          filters = SelectedFilters.ToArray()
+          AudioId = SelectedAudioId,
+          ViewType = SelectedViewType,
+          WindowSize = WindowSize,
+          HopLength = HopLength,
+          NFFT = NFFT,
+          FrequencyRange = (FrequencyMin.HasValue || FrequencyMax.HasValue)
+            ? new AdvancedSpectrogramRange { Min = FrequencyMin, Max = FrequencyMax }
+            : null,
+          TimeRange = (TimeStart.HasValue || TimeEnd.HasValue)
+            ? new AdvancedSpectrogramTimeRange { Start = TimeStart, End = TimeEnd }
+            : null,
+          ColorScheme = SelectedColorScheme,
+          ApplyFilters = ApplyFilters,
+          Filters = SelectedFilters.ToArray()
         };
 
-        var response = await _backendClient.SendRequestAsync<object, AdvancedSpectrogramResponse>(
-            "/api/advanced-spectrogram/generate",
-            request
-        );
+        var response = await _spectrogramClient.GenerateSpectrogramAsync(request);
 
         if (response != null)
         {
@@ -209,18 +212,13 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new AdvancedSpectrogramCompareRequest
         {
-          audio_ids = ComparisonAudioIds.ToArray(),
-          comparison_type = ComparisonType
+          AudioIds = ComparisonAudioIds.ToArray(),
+          ComparisonType = ComparisonType
         };
 
-        var response = await _backendClient.SendRequestAsync<object, SpectrogramComparisonResponse>(
-            "/api/advanced-spectrogram/compare",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _spectrogramClient.CompareSpectrogramsAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -254,7 +252,7 @@ namespace VoiceStudio.App.ViewModels
         foreach (var project in projects)
         {
           cancellationToken.ThrowIfCancellationRequested();
-          var audioFiles = await _backendClient.ListProjectAudioAsync(project.Id, cancellationToken);
+          var audioFiles = await _projectAudioClient.ListProjectAudioAsync(project.Id, cancellationToken);
           foreach (var audioFile in audioFiles)
           {
             if (!string.IsNullOrEmpty(audioFile.Filename))
@@ -298,46 +296,18 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Response models
-    private class ViewTypesResponse
-    {
-      public ViewTypeInfo[] ViewTypes { get; set; } = Array.Empty<ViewTypeInfo>();
-    }
-
-    private class AdvancedSpectrogramResponse
-    {
-      public string ViewId { get; set; } = string.Empty;
-      public string? DataUrl { get; set; }
-      public System.Collections.Generic.Dictionary<string, object> Metadata { get; set; } = new();
-      public string Message { get; set; } = string.Empty;
-    }
-
-    private class SpectrogramComparisonResponse
-    {
-      public string Id { get; set; } = string.Empty;
-      public string[] AudioIds { get; set; } = Array.Empty<string>();
-      public string ComparisonType { get; set; } = string.Empty;
-      public System.Collections.Generic.Dictionary<string, object> ResultData { get; set; } = new();
-      public string Created { get; set; } = string.Empty;
-    }
   }
 
   // Data models
   public class ViewTypeItem : ObservableObject
   {
-    public string Id { get; set; }
-    public string Name { get; set; }
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
 
-    public ViewTypeItem(ViewTypeInfo info)
+    public ViewTypeItem(AdvancedSpectrogramViewTypeInfo info)
     {
       Id = info.Id;
       Name = info.Name;
     }
-  }
-
-  public class ViewTypeInfo
-  {
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
   }
 }

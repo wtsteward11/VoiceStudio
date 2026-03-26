@@ -428,14 +428,28 @@
                               Margin="0,0,8,0" />
 
                 <!-- Error or status message -->
-                <TextBlock Grid.Column="1"
-                           AutomationProperties.AutomationId="TranscribeView_StatusText"
-                           Text="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
-                           Foreground="IndianRed"
-                           FontSize="12"
-                           VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis"
-                           Visibility="{x:Bind ViewModel.ErrorMessage, Converter={StaticResource NullToVisibilityConverter}, Mode=OneWay, FallbackValue=Collapsed}" />
+                <StackPanel Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Spacing="2">
+                    <TextBlock AutomationProperties.AutomationId="TranscribeView_StatusText"
+                               Text="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                               Foreground="IndianRed"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               Visibility="{x:Bind ViewModel.ErrorMessage, Converter={StaticResource NullToVisibilityConverter}, Mode=OneWay, FallbackValue=Collapsed}" />
+                    <TextBlock AutomationProperties.AutomationId="TranscribeView_PersistenceSemanticsHint"
+                               Text="{x:Bind ViewModel.AudioPersistenceSemanticsHint, Mode=OneWay}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               FontSize="11"
+                               TextWrapping="WrapWholeWords"
+                               Visibility="{x:Bind ViewModel.AudioPersistenceSemanticsHint, Converter={StaticResource NullToVisibilityConverter}, Mode=OneWay, FallbackValue=Collapsed}" />
+                    <TextBlock AutomationProperties.AutomationId="TranscribeView_PersistenceScopeFootnote"
+                               Text="{x:Bind ViewModel.PersistenceScopeFootnote, Mode=OneWay}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               FontSize="10"
+                               Opacity="0.85"
+                               TextWrapping="WrapWholeWords" />
+                </StackPanel>
 
                 <!-- Selection count -->
                 <TextBlock Grid.Column="2"

@@ -3,6 +3,7 @@ using Moq;
 using System;
 using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -71,7 +72,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestMethod]
         public void PanelId_ReturnsImageSearch()
         {
-            Assert.AreEqual("image-search", _viewModel!.PanelId);
+            Assert.AreEqual(PanelIds.ImageSearch, _viewModel!.PanelId);
         }
 
         [TestMethod]

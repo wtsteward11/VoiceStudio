@@ -5,6 +5,7 @@ using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services.UndoableActions;
 using System;
+using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -23,8 +24,9 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new PronunciationLexiconViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient(),
+          AppServices.GetPronunciationLexiconClient(),
           ServiceProvider.GetProfilesClient(),
+          AppServices.GetRequiredService<IVoiceSynthesisService>(),
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IAudioPlayerService>()
       );
       DataContext = ViewModel;
@@ -33,9 +35,6 @@ namespace VoiceStudio.App.Views.Panels
       _contextMenuService = ServiceProvider.GetContextMenuService();
       _toastService = ServiceProvider.GetToastNotificationService();
       _undoRedoService = ServiceProvider.GetUndoRedoService();
-
-      // Load entries on initialization
-      ViewModel.LoadEntriesCommand.ExecuteAsync(null);
 
       // Subscribe to ViewModel events for toast notifications
       ViewModel.PropertyChanged += (_, e) =>
@@ -50,8 +49,8 @@ namespace VoiceStudio.App.Views.Panels
         }
       };
 
-      // Setup keyboard navigation
-      this.Loaded += PronunciationLexiconView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and load entries (not in constructor — RETAINED_ASYNC_RULE)
+      this.Loaded += PronunciationLexiconView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -63,9 +62,10 @@ namespace VoiceStudio.App.Views.Panels
       });
     }
 
-    private void PronunciationLexiconView_KeyboardNavigation_Loaded(object _, RoutedEventArgs __)
+    private void PronunciationLexiconView_Loaded(object _, RoutedEventArgs __)
     {
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      ViewModel.LoadEntriesCommand.ExecuteAsync(null);
     }
 
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)

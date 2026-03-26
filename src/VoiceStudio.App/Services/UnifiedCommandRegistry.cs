@@ -19,11 +19,25 @@ namespace VoiceStudio.App.Services
         private readonly ConcurrentDictionary<string, CommandEntry> _commands = new();
         private readonly ConcurrentDictionary<string, RegistryRelayCommand> _commandWrappers = new();
         private readonly KeyboardShortcutService? _shortcutService;
+        private readonly IStartupStateService? _startupStateService;
         private readonly object _lock = new();
 
         // GAP-B12: Command queue service for busy-state handling
         private ICommandQueueService? _queueService;
         private volatile bool _isBusy;
+
+        /// <summary>
+        /// Command IDs that require backend to be ready. Gated by IStartupStateService.IsReady (Task 3).
+        /// See docs/design/STARTUP_ORCHESTRATION_HARDENING_PLAN.md.
+        /// </summary>
+        private static readonly HashSet<string> BackendDependentCommandIds = new(StringComparer.OrdinalIgnoreCase)
+        {
+            CommandIds.FileImport, CommandIds.FileNew, CommandIds.FileOpen, CommandIds.FileSave, CommandIds.FileSaveAs,
+            CommandIds.SynthesisGenerate, CommandIds.SynthesisPreview, CommandIds.SynthesisRegenerate, CommandIds.SynthesisAddToTimeline,
+            CommandIds.PanelSynthesis, CommandIds.PanelLibrary, CommandIds.PanelProfiles,
+            "nav.profiles", "nav.library", "nav.synthesis", "nav.train", "nav.analyze",
+            "profile.create", "profile.edit", "profile.delete", "profile.save", "profile.load", "profile.clone", "profile.select",
+        };
 
         /// <summary>
         /// Gets or sets whether the registry is in "busy" mode.
@@ -56,9 +70,10 @@ namespace VoiceStudio.App.Services
         public event EventHandler<CommandDescriptor>? CommandRegistered;
         public event EventHandler<string>? CommandUnregistered;
 
-        public UnifiedCommandRegistry(KeyboardShortcutService? shortcutService = null)
+        public UnifiedCommandRegistry(KeyboardShortcutService? shortcutService = null, IStartupStateService? startupStateService = null)
         {
             _shortcutService = shortcutService;
+            _startupStateService = startupStateService;
         }
 
         #region Registration
@@ -187,6 +202,15 @@ namespace VoiceStudio.App.Services
             {
                 Debug.WriteLine($"[CommandRegistry] Command disabled: {commandId}");
                 FileLog($"[CommandRegistry] Command disabled: {commandId}");
+                return;
+            }
+
+            // Task 3: Gate backend-dependent commands until startup ready (STARTUP_ORCHESTRATION_HARDENING_PLAN)
+            if (_startupStateService != null && BackendDependentCommandIds.Contains(commandId) && !_startupStateService.IsReady)
+            {
+                Debug.WriteLine($"[CommandRegistry] Backend not ready - blocking command: {commandId}");
+                FileLog($"[CommandRegistry] Backend not ready - blocking command: {commandId}");
+                AppServices.TryGetToastNotificationService()?.ShowInfo("Starting VoiceStudio services…", "Please wait");
                 return;
             }
 

@@ -10,10 +10,10 @@ using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.Core.Models;
 using VoiceStudio.App.Utilities;
-using EmbeddingVectorModel = VoiceStudio.App.ViewModels.EmbeddingExplorerViewModel.EmbeddingVector;
-using EmbeddingSimilarityModel = VoiceStudio.App.ViewModels.EmbeddingExplorerViewModel.EmbeddingSimilarity;
-using EmbeddingVisualizationModel = VoiceStudio.App.ViewModels.EmbeddingExplorerViewModel.EmbeddingVisualization;
-using EmbeddingClusterModel = VoiceStudio.App.ViewModels.EmbeddingExplorerViewModel.EmbeddingCluster;
+using EmbeddingVectorModel = VoiceStudio.App.Services.EmbeddingVector;
+using EmbeddingSimilarityModel = VoiceStudio.App.Services.EmbeddingSimilarity;
+using EmbeddingVisualizationModel = VoiceStudio.App.Services.EmbeddingVisualization;
+using EmbeddingClusterModel = VoiceStudio.App.Services.EmbeddingCluster;
 using Windows.Storage.Pickers;
 using Windows.Storage;
 using Windows.Storage.Streams;
@@ -25,12 +25,13 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class EmbeddingExplorerViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IEmbeddingExplorerClient _embeddingClient;
     private readonly IProjectsClient _projectsClient;
+    private readonly IProjectAudioClient _projectAudioClient;
     private readonly IProfilesClient _profilesClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
-    public string PanelId => "embedding-explorer";
+    public string PanelId => PanelIds.EmbeddingExplorer;
     public string DisplayName => ResourceHelper.GetString("Panel.EmbeddingExplorer.DisplayName", "Speaker Embedding Explorer");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -88,11 +89,12 @@ namespace VoiceStudio.App.ViewModels
       ExportVisualizationCommand.NotifyCanExecuteChanged();
     }
 
-    public EmbeddingExplorerViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient, IProfilesClient profilesClient)
+    public EmbeddingExplorerViewModel(IViewModelContext context, IEmbeddingExplorerClient embeddingClient, IProjectsClient projectsClient, IProjectAudioClient projectAudioClient, IProfilesClient profilesClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _embeddingClient = embeddingClient ?? throw new ArgumentNullException(nameof(embeddingClient));
       _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
+      _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
       // Get toast notification service (may be null if not initialized)
@@ -173,10 +175,17 @@ namespace VoiceStudio.App.ViewModels
         await RefreshAsync(ct);
       }, () => !IsLoading);
 
-      // Load initial data
-      _ = LoadEmbeddingsAsync(CancellationToken.None);
-      _ = LoadAudioFilesAsync(CancellationToken.None);
-      _ = LoadVoiceProfilesAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Initialize panel data. Call from View Loaded event (ADR-047: no constructor fire-and-forget).
+    /// </summary>
+    public void InitializeAsync()
+    {
+      var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+      _ = LoadEmbeddingsAsync(cts.Token);
+      _ = LoadAudioFilesAsync(cts.Token);
+      _ = LoadVoiceProfilesAsync(cts.Token);
     }
 
     public IAsyncRelayCommand LoadEmbeddingsCommand { get; }
@@ -198,12 +207,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var embeddings = await _backendClient.SendRequestAsync<object, EmbeddingVector[]>(
-            "/api/embedding-explorer/embeddings",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var embeddings = await _embeddingClient.GetEmbeddingsAsync(cancellationToken);
 
         if (embeddings != null)
         {
@@ -257,19 +261,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          audio_id = SourceAudioId,
-          voice_profile_id = SelectedVoiceProfileId,
-          method = "default"
-        };
-
-        var embedding = await _backendClient.SendRequestAsync<object, EmbeddingVector>(
-            "/api/embedding-explorer/extract",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var embedding = await _embeddingClient.ExtractEmbeddingAsync(SourceAudioId, SelectedVoiceProfileId, cancellationToken);
 
         if (embedding != null)
         {
@@ -309,12 +301,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/embedding-explorer/embeddings/{Uri.EscapeDataString(SelectedEmbedding1.EmbeddingId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _embeddingClient.DeleteEmbeddingAsync(SelectedEmbedding1.EmbeddingId, cancellationToken);
 
         Embeddings.Remove(SelectedEmbedding1);
         SelectedEmbedding1 = null;
@@ -351,18 +338,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
-        {
-          embedding_id_1 = SelectedEmbedding1.EmbeddingId,
-          embedding_id_2 = SelectedEmbedding2.EmbeddingId
-        };
-
-        var similarity = await _backendClient.SendRequestAsync<object, EmbeddingSimilarity>(
-            "/api/embedding-explorer/compare",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var similarity = await _embeddingClient.CompareEmbeddingsAsync(SelectedEmbedding1.EmbeddingId, SelectedEmbedding2.EmbeddingId, cancellationToken);
 
         if (similarity != null)
         {
@@ -395,12 +371,7 @@ namespace VoiceStudio.App.ViewModels
       {
         var embeddingIds = Embeddings.Select(e => e.EmbeddingId).ToList();
 
-        var visualizations = await _backendClient.SendRequestAsync<object, EmbeddingVisualization[]>(
-            $"/api/embedding-explorer/visualize?method={Uri.EscapeDataString(VisualizationMethod)}&dimensions={VisualizationDimensions}",
-            embeddingIds,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var visualizations = await _embeddingClient.VisualizeEmbeddingsAsync(embeddingIds, VisualizationMethod, VisualizationDimensions, cancellationToken);
 
         if (visualizations != null)
         {
@@ -445,12 +416,7 @@ namespace VoiceStudio.App.ViewModels
       {
         var embeddingIds = Embeddings.Select(e => e.EmbeddingId).ToList();
 
-        var clusters = await _backendClient.SendRequestAsync<object, EmbeddingCluster[]>(
-            $"/api/embedding-explorer/cluster?num_clusters={NumClusters}&method=kmeans",
-            embeddingIds,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var clusters = await _embeddingClient.ClusterEmbeddingsAsync(embeddingIds, NumClusters, cancellationToken);
 
         if (clusters != null)
         {
@@ -491,7 +457,7 @@ namespace VoiceStudio.App.ViewModels
 
         foreach (var project in projects)
         {
-          var audioFiles = await _backendClient.ListProjectAudioAsync(project.Id, cancellationToken);
+          var audioFiles = await _projectAudioClient.ListProjectAudioAsync(project.Id, cancellationToken);
           foreach (var audioFile in audioFiles)
           {
             if (!string.IsNullOrEmpty(audioFile.AudioId))
@@ -733,40 +699,6 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Response models
-    public class EmbeddingVector
-    {
-      public string EmbeddingId { get; set; } = string.Empty;
-      public string VoiceProfileId { get; set; } = string.Empty;
-      public double[] Vector { get; set; } = Array.Empty<double>();
-      public int Dimension { get; set; }
-      public string Created { get; set; } = string.Empty;
-    }
-
-    public class EmbeddingSimilarity
-    {
-      public string EmbeddingId1 { get; set; } = string.Empty;
-      public string EmbeddingId2 { get; set; } = string.Empty;
-      public double Similarity { get; set; }
-      public double Distance { get; set; }
-    }
-
-    public class EmbeddingVisualization
-    {
-      public string EmbeddingId { get; set; } = string.Empty;
-      public double X { get; set; }
-      public double Y { get; set; }
-      public double? Z { get; set; }
-      public string? Color { get; set; }
-    }
-
-    public class EmbeddingCluster
-    {
-      public string ClusterId { get; set; } = string.Empty;
-      public string[] EmbeddingIds { get; set; } = Array.Empty<string>();
-      public double[] Centroid { get; set; } = Array.Empty<double>();
-      public int Size { get; set; }
-    }
   }
 
   // Data models

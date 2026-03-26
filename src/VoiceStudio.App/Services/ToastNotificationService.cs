@@ -22,10 +22,20 @@ namespace VoiceStudio.App.Services
   }
 
   /// <summary>
+  /// Minimal interface for toast notifications. Enables test doubles without UI.
+  /// Used by ProjectWorkflowCoordinator for error surfacing verification.
+  /// </summary>
+  public interface IToastNotificationService
+  {
+    void ShowToast(ToastType type, string message, string? title = null);
+    void ShowInfo(string message, string? title = null);
+  }
+
+  /// <summary>
   /// Service for displaying toast notifications.
   /// Implements IDEA 11: Toast Notification System for User Feedback.
   /// </summary>
-  public class ToastNotificationService
+  public class ToastNotificationService : IToastNotificationService
   {
     private readonly List<ToastNotification> _activeToasts = new();
     private readonly StackPanel _toastContainer;
@@ -55,14 +65,15 @@ namespace VoiceStudio.App.Services
     {
       if (AppServices.GetService<GracefulDegradationService>()?.IsDegradedMode == true)
         return;
-      if (SuppressTransientBackendErrors && LooksLikeTransientBackendError(message))
+      if (SuppressTransientBackendErrors && LooksLikeTransientBackendError(message, title))
         return;
       ShowToast(ToastType.Error, message, title, 0, viewDetailsAction);
     }
 
-    private static bool LooksLikeTransientBackendError(string message)
+    private static bool LooksLikeTransientBackendError(string message, string? title = null)
     {
       var m = message.AsSpan();
+      var t = (title ?? string.Empty).AsSpan();
       return m.Contains("unable to connect".AsSpan(), StringComparison.OrdinalIgnoreCase)
           || m.Contains("connection refused".AsSpan(), StringComparison.OrdinalIgnoreCase)
           || m.Contains("No connection could be made".AsSpan(), StringComparison.OrdinalIgnoreCase)
@@ -70,10 +81,21 @@ namespace VoiceStudio.App.Services
           || m.Contains("too many requests".AsSpan(), StringComparison.OrdinalIgnoreCase)
           || m.Contains("requests per second".AsSpan(), StringComparison.OrdinalIgnoreCase)
           || m.Contains("requested resource was not found".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains(" not found".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains(" not found.".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("item not found".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("profile not found".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || m.Contains("project not found".AsSpan(), StringComparison.OrdinalIgnoreCase)
+          || t.Contains("not found".AsSpan(), StringComparison.OrdinalIgnoreCase)
           || (m.Contains("backend".AsSpan(), StringComparison.OrdinalIgnoreCase)
               && (m.Contains("connect".AsSpan(), StringComparison.OrdinalIgnoreCase)
                   || m.Contains("unavailable".AsSpan(), StringComparison.OrdinalIgnoreCase)
                   || m.Contains("not running".AsSpan(), StringComparison.OrdinalIgnoreCase)));
+    }
+
+    void IToastNotificationService.ShowToast(ToastType type, string message, string? title)
+    {
+      _ = ShowToast(type, message, title);
     }
 
     /// <summary>
@@ -108,6 +130,15 @@ namespace VoiceStudio.App.Services
         Action? action = null,
         bool isProgress = false)
     {
+      // Error toasts: apply same suppression as ShowError (degraded mode, transient backend errors)
+      if (type == ToastType.Error)
+      {
+        if (AppServices.GetService<GracefulDegradationService>()?.IsDegradedMode == true)
+          return new ToastNotification { Type = type, Message = message, Title = title };
+        if (SuppressTransientBackendErrors && LooksLikeTransientBackendError(message, title))
+          return new ToastNotification { Type = type, Message = message, Title = title };
+      }
+
       var toast = new ToastNotification
       {
         Type = type,

@@ -241,70 +241,9 @@ namespace VoiceStudio.App.Services.Gateways
         CancellationToken cancellationToken)
     {
       var statusCode = (int)response.StatusCode;
-      string? message = null;
-      string? errorCode = null;
-      JsonElement? details = null;
-      string? requestId = null;
-      string? timestamp = null;
-      string? path = null;
-      string? recoverySuggestion = null;
+      var parsed = await StandardErrorResponseParser.ParseAsync(response, _jsonOptions, cancellationToken);
 
-      try
-      {
-        var content = await response.Content.ReadAsStringAsync(cancellationToken);
-        if (!string.IsNullOrEmpty(content))
-        {
-          try
-          {
-            var errorJson = JsonSerializer.Deserialize<JsonElement>(content, _jsonOptions);
-            // Parse backend StandardErrorResponse fields
-            if (errorJson.TryGetProperty("message", out var msgProp))
-              message = msgProp.GetString();
-            if (errorJson.TryGetProperty("error", out var errProp) && errProp.ValueKind == JsonValueKind.String)
-              message = errProp.GetString() ?? message;
-            if (errorJson.TryGetProperty("error_code", out var codeProp))
-              errorCode = codeProp.GetString();
-            if (errorJson.TryGetProperty("details", out var detailsProp))
-              details = detailsProp;
-            if (errorJson.TryGetProperty("request_id", out var requestIdProp))
-              requestId = requestIdProp.GetString();
-            if (errorJson.TryGetProperty("timestamp", out var timestampProp))
-              timestamp = timestampProp.GetString();
-            if (errorJson.TryGetProperty("path", out var pathProp))
-              path = pathProp.GetString();
-            if (errorJson.TryGetProperty("recovery_suggestion", out var recoverySuggestionProp))
-              recoverySuggestion = recoverySuggestionProp.GetString();
-          }
-          catch
-          {
-            // Non-JSON response; use truncated content as message
-            message = content.Length > 200 ? content[..200] + "..." : content;
-          }
-        }
-      }
-      catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Failed to read error response: {ex.Message}", "BackendTransport");
-      }
-
-      // Default messages based on status code
-      message ??= statusCode switch
-      {
-        400 => "Invalid request. Please check your input and try again.",
-        401 => "Authentication failed. Please check your credentials.",
-        403 => "You don't have permission to perform this action.",
-        404 => "The requested resource was not found.",
-        409 => "A conflict occurred. The resource may have been modified.",
-        422 => "Validation failed. Please check your input.",
-        429 => "Too many requests. Please wait a moment and try again.",
-        500 => "An internal server error occurred. Please try again later.",
-        502 => "Bad gateway. The backend server may be unavailable.",
-        503 => "Service unavailable. The backend server is temporarily unavailable.",
-        504 => "Gateway timeout. The request took too long to process.",
-        _ => $"An error occurred (HTTP {statusCode}). Please try again."
-      };
-
-      errorCode ??= statusCode switch
+      var errorCode = parsed.ErrorCode ?? statusCode switch
       {
         400 => "VALIDATION_ERROR",
         401 => "AUTHENTICATION_FAILED",
@@ -314,18 +253,16 @@ namespace VoiceStudio.App.Services.Gateways
         _ => "UNKNOWN_ERROR"
       };
 
-      var isRetryable = statusCode >= 500 || statusCode == 429;
-
       return new GatewayError(
-          errorCode, 
-          message, 
-          statusCode, 
-          isRetryable, 
-          recoverySuggestion, 
-          details, 
-          requestId, 
-          timestamp, 
-          path);
+          errorCode,
+          parsed.Message,
+          statusCode,
+          parsed.IsRetryable,
+          parsed.RecoverySuggestion,
+          parsed.Details,
+          parsed.RequestId,
+          parsed.Timestamp,
+          parsed.Path);
     }
 
     private async Task<GatewayResult<T>> ExecuteAsync<T>(

@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -50,6 +51,21 @@ namespace VoiceStudio.App.Tests.ViewModels
       _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
     }
 
+    /// <summary>
+    /// Invariant: constructor must not call any client methods before activation.
+    /// Prevents constructor fire-and-forget regression (RETAINED_ASYNC_RULE, ADR-047).
+    /// </summary>
+    [TestMethod]
+    public void Constructor_DoesNotCallClient_BeforeActivation()
+    {
+      _ = new ProfileComparisonViewModel(
+          _context,
+          _mockSynthesisService.Object,
+          _mockProfilesClient.Object,
+          _mockAudioPlayer.Object);
+      _mockProfilesClient.Verify(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [TestMethod]
     public void Constructor_WithSeamClients_CreatesInstance()
     {
@@ -59,7 +75,7 @@ namespace VoiceStudio.App.Tests.ViewModels
           _mockProfilesClient.Object,
           _mockAudioPlayer.Object);
       Assert.IsNotNull(vm);
-      Assert.AreEqual("profile-comparison", vm.PanelId);
+      Assert.AreEqual(PanelIds.ProfileComparison, vm.PanelId);
       Assert.IsNotNull(vm.LoadProfilesCommand);
       Assert.IsNotNull(vm.CompareProfilesCommand);
     }

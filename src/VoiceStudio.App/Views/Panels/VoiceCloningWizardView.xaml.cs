@@ -24,7 +24,7 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new VoiceCloningWizardViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          ServiceProvider.GetBackendClient()
+          AppServices.GetRequiredService<IVoiceCloningWizardClient>()
       );
       DataContext = ViewModel;
 
@@ -147,6 +147,9 @@ namespace VoiceStudio.App.Views.Panels
       _panelDragDropService?.RegisterDropTarget(
           ViewModel.PanelId,
           CanAcceptDrop);
+
+      // Initialize wizard data from Loaded (ADR-047: no constructor fire-and-forget)
+      ViewModel.InitializeAsync();
     }
 
     private void VoiceCloningWizardView_Unloaded(object _, RoutedEventArgs __)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -15,7 +16,7 @@ namespace VoiceStudio.App.Views.Panels
   /// </summary>
   public partial class EngineParameterTuningViewModel : ObservableObject
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IEngineParameterTuningClient _engineParameterTuningClient;
 
     [ObservableProperty]
     private ObservableCollection<EngineInfo> availableEngines = new();
@@ -55,9 +56,9 @@ namespace VoiceStudio.App.Views.Panels
 
     public bool HasParameters => Parameters.Count > 0;
 
-    public EngineParameterTuningViewModel(IBackendClient backendClient)
+    public EngineParameterTuningViewModel(IEngineParameterTuningClient engineParameterTuningClient)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _engineParameterTuningClient = engineParameterTuningClient ?? throw new ArgumentNullException(nameof(engineParameterTuningClient));
       SavePresetCommand = new RelayCommand(SavePreset, () => Parameters.Count > 0);
       AutoOptimizeCommand = new AsyncRelayCommand(AutoOptimizeAsync, () => Parameters.Count > 0);
       ResetToDefaultsCommand = new RelayCommand(ResetToDefaults, () => Parameters.Count > 0);
@@ -435,16 +436,10 @@ namespace VoiceStudio.App.Views.Panels
         }
 
         // Send parameters to backend to update engine configuration
-        var request = new
-        {
-          engine_id = SelectedEngine.Id,
-          parameters = parameterDict
-        };
-
-        await _backendClient.SendRequestAsync<object, object>(
-            "/api/engines/configure",
-            request
-        );
+        await _engineParameterTuningClient.ConfigureEngineAsync(
+          SelectedEngine.Id,
+          parameterDict,
+          CancellationToken.None);
       }
       catch (Exception ex)
       {

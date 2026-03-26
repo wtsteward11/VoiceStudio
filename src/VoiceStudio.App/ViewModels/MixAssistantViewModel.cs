@@ -6,19 +6,19 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
-using MixSuggestionModel = VoiceStudio.App.ViewModels.MixAssistantViewModel.MixSuggestion;
 
 namespace VoiceStudio.App.ViewModels
 {
   /// <summary>
   /// ViewModel for the MixAssistantView panel - AI mixing & mastering assistant.
   /// </summary>
-  public partial class MixAssistantViewModel : BaseViewModel, IPanelView
+  public partial class MixAssistantViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IMixAssistantClient _mixAssistantClient;
     private readonly IProjectsClient _projectsClient;
 
     public string PanelId => "mix-assistant";
@@ -73,10 +73,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<string> availableGenres = new() { "pop", "rock", "jazz", "classical", "electronic", "hip-hop", "country" };
 
-    public MixAssistantViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient)
+    public MixAssistantViewModel(IViewModelContext context, IMixAssistantClient mixAssistantClient, IProjectsClient projectsClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _mixAssistantClient = mixAssistantClient ?? throw new ArgumentNullException(nameof(mixAssistantClient));
       _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
 
       AnalyzeMixCommand = new EnhancedAsyncRelayCommand(async (ct) =>
@@ -125,10 +125,16 @@ namespace VoiceStudio.App.ViewModels
         await RefreshAsync(ct);
       }, () => !IsLoading);
 
-      // Load initial data
-      _ = LoadProjectsAsync(CancellationToken.None);
-      _ = LoadSuggestionsAsync(CancellationToken.None);
     }
+
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      await LoadProjectsAsync(cancellationToken);
+      await LoadSuggestionsAsync(cancellationToken);
+    }
+
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
 
     public IAsyncRelayCommand AnalyzeMixCommand { get; }
     public IAsyncRelayCommand ApplySuggestionCommand { get; }
@@ -194,12 +200,13 @@ namespace VoiceStudio.App.ViewModels
           analyze_dynamics = AnalyzeDynamics
         };
 
-        var suggestions = await _backendClient.SendRequestAsync<object, MixSuggestion[]>(
-            "/api/mix-assistant/analyze",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var suggestions = await _mixAssistantClient.AnalyzeMixAsync(
+            SelectedProjectId!,
+            AnalyzeLevels,
+            AnalyzeFrequency,
+            AnalyzeStereo,
+            AnalyzeDynamics,
+            cancellationToken);
 
         if (suggestions != null)
         {
@@ -237,18 +244,10 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          suggestion_ids = new[] { SelectedSuggestion.SuggestionId },
-          apply_all = false
-        };
-
-        await _backendClient.SendRequestAsync<object, object>(
-            "/api/mix-assistant/apply",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _mixAssistantClient.ApplySuggestionsAsync(
+            new[] { SelectedSuggestion.SuggestionId },
+            false,
+            cancellationToken);
 
         Suggestions.Remove(SelectedSuggestion);
         SelectedSuggestion = null;
@@ -287,12 +286,10 @@ namespace VoiceStudio.App.ViewModels
           apply_all = true
         };
 
-        await _backendClient.SendRequestAsync<object, object>(
-            "/api/mix-assistant/apply",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _mixAssistantClient.ApplySuggestionsAsync(
+            Suggestions.Select(s => s.SuggestionId).ToArray(),
+            true,
+            cancellationToken);
 
         Suggestions.Clear();
         StatusMessage = ResourceHelper.GetString("MixAssistant.AllSuggestionsApplied", "All suggestions applied");
@@ -324,12 +321,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/mix-assistant/suggestions/{Uri.EscapeDataString(SelectedSuggestion.SuggestionId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _mixAssistantClient.DismissSuggestionAsync(SelectedSuggestion.SuggestionId, cancellationToken);
 
         Suggestions.Remove(SelectedSuggestion);
         SelectedSuggestion = null;
@@ -377,12 +369,11 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var preset = await _backendClient.SendRequestAsync<object, MixPreset>(
-            $"/api/mix-assistant/presets/generate?project_id={Uri.EscapeDataString(SelectedProjectId)}&name={Uri.EscapeDataString(PresetName)}&genre={Uri.EscapeDataString(SelectedGenre ?? "")}",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var preset = await _mixAssistantClient.GeneratePresetAsync(
+            SelectedProjectId!,
+            PresetName,
+            SelectedGenre,
+            cancellationToken);
 
         if (preset != null)
         {
@@ -411,32 +402,11 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var queryParams = new List<string>();
-        if (!string.IsNullOrEmpty(SelectedProjectId))
-        {
-          queryParams.Add($"project_id={Uri.EscapeDataString(SelectedProjectId)}");
-        }
-        if (!string.IsNullOrEmpty(SelectedCategory) && SelectedCategory != "all")
-        {
-          queryParams.Add($"category={Uri.EscapeDataString(SelectedCategory)}");
-        }
-        if (!string.IsNullOrEmpty(SelectedPriority) && SelectedPriority != "all")
-        {
-          queryParams.Add($"priority={Uri.EscapeDataString(SelectedPriority)}");
-        }
-
-        var url = "/api/mix-assistant/suggestions";
-        if (queryParams.Count > 0)
-        {
-          url += "?" + string.Join("&", queryParams);
-        }
-
-        var suggestions = await _backendClient.SendRequestAsync<object, MixSuggestion[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var suggestions = await _mixAssistantClient.GetSuggestionsAsync(
+            SelectedProjectId,
+            SelectedCategory,
+            SelectedPriority,
+            cancellationToken);
 
         if (suggestions != null)
         {
@@ -536,7 +506,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var project = await _backendClient.GetProjectAsync(SelectedProjectId, cancellationToken);
+        var project = await _projectsClient.GetProjectAsync(SelectedProjectId, cancellationToken);
 
         if (project != null)
         {
@@ -579,7 +549,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    public async Task RefreshAsync(CancellationToken cancellationToken)
     {
       try
       {
@@ -597,30 +567,6 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Response models
-    public class MixSuggestion
-    {
-      public string SuggestionId { get; set; } = string.Empty;
-      public string ProjectId { get; set; } = string.Empty;
-      public string Category { get; set; } = string.Empty;
-      public string Priority { get; set; } = string.Empty;
-      public string Description { get; set; } = string.Empty;
-      public string? Parameter { get; set; }
-      public double? CurrentValue { get; set; }
-      public double? SuggestedValue { get; set; }
-      public double Confidence { get; set; }
-      public string Created { get; set; } = string.Empty;
-    }
-
-    private class MixPreset
-    {
-      public string PresetId { get; set; } = string.Empty;
-      public string Name { get; set; } = string.Empty;
-      public string? Description { get; set; }
-      public string? Genre { get; set; }
-      public Dictionary<string, object> Settings { get; set; } = new();
-      public string Created { get; set; } = string.Empty;
-    }
   }
 
   // Data models
@@ -650,7 +596,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    public MixAssistantMixSuggestionItem(MixSuggestionModel suggestion)
+    public MixAssistantMixSuggestionItem(MixSuggestion suggestion)
     {
       SuggestionId = suggestion.SuggestionId;
       ProjectId = suggestion.ProjectId;

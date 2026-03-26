@@ -6,19 +6,20 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Utilities;
-using StyleTransferJobModel = VoiceStudio.App.ViewModels.StyleTransferViewModel.StyleTransferJob;
 
 namespace VoiceStudio.App.ViewModels
 {
   /// <summary>
   /// ViewModel for the StyleTransferView panel - Voice style transfer.
   /// </summary>
-  public partial class StyleTransferViewModel : BaseViewModel, IPanelView
+  public partial class StyleTransferViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IStyleTransferClient _styleTransferClient;
+    private readonly IProjectAudioClient _projectAudioClient;
     private readonly IProjectsClient _projectsClient;
     private readonly IProfilesClient _profilesClient;
 
@@ -59,10 +60,11 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private StyleTransferJobItem? selectedJob;
 
-    public StyleTransferViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient, IProfilesClient profilesClient)
+    public StyleTransferViewModel(IViewModelContext context, IStyleTransferClient styleTransferClient, IProjectAudioClient projectAudioClient, IProjectsClient projectsClient, IProfilesClient profilesClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _styleTransferClient = styleTransferClient ?? throw new ArgumentNullException(nameof(styleTransferClient));
+      _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
       _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
@@ -101,13 +103,16 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadAudioFilesAsync(CancellationToken.None);
-      _ = LoadVoiceProfilesAsync(CancellationToken.None);
-      _ = LoadPresetsCommandAsync(CancellationToken.None);
-      _ = LoadJobsAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      return RefreshAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public IAsyncRelayCommand LoadAudioFilesCommand { get; }
     public IAsyncRelayCommand LoadVoiceProfilesCommand { get; }
@@ -138,7 +143,7 @@ namespace VoiceStudio.App.ViewModels
         foreach (var project in projects)
         {
           cancellationToken.ThrowIfCancellationRequested();
-          var audioFiles = await _backendClient.ListProjectAudioAsync(project.Id, cancellationToken);
+          var audioFiles = await _projectAudioClient.ListProjectAudioAsync(project.Id, cancellationToken);
           foreach (var audioFile in audioFiles)
           {
             if (!string.IsNullOrEmpty(audioFile.AudioId))
@@ -207,12 +212,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var presets = await _backendClient.SendRequestAsync<object, StyleTransferPresetDto[]>(
-            "/api/style-transfer/presets",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var presets = await _styleTransferClient.GetPresetsAsync(cancellationToken);
 
         if (presets != null)
         {
@@ -256,22 +256,17 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new StyleTransferCreateRequest
         {
-          source_audio_id = SourceAudioId,
-          target_style_id = TargetStyleId,
-          transfer_strength = TransferStrength,
-          preserve_content = PreserveContent,
-          preserve_emotion = PreserveEmotion,
-          output_format = "wav"
+          SourceAudioId = SourceAudioId!,
+          TargetStyleId = TargetStyleId!,
+          TransferStrength = TransferStrength,
+          PreserveContent = PreserveContent,
+          PreserveEmotion = PreserveEmotion,
+          OutputFormat = "wav"
         };
 
-        var job = await _backendClient.SendRequestAsync<object, StyleTransferJob>(
-            "/api/style-transfer/transfer",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var job = await _styleTransferClient.CreateTransferAsync(request, cancellationToken);
 
         if (job != null)
         {
@@ -302,12 +297,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var jobs = await _backendClient.SendRequestAsync<object, StyleTransferJob[]>(
-            "/api/style-transfer/jobs",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var jobs = await _styleTransferClient.GetJobsAsync(cancellationToken);
 
         if (jobs != null)
         {
@@ -345,12 +335,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/style-transfer/jobs/{Uri.EscapeDataString(SelectedJob.JobId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _styleTransferClient.DeleteJobAsync(SelectedJob.JobId, cancellationToken);
 
         Jobs.Remove(SelectedJob);
         SelectedJob = null;
@@ -370,7 +355,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    public async Task RefreshAsync(CancellationToken cancellationToken)
     {
       await LoadAudioFilesAsync(cancellationToken);
       await LoadVoiceProfilesAsync(cancellationToken);
@@ -378,34 +363,9 @@ namespace VoiceStudio.App.ViewModels
       await LoadJobsAsync(cancellationToken);
       StatusMessage = ResourceHelper.GetString("StyleTransfer.Refreshed", "Refreshed");
     }
-
-    // Response models
-    public class StyleTransferJob
-    {
-      public string JobId { get; set; } = string.Empty;
-      public string SourceAudioId { get; set; } = string.Empty;
-      public string TargetStyleId { get; set; } = string.Empty;
-      public double TransferStrength { get; set; }
-      public string Status { get; set; } = string.Empty;
-      public double Progress { get; set; }
-      public string? OutputAudioId { get; set; }
-      public string? ErrorMessage { get; set; }
-      public string Created { get; set; } = string.Empty;
-      public string? Completed { get; set; }
-    }
   }
 
-  // Data models
-  public class StyleTransferPresetDto
-  {
-    public string PresetId { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public string? VoiceProfileId { get; set; }
-    public Dictionary<string, object> StyleCharacteristics { get; set; } = new();
-    public string Created { get; set; } = string.Empty;
-  }
-
+  // UI item models
   public class StyleTransferJobItem : ObservableObject
   {
     public string JobId { get; set; }
@@ -421,7 +381,7 @@ namespace VoiceStudio.App.ViewModels
     public string ProgressDisplay => $"{Progress:P0}";
     public string StatusDisplay => Status.ToUpper();
 
-    public StyleTransferJobItem(StyleTransferJobModel job)
+    public StyleTransferJobItem(StyleTransferJobResponse job)
     {
       JobId = job.JobId;
       SourceAudioId = job.SourceAudioId;
@@ -444,7 +404,7 @@ namespace VoiceStudio.App.ViewModels
     public string? VoiceProfileId { get; set; }
     public Dictionary<string, object> StyleCharacteristics { get; set; }
 
-    public StyleTransferPresetItem(StyleTransferPresetDto preset)
+    public StyleTransferPresetItem(StyleTransferPresetResponse preset)
     {
       PresetId = preset.PresetId;
       Name = preset.Name;

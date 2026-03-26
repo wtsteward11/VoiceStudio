@@ -16,18 +16,18 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestClass]
     public class LexiconViewModelTests : ViewModelTestBase
     {
-        private Mock<IBackendClient>? _mockBackendClient;
+        private Mock<ILexiconClient>? _mockLexiconClient;
 
         [TestInitialize]
         public override void TestInitialize()
         {
             base.TestInitialize();
-            _mockBackendClient = new Mock<IBackendClient>();
+            _mockLexiconClient = new Mock<ILexiconClient>();
         }
 
         private LexiconViewModel CreateViewModel()
         {
-            return new LexiconViewModel(MockContext!, _mockBackendClient!.Object);
+            return new LexiconViewModel(MockContext!, _mockLexiconClient!.Object);
         }
 
         #region Construction and Initialization Tests
@@ -50,11 +50,11 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Constructor_WithNullContext_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
-                new LexiconViewModel(null!, _mockBackendClient!.Object));
+                new LexiconViewModel(null!, _mockLexiconClient!.Object));
         }
 
         [TestMethod]
-        public void Constructor_WithNullBackendClient_ThrowsArgumentNullException()
+        public void Constructor_WithNullLexiconClient_ThrowsArgumentNullException()
         {
             Assert.ThrowsException<ArgumentNullException>(() =>
                 new LexiconViewModel(MockContext!, null!));

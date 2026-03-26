@@ -1,6 +1,5 @@
 using System;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -15,13 +14,15 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the HelpView panel - Help system.
   /// </summary>
-  public partial class HelpViewModel : BaseViewModel, IPanelView
+  public partial class HelpViewModel : BaseViewModel, ILifecyclePanelView
   {
-    private readonly IBackendClient _backendClient;
-    private CancellationTokenSource? _searchDebounceCts;
+    private readonly IHelpClient _helpClient;
+    private readonly CancellationTokenSource _disposalCts = new();
+    private CancellationTokenSource? _loadCts;
+    private readonly IDispatcherTimer? _searchDebounceTimer;
     private const int SearchDebounceMs = 300;
 
-    public string PanelId => "help";
+    public string PanelId => PanelIds.Help;
     public string DisplayName => ResourceHelper.GetString("Panel.Help.DisplayName", "Help");
     public PanelRegion Region => PanelRegion.Right;
 
@@ -52,10 +53,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool showSearchResults;
 
-    public HelpViewModel(IViewModelContext context, IBackendClient backendClient)
+    public HelpViewModel(IViewModelContext context, IHelpClient helpClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _helpClient = helpClient ?? throw new ArgumentNullException(nameof(helpClient));
 
       LoadTopicsCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -85,13 +86,42 @@ namespace VoiceStudio.App.ViewModels
       RefreshCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
-        await RefreshAsync(ct);
+        await RefreshAsyncInternal(ct);
       });
 
-      // Load initial data
-      _ = LoadCategoriesAsync(CancellationToken.None);
-      _ = LoadTopicsAsync(CancellationToken.None);
-      _ = LoadShortcutsAsync(CancellationToken.None);
+      _searchDebounceTimer = Dispatcher.CreateTimer();
+      if (_searchDebounceTimer != null)
+      {
+        _searchDebounceTimer.Interval = TimeSpan.FromMilliseconds(SearchDebounceMs);
+        _searchDebounceTimer.IsRepeating = false;
+        _searchDebounceTimer.Tick += OnSearchDebounceTick;
+      }
+    }
+
+    /// <inheritdoc />
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      _loadCts?.Cancel();
+      _loadCts?.Dispose();
+      using var linked = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token, cancellationToken);
+      await LoadCategoriesAsync(linked.Token);
+      await LoadTopicsAsync(linked.Token);
+      await LoadShortcutsAsync(linked.Token);
+    }
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => RefreshAsyncInternal(cancellationToken);
+
+    private void OnSearchDebounceTick(object? sender, object e)
+    {
+      if (_disposalCts.IsCancellationRequested) return;
+      _loadCts?.Cancel();
+      _loadCts?.Dispose();
+      _loadCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = SearchHelpAsync(_loadCts.Token);
     }
 
     public IAsyncRelayCommand LoadTopicsCommand { get; }
@@ -103,33 +133,18 @@ namespace VoiceStudio.App.ViewModels
 
     private async Task LoadTopicsAsync(CancellationToken cancellationToken)
     {
+      var categorySnapshot = SelectedCategory;
+      var panelSnapshot = SelectedPanelId;
+
       IsLoading = true;
       ErrorMessage = null;
 
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (!string.IsNullOrEmpty(SelectedCategory))
-          queryParams.Add("category", SelectedCategory);
-        if (!string.IsNullOrEmpty(SelectedPanelId))
-          queryParams.Add("panel_id", SelectedPanelId);
+        var topics = await _helpClient.GetTopicsAsync(categorySnapshot, panelSnapshot, cancellationToken);
 
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/help/topics";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var topics = await _backendClient.SendRequestAsync<object, HelpTopic[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        if (SelectedCategory != categorySnapshot || SelectedPanelId != panelSnapshot)
+          return;
 
         Topics.Clear();
         if (topics != null)
@@ -165,32 +180,19 @@ namespace VoiceStudio.App.ViewModels
         return;
       }
 
+      var querySnapshot = SearchQuery;
+      var categorySnapshot = SelectedCategory;
+      var panelSnapshot = SelectedPanelId;
+
       IsLoading = true;
       ErrorMessage = null;
 
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        queryParams.Add("query", SearchQuery);
-        if (!string.IsNullOrEmpty(SelectedCategory))
-          queryParams.Add("category", SelectedCategory);
-        if (!string.IsNullOrEmpty(SelectedPanelId))
-          queryParams.Add("panel_id", SelectedPanelId);
+        var response = await _helpClient.SearchAsync(querySnapshot, categorySnapshot, panelSnapshot, cancellationToken);
 
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = $"/api/help/search?{queryString}";
-
-        var response = await _backendClient.SendRequestAsync<object, HelpSearchResponse>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        if (SearchQuery != querySnapshot || SelectedCategory != categorySnapshot || SelectedPanelId != panelSnapshot)
+          return;
 
         Topics.Clear();
         if (response?.Topics != null)
@@ -222,26 +224,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (!string.IsNullOrEmpty(SelectedPanelId))
-          queryParams.Add("panel_id", SelectedPanelId);
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/help/shortcuts";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var shortcuts = await _backendClient.SendRequestAsync<object, HelpKeyboardShortcut[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var shortcuts = await _helpClient.GetShortcutsAsync(SelectedPanelId, cancellationToken);
 
         Shortcuts.Clear();
         if (shortcuts != null)
@@ -267,12 +250,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, HelpCategoriesResponse>(
-            "/api/help/categories",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _helpClient.GetCategoriesAsync(cancellationToken);
 
         AvailableCategories.Clear();
         if (response?.Categories != null)
@@ -296,7 +274,8 @@ namespace VoiceStudio.App.ViewModels
 
     private async Task LoadPanelHelpAsync(CancellationToken cancellationToken)
     {
-      if (string.IsNullOrEmpty(SelectedPanelId))
+      var panelSnapshot = SelectedPanelId;
+      if (string.IsNullOrEmpty(panelSnapshot))
         return;
 
       IsLoading = true;
@@ -304,12 +283,10 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, PanelHelpResponse>(
-            $"/api/help/panel/{SelectedPanelId}",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var response = await _helpClient.GetPanelHelpAsync(panelSnapshot, cancellationToken);
+
+        if (SelectedPanelId != panelSnapshot)
+          return;
 
         Topics.Clear();
         if (response?.Topics != null)
@@ -346,7 +323,7 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    private async Task RefreshAsyncInternal(CancellationToken cancellationToken)
     {
       await LoadTopicsAsync(cancellationToken);
       await LoadShortcutsAsync(cancellationToken);
@@ -355,50 +332,41 @@ namespace VoiceStudio.App.ViewModels
 
     partial void OnSelectedCategoryChanged(string? value)
     {
-      _ = LoadTopicsAsync(CancellationToken.None);
+      _loadCts?.Cancel();
+      _loadCts?.Dispose();
+      _loadCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = LoadTopicsAsync(_loadCts.Token);
     }
 
     partial void OnSelectedPanelIdChanged(string? value)
     {
-      _ = LoadPanelHelpAsync(CancellationToken.None);
+      _loadCts?.Cancel();
+      _loadCts?.Dispose();
+      _loadCts = CancellationTokenSource.CreateLinkedTokenSource(_disposalCts.Token);
+      _ = LoadPanelHelpAsync(_loadCts.Token);
     }
 
     partial void OnSearchQueryChanged(string? value)
     {
-      _searchDebounceCts?.Cancel();
-      _searchDebounceCts = new CancellationTokenSource();
-      var cts = _searchDebounceCts;
-      _ = Task.Run(async () =>
+      _searchDebounceTimer?.Stop();
+      _searchDebounceTimer?.Start();
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+      if (disposing)
       {
-        try
-        {
-          await Task.Delay(SearchDebounceMs, cts.Token);
-          Dispatcher.TryEnqueue(() => _ = SearchHelpAsync(cts.Token));
-        }
-        catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "HelpViewModel.OnSearchQueryChanged");
+        _searchDebounceTimer?.Stop();
+        if (_searchDebounceTimer != null)
+          _searchDebounceTimer.Tick -= OnSearchDebounceTick;
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = null;
+        _disposalCts.Cancel();
+        _disposalCts.Dispose();
       }
-      });
-    }
-
-    // Response models
-    private class HelpSearchResponse
-    {
-      public HelpTopic[] Topics { get; set; } = Array.Empty<HelpTopic>();
-      public int Total { get; set; }
-    }
-
-    private class HelpCategoriesResponse
-    {
-      public string[] Categories { get; set; } = Array.Empty<string>();
-    }
-
-    private class PanelHelpResponse
-    {
-      public HelpTopic[] Topics { get; set; } = Array.Empty<HelpTopic>();
-      public HelpKeyboardShortcut[] Shortcuts { get; set; } = Array.Empty<HelpKeyboardShortcut>();
-      public string PanelId { get; set; } = string.Empty;
+      base.Dispose(disposing);
     }
   }
 

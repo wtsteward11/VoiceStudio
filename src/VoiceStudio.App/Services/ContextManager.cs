@@ -33,6 +33,9 @@ public class ContextManager : IContextManager
     private string? _activeAssetType;
     private string? _activeEngineId;
     private string? _activeJobId;
+    private string? _currentPlayableAudioId;
+    private TransportSource? _currentPlayableSource;
+    private string? _currentPlayableTitle;
 
     /// <summary>
     /// Source panel ID used when publishing events.
@@ -192,6 +195,21 @@ public class ContextManager : IContextManager
         }
     }
 
+    public string? CurrentPlayableAudioId
+    {
+        get { lock (_lock) return _currentPlayableAudioId; }
+    }
+
+    public TransportSource? CurrentPlayableSource
+    {
+        get { lock (_lock) return _currentPlayableSource; }
+    }
+
+    public string? CurrentPlayableTitle
+    {
+        get { lock (_lock) return _currentPlayableTitle; }
+    }
+
     #endregion
 
     #region IContextManager Setters
@@ -307,6 +325,28 @@ public class ContextManager : IContextManager
                 assetType,
                 assetName,
                 intent));
+        }
+    }
+
+    public void SetCurrentPlayable(string? audioId, TransportSource? source, string? title)
+    {
+        lock (_lock)
+        {
+            if (_currentPlayableAudioId == audioId && _currentPlayableSource == source && _currentPlayableTitle == title)
+                return;
+
+            var oldAudioId = _currentPlayableAudioId;
+            _currentPlayableAudioId = audioId;
+            _currentPlayableSource = source;
+            _currentPlayableTitle = title;
+
+            // Use composite sentinel so listeners know "any transport field changed"
+            OnContextChanged(new ContextChangedEventArgs(
+                "CurrentPlayable",
+                InteractionIntent.ImmediateUse,
+                oldAudioId,
+                audioId));
+            TransportContextChanged?.Invoke(this, new TransportContextChangedEventArgs(audioId, source, title));
         }
     }
 
@@ -445,6 +485,7 @@ public class ContextManager : IContextManager
     #region Events
 
     public event EventHandler<ContextChangedEventArgs>? ContextChanged;
+    public event EventHandler<TransportContextChangedEventArgs>? TransportContextChanged;
     public event EventHandler<PanelViewStateChangedEventArgs>? ViewStateChanged;
 
     private void OnContextChanged(ContextChangedEventArgs args)

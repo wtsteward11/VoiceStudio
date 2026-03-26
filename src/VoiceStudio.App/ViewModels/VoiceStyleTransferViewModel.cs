@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
@@ -18,11 +19,11 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public partial class VoiceStyleTransferViewModel : BaseViewModel, IPanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IVoiceStyleTransferClient _voiceStyleTransferClient;
     private readonly IProfilesClient _profilesClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
-    public string PanelId => "voice-style-transfer";
+    public string PanelId => PanelIds.VoiceStyleTransfer;
     public string DisplayName => ResourceHelper.GetString("Panel.VoiceStyleTransfer.DisplayName", "Voice Style Transfer");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -65,10 +66,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private bool showComparison;
 
-    public VoiceStyleTransferViewModel(IViewModelContext context, IBackendClient backendClient, IProfilesClient profilesClient)
+    public VoiceStyleTransferViewModel(IViewModelContext context, IVoiceStyleTransferClient voiceStyleTransferClient, IProfilesClient profilesClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _voiceStyleTransferClient = voiceStyleTransferClient ?? throw new ArgumentNullException(nameof(voiceStyleTransferClient));
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
 
       // Get toast notification service using helper (reduces code duplication)
@@ -123,19 +124,14 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new StyleExtractRequest
+        var request = new VoiceStyleTransferExtractRequest
         {
           AudioId = ReferenceAudioId ?? "",
           AnalyzeProsody = true,
           AnalyzeEmotion = true
         };
 
-        var response = await _backendClient.SendRequestAsync<StyleExtractRequest, StyleProfileResponse>(
-            "/api/style-transfer/style/extract",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _voiceStyleTransferClient.ExtractStyleAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -172,17 +168,12 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new StyleAnalyzeRequest
+        var request = new VoiceStyleTransferAnalyzeRequest
         {
           AudioId = ReferenceAudioId ?? ""
         };
 
-        var response = await _backendClient.SendRequestAsync<StyleAnalyzeRequest, StyleAnalyzeResponse>(
-            "/api/style-transfer/style/analyze",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _voiceStyleTransferClient.AnalyzeStyleAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -219,7 +210,7 @@ namespace VoiceStudio.App.ViewModels
         IsGenerating = true;
         ErrorMessage = null;
 
-        var request = new StyleSynthesizeRequest
+        var request = new VoiceStyleTransferSynthesizeRequest
         {
           VoiceProfileId = TargetVoiceProfileId ?? "",
           Text = TargetText ?? "",
@@ -229,11 +220,7 @@ namespace VoiceStudio.App.ViewModels
           Language = "en"
         };
 
-        var response = await _backendClient.SendRequestAsync<StyleSynthesizeRequest, StyleSynthesizeResponse>(
-            "/api/style-transfer/synthesize/style",
-            request,
-            System.Net.Http.HttpMethod.Post
-        );
+        var response = await _voiceStyleTransferClient.SynthesizeStyleAsync(request);
 
         if (response != null)
         {
@@ -286,63 +273,6 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    // Request/Response models
-    private class StyleExtractRequest
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public bool AnalyzeProsody { get; set; }
-      public bool AnalyzeEmotion { get; set; }
-    }
-
-    public class StyleProfileResponse
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public float AveragePitch { get; set; }
-      public float PitchVariation { get; set; }
-      public float Energy { get; set; }
-      public float SpeakingRate { get; set; }
-      public string? EmotionTag { get; set; }
-      public Dictionary<string, object>? ProsodicFeatures { get; set; }
-      public List<float>? StyleEmbedding { get; set; }
-    }
-
-    private class StyleAnalyzeRequest
-    {
-      public string AudioId { get; set; } = string.Empty;
-    }
-
-    public class StyleAnalyzeResponse
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public List<float>? PitchContour { get; set; }
-      public List<float>? EnergyContour { get; set; }
-      public Dictionary<string, object>? TimingPatterns { get; set; }
-      public List<Dictionary<string, object>>? StyleMarkers { get; set; }
-    }
-
-    private class StyleSynthesizeRequest
-    {
-      public string VoiceProfileId { get; set; } = string.Empty;
-      public string Text { get; set; } = string.Empty;
-      public string? ReferenceAudioId { get; set; }
-      public List<float>? StyleEmbedding { get; set; }
-      public float StyleIntensity { get; set; }
-      public string Language { get; set; } = "en";
-    }
-
-    private class StyleSynthesizeResponse
-    {
-      public string AudioId { get; set; } = string.Empty;
-      public string AudioUrl { get; set; } = string.Empty;
-      public float Duration { get; set; }
-      public bool StyleApplied { get; set; }
-    }
-
-    private class VoiceProfileData
-    {
-      public string? ProfileId { get; set; }
-      public string? Name { get; set; }
-    }
   }
 
   // Data models
@@ -363,7 +293,7 @@ namespace VoiceStudio.App.ViewModels
     public string EmotionDisplay => EmotionTag ?? ResourceHelper.GetString("VoiceStyleTransfer.Neutral", "Neutral");
     public bool HasEmotion => !string.IsNullOrWhiteSpace(EmotionTag);
 
-    public StyleProfileItem(VoiceStyleTransferViewModel.StyleProfileResponse response)
+    public StyleProfileItem(VoiceStyleTransferProfileResponse response)
     {
       AudioId = response.AudioId;
       AveragePitch = response.AveragePitch;
@@ -387,7 +317,7 @@ namespace VoiceStudio.App.ViewModels
     public int MarkerCount => StyleMarkers?.Count ?? 0;
     public bool HasMarkers => MarkerCount > 0;
 
-    public StyleAnalysisItem(VoiceStyleTransferViewModel.StyleAnalyzeResponse response)
+    public StyleAnalysisItem(VoiceStyleTransferAnalyzeResponse response)
     {
       AudioId = response.AudioId;
       PitchContour = response.PitchContour;

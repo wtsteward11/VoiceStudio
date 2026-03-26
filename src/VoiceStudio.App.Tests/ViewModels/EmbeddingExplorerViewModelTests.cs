@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Services;
 using VoiceStudio.Core.Services;
-// Type aliases matching the ViewModel's internal model types
-using EmbeddingSimilarityModel = VoiceStudio.App.ViewModels.EmbeddingExplorerViewModel.EmbeddingSimilarity;
-using EmbeddingVectorModel = VoiceStudio.App.ViewModels.EmbeddingExplorerViewModel.EmbeddingVector;
-using EmbeddingVisualizationModel = VoiceStudio.App.ViewModels.EmbeddingExplorerViewModel.EmbeddingVisualization;
-using EmbeddingClusterModel = VoiceStudio.App.ViewModels.EmbeddingExplorerViewModel.EmbeddingCluster;
+// Type aliases for embedding explorer API models
+using EmbeddingSimilarityModel = VoiceStudio.App.Services.EmbeddingSimilarity;
+using EmbeddingVectorModel = VoiceStudio.App.Services.EmbeddingVector;
+using EmbeddingVisualizationModel = VoiceStudio.App.Services.EmbeddingVisualization;
+using EmbeddingClusterModel = VoiceStudio.App.Services.EmbeddingCluster;
 
 namespace VoiceStudio.App.Tests.ViewModels
 {

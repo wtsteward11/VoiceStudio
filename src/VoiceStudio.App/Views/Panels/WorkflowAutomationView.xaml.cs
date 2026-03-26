@@ -25,7 +25,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       ViewModel = new WorkflowAutomationViewModel(
-          ServiceProvider.GetBackendClient()
+          AppServices.GetWorkflowAutomationClient()
       );
       this.DataContext = ViewModel;
 

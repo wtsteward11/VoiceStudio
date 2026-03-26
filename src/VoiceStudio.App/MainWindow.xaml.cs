@@ -23,6 +23,7 @@ using VoiceStudio.App.Controls;
 using VoiceStudio.App.Views.Dialogs;
 using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel;
+using Microsoft.Extensions.Logging;
 using VoiceStudio.App.Logging;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Models;
@@ -37,6 +38,7 @@ namespace VoiceStudio.App
         private readonly PanelStateService? _panelStateService;
         private readonly RecentProjectsService? _recentProjectsService;
         private readonly CommandRouter? _commandRouter;
+        private IStartupStateService? _startupStateService;
         private const string ShowWelcomeKey = "ShowWelcomeDialog";
         private bool _disposed;
         private bool _welcomeDialogShown;
@@ -64,6 +66,13 @@ namespace VoiceStudio.App
         // Workspace splitter drag state (WinUI 3 has no built-in GridSplitter)
         private enum SplitterKind { None, Vertical1, Vertical2, Horizontal }
         private SplitterKind _activeSplitter;
+
+        private GlobalTransportControl? _globalTransport;
+        private StatusBarCoordinator? _statusBarCoordinator;
+        private TransportShortcutCoordinator? _transportShortcutCoordinator;
+        private IShellNavigationCoordinator? _shellNavigationCoordinator;
+        private ISearchOverlayCoordinator? _searchOverlayCoordinator;
+        private IProjectWorkflowCoordinator? _projectWorkflowCoordinator;
 
         private Debouncer? _layoutSaveDebouncer;
         private double _splitterStartX;
@@ -115,95 +124,29 @@ namespace VoiceStudio.App
         }
 
         /// <summary>
-        /// Gets the default region for a panel.
+        /// Gets the default region for a panel. Delegates to ShellNavigationCoordinator when available.
         /// </summary>
         private PanelRegion GetPanelRegion(string panelId)
         {
-            if (UnifiedPanelRegistry.TryGetDescriptor(panelId, out var descriptor) && descriptor != null)
-            {
-                return descriptor.DefaultRegion;
-            }
-
-            if (_legacyPanelRegistry.TryGetValue(panelId, out var legacyEntry))
-            {
-                return legacyEntry.DefaultRegion;
-            }
-
-            return PanelRegion.Center; // Default
+            return _shellNavigationCoordinator?.GetPanelRegion(panelId) ?? PanelRegion.Center;
         }
 
         /// <summary>
-        /// Gets the display name for a panel.
+        /// Gets the display name for a panel. Delegates to ShellNavigationCoordinator when available.
         /// </summary>
         private string GetPanelTitle(string panelId)
         {
-            if (UnifiedPanelRegistry.TryGetDescriptor(panelId, out var descriptor) && descriptor != null)
-            {
-                return descriptor.DisplayName;
-            }
-
-            if (_legacyPanelRegistry.TryGetValue(panelId, out var legacyEntry))
-            {
-                return legacyEntry.Title;
-            }
-
-            return panelId; // Fall back to ID
+            return _shellNavigationCoordinator?.GetPanelTitle(panelId) ?? panelId;
         }
 
         /// <summary>
-        /// Opens a panel by its canonical registry ID, using the unified PanelRegistry with legacy fallback.
+        /// Opens a panel by its canonical registry ID. Delegates to ShellNavigationCoordinator.
         /// </summary>
-        /// <param name="panelId">The canonical panel ID (case-insensitive, e.g. "Timeline", "EffectsMixer").</param>
-        /// <param name="overrideRegion">Optional region override; defaults to the registry-defined region.</param>
-        /// <returns>True if the panel was opened; false if the ID was not found in any registry.</returns>
         private async Task<bool> OpenPanelByIdAsync(string panelId, PanelRegion? overrideRegion = null)
         {
-            var finalRegion = overrideRegion ?? GetPanelRegion(panelId);
-
-            // Migrate panel state when opening into a non-default region (e.g. Tool Catalog region override).
-            // Ensures persisted state follows the panel to the target region.
-            if (overrideRegion.HasValue && _panelStateService != null)
-            {
-                var layout = _panelStateService.GetCurrentLayout();
-                var currentRegionState = layout.Regions?.FirstOrDefault(r => r.PanelStates.ContainsKey(panelId));
-                if (currentRegionState != null && currentRegionState.Region != finalRegion)
-                    _panelStateService.MigratePanelState(panelId, currentRegionState.Region, finalRegion);
-            }
-
-            return await SwitchToPanelByIdAsync(finalRegion, panelId);
-        }
-
-        /// <summary>
-        /// Switches to a panel by ID, using LoadPanelAsync (cached) with legacy factory fallback.
-        /// Never blocks the UI thread; uses WaitAsync consistently.
-        /// </summary>
-        private async Task<bool> SwitchToPanelByIdAsync(PanelRegion region, string panelId)
-        {
-            Controls.PanelHost? targetHost = region switch
-            {
-                PanelRegion.Left => FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
-                PanelRegion.Center => FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
-                PanelRegion.Right => FindNameOnContent("RightPanelHost") as Controls.PanelHost,
-                PanelRegion.Bottom => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
-                _ => null
-            };
-
-            if (targetHost == null)
-                return false;
-
-            Func<UserControl>? legacyFactory = null;
-            if (_legacyPanelRegistry.TryGetValue(panelId, out var legacyEntry))
-                legacyFactory = legacyEntry.Factory;
-
-            var panel = await targetHost.LoadPanelAsync(panelId, legacyFactory);
-            if (panel == null)
-                return false;
-
-            var title = GetPanelTitle(panelId);
-            if (!IsGateCSmokeMode())
-                ShowPanelQuickSwitchIndicator(title, region, targetHost);
-
-            return true;
+            return _shellNavigationCoordinator != null
+                ? await _shellNavigationCoordinator.OpenPanelByIdAsync(panelId, overrideRegion)
+                : false;
         }
 
         private static void SetPanelHostMeta(Controls.PanelHost? host, string title, string icon)
@@ -234,6 +177,27 @@ namespace VoiceStudio.App
             return FindInContent<object>(name);
         }
 
+        /// <summary>
+        /// Dependency bundle for project workflow coordinator. All pulls happen in MainWindow constructor.
+        /// </summary>
+        private sealed record WorkflowDependencies(
+            IStartupStateService Startup,
+            IBackendClient Backend,
+            RecentProjectsService? RecentProjects,
+            IToastNotificationService? Toast,
+            ILogger<ProjectWorkflowCoordinator>? Logger);
+
+        /// <summary>
+        /// Creates the project workflow coordinator from an explicit dependency bundle.
+        /// Zero ServiceProvider/AppServices calls; pure composition seam.
+        /// </summary>
+        private IProjectWorkflowCoordinator CreateProjectWorkflowCoordinator(IShellNavigationCoordinator shellNav, WorkflowDependencies deps)
+        {
+            var getTimeline = () => (FindNameOnContent("CenterPanelHost") as Controls.PanelHost)?.Content is TimelineView tv ? tv.ViewModel : null;
+            var getMixer = () => (FindNameOnContent("RightPanelHost") as Controls.PanelHost)?.Content is EffectsMixerView em ? em.ViewModel : null;
+            return ProjectWorkflowBootstrap.Create(shellNav, getTimeline, getMixer, SetActiveNavButton, deps.Startup, deps.Backend, deps.RecentProjects, deps.Toast, deps.Logger);
+        }
+
         public MainWindow()
         {
             using var profiler = PerformanceProfiler.Start("MainWindow Construction");
@@ -259,7 +223,29 @@ namespace VoiceStudio.App
             _commandRouter = AppServices.TryGetCommandRouter();
             profiler.Checkpoint("CommandRouter Retrieved");
 
-            // Initialize Toast Notification Service (IDEA 11)
+            // Shell navigation coordination (Premium Reliability Pass Task 9)
+            _shellNavigationCoordinator = new ShellNavigationCoordinator(
+                r => r switch
+                {
+                    PanelRegion.Left => FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
+                    PanelRegion.Center => FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
+                    PanelRegion.Right => FindNameOnContent("RightPanelHost") as Controls.PanelHost,
+                    PanelRegion.Bottom => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
+                    _ => null
+                },
+                FindNameOnContent,
+                id => _legacyPanelRegistry.TryGetValue(id, out var e) ? e.Factory : null,
+                SetActiveNavButton,
+                ShowPanelQuickSwitchIndicator,
+                IsGateCSmokeMode,
+                _panelStateService,
+                _commandRouter);
+            profiler.Checkpoint("ShellNavigationCoordinator Created");
+
+            _searchOverlayCoordinator = new SearchOverlayCoordinator(FindNameOnContent, _shellNavigationCoordinator!);
+            profiler.Checkpoint("SearchOverlayCoordinator Created");
+
+            // Initialize Toast Notification Service before coordinator (ToastContainer available after InitializeComponent)
             var toastContainer = FindInContent<StackPanel>("ToastContainer");
             if (toastContainer != null)
             {
@@ -268,20 +254,14 @@ namespace VoiceStudio.App
                 profiler.Checkpoint("ToastNotificationService Initialized");
             }
 
-            // Start backend health monitoring (must come after toast service)
-            if (AppServices.TryGetErrorPresentationService() is ErrorPresentationService eps)
-            {
-                eps.StartBackendMonitoring();
-                ErrorPresentationService.BackendReachabilityChanged += OnBackendReachabilityChanged;
-                profiler.Checkpoint("BackendConnectionMonitor Started");
-            }
-
-            // Degraded mode banner (429/backend stress)
-            if (AppServices.GetService<GracefulDegradationService>() is GracefulDegradationService gds)
-            {
-                gds.DegradedModeChanged += OnDegradedModeChanged;
-                profiler.Checkpoint("DegradedModeBanner Subscribed");
-            }
+            var workflowDeps = new WorkflowDependencies(
+                ServiceProvider.GetStartupStateService(),
+                ServiceProvider.GetBackendClient(),
+                ServiceProvider.TryGetRecentProjectsService(),
+                ServiceProvider.TryGetToastNotificationService(),
+                AppServices.GetService<ILogger<ProjectWorkflowCoordinator>>());
+            _projectWorkflowCoordinator = CreateProjectWorkflowCoordinator(_shellNavigationCoordinator!, workflowDeps);
+            profiler.Checkpoint("ProjectWorkflowCoordinator Created");
 
             RegisterKeyboardShortcuts();
             profiler.Checkpoint("Keyboard Shortcuts Registered");
@@ -307,6 +287,19 @@ namespace VoiceStudio.App
             // Also register Activated handler for welcome dialog
             this.Activated += MainWindow_Activated;
             profiler.Checkpoint("Event Handlers Registered");
+
+            // Startup overlay: visible until backend ready (STARTUP_ORCHESTRATION_HARDENING_PLAN)
+            try
+            {
+                _startupStateService = ServiceProvider.GetStartupStateService();
+                _startupStateService.StateChanged += StartupState_StateChanged;
+                UpdateStartupOverlay(_startupStateService.CurrentState, _startupStateService.FailureMessage);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Startup overlay init failed: {ex.Message}");
+            }
+            profiler.Checkpoint("Startup Overlay Subscribed");
 
             // DEBUG: Add AddHandler with handledEventsToo to capture ALL pointer events (after Loaded)
             if (this.Content is FrameworkElement contentFE)
@@ -372,11 +365,16 @@ namespace VoiceStudio.App
                     }),
               true); // handledEventsToo = true
 #endif
+                // Transport shortcut orchestration (Transport Coherence Wave 4 Phase 1)
+                _transportShortcutCoordinator = AppServices.GetService<TransportShortcutCoordinator>();
+                _transportShortcutCoordinator?.Attach(_keyboardShortcutService, () => ToggleRecording());
+
                 // FIX: Defer panel initialization to the Loaded event.
                 // XamlRoot is guaranteed non-null here; it is still null during the constructor,
                 // so any popup/dialog created during panel init previously threw
                 // COMException "Catastrophic failure — XamlRoot must be explicitly set for unparented popup."
-                _ = InitializePanelsAsync(
+                // Round 4 Task 1: Defer panel init until BackendReady to avoid backend calls during startup.
+                _ = RunPanelInitWhenReadyAsync(
                     FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
                     FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
                     FindNameOnContent("RightPanelHost") as Controls.PanelHost,
@@ -451,6 +449,33 @@ namespace VoiceStudio.App
                 globalSearchView.NavigateRequested += GlobalSearchView_NavigateRequested;
             }
 
+            // Wire up global transport strip to main Play/Stop (Task 5: delegate to orchestrator)
+            var bootstrap = AppServices.GetService<TransportOrchestrationBootstrap>();
+            bootstrap?.SetGetTimelineController(() =>
+            {
+                var host = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
+                if (host?.Content is TimelineView tv && tv.ViewModel is ITimelineTransportController ctrl)
+                    return ctrl;
+                return null;
+            });
+            _globalTransport = FindNameOnContent("GlobalTransportControl") as Controls.GlobalTransportControl;
+            if (_globalTransport != null)
+            {
+                _globalTransport.PlayRequested += OnPlayRequested;
+                _globalTransport.StopRequested += OnStopRequested;
+            }
+
+            // Status bar orchestration (Transport Coherence Wave 3 Task 5)
+            _statusBarCoordinator = AppServices.GetService<StatusBarCoordinator>();
+            if (_statusBarCoordinator != null)
+            {
+                _statusBarCoordinator.Attach(DispatcherQueue, FindNameOnContent);
+                _statusBarCoordinator.Subscribe(
+                    AppServices.GetContextManager(),
+                    AppServices.TryGetStatusBarActivityService(),
+                    AppServices.GetService<GracefulDegradationService>());
+            }
+
             // Populate Recent Projects menu (IDEA 16)
             PopulateRecentProjectsMenu();
 
@@ -468,9 +493,7 @@ namespace VoiceStudio.App
                 };
             }
 
-            // Wire up status bar activity indicators (IDEA 19)
-            WireUpStatusBarIndicators();
-            profiler.Checkpoint("Status Bar Indicators Wired");
+            profiler.Checkpoint("Status Bar Coordinated");
 
             // Start clock timer
             UpdateClock();
@@ -501,7 +524,7 @@ namespace VoiceStudio.App
         #region Navigation Button Click Handlers
 
         /// <summary>
-        /// Executes a navigation command via CommandRouter, falling back to OpenPanelByIdAsync if unavailable.
+        /// Executes a navigation command. Delegates to ShellNavigationCoordinator.
         /// </summary>
         private void ExecuteNavCommand(string commandId, string fallbackPanelId, PanelRegion fallbackRegion, string buttonName)
         {
@@ -513,27 +536,8 @@ namespace VoiceStudio.App
         /// </summary>
         private async Task ExecuteNavCommandAsync(string commandId, string fallbackPanelId, PanelRegion fallbackRegion, string buttonName)
         {
-            if (IsSafeStartupMode())
-            {
-                if (await OpenPanelByIdAsync(fallbackPanelId, fallbackRegion))
-                    SetActiveNavButton(buttonName);
-                return;
-            }
-
-            if (_commandRouter != null)
-            {
-                var success = await _commandRouter.ExecuteSafeAsync(commandId);
-                if (success)
-                {
-                    Debug.WriteLine($"[MainWindow] Nav command succeeded via CommandRouter: {commandId}");
-                    SetActiveNavButton(buttonName);
-                    return;
-                }
-                Debug.WriteLine($"[MainWindow] Nav command failed; falling back to OpenPanelByIdAsync: {fallbackPanelId}");
-            }
-
-            if (await OpenPanelByIdAsync(fallbackPanelId, fallbackRegion))
-                SetActiveNavButton(buttonName);
+            if (_shellNavigationCoordinator != null)
+                await _shellNavigationCoordinator.ExecuteNavCommandAsync(commandId, fallbackPanelId, fallbackRegion, buttonName);
         }
 
         #endregion Navigation Button Click Handlers
@@ -563,19 +567,7 @@ namespace VoiceStudio.App
         {
             try
             {
-                var canonicalId = panelId switch
-                {
-                    "studio" or "home" or "timeline" => "Timeline",
-                    "profiles" => "Profiles",
-                    "library" => "Library",
-                    "effects" => "EffectsMixer",
-                    "train" => "Training",
-                    "analyze" => "Analyzer",
-                    "settings" => "Settings",
-                    "logs" => "Diagnostics",
-                    "synthesis" => "VoiceSynthesis",
-                    _ => originalPanelId,
-                };
+                var canonicalId = _shellNavigationCoordinator?.ResolvePanelIdAlias(panelId) ?? originalPanelId;
 
                 if (await OpenPanelByIdAsync(canonicalId))
                 {
@@ -618,210 +610,6 @@ namespace VoiceStudio.App
                 navButton.IsChecked = string.Equals(navButton.Name, activeButtonName, StringComparison.Ordinal);
             }
         }
-
-        #region Status Bar Activity Indicators (IDEA 19)
-
-        /// <summary>
-        /// Wires up status bar activity indicators to the StatusBarActivityService.
-        /// </summary>
-        private void WireUpStatusBarIndicators()
-        {
-            var activityService = ServiceProvider.TryGetStatusBarActivityService();
-            if (activityService == null)
-                return;
-
-            // Subscribe to activity status changes
-            activityService.ActivityStatusChanged += ActivityService_ActivityStatusChanged;
-
-            // Update initial state
-            UpdateActivityIndicators(activityService);
-        }
-
-        /// <summary>
-        /// Handles activity status changes and updates UI indicators.
-        /// </summary>
-        private void ActivityService_ActivityStatusChanged(object? sender, ActivityStatusChangedEventArgs e)
-        {
-            // Update on UI thread
-            this.DispatcherQueue.TryEnqueue(() => UpdateActivityIndicators(e));
-        }
-
-        /// <summary>
-        /// Updates activity indicators based on current status.
-        /// </summary>
-        private void UpdateActivityIndicators(StatusBarActivityService? service = null)
-        {
-            if (service == null)
-                service = ServiceProvider.TryGetStatusBarActivityService();
-
-            if (service == null)
-                return;
-
-            var status = new ActivityStatusChangedEventArgs
-            {
-                ProcessingStatus = service.ProcessingStatus,
-                NetworkStatus = service.NetworkStatus,
-                EngineStatus = service.EngineStatus,
-                ActiveJobCount = service.ActiveJobCount,
-                QueuedOperationCount = service.QueuedOperationCount
-            };
-
-            UpdateActivityIndicators(status);
-        }
-
-        /// <summary>
-        /// Updates activity indicators based on status event args.
-        /// </summary>
-        private void UpdateActivityIndicators(ActivityStatusChangedEventArgs status)
-        {
-            // Update Processing Indicator
-            UpdateProcessingIndicator(status.ProcessingStatus, status.ActiveJobCount, status.QueuedOperationCount);
-
-            // Update Network Indicator
-            UpdateNetworkIndicator(status.NetworkStatus);
-
-            // Update Engine Indicator
-            UpdateEngineIndicator(status.EngineStatus);
-
-            // Update status text
-            UpdateStatusText(status);
-        }
-
-        /// <summary>
-        /// Updates the processing indicator.
-        /// </summary>
-        private void UpdateProcessingIndicator(ProcessingStatus status, int activeJobCount, int queuedCount)
-        {
-            if (!(FindNameOnContent("ProcessingIndicator") is FrameworkElement processingIndicator))
-                return;
-
-            var tooltip = status switch
-            {
-                ProcessingStatus.Processing => $"Processing: {activeJobCount} active job(s), {queuedCount} queued",
-                ProcessingStatus.Paused => "Processing: Paused",
-                ProcessingStatus.Error => "Processing: Error",
-                _ => "Processing: Idle"
-            };
-
-            ToolTipService.SetToolTip(processingIndicator, tooltip);
-
-            var color = status switch
-            {
-                ProcessingStatus.Processing => Windows.UI.Color.FromArgb(255, 0, 255, 127), // Green
-                ProcessingStatus.Paused => Windows.UI.Color.FromArgb(255, 255, 255, 0), // Yellow
-                ProcessingStatus.Error => Windows.UI.Color.FromArgb(255, 255, 0, 0), // Red
-                _ => Windows.UI.Color.FromArgb(255, 128, 128, 128) // Gray
-            };
-
-            processingIndicator.SetValue(Control.BackgroundProperty, new SolidColorBrush(color));
-            processingIndicator.Opacity = status == ProcessingStatus.Idle ? 0.3 : 1.0;
-        }
-
-        /// <summary>
-        /// Updates the network indicator.
-        /// </summary>
-        private void UpdateNetworkIndicator(NetworkStatus status)
-        {
-            if (!(FindNameOnContent("NetworkIndicator") is FrameworkElement networkIndicator))
-                return;
-
-            var tooltip = status switch
-            {
-                NetworkStatus.Connected => "Network: Connected",
-                NetworkStatus.Disconnected => "Network: Disconnected",
-                NetworkStatus.Reconnecting => "Network: Reconnecting...",
-                _ => "Network: Error"
-            };
-
-            ToolTipService.SetToolTip(networkIndicator, tooltip);
-
-            var color = status switch
-            {
-                NetworkStatus.Connected => Windows.UI.Color.FromArgb(255, 0, 255, 127), // Green
-                NetworkStatus.Reconnecting => Windows.UI.Color.FromArgb(255, 255, 255, 0), // Yellow
-                _ => Windows.UI.Color.FromArgb(255, 255, 0, 0) // Red
-            };
-
-            networkIndicator.SetValue(Control.BackgroundProperty, new SolidColorBrush(color));
-            networkIndicator.Opacity = status == NetworkStatus.Connected ? 1.0 : 0.7;
-        }
-
-        /// <summary>
-        /// Updates the engine indicator.
-        /// </summary>
-        private void UpdateEngineIndicator(EngineStatus status)
-        {
-            if (!(FindNameOnContent("EngineIndicator") is FrameworkElement engineIndicator))
-                return;
-
-            var tooltip = status switch
-            {
-                EngineStatus.Ready => "Engine: Ready",
-                EngineStatus.Busy => "Engine: Busy",
-                EngineStatus.Starting => "Engine: Starting...",
-                EngineStatus.Offline => "Engine: Offline",
-                _ => "Engine: Error"
-            };
-
-            ToolTipService.SetToolTip(engineIndicator, tooltip);
-
-            var color = status switch
-            {
-                EngineStatus.Ready => Color.FromArgb(255, 0, 255, 127), // Green
-                EngineStatus.Busy => Color.FromArgb(255, 0, 120, 212), // Blue
-                EngineStatus.Starting => Color.FromArgb(255, 255, 255, 0), // Yellow
-                _ => Color.FromArgb(255, 255, 0, 0) // Red
-            };
-
-            engineIndicator.SetValue(Control.BackgroundProperty, new SolidColorBrush(color));
-            engineIndicator.Opacity = status == EngineStatus.Ready ? 1.0 : 0.8;
-        }
-
-        /// <summary>
-        /// Updates the status text based on current activity.
-        /// </summary>
-        private void UpdateStatusText(ActivityStatusChangedEventArgs status)
-        {
-            if (!(FindNameOnContent("StatusText") is TextBlock statusText))
-                return;
-
-            if (ErrorPresentationService.IsBackendOffline)
-                return;
-
-            statusText.Text = status.ProcessingStatus switch
-            {
-                ProcessingStatus.Processing => $"Processing ({status.ActiveJobCount} job(s))",
-                ProcessingStatus.Paused => "Paused",
-                ProcessingStatus.Error => "Error",
-                _ => "Ready"
-            };
-        }
-
-        private void OnBackendReachabilityChanged(object? sender, bool reachable)
-        {
-            DispatcherQueue?.TryEnqueue(() =>
-            {
-                UpdateNetworkIndicator(reachable ? NetworkStatus.Connected : NetworkStatus.Disconnected);
-
-                if (FindNameOnContent("StatusText") is TextBlock statusText)
-                    statusText.Text = reachable ? "Ready" : "Backend offline \u2014 reconnecting\u2026";
-            });
-        }
-
-        private void OnDegradedModeChanged(object? sender, bool isDegraded)
-        {
-            DispatcherQueue?.TryEnqueue(() =>
-            {
-                var banner = FindInContent<Microsoft.UI.Xaml.Controls.InfoBar>("DegradedModeBanner");
-                if (banner == null)
-                    return;
-                banner.IsOpen = isDegraded;
-                if (isDegraded && sender is GracefulDegradationService gds)
-                    banner.Message = gds.DegradationReason ?? "Backend temporarily unavailable.";
-            });
-        }
-
-        #endregion Status Bar Activity Indicators (IDEA 19)
 
         #region Panel Preview on Hover (IDEA 20)
 
@@ -1070,109 +858,81 @@ namespace VoiceStudio.App
 
         private async void GlobalSearchView_NavigateRequested(object? sender, Views.SearchNavigationEventArgs e)
         {
-            HideGlobalSearch();
+            if (_searchOverlayCoordinator != null)
+                await _searchOverlayCoordinator.HandleNavigateRequestedAsync(e.Result).ConfigureAwait(true);
+        }
 
-            try
+        private void StartupState_StateChanged(object? sender, StartupStateChangedEventArgs e)
+        {
+            this.DispatcherQueue.TryEnqueue(() =>
+                UpdateStartupOverlay(e.NewState, e.FailureMessage));
+        }
+
+        private void UpdateStartupOverlay(StartupState state, string? failureMessage)
+        {
+            var overlay = FindInContent<Border>("StartupOverlay");
+            var message = FindInContent<TextBlock>("StartupOverlayMessage");
+            var progress = FindInContent<ProgressRing>("StartupProgressRing");
+            var retryBtn = FindInContent<Button>("StartupRetryButton");
+            if (overlay == null)
+                return;
+
+            var showOverlay = state == StartupState.Starting || state == StartupState.BackendStarting || state == StartupState.BackendFailed;
+            overlay.Visibility = showOverlay ? Visibility.Visible : Visibility.Collapsed;
+
+            if (showOverlay)
             {
-                await NavigateToSearchResultAsync(e.Result);
-            }
-            catch (Exception ex)
-            {
-                var toastService = ServiceProvider.GetToastNotificationService();
-                toastService?.ShowError(
-                    "Navigation Failed",
-                    $"Could not navigate to search result: {ex.Message}");
+                if (state == StartupState.BackendFailed)
+                {
+                    if (message != null)
+                        message.Text = string.IsNullOrEmpty(failureMessage) ? "Backend failed to start." : failureMessage;
+                    if (progress != null)
+                        progress.IsActive = false;
+                    if (retryBtn != null)
+                        retryBtn.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    if (message != null)
+                        message.Text = "Starting VoiceStudio services…";
+                    if (progress != null)
+                        progress.IsActive = true;
+                    if (retryBtn != null)
+                        retryBtn.Visibility = Visibility.Collapsed;
+                }
             }
         }
 
-        /// <summary>
-        /// Navigates to a search result by opening the appropriate panel and selecting the item.
-        /// </summary>
-        private async Task NavigateToSearchResultAsync(VoiceStudio.Core.Models.SearchResultItem result)
+        private async void StartupRetryButton_Click(object sender, RoutedEventArgs e)
         {
-            // Use fully qualified property access to resolve ambiguity
-            var panelId = (result as dynamic)?.PanelId?.ToLowerInvariant() ?? string.Empty;
-            var itemId = (result as dynamic)?.Id ?? string.Empty;
-
-            // Resolve panel ID aliases to canonical registry IDs
-            var canonicalId = panelId switch
-            {
-                "profiles" or "profilesview" => "Profiles",
-                "timeline" or "timelineview" => "Timeline",
-                "effectsmixer" or "effectsmixerview" or "effects" => "EffectsMixer",
-                "macro" or "macroview" or "macros" => "Macro",
-                "analyzer" or "analyzerview" => "Analyzer",
-                "library" or "libraryview" => "Library",
-                _ => string.Empty,
-            };
-
-            if (string.IsNullOrEmpty(canonicalId))
-            {
-                var toastService = ServiceProvider.GetToastNotificationService();
-                var resultPanelId = (result as dynamic)?.PanelId ?? "Unknown";
-                toastService?.ShowError("Panel Not Found", $"Could not find panel: {resultPanelId}");
+            var coordinator = AppServices.GetService<StartupRetryCoordinator>();
+            if (coordinator == null)
                 return;
-            }
+            var messageEl = FindInContent<TextBlock>("StartupOverlayMessage");
+            var progressEl = FindInContent<ProgressRing>("StartupProgressRing");
+            var retryBtn = FindInContent<Button>("StartupRetryButton");
 
-            var region = GetPanelRegion(canonicalId);
-            if (!await OpenPanelByIdAsync(canonicalId, region))
+            var progress = new Progress<StartupRetryProgress>(p =>
             {
-                var toastService = ServiceProvider.GetToastNotificationService();
-                toastService?.ShowError("Panel Not Found", $"Could not create panel: {canonicalId}");
-                return;
-            }
+                this.DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (messageEl != null)
+                        messageEl.Text = p.Message;
+                    if (progressEl != null)
+                        progressEl.IsActive = true;
+                    if (retryBtn != null)
+                        retryBtn.Visibility = Visibility.Collapsed;
+                });
+            });
 
-            var targetHost = region switch
-            {
-                PanelRegion.Left => FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
-                PanelRegion.Center => FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
-                PanelRegion.Right => FindNameOnContent("RightPanelHost") as Controls.PanelHost,
-                PanelRegion.Bottom => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
-                _ => null
-            };
-            var panelView = targetHost?.Content as UserControl;
+            if (messageEl != null)
+                messageEl.Text = "Retrying…";
+            if (progressEl != null)
+                progressEl.IsActive = true;
+            if (retryBtn != null)
+                retryBtn.Visibility = Visibility.Collapsed;
 
-            var resultType = (result as dynamic)?.Type ?? string.Empty;
-            var resultTitle = (result as dynamic)?.Title ?? "Unknown";
-            if (panelView != null)
-                TrySelectItemInPanel(panelView, itemId, resultType);
-
-            var successToast = ServiceProvider.GetToastNotificationService();
-            successToast?.ShowSuccess("Navigation Complete", $"Navigated to {resultType}: {resultTitle}");
-        }
-
-        /// <summary>
-        /// Attempts to select an item in a panel by ID. Each panel should implement
-        /// its own item selection logic if needed.
-        /// </summary>
-        private void TrySelectItemInPanel(UserControl panelView, string _, string __)
-        {
-            // Panel-specific item selection logic
-            // Each panel can implement INavigatablePanel interface in the future for standardized navigation
-
-            switch (panelView)
-            {
-                case ProfilesView profilesView:
-                    // ProfilesView could select a profile by ID
-                    // Implementation depends on ProfilesViewModel having a NavigateToItem method
-                    break;
-
-                case TimelineView timelineView:
-                    // TimelineView could select a project or clip by ID
-                    break;
-
-                case EffectsMixerView effectsMixerView:
-                    // EffectsMixerView could select an effect or channel by ID
-                    break;
-
-                case MacroView macroView:
-                    // MacroView could select a macro by ID
-                    break;
-
-                    // Add more panel-specific navigation logic as needed
-            }
-
-            // Future: Panels can implement an interface like INavigatablePanel with NavigateToItem(itemId) method
+            await coordinator.RetryAsync(progress);
         }
 
         private async void MainWindow_Activated(object sender, WindowActivatedEventArgs e)
@@ -1328,27 +1088,7 @@ namespace VoiceStudio.App
                 () => ImportAudioFile(),
                 "Import Audio");
 
-            // Playback
-            _keyboardShortcutService.RegisterShortcut(
-                "playback.play",
-                VirtualKey.Space,
-                VirtualKeyModifiers.None,
-                () => TogglePlayback(),
-                "Play/Pause");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "playback.stop",
-                VirtualKey.S,
-                VirtualKeyModifiers.None,
-                () => StopPlayback(),
-                "Stop");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "playback.record",
-                VirtualKey.R,
-                VirtualKeyModifiers.Control,
-                () => ToggleRecording(),
-                "Record");
+            // Playback shortcuts: registered by TransportShortcutCoordinator in Loaded (Wave 4 Phase 1)
 
             // Edit operations
             _keyboardShortcutService.RegisterShortcut(
@@ -1926,36 +1666,13 @@ namespace VoiceStudio.App
             }
         }
 
-        private void ShowGlobalSearch()
-        {
-            var globalSearchView = FindNameOnContent("GlobalSearchView") as Views.GlobalSearchView;
-            var globalSearchOverlay = FindNameOnContent("GlobalSearchOverlay") as FrameworkElement;
-            if (globalSearchView != null && globalSearchOverlay != null)
-            {
-                globalSearchOverlay.Visibility = Microsoft.UI.Xaml.Visibility.Visible;
-                globalSearchView.Show();
-            }
-        }
+        private void ShowGlobalSearch() => _searchOverlayCoordinator?.Show();
 
         private void GlobalSearchOverlay_Tapped(object _, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
         {
-            // Close search when clicking on overlay background
             var globalSearchOverlay = FindNameOnContent("GlobalSearchOverlay") as FrameworkElement;
             if (globalSearchOverlay != null && ReferenceEquals(e.OriginalSource, globalSearchOverlay))
-            {
-                HideGlobalSearch();
-            }
-        }
-
-        private void HideGlobalSearch()
-        {
-            var globalSearchView = FindNameOnContent("GlobalSearchView") as Views.GlobalSearchView;
-            var globalSearchOverlay = FindNameOnContent("GlobalSearchOverlay") as FrameworkElement;
-            if (globalSearchView != null && globalSearchOverlay != null)
-            {
-                globalSearchView.Hide();
-                globalSearchOverlay.Visibility = Microsoft.UI.Xaml.Visibility.Collapsed;
-            }
+                _searchOverlayCoordinator?.Hide();
         }
 
         // Collaboration Panel Toggle (IDEA 25)
@@ -1981,261 +1698,44 @@ namespace VoiceStudio.App
 
         private async void SaveProject()
         {
-            var centerPanelHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-            var rightPanelHost = FindNameOnContent("RightPanelHost") as Controls.PanelHost;
-            if (centerPanelHost?.Content is TimelineView timelineView && timelineView.ViewModel != null)
-            {
-                var viewModel = timelineView.ViewModel;
-                if (viewModel.SelectedProject != null)
-                {
-                    try
-                    {
-                        // Save mixer state if EffectsMixerView is active
-                        if (rightPanelHost?.Content is EffectsMixerView mixerView && mixerView.ViewModel != null && mixerView.ViewModel.SaveMixerStateCommand.CanExecute(null))
-                        {
-                            await mixerView.ViewModel.SaveMixerStateCommand.ExecuteAsync(null);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "MainWindow.SaveProject");
-                    }
-                }
-            }
+            if (_projectWorkflowCoordinator != null)
+                await _projectWorkflowCoordinator.SaveProjectAsync();
         }
 
         private async void CreateNewProject()
         {
-            var centerPanelHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-            if (centerPanelHost?.Content is TimelineView timelineView && timelineView.ViewModel != null)
-            {
-                var viewModel = timelineView.ViewModel;
-                if (viewModel.CreateProjectCommand.CanExecute(null))
-                {
-                    await viewModel.CreateProjectCommand.ExecuteAsync(null);
-                }
-            }
+            if (_projectWorkflowCoordinator != null)
+                await _projectWorkflowCoordinator.CreateNewProjectAsync();
         }
 
         private async void OpenProject()
         {
-            // First ensure the Timeline panel is visible in Center
-            await OpenPanelByIdAsync("Timeline", PanelRegion.Center);
-            SetActiveNavButton("NavStudio");
-
-            // Give UI time to render the panel
-            await Task.Delay(100);
-
-            var centerPanelHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-            if (centerPanelHost?.Content is TimelineView timelineView && timelineView.ViewModel != null)
-            {
-                var viewModel = timelineView.ViewModel;
-                if (viewModel.LoadProjectsCommand.CanExecute(null))
-                {
-                    await viewModel.LoadProjectsCommand.ExecuteAsync(null);
-                }
-            }
+            if (_projectWorkflowCoordinator != null)
+                await _projectWorkflowCoordinator.OpenProjectAsync();
         }
 
-        public async void ImportAudioFile()
+        /// <summary>
+        /// Thin wrapper for import workflow. Delegates to IImportWorkflowService (Transport Coherence Wave 4 Phase 2).
+        /// Gated: blocks until backend ready (Round 5 Task 2 — audit non-registry paths).
+        /// </summary>
+        public void ImportAudioFile()
         {
-#if DEBUG
-            var logPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoiceStudio", "import_debug.log");
-            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(logPath)!);
-#endif
-            void Log(string msg)
+            var startupState = ServiceProvider.GetStartupStateService();
+            if (!startupState.IsReady)
             {
-                var line = $"[{DateTime.Now:HH:mm:ss.fff}] {msg}";
-                Debug.WriteLine(line);
-#if DEBUG
-                try { System.IO.File.AppendAllText(logPath, line + Environment.NewLine); }
-                catch (Exception ex) { Debug.WriteLine($"[MainWindow] File log write failed (non-fatal): {ex.Message}"); }
-#endif
+                AppServices.TryGetToastNotificationService()?.ShowInfo("Starting VoiceStudio services…", "Please wait");
+                return;
             }
-
-            Log("[MainWindow] ImportAudioFile() called");
-
-            // Check if we're on UI thread
-            var dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
-            Log($"[MainWindow] DispatcherQueue: {(dispatcherQueue != null ? "available" : "NULL")}");
-            Log($"[MainWindow] Thread ID: {Environment.CurrentManagedThreadId}");
-
-            try
-            {
-                Log("[MainWindow] Getting window handle...");
-                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-                Log($"[MainWindow] HWND: 0x{hwnd:X}");
-
-                string? filePath = null;
-
-                try
-                {
-                    // Try WinRT FileOpenPicker first
-                    Log("[MainWindow] Trying WinRT FileOpenPicker...");
-                    var picker = new Windows.Storage.Pickers.FileOpenPicker();
-                    picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.MusicLibrary;
-                    picker.FileTypeFilter.Add(".wav");
-                    picker.FileTypeFilter.Add(".mp3");
-                    picker.FileTypeFilter.Add(".flac");
-                    picker.FileTypeFilter.Add(".ogg");
-                    picker.FileTypeFilter.Add(".m4a");
-                    picker.FileTypeFilter.Add(".aac");
-                    picker.FileTypeFilter.Add(".wma");
-
-                    WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-                    Log("[MainWindow] Picker initialized, calling PickSingleFileAsync...");
-
-                    var file = await picker.PickSingleFileAsync();
-                    filePath = file?.Path;
-                    Log($"[MainWindow] WinRT PickSingleFileAsync returned: {(filePath == null ? "null" : filePath)}");
-                }
-                catch (System.Runtime.InteropServices.COMException ex) when (ex.HResult == unchecked((int)0x80004005))
-                {
-                    // WinRT FileOpenPicker fails on some systems (known issue) - use native Win32 dialog
-                    Log($"[MainWindow] WinRT FileOpenPicker failed (0x80004005), using native Win32 fallback");
-                    filePath = await Services.NativeFileDialog.ShowOpenFileDialogAsync(
-                      hwnd, "Import Audio File", ".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".wma");
-                    Log($"[MainWindow] Native dialog returned: {(filePath == null ? "null" : filePath)}");
-                }
-
-                if (!string.IsNullOrEmpty(filePath))
-                {
-                    Log($"[MainWindow] Selected file: {filePath}");
-
-                    var backendClient = ServiceProvider.GetBackendClient();
-                    if (backendClient != null)
-                    {
-                        var uploadResult = await backendClient.UploadAudioFileAsync(filePath);
-                        Debug.WriteLine($"[MainWindow] Audio uploaded: {System.IO.Path.GetFileName(filePath)} -> {uploadResult.Id}");
-
-                        // Publish AssetAddedEvent so Library and other panels refresh
-                        var eventAggregator = AppServices.TryGetEventAggregator();
-                        eventAggregator?.Publish(new VoiceStudio.Core.Events.AssetAddedEvent(
-                            "main-window",
-                            uploadResult.Id,
-                            "audio",
-                            filePath));
-                        Log($"[MainWindow] Published AssetAddedEvent for {uploadResult.Id}");
-
-                        var toastService = ServiceProvider.GetToastNotificationService();
-                        toastService?.ShowToast(
-                            Services.ToastType.Success,
-                            "Audio Imported",
-                            $"Uploaded: {System.IO.Path.GetFileName(filePath)}");
-                    }
-                    else
-                    {
-                        var toastService = ServiceProvider.GetToastNotificationService();
-                        toastService?.ShowToast(
-                            Services.ToastType.Warning,
-                            "Import Incomplete",
-                            $"Selected {System.IO.Path.GetFileName(filePath)} but backend is not available. Start the backend and try again.");
-                    }
-                }
-                else
-                {
-                    Log("[MainWindow] File selection cancelled");
-                }
-            }
-            catch (Exception ex)
-            {
-                Log($"[MainWindow] ImportAudioFile EXCEPTION: {ex.GetType().Name}: {ex.Message}");
-                Log($"[MainWindow] Stack: {ex.StackTrace}");
-                if (ex is System.Runtime.InteropServices.COMException comEx)
-                {
-                    Log($"[MainWindow] COM HResult: 0x{comEx.HResult:X8}");
-                }
-                Debug.WriteLine($"[MainWindow] ImportAudioFile failed: {ex.Message}");
-                var toastService = ServiceProvider.GetToastNotificationService();
-                toastService?.ShowToast(
-                    Services.ToastType.Error,
-                    "Import Failed",
-                    ex.Message);
-            }
+            var service = AppServices.GetService<IImportWorkflowService>();
+            if (service == null) return;
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            _ = service.ImportAudioFileAsync(hwnd);
         }
 
         private async void OpenRecentProject(string projectId, string projectName)
         {
-            try
-            {
-                var centerPanelHost2 = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-                if (centerPanelHost2?.Content is TimelineView timelineView && timelineView.ViewModel != null)
-                {
-                    var viewModel = timelineView.ViewModel;
-
-                    // Load projects if not already loaded
-                    if (viewModel.Projects.Count == 0)
-                    {
-                        await viewModel.LoadProjectsCommand.ExecuteAsync(null);
-                    }
-
-                    // Find and select the project - handle ambiguity by checking both Project types
-                    var project = viewModel.Projects
-                        .OfType<VoiceStudio.Core.Models.Project>()
-                        .FirstOrDefault(p => p.Id == projectId);
-                    if (project != null)
-                    {
-                        viewModel.SelectedProject = project;
-
-                        // Update recent projects service
-                        if (_recentProjectsService != null)
-                        {
-                            await _recentProjectsService.AddRecentProjectAsync(projectId, projectName);
-                        }
-
-                        var toastService = ServiceProvider.GetToastNotificationService();
-                        toastService?.ShowToast(
-                            Services.ToastType.Success,
-                            "Project Opened",
-                            $"Opened project: {projectName}");
-                    }
-                    else
-                    {
-                        // Project not found - try to load it from backend
-                        var backendClient = ServiceProvider.GetBackendClient();
-                        try
-                        {
-                            var loadedProject = await backendClient.GetProjectAsync(projectId);
-                            if (loadedProject != null)
-                            {
-                                viewModel.Projects.Add(loadedProject);
-                                viewModel.SelectedProject = loadedProject;
-
-                                if (_recentProjectsService != null)
-                                {
-                                    await _recentProjectsService.AddRecentProjectAsync(projectId, projectName);
-                                }
-                            }
-                            else
-                            {
-                                throw new Exception("Project not found");
-                            }
-                        }
-                        catch
-                        {
-                            var toastService = ServiceProvider.GetToastNotificationService();
-                            toastService?.ShowToast(
-                                Services.ToastType.Error,
-                                "Project Not Found",
-                                $"Could not open project: {projectName}. It may have been deleted.");
-
-                            // Remove from recent projects
-                            if (_recentProjectsService != null)
-                            {
-                                await _recentProjectsService.RemoveRecentProjectAsync(projectId);
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                var toastService = ServiceProvider.GetToastNotificationService();
-                toastService?.ShowToast(
-                    Services.ToastType.Error,
-                    "Failed to Open Project",
-                    ex.Message);
-            }
+            if (_projectWorkflowCoordinator != null)
+                await _projectWorkflowCoordinator.OpenRecentProjectAsync(projectId, projectName);
         }
 
         private async void PinRecentProject(string projectId)
@@ -2527,44 +2027,48 @@ namespace VoiceStudio.App
             }
         }
 
+        private void OnPlayRequested(object? sender, EventArgs e) => TogglePlayback();
+        private void OnStopRequested(object? sender, EventArgs e) => StopPlayback();
+
         private async void TogglePlayback()
         {
-            var centerPanelHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-            if (centerPanelHost?.Content is TimelineView timelineView && timelineView.ViewModel != null)
+            // Task 4 (Round 4): Gate transport until backend ready
+            if (StartupGatingHelper.ShouldBlockTransportPlayback(ServiceProvider.GetStartupStateService()))
             {
-                var viewModel = timelineView.ViewModel;
-                if (viewModel.IsPlaying)
-                {
-                    if (viewModel.PauseAudioCommand.CanExecute(null))
-                    {
-                        viewModel.PauseAudioCommand.Execute(null);
-                    }
-                }
-                else
-                {
-                    if (viewModel.PlayAudioCommand.CanExecute(null))
-                    {
-                        await viewModel.PlayAudioCommand.ExecuteAsync(null);
-                    }
-                }
+                ServiceProvider.TryGetToastNotificationService()?.ShowInfo("Starting VoiceStudio services…", "Please wait");
+                return;
+            }
+            var orchestrator = AppServices.GetService<IGlobalTransportOrchestrator>();
+            if (orchestrator != null)
+            {
+                await orchestrator.TogglePlaybackAsync();
+            }
+            else
+            {
+                var toast = ServiceProvider.TryGetToastNotificationService();
+                toast?.ShowToast(ToastType.Info, "No media selected", "Select an audio asset in Library or Timeline, then press Play.");
             }
         }
 
         private void StopPlayback()
         {
-            var centerPanelHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-            if (centerPanelHost?.Content is TimelineView timelineView && timelineView.ViewModel != null)
+            // Task 4 (Round 4): Gate transport until backend ready
+            if (StartupGatingHelper.ShouldBlockTransportPlayback(ServiceProvider.GetStartupStateService()))
             {
-                var viewModel = timelineView.ViewModel;
-                if (viewModel.StopAudioCommand.CanExecute(null))
-                {
-                    viewModel.StopAudioCommand.Execute(null);
-                }
+                ServiceProvider.TryGetToastNotificationService()?.ShowInfo("Starting VoiceStudio services…", "Please wait");
+                return;
             }
+            var orchestrator = AppServices.GetService<IGlobalTransportOrchestrator>();
+            orchestrator?.StopPlayback();
         }
 
         private async void ToggleRecording()
         {
+            if (!ServiceProvider.GetStartupStateService().IsReady)
+            {
+                AppServices.TryGetToastNotificationService()?.ShowInfo("Starting VoiceStudio services…", "Please wait");
+                return;
+            }
             try
             {
                 if (!(FindNameOnContent("RightPanelHost") is Controls.PanelHost rightPanelHost))
@@ -2698,6 +2202,25 @@ namespace VoiceStudio.App
             if (_panelStateService != null)
             {
                 _panelStateService.WorkspaceProfileChanged -= OnWorkspaceProfileChanged;
+            }
+
+            // Startup overlay cleanup
+            if (_startupStateService != null)
+            {
+                _startupStateService.StateChanged -= StartupState_StateChanged;
+                _startupStateService = null;
+            }
+
+            // Transport/status event cleanup (Transport Coherence Wave 3 Task 1, 5; Wave 4 Phase 1)
+            _transportShortcutCoordinator?.Detach();
+            _transportShortcutCoordinator = null;
+            _statusBarCoordinator?.Unsubscribe();
+            _statusBarCoordinator = null;
+            if (_globalTransport != null)
+            {
+                _globalTransport.PlayRequested -= OnPlayRequested;
+                _globalTransport.StopRequested -= OnStopRequested;
+                _globalTransport = null;
             }
 
             _disposed = true;

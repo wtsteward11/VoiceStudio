@@ -19,16 +19,16 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the EnsembleSynthesisView panel - Multi-voice synthesis.
   /// </summary>
-  public partial class EnsembleSynthesisViewModel : BaseViewModel, IPanelView
+  public partial class EnsembleSynthesisViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IEnsembleSynthesisClient _ensembleClient;
     private readonly IDialogService _dialogService;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly UndoRedoService? _undoRedoService;
     private readonly MultiSelectService _multiSelectService;
     private MultiSelectState? _multiSelectState;
 
-    public string PanelId => "ensemble-synthesis";
+    public string PanelId => PanelIds.EnsembleSynthesis;
     public string DisplayName => ResourceHelper.GetString("Panel.EnsembleSynthesis.DisplayName", "Ensemble Synthesis");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -81,10 +81,10 @@ namespace VoiceStudio.App.ViewModels
 
     public bool IsJobSelected(string jobId) => _multiSelectState?.SelectedIds.Contains(jobId) ?? false;
 
-    public EnsembleSynthesisViewModel(IViewModelContext context, IBackendClient backendClient, IDialogService dialogService)
+    public EnsembleSynthesisViewModel(IViewModelContext context, IEnsembleSynthesisClient ensembleClient, IDialogService dialogService)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _ensembleClient = ensembleClient ?? throw new ArgumentNullException(nameof(ensembleClient));
       _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
 
       // Get services (may be null if not initialized)
@@ -154,9 +154,6 @@ namespace VoiceStudio.App.ViewModels
         await DeleteSelectedJobsAsync(ct);
       }, () => SelectedJobCount > 0 && !IsLoading);
 
-      // Load engines on init
-      _ = LoadEnginesAsync(new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token);
-
       // Subscribe to selection changes
       _multiSelectService.SelectionChanged += (_, e) =>
       {
@@ -167,10 +164,18 @@ namespace VoiceStudio.App.ViewModels
           OnPropertyChanged(nameof(HasMultipleJobSelection));
         }
       };
-
-      // Load initial data
-      _ = LoadJobsAsync(CancellationToken.None);
     }
+
+    Task IPanelLifecycle.OnActivatedAsync(CancellationToken ct)
+    {
+      _ = LoadEnginesAsync(ct);
+      _ = LoadJobsAsync(ct);
+      return Task.CompletedTask;
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken ct) => Task.CompletedTask;
+
+    async Task IPanelLifecycle.RefreshAsync(CancellationToken ct) => await RefreshAsync(ct);
 
     public IAsyncRelayCommand AddVoiceCommand { get; }
     public IAsyncRelayCommand<EnsembleVoiceItem> RemoveVoiceCommand { get; }
@@ -285,27 +290,22 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new EnsembleSynthesisRequest
         {
-          voices = Voices.Select(v => new
+          Voices = Voices.Select(v => new EnsembleVoiceRequest
           {
-            profile_id = v.ProfileId,
-            text = v.Text,
-            engine = v.Engine,
-            language = v.Language,
-            emotion = v.Emotion
+            ProfileId = v.ProfileId,
+            Text = v.Text,
+            Engine = v.Engine,
+            Language = v.Language,
+            Emotion = v.Emotion
           }).ToArray(),
-          project_id = SelectedProjectId,
-          mix_mode = MixMode,
-          output_format = OutputFormat
+          ProjectId = SelectedProjectId,
+          MixMode = MixMode,
+          OutputFormat = OutputFormat
         };
 
-        var response = await _backendClient.SendRequestAsync<object, EnsembleSynthesisResponse>(
-            "/api/ensemble",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _ensembleClient.CreateSynthesisAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -337,26 +337,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var queryParams = new System.Collections.Specialized.NameValueCollection();
-        if (!string.IsNullOrEmpty(SelectedProjectId))
-          queryParams.Add("project_id", SelectedProjectId);
-
-        var queryString = string.Join("&",
-            queryParams.AllKeys.SelectMany(key =>
-                queryParams.GetValues(key)?.Select(value => $"{key}={Uri.EscapeDataString(value)}") ?? Array.Empty<string>()
-            )
-        );
-
-        var url = "/api/ensemble";
-        if (!string.IsNullOrEmpty(queryString))
-          url += $"?{queryString}";
-
-        var jobs = await _backendClient.SendRequestAsync<object, EnsembleJobStatus[]>(
-            url,
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var jobs = await _ensembleClient.ListJobsAsync(SelectedProjectId, cancellationToken);
 
         Jobs.Clear();
         if (jobs != null)
@@ -391,7 +372,7 @@ namespace VoiceStudio.App.ViewModels
     {
       try
       {
-        var engines = await _backendClient.GetEnginesAsync(cancellationToken);
+        var engines = await _ensembleClient.GetEnginesAsync(cancellationToken);
         AvailableEngines.Clear();
         foreach (var e in engines)
           AvailableEngines.Add(e);
@@ -431,12 +412,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/ensemble/{job.JobId}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _ensembleClient.DeleteJobAsync(job.JobId, cancellationToken);
 
         Jobs.Remove(job);
         StatusMessage = ResourceHelper.GetString("EnsembleSynthesis.JobDeleted", "Job deleted");
@@ -548,12 +524,7 @@ namespace VoiceStudio.App.ViewModels
 
           try
           {
-            await _backendClient.SendRequestAsync<object, object>(
-                $"/api/ensemble/{Uri.EscapeDataString(jobId)}",
-                null,
-                System.Net.Http.HttpMethod.Delete,
-                cancellationToken
-            );
+            await _ensembleClient.DeleteJobAsync(jobId, cancellationToken);
 
             var job = Jobs.FirstOrDefault(j => j.JobId == jobId);
             if (job != null)
@@ -622,30 +593,9 @@ namespace VoiceStudio.App.ViewModels
         ((System.Windows.Input.ICommand)DeleteSelectedJobsCommand).NotifyCanExecuteChanged();
     }
 
-    // Response models
-    private class EnsembleSynthesisResponse
-    {
-      public string JobId { get; set; } = string.Empty;
-      public string Status { get; set; } = string.Empty;
-      public string[] AudioIds { get; set; } = Array.Empty<string>();
-      public string Message { get; set; } = string.Empty;
-    }
   }
 
   // Data models
-  public class EnsembleJobStatus
-  {
-    public string JobId { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
-    public double Progress { get; set; }
-    public int CompletedVoices { get; set; }
-    public int TotalVoices { get; set; }
-    public string[] AudioIds { get; set; } = Array.Empty<string>();
-    public string? Error { get; set; }
-    public string Created { get; set; } = string.Empty;
-    public string Updated { get; set; } = string.Empty;
-  }
-
   public class EnsembleVoiceItem : ObservableObject
   {
     public string ProfileId { get; set; } = string.Empty;
@@ -669,7 +619,7 @@ namespace VoiceStudio.App.ViewModels
     public string ProgressDisplay => $"{Progress:P0}";
     public string VoicesDisplay => $"{CompletedVoices}/{TotalVoices} voices";
 
-    public EnsembleJobItem(EnsembleJobStatus job)
+    public EnsembleJobItem(VoiceStudio.App.Services.EnsembleJobStatus job)
     {
       JobId = job.JobId;
       Status = job.Status;

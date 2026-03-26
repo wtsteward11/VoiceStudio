@@ -19,13 +19,14 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the TextHighlightingView panel - Text highlighting with audio sync.
   /// </summary>
-  public partial class TextHighlightingViewModel : BaseViewModel, IPanelView
+  public partial class TextHighlightingViewModel : BaseViewModel, IPanelView, IPanelLifecycle
   {
-    private readonly IBackendClient _backendClient;
+    private readonly ITextHighlightingClient _client;
     private readonly IProjectsClient _projectsClient;
+    private readonly IProjectAudioClient _projectAudioClient;
     private readonly ToastNotificationService? _toastNotificationService;
 
-    public string PanelId => "text-highlighting";
+    public string PanelId => PanelIds.TextHighlighting;
     public string DisplayName => ResourceHelper.GetString("Panel.TextHighlighting.DisplayName", "Text Highlighting");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -73,11 +74,12 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<string> availableHighlightTypes = new() { "word", "phrase", "sentence", "emphasis", "note", "error" };
 
-    public TextHighlightingViewModel(IViewModelContext context, IBackendClient backendClient, IProjectsClient projectsClient)
+    public TextHighlightingViewModel(IViewModelContext context, ITextHighlightingClient client, IProjectsClient projectsClient, IProjectAudioClient projectAudioClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
       _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
+      _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
 
       // Get services using helper (reduces code duplication)
       _toastNotificationService = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetToastNotificationService());
@@ -91,9 +93,18 @@ namespace VoiceStudio.App.ViewModels
       SaveSessionCommand = new AsyncRelayCommand(SaveSessionAsync, () => !string.IsNullOrEmpty(SessionId));
       LoadSessionCommand = new AsyncRelayCommand(LoadSessionAsync);
       ExportSessionCommand = new AsyncRelayCommand(ExportSessionAsync, () => !string.IsNullOrEmpty(SessionId) && Segments.Count > 0);
+    }
 
-      // Load initial data
-      _ = LoadAudioFilesAsync(CancellationToken.None);
+    Task IPanelLifecycle.OnActivatedAsync(CancellationToken cancellationToken)
+    {
+      return LoadAudioFilesAsync(cancellationToken);
+    }
+
+    Task IPanelLifecycle.OnDeactivatedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    Task IPanelLifecycle.RefreshAsync(CancellationToken cancellationToken)
+    {
+      return RefreshAsync(cancellationToken);
     }
 
     public IAsyncRelayCommand CreateSessionCommand { get; }
@@ -119,7 +130,7 @@ namespace VoiceStudio.App.ViewModels
         foreach (var project in projects)
         {
           cancellationToken.ThrowIfCancellationRequested();
-          var audioFiles = await _backendClient.ListProjectAudioAsync(project.Id, cancellationToken);
+          var audioFiles = await _projectAudioClient.ListProjectAudioAsync(project.Id, cancellationToken);
           foreach (var audioFile in audioFiles)
           {
             if (!string.IsNullOrEmpty(audioFile.Filename))
@@ -170,20 +181,15 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new TextHighlightingCreateRequest
         {
-          audio_id = SelectedAudioId,
-          text = Text,
-          highlight_type = SelectedHighlightType,
-          segments = (object?)null
+          AudioId = SelectedAudioId,
+          Text = Text,
+          HighlightType = SelectedHighlightType,
+          Segments = null
         };
 
-        var session = await _backendClient.SendRequestAsync<object, HighlightingSession>(
-            "/api/text-highlighting",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var session = await _client.CreateSessionAsync(request, cancellationToken);
 
         if (session != null)
         {
@@ -191,7 +197,7 @@ namespace VoiceStudio.App.ViewModels
           Segments.Clear();
           foreach (var segment in session.Segments)
           {
-            Segments.Add(new HighlightTextSegmentItem(segment));
+            Segments.Add(new HighlightTextSegmentItem(ToHighlightTextSegment(segment)));
           }
           StatusMessage = ResourceHelper.GetString("TextHighlighting.SessionCreated", "Highlighting session created");
           _toastNotificationService?.ShowSuccess(
@@ -226,18 +232,13 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
+        var request = new TextHighlightingSyncRequest
         {
-          audio_id = SelectedAudioId,
-          current_time = CurrentTime
+          AudioId = SelectedAudioId,
+          CurrentTime = CurrentTime
         };
 
-        var response = await _backendClient.SendRequestAsync<object, HighlightingSyncResponse>(
-            "/api/text-highlighting/sync",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _client.SyncHighlightingAsync(request, cancellationToken);
 
         if (response != null)
         {
@@ -280,33 +281,28 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
+        var request = new TextHighlightingUpdateRequest
         {
-          current_time = CurrentTime,
-          segments = Segments.Select(s => new
+          CurrentTime = CurrentTime,
+          Segments = Segments.Select(s => new TextHighlightingUpdateSegmentDto
           {
-            id = s.Id,
-            text = s.Text,
-            start_time = s.StartTime,
-            end_time = s.EndTime,
-            highlight_type = s.HighlightType,
-            word_timings = s.WordTimings
+            Id = s.Id,
+            Text = s.Text,
+            StartTime = s.StartTime,
+            EndTime = s.EndTime,
+            HighlightType = s.HighlightType,
+            WordTimings = s.WordTimings
           }).ToArray()
         };
 
-        var updated = await _backendClient.SendRequestAsync<object, HighlightingSession>(
-            $"/api/text-highlighting/{Uri.EscapeDataString(SessionId)}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var updated = await _client.UpdateSessionAsync(SessionId, request, cancellationToken);
 
         if (updated != null)
         {
           Segments.Clear();
           foreach (var segment in updated.Segments)
           {
-            Segments.Add(new HighlightTextSegmentItem(segment));
+            Segments.Add(new HighlightTextSegmentItem(ToHighlightTextSegment(segment)));
           }
           StatusMessage = ResourceHelper.GetString("TextHighlighting.SessionUpdated", "Session updated");
           _toastNotificationService?.ShowSuccess(
@@ -341,12 +337,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/text-highlighting/{Uri.EscapeDataString(SessionId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _client.DeleteSessionAsync(SessionId, cancellationToken);
 
         SessionId = null;
         Segments.Clear();
@@ -388,30 +379,24 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        // Persist session to backend
-        var request = new
+        var request = new TextHighlightingPersistRequest
         {
-          session_id = SessionId,
-          audio_id = SelectedAudioId,
-          text = Text,
-          segments = Segments.Select(s => new
+          SessionId = SessionId,
+          AudioId = SelectedAudioId,
+          Text = Text,
+          Segments = Segments.Select(s => new TextHighlightingUpdateSegmentDto
           {
-            id = s.Id,
-            text = s.Text,
-            start_time = s.StartTime,
-            end_time = s.EndTime,
-            highlight_type = s.HighlightType,
-            word_timings = s.WordTimings
+            Id = s.Id,
+            Text = s.Text,
+            StartTime = s.StartTime,
+            EndTime = s.EndTime,
+            HighlightType = s.HighlightType,
+            WordTimings = s.WordTimings
           }).ToArray(),
-          created = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+          Created = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
         };
 
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/text-highlighting/{Uri.EscapeDataString(SessionId)}/persist",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        await _client.PersistSessionAsync(SessionId, request, cancellationToken);
 
         StatusMessage = ResourceHelper.GetString("TextHighlighting.SessionSaved", "Session saved");
         _toastNotificationService?.ShowSuccess(
@@ -438,13 +423,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        // Load saved sessions from backend
-        var sessions = await _backendClient.SendRequestAsync<object, HighlightingSession[]>(
-            "/api/text-highlighting/sessions",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var sessions = await _client.GetSessionsAsync(cancellationToken);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -582,6 +561,18 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
+    private static HighlightTextSegment ToHighlightTextSegment(TextHighlightingSegment s)
+    {
+      return new HighlightTextSegment
+      {
+        Id = s.Id,
+        Text = s.Text,
+        StartTime = s.StartTime,
+        EndTime = s.EndTime,
+        WordTimings = s.WordTimings
+      };
+    }
+
     private class HighlightingSessionData
     {
       public string SessionId { get; set; } = string.Empty;
@@ -600,23 +591,6 @@ namespace VoiceStudio.App.ViewModels
       public System.Collections.Generic.Dictionary<string, object>[]? WordTimings { get; set; }
     }
 
-    // Response models
-    private class HighlightingSession
-    {
-      public string Id { get; set; } = string.Empty;
-      public string AudioId { get; set; } = string.Empty;
-      public string Text { get; set; } = string.Empty;
-      public HighlightTextSegment[] Segments { get; set; } = Array.Empty<HighlightTextSegment>();
-      public double CurrentTime { get; set; }
-      public string Created { get; set; } = string.Empty;
-    }
-
-    private class HighlightingSyncResponse
-    {
-      public string? ActiveSegmentId { get; set; }
-      public int? ActiveWordIndex { get; set; }
-      public HighlightTextSegment[] Segments { get; set; } = Array.Empty<HighlightTextSegment>();
-    }
   }
 
   // Data models

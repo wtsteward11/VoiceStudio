@@ -1,4 +1,5 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using VoiceStudio.Core.Models;
 using VoiceStudio.App.ViewModels;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -17,7 +18,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_Constructor_SetsAllProperties()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "gpu-0",
                 Name = "NVIDIA RTX 4090",
@@ -55,7 +56,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_MemoryTotalDisplay_FormatsAsGB()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "gpu-0",
                 Name = "Test",
@@ -75,7 +76,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_MemoryUsedDisplay_FormatsAsGB()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "gpu-0",
                 Name = "Test",
@@ -96,7 +97,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_MemoryFreeDisplay_FormatsAsGB()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "gpu-0",
                 Name = "Test",
@@ -117,7 +118,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_MemoryUsagePercent_CalculatesCorrectly()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "gpu-0",
                 Name = "Test",
@@ -138,7 +139,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_UtilizationDisplay_FormatsAsPercentage()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "gpu-0",
                 Name = "Test",
@@ -159,7 +160,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_TemperatureDisplay_FormatsWithCelsius()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "gpu-0",
                 Name = "Test",
@@ -180,7 +181,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_TemperatureDisplay_WhenNull_ReturnsNA()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "gpu-0",
                 Name = "Test",
@@ -201,7 +202,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_PowerDisplay_FormatsWithWatts()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "gpu-0",
                 Name = "Test",
@@ -222,7 +223,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_PowerDisplay_WhenNull_ReturnsNA()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "gpu-0",
                 Name = "Test",
@@ -243,7 +244,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_StatusDisplay_WhenAvailable_ReturnsAvailable()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "gpu-0",
                 Name = "Test",
@@ -263,7 +264,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_StatusDisplay_WhenUnavailable_ReturnsUnavailable()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "gpu-0",
                 Name = "Test",
@@ -287,7 +288,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_WithZeroMemory_HandlesGracefully()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "gpu-0",
                 Name = "Test",
@@ -309,7 +310,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void GPUDeviceItem_WithEmptyStrings_HandlesGracefully()
         {
             // Arrange
-            var device = new GPUStatusViewModel.GPUDevice
+            var device = new GPUStatusDevice
             {
                 DeviceId = "",
                 Name = "",

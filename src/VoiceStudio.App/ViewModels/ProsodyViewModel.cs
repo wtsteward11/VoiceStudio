@@ -16,11 +16,11 @@ namespace VoiceStudio.App.ViewModels
   /// <summary>
   /// ViewModel for the ProsodyView panel - Prosody & phoneme control.
   /// </summary>
-  public partial class ProsodyViewModel : BaseViewModel, IPanelView
+  public partial class ProsodyViewModel : BaseViewModel, IPanelView, ILifecyclePanelView
   {
-    private readonly IBackendClient _backendClient;
+    private readonly IProsodyClient _prosodyClient;
 
-    public string PanelId => "prosody";
+    public string PanelId => PanelIds.Prosody;
     public string DisplayName => ResourceHelper.GetString("Panel.Prosody.DisplayName", "Prosody & Phoneme Control");
     public PanelRegion Region => PanelRegion.Center;
 
@@ -66,10 +66,10 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private ObservableCollection<string> availableEngines = new();
 
-    public ProsodyViewModel(IViewModelContext context, IBackendClient backendClient)
+    public ProsodyViewModel(IViewModelContext context, IProsodyClient prosodyClient)
         : base(context)
     {
-      _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+      _prosodyClient = prosodyClient ?? throw new ArgumentNullException(nameof(prosodyClient));
 
       LoadConfigsCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -106,10 +106,16 @@ namespace VoiceStudio.App.ViewModels
         using var profiler = PerformanceProfiler.StartCommand("Refresh");
         await RefreshAsync(ct);
       }, () => !IsLoading);
-
-      // Load initial data
-      _ = LoadConfigsAsync(CancellationToken.None);
     }
+
+    /// <inheritdoc />
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      await LoadConfigsAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task OnDeactivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public IAsyncRelayCommand LoadConfigsCommand { get; }
     public IAsyncRelayCommand CreateConfigCommand { get; }
@@ -138,12 +144,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var configs = await _backendClient.SendRequestAsync<object, ProsodyConfig[]>(
-            "/api/prosody/configs",
-            null,
-            System.Net.Http.HttpMethod.Get,
-            cancellationToken
-        );
+        var configs = await _prosodyClient.GetConfigsAsync(cancellationToken);
 
         if (configs != null)
         {
@@ -181,21 +182,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var request = new
-        {
-          name = ConfigName,
-          pitch = Pitch,
-          rate = Rate,
-          volume = Volume,
-          intonation = Intonation
-        };
-
-        var config = await _backendClient.SendRequestAsync<object, ProsodyConfig>(
-            "/api/prosody/configs",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var config = await _prosodyClient.CreateConfigAsync(ConfigName, Pitch, Rate, Volume, Intonation, cancellationToken);
 
         if (config != null)
         {
@@ -232,21 +219,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
-        {
-          name = ConfigName,
-          pitch = Pitch,
-          rate = Rate,
-          volume = Volume,
-          intonation = Intonation
-        };
-
-        var config = await _backendClient.SendRequestAsync<object, ProsodyConfig>(
-            $"/api/prosody/configs/{Uri.EscapeDataString(SelectedConfig.ConfigId)}",
-            request,
-            System.Net.Http.HttpMethod.Put,
-            cancellationToken
-        );
+        var config = await _prosodyClient.UpdateConfigAsync(SelectedConfig.ConfigId, ConfigName, Pitch, Rate, Volume, Intonation, cancellationToken);
 
         if (config != null)
         {
@@ -280,12 +253,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        await _backendClient.SendRequestAsync<object, object>(
-            $"/api/prosody/configs/{Uri.EscapeDataString(SelectedConfig.ConfigId)}",
-            null,
-            System.Net.Http.HttpMethod.Delete,
-            cancellationToken
-        );
+        await _prosodyClient.DeleteConfigAsync(SelectedConfig.ConfigId, cancellationToken);
 
         Configs.Remove(SelectedConfig);
         SelectedConfig = null;
@@ -318,12 +286,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var response = await _backendClient.SendRequestAsync<object, PhonemeAnalysisResponse>(
-            $"/api/prosody/phonemes/analyze?text={Uri.EscapeDataString(InputText)}&language=en",
-            null,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _prosodyClient.AnalyzePhonemesAsync(InputText, "en", cancellationToken);
 
         if (response != null)
         {
@@ -378,20 +341,7 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
-        var request = new
-        {
-          config_id = SelectedConfig.ConfigId,
-          text = InputText,
-          voice_profile_id = SelectedVoiceProfileId,
-          engine = SelectedEngine
-        };
-
-        var response = await _backendClient.SendRequestAsync<object, ProsodyApplyResponse>(
-            "/api/prosody/apply",
-            request,
-            System.Net.Http.HttpMethod.Post,
-            cancellationToken
-        );
+        var response = await _prosodyClient.ApplyProsodyAsync(SelectedConfig.ConfigId, InputText, SelectedVoiceProfileId!, SelectedEngine, cancellationToken);
 
         if (response != null)
         {
@@ -408,7 +358,8 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
       await LoadConfigsAsync(cancellationToken);
       StatusMessage = ResourceHelper.GetString("Prosody.Refreshed", "Refreshed");
@@ -427,7 +378,7 @@ namespace VoiceStudio.App.ViewModels
       public string? Intonation { get; set; }
     }
 
-    private class PhonemeAnalysisResponse
+    public class PhonemeAnalysisResponse
     {
       public string Text { get; set; } = string.Empty;
       public string[] Phonemes { get; set; } = Array.Empty<string>();
@@ -435,7 +386,7 @@ namespace VoiceStudio.App.ViewModels
       public int[] WordBoundaries { get; set; } = Array.Empty<int>();
     }
 
-    private class ProsodyApplyResponse
+    public class ProsodyApplyResponse
     {
       public string AudioId { get; set; } = string.Empty;
       public string ConfigApplied { get; set; } = string.Empty;

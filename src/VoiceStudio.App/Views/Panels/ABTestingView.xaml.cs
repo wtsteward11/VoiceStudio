@@ -1,3 +1,4 @@
+using System.Threading;
 using Microsoft.UI.Xaml.Controls;
 using VoiceStudio.App.Services;
 
@@ -39,8 +40,8 @@ namespace VoiceStudio.App.Views.Panels
         }
       };
 
-      // Setup keyboard navigation
-      this.Loaded += ABTestingView_KeyboardNavigation_Loaded;
+      // Setup keyboard navigation and initial data load (ADR-047)
+      this.Loaded += ABTestingView_Loaded;
 
       // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
@@ -52,9 +53,11 @@ namespace VoiceStudio.App.Views.Panels
       });
     }
 
-    private void ABTestingView_KeyboardNavigation_Loaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async void ABTestingView_Loaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
+      this.Loaded -= ABTestingView_Loaded;
       KeyboardNavigationHelper.SetupTabNavigation(this);
+      await ViewModel.InitializeAsync(CancellationToken.None);
     }
 
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)

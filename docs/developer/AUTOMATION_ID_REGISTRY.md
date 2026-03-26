@@ -267,6 +267,24 @@ Every panel has a `_Root` AutomationId for test navigation:
 | ProfileComparisonView (W8-C3) | `ProfileComparisonView_PlayAButton` |
 | ProfileComparisonView (W8-C3) | `ProfileComparisonView_PlayBButton` |
 | ProfileComparisonView (W8-C3) | `ProfileComparisonView_StopButton` |
+| ABTestingView (Pass 08 W8-C2) | `ABTestingView_Root` |
+| ABTestingView (W8-C2) | `ABTestingView_HelpButton` |
+| ABTestingView (W8-C2) | `ABTestingView_ErrorInfoBar` |
+| ABTestingView (W8-C2) | `ABTestingView_ProfileComboBox` |
+| ABTestingView (W8-C2) | `ABTestingView_TestTextBox` |
+| ABTestingView (W8-C2) | `ABTestingView_EngineATextBox` |
+| ABTestingView (W8-C2) | `ABTestingView_EngineBTextBox` |
+| ABTestingView (W8-C2) | `ABTestingView_EmotionATextBox` |
+| ABTestingView (W8-C2) | `ABTestingView_EmotionBTextBox` |
+| ABTestingView (W8-C2) | `ABTestingView_EnhanceQualityACheckBox` |
+| ABTestingView (W8-C2) | `ABTestingView_EnhanceQualityBCheckBox` |
+| ABTestingView (W8-C2) | `ABTestingView_RunButton` |
+| ABTestingView (W8-C2) | `ABTestingView_LoadingRing` |
+| ABTestingView (W8-C2) | `ABTestingView_SampleAMetrics` |
+| ABTestingView (W8-C2) | `ABTestingView_SampleBMetrics` |
+| ABTestingView (W8-C2) | `ABTestingView_ComparisonSummary` |
+| ABTestingView (W8-C2) | `ABTestingView_PlaySampleAButton` |
+| ABTestingView (W8-C2) | `ABTestingView_PlaySampleBButton` |
 | DatasetQAView | `DatasetQAView_Root` |
 | DeepfakeCreatorView | `DeepfakeCreatorView_Root` |
 | ImageGenView | `ImageGenView_Root` |

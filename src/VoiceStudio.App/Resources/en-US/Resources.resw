@@ -3460,6 +3460,12 @@
   <data name="Panel.ABTesting.DisplayName" xml:space="preserve">
     <value>A/B Testing</value>
   </data>
+  <data name="ABTesting.W8C2.DefaultTestText" xml:space="preserve">
+    <value>Hello, this is a test sentence for A/B voice comparison.</value>
+  </data>
+  <data name="ABTesting.W8C2.RunSuccessToast" xml:space="preserve">
+    <value>A/B test finished successfully.</value>
+  </data>
   <data name="Panel.MiniTimeline.DisplayName" xml:space="preserve">
     <value>Mini Timeline</value>
   </data>

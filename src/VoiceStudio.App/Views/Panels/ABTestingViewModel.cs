@@ -36,7 +36,9 @@ namespace VoiceStudio.App.Views.Panels
     private VoiceProfile? selectedProfile;
 
     [ObservableProperty]
-    private string testText = string.Empty;
+    private string testText = ResourceHelper.GetString(
+        "ABTesting.W8C2.DefaultTestText",
+        "Hello, this is a test sentence for A/B voice comparison.");
 
     [ObservableProperty]
     private string engineA = "xtts";
@@ -133,12 +135,6 @@ namespace VoiceStudio.App.Views.Panels
       _profilesClient = profilesClient ?? throw new ArgumentNullException(nameof(profilesClient));
       _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
 
-      PropertyChanged += (_, e) =>
-      {
-        if (e.PropertyName == nameof(HasError))
-          OnPropertyChanged(nameof(ErrorVisibility));
-      };
-
       RunTestCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("RunABTest");
@@ -147,7 +143,19 @@ namespace VoiceStudio.App.Views.Panels
       PlaySampleACommand = new CommunityToolkit.Mvvm.Input.RelayCommand(PlaySampleA, () => CanPlaySampleA);
       PlaySampleBCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(PlaySampleB, () => CanPlaySampleB);
 
-      _ = LoadProfilesAsync(CancellationToken.None);
+      PropertyChanged += (_, e) =>
+      {
+        if (e.PropertyName == nameof(HasError))
+          OnPropertyChanged(nameof(ErrorVisibility));
+        if (e.PropertyName == nameof(IsLoading))
+          RunTestCommand.NotifyCanExecuteChanged();
+      };
+    }
+
+    /// <summary>W8-C2: load profiles after the view raises Loaded (ADR-047); not from constructor.</summary>
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+      await LoadProfilesAsync(cancellationToken);
     }
 
     partial void OnTestResultsChanged(ABTestResponse? value)
@@ -196,6 +204,7 @@ namespace VoiceStudio.App.Views.Panels
 
       IsLoading = true;
       ErrorMessage = null;
+      StatusMessage = null;
 
       try
       {
@@ -213,6 +222,10 @@ namespace VoiceStudio.App.Views.Panels
         };
 
         TestResults = await _abTestService.RunABTestAsync(request, cancellationToken);
+
+        StatusMessage = ResourceHelper.GetString(
+            "ABTesting.W8C2.RunSuccessToast",
+            "A/B test finished successfully.");
 
         // Notify property changes
         OnPropertyChanged(nameof(HasResults));

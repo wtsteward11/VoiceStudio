@@ -3,7 +3,7 @@
 **Purpose:** Bounded **planning-first** pass for the **quality evaluation cluster**: **Quality Benchmark**, **A/B Testing**, and **Profile Comparison** — map **code-truth** workflows, defects, and a **single** bounded implementation row (**W8-C1**) without claiming closure-grade product workflow until **§8** is signed.
 
 **Date:** 2026-03-24  
-**Status:** **W8-C1 closed** (2026-03-25) — **§8.2** signed; operational Quality Benchmark UI + **8** seam tests + historical Quick **`artifacts/verify/20260325_191036`** (**`commit_hash`** **`bcd6d4e52e0b2a7763f0baaa261e7cdac7f8a665`** — W8-C1 product closure). **Repo-wide latest pointer** (2026-03-26): **W8-C3 closure** — Quick **`artifacts/verify/20260326_025824`**, **`commit_hash`** **`eb98604039b390f676c98fdb805957a46cd9429c`** (**§8.7**). **Hermetic hardening** milestone remains **`20260326_020644`** / **`8ba6363f`** (compile baseline; does **not** rerun QB/C3 seams). Export/context remain **OUT**. **§1–§7** baseline complete. **Workflow 7** remains **paused after W7-C1** ([Pass 07 §8.4](WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md#84-workflow-7--continuation--pause-governance)). **[Product trust Pass 01](PRODUCT_TRUST_AND_RELEASE_HONESTY_PASS_01.md)** remains **paused** (§8.9 Option 1). **P05-Persist-A4** remains **§12-gated**. **Pass 06** further `src/` requires a **new §5** row. **Leftovers:** A/B placeholder (**W8-C2**). **W8-C3 closed** (2026-03-26) — see §8.7; Profile Comparison operational shell + **8** seam tests.
+**Status:** **W8-C1 closed** (2026-03-25) — **§8.2** signed; operational Quality Benchmark UI + **8** seam tests + historical Quick **`artifacts/verify/20260325_191036`** (**`commit_hash`** **`bcd6d4e52e0b2a7763f0baaa261e7cdac7f8a665`** — W8-C1 product closure). **W8-C3 closed** (2026-03-26) — §8.7; Quick **`artifacts/verify/20260326_025824`**, **`commit_hash`** **`eb98604039b390f676c98fdb805957a46cd9429c`**. **W8-C2:** **closed** (2026-03-26) — operational **`ABTestingView`** + **`ABTestingViewModelSeamTests`** **8** — proof **§8.10** + **`latest_pointer.json`** after **post–W8-C2-commit** `verify.ps1 -Quick` (Pass 08 **§8.9** sign-off **not** Product Trust §8.9). **Hermetic hardening** milestone remains **`20260326_020644`** / **`8ba6363f`** (compile baseline; does **not** rerun QB/C3/C2 seams). Export/context remain **OUT**. **§1–§7** baseline complete. **Workflow 7** remains **paused after W7-C1** ([Pass 07 §8.4](WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md#84-workflow-7--continuation--pause-governance)). **[Product trust Pass 01](PRODUCT_TRUST_AND_RELEASE_HONESTY_PASS_01.md)** remains **paused** (Pass 01 §8.9 Option 1). **P05-Persist-A4** remains **§12-gated**. **Pass 06** further `src/` requires a **new §5** row.
 
 **Related:** [CROSS_FEATURE_WORKFLOW_BACKLOG.md](CROSS_FEATURE_WORKFLOW_BACKLOG.md) (Workflow 8), [Pass 07](WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md) (adjacent lane discipline).
 
@@ -36,8 +36,8 @@ Paths relative to repo root. Inventory from **2026-03-24** read.
 |-------|------|------|
 | **Quality Benchmark VM** | [src/VoiceStudio.App/Views/Panels/QualityBenchmarkViewModel.cs](../../src/VoiceStudio.App/Views/Panels/QualityBenchmarkViewModel.cs) | `IQualityControlClient`, `IProfilesClient`; `InitializeAsync` → `LoadProfilesAsync` (`GetProfilesAsync`); `RunBenchmarkCommand` → `RunBenchmarkAsync` → populates `BenchmarkResults` / `BenchmarkResultViewModel`; `SurfaceMaturityFootnote` (Product Trust slice 4); `ResultsSummary` from resource `QualityBenchmark.BenchmarkComplete` |
 | **Quality Benchmark view** | [src/VoiceStudio.App/Views/Panels/QualityBenchmarkView.xaml](../../src/VoiceStudio.App/Views/Panels/QualityBenchmarkView.xaml), [.xaml.cs](../../src/VoiceStudio.App/Views/Panels/QualityBenchmarkView.xaml.cs) | **XAML:** header + **`SurfaceMaturityFootnote`** + collapsed `HelpOverlay` only — **no** operational bindings to VM. **Code-behind:** `Loaded` → `InitializeAsync`; toast on `ErrorMessage`; **subscribes to `StatusMessage`** (VM has **no** such property — see §4); `BenchmarkResult_RightTapped` / export expect **ListView** not present in XAML |
-| **A/B Testing VM** | [src/VoiceStudio.App/Views/Panels/ABTestingViewModel.cs](../../src/VoiceStudio.App/Views/Panels/ABTestingViewModel.cs) | `IABTestService`, `IProfilesClient`, `IAudioPlayerService`; **ctor** `_ = LoadProfilesAsync(CancellationToken.None)`; `RunTestCommand` → `RunABTestAsync` → `TestResults`; `PlaySampleA/B` via `GetAudioStreamAsync` + `PlayStreamAsync` |
-| **A/B Testing view** | [src/VoiceStudio.App/Views/Panels/ABTestingView.xaml](../../src/VoiceStudio.App/Views/Panels/ABTestingView.xaml), [.xaml.cs](../../src/VoiceStudio.App/Views/Panels/ABTestingView.xaml.cs) | **XAML:** “under development” **placeholder** copy — **no** `x:Bind` to VM. **Code-behind:** toast on `ErrorMessage`; **subscribes to `StatusMessage`** (VM has **no** such property) |
+| **A/B Testing VM** | [src/VoiceStudio.App/Views/Panels/ABTestingViewModel.cs](../../src/VoiceStudio.App/Views/Panels/ABTestingViewModel.cs) | `IABTestService`, `IProfilesClient`, `IAudioPlayerService`; **`InitializeAsync`** → `LoadProfilesAsync` ( **W8-C2** / **§8.8** ); `RunTestCommand` → `RunABTestAsync` → `TestResults`; **`StatusMessage`** on success; `PlaySampleA/B` via `GetAudioStreamAsync` + `PlayStreamAsync` |
+| **A/B Testing view** | [src/VoiceStudio.App/Views/Panels/ABTestingView.xaml](../../src/VoiceStudio.App/Views/Panels/ABTestingView.xaml), [.xaml.cs](../../src/VoiceStudio.App/Views/Panels/ABTestingView.xaml.cs) | **W8-C2:** operational **`x:Bind`** shell + **`Loaded`** → `InitializeAsync`. **Code-behind:** toasts on **`ErrorMessage`** / **`StatusMessage`** |
 | **Profile Comparison VM** | [src/VoiceStudio.App/ViewModels/ProfileComparisonViewModel.cs](../../src/VoiceStudio.App/ViewModels/ProfileComparisonViewModel.cs) | `IVoiceSynthesisService`, `IProfilesClient`, `IAudioPlayerService`; `InitializeAsync` → `LoadProfilesAsync`; `CompareProfilesAsync` — **hard-coded** `Engine = "xtts"` for both requests; success **toast** on compare; auto `CompareProfilesAsync` on A/B selection change (fire-and-forget with `CancellationToken.None`) |
 | **Profile Comparison view** | [src/VoiceStudio.App/Views/Panels/ProfileComparisonView.xaml](../../src/VoiceStudio.App/Views/Panels/ProfileComparisonView.xaml), [.xaml.cs](../../src/VoiceStudio.App/Views/Panels/ProfileComparisonView.xaml.cs) | **XAML:** **HelpOverlay-only** grid — **no** profile pickers or compare UI. **Code-behind:** `Loaded` → `InitializeAsync`; error toast only |
 | **Quality HTTP contract** | [src/VoiceStudio.App/Core/Services/IQualityControlClient.cs](../../src/VoiceStudio.App/Core/Services/IQualityControlClient.cs) | Includes `RunBenchmarkAsync(BenchmarkRequest)` plus broader quality APIs (dashboard, analysis, etc.) — **Pass 08** does **not** inventory every consumer |
@@ -58,10 +58,10 @@ Paths relative to repo root. Inventory from **2026-03-24** read.
 
 ### 3.2 A/B Testing
 
-1. **Ctor:** `ABTestingViewModel` schedules **`LoadProfilesAsync`** without `InitializeAsync` / panel **`Loaded`** gate.
-2. **Run:** `RunTestAsync` → **`IABTestService.RunABTestAsync`** with `EngineA`/`EngineB`, emotions, enhancement flags → **`TestResults`**; updates metrics display properties.
+1. **Shell load (W8-C2):** `ABTestingView` **`Loaded`** (ADR-047) calls **`InitializeAsync`** → **`LoadProfilesAsync`** → **`IProfilesClient.GetProfilesAsync`** → fills `Profiles`.
+2. **Run:** `RunTestAsync` → **`IABTestService.RunABTestAsync`** with `EngineA`/`EngineB`, emotions, enhancement flags → **`TestResults`**; sets **`StatusMessage`** on success; updates metrics display properties.
 3. **Play:** `PlaySampleA` / `PlaySampleB` (**async void**) fetch stream via **`GetAudioStreamAsync(Sample.AudioId)`** + **`PlayStreamAsync`**.
-4. **View:** Placeholder “Planned Features” — **no** inputs or **RunTestCommand** binding — workflow **not** reachable from current XAML.
+4. **View:** Operational controls bound to VM (**profile**, **test text**, engines, run, results, play when URLs exist).
 
 ### 3.3 Profile Comparison
 
@@ -128,7 +128,7 @@ Only **one** row may be **in progress** in implementation at a time. All rows re
 | Row ID | Hypothesis | Primary owner | Supporting owner (exactly one path) | Initial tests / proof |
 |--------|------------|---------------|-------------------------------------|------------------------|
 | **W8-C1** (frozen §8.1) | Operational UI + results + next-step guidance; **export/context-menu OUT** — **§8.1** table. | [QualityBenchmarkViewModel.cs](../../src/VoiceStudio.App/Views/Panels/QualityBenchmarkViewModel.cs) | [QualityBenchmarkView.xaml](../../src/VoiceStudio.App/Views/Panels/QualityBenchmarkView.xaml); [.xaml.cs](../../src/VoiceStudio.App/Views/Panels/QualityBenchmarkView.xaml.cs) — strip dead export/context handlers | **FQN** `VoiceStudio.App.Tests.ViewModels.QualityBenchmarkViewModelSeamTests`; **8** passed after closure (5+3); **§8.1** |
-| W8-C2 | A/B Testing **operational UI** (TBD) | `ABTestingViewModel` | `ABTestingView` only | TBD — new **§5** line + **§8** when chosen |
+| **W8-C2** (**§8.8** freeze; **`src/`** after **§8.9**) | A/B Testing **operational UI**: profile + test text + engine A/B + emotion + enhancement + **Run** + results metrics + play A/B; **lifecycle:** `InitializeAsync` + **`Loaded`** (no ctor profile load). | [`ABTestingViewModel.cs`](../../src/VoiceStudio.App/Views/Panels/ABTestingViewModel.cs) | [`ABTestingView.xaml`](../../src/VoiceStudio.App/Views/Panels/ABTestingView.xaml); [`ABTestingView.xaml.cs`](../../src/VoiceStudio.App/Views/Panels/ABTestingView.xaml.cs) | **FQN** `ABTestingViewModelSeamTests`; **0→8**; proof **§8.10** |
 | **W8-C3** (**closed** 2026-03-26 — **§8.6** + **§8.7**) | Operational shell: profile **A** / **B** selectors, **preview text**, **explicit Compare** control, **engine policy** (`ComparisonEngineId` + combo; no buried literals-only path), **comparison result surface**; **playback** via `PlayProfileA/B`. | [ProfileComparisonViewModel.cs](../../src/VoiceStudio.App/ViewModels/ProfileComparisonViewModel.cs) | [ProfileComparisonView.xaml](../../src/VoiceStudio.App/Views/Panels/ProfileComparisonView.xaml); [.xaml.cs](../../src/VoiceStudio.App/Views/Panels/ProfileComparisonView.xaml.cs) | **FQN** `ProfileComparisonViewModelSeamTests`; **8** passed; proof **§8.7** |
 
 **W8-C1 rationale:** **Footnote + VM** already exist; the largest **user-visible** gap is **missing operational shell** (W8-D001) plus **post-run guidance** (W8-D010). Fixing all three panels at once violates **narrow lane** discipline.
@@ -233,7 +233,7 @@ This block is the **execution-grade** contract. **§8.2** is the **authorization
 
 ### 8.4 Continuation / pause
 
-**2026-03-25:** **W8-C1** closed — Quality Benchmark **`src/`** row complete under §8.1 lock. **No default `src/`** for **W8-C2** / **W8-C3** until authorization: **W8-C3** has a **§8.5** technical freeze + **§8.6** sign-off gate (below); **W8-C2** remains TBD. **Workflow 7** remains paused per Pass 07 §8.4.
+**2026-03-25:** **W8-C1** closed — Quality Benchmark **`src/`** row complete under §8.1 lock. **W8-C3** closed under **§8.5–§8.7**. **W8-C2** — **`src/`** only after **§8.9** (Pass 08 W8-C2 sign-off below); technical freeze **§8.8**. **Workflow 7** remains paused per Pass 07 §8.4.
 
 ### 8.5 Execution row W8-C3 — technical freeze (implementation **not** authorized until §8.6)
 
@@ -291,12 +291,61 @@ This block is the **execution-grade** contract for the **recommended next** qual
 | **Quick artifact** | **`artifacts/verify/20260326_025824`** (PASS) — cited **separately** from seam (**Quick does not subsume** seam). |
 | **`latest_pointer.json`** | **`commit_hash`** **`eb98604039b390f676c98fdb805957a46cd9429c`** — run_dir **`20260326_025824`**. |
 
+### 8.8 Execution row W8-C2 — technical freeze (implementation **not** authorized until §8.9)
+
+This block is the **execution-grade** contract for **A/B Testing** operational UI. **§8.9** is the **Pass 08** authorization gate (**disambiguation:** **not** [Product trust Pass 01](PRODUCT_TRUST_AND_RELEASE_HONESTY_PASS_01.md) §8.9). **No `src/`** for W8-C2 until **§8.9** is signed.
+
+| | |
+|--|--|
+| **Target behavior (IN)** | End user can: pick **one profile** (`Profiles` / `SelectedProfile`), edit **test text** (`TestText`, **resource-backed default**), set **Engine A** / **Engine B**, optional **Emotion A/B**, **Enhance quality A/B** toggles, run **`RunTestCommand`** from a visible control. **Results:** `SampleAMetricsDisplay`, `SampleBMetricsDisplay`, `ComparisonSummary`, **`ResultsVisibility`**. **Playback:** **`PlaySampleACommand`** / **`PlaySampleBCommand`** when samples have **`AudioUrl`**. **Lifecycle:** **`InitializeAsync`** loads profiles (from view **`Loaded`**); **no** ctor **`LoadProfilesAsync`** ( **W8-D007** — **Option 2**). **`StatusMessage`** set on successful run so **`ABTestingView`** success toast contract (**W8-D005**) is satisfied. |
+| **Explicit OUT (W8-C2)** | **ProfileComparison** / **QualityBenchmark** files; cluster-wide **`IContextManager`** / global profile harmonization; broad **`IABTestService`** or backend A/B redesign; **new** HTTP clients; **combining W8-C2** with W8-C1/C3 **without** expanding **§5**. |
+| **Primary owner** | [`ABTestingViewModel.cs`](../../src/VoiceStudio.App/Views/Panels/ABTestingViewModel.cs) |
+| **Supporting owner** | [`ABTestingView.xaml`](../../src/VoiceStudio.App/Views/Panels/ABTestingView.xaml); [`ABTestingView.xaml.cs`](../../src/VoiceStudio.App/Views/Panels/ABTestingView.xaml.cs) — **`Loaded`** → **`InitializeAsync`**, toasts, bindings only |
+| **File lock (exact — no expansion without new §5 row)** | 1. `src/VoiceStudio.App/Views/Panels/ABTestingViewModel.cs` 2. `src/VoiceStudio.App/Views/Panels/ABTestingView.xaml` 3. `src/VoiceStudio.App/Views/Panels/ABTestingView.xaml.cs` 4. `src/VoiceStudio.App.Tests/ViewModels/ABTestingViewModelSeamTests.cs` — **Optional same slice only:** `src/VoiceStudio.App/Resources/en-US/Resources.resw` under **`ABTesting.W8C2.*`** and **AutomationId** rows in [AUTOMATION_ID_REGISTRY.md](../../docs/developer/AUTOMATION_ID_REGISTRY.md) when controls gain stable ids. |
+| **Seam strategy** | **New** class **`VoiceStudio.App.Tests.ViewModels.ABTestingViewModelSeamTests`**, **`[TestCategory("SeamAware")]`**. **Baseline:** **0** tests (class did not exist pre–W8-C2). |
+| **Seam class FQN** | `VoiceStudio.App.Tests.ViewModels.ABTestingViewModelSeamTests` |
+| **dotnet test filter (full class FQN substring)** | `dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --filter "FullyQualifiedName~VoiceStudio.App.Tests.ViewModels.ABTestingViewModelSeamTests"` |
+| **Expected seam count (post–W8-C2 closure)** | **8** — **exactly** these test method names: **(1)** `Constructor_DoesNotCallClient_BeforeActivation` **(2)** `Constructor_WithSeamClients_CreatesInstance` **(3)** `Constructor_WithNullABTestService_Throws` **(4)** `Constructor_WithNullProfilesClient_Throws` **(5)** `Constructor_WithNullAudioPlayer_Throws` **(6)** `InitializeAsync_CallsIProfilesClient_GetProfilesAsync` **(7)** `RunTestAsync_PopulatesTestResults_AndSetsStatusMessage_OnSuccess` **(8)** `RunTestCommandContract_AlignsWithExplicitRunAffordance` |
+| **Proof commands (frozen)** | `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64`; `dotnet test ... --filter "FullyQualifiedName~VoiceStudio.App.Tests.ViewModels.ABTestingViewModelSeamTests"` — **expect 8 passed**; `.\scripts\verify.ps1 -Quick` → new artifact; **`latest_pointer.json`** **`commit_hash`** must match the commit that contains W8-C2 **implementation** (document **HEAD vs pointer** if docs-only commits follow). |
+| **Authorized by** | **Tyler** — Date: **2026-03-24** (**§8.9** below) |
+
+#### 8.8.1 §8.8 preflight — code truth vs freeze (2026-03-24)
+
+**Record only.** Preflight **does not** replace **§8.9** sign-off.
+
+| Check | Result (pre–W8-C2 `src/`) |
+|-------|---------------------------|
+| **§8.8 file lock paths** | Present (VM/view/tests path reserved): [`ABTestingViewModel.cs`](../../src/VoiceStudio.App/Views/Panels/ABTestingViewModel.cs), [`ABTestingView.xaml`](../../src/VoiceStudio.App/Views/Panels/ABTestingView.xaml), [`ABTestingView.xaml.cs`](../../src/VoiceStudio.App/Views/Panels/ABTestingView.xaml.cs). **No** seam class until W8-C2 implementation. |
+| **Lifecycle (W8-D007)** | VM used **`_ = LoadProfilesAsync(CancellationToken.None)`** in **ctor**; **§8.8** locks **Option 2:** remove ctor load; add **`InitializeAsync`** + view **`Loaded`** (mirror Profile Comparison / Quality Benchmark). |
+| **`StatusMessage` (W8-D005)** | View **code-behind** listens for **`StatusMessage`**; VM did **not** set it on run — **gap**; freeze **IN** requires success **`StatusMessage`** after **`RunABTestAsync`**. |
+| **XAML vs IN** | [`ABTestingView.xaml`](../../src/VoiceStudio.App/Views/Panels/ABTestingView.xaml) **placeholder** — **no** operational **`x:Bind`** — **gap** until implementation. |
+
+### 8.9 Product / engineering sign-off block — **Pass 08** W8-C2 (**not** Product Trust §8.9)
+
+**Pass 08 — W8-C2 — AUTHORIZED** as of the following:
+
+- Signatory: **Tyler** Date: **2026-03-24**
+- Confirmed file lock matches **§8.8**.
+- Confirmed **OUT** list understood. **Implementation authorized** for **W8-C2** per **§8.8** file lock only.
+- Confirmed **§8.8.1** preflight read; **W8-D007** **Option 2** (**`InitializeAsync`**, no ctor load) and **W8-D005** **`StatusMessage`** contract are **in scope** for this slice.
+
+### 8.10 Proof pointers — W8-C2 (post-implementation)
+
+| | |
+|---|---|
+| **Seam FQN (frozen)** | `VoiceStudio.App.Tests.ViewModels.ABTestingViewModelSeamTests` |
+| **Seam passed (actual)** | **8** — `dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --filter "FullyQualifiedName~VoiceStudio.App.Tests.ViewModels.ABTestingViewModelSeamTests"` |
+| **Quick artifact** | **Post–W8-C2-commit Quick** (authoritative for pointer) — dev validation **`artifacts/verify/20260326_033214`** (PASS) **with W8-C2 files in working tree**; **re-run `verify.ps1 -Quick` after the W8-C2 implementation commit** and record **that** run_dir below (supersedes dev row when committed). |
+| **`latest_pointer.json`** | **After post-commit verify:** **`commit_hash`** = W8-C2 implementation commit; see **STATE.md** **LATEST PROOF INDEX** + **LATEST MILESTONE** row. |
+
 ---
 
 ## Changelog
 
 | Date | Change |
 |------|--------|
+| 2026-03-26 | **W8-C2 closure:** **`InitializeAsync`** + **`Loaded`**; **`StatusMessage`** on success; **`ABTesting.W8C2.*`** resources; seam **8**; **§8.10** proof row (**post-commit Quick** = authoritative pointer). |
+| 2026-03-24 | **W8-C2 planning + authorization:** **§8.8** execution freeze (file lock, **0→8** seam names, proof cmds); **§8.8.1** preflight; **§8.9** Pass 08 W8-C2 sign-off (**Tyler**, 2026-03-24); **§8.10** proof stub; **§2/§3.2** A/B code-truth updated post-implementation intent. |
 | 2026-03-26 | **W8-C3 authorization:** **§8.5.1** PreviewText / Compare contract (**Option B clarified**); **§8.5** third seam wording + **§8.6.1** resolution; **§8.6** signed (**Tyler**, 2026-03-26). |
 | 2026-03-26 | **W8-C3 closure:** operational **`ProfileComparisonView`** + VM engine policy + **§8.5.1** can-execute (`PreviewText` trimmed non-empty); seam **8** passed; **§8.7** proof — Quick **`20260326_025824`**, pointer **`eb986040`**; registry AutomationIds. |
 | 2026-03-24 | Pass 08 created — planning freeze; §2–§4 code-truth from repo audit; **W8-C1** proposed |

@@ -21,7 +21,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Archive Policy | `docs/governance/ARCHIVE_POLICY.md` | — | **DEFERRED** — Use [document-lifecycle.mdc](.cursor/rules/workflows/document-lifecycle.mdc) and archive structure in `docs/archive/` |
 | Governance Lock | `docs/governance/GOVERNANCE_LOCK.md` | — | **DEFERRED** — Low priority |
 | Definition of Done | `docs/governance/DEFINITION_OF_DONE.md` | 2026-01-25 | Consolidated completion criteria |
-| Session State | `.cursor/STATE.md` | 2026-03-26 | **Global Quick** **`20260326_145710`** / **`e2819074`**; **HEAD** **`6f971695…`** (post-Quick docs); **Pass 05 P05-Persist-A4** active **planning-only**; **`stash@{0}`** inspected + **parked** (83 paths); **W7** / Product trust / **W8** paused except signed reopen. |
+| Session State | `.cursor/STATE.md` | 2026-03-26 | **Global Quick** **`20260326_145710`** / **`e2819074`**; **HEAD** **`eb81d437…`** (post-handoff); **Pass 05 P05-Persist-A4** active **planning-only**; **`stash@{0}`** inspected + **parked** (83 paths); **W7** / Product trust / **W8** paused except signed reopen. |
 | Memory Index | `openmemory.md` | 2026-01-25 | Living project index for AI context |
 | **Project Handoff Guide** | `docs/governance/PROJECT_HANDOFF_GUIDE.md` | 2026-01-30 | Maintainer entry point; gate status, build/test, structure, roles, task brief creation |
 | **Overseer Newcomer Handoff** | `docs/governance/overseer/OVERSEER_NEWCOMER_HANDOFF.md` | 2026-03-24 | New Overseer (Role 0) onboarding; **§2 project snapshot** (workflow passes, verify pointers, code-truth); Day 1 reads, first commands, daily cadence, non-negotiables |

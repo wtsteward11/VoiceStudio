@@ -11,6 +11,8 @@
 
 **This pass proof:** §8 — **slice 1** seam **10**; Quick `20260324_204541`. **Slice 2** seam **27**; Quick **`20260324_221954`**. **Slice 3** seam **30**; Quick **`20260324_225957`**. **Slice 4** seam **32**; Quick **`artifacts/verify/20260325_055851`**. **Slice 5** (§5.5): Python **`tests/unit/backend/api/routes/test_backup_upload_metadata.py`** **8** passed; .NET seam **32** unchanged — §7.2; **global Quick** **`artifacts/verify/20260326_145710`** (golden-loop stub path when **`VOICESTUDIO_TEST_MODE=stub`**; **`commit_hash`** **`e2819074`**). **Quick verify does not subsume seam tests.**
 
+**`commit_hash` vs `main`:** `latest_pointer.json` records the **tree that PASSED Quick** (**`e2819074`**). **`refs/heads/main`** may advance with **docs-only** commits afterward — see [`.cursor/STATE.md`](../../.cursor/STATE.md) Truth Sync — so **HEAD** is **not** always identical to **`commit_hash`**.
+
 ---
 
 ## 1. Participating components (as-is + downstream owners)

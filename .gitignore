@@ -148,8 +148,8 @@ runtime/external/
 # Installer runtime binaries (local only, too large for git)
 installer/runtime/
 
-# Models directory (downloaded at runtime)
-models/
+# Root-level ML/adhoc downloads only (do not match src/**/Models C# source; see build integrity doc 2026-03)
+/models/
 
 # OpenMemory - IDE/Assistant specific rules
 .cursor/rules/openmemory.mdc

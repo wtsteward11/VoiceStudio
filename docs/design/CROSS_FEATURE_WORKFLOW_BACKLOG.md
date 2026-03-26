@@ -104,9 +104,9 @@
 | **Involved panels/services** | `BackupRestoreViewModel`, `IBackupRestoreClient`; FastAPI [backup.py](../../backend/api/routes/backup.py); downstream owners per Pass 06 §1.2: `ProjectStore`, `TimelineViewModel`, `ProfilesViewModel`, `SettingsViewModel`, `IContextManager`, `TranscribeViewModel` (and optionally `RecordingViewModel`) |
 | **Current wiring status** | PR-14: client owns HTTP. **Restore** updates on-disk stores; **Pass 06:** `BackupRestoredEvent` after API success; timeline/profiles reload (slice 1); **settings** reload when `RestoreSettings` (slice 2); active project via timeline → `IContextManager` (Pass 02). |
 | **Known gaps/friction** | **Slice 5 closed (2026-03-26):** §5.5 D6 — `upload_backup` **`metadata.json`** validation + **`schema_version`** on create ([Pass 06 §5.5](WORKFLOW_COHERENCE_PASS_06_BACKUP_RESTORE_PROJECT_SETTINGS_PROFILE_RECOVERY.md)). Further backup-format work → **new** §5 row. |
-| **Pass 06 status** | **Slices 1–5 complete**: §8 — through slice 4 as before; **slice 5** pytest **`test_backup_upload_metadata`** **8** passed; .NET seam **32** unchanged (Pass 06 §7.2). |
-| **Recommended next improvement** | **Pass 06 slice 5 closed.** **Next lanes:** other backlog (Pass 07 §8 reopen, Product Trust §8.9, Pass 05 Option A follow-up if reopened, Workflow 8) — **one lane** via STATE + product. |
-| **Proof/test opportunity** | **Slices 1–4:** extended filter — **32 passed** + **slice 5:** §7.2 Python **8** + `verify.ps1 -Quick` **separate** — Pass 06 §7–§8. |
+| **Pass 06 status** | **Slices 1–5 complete**: §8 — through slice 4 as before; **slice 5** pytest **`test_backup_upload_metadata`** **8** passed; .NET seam **32** unchanged (Pass 06 §7.2); **global Quick** **`artifacts/verify/20260326_145710`** / **`latest_pointer.json`** **`e2819074`** (slice 5 lane closure). |
+| **Recommended next improvement** | **Pass 06 slice 5 lane closed** (Quick + pointer). **Next:** classify pre-Pass06 **`git stash`** (**no** blind pop); pick **one** backlog lane (Pass 07 §8.4, Product Trust §8.9, Pass 05 Option A, Workflow 8, docs/hygiene) — **STATE + same commit** as scope change. |
+| **Proof/test opportunity** | **Slices 1–4:** extended filter — **32 passed** + **slice 5:** §7.2 Python **8**; **`verify.ps1 -Quick`** **`20260326_145710`** — Pass 06 §7–§8. |
 
 ---
 
@@ -147,6 +147,6 @@
 | 3 | Search → panel focus | **Pass 03 complete** (2026-03-24). Proof: artifacts/verify/20260324_030133. |
 | 4 | Script editor → synthesis | **Pass 04 complete** (2026-03-24). Proof: artifacts/verify/20260324_070722. |
 | 5 | Record → transcription → project | **Pass 05:** slices 1–3 complete (C3 Option B). Proof: `artifacts/verify/20260324_190103`. |
-| 6 | Backup/restore | **Pass 06 slices 1–5 complete** (through 2026-03-26). Doc §8; slice 4 Quick **`20260325_055851`** / seam **32**; slice 5 D6 pytest **8** ([§5.5](WORKFLOW_COHERENCE_PASS_06_BACKUP_RESTORE_PROJECT_SETTINGS_PROFILE_RECOVERY.md)). |
+| 6 | Backup/restore | **Pass 06 slices 1–5 complete** (through 2026-03-26). Doc §8; slice 4 Quick **`20260325_055851`** / seam **32**; slice 5 D6 pytest **8** + lane closure Quick **`20260326_145710`** / **`e2819074`** ([§5.5](WORKFLOW_COHERENCE_PASS_06_BACKUP_RESTORE_PROJECT_SETTINGS_PROFILE_RECOVERY.md)). |
 | 7 | Training | **Workflow 7 paused** after W7-C1 — Pass 07 §8.4; reopen = signed §8 only. |
 | 8 | Quality / benchmark / comparison | **Pass 08** — **W8-C1** + **W8-C2** + **W8-C3** closed (2026-03-25–26); further `src/` → **new §5/§8** row only. |

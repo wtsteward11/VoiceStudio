@@ -3,7 +3,7 @@
 **Purpose:** Bounded **planning-first** pass for the **quality evaluation cluster**: **Quality Benchmark**, **A/B Testing**, and **Profile Comparison** — map **code-truth** workflows, defects, and a **single** bounded implementation row (**W8-C1**) without claiming closure-grade product workflow until **§8** is signed.
 
 **Date:** 2026-03-24  
-**Status:** **W8-C1 closed** (2026-03-25) — **§8.2** signed; operational Quality Benchmark UI + **8** seam tests + Quick **`artifacts/verify/20260325_191036`** (**`latest_pointer.json`** **`commit_hash`** = **`bcd6d4e52e0b2a7763f0baaa261e7cdac7f8a665`** — proof realigned to committed **W8-C1** closure); export/context remain **OUT**. **§1–§7** baseline complete. **Workflow 7** remains **paused after W7-C1** ([Pass 07 §8.4](WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md#84-workflow-7--continuation--pause-governance)). **[Product trust Pass 01](PRODUCT_TRUST_AND_RELEASE_HONESTY_PASS_01.md)** remains **paused** (§8.9 Option 1). **P05-Persist-A4** remains **§12-gated**. **Pass 06** further `src/` requires a **new §5** row. **Leftovers:** A/B placeholder (**W8-C2**), Profile Comparison shell (**W8-C3**); see §8.3.
+**Status:** **W8-C1 closed** (2026-03-25) — **§8.2** signed; operational Quality Benchmark UI + **8** seam tests + historical Quick **`artifacts/verify/20260325_191036`** (**`commit_hash`** **`bcd6d4e52e0b2a7763f0baaa261e7cdac7f8a665`** — W8-C1 product closure). **Repo-wide latest pointer** (2026-03-26): hermetic compile-closure hardening — Quick **`artifacts/verify/20260326_020644`**, **`commit_hash`** **`8ba6363f8ccab333b675fd462c902a172983f76e`** (does **not** rerun QB seam; see changelog). Export/context remain **OUT**. **§1–§7** baseline complete. **Workflow 7** remains **paused after W7-C1** ([Pass 07 §8.4](WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md#84-workflow-7--continuation--pause-governance)). **[Product trust Pass 01](PRODUCT_TRUST_AND_RELEASE_HONESTY_PASS_01.md)** remains **paused** (§8.9 Option 1). **P05-Persist-A4** remains **§12-gated**. **Pass 06** further `src/` requires a **new §5** row. **Leftovers:** A/B placeholder (**W8-C2**), Profile Comparison shell (**W8-C3**); see §8.3.
 
 **Related:** [CROSS_FEATURE_WORKFLOW_BACKLOG.md](CROSS_FEATURE_WORKFLOW_BACKLOG.md) (Workflow 8), [Pass 07](WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md) (adjacent lane discipline).
 
@@ -262,6 +262,21 @@ This block is the **execution-grade** contract for the **recommended next** qual
 - Confirmed file lock matches **§8.5**.
 - Confirmed **OUT** list understood. **Implementation authorized** for **W8-C3** per §8.5 file lock only.
 
+#### 8.6.1 §8.5 preflight — code truth vs freeze (2026-03-26)
+
+**Record only.** This preflight **does not** satisfy or replace **§8.6** sign-off.
+
+| Check | Result |
+|-------|--------|
+| **§8.5 file lock paths** | Present in repo: [`ProfileComparisonViewModel.cs`](../../src/VoiceStudio.App/ViewModels/ProfileComparisonViewModel.cs), [`ProfileComparisonView.xaml`](../../src/VoiceStudio.App/Views/Panels/ProfileComparisonView.xaml), [`ProfileComparisonView.xaml.cs`](../../src/VoiceStudio.App/Views/Panels/ProfileComparisonView.xaml.cs), [`ProfileComparisonViewModelSeamTests.cs`](../../src/VoiceStudio.App.Tests/ViewModels/ProfileComparisonViewModelSeamTests.cs). |
+| **Seam baseline count** | **5** tests in `ProfileComparisonViewModelSeamTests` — matches §8.5 **5→8** baseline. |
+| **XAML vs IN criteria** | [`ProfileComparisonView.xaml`](../../src/VoiceStudio.App/Views/Panels/ProfileComparisonView.xaml) remains **HelpOverlay-only** inner grid (`ProfileComparisonView_Root`); **no** profile pickers, preview editor, or explicit Compare control — **gap vs §8.5 IN** remains; implementation still required. |
+| **Engine policy** | `CompareProfilesAsync` still sets **`Engine = "xtts"`** twice (buried literals) — matches known defect; W8-C3 must surface policy per §8.5. |
+| **`CompareProfilesCommand` can-execute** | Current predicate: `SelectedProfileA` and `SelectedProfileB` non-null, `!IsComparing`, `!IsLoading` — **does not** require non-empty `PreviewText`. §8.5 mandates seam test **`CompareCommandContract_AlignsWithExplicitCompareAffordance`** with **two profiles + non-empty preview text**; implementation must **align** command rules with wired UI (or **§8.5** amended with explicit product approval). |
+| **Fire-and-forget** | `OnSelectedProfileA/BChanged` invokes `CompareProfilesAsync` without awaiting — **not** constructor scope; §8.5 **OUT** forbids **new** ctor fire-and-forget only. |
+
+**§8.6:** Still **unsigned** — no implementation authorized from this preflight alone.
+
 ---
 
 ## Changelog
@@ -274,3 +289,4 @@ This block is the **execution-grade** contract for the **recommended next** qual
 | 2026-03-25 | **W8-C1 proof realignment:** Quick **`artifacts/verify/20260325_191036`** supersedes **`20260325_181543`** for **git-level** closure — **`latest_pointer.json`** **`commit_hash`** **`bcd6d4e52e0b2a7763f0baaa261e7cdac7f8a665`** matches **W8-C1** commit (**`9192128a`** was pre-commit tree). **Runner truth:** verify executed at **HEAD = `bcd6d4e5`** with **restored working tree** after stash (isolated clean checkout of **`bcd6d4e5`** did **not** **`dotnet build`** here — dependency gap vs **W8-C1** commit-only tree). |
 | 2026-03-25 | **W8-C3 planning freeze:** **§5** row + **§8.5** technical contract + **§8.6** sign-off placeholder; **5→8** seam tests specified; **`src/`** blocked until **§8.6** |
 | 2026-03-26 | **Hermetic compile closure (repo integrity):** `fix(build)` commit **`8ba6363f`** commits App / Core / App.Tests sources that a clean checkout at **`c7c40a6b`** lacked (untracked utilities, transport/seam alignment, tests). `verify.ps1 -Quick` **`artifacts/verify/20260326_020644`** PASS; **`latest_pointer.json`** **`commit_hash`** matches **`8ba6363f`**. Narrows the §8.3 note that isolated checkout did not build — inventory [BUILD_INTEGRITY_NON_HERMETIC_W8C1_2026-03-25.md](../reports/build/BUILD_INTEGRITY_NON_HERMETIC_W8C1_2026-03-25.md) § Changelog 2026-03-26. **W8-C3** still gated on **§8.6**; no Quality Benchmark seam rerun required for this hardening. |
+| 2026-03-26 | **Governance sync:** [CROSS_FEATURE_WORKFLOW_BACKLOG.md](CROSS_FEATURE_WORKFLOW_BACKLOG.md) and [CANONICAL_REGISTRY.md](../governance/CANONICAL_REGISTRY.md) banner/tables updated — latest authoritative Quick **`20260326_020644`** / **`8ba6363f`** vs historical W8-C1 **`20260325_191036`** / **`bcd6d4e5`**. **§8.6.1** §8.5 code-truth preflight recorded; **§8.6** remains blank. |

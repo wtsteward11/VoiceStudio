@@ -235,6 +235,8 @@ This block is the **execution-grade** contract. **§8.2** is the **authorization
 
 **2026-03-26:** **W8-C1** + **W8-C2** + **W8-C3** **closed** under Pass 08 **§8** (proofs **§8.3** / **§8.10** / **§8.7**). Further quality-cluster **`src/`** → **new §5 + §8** row only. **Workflow 7** remains paused per Pass 07 §8.4.
 
+**2026-03-24 (post–Pass 08 — deliberate lane):** **Default posture:** **Workflow 8 paused**. The **§5 bounded matrix** for this pass’s quality cluster is **complete**; do **not** reopen **W8-C1/C2/C3** for polish (engine field UX, `async void` playback, hard-coded language, auto-compare affordances, **W8-D008–D009** cluster harmonization, etc.) unless product approves a **new §5 row** with **strict IN/OUT** and a matching **§8** technical freeze + sign-off **before** any **`src/`** (**W8-C4-class**). Opportunistic Pass 08 **`src/`** without that discipline is **out of scope**.
+
 ### 8.5 Execution row W8-C3 — technical freeze (implementation **not** authorized until §8.6)
 
 This block is the **execution-grade** contract for the **recommended next** quality-cluster slice. **§8.6** is the **authorization** gate. **No `src/`** until **§8.6** is signed.

@@ -154,6 +154,7 @@ namespace VoiceStudio.App.Views.Panels
 
     /// <summary>W8-C2: load profiles after the view raises Loaded (ADR-047); not from constructor.</summary>
     /// <param name="cancellationToken">Cancellation token for profile load.</param>
+    /// <returns>A task representing profile load completion.</returns>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
       await LoadProfilesAsync(cancellationToken);

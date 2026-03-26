@@ -229,11 +229,11 @@ This block is the **execution-grade** contract. **§8.2** is the **authorization
 | **Quick artifact** | **`artifacts/verify/20260325_191036`** (PASS) — cited **separately** from seam; **Quick does not subsume seam**; proves **`bcd6d4e52e0b2a7763f0baaa261e7cdac7f8a665`** (W8-C1 closure commit) via pointer **`commit_hash`** |
 | **`latest_pointer.json`** | **`E:\VoiceStudio\artifacts\verify\latest_pointer.json`** → run_dir **`20260325_191036`**; **`commit_hash`** **`bcd6d4e52e0b2a7763f0baaa261e7cdac7f8a665`** |
 
-**§8.3 leftovers (explicit):** **W8-C2** — A/B Testing operational UI (placeholder view today). **W8-C3** — Profile Comparison operational UI + engine policy. Cluster items **W8-D004–D006** and related rows remain until those passes. **W8-D007–D010** partially addressed for benchmark (D010 next-step / D002 `StatusMessage`); global cluster gaps (D007–D009) unchanged.
+**§8.3 leftovers (explicit):** **W8-C1–C3** **closed** under **§8.3** / **§8.10** / **§8.7**. **W8-D004** / **W8-D007** (A/B) **addressed** for W8-C2 slice; **W8-D005** **StatusMessage** path live. **Global** cluster gaps **W8-D008–D009** (engine harmonization; **IContextManager**) unchanged unless a **new §5** row adds them.
 
 ### 8.4 Continuation / pause
 
-**2026-03-25:** **W8-C1** closed — Quality Benchmark **`src/`** row complete under §8.1 lock. **W8-C3** closed under **§8.5–§8.7**. **W8-C2** — **`src/`** only after **§8.9** (Pass 08 W8-C2 sign-off below); technical freeze **§8.8**. **Workflow 7** remains paused per Pass 07 §8.4.
+**2026-03-26:** **W8-C1** + **W8-C2** + **W8-C3** **closed** under Pass 08 **§8** (proofs **§8.3** / **§8.10** / **§8.7**). Further quality-cluster **`src/`** → **new §5 + §8** row only. **Workflow 7** remains paused per Pass 07 §8.4.
 
 ### 8.5 Execution row W8-C3 — technical freeze (implementation **not** authorized until §8.6)
 

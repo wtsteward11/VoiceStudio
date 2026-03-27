@@ -4,7 +4,7 @@
 **Purpose:** **Re-baseline** the **`stash@{0}`** **T1** surface against current **`main`** after **[`GOV-STASH0-T1-S1-01`](STASH0_T1_S1_EXECUTION_ROW.md)** landed the **T1-C1 / eight-path** synthesis vertical. Produce **one** narrow candidate for the **next** implementation slice—**no** selective checkout, **no** `backend/**` or **`app/core/**`** edits, **no** bulk **`stash pop`** under this row.  
 **Source stash:** *WIP: pre-Pass06-20260326 unclassified local and untracked* (same entry as prior T1 rows).  
 **Date (row drafted):** 2026-03-27  
-**§1 authorization:** **Pending** — engineering accepts **§3** re-baseline; product / engineering picks **exactly one** remainder slice (**§5**) before any **new** execution row **§1** implementation date.
+**§1 authorization:** **Slice choice complete** **2026-03-27** — engineering preflight + product / engineering selected **§5 Option A** (narrow **T1-C2**). **Implementation** authorized only on **[`GOV-STASH0-T1-R1A-EXEC-01`](STASH0_T1_R1A_EXECUTION_ROW.md)** **§1** (implementation row).
 
 **Related:** [STASH0_T1_S1_EXECUTION_ROW.md](STASH0_T1_S1_EXECUTION_ROW.md) (**T1-S1** — **closed** on **`main`**); [STASH0_T1_PREFLIGHT_EXECUTION_ROW.md](STASH0_T1_PREFLIGHT_EXECUTION_ROW.md) (original **T1-C1–C4** decomposition — **T1-S1** consumed **T1-C1**); [STASH0_T2_VERIFY_CI_EXECUTION_ROW.md](STASH0_T2_VERIFY_CI_EXECUTION_ROW.md); [`.cursor/STATE.md`](../../.cursor/STATE.md).
 
@@ -14,10 +14,10 @@
 
 | Role | Decision | Date |
 |------|----------|------|
-| **Engineering (preflight)** | **Pending** — Confirm **§3** table reflects current **`main`** vs **`stash@{0}`** (re-run per-path diff if either tip moved). | — |
-| **Product / engineering (slice choice)** | **Pending** — Select **one** option from **§5** (or record **explicit pause**: no next T1 slice until new product gate). | — |
+| **Engineering (preflight)** | **Preflight acknowledged** — **§3** re-baseline re-verified **`main`** **`451cd820`** vs **`stash@{0}`**; **merge-base** **`a7a45f4c`**; per-path stats for **Option A** candidates match **§5** default list (all **non-empty** material diffs). Re-run diffs if tips move before **R1A** extract. | **2026-03-27** |
+| **Product / engineering (slice choice)** | **Option A** — **Narrow T1-C2** (ancillary routes + **`route_registry`** + helper services **without** **`v3/models.py`** / **`v3/projects.py`**). Next execution row: **`GOV-STASH0-T1-R1A-EXEC-01`**. | **2026-03-27** |
 
-**Hard gate:** **No** **§4 file lock** exists on **this** preflight doc. The **future** execution row (new ID, e.g. **`GOV-STASH0-T1-S2-01`** or other) owns **§4** / **§7** / **§8** only after **§1** here is satisfied and that row is drafted.
+**Hard gate:** **No** **§4 file lock** on **this** preflight doc. **Implementation** file lock, proof, extract, and closure live on **[`STASH0_T1_R1A_EXECUTION_ROW.md`](STASH0_T1_R1A_EXECUTION_ROW.md)** (**`GOV-STASH0-T1-R1A-EXEC-01`**) — **§1** implementation **Pending** until product dates that row.
 
 ---
 
@@ -30,7 +30,7 @@ After **T1-S1**, classify every **`stash@{0}`** path that still differs from **`
 ## 3. Baseline truth (do not contradict)
 
 - **`GOV-STASH0-T1-S1-01`** is **closed**; **T1-C1** (eight paths) is on **`main`**. Repo-global **Quick** remains **`artifacts/verify/20260326_230934`** / **`commit_hash`** **`f60477978e72ad3bdbcfb2f2ba7e56c50ebc76c3`** until a new green **Quick** advances [`latest_pointer.json`](../../artifacts/verify/latest_pointer.json).
-- **`git merge-base main 'stash@{0}'`** = **`a7a45f4cc2e8e81671eefffe885df3a86227b10a`** (recorded **2026-03-27**). **`main`** tip recorded at preflight authoring: **`737f0886`** — **verify** with **`git rev-parse HEAD`** before relying on hashes.
+- **`git merge-base main 'stash@{0}'`** = **`a7a45f4cc2e8e81671eefffe885df3a86227b10a`** (recorded **2026-03-27**). **`main`** tip at **§1** slice-choice pass: **`451cd820`** — **verify** with **`git rev-parse HEAD`** before relying on hashes.
 - **`T1-S1` eight paths** vs **`stash@{0}`**: **empty diffs** (stash content **matches** landed **`main`** for those files). **Do not** re-extract them under a “remainder” row without a **new** §1 and cause.
 
 ---
@@ -129,10 +129,10 @@ Unless a **new** signed row explicitly expands scope:
 
 | Step | Owner | Action |
 |------|-------|--------|
-| 1 | Engineering | Date **§1** preflight row after confirming **§3** (or refresh **§3** if tips moved) |
-| 2 | Product | Choose **§5** option **A–E** |
-| 3 | Overseer / engineer | Draft **new** execution row: **§4** file lock, **§5** proof commands, **§6** OUT, **§7** extract, **§8** closure — **then** date **implementation §1** on **that** row |
-| 4 | — | **No** `backend/**` / **`app/core/**`** code until step 3 **implementation** **§1** is dated |
+| 1 | Engineering | **Done** **2026-03-27** — **§1** preflight dated; **§3** verified on **`451cd820`**. |
+| 2 | Product | **Done** **2026-03-27** — **§5 Option A**. |
+| 3 | Overseer / engineer | **Done** **2026-03-27** — [STASH0_T1_R1A_EXECUTION_ROW.md](STASH0_T1_R1A_EXECUTION_ROW.md) (**`GOV-STASH0-T1-R1A-EXEC-01`**). **Next:** date **implementation §1** on **that** row. |
+| 4 | — | **No** `backend/**` / **`app/core/**`** code until **R1A** **implementation §1** is dated |
 
 ---
 
@@ -151,3 +151,4 @@ Unless a **new** signed row explicitly expands scope:
 | Date | Change |
 |------|--------|
 | 2026-03-27 | **Created** — **`GOV-STASH0-T1-R1-PREFLIGHT-01`**: post–**T1-S1** re-baseline; remainder map; **§1** **Pending**. |
+| 2026-03-27 | **§1 slice choice** — **Option A**; engineering ack + **`main`** **`451cd820`**; execution row **[`GOV-STASH0-T1-R1A-EXEC-01`](STASH0_T1_R1A_EXECUTION_ROW.md)** drafted (**implementation §1** still **Pending**). |

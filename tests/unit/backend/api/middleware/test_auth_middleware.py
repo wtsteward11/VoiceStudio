@@ -193,7 +193,10 @@ class TestRequireAuthentication:
         mock_request.url.path = "/api/test"
         mock_request.method = "GET"
 
-        with patch("backend.api.middleware.auth_middleware.get_current_user") as mock_get_user:
+        with patch(
+            "backend.api.middleware.auth_middleware.get_current_user",
+            new_callable=AsyncMock,
+        ) as mock_get_user:
             mock_get_user.return_value = mock_user
 
             user = await auth_middleware.require_authentication(mock_request)
@@ -210,7 +213,10 @@ class TestRequireAuthentication:
         mock_request.url.path = "/api/test"
         mock_request.method = "GET"
 
-        with patch("backend.api.middleware.auth_middleware.get_current_user") as mock_get_user:
+        with patch(
+            "backend.api.middleware.auth_middleware.get_current_user",
+            new_callable=AsyncMock,
+        ) as mock_get_user:
             mock_get_user.return_value = None
 
             with pytest.raises(Exception) as exc_info:
@@ -228,7 +234,10 @@ class TestRequireAuthentication:
         mock_request.url.path = "/api/protected"
         mock_request.method = "POST"
 
-        with patch("backend.api.middleware.auth_middleware.get_current_user") as mock_get_user:
+        with patch(
+            "backend.api.middleware.auth_middleware.get_current_user",
+            new_callable=AsyncMock,
+        ) as mock_get_user:
             mock_get_user.return_value = None
             with patch("backend.api.middleware.auth_middleware.logger") as mock_logger:
                 try:
@@ -257,7 +266,8 @@ class TestRequirePermissionMiddleware:
         mock_request.method = "GET"
 
         with patch(
-            "backend.api.middleware.auth_middleware.require_authentication"
+            "backend.api.middleware.auth_middleware.require_authentication",
+            new_callable=AsyncMock,
         ) as mock_req_auth:
             mock_req_auth.return_value = mock_user
 
@@ -283,7 +293,8 @@ class TestRequirePermissionMiddleware:
         mock_request.method = "POST"
 
         with patch(
-            "backend.api.middleware.auth_middleware.require_authentication"
+            "backend.api.middleware.auth_middleware.require_authentication",
+            new_callable=AsyncMock,
         ) as mock_req_auth:
             mock_req_auth.return_value = mock_user
 
@@ -310,7 +321,8 @@ class TestRequirePermissionMiddleware:
         mock_request.method = "DELETE"
 
         with patch(
-            "backend.api.middleware.auth_middleware.require_authentication"
+            "backend.api.middleware.auth_middleware.require_authentication",
+            new_callable=AsyncMock,
         ) as mock_req_auth:
             mock_req_auth.return_value = mock_user
             with patch("backend.api.middleware.auth_middleware.logger") as mock_logger:
@@ -343,7 +355,8 @@ class TestRequireRoleMiddleware:
         mock_request.method = "GET"
 
         with patch(
-            "backend.api.middleware.auth_middleware.require_authentication"
+            "backend.api.middleware.auth_middleware.require_authentication",
+            new_callable=AsyncMock,
         ) as mock_req_auth:
             mock_req_auth.return_value = mock_user
 
@@ -366,7 +379,8 @@ class TestRequireRoleMiddleware:
         mock_request.method = "GET"
 
         with patch(
-            "backend.api.middleware.auth_middleware.require_authentication"
+            "backend.api.middleware.auth_middleware.require_authentication",
+            new_callable=AsyncMock,
         ) as mock_req_auth:
             mock_req_auth.return_value = mock_user
 
@@ -390,7 +404,8 @@ class TestRequireRoleMiddleware:
         mock_request.method = "GET"
 
         with patch(
-            "backend.api.middleware.auth_middleware.require_authentication"
+            "backend.api.middleware.auth_middleware.require_authentication",
+            new_callable=AsyncMock,
         ) as mock_req_auth:
             mock_req_auth.return_value = mock_user
 
@@ -415,7 +430,8 @@ class TestRequireRoleMiddleware:
         mock_request.method = "GET"
 
         with patch(
-            "backend.api.middleware.auth_middleware.require_authentication"
+            "backend.api.middleware.auth_middleware.require_authentication",
+            new_callable=AsyncMock,
         ) as mock_req_auth:
             mock_req_auth.return_value = mock_user
 
@@ -439,7 +455,8 @@ class TestRequireRoleMiddleware:
         mock_request.method = "POST"
 
         with patch(
-            "backend.api.middleware.auth_middleware.require_authentication"
+            "backend.api.middleware.auth_middleware.require_authentication",
+            new_callable=AsyncMock,
         ) as mock_req_auth:
             mock_req_auth.return_value = mock_user
             with patch("backend.api.middleware.auth_middleware.logger") as mock_logger:
@@ -462,74 +479,66 @@ class TestGetOptionalUser:
 
         mock_request = Mock()
 
-        # Mock asyncio.get_event_loop to return a non-running loop
-        mock_loop = Mock()
-        mock_loop.is_running.return_value = False
-        mock_loop.run_until_complete.return_value = mock_user
+        # Use AsyncMock so the coroutine is properly awaited by the real event loop
+        with patch(
+            "backend.api.middleware.auth_middleware.get_current_user",
+            new_callable=AsyncMock,
+        ) as mock_get_user:
+            mock_get_user.return_value = mock_user
 
-        with patch("asyncio.get_event_loop") as mock_get_loop:
-            mock_get_loop.return_value = mock_loop
-            with patch("backend.api.middleware.auth_middleware.get_current_user"):
-                user = auth_middleware.get_optional_user(mock_request)
+            user = auth_middleware.get_optional_user(mock_request)
 
-                assert user is not None, "Should return user when authenticated"
-                assert user.user_id == "user123", "Should return correct user"
+            assert user is not None, "Should return user when authenticated"
+            assert user.user_id == "user123", "Should return correct user"
 
     def test_get_optional_user_no_authentication(self):
         """Test get_optional_user returns None when not authenticated."""
         mock_request = Mock()
 
-        # Mock asyncio.get_event_loop to return a non-running loop
-        mock_loop = Mock()
-        mock_loop.is_running.return_value = False
-        mock_loop.run_until_complete.return_value = None
+        # Use AsyncMock so the coroutine is properly awaited by the real event loop
+        with patch(
+            "backend.api.middleware.auth_middleware.get_current_user",
+            new_callable=AsyncMock,
+        ) as mock_get_user:
+            mock_get_user.return_value = None
 
-        with patch("asyncio.get_event_loop") as mock_get_loop:
-            mock_get_loop.return_value = mock_loop
-            with patch("backend.api.middleware.auth_middleware.get_current_user"):
-                user = auth_middleware.get_optional_user(mock_request)
+            user = auth_middleware.get_optional_user(mock_request)
 
-                assert user is None, "Should return None when not authenticated"
+            assert user is None, "Should return None when not authenticated"
 
     def test_get_optional_user_handles_runtime_error(self):
         """Test get_optional_user handles RuntimeError gracefully."""
         mock_request = Mock()
 
-        with patch("backend.api.middleware.auth_middleware.get_current_user"):
-            with patch("asyncio.get_event_loop") as mock_get_loop:
-                mock_loop = Mock()
-                mock_loop.is_running.return_value = True
-                mock_get_loop.return_value = mock_loop
+        # When loop is running, get_optional_user returns None without calling get_current_user
+        with patch("asyncio.get_event_loop") as mock_get_loop:
+            mock_loop = Mock()
+            mock_loop.is_running.return_value = True
+            mock_get_loop.return_value = mock_loop
 
-                user = auth_middleware.get_optional_user(mock_request)
+            user = auth_middleware.get_optional_user(mock_request)
 
-                assert user is None, "Should return None when event loop is running"
+            assert user is None, "Should return None when event loop is running"
 
     def test_get_optional_user_handles_exception(self):
         """Test get_optional_user handles exceptions gracefully."""
         mock_request = Mock()
 
-        # First try to get event loop - raises RuntimeError
-        # Then try asyncio.run - raises Exception, which is caught
+        # get_event_loop raises RuntimeError -> code falls back to asyncio.run
+        # get_current_user returns coroutine that raises when awaited
+        # asyncio.run runs it, exception propagates, get_optional_user catches and returns None
         with patch("asyncio.get_event_loop") as mock_get_loop:
             mock_get_loop.side_effect = RuntimeError("No event loop")
 
-            with patch("asyncio.run") as mock_run:
-                # Mock asyncio.run to raise exception
-                # The code catches Exception and returns None
-                def raise_exception(*args, **kwargs):
-                    raise Exception("Test exception")
+            with patch(
+                "backend.api.middleware.auth_middleware.get_current_user",
+                new_callable=AsyncMock,
+            ) as mock_get_user:
+                mock_get_user.side_effect = Exception("Test exception")
 
-                mock_run.side_effect = raise_exception
+                user = auth_middleware.get_optional_user(mock_request)
 
-                # The function should catch the exception and return None
-                try:
-                    user = auth_middleware.get_optional_user(mock_request)
-                    assert user is None, "Should return None on exception"
-                except Exception:
-                    # If exception is not caught, that's also acceptable for this test
-                    # as it demonstrates the exception handling path
-                    ...
+                assert user is None, "Should return None on exception"
 
 
 class TestSecurityScheme:

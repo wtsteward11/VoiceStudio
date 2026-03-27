@@ -197,7 +197,10 @@ def get_optional_user(request: Request) -> User | None:
             return loop.run_until_complete(get_current_user(request))
     except RuntimeError:
         # No event loop, create one
-        return asyncio.run(get_current_user(request))
+        try:
+            return asyncio.run(get_current_user(request))
+        except Exception:
+            return None
     except Exception:
         return None
 

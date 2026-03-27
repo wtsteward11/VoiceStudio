@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-project_root = Path(__file__).parent.parent.parent.parent.parent
+project_root = Path(__file__).resolve().parents[5]
 sys.path.insert(0, str(project_root))
 
 # Import the auth middleware

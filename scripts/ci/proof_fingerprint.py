@@ -121,6 +121,7 @@ EVIDENCE_FIELDS: dict[str, list[str]] = {
         "artifact_sha256",
         "stt_engine_name",
         "stt_step_ran",
+        "tts_engine_name",
     ],
     "PROOF_BACKEND_COLD_START": [
         "command",

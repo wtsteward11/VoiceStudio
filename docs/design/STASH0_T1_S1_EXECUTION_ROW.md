@@ -130,10 +130,10 @@ Run **after** the reconciled diff is merged to **`main`** (or on the PR verifica
 
 | Field | Value |
 |-------|--------|
-| **Quick** | *(e.g. `artifacts/verify/<run_id>` — **PASSED**)* |
-| **`latest_pointer.json` `commit_hash`** | *(implementation merge commit that passed **Quick**)* |
-| **`run_verification.py` `timestamp_short`** | *(from `.buildlogs/verification/last_run.json` when **STATE** synced)* |
-| **Notes** | *(selective checkout summary; any path dropped from stash delta; **stash@{0}** still parked?)* |
+| **Quick** | **`artifacts/verify/20260326_230934`** — **PASSED** (`verify.ps1 -Quick` on implementation tree) |
+| **`latest_pointer.json` `commit_hash`** | **`f60477978e72ad3bdbcfb2f2ba7e56c50ebc76c3`** |
+| **`run_verification.py` `timestamp_short`** | **`20260326-232319`** (verbatim from `.buildlogs/verification/last_run.json` — final **PASS** before freeze) |
+| **Notes** | Selective **`git checkout 'stash@{0}' --`** eight **§4** paths on branch **`stash0-t1-s1-01`**; no paths dropped; **`stash@{0}`** remains **parked**; **§5** pytest pair **PASS** (5 tests); **`dotnet build`** **0** errors. |
 
 ---
 
@@ -144,3 +144,4 @@ Run **after** the reconciled diff is merged to **`main`** (or on the PR verifica
 | 2026-03-24 | **Created** — **GOV-STASH0-T1-S1-01**; **§1 Pending**; eight-path lock aligned with preflight **T1-C1**. |
 | 2026-03-24 | **Sign-off readiness** — **§3** preflight table filled (`main` vs **`stash@{0}`**); all paths **Keep**; **§5.1** **Option A**; **§1** engineering row dated; **product** implementation row **Pending**. |
 | 2026-03-26 | **Implementation go** — **§1** product/engineering row dated; selective extract **§7** authorized. |
+| 2026-03-26 | **Closure** — **§8** filled; **`verify.ps1 -Quick`** **`20260326_230934`**; pointer **`f6047797`**; **`run_verification`** **`20260326-232319`**. |

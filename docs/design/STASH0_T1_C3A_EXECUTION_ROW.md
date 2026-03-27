@@ -4,8 +4,8 @@
 **Purpose:** Land **only** **`backend/api/rate_limiting.py`** and **`backend/api/rate_limiting_enhanced.py`** from **`stash@{0}`** per **[`GOV-STASH0-T1-C3-PREFLIGHT-01`](STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md)** **§5 Option A** (**C3a**) — **without** **`auth_middleware.py`**, **without** **`models_additional.py`**, **without** **T3** contracts, **without** bulk **`stash pop`**.  
 **Source stash:** *WIP: pre-Pass06-20260326 unclassified local and untracked*.  
 **Date (row drafted):** 2026-03-28  
-**Status:** **Open** — **§1** **implementation** **Go** **2026-03-28** — **§8** pending proof.  
-**§1 authorization:** **Engineering preflight** — **§3** complete **2026-03-28**. **Product / engineering (implementation)** — **Implementation authorized** **2026-03-28** — binding **go** for selective **`git checkout 'stash@{0}' --`** for **§4** only (**§7**); **§6 OUT** accepted; **§5** proof + **`verify.ps1 -Quick`** mandatory for closure.
+**Status:** **Closed (implementation + proof)** — **2026-03-28**  
+**§1 authorization:** **Engineering preflight** — **§3** complete **2026-03-28**. **Product / engineering (implementation)** — **Implementation authorized** **2026-03-28**; **§8** closure **2026-03-28** (merge **`ab52c3de`**).
 
 **Related:** [STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md](STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md) (**slice choice** **Option A**); [STASH0_T1_R1A_EXECUTION_ROW.md](STASH0_T1_R1A_EXECUTION_ROW.md) (**R1A** — **closed**); [`.cursor/STATE.md`](../../.cursor/STATE.md).
 
@@ -107,10 +107,10 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 
 | Field | Value |
 |-------|--------|
-| **Quick** | *(pending)* |
-| **`latest_pointer.json` `commit_hash`** | *(pending)* |
-| **`run_verification.py` `timestamp_short`** | *(verbatim `.buildlogs/verification/last_run.json`)* |
-| **Notes** | *(branch, merge, reconcile, pytest counts)* |
+| **Quick** | **`artifacts/verify/20260327_175838`** (**PASS**) |
+| **`latest_pointer.json` `commit_hash`** | **`ab52c3dee676f13b921e6e6b9cd31eb96b1f9f1a`** |
+| **`run_verification.py` `timestamp_short`** | **`20260327-180444`** (verbatim **`.buildlogs/verification/last_run.json`** — post-**§5** ladder **`20260327-180310`** from **Quick** gate/ledger; refreshed **`20260327-180444`** after **§8** / **STATE** / registry closure edits + **`python scripts/run_verification.py`**) |
+| **Notes** | Branch **`stash0-t1-c3a-01`**; selective **`git checkout 'stash@{0}' --`** **§4** only (**`rate_limiting.py`**, **`rate_limiting_enhanced.py`**); **Keep** stash semantics (localhost exempt when **`rate_limit_localhost_exempt`**, **`middleware_setup`** unchanged vs stash); **fast-forward** merged to **`main`** **`ab52c3de`**; **§5** **`pytest`** **4** passed, **1** skipped (**`test_rate_limiting_enhanced`** collection skip unchanged); **`dotnet build`** **0** errors; **`stash@{0}`** **unchanged**. |
 
 ---
 
@@ -120,3 +120,4 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 |------|--------|
 | 2026-03-28 | **Created** — **`GOV-STASH0-T1-C3A-EXEC-01`**; **§4** **two**-path **C3a** lock; **§1** implementation **Pending**. |
 | 2026-03-28 | **§1** **implementation** **Go**; **§3** note — governance **`run_verification`** stamp sync (**`20260327-170027`**). |
+| 2026-03-28 | **Closed** — **`stash0-t1-c3a-01`** → **`main`** **`ab52c3de`**; **Quick** **`20260327_175838`**; **`run_verification`** **`20260327-180444`** (final ledger sync post-**§8** doc); **§5** pytest **4** passed **1** skipped. |

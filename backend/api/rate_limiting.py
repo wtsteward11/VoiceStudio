@@ -117,10 +117,25 @@ training_rate_limiter = RateLimiter(
 )
 
 
+# Loopback hosts (desktop mode) - exempt when configured
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
 def rate_limit_middleware(request: Request, call_next):
     """Middleware to apply rate limiting."""
     # Skip rate limiting for health checks
     if request.url.path in ["/health", "/api/health", "/"]:
+        return call_next(request)
+
+    # Desktop mode: exempt localhost when configured (same as enhanced limiter)
+    client_host = request.client.host if request.client else ""
+    try:
+        from backend.core.settings import settings
+
+        localhost_exempt = getattr(settings, "rate_limit_localhost_exempt", True)
+    except ImportError:
+        localhost_exempt = True
+    if localhost_exempt and client_host in _LOOPBACK_HOSTS:
         return call_next(request)
 
     # Apply default rate limiting

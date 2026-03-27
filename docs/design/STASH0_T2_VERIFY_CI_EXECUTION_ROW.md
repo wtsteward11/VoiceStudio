@@ -116,7 +116,7 @@ Run after code lands on **`main`** (from **§3** selective checkout or full stas
 |-------|------------------|
 | **Quick** | **`artifacts/verify/20260326_211554`** (**PASSED**; post-merge tree). |
 | **`latest_pointer.json` `commit_hash`** | **`dc07e51597e42bac294899dcaf123339e63ccbbc`** (merge **T2** into **`main`**; pointer aligned by **`verify.ps1 -Quick`**). |
-| **Notes** | **`python scripts/run_verification.py`** **ALL PASS** — **`20260326-212656`** (**post–§8** **STATE**/**registry** sync on machine that ran closure). T2 applied via **`stash0-t2-verify-01`** selective **`git checkout 'stash@{0}' -- <six paths>`**; **`stash@{0}`** retained for **T1/T3/T4**. |
+| **Notes** | **`python scripts/run_verification.py`** **ALL PASS** — **`20260326-212909`** (**post–§8** **STATE**/**registry** sync on machine that ran closure). T2 applied via **`stash0-t2-verify-01`** selective **`git checkout 'stash@{0}' -- <six paths>`**; **`stash@{0}`** retained for **T1/T3/T4**. |
 
 ---
 

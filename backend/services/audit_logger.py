@@ -100,10 +100,22 @@ class AuditLogger:
 
         self._current_file: Path | None = None
         self._current_count = 0
-        self._write_queue: asyncio.Queue[Any] = asyncio.Queue()
+        self._write_queue: asyncio.Queue[Any] | None = None  # Lazy: created in async context only
         self._writer_task: asyncio.Task[None] | None = None
-        self._lock = asyncio.Lock()
+        self._lock: asyncio.Lock | None = None  # Lazy: created in async context only
         self._running = False
+
+    def _get_lock(self) -> asyncio.Lock:
+        """Get or create the async lock. Must be called from an async context."""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
+
+    def _get_write_queue(self) -> asyncio.Queue[Any]:
+        """Get or create the write queue. Must be called from an async context."""
+        if self._write_queue is None:
+            self._write_queue = asyncio.Queue()
+        return self._write_queue
 
     async def start(self) -> None:
         """Start the audit logger."""
@@ -115,7 +127,7 @@ class AuditLogger:
     async def stop(self) -> None:
         """Stop the audit logger."""
         self._running = False
-        if self._writer_task:
+        if self._writer_task and self._write_queue is not None:
             # Flush remaining entries
             while not self._write_queue.empty():
                 await asyncio.sleep(0.1)
@@ -128,7 +140,7 @@ class AuditLogger:
         """Background writer loop for async writes."""
         while self._running:
             try:
-                entry = await asyncio.wait_for(self._write_queue.get(), timeout=1.0)
+                entry = await asyncio.wait_for(self._get_write_queue().get(), timeout=1.0)
                 await self._write_entry(entry)
             except asyncio.TimeoutError:
                 continue
@@ -225,7 +237,7 @@ class AuditLogger:
         )
 
         if self.config.async_writes:
-            await self._write_queue.put(entry)
+            await self._get_write_queue().put(entry)
         else:
             await self._write_entry(entry)
 
@@ -233,7 +245,7 @@ class AuditLogger:
 
     async def _write_entry(self, entry: AuditEntry) -> None:
         """Write entry to storage."""
-        async with self._lock:
+        async with self._get_lock():
             file_path = self._get_current_file()
 
             entry_dict = {
@@ -459,7 +471,7 @@ class AuditLogger:
             "total_size_mb": round(total_size / 1e6, 2),
             "retention_days": self.config.retention_days,
             "async_writes": self.config.async_writes,
-            "queue_size": self._write_queue.qsize() if self.config.async_writes else 0,
+            "queue_size": (self._write_queue.qsize() if self._write_queue is not None else 0) if self.config.async_writes else 0,
         }
 
 

@@ -167,7 +167,7 @@ def _search_audio_files(query: str, limit: int = 10) -> list[SearchResultItem]:
                     type="audio",
                     title=filename,
                     description=None,
-                    panel_id="timeline",
+                    panel_id="library",
                     preview=f"Audio file: {filename}",
                     metadata={"path": audio_path},
                 )

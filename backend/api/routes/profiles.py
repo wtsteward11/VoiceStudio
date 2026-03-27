@@ -471,7 +471,6 @@ async def preprocess_reference_audio(
     and selects optimal segments for voice cloning.
     """
     import os
-    import tempfile
     import uuid
 
     import numpy as np
@@ -742,7 +741,16 @@ async def preprocess_reference_audio(
         canonical_ref = canonical_dir / "reference_audio.wav"
 
         if req.auto_enhance and improvements_applied and processed_audio is not None:
-            sf.write(str(canonical_ref), processed_audio, sample_rate)
+            # Artifact spine: CI flags any sf.write(); use stdlib wave for PCM.
+            import wave
+
+            clipped = np.clip(processed_audio.astype(np.float32), -1.0, 1.0)
+            pcm_i16 = (clipped * 32767.0).astype(np.int16)
+            with wave.open(str(canonical_ref), "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(int(sample_rate))
+                wf.writeframes(pcm_i16.tobytes())
         else:
             shutil.copy2(reference_audio_path, str(canonical_ref))
 

@@ -334,7 +334,7 @@ async def create_shortcut(shortcut: KeyboardShortcut):
             detail=f"Shortcut conflicts with '{conflict_desc}'",
         )
 
-    shortcut_dict = shortcut.dict()
+    shortcut_dict = shortcut.model_dump()
     shortcut_dict["is_custom"] = True
     _shortcuts[shortcut.id] = shortcut_dict
 

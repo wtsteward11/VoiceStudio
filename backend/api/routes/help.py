@@ -347,7 +347,7 @@ async def get_help_topic(topic_id: str):
 @router.post("/topics", response_model=HelpTopic)
 async def create_help_topic(topic: HelpTopic):
     """Create or update a help topic."""
-    _help_topics[topic.id] = topic.dict()
+    _help_topics[topic.id] = topic.model_dump()
     _save_help_data()
     return topic
 
@@ -361,7 +361,7 @@ async def update_help_topic(topic_id: str, topic: HelpTopic):
     if topic_id not in _help_topics:
         raise HTTPException(status_code=404, detail="Help topic not found")
 
-    _help_topics[topic_id] = topic.dict()
+    _help_topics[topic_id] = topic.model_dump()
     _save_help_data()
     return topic
 
@@ -380,7 +380,7 @@ async def delete_help_topic(topic_id: str):
 @router.post("/shortcuts", response_model=KeyboardShortcut)
 async def create_keyboard_shortcut(shortcut: KeyboardShortcut):
     """Create or update a keyboard shortcut."""
-    _keyboard_shortcuts[shortcut.key] = shortcut.dict()
+    _keyboard_shortcuts[shortcut.key] = shortcut.model_dump()
     _save_help_data()
     return shortcut
 
@@ -394,7 +394,7 @@ async def update_keyboard_shortcut(key: str, shortcut: KeyboardShortcut):
     if key not in _keyboard_shortcuts:
         raise HTTPException(status_code=404, detail="Keyboard shortcut not found")
 
-    _keyboard_shortcuts[key] = shortcut.dict()
+    _keyboard_shortcuts[key] = shortcut.model_dump()
     _save_help_data()
     return shortcut
 

@@ -11,7 +11,7 @@ import logging
 from enum import Enum
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +95,8 @@ class RealtimeSettings(BaseModel):
         description="Normalize output audio levels",
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "quality_mode": "balanced",
                 "chunk_size": 1024,
@@ -110,6 +110,7 @@ class RealtimeSettings(BaseModel):
                 "normalize_output": True,
             }
         }
+    )
 
 
 class QualityModeInfo(BaseModel):

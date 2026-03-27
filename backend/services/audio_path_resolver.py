@@ -50,6 +50,13 @@ def resolve_audio_path(audio_id: str) -> str | None:
         if os.path.exists(original_path):
             return original_path
 
+    # 2b. Library upload root (library import stores at audio_uploads/{file_id}.wav)
+    upload_root = str(upload_base)
+    for ext in [".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac"]:
+        root_path = os.path.join(upload_root, f"{audio_id}{ext}")
+        if os.path.exists(root_path):
+            return root_path
+
     # 3. Project audio (path_config-backed)
     projects_dir = get_path("data") / "projects"
     if projects_dir.exists():

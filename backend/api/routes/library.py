@@ -74,6 +74,8 @@ class LibraryAsset(BaseModel):
     size: int = 0
     duration: float | None = None  # For audio/video
     thumbnail_url: str | None = None
+    # First-class playback ID: backend-playable audio_id (preferred over metadata.upload_id)
+    audio_id: str | None = None
 
 
 class LibraryFolder(BaseModel):
@@ -127,6 +129,12 @@ def _entity_to_asset(entity: LibraryAssetEntity) -> LibraryAsset:
         logger.debug(f"Failed to parse metadata JSON for entity {entity.id}: {e}")
         metadata = {}
 
+    audio_id: str | None = None
+    if isinstance(metadata.get("upload_id"), str):
+        audio_id = metadata["upload_id"]
+    elif metadata.get("upload_id") is not None:
+        audio_id = str(metadata["upload_id"])
+
     return LibraryAsset(
         id=entity.id,
         name=entity.name,
@@ -140,6 +148,7 @@ def _entity_to_asset(entity: LibraryAssetEntity) -> LibraryAsset:
         size=entity.size or 0,
         duration=entity.duration,
         thumbnail_url=entity.thumbnail_url,
+        audio_id=audio_id,
     )
 
 

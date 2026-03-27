@@ -4,7 +4,8 @@
 **Purpose:** Land **only** the **narrow T1-C2** remainder from **`stash@{0}`** per **[`GOV-STASH0-T1-R1-PREFLIGHT-01`](STASH0_T1_R1_PREFLIGHT_EXECUTION_ROW.md)** **§5 Option A** — ancillary HTTP routes, **`route_registry`**, and helper services **listed in §4** — **without** **`v3/models.py`** / **`v3/projects.py`**, **without** **T1-C3** cross-cutting, **without** **T3** contracts, and **without** bulk **`stash pop`**.  
 **Source stash:** *WIP: pre-Pass06-20260326 unclassified local and untracked*.  
 **Date (row drafted):** 2026-03-27  
-**§1 authorization:** **Engineering preflight** — **§3** complete **2026-03-27**. **Product / engineering (implementation)** — **Authorized** **2026-03-28** (selective extract **§7**, **§6 OUT** binding, **§5** + **Quick** closure).
+**Status:** **Closed (implementation + proof)** — **2026-03-27**  
+**§1 authorization:** **Engineering preflight** — **§3** complete **2026-03-27**. **Product / engineering (implementation)** — **Authorized** **2026-03-28**; **§8** closure **2026-03-27** (merge **`0e0d0a91`**).
 
 **Related:** [STASH0_T1_R1_PREFLIGHT_EXECUTION_ROW.md](STASH0_T1_R1_PREFLIGHT_EXECUTION_ROW.md) (**slice choice** **Option A**); [STASH0_T1_S1_EXECUTION_ROW.md](STASH0_T1_S1_EXECUTION_ROW.md) (**T1-S1** — **closed**); [`.cursor/STATE.md`](../../.cursor/STATE.md).
 
@@ -129,10 +130,10 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 
 | Field | Value |
 |-------|--------|
-| **Quick** | *(TBD — `verify.ps1 -Quick` artifact dir on implementation tree)* |
-| **`latest_pointer.json` `commit_hash`** | *(TBD)* |
-| **`run_verification.py` `timestamp_short`** | *(TBD — verbatim from `.buildlogs` after the run that justifies **STATE**/registry edits)* |
-| **Notes** | *(TBD)* |
+| **Quick** | **`artifacts/verify/20260327_165459`** (**PASSED**; **`verify.ps1 -Quick`** on **`main`** merge tree **`0e0d0a91`**) |
+| **`latest_pointer.json` `commit_hash`** | **`0e0d0a91b826dc70aff2ffdbb0432f9dff3fdac7`** |
+| **`run_verification.py` `timestamp_short`** | **`20260327-170011`** (verbatim **`.buildlogs/verification/last_run.json`** after post-Quick **`python scripts/run_verification.py`**) |
+| **Notes** | Branch **`stash0-t1-r1a-01`** → fast-forward **`main`**. Selective **`git checkout 'stash@{0}' --`** all **§4** paths; **Partial reconcile:** **`backend/services/script_store.py`** and **`backend/api/route_registry.py`** left at **`main`** — stash versions referenced missing **`backend.services.script_repository`** and registered **`script_editor`** while live module is under **`backend.api.routes._archived.script_editor`**. **Keep** (stash): **help**, **library**, **profiles**, **realtime_settings**, **search**, **shortcuts**, **audio_path_resolver**, **audit_logger**. **§5** **`pytest`**: **74** passed, **2** skipped; **`dotnet build`** **0** errors; **`stash@{0}`** **retained**. |
 
 ---
 
@@ -143,3 +144,4 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 | 2026-03-27 | **Created** — **`GOV-STASH0-T1-R1A-EXEC-01`**; **§4** ten-path **Option A** lock; **§1** implementation **Pending**. |
 | 2026-03-27 | **Governance sync** — [`.cursor/STATE.md`](../../.cursor/STATE.md) **ACTIVE WINDOW** + [`CANONICAL_REGISTRY.md`](../governance/CANONICAL_REGISTRY.md) row; **§5** pytest subset on **`main`** (**74** passed, **2** skipped) — counts **re-verified** same day. |
 | 2026-03-27 | **Plan completion** — **§3** **`main`** tip refreshed (**`8d4a2cc6`**); **sign-off readiness gates** table; **§5.2** coverage honesty for **`script_store`** / **`audio_path_resolver`**; **§5** expected counts aligned to observed **`pytest`** run. |
+| 2026-03-27 | **Closed** — **`stash0-t1-r1a-01`** merged **`main`** (**`0e0d0a91`**); **§8** filled; **Quick** **`20260327_165459`**; **`run_verification`** **`20260327-170011`**; **Partial** on **`script_store`** + **`route_registry`**. |

@@ -108,7 +108,7 @@ Unless a **new** signed row explicitly expands scope:
 |------|-------|--------|
 | 1 | Engineering | **Done** **2026-03-28** — **§1** engineering preflight dated; **§4** verified on **`37fb89e6`**. |
 | 2 | Product | **Done** **2026-03-28** — **§5 Option A** (**C3a**). |
-| 3 | Overseer / engineer | **Done** **2026-03-28** — **[`STASH0_T1_C3A_EXECUTION_ROW.md`](STASH0_T1_C3A_EXECUTION_ROW.md)** (**`GOV-STASH0-T1-C3A-EXEC-01`**). **Next:** date **implementation §1** on **that** row before extract. |
+| 3 | Overseer / engineer | **Done** **2026-03-28** — **[`STASH0_T1_C3A_EXECUTION_ROW.md`](STASH0_T1_C3A_EXECUTION_ROW.md)** (**`GOV-STASH0-T1-C3A-EXEC-01`**) **closed**. **Next:** **[`STASH0_T1_C3B_EXECUTION_ROW.md`](STASH0_T1_C3B_EXECUTION_ROW.md)** (**`GOV-STASH0-T1-C3B-EXEC-01`**) — date **implementation §1** before extract. |
 | 4 | — | **No** `backend/**` / **`app/core/**`** code under **`GOV-STASH0-T1-C3-PREFLIGHT-01`**. |
 
 ---
@@ -129,3 +129,4 @@ Unless a **new** signed row explicitly expands scope:
 |------|--------|
 | 2026-03-28 | **Created** — **`GOV-STASH0-T1-C3-PREFLIGHT-01`**: post–**R1A** **T1-C3** re-baseline; **§1** product slice **Pending**; child execution row **deferred**. |
 | 2026-03-28 | **§1 slice choice** — **Option A** (**C3a**); child execution row **[`GOV-STASH0-T1-C3A-EXEC-01`](STASH0_T1_C3A_EXECUTION_ROW.md)** drafted; **implementation** sign-off **on child row** still **Pending**. |
+| 2026-03-28 | **Child** **[`GOV-STASH0-T1-C3B-EXEC-01`](STASH0_T1_C3B_EXECUTION_ROW.md)** (**C3b**) **drafted** — **§5 Option B**; **§1** implementation **Pending** on **child** row (not this preflight). |

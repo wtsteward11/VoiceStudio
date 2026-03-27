@@ -1,0 +1,123 @@
+# stash@{0} — T1-C3b — auth middleware (narrow) — execution row
+
+**Row ID:** **GOV-STASH0-T1-C3B-EXEC-01**  
+**Purpose:** Land **only** **`backend/api/middleware/auth_middleware.py`** and **`tests/unit/backend/api/middleware/test_auth_middleware.py`** from **`stash@{0}`** per **[`GOV-STASH0-T1-C3-PREFLIGHT-01`](STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md)** **§5 Option B** (**C3b**) — **without** **`models_additional.py`**, **without** **C3a** stash re-checkout (**`rate_limiting*.py`** already on **`main`**), **without** **T3** contracts, **without** bulk **`stash pop`**.  
+**Source stash:** *WIP: pre-Pass06-20260326 unclassified local and untracked*.  
+**Date (row drafted):** 2026-03-28  
+**Status:** **Open** — **§1** **implementation** **Pending**.  
+**§1 authorization:** **Engineering preflight** — **§3** complete **2026-03-28**. **Product / engineering (implementation)** — **Pending** until binding **go** for selective **`git checkout 'stash@{0}' --`** for **§4** only.
+
+**Related:** [STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md](STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md) (**§5 Option B** / **C3b**); [STASH0_T1_C3A_EXECUTION_ROW.md](STASH0_T1_C3A_EXECUTION_ROW.md) (**C3a** — **closed**); [`.cursor/STATE.md`](../../.cursor/STATE.md).
+
+---
+
+## 1. Sign-off
+
+| Role | Decision | Date |
+|------|----------|------|
+| **Engineering (preflight)** | **Preflight complete** — **§3** filled from **`main`** **`cc889705accb4bba3c084f3244900099d53befa2`** vs **`stash@{0}`**; **`git merge-base main 'stash@{0}'`** **`a7a45f4cc2e8e81671eefffe885df3a86227b10a`**; **§4** both paths **non-empty**; top **`stash@{0}`** message matches STATE. Re-run **§3** before extract if **`main`** or **`stash@{0}`** moves. | **2026-03-28** |
+| **Product / engineering (implementation)** | **Pending** — binding **go** to selective **`git checkout 'stash@{0}' --`** for **§4** only (**§7**); **§6 OUT** accepted; **§5** proof + **`verify.ps1 -Quick`** mandatory for closure. | — |
+
+---
+
+## 2. Objective (single sentence)
+
+Reconcile and land **only** the **auth middleware + companion unit test** deltas in **§4** from **`stash@{0}`** onto **`main`**, preserving **`require_auth_if_enabled`** / **`require_authentication`** contracts for route dependencies—**without** **`models_additional`** (**C3c** / **T3** bleed), **without** re-checking out **C3a** rate-limit files from stash, and **without** OpenAPI or shared-schema churn (**T3**).
+
+**Narrowing rule:** If **§3** shows a **§4** path **empty** vs **`stash@{0}`**, **stop** and update **§3** + **§1** re-acknowledgment before extract.
+
+**Coupling note:** Routes import **`require_auth_if_enabled`** from [`backend/api/middleware/auth_middleware.py`](../../backend/api/middleware/auth_middleware.py); some modules use **`backend.api.auth`** re-exports — reconcile must not break public dependency signatures. **C3a** vs **C3b** remain separable for **`middleware_setup`** registration per parent preflight **§4.2**; still verify anonymous vs authenticated paths vs rate limiter behavior after merge (**§8 Notes**).
+
+---
+
+## 3. Preflight — `git diff main 'stash@{0}' -- <path>`
+
+**Recorded** **`main`** @ **`cc889705accb4bba3c084f3244900099d53befa2`** (**re-verify** with **`git rev-parse HEAD`** before relying on hashes). **`git merge-base main 'stash@{0}'`** = **`a7a45f4cc2e8e81671eefffe885df3a86227b10a`**.
+
+**Sign-off readiness gates**
+
+| Gate | Must be |
+|------|---------|
+| **Single slice?** | **Yes** — **C3b** only (**two** files); **not** **C3c** / **T1-C4** tests / **C3a** stash re-checkout. |
+| **Obsolete vs `main`?** | Each **§4** row **non-empty** vs **`stash@{0}`** (or **Drop** with **§1** re-ack). |
+| **C3a already landed?** | **`rate_limiting.py`** / **`rate_limiting_enhanced.py`** — **on `main`** via **[`GOV-STASH0-T1-C3A-EXEC-01`](STASH0_T1_C3A_EXECUTION_ROW.md)**; **do not** **`stash@{0}`** checkout those paths in this row. |
+
+| Path | Stat (`git diff --shortstat`) | Decision |
+|------|-------------------------------|----------|
+| `backend/api/middleware/auth_middleware.py` | 1 file changed, 4 insertions(+), 1 deletion(-) | **Keep** — auth dependencies / middleware behavior. |
+| `tests/unit/backend/api/middleware/test_auth_middleware.py` | 1 file changed, 62 insertions(+), 53 deletions(-) | **Keep** — companion tests; **Partial** if **`main`** test intent conflicts. |
+
+---
+
+## 4. File lock (IN)
+
+**Exactly** these **two** paths. **No** additions without a **new** row ID.
+
+| Path |
+|------|
+| `backend/api/middleware/auth_middleware.py` |
+| `tests/unit/backend/api/middleware/test_auth_middleware.py` |
+
+---
+
+## 5. Proof commands (post-implementation)
+
+Run **after** reconciled diff is on the branch that will merge to **`main`** (or PR verification tree).
+
+| # | Command | Expected |
+|---|---------|----------|
+| 1 | `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` | **0** errors |
+| 2 | `python -m pytest tests/unit/backend/api/middleware/test_auth_middleware.py -q --tb=line` | **PASS** — record **exact** passed/skipped/failed in **§8** at closure. |
+| 3 | `python scripts/run_verification.py` | **ALL PASS**; if updating **STATE** / registry proof lines, copy **`timestamp_short`** **verbatim** from `.buildlogs/verification/last_run.json` |
+| 4 | `.\scripts\verify.ps1 -Quick` | **PASS** — **mandatory** for **closure**; advances **`artifacts/verify/latest_pointer.json`** only on **PASSED** **Quick** for the **implementation** commit tree |
+
+### 5.1 Coverage honesty
+
+- **Direct:** frozen **§5** **#2** exercises **`auth_middleware`** via **`test_auth_middleware`**.
+- **Indirect:** broader security / route matrix suites are **not** in the frozen **§5** subset — **Quick** + **§5** **#2** are the **primary** regression signal for this row. Expanding **§5** requires **§4** expansion + **§1** re-sign.
+
+---
+
+## 6. OUT (strict)
+
+| # | OUT |
+|---|-----|
+| 1 | **`backend/api/rate_limiting.py`**, **`backend/api/rate_limiting_enhanced.py`** — **C3a**; **already on `main`**; **no** **`stash@{0}`** checkout in this row. |
+| 2 | **`backend/api/models_additional.py`**, **`tests/unit/backend/api/test_models_additional.py`** — **C3c** / **T3**-adjacent; **new** row. |
+| 3 | **`docs/api/openapi.json`**, **`shared/schemas/**`**, **`tests/contract/**`** — **T3**; joint row only. |
+| 4 | **`backend/api/v3/models.py`**, **`backend/api/v3/projects.py`**, **R1A** ancillary paths, **`app/core/**`**, **`src/VoiceStudio.App/**`**. |
+| 5 | **T1-C4** stash test checkouts — **no** **`stash@{0}`** checkout of **`test_synthesis_policy.py`** / **`test_golden_loop_smoke.py`** unless **§4** expands under **new** **§1**. |
+| 6 | **`backend/mcp_bridge/README.md`**, **`backend/plugins/sandbox/resource_monitor.py`**, **T5** `LibraryView.xaml.cs`, **T4** sweeps except minimal **STATE**/registry **after** proof. |
+| 7 | Mining **`stash@{0}`** outside **§4**; **`git stash pop`**. |
+| 8 | Reopening **W8 / W7 / Product Trust / A4 / Pass 06** under this banner. |
+
+---
+
+## 7. Execution sequence (extraction — **after** implementation **§1** dated)
+
+1. **`git stash list`** — confirm **`stash@{0}`** matches [`.cursor/STATE.md`](../../.cursor/STATE.md).  
+2. **`git switch -c stash0-t1-c3b-01 main`** (name per team convention).  
+3. **`git checkout 'stash@{0}' -- backend/api/middleware/auth_middleware.py tests/unit/backend/api/middleware/test_auth_middleware.py`** (PowerShell-quoted **`stash@{0}`**).
+
+**Do not** use **`git stash pop`**.
+
+**Reconcile** each file: **Keep** / **Partial** / **Drop** (see **§2**).
+
+---
+
+## 8. Closure record (fill after proof only)
+
+| Field | Value |
+|-------|--------|
+| **Quick** | *(pending)* |
+| **`latest_pointer.json` `commit_hash`** | *(pending)* |
+| **`run_verification.py` `timestamp_short`** | *(verbatim `.buildlogs/verification/last_run.json`)* |
+| **Notes** | *(branch, merge, reconcile, pytest counts)* |
+
+---
+
+## Changelog
+
+| Date | Change |
+|------|--------|
+| 2026-03-28 | **Created** — **`GOV-STASH0-T1-C3B-EXEC-01`**; **§4** **two**-path **C3b** lock (auth + companion test); **§1** implementation **Pending**. |

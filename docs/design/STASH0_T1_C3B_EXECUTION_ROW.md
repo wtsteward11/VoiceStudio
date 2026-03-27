@@ -4,8 +4,8 @@
 **Purpose:** Land **only** **`backend/api/middleware/auth_middleware.py`** and **`tests/unit/backend/api/middleware/test_auth_middleware.py`** from **`stash@{0}`** per **[`GOV-STASH0-T1-C3-PREFLIGHT-01`](STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md)** **§5 Option B** (**C3b**) — **without** **`models_additional.py`**, **without** **C3a** stash re-checkout (**`rate_limiting*.py`** already on **`main`**), **without** **T3** contracts, **without** bulk **`stash pop`**.  
 **Source stash:** *WIP: pre-Pass06-20260326 unclassified local and untracked*.  
 **Date (row drafted):** 2026-03-28  
-**Status:** **Open** — **§1** **implementation** **Go** **2026-03-28** — **§8** pending proof.  
-**§1 authorization:** **Engineering preflight** — **§3** complete **2026-03-28**. **Product / engineering (implementation)** — **Implementation authorized** **2026-03-28** — binding **go** for selective **`git checkout 'stash@{0}' --`** for **§4** only (**§7**); **§6 OUT** accepted; **§5** proof + **`verify.ps1 -Quick`** mandatory for closure.
+**Status:** **Closed (implementation + proof)** — **2026-03-28**  
+**§1 authorization:** **Engineering preflight** — **§3** complete **2026-03-28**. **Product / engineering (implementation)** — **Implementation authorized** **2026-03-28**; **§8** closure **2026-03-28** (merge **`9f550a0f`** test-path fix; **Quick** pointer **`9f550a0f`**).
 
 **Related:** [STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md](STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md) (**§5 Option B** / **C3b**); [STASH0_T1_C3A_EXECUTION_ROW.md](STASH0_T1_C3A_EXECUTION_ROW.md) (**C3a** — **closed**); [`.cursor/STATE.md`](../../.cursor/STATE.md).
 
@@ -67,7 +67,7 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 | # | Command | Expected |
 |---|---------|----------|
 | 1 | `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` | **0** errors |
-| 2 | `python -m pytest tests/unit/backend/api/middleware/test_auth_middleware.py -q --tb=line` | **PASS** — record **exact** passed/skipped/failed in **§8** at closure. |
+| 2 | `python -m pytest tests/unit/backend/api/middleware/test_auth_middleware.py -q --tb=line` | **PASS** — **closure** **2026-03-28**: **24** passed, **0** skipped (after **`project_root`** fix — see **§8 Notes**). |
 | 3 | `python scripts/run_verification.py` | **ALL PASS**; if updating **STATE** / registry proof lines, copy **`timestamp_short`** **verbatim** from `.buildlogs/verification/last_run.json` |
 | 4 | `.\scripts\verify.ps1 -Quick` | **PASS** — **mandatory** for **closure**; advances **`artifacts/verify/latest_pointer.json`** only on **PASSED** **Quick** for the **implementation** commit tree |
 
@@ -109,10 +109,10 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 
 | Field | Value |
 |-------|--------|
-| **Quick** | *(pending)* |
-| **`latest_pointer.json` `commit_hash`** | *(pending)* |
-| **`run_verification.py` `timestamp_short`** | *(verbatim `.buildlogs/verification/last_run.json`)* |
-| **Notes** | *(branch, merge, reconcile, pytest counts)* |
+| **Quick** | **`artifacts/verify/20260327_182409`** (**PASS**) |
+| **`latest_pointer.json` `commit_hash`** | **`9f550a0f32a9039064677abcfe1c8d18b2ba735c`** |
+| **`run_verification.py` `timestamp_short`** | **`20260327-182920`** (verbatim **`.buildlogs/verification/last_run.json`** after **§5** ladder — **Quick** gate/ledger stage) |
+| **Notes** | Branch **`stash0-t1-c3b-01`**; selective **`git checkout 'stash@{0}' --`** **§4** only; **Keep** stash **`auth_middleware`** **`get_optional_user`** **`asyncio.run`** try/except + test **AsyncMock** patches; **reconcile:** **`test_auth_middleware.py`** **`project_root`** — **`Path(__file__).resolve().parents[5]`** (root cause: prior path stopped at **`tests/`**, module skipped at import); **fast-forward** merged to **`main`**; **feat** **`23aa2902`** + **governance** **`d639d77f`** + **`fix(test)`** **`9f550a0f`**; **§5** pytest **24** passed; **`dotnet build`** **0** errors; **`stash@{0}`** **unchanged**. |
 
 ---
 
@@ -122,3 +122,4 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 |------|--------|
 | 2026-03-28 | **Created** — **`GOV-STASH0-T1-C3B-EXEC-01`**; **§4** **two**-path **C3b** lock (auth + companion test); **§1** implementation **Pending**. |
 | 2026-03-28 | **§1** **implementation** **Go** — selective extract authorized. |
+| 2026-03-28 | **Closed** — **`stash0-t1-c3b-01`** → **`main`**; **Quick** **`20260327_182409`**; **`run_verification`** **`20260327-182920`**; **§5** pytest **24** passed; **`fix(test)`** **`project_root`** on **`test_auth_middleware.py`**. |

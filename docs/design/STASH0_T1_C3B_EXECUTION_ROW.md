@@ -4,8 +4,8 @@
 **Purpose:** Land **only** **`backend/api/middleware/auth_middleware.py`** and **`tests/unit/backend/api/middleware/test_auth_middleware.py`** from **`stash@{0}`** per **[`GOV-STASH0-T1-C3-PREFLIGHT-01`](STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md)** **§5 Option B** (**C3b**) — **without** **`models_additional.py`**, **without** **C3a** stash re-checkout (**`rate_limiting*.py`** already on **`main`**), **without** **T3** contracts, **without** bulk **`stash pop`**.  
 **Source stash:** *WIP: pre-Pass06-20260326 unclassified local and untracked*.  
 **Date (row drafted):** 2026-03-28  
-**Status:** **Open** — **§1** **implementation** **Pending**.  
-**§1 authorization:** **Engineering preflight** — **§3** complete **2026-03-28**. **Product / engineering (implementation)** — **Pending** until binding **go** for selective **`git checkout 'stash@{0}' --`** for **§4** only.
+**Status:** **Open** — **§1** **implementation** **Go** **2026-03-28** — **§8** pending proof.  
+**§1 authorization:** **Engineering preflight** — **§3** complete **2026-03-28**. **Product / engineering (implementation)** — **Implementation authorized** **2026-03-28** — binding **go** for selective **`git checkout 'stash@{0}' --`** for **§4** only (**§7**); **§6 OUT** accepted; **§5** proof + **`verify.ps1 -Quick`** mandatory for closure.
 
 **Related:** [STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md](STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md) (**§5 Option B** / **C3b**); [STASH0_T1_C3A_EXECUTION_ROW.md](STASH0_T1_C3A_EXECUTION_ROW.md) (**C3a** — **closed**); [`.cursor/STATE.md`](../../.cursor/STATE.md).
 
@@ -16,7 +16,7 @@
 | Role | Decision | Date |
 |------|----------|------|
 | **Engineering (preflight)** | **Preflight complete** — **§3** filled from **`main`** **`cc889705accb4bba3c084f3244900099d53befa2`** vs **`stash@{0}`**; **`git merge-base main 'stash@{0}'`** **`a7a45f4cc2e8e81671eefffe885df3a86227b10a`**; **§4** both paths **non-empty**; top **`stash@{0}`** message matches STATE. Re-run **§3** before extract if **`main`** or **`stash@{0}`** moves. | **2026-03-28** |
-| **Product / engineering (implementation)** | **Pending** — binding **go** to selective **`git checkout 'stash@{0}' --`** for **§4** only (**§7**); **§6 OUT** accepted; **§5** proof + **`verify.ps1 -Quick`** mandatory for closure. | — |
+| **Product / engineering (implementation)** | **Implementation authorized** — Binding **go** to selective **`git checkout 'stash@{0}' --`** for **§4** only (**§7**); reconcile **`backend/**` / tests under lock; **§6 OUT** accepted; **§5** proof + **`verify.ps1 -Quick`** mandatory for closure. **Pre-extract** **2026-03-28**: **`stash@{0}`** message matches STATE; **`main`** **`cc889705`**; **§4** paths **non-empty** vs **`stash@{0}`**. | **2026-03-28** |
 
 ---
 
@@ -121,3 +121,4 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 | Date | Change |
 |------|--------|
 | 2026-03-28 | **Created** — **`GOV-STASH0-T1-C3B-EXEC-01`**; **§4** **two**-path **C3b** lock (auth + companion test); **§1** implementation **Pending**. |
+| 2026-03-28 | **§1** **implementation** **Go** — selective extract authorized. |

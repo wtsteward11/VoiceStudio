@@ -12,7 +12,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .models import (
     StandardResponse,
@@ -52,8 +52,8 @@ class VoiceProfile(BaseModel):
     engine_id: str | None = None
     created_at: str | None = None
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "voice_abc123",
                 "name": "Professional Male",
@@ -65,6 +65,7 @@ class VoiceProfile(BaseModel):
                 "is_custom": False,
             }
         }
+    )
 
 
 class VoiceListResponse(BaseModel):

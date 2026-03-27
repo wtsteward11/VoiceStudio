@@ -24,14 +24,18 @@ from typing import Any
 from pydantic import Field
 
 BaseSettings: Any = None
+SettingsConfigDict: Any = None
 try:
     from pydantic_settings import BaseSettings as _BS
+    from pydantic_settings import SettingsConfigDict as _SCD
 
     BaseSettings = _BS
+    SettingsConfigDict = _SCD
 except ImportError:
     from pydantic import BaseSettings as _BS2
 
     BaseSettings = _BS2
+    SettingsConfigDict = None
 
 
 class VoiceStudioSettings(BaseSettings):
@@ -96,11 +100,21 @@ class VoiceStudioSettings(BaseSettings):
         default="*", description="Comma-separated list of allowed CORS origins"
     )
 
-    class Config:
-        env_prefix = "VOICESTUDIO_"
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = (
+        SettingsConfigDict(
+            env_prefix="VOICESTUDIO_",
+            env_file=".env",
+            env_file_encoding="utf-8",
+            case_sensitive=False,
+        )
+        if SettingsConfigDict is not None
+        else {
+            "env_prefix": "VOICESTUDIO_",
+            "env_file": ".env",
+            "env_file_encoding": "utf-8",
+            "case_sensitive": False,
+        }
+    )
 
     @property
     def hf_cache_path(self) -> Path:

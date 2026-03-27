@@ -13,7 +13,7 @@ from enum import Enum
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from backend.ml.models.engine_service import IEngineService, get_engine_service
 
@@ -68,8 +68,8 @@ class SynthesisRequest(BaseModel):
     speed: float = Field(default=1.0, ge=0.5, le=2.0, description="Speech speed multiplier")
     pitch: float = Field(default=1.0, ge=0.5, le=2.0, description="Pitch multiplier")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "text": "Hello, this is a test synthesis.",
                 "engine_id": "xtts_v2",
@@ -81,6 +81,7 @@ class SynthesisRequest(BaseModel):
                 "streaming": False,
             }
         }
+    )
 
 
 class SynthesisResponse(BaseModel):
@@ -94,8 +95,8 @@ class SynthesisResponse(BaseModel):
     engine_used: str
     processing_time_ms: float | None = None
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "job_id": "syn_abc123",
                 "status": "completed",
@@ -106,6 +107,7 @@ class SynthesisResponse(BaseModel):
                 "processing_time_ms": 450.5,
             }
         }
+    )
 
 
 class BatchSynthesisRequest(BaseModel):

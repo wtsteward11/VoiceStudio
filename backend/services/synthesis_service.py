@@ -32,6 +32,13 @@ from backend.services.voice_helpers import (
 
 logger = logging.getLogger(__name__)
 
+
+def _is_voice_studio_stub_test_mode() -> bool:
+    """True when CI/stub runs must not load real TTS engines (golden-loop smoke, integration)."""
+    v = os.environ.get("VOICESTUDIO_TEST_MODE", "").strip().lower()
+    return v in ("1", "true", "yes", "stub")
+
+
 # Quality optimization
 HAS_QUALITY_OPTIMIZATION = False
 try:
@@ -336,34 +343,6 @@ class SynthesisService:
             except Exception as _ce:
                 logger.warning("Consent check error: %s", _ce)
 
-        # Golden-loop / CI: VOICESTUDIO_TEST_MODE=stub (see tests/ci/test_golden_loop_smoke.py)
-        # yields a registered WAV artifact without initializing real TTS engines.
-        _test_mode = os.environ.get("VOICESTUDIO_TEST_MODE", "").strip().lower()
-        if _test_mode == "stub":
-            from backend.api.models_additional import VoiceSynthesizeResponse
-
-            if not getattr(req, "profile_id", None):
-                raise ServiceError(400, "profile_id required")
-            if not getattr(req, "text", None):
-                raise ServiceError(400, "text required")
-            sample_rate = 22050
-            samples = 4000
-            audio = np.zeros(samples, dtype=np.float32)
-            audio_id = f"synth_stub_{req.profile_id}_{uuid.uuid4().hex[:8]}"
-            create_audio_artifact_from_wav_array(
-                audio,
-                sample_rate,
-                created_by="stub",
-                audio_id=audio_id,
-            )
-            return VoiceSynthesizeResponse(
-                audio_id=audio_id,
-                audio_url=f"/api/voice/audio/{audio_id}",
-                duration=float(samples) / float(sample_rate),
-                quality_score=0.0,
-                quality_metrics=None,
-            )
-
         request_id = getattr(request.state, "request_id", None)
 
         if not req.engine or not req.engine.strip():
@@ -382,7 +361,6 @@ class SynthesisService:
             requested_engine = req.engine.strip()
 
         engine_id = normalize_engine_id(requested_engine)
-        ensure_tts_assets(engine_id)
 
         with instrument_flow(
             EventType.SYNTHESIS_START,
@@ -394,6 +372,38 @@ class SynthesisService:
             text_length=len(req.text) if req.text else 0,
         ):
             try:
+                if _is_voice_studio_stub_test_mode():
+                    # Avoid LogRecord key collisions (e.g. correlation_id) from _get_log_context.
+                    logger.info(
+                        "VOICESTUDIO_TEST_MODE stub: deterministic synthesis artifact (no engine load).",
+                        extra={
+                            "vs_operation": "synthesis_stub",
+                            "vs_profile_id": req.profile_id,
+                            "vs_engine": engine_id,
+                        },
+                    )
+                    audio_id = f"synth_{req.profile_id}_{uuid.uuid4().hex[:8]}"
+                    sample_rate = 22050
+                    n_samples = int(sample_rate * 0.25)
+                    silence = np.zeros(n_samples, dtype=np.float32)
+                    create_audio_artifact_from_wav_array(
+                        silence,
+                        sample_rate,
+                        created_by="stub",
+                        audio_id=audio_id,
+                        source="ci_golden_loop_stub",
+                    )
+                    duration = float(n_samples) / float(sample_rate)
+                    return VoiceSynthesizeResponse(
+                        audio_id=audio_id,
+                        audio_url=f"/api/voice/audio/{audio_id}",
+                        duration=duration,
+                        quality_score=0.0,
+                        quality_metrics=None,
+                    )
+
+                ensure_tts_assets(engine_id)
+
                 valid_engines: list[str] = []
                 if ENGINE_AVAILABLE and engine_router:
                     valid_engines = engine_router.list_engines()
@@ -640,7 +650,7 @@ class SynthesisService:
                                         audio_id=result["audio_id"],
                                         audio_url=f"/api/voice/audio/{result['audio_id']}",
                                         duration=result.get("duration", 0.0),
-                                        quality_score=None,
+                                        quality_score=0.0,
                                         quality_metrics=None,
                                     )
 
@@ -649,7 +659,7 @@ class SynthesisService:
                                     audio_id=result["audio_id"],
                                     audio_url=f"/api/voice/audio/{result['audio_id']}",
                                     duration=result.get("duration", 0.0),
-                                    quality_score=None,
+                                    quality_score=0.0,
                                     quality_metrics=None,
                                 )
 

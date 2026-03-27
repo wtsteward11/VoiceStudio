@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from backend.ml.models.engine_service import IEngineService, get_engine_service
 
@@ -47,8 +47,8 @@ class EngineInfo(BaseModel):
     memory_usage_mb: float | None = None
     gpu_usage_percent: float | None = None
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "xtts_v2",
                 "name": "XTTS v2",
@@ -62,6 +62,7 @@ class EngineInfo(BaseModel):
                 "memory_usage_mb": 2048.5,
             }
         }
+    )
 
 
 class EngineListResponse(BaseModel):

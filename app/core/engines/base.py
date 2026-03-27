@@ -331,6 +331,7 @@ class EngineProtocol(ABC):
         """
         return {
             "name": self.__class__.__name__,
+            "version": getattr(self, "engine_version", "0.0.0"),
             "device": self.device,
             "initialized": self._initialized,
         }

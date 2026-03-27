@@ -5,6 +5,11 @@ Run Verification
 Automated verification script that validates gate status and ledger.
 Includes import validation as a defensive pre-check.
 
+For full product verification including startup orchestration (icon launch,
+backend auto-start, overlay), use scripts/verify.ps1 Stage 7/8.5 or
+scripts/gatec-publish-launch.ps1 -UiSmoke. See
+docs/design/STARTUP_ORCHESTRATION_HARDENING_PLAN.md.
+
 Exit codes:
   0 - All checks passed
   1 - One or more checks failed
@@ -43,6 +48,51 @@ def _validate_imports_first():
             return False, f"Import validation failed: {module} - {e}"
 
     return True, "Imports validated"
+
+
+def _check_testhost_present():
+    """Return True if testhost.exe is running (Windows only)."""
+    if sys.platform != "win32":
+        return False
+    try:
+        result = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq testhost.exe", "/NH"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return "testhost.exe" in (result.stdout or "").lower()
+    except Exception as ex:
+        print(f"  [SKIP] testhost probe: {ex}", file=sys.stderr)
+        return False
+
+
+def _kill_testhost_before_build():
+    """
+    Kill lingering testhost processes that can lock DLLs during build.
+
+    Root cause: MSB3027/MSB3021 when testhost.exe holds VoiceStudio.Core.dll
+    or VoiceStudio.App.dll from a previous test run. Running build immediately
+    after tests can fail with "file is being used by another process".
+
+    Returns:
+        bool: True if testhost was present and cleanup was performed.
+    """
+    if sys.platform != "win32":
+        return False
+    was_present = _check_testhost_present()
+    if not was_present:
+        return False
+    try:
+        subprocess.run(
+            ["taskkill", "/F", "/IM", "testhost.exe"],
+            capture_output=True,
+            timeout=5,
+        )
+        return True
+    except Exception as e:
+        print(f"  [SKIP] testhost cleanup: {e}", file=sys.stderr)
+        return False
 
 
 def run_check(name, command, timeout=30):
@@ -209,14 +259,16 @@ def main():
     if "--build" in sys.argv:
         checks.append({
             "name": "build_smoke",
-            "command": "dotnet build VoiceStudio.sln -c Debug -p:Platform=x64 --verbosity minimal"
+            "command": "dotnet build VoiceStudio.sln -c Debug -p:Platform=x64 --verbosity minimal",
+            "timeout": 90
         })
 
     # Optionally add release build check if --release flag (WS-5)
     if "--release" in sys.argv:
         checks.append({
             "name": "release_build_smoke",
-            "command": "dotnet build VoiceStudio.sln -c Release -p:Platform=x64 --verbosity minimal"
+            "command": "dotnet build VoiceStudio.sln -c Release -p:Platform=x64 --verbosity minimal",
+            "timeout": 90
         })
 
     # Run checks
@@ -228,8 +280,16 @@ def main():
     if skip_guard:
         print("  [SKIP] completion_guard (--skip-guard flag)")
     for check in checks:
+        # Pre-build cleanup: kill testhost to avoid MSB3027 file-lock failures
+        stale_process_cleaned = False
+        if check["name"] in ("build_smoke", "release_build_smoke"):
+            stale_process_cleaned = _kill_testhost_before_build()
+            if stale_process_cleaned:
+                print(f"  [AUDIT] testhost.exe was present; cleanup performed before {check['name']}")
         timeout = check.get("timeout", 30)  # Default 30s, or per-check override
         result = run_check(check["name"], check["command"], timeout=timeout)
+        if stale_process_cleaned:
+            result["stale_process_cleaned"] = True
         results.append(result)
 
         status = "PASS" if result["passed"] else "FAIL"
@@ -237,18 +297,23 @@ def main():
 
     # Summary
     all_passed = all(r["passed"] for r in results)
+    any_stale_cleaned = any(r.get("stale_process_cleaned") for r in results)
     print()
     print(f"  Overall: {'PASS' if all_passed else 'FAIL'}")
+    if any_stale_cleaned:
+        print(f"  [AUDIT] stale_process_cleaned: true (testhost was killed before build)")
     print()
 
     # Save JSON report
     output_dir = project_root / ".buildlogs" / "verification"
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Include stale_process_cleaned at top level for trending
     report = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "timestamp_short": datetime.now().strftime("%Y%m%d-%H%M%S"),
         "all_passed": all_passed,
+        "stale_process_cleaned": any_stale_cleaned,
         "checks": results
     }
 

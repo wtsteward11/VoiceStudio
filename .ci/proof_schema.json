@@ -59,7 +59,7 @@
       "output_metrics", "models", "passed",
       "test_ran", "pytest_stdout_sha256", "pytest_stderr_sha256",
       "artifact_path", "artifact_sha256",
-      "stt_engine_name", "stt_step_ran"
+      "stt_engine_name", "stt_step_ran", "tts_engine_name"
     ],
     "PROOF_BACKEND_COLD_START": [
       "command", "exit_code", "cold_start_ms", "first_api_ms",
@@ -247,7 +247,8 @@
       "artifact_sha256_required": true,
       "artifact_path_required": true,
       "stt_step_ran_must_be_true": true,
-      "stt_engine_name_required": true
+      "stt_engine_name_required": true,
+      "tts_engine_name_required": true
     },
     "PROOF_BACKEND_COLD_START": {
       "within_budget_must_be_true": true,

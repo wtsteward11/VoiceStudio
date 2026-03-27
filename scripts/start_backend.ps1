@@ -4,7 +4,7 @@ Ensures the correct Python venv is used
 #>
 
 $ErrorActionPreference = "Stop"
-$ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
 if (-not $ProjectRoot) { $ProjectRoot = "E:\VoiceStudio" }
 
 Write-Host "=" * 60 -ForegroundColor Cyan

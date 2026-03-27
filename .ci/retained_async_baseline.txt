@@ -1,6 +1,7 @@
-# Retained-async known violations baseline (2026-03-13)
+# Retained-async known violations baseline (2026-03-13, audited 2026-03-15)
 # Option C per Assessment Remediation Plan: fail only if NEW violations appear.
 # Reduce this baseline over time as violations are fixed.
+# Exemptions and rationale: docs/design/RETAINED_ASYNC_EXEMPTIONS.md
 # Format: path:line (one per line)
 
 src/VoiceStudio.App/ViewModels/AdvancedWaveformVisualizationViewModel.cs:342
@@ -9,14 +10,8 @@ src/VoiceStudio.App/ViewModels/AudioAnalysisViewModel.cs:270
 src/VoiceStudio.App/ViewModels/AutomationViewModel.cs:389
 src/VoiceStudio.App/ViewModels/AutomationViewModel.cs:395
 src/VoiceStudio.App/ViewModels/GlobalSearchViewModel.cs:132
-src/VoiceStudio.App/ViewModels/HelpViewModel.cs:371
-src/VoiceStudio.App/ViewModels/HelpViewModel.cs:356
-src/VoiceStudio.App/ViewModels/HelpViewModel.cs:361
 src/VoiceStudio.App/ViewModels/JobProgressViewModel.cs:496
 src/VoiceStudio.App/ViewModels/JobProgressViewModel.cs:501
-src/VoiceStudio.App/ViewModels/KeyboardShortcutsViewModel.cs:484
-src/VoiceStudio.App/ViewModels/KeyboardShortcutsViewModel.cs:469
-src/VoiceStudio.App/ViewModels/KeyboardShortcutsViewModel.cs:474
 src/VoiceStudio.App/ViewModels/LexiconViewModel.cs:153
 src/VoiceStudio.App/ViewModels/LibraryViewModel.cs:558
 src/VoiceStudio.App/ViewModels/PluginGalleryViewModel.cs:177
@@ -31,8 +26,8 @@ src/VoiceStudio.App/ViewModels/RecordingViewModel.cs:163
 src/VoiceStudio.App/ViewModels/SpectrogramViewModel.cs:335
 src/VoiceStudio.App/ViewModels/SSMLControlViewModel.cs:618
 src/VoiceStudio.App/ViewModels/SSMLControlViewModel.cs:623
-src/VoiceStudio.App/ViewModels/TagManagerViewModel.cs:547
-src/VoiceStudio.App/ViewModels/TagManagerViewModel.cs:537
+src/VoiceStudio.App/ViewModels/TagManagerViewModel.cs:486
+src/VoiceStudio.App/ViewModels/TagManagerViewModel.cs:476
 src/VoiceStudio.App/ViewModels/TemplateLibraryViewModel.cs:480
 src/VoiceStudio.App/ViewModels/TemplateLibraryViewModel.cs:470
 src/VoiceStudio.App/ViewModels/TodoPanelViewModel.cs:142
@@ -50,10 +45,6 @@ src/VoiceStudio.App/ViewModels/VoiceBrowserViewModel.cs:315
 src/VoiceStudio.App/ViewModels/VoiceBrowserViewModel.cs:321
 src/VoiceStudio.App/ViewModels/VoiceQuickCloneViewModel.cs:96
 src/VoiceStudio.App/Views/Panels/DiagnosticsViewModel.cs:833
-src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs:412
-src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs:418
-src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs:424
-src/VoiceStudio.App/Views/Panels/EffectsMixerViewModel.cs:461
 src/VoiceStudio.App/Views/Panels/MacroViewModel.cs:442
 src/VoiceStudio.App/Views/Panels/MacroViewModel.cs:482
 src/VoiceStudio.App/Views/Panels/MacroViewModel.cs:234

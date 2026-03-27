@@ -3,7 +3,7 @@
 **Row ID:** **GOV-STASH0-T2-VERIFY-01**  
 **Purpose:** Execution-grade freeze for the **`stash@{0}`** **T2 — Verify / CI baselines** slice named in [`.cursor/STATE.md`](../../.cursor/STATE.md) (~ **2026-03-28** classification). Source stash message: *WIP: pre-Pass06-20260326 unclassified local and untracked*.  
 **Date:** 2026-03-28 (created); **§1 signed:** 2026-03-26  
-**Status:** **§1 signed — implementation authorized.** Land locked paths via merge to **`main`**; then run **§5** proofs. **No** bulk `stash pop`.
+**Status:** **Closed (implementation + proof)** — **2026-03-26**. Locked paths merged to **`main`**; **§5** green. **No** bulk `stash pop`.
 
 **Related:** [CROSS_FEATURE_WORKFLOW_BACKLOG.md](CROSS_FEATURE_WORKFLOW_BACKLOG.md); [RETAINED_ASYNC_EXEMPTIONS.md](RETAINED_ASYNC_EXEMPTIONS.md); [STARTUP_ORCHESTRATION_HARDENING_PLAN.md](STARTUP_ORCHESTRATION_HARDENING_PLAN.md); [`scripts/verify.ps1`](../../scripts/verify.ps1); [`verification-harness.mdc`](../../.cursor/rules/workflows/verification-harness.mdc).
 
@@ -114,9 +114,9 @@ Run after code lands on **`main`** (from **§3** selective checkout or full stas
 
 | Field | Planned / actual |
 |-------|------------------|
-| **Quick** | `artifacts/verify/<timestamp>` — **Pending** |
-| **`latest_pointer.json` `commit_hash`** | **Pending** |
-| **Notes** | **Pending** |
+| **Quick** | **`artifacts/verify/20260326_211554`** (**PASSED**; post-merge tree). |
+| **`latest_pointer.json` `commit_hash`** | **`dc07e51597e42bac294899dcaf123339e63ccbbc`** (merge **T2** into **`main`**; pointer aligned by **`verify.ps1 -Quick`**). |
+| **Notes** | **`python scripts/run_verification.py`** **ALL PASS** — **`20260326-212656`** (**post–§8** **STATE**/**registry** sync on machine that ran closure). T2 applied via **`stash0-t2-verify-01`** selective **`git checkout 'stash@{0}' -- <six paths>`**; **`stash@{0}`** retained for **T1/T3/T4**. |
 
 ---
 
@@ -126,3 +126,4 @@ Run after code lands on **`main`** (from **§3** selective checkout or full stas
 |------|--------|
 | 2026-03-28 | **Created** — **GOV-STASH0-T2-VERIFY-01**; preflight from `main` vs `stash@{0}`; §1 **Pending**. |
 | 2026-03-26 | **§1 signed**; preflight **re-run** with `--stat`; sign-off gates table; extraction note (selective checkout); **§7** updated. |
+| 2026-03-26 | **Closed** — merge **`stash0-t2-verify-01`** → **`main`**; **§5** proofs green; **§8** filled; **`latest_pointer.json`** **`dc07e515`**. |

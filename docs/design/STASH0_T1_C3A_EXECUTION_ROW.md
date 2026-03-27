@@ -109,7 +109,7 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 |-------|--------|
 | **Quick** | **`artifacts/verify/20260327_175838`** (**PASS**) |
 | **`latest_pointer.json` `commit_hash`** | **`ab52c3dee676f13b921e6e6b9cd31eb96b1f9f1a`** |
-| **`run_verification.py` `timestamp_short`** | **`20260327-180444`** (verbatim **`.buildlogs/verification/last_run.json`** — post-**§5** ladder **`20260327-180310`** from **Quick** gate/ledger; refreshed **`20260327-180444`** after **§8** / **STATE** / registry closure edits + **`python scripts/run_verification.py`**) |
+| **`run_verification.py` `timestamp_short`** | **`20260327-180527`** (verbatim **`.buildlogs/verification/last_run.json`** — includes post-closure doc commits + final **`python scripts/run_verification.py`**) |
 | **Notes** | Branch **`stash0-t1-c3a-01`**; selective **`git checkout 'stash@{0}' --`** **§4** only (**`rate_limiting.py`**, **`rate_limiting_enhanced.py`**); **Keep** stash semantics (localhost exempt when **`rate_limit_localhost_exempt`**, **`middleware_setup`** unchanged vs stash); **fast-forward** merged to **`main`** **`ab52c3de`**; **§5** **`pytest`** **4** passed, **1** skipped (**`test_rate_limiting_enhanced`** collection skip unchanged); **`dotnet build`** **0** errors; **`stash@{0}`** **unchanged**. |
 
 ---
@@ -120,4 +120,4 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 |------|--------|
 | 2026-03-28 | **Created** — **`GOV-STASH0-T1-C3A-EXEC-01`**; **§4** **two**-path **C3a** lock; **§1** implementation **Pending**. |
 | 2026-03-28 | **§1** **implementation** **Go**; **§3** note — governance **`run_verification`** stamp sync (**`20260327-170027`**). |
-| 2026-03-28 | **Closed** — **`stash0-t1-c3a-01`** → **`main`** **`ab52c3de`**; **Quick** **`20260327_175838`**; **`run_verification`** **`20260327-180444`** (final ledger sync post-**§8** doc); **§5** pytest **4** passed **1** skipped. |
+| 2026-03-28 | **Closed** — **`stash0-t1-c3a-01`** → **`main`** **`ab52c3de`**; **Quick** **`20260327_175838`**; **`run_verification`** **`20260327-180527`** (final ledger sync); **§5** pytest **4** passed **1** skipped. |

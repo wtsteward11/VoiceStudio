@@ -21,7 +21,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Archive Policy | `docs/governance/ARCHIVE_POLICY.md` | — | **DEFERRED** — Use [document-lifecycle.mdc](.cursor/rules/workflows/document-lifecycle.mdc) and archive structure in `docs/archive/` |
 | Governance Lock | `docs/governance/GOVERNANCE_LOCK.md` | — | **DEFERRED** — Low priority |
 | Definition of Done | `docs/governance/DEFINITION_OF_DONE.md` | 2026-01-25 | Consolidated completion criteria |
-| Session State | `.cursor/STATE.md` | 2026-03-27 | **Global Quick** **`20260326_163358`** / **`3ad39e35`**; **`HEAD`** = `git rev-parse`; **P05-Persist-A4** **closed**; **`stash@{0}`** still **parked**; **W7** / Product trust / **W8** paused unless signed reopen. |
+| Session State | `.cursor/STATE.md` | 2026-03-28 | **Global Quick** **`20260326_163358`** / **`3ad39e35`**; **`HEAD`** = `git rev-parse`; **P05-Persist-A4** **closed**; **`stash@{0}`** **parked**; **T2** = [STASH0_T2_VERIFY_CI_EXECUTION_ROW.md](../design/STASH0_T2_VERIFY_CI_EXECUTION_ROW.md) (**§1 Pending**); **W7** / Product trust / **W8** paused unless signed reopen. |
 | Memory Index | `openmemory.md` | 2026-01-25 | Living project index for AI context |
 | **Project Handoff Guide** | `docs/governance/PROJECT_HANDOFF_GUIDE.md` | 2026-01-30 | Maintainer entry point; gate status, build/test, structure, roles, task brief creation |
 | **Overseer Newcomer Handoff** | `docs/governance/overseer/OVERSEER_NEWCOMER_HANDOFF.md` | 2026-03-24 | New Overseer (Role 0) onboarding; **§2 project snapshot** (workflow passes, verify pointers, code-truth); Day 1 reads, first commands, daily cadence, non-negotiables |
@@ -87,6 +87,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Pass 05 C3 persistence policy** | `docs/design/PASS_05_C3_PROJECT_AUDIO_PERSISTENCE_POLICY.md` | 2026-03-24 | **Option B frozen** 2026-03-24 — decisions §2, OUT §5, matrix **C3-OptB**, pre-map §8 |
 | **Pass 05 persistence Option C follow-up** | `docs/design/WORKFLOW_COHERENCE_PASS_05_PERSISTENCE_OPTION_C_FOLLOWUP.md` | 2026-03-25 | Record-only `IProjectAudioClient` bridge; §8 execution |
 | **Pass 05 persistence follow-up (Option A — transcribe + import)** | `docs/design/WORKFLOW_COHERENCE_PASS_05_PERSISTENCE_OPTION_A_FOLLOWUP.md` | 2026-03-27 | **A1–A4 complete.** A4: Quick **`20260326_163358`**, seam **54** (§7); **`LibraryDragDropToProjectPersistence`** + `LibraryView` drag-drop; commit **`3ad39e35`**. |
+| **Stash T2 verify/CI execution row** | `docs/design/STASH0_T2_VERIFY_CI_EXECUTION_ROW.md` | 2026-03-28 | **`GOV-STASH0-T2-VERIFY-01`** — **`stash@{0}`** **Extract** slice; **six-file** lock (`verify.ps1`, `run_verification.py`, CI proof + baseline, `start_backend.ps1`); **§1 Pending** until sign-off; [`.cursor/STATE.md`](../.cursor/STATE.md) T2 planning lane. |
 | **PR-8 Telemetry/Diagnostics scope** | `docs/design/PR-8_TELEMETRY_DIAGNOSTICS_SCOPE.md` | 2026-03-22 | PR-8 extraction scope: Option A (DiagnosticsClient decoupling) or Option B (Macros) |
 | **Premium Software Coherence Audit** | `docs/design/PREMIUM_SOFTWARE_COHERENCE_AUDIT.md` | 2026-03-17 | Formal audit: startup, shell, transport, panel lifecycle, event wiring, backend seam, workflows, UX; gaps ranked S0–S2 |
 

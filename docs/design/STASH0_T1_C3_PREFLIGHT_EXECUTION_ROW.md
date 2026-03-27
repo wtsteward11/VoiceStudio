@@ -4,7 +4,7 @@
 **Purpose:** **Re-baseline** the **T1-C3** candidate surface (**auth**, **rate limiting**, **`models_additional`**, companion tests) in **`stash@{0}`** vs **current** **`main`** after **[`GOV-STASH0-T1-R1A-EXEC-01`](STASH0_T1_R1A_EXECUTION_ROW.md)** closed. Classify **subclusters**, **T3 bleed risk**, and **test companions**; recommend **exactly one** next bounded implementation slice. **No** selective checkout, **no** `backend/**` or **`app/core/**`** edits, **no** bulk **`stash pop`** under this row.  
 **Source stash:** *WIP: pre-Pass06-20260326 unclassified local and untracked* (same entry as prior T1 rows).  
 **Date (row drafted):** 2026-03-28  
-**§1 authorization:** **Engineering (preflight)** — **§3/§4** re-baseline **2026-03-28** on **`main`** **`37fb89e6`**. **Product / engineering (slice choice)** — **Pending** until **one** **§5** option is dated (or **Pause**). **Implementation** authorized only on a **new child execution row** (e.g. `GOV-STASH0-T1-C3A-EXEC-01` — **name TBD**) after **§1** slice choice + **§1** **implementation** sign-off **on that row**.
+**§1 authorization:** **Engineering (preflight)** — **§3/§4** re-baseline **2026-03-28** on **`main`** **`37fb89e6`** (preflight authoring tip); **post-preflight** governance commit **`843e86a2`** — **re-verify** **§4.1** shortstats before extract. **Product / engineering (slice choice)** — **Option A** (**C3a** — rate limiting only) **dated** **2026-03-28**. **Implementation** authorized only on **[`GOV-STASH0-T1-C3A-EXEC-01`](STASH0_T1_C3A_EXECUTION_ROW.md)** after **that** row’s **§1** **implementation** sign-off is dated.
 
 **Related:** [STASH0_T1_R1A_EXECUTION_ROW.md](STASH0_T1_R1A_EXECUTION_ROW.md) (**R1A** — **closed**); [STASH0_T1_R1_PREFLIGHT_EXECUTION_ROW.md](STASH0_T1_R1_PREFLIGHT_EXECUTION_ROW.md) (**T1-C3** seed list **§4.2**); [STASH0_T1_PREFLIGHT_EXECUTION_ROW.md](STASH0_T1_PREFLIGHT_EXECUTION_ROW.md) (original **T1** decomposition); [`.cursor/STATE.md`](../../.cursor/STATE.md).
 
@@ -15,7 +15,7 @@
 | Role | Decision | Date |
 |------|----------|------|
 | **Engineering (preflight)** | **Preflight acknowledged** — **§3** + **§4** re-run on **`main`** **`37fb89e6`** vs **`stash@{0}`**; **`git merge-base main 'stash@{0}'`** **`a7a45f4cc2e8e81671eefffe885df3a86227b10a`**; top stash message matches STATE; all six T1-C3 candidate paths show **non-empty** material diffs (see **§4.1**). | **2026-03-28** |
-| **Product / engineering (slice choice)** | **Pending** — pick **one** **§5** option (**A**–**E**) or record **Pause**. | — |
+| **Product / engineering (slice choice)** | **Option A** — **C3a** first: **`backend/api/rate_limiting.py`** + **`backend/api/rate_limiting_enhanced.py`** only; **exclude** **C3b**/**C3c** for this slice. Child execution row: **[`GOV-STASH0-T1-C3A-EXEC-01`](STASH0_T1_C3A_EXECUTION_ROW.md)**. | **2026-03-28** |
 
 **Hard gate:** **No** implementation **§4 file lock** on **this** preflight doc. **Child execution row** owns **§4** lock, **§5** frozen proof, **§7** extract, **§8** closure.
 
@@ -29,7 +29,7 @@ After **R1A**, re-verify every **T1-C3** stash path that still differs from **`m
 
 ## 3. Baseline truth (do not contradict)
 
-- **`GOV-STASH0-T1-R1A-EXEC-01`** is **closed**; **R1A** merge tree **`0e0d0a91`** passed repo-global **Quick** **`artifacts/verify/20260327_165459`** (see **R1A §8**). **`main`** tip at this preflight pass: **`37fb89e6`** — **re-verify** with **`git rev-parse HEAD`** before relying on hashes after further commits.
+- **`GOV-STASH0-T1-R1A-EXEC-01`** is **closed**; **R1A** merge tree **`0e0d0a91`** passed repo-global **Quick** **`artifacts/verify/20260327_165459`** (see **R1A §8**). **`main`** tip when **§4** stats were recorded: **`37fb89e6`**; **governance** commit adding this preflight: **`843e86a2`** — **re-run** **`git diff --shortstat main 'stash@{0}' --`** on each **§4.1** path before **C3A** extract (**narrowing rule**).
 - **`git merge-base main 'stash@{0}'`** = **`a7a45f4cc2e8e81671eefffe885df3a86227b10a`** (**2026-03-28**).
 - **`git stash list`** (top): **`stash@{0}: On main: WIP: pre-Pass06-20260326 unclassified local and untracked`** — matches [`.cursor/STATE.md`](../../.cursor/STATE.md) stash disposition.
 - **Already landed (do not re-extract as T1-C3 remainder without cause):** **T1-S1** eight paths; **R1A** **§4** ten paths with **Partial** on **`backend/services/script_store.py`** and **`backend/api/route_registry.py`** (**main** retained). **Do not** treat R1A paths as T1-C3 scope.
@@ -107,8 +107,8 @@ Unless a **new** signed row explicitly expands scope:
 | Step | Owner | Action |
 |------|-------|--------|
 | 1 | Engineering | **Done** **2026-03-28** — **§1** engineering preflight dated; **§4** verified on **`37fb89e6`**. |
-| 2 | Product | **Pending** — date **§1** slice choice (**§5** **A**–**E**). |
-| 3 | Overseer / engineer | **Blocked** — draft **child execution row** (**§4** lock, **§5** proof, **§6** OUT) **only after** step 2. **Do not** draft **`GOV-STASH0-T1-C3A-EXEC-01`** (or final ID) until slice is chosen. |
+| 2 | Product | **Done** **2026-03-28** — **§5 Option A** (**C3a**). |
+| 3 | Overseer / engineer | **Done** **2026-03-28** — **[`STASH0_T1_C3A_EXECUTION_ROW.md`](STASH0_T1_C3A_EXECUTION_ROW.md)** (**`GOV-STASH0-T1-C3A-EXEC-01`**). **Next:** date **implementation §1** on **that** row before extract. |
 | 4 | — | **No** `backend/**` / **`app/core/**`** code under **`GOV-STASH0-T1-C3-PREFLIGHT-01`**. |
 
 ---
@@ -128,3 +128,4 @@ Unless a **new** signed row explicitly expands scope:
 | Date | Change |
 |------|--------|
 | 2026-03-28 | **Created** — **`GOV-STASH0-T1-C3-PREFLIGHT-01`**: post–**R1A** **T1-C3** re-baseline; **§1** product slice **Pending**; child execution row **deferred**. |
+| 2026-03-28 | **§1 slice choice** — **Option A** (**C3a**); child execution row **[`GOV-STASH0-T1-C3A-EXEC-01`](STASH0_T1_C3A_EXECUTION_ROW.md)** drafted; **implementation** sign-off **on child row** still **Pending**. |

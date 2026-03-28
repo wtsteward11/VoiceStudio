@@ -8,6 +8,7 @@ Provides resolve_reference_audio_path as single source of truth for profile refe
 from __future__ import annotations
 
 import logging
+import shutil
 import time
 import uuid
 from pathlib import Path
@@ -45,14 +46,19 @@ def create_profile_from_request(
     tags: list[str] | None = None,
     avatar_url: str | None = None,
     description: str | None = None,
+    reference_audio_source: str | Path | None = None,
 ) -> dict[str, Any]:
     """
     Create a new voice profile and save to store.
 
+    When ``reference_audio_source`` is set, the file is copied to the canonical
+    profile directory as ``reference_audio.wav`` **before** persist — if copy
+    fails, no profile row is saved.
+
     Returns the created profile dict with id, name, language, etc.
-    Caller can use get_profile_store().save() - this function does the save.
     """
     from backend.project.management.profile_store import get_profile_store
+    from backend.services.profile_storage_service import ensure_profile_dir
 
     if not name or not str(name).strip():
         raise ValueError("Profile name is required and cannot be empty")
@@ -62,7 +68,7 @@ def create_profile_from_request(
     profile_id = str(uuid.uuid4())
     tags_list = [str(t).strip() for t in tags] if tags else []
 
-    profile_data = {
+    profile_data: dict[str, Any] = {
         "id": profile_id,
         "name": str(name).strip(),
         "language": str(language).strip(),
@@ -74,6 +80,18 @@ def create_profile_from_request(
         "created_at": time.time(),
         "owner_user_id": "local",
     }
+
+    if reference_audio_source is not None:
+        source = Path(reference_audio_source)
+        if not source.is_file():
+            raise ValueError(f"reference_audio_source does not exist or is not a file: {source}")
+        dest_dir = ensure_profile_dir(profile_id)
+        dest = dest_dir / "reference_audio.wav"
+        shutil.copy2(source, dest)
+        profile_data["reference_audio_url"] = str(dest)
+        profile_data["reference_audio_bound"] = True
+    else:
+        profile_data["reference_audio_bound"] = False
 
     store = get_profile_store()
     store.save(profile_data)

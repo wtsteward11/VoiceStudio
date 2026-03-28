@@ -3,7 +3,7 @@
 This registry is the single source of truth for all canonical documents in VoiceStudio.
 Before creating a new document, check this registry to ensure the topic isn't already covered.
 
-> **Last Updated**: 2026-03-28 (Unified startup lane closed; Role 8 Project Intelligence Analyst guide/prompt registered)
+> **Last Updated**: 2026-03-29 (Professional Roadmap V3 + Gap Tracker registered; Completion Roadmap v2 / Unified Master Roadmap forward timeline superseded by V3; voice cloning integrity lane closed; Role 8 registered)
 
 ---
 
@@ -21,7 +21,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Archive Policy | `docs/governance/ARCHIVE_POLICY.md` | — | **DEFERRED** — Use [document-lifecycle.mdc](.cursor/rules/workflows/document-lifecycle.mdc) and archive structure in `docs/archive/` |
 | Governance Lock | `docs/governance/GOVERNANCE_LOCK.md` | — | **DEFERRED** — Low priority |
 | Definition of Done | `docs/governance/DEFINITION_OF_DONE.md` | 2026-01-25 | Consolidated completion criteria |
-| Session State | `.cursor/STATE.md` | 2026-03-28 | **Operational truth** — lane `GOV-VOICESTUDIO-UNIFIED-STARTUP-01` **closed** 2026-03-28; proof `docs/reports/verification/VOICESTUDIO_UNIFIED_STARTUP_LANE_CLOSURE_2026-03-28.md`; verify Quick `artifacts/verify/20260328_004504/` |
+| Session State | `.cursor/STATE.md` | 2026-03-29 | **Operational truth** — **Active Plan:** [VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md) + [PROFESSIONAL_GAP_TRACKER.md](../design/PROFESSIONAL_GAP_TRACKER.md); lane `GOV-VOICESTUDIO-VOICE-CLONING-INTEGRITY-01` **closed** 2026-03-29; proof `docs/reports/verification/VOICESTUDIO_VOICE_CLONING_INTEGRITY_LANE_CLOSURE_2026-03-29.md` |
 | Memory Index | `openmemory.md` | 2026-01-25 | Living project index for AI context |
 | **Project Handoff Guide** | `docs/governance/PROJECT_HANDOFF_GUIDE.md` | 2026-01-30 | Maintainer entry point; gate status, build/test, structure, roles, task brief creation |
 | **Overseer Newcomer Handoff** | `docs/governance/overseer/OVERSEER_NEWCOMER_HANDOFF.md` | 2026-03-12 | New Overseer (Role 0) onboarding; Day 1 reads, first commands, daily cadence, non-negotiables |
@@ -39,7 +39,9 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Verification Harness Rule** | `.cursor/rules/workflows/verification-harness.mdc` | 2026-02-09 | Agent rule for verify.ps1 usage; "no green = no merge" enforcement |
 | **Plugin System Guidelines** | `docs/governance/PLUGIN_SYSTEM_GUIDELINES.md` | 2026-02-16 | Canonical plugin governance: architecture, security, performance, DX, testing, UI, compatibility, risk, observability (10 sections). Companion to ADR-036. |
 | **Provenance Policy** | `docs/governance/PROVENANCE_POLICY.md` | 2026-03-01 | Best-effort provenance and usage recording for audio outputs; do not claim full traceability |
-| **Completion Roadmap v2.0** | `docs/governance/VOICESTUDIO_COMPLETION_ROADMAP_V2.md` | 2026-03-03 | CI-enforced hardened roadmap for v1.1.0; 7 gaps, 6 phases (0/A/B/C/D/E/F), 5 permanent CI invariants |
+| **Completion Roadmap v2.0** | `docs/governance/VOICESTUDIO_COMPLETION_ROADMAP_V2.md` | 2026-03-03 | v1.1.0 **CI invariants (I-1–I-5)** and historical closure evidence. **Forward-looking phase authority superseded** by [VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md) |
+| **Professional Roadmap v3.0** | `docs/governance/VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md` | 2026-03-29 | **Active north-star** — 3 hero workflows; Phases 0–7 + Phase 8+ deferred; continuous CI track; companion [PROFESSIONAL_GAP_TRACKER.md](../design/PROFESSIONAL_GAP_TRACKER.md) |
+| **Professional Gap Tracker** | `docs/design/PROFESSIONAL_GAP_TRACKER.md` | 2026-03-29 | **69 deduplicated gaps** (GAP-001–GAP-069); audit + Desktop Commander + strategy; execution list for V3 |
 | **Feature Catalog Master** | `docs/governance/FEATURE_CATALOG_MASTER.md` | 2026-03-05 | Single canonical feature inventory; 47 panels, API/engine/plugin surface; machine appendix: [FEATURE_CATALOG_MASTER.appendix.json](FEATURE_CATALOG_MASTER.appendix.json); CI drift check in `tests/ci/test_feature_catalog_appendix.py` |
 | **Finish Line: Personal Studio** | `docs/governance/FINISH_LINE_PERSONAL_STUDIO.md` | 2026-03-06 | Acceptance criteria for workspaces CRUD/import/export, tool catalog, docking/resize/collapse persistence, restore failure recovery; manual thrash test; build determinism rule |
 | **Unified Startup Lane Execution Row** | `docs/design/GOV_VOICESTUDIO_UNIFIED_STARTUP_01_EXECUTION_ROW.md` | 2026-03-28 | Frozen lane for app-native startup orchestrator; **lane closed** 2026-03-28 (Slices 1–4); §0 + §15.1 Closed |
@@ -48,6 +50,13 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Unified Startup Slice 2 Proof** | `docs/reports/verification/VOICESTUDIO_UNIFIED_STARTUP_SLICE2_PROOF_2026-03-28.md` | 2026-03-28 | Startup gating and single-authority failure surface proof with targeted startup test artifacts |
 | **Unified Startup Slice 3 Proof** | `docs/reports/verification/VOICESTUDIO_UNIFIED_STARTUP_SLICE3_PROOF_2026-03-28.md` | 2026-03-28 | Port conflict + in-process repeat-launch proof; extended `startup_decision.json` fields; archived TRX |
 | **Unified Startup Lane Closure** | `docs/reports/verification/VOICESTUDIO_UNIFIED_STARTUP_LANE_CLOSURE_2026-03-28.md` | 2026-03-28 | Five-scenario closure matrix + mandatory §6 verification; cross-process repeat launch = code-truth / operator class |
+| **Workflow Coherence Advanced Lane Execution Row** | `docs/design/GOV_VOICESTUDIO_WORKFLOW_COHERENCE_ADVANCED_01_EXECUTION_ROW.md` | 2026-03-28 | Frozen lane: Workflows A/B proof + optional shell gate; **lane closed** 2026-03-28 (Slices 1–4); §0 Closed |
+| **Workflow Coherence Advanced Slice 1 Proof** | `docs/reports/verification/VOICESTUDIO_WORKFLOW_COHERENCE_ADVANCED_SLICE1_PROOF_2026-03-28.md` | 2026-03-28 | Workflow A MSTest + path map; `WorkflowCoherenceAdvancedTests` |
+| **Workflow Coherence Advanced Slice 2 Proof** | `docs/reports/verification/VOICESTUDIO_WORKFLOW_COHERENCE_ADVANCED_SLICE2_PROOF_2026-03-28.md` | 2026-03-28 | Workflow B proof index; `SearchOverlayCoordinatorTests` |
+| **Workflow Coherence Advanced Slice 3 Decision** | `docs/reports/verification/VOICESTUDIO_WORKFLOW_COHERENCE_ADVANCED_SLICE3_DECISION_2026-03-28.md` | 2026-03-28 | MainWindow shell extraction **NOT REQUIRED** |
+| **Workflow Coherence Advanced Lane Closure** | `docs/reports/verification/VOICESTUDIO_WORKFLOW_COHERENCE_ADVANCED_LANE_CLOSURE_2026-03-28.md` | 2026-03-28 | Consolidated closure matrix + mandatory §6 verification; honest limits §4 |
+| **Voice Cloning Integrity Lane Execution Row** | `docs/design/GOV_VOICESTUDIO_VOICE_CLONING_INTEGRITY_01_EXECUTION_ROW.md` | 2026-03-29 | Reference audio binding for clone wizard + API `reference_audio_bound`; **lane closed** Slices 1–4 |
+| **Voice Cloning Integrity Lane Closure** | `docs/reports/verification/VOICESTUDIO_VOICE_CLONING_INTEGRITY_LANE_CLOSURE_2026-03-29.md` | 2026-03-29 | Closure §4 verification; binding tests; honest scope §1 |
 | **Test Classification** | `docs/governance/TEST_CLASSIFICATION.md` | 2026-03-12 | Seam-aware vs transport-mock vs legacy; supports architectural completion claims |
 | **Training Lifecycle Async Patterns** | `docs/design/TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md` | 2026-03-12 | Fire-and-forget paths in TrainingViewModel; cancellation ownership |
 | **Retained Async Rule** | `docs/design/RETAINED_ASYNC_RULE.md` | 2026-03-13 | Unified rule for ViewModel fire-and-forget; aligns SceneBuilder, BatchProcessing, Training |
@@ -137,8 +146,8 @@ Before creating a new document, check this registry to ensure the topic isn't al
 
 | Topic | Canonical Source | Last Updated | Notes |
 | --- | --- | --- | --- |
-| **Ultimate Master Plan 2026 (Optimized)** | `docs/governance/ULTIMATE_MASTER_PLAN_2026_OPTIMIZED.md` | 2026-02-04 | **ACTIVE PLAN** — 8 phases, 145 tasks, optimized role assignments. Supersedes prior plan versions. |
-| **Unified Master Roadmap** | `docs/governance/MASTER_ROADMAP_UNIFIED.md` | 2026-01-25 | **Primary canonical roadmap** - consolidates all previous roadmaps |
+| **Ultimate Master Plan 2026 (Optimized)** | `docs/governance/ULTIMATE_MASTER_PLAN_2026_OPTIMIZED.md` | 2026-02-04 | **Task backlog reference** — 8 phases, 145 tasks; **reconcile picks to** [VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md) for forward phase sequencing |
+| **Unified Master Roadmap** | `docs/governance/MASTER_ROADMAP_UNIFIED.md` | 2026-01-25 | **Historical milestone / vision reference** — **forward phase authority:** [VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md) |
 | **Optional Task Inventory** | `docs/governance/OPTIONAL_TASK_INVENTORY.md` | 2026-01-29 | Authoritative optional-task backlog and dependency map; Phase 1 Master Plan deliverable |
 | Master Roadmap (Legacy) | `docs/archive/governance/MASTER_ROADMAP.md` | 2026-01-25 | **ARCHIVED** — Superseded by MASTER_ROADMAP_UNIFIED.md. Note: `docs/archive/governance/` may be missing; create and move legacy roadmaps if archive policy requires. See [Final Sweep (Pre-Realignment)](../reports/audit/FINAL_SWEEP_ALL_ROLES_PRE_REALIGNMENT_2026-01-30.md) §2, §6.1. |
 | Roadmap Summary (Legacy) | `docs/archive/governance/MASTER_ROADMAP_SUMMARY.md` | 2026-01-25 | **ARCHIVED** — Superseded by MASTER_ROADMAP_UNIFIED.md |

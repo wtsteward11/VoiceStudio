@@ -30,6 +30,15 @@ from ..optimization import cache_response, get_pagination_params
 logger = logging.getLogger(__name__)
 
 
+def _reference_audio_bound_for_id(profile_id: str) -> bool:
+    """True when canonical reference audio exists on disk for this profile."""
+    if not profile_id or not str(profile_id).strip():
+        return False
+    from backend.services.profile_storage_service import exists_reference_audio
+
+    return exists_reference_audio(profile_id)
+
+
 # Backward-compatible module-level exports for legacy code that imports _profiles
 # These are lazy-initialized to avoid import-time issues
 def _get_profiles_wrapper():
@@ -226,6 +235,7 @@ def list_profiles(
                 language=p.get("language", "en"),
                 quality_score=p.get("quality_score", 0.0),
                 tags=p.get("tags", []),
+                reference_audio_bound=_reference_audio_bound_for_id(p.get("id", "")),
             )
             for p in all_profiles
         ]
@@ -271,6 +281,7 @@ def get_profile(
             quality_score=profile_data.get("quality_score", 0.0),
             tags=profile_data.get("tags", []),
             reference_audio_url=profile_data.get("reference_audio_url"),
+            reference_audio_bound=_reference_audio_bound_for_id(profile_id),
             avatar_url=profile_data.get("avatar_url"),
         )
     except HTTPException:
@@ -343,6 +354,7 @@ def create_profile(
             tags=tags_list,
             quality_score=0.0,
             avatar_url=str(profile_data["avatar_url"]) if profile_data.get("avatar_url") else None,
+            reference_audio_bound=_reference_audio_bound_for_id(profile_id),
         )
 
         logger.info(f"Created profile: {profile_id} - {profile.name}")
@@ -413,6 +425,7 @@ def update_profile(
             quality_score=profile_data.get("quality_score", 0.0),
             tags=profile_data.get("tags", []),
             reference_audio_url=profile_data.get("reference_audio_url"),
+            reference_audio_bound=_reference_audio_bound_for_id(profile_id),
             avatar_url=profile_data.get("avatar_url"),
         )
 
@@ -492,6 +505,7 @@ async def preprocess_reference_audio(
             name=profile_data.get("name", ""),
             language=profile_data.get("language", "en"),
             reference_audio_url=profile_data.get("reference_audio_url"),
+            reference_audio_bound=_reference_audio_bound_for_id(profile_id),
         )
 
         # Get reference audio path

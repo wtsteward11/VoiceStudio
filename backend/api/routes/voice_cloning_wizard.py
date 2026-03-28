@@ -499,6 +499,7 @@ async def process_wizard(
                     name=job.profile_name or f"Wizard Profile {job_id}",
                     language="en",
                     description=job.profile_description or "Created via Voice Cloning Wizard",
+                    reference_audio_source=audio_path,
                 )
                 job.profile_id = profile_data["id"]
                 job.progress = 0.6
@@ -598,10 +599,14 @@ async def finalize_wizard(job_id: str, request: WizardFinalizeRequest):
                 ),
             )
 
-        # In a real implementation, this would:
-        # 1. Create voice profile using existing /api/profiles endpoint
-        # 2. Associate reference audio with profile
-        # 3. Save profile metadata
+        # Profile and reference audio binding occur in process step
+        # (create_profile_from_request + reference_audio.wav). Finalize only
+        # adjusts display metadata; never invent a profile_id the store lacks.
+        if not job.profile_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Wizard must complete the process step before finalizing.",
+            )
 
         # Update profile name/description if provided
         if request.profile_name:
@@ -615,7 +620,7 @@ async def finalize_wizard(job_id: str, request: WizardFinalizeRequest):
         logger.info(f"Finalized voice cloning wizard: {job_id}")
 
         return WizardFinalizeResponse(
-            profile_id=job.profile_id or f"profile-{uuid.uuid4().hex[:8]}",
+            profile_id=job.profile_id,
             profile_name=job.profile_name or "Untitled Profile",
             success=True,
         )

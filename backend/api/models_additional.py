@@ -64,6 +64,7 @@ class VoiceProfile(VoiceStudioBaseModel):
     quality_score: float = 0.0
     tags: list[str] = []
     reference_audio_url: str | None = None
+    reference_audio_bound: bool = False
     avatar_url: str | None = None  # URL or path to profile avatar image
 
 

@@ -110,7 +110,8 @@ Unless a **new** signed row explicitly expands scope:
 | 2 | Product | **Done** **2026-03-28** — **§5 Option A** (**C3a**). |
 | 3 | Overseer / engineer | **Done** **2026-03-28** — **[`STASH0_T1_C3A_EXECUTION_ROW.md`](STASH0_T1_C3A_EXECUTION_ROW.md)** (**`GOV-STASH0-T1-C3A-EXEC-01`**) **closed**. **Next:** **[`STASH0_T1_C3B_EXECUTION_ROW.md`](STASH0_T1_C3B_EXECUTION_ROW.md)** (**`GOV-STASH0-T1-C3B-EXEC-01`**) — date **implementation §1** before extract. |
 | 4 | Overseer / engineer | **Done** **2026-03-28** — **[`STASH0_T1_C3B_EXECUTION_ROW.md`](STASH0_T1_C3B_EXECUTION_ROW.md)** (**`GOV-STASH0-T1-C3B-EXEC-01`**) **closed**. **Next:** **[`STASH0_T1_C3C_EXECUTION_ROW.md`](STASH0_T1_C3C_EXECUTION_ROW.md)** (**`GOV-STASH0-T1-C3C-EXEC-01`**) — **§5 Option C** — date **implementation §1** before extract. |
-| 5 | — | **No** `backend/**` / **`app/core/**`** code under **`GOV-STASH0-T1-C3-PREFLIGHT-01`**. |
+| 5 | Overseer / engineer | **Done** **2026-03-28** — **[`STASH0_T1_C3C_EXECUTION_ROW.md`](STASH0_T1_C3C_EXECUTION_ROW.md)** (**`GOV-STASH0-T1-C3C-EXEC-01`**) **closed** — **T1-C3** trio (**C3a**/**C3b**/**C3c**) **consumed** for locked paths. **Next:** **`stash@{0}`** **remainder** / **T1-C4** — **new** execution row + **§1** (not this preflight). |
+| 6 | — | **No** `backend/**` / **`app/core/**`** code under **`GOV-STASH0-T1-C3-PREFLIGHT-01`**. |
 
 ---
 
@@ -132,3 +133,4 @@ Unless a **new** signed row explicitly expands scope:
 | 2026-03-28 | **§1 slice choice** — **Option A** (**C3a**); child execution row **[`GOV-STASH0-T1-C3A-EXEC-01`](STASH0_T1_C3A_EXECUTION_ROW.md)** drafted; **implementation** sign-off **on child row** still **Pending**. |
 | 2026-03-28 | **Child** **[`GOV-STASH0-T1-C3B-EXEC-01`](STASH0_T1_C3B_EXECUTION_ROW.md)** (**C3b**) **drafted** — **§5 Option B**; **§1** implementation **Pending** on **child** row (not this preflight). |
 | 2026-03-28 | **Child** **[`GOV-STASH0-T1-C3C-EXEC-01`](STASH0_T1_C3C_EXECUTION_ROW.md)** (**C3c**) **drafted** — **§5 Option C**; **§1** implementation **Pending** on **child** row (not this preflight). |
+| 2026-03-28 | **Child** **`GOV-STASH0-T1-C3C-EXEC-01`** **closed** — **`models_additional`** + **`test_models_additional`** from **`stash@{0}`**; **§8** **Quick** **`20260327_190856`**; **T3** firewall held. |

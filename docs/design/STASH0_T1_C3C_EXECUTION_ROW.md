@@ -4,8 +4,8 @@
 **Purpose:** Land **only** **`backend/api/models_additional.py`** and **`tests/unit/backend/api/test_models_additional.py`** from **`stash@{0}`** per **[`GOV-STASH0-T1-C3-PREFLIGHT-01`](STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md)** **§4.1** / **§5 Option C** (**C3c**) — **without** **`docs/api/openapi.json`**, **`shared/schemas/**`**, **`tests/contract/**`**, **without** re-checking **C3a** / **C3b** paths from stash, **without** bulk **`stash pop`**. **T3-adjacent:** reconcile must reject hunks that **require** contract/schema/OpenAPI edits under this row; any such need → **Pause** / **new T3 row**.  
 **Source stash:** *WIP: pre-Pass06-20260326 unclassified local and untracked*.  
 **Date (row drafted):** 2026-03-28  
-**Status:** **Open** — **§1** **implementation** **Go** **2026-03-28** — extract + proof in flight.  
-**§1 authorization:** **Engineering (preflight)** — **§3** complete **2026-03-28**; **§3 re-verified** **2026-03-28** on **`main`** **`9f7e19e9`** (shortstats unchanged vs **`stash@{0}`**). **Product / engineering (implementation)** — **Go** **2026-03-28** — selective **`stash@{0}`** checkout **§4** only; **§6 OUT**; **§5** + **Quick** for closure.
+**Status:** **Closed (implementation + proof)** — **2026-03-28**  
+**§1 authorization:** **Engineering (preflight)** — **§3** complete **2026-03-28**; **§3 re-verified** on **`main`** **`9f7e19e9`**. **Product / engineering (implementation)** — **Go** **2026-03-28**; **§8** closure **2026-03-28** (**Quick** pointer **`d70c7eac`**).
 
 **Related:** [STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md](STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md) (**§5 Option C** / **C3c**); [STASH0_T1_C3A_EXECUTION_ROW.md](STASH0_T1_C3A_EXECUTION_ROW.md) (**C3a** — **closed**); [STASH0_T1_C3B_EXECUTION_ROW.md](STASH0_T1_C3B_EXECUTION_ROW.md) (**C3b** — **closed**); [`.cursor/STATE.md`](../../.cursor/STATE.md).
 
@@ -67,7 +67,7 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 | # | Command | Expected |
 |---|---------|----------|
 | 1 | `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` | **0** errors |
-| 2 | `python -m pytest tests/unit/backend/api/test_models_additional.py -q --tb=line` | **PASS** — record **exact** passed/skipped/failed in **§8** at closure |
+| 2 | `python -m pytest tests/unit/backend/api/test_models_additional.py -q --tb=line` | **PASS** — **closure** **2026-03-28**: **7** passed, **0** skipped |
 | 3 | `python scripts/run_verification.py` | **ALL PASS**; if updating **STATE** / registry proof lines, copy **`timestamp_short`** **verbatim** from `.buildlogs/verification/last_run.json` |
 | 4 | `.\scripts\verify.ps1 -Quick` | **PASS** — **mandatory** for **closure**; advances **`artifacts/verify/latest_pointer.json`** only on **PASSED** **Quick** for the **implementation** commit tree |
 
@@ -109,10 +109,10 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 
 | Field | Value |
 |-------|--------|
-| **Quick** | *(pending)* |
-| **`latest_pointer.json` `commit_hash`** | *(pending)* |
-| **`run_verification.py` `timestamp_short`** | *(verbatim `.buildlogs/verification/last_run.json`)* |
-| **Notes** | *(branch, merge, reconcile, pytest counts, T3 firewall adherence)* |
+| **Quick** | **`artifacts/verify/20260327_190856`** (**PASS**) |
+| **`latest_pointer.json` `commit_hash`** | **`d70c7eac07aad88718857b3168b5ec352eba2d17`** |
+| **`run_verification.py` `timestamp_short`** | **`20260327-191411`** (verbatim **`.buildlogs/verification/last_run.json`** after **§5** ladder — **Quick** gate/ledger stage) |
+| **Notes** | Branch **`stash0-t1-c3c-01`**; selective **`git checkout 'stash@{0}' --`** **§4** only; **Keep** stash **`models_additional`** Pydantic v2 **`field_validator`** migration + type guards; **Keep** companion tests **`TestVoiceSynthesizeRequestOptionalFieldValidators`**; **no** **T3** file edits; **fast-forward** merged to **`main`** **`d70c7eac`**; **§5** pytest **7** passed; **`dotnet build`** **0** errors; **`stash@{0}`** **unchanged**. |
 
 ---
 
@@ -122,3 +122,4 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 |------|--------|
 | 2026-03-28 | **Created** — **`GOV-STASH0-T1-C3C-EXEC-01`**; **§4** two-path **C3c** lock (**`models_additional`** + companion test); **§1** implementation **Pending**. |
 | 2026-03-28 | **§3** refreshed — **`main`** **`9f7e19e9`**; shortstats unchanged (**45+/15−**, **49+** test). **§1** **implementation** **Go**. |
+| 2026-03-28 | **Closed** — **`stash0-t1-c3c-01`** → **`main`** **`d70c7eac`**; **Quick** **`20260327_190856`**; **`run_verification`** **`20260327-191411`** (post-Quick); **§5** pytest **7** passed; **T3** firewall held. |

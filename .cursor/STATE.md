@@ -37,9 +37,9 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 - **Next 3 Steps:** (1) Select next engineering priority from **Professional Gap Tracker** (e.g. GAP-007 PanelHost, GAP-004 synthesis path, Phase 0 audit items); (2) Set Active Task + proof expectations; (3) Run `verify.ps1 -Quick` before substantive code changes per repo policy.
 - **Current Blocker:** None
 - **Truth Sync Note:** Runtime honesty lane: [VOICESTUDIO_RUNTIME_HONESTY_LANE_CLOSURE_2026-03-29.md](../docs/reports/verification/VOICESTUDIO_RUNTIME_HONESTY_LANE_CLOSURE_2026-03-29.md) — engine telemetry 503 (no fake metrics); training simulation `simulation_complete`; prosody HTTP 501; batch `None` + on-disk file success; GAP-001/002/003 closed in tracker. Voice cloning closure remains valid; see HISTORY LEDGER.
-- **Last Verified Commands:** `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` (PASS), `dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64` (PASS), `python -m pytest tests/ci/ -q --randomly-seed=12345` (PASS), `.\scripts\verify.ps1 -Quick` (PASS), `python scripts/run_verification.py` (PASS, **completion_guard** included)
+- **Last Verified Commands:** `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` (PASS), `dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64` (PASS, 2791 passed / 274 skipped), `python -m pytest tests/ci/ -q --randomly-seed=12345` (PASS, 216 passed / 2 deselected), `.\scripts\verify.ps1 -Quick` (PASS → `artifacts/verify/20260328_031316/`; Quick skips **completion_guard**), `python scripts/run_verification.py` (PASS, **completion_guard** after lane commit)
 - **Context Acknowledgment:** 2026-03-29 (Runtime honesty lane closure; Gap Tracker GAP-001/002/003 closed; CANONICAL_REGISTRY execution row + closure report)
-- **Latest verify artifact:** see post-closure `artifacts/verify/latest` after `verify.ps1 -Quick`; `.buildlogs/verification/last_run.json`
+- **Latest verify artifact:** `artifacts/verify/20260328_031316/verification_report.md`; `.buildlogs/verification/last_run.json`
 
 ---
 

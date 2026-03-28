@@ -4,8 +4,8 @@
 **Purpose:** Land **only** **`backend/api/models_additional.py`** and **`tests/unit/backend/api/test_models_additional.py`** from **`stash@{0}`** per **[`GOV-STASH0-T1-C3-PREFLIGHT-01`](STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md)** **§4.1** / **§5 Option C** (**C3c**) — **without** **`docs/api/openapi.json`**, **`shared/schemas/**`**, **`tests/contract/**`**, **without** re-checking **C3a** / **C3b** paths from stash, **without** bulk **`stash pop`**. **T3-adjacent:** reconcile must reject hunks that **require** contract/schema/OpenAPI edits under this row; any such need → **Pause** / **new T3 row**.  
 **Source stash:** *WIP: pre-Pass06-20260326 unclassified local and untracked*.  
 **Date (row drafted):** 2026-03-28  
-**Status:** **Open** — **§1** **implementation** **Pending**.  
-**§1 authorization:** **Engineering (preflight)** — **§3** complete **2026-03-28**. **Product / engineering (implementation)** — **Pending** until binding **Go** on **this** row.
+**Status:** **Open** — **§1** **implementation** **Go** **2026-03-28** — extract + proof in flight.  
+**§1 authorization:** **Engineering (preflight)** — **§3** complete **2026-03-28**; **§3 re-verified** **2026-03-28** on **`main`** **`9f7e19e9`** (shortstats unchanged vs **`stash@{0}`**). **Product / engineering (implementation)** — **Go** **2026-03-28** — selective **`stash@{0}`** checkout **§4** only; **§6 OUT**; **§5** + **Quick** for closure.
 
 **Related:** [STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md](STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md) (**§5 Option C** / **C3c**); [STASH0_T1_C3A_EXECUTION_ROW.md](STASH0_T1_C3A_EXECUTION_ROW.md) (**C3a** — **closed**); [STASH0_T1_C3B_EXECUTION_ROW.md](STASH0_T1_C3B_EXECUTION_ROW.md) (**C3b** — **closed**); [`.cursor/STATE.md`](../../.cursor/STATE.md).
 
@@ -15,8 +15,8 @@
 
 | Role | Decision | Date |
 |------|----------|------|
-| **Engineering (preflight)** | **Preflight complete** — **§3** filled from **`main`** **`86aeffb4883dc5dc77e75ebcbcddf5af430f017f`** vs **`stash@{0}`**; **`git merge-base main 'stash@{0}'`** **`a7a45f4cc2e8e81671eefffe885df3a86227b10a`**; **§4** both paths **non-empty**; top **`stash@{0}`** message matches STATE. Re-run **§3** before extract if **`main`** or **`stash@{0}`** moves. | **2026-03-28** |
-| **Product / engineering (implementation)** | **Pending** — Binding **go** to selective **`git checkout 'stash@{0}' --`** for **§4** only (**§7**); reconcile under lock; **§6 OUT** accepted; **§5** proof + **`verify.ps1 -Quick`** mandatory for closure. **Pause** path: dated pause + rationale; **no** extract. | — |
+| **Engineering (preflight)** | **Preflight complete** — **§3** refreshed **2026-03-28** on **`main`** **`9f7e19e93ddf115ebc2569feb2af9a9045414363`** vs **`stash@{0}`**; **`git merge-base main 'stash@{0}'`** **`a7a45f4cc2e8e81671eefffe885df3a86227b10a`**; **§4** both paths **non-empty**; stash top matches STATE. Re-run **§3** if **`main`** or **`stash@{0}`** moves before checkout. | **2026-03-28** |
+| **Product / engineering (implementation)** | **Implementation authorized** — Binding **go** to selective **`git checkout 'stash@{0}' --`** for **§4** only (**§7**); reconcile under lock; **§6 OUT** accepted; **§5** proof + **`verify.ps1 -Quick`** mandatory for closure. **Pre-extract** **2026-03-28**: **`stash@{0}`** message matches STATE; **`main`** **`9f7e19e9`**; **§4** shortstats **unchanged** vs prior draft. | **2026-03-28** |
 
 ---
 
@@ -32,7 +32,7 @@ Reconcile and land **only** the **Pydantic models adjunct + companion unit tests
 
 ## 3. Preflight — `git diff main 'stash@{0}' -- <path>`
 
-**Recorded** **`main`** @ **`86aeffb4883dc5dc77e75ebcbcddf5af430f017f`** (**re-verify** with **`git rev-parse HEAD`** before relying on hashes). **`git merge-base main 'stash@{0}'`** = **`a7a45f4cc2e8e81671eefffe885df3a86227b10a`**.
+**Recorded** **`main`** @ **`9f7e19e93ddf115ebc2569feb2af9a9045414363`** (**§3 refresh** **2026-03-28** — **re-verify** with **`git rev-parse HEAD`** before checkout if **`main`** moves again). **`git merge-base main 'stash@{0}'`** = **`a7a45f4cc2e8e81671eefffe885df3a86227b10a`**.
 
 **Sign-off readiness gates**
 
@@ -121,3 +121,4 @@ Run **after** reconciled diff is on the branch that will merge to **`main`** (or
 | Date | Change |
 |------|--------|
 | 2026-03-28 | **Created** — **`GOV-STASH0-T1-C3C-EXEC-01`**; **§4** two-path **C3c** lock (**`models_additional`** + companion test); **§1** implementation **Pending**. |
+| 2026-03-28 | **§3** refreshed — **`main`** **`9f7e19e9`**; shortstats unchanged (**45+/15−**, **49+** test). **§1** **implementation** **Go**. |

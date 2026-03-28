@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # GAP-I16: Import base model for consistent null handling
 from backend.api.models import VoiceStudioBaseModel
@@ -250,9 +250,14 @@ class VoiceSynthesizeRequest(VoiceStudioBaseModel):
         le=1.0,
     )
 
-    @validator("engine")
+    @field_validator("engine", mode="before")
+    @classmethod
     def validate_engine(cls, v):
         """Validate engine name format."""
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            raise ValueError("Engine must be a string")
         if not re.match(r"^[a-z0-9_-]+$", v.lower()):
             raise ValueError(
                 "Engine name must contain only lowercase letters, numbers, "
@@ -260,7 +265,8 @@ class VoiceSynthesizeRequest(VoiceStudioBaseModel):
             )
         return v.lower()
 
-    @validator("profile_id")
+    @field_validator("profile_id", mode="before")
+    @classmethod
     def validate_profile_id(cls, v):
         """Validate profile ID format. Allows alphanumeric, hyphen, underscore for local;
         also colon, slash, dot for third-party IDs (e.g. external/voice_001)."""
@@ -271,16 +277,24 @@ class VoiceSynthesizeRequest(VoiceStudioBaseModel):
             )
         return v
 
-    @validator("language")
+    @field_validator("language", mode="before")
+    @classmethod
     def validate_language(cls, v):
         """Validate language code format."""
-        if v and not re.match(r"^[a-z]{2}(-[A-Z]{2})?$", v.lower()):
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            raise ValueError("Language must be a string")
+        if not re.match(r"^[a-z]{2}(-[A-Z]{2})?$", v.lower()):
             raise ValueError("Language must be a valid ISO 639-1 code (e.g., 'en', 'en-US')")
-        return v.lower() if v else v
+        return v.lower()
 
-    @validator("text")
+    @field_validator("text", mode="before")
+    @classmethod
     def validate_text(cls, v):
         """Validate text content."""
+        if v is not None and not isinstance(v, str):
+            raise ValueError("Text must be a string")
         if not v or not v.strip():
             raise ValueError("Text cannot be empty")
         if len(v.strip()) > 10000:
@@ -437,7 +451,8 @@ class VoiceCloneRequest(VoiceStudioBaseModel):
     )
     language: str = Field(default="en", description="Language code for synthesis")
 
-    @validator("engine")
+    @field_validator("engine", mode="before")
+    @classmethod
     def validate_engine(cls, v):
         """Validate engine name format."""
         if not re.match(r"^[a-z0-9_-]+$", v.lower()):
@@ -447,18 +462,26 @@ class VoiceCloneRequest(VoiceStudioBaseModel):
             )
         return v.lower()
 
-    @validator("quality_mode")
+    @field_validator("quality_mode", mode="before")
+    @classmethod
     def validate_quality_mode(cls, v):
         """Validate quality mode."""
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            raise ValueError("Quality mode must be a string")
         valid_modes = ["fast", "standard", "high", "ultra"]
         if v.lower() not in valid_modes:
             raise ValueError(f"Quality mode must be one of: {', '.join(valid_modes)}")
         return v.lower()
 
-    @validator("text")
+    @field_validator("text", mode="before")
+    @classmethod
     def validate_text(cls, v):
         """Validate text if provided."""
         if v is not None:
+            if not isinstance(v, str):
+                raise ValueError("Text must be a string")
             v = v.strip()
             if not v:
                 return None
@@ -466,7 +489,8 @@ class VoiceCloneRequest(VoiceStudioBaseModel):
                 raise ValueError("Text cannot exceed 10000 characters")
         return v
 
-    @validator("prosody_params")
+    @field_validator("prosody_params", mode="before")
+    @classmethod
     def validate_prosody_params(cls, v):
         """Validate prosody parameters if provided."""
         if v is not None:
@@ -559,7 +583,8 @@ class MultiPassSynthesisRequest(VoiceStudioBaseModel):
         description="Consent record ID required when synthesizing with a third-party voice profile",
     )
 
-    @validator("engine")
+    @field_validator("engine", mode="before")
+    @classmethod
     def validate_engine(cls, v):
         if not re.match(r"^[a-z0-9_-]+$", v.lower()):
             raise ValueError(
@@ -746,7 +771,8 @@ class ImageGenerateRequest(BaseModel):
         description="Additional engine-specific parameters",
     )
 
-    @validator("engine")
+    @field_validator("engine", mode="before")
+    @classmethod
     def validate_engine(cls, v):
         """Validate engine name format."""
         if not re.match(r"^[a-z0-9_-]+$", v.lower()):
@@ -756,9 +782,12 @@ class ImageGenerateRequest(BaseModel):
             )
         return v.lower()
 
-    @validator("prompt")
+    @field_validator("prompt", mode="before")
+    @classmethod
     def validate_prompt(cls, v):
         """Validate prompt content."""
+        if v is not None and not isinstance(v, str):
+            raise ValueError("Prompt must be a string")
         if not v or not v.strip():
             raise ValueError("Prompt cannot be empty")
         if len(v.strip()) > 2000:
@@ -880,7 +909,8 @@ class VideoGenerateRequest(BaseModel):
         description="Additional engine-specific parameters",
     )
 
-    @validator("engine")
+    @field_validator("engine", mode="before")
+    @classmethod
     def validate_engine(cls, v):
         """Validate engine name format."""
         if not re.match(r"^[a-z0-9_-]+$", v.lower()):

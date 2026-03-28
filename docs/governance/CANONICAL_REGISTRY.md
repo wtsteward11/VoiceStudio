@@ -21,7 +21,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Archive Policy | `docs/governance/ARCHIVE_POLICY.md` | — | **DEFERRED** — Use [document-lifecycle.mdc](.cursor/rules/workflows/document-lifecycle.mdc) and archive structure in `docs/archive/` |
 | Governance Lock | `docs/governance/GOVERNANCE_LOCK.md` | — | **DEFERRED** — Low priority |
 | Definition of Done | `docs/governance/DEFINITION_OF_DONE.md` | 2026-01-25 | Consolidated completion criteria |
-| Session State | `.cursor/STATE.md` | 2026-03-29 | **Operational truth** — **Active Plan:** [VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md) + [PROFESSIONAL_GAP_TRACKER.md](../design/PROFESSIONAL_GAP_TRACKER.md); lane `GOV-VOICESTUDIO-VOICE-CLONING-INTEGRITY-01` **closed** 2026-03-29; proof `docs/reports/verification/VOICESTUDIO_VOICE_CLONING_INTEGRITY_LANE_CLOSURE_2026-03-29.md` |
+| Session State | `.cursor/STATE.md` | 2026-03-29 | **Operational truth** — **Active Plan:** [VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md) + [PROFESSIONAL_GAP_TRACKER.md](../design/PROFESSIONAL_GAP_TRACKER.md); lanes **Voice Cloning Integrity** + **Runtime Honesty** closed 2026-03-29; proofs under `docs/reports/verification/VOICESTUDIO_*_LANE_CLOSURE_2026-03-29.md` |
 | Memory Index | `openmemory.md` | 2026-01-25 | Living project index for AI context |
 | **Project Handoff Guide** | `docs/governance/PROJECT_HANDOFF_GUIDE.md` | 2026-01-30 | Maintainer entry point; gate status, build/test, structure, roles, task brief creation |
 | **Overseer Newcomer Handoff** | `docs/governance/overseer/OVERSEER_NEWCOMER_HANDOFF.md` | 2026-03-12 | New Overseer (Role 0) onboarding; Day 1 reads, first commands, daily cadence, non-negotiables |

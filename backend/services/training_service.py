@@ -36,6 +36,9 @@ _MAX_TRAINING_JOBS = 100
 _MAX_TRAINING_LOGS_PER_JOB = 1000
 _MAX_QUALITY_HISTORY_PER_JOB = 1000
 
+# Distinct from real training `"completed"` — clients must not treat simulation as a trained model.
+SIMULATION_STATUS = "simulation_complete"
+
 # One-time migration: move dataset_* keys from legacy training_jobs into _datasets_store
 _MIGRATION_DONE_KEY = "_datasets_migrated_v1"
 
@@ -780,13 +783,13 @@ async def _simulate_training(
                 pass
 
         if key in _training_jobs_store:
-            status_dict["status"] = "completed"
+            status_dict["status"] = SIMULATION_STATUS
             status_dict["completed"] = datetime.utcnow().isoformat()
             status_dict["progress"] = 1.0
             _training_logs[training_id].append({
                 "timestamp": datetime.utcnow().isoformat(),
                 "level": "info",
-                "message": "Training completed successfully",
+                "message": "Training simulation finished (not a real trained model)",
                 "epoch": epochs,
                 "loss": status_dict.get("loss", 0.2),
             })

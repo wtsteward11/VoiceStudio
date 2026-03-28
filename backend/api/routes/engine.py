@@ -19,6 +19,23 @@ from ..optimization import cache_response
 
 logger = logging.getLogger(__name__)
 
+_TELEMETRY_UNAVAILABLE = (
+    "Engine telemetry is unavailable: synthesis metrics could not be collected "
+    "from the engine service or runtime. No placeholder metrics are returned."
+)
+
+
+def _telemetry_service_unavailable() -> HTTPException:
+    """503 when real telemetry cannot be produced (no fabricated metrics)."""
+    return HTTPException(
+        status_code=503,
+        detail={
+            "code": "TELEMETRY_UNAVAILABLE",
+            "message": _TELEMETRY_UNAVAILABLE,
+            "available": False,
+        },
+    )
+
 router = APIRouter(prefix="/api/engine", tags=["engine", "telemetry"])
 
 # In-memory telemetry storage (replace with database in production)
@@ -105,47 +122,28 @@ async def telemetry(
 
         except Exception as service_err:
             logger.debug(f"Engine service error: {service_err}")
-            # Engine router not available, try resource manager
+            # Do not fabricate synthesis timing or VRAM when the service path fails.
             try:
                 from core.runtime.resource_manager import get_resource_manager
 
-                rm = get_resource_manager()
-
-                # Get GPU usage
-                gpu_info = rm.get_gpu_info()
-                if gpu_info and len(gpu_info) > 0:
-                    vram_pct = gpu_info[0].get("memory_used_percent", 0.0)
-                else:
-                    vram_pct = 0.0
-
-                # Estimate engine_ms from recent operations
-                # (in production, this would track actual synthesis times)
-                engine_ms = 15.0  # Default estimate
-                underruns = 0
-
-                logger.debug(
-                    f"Telemetry from resource manager: "
-                    f"engine_ms={engine_ms:.2f}, vram_pct={vram_pct:.2f}%"
-                )
-
-                return Telemetry(
-                    engine_ms=float(engine_ms),
-                    underruns=int(underruns),
-                    vram_pct=float(vram_pct),
-                )
-
+                _ = get_resource_manager()
             except ImportError:
-                # Fallback: return default values
                 logger.warning(
-                    "Engine router and resource manager not available, "
-                    "returning default telemetry"
+                    "Engine service failed and resource manager is not importable; "
+                    "telemetry unavailable (no placeholder metrics)."
                 )
-                return Telemetry(engine_ms=12.3, underruns=0, vram_pct=42.0)
+            else:
+                logger.warning(
+                    "Engine service failed; resource manager cannot supply honest "
+                    "synthesis timing — telemetry unavailable (no placeholder metrics)."
+                )
+            raise _telemetry_service_unavailable() from service_err
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get telemetry: {e}", exc_info=True)
-        # Return default values on error
-        return Telemetry(engine_ms=12.3, underruns=0, vram_pct=42.0)
+        raise _telemetry_service_unavailable() from e
 
 
 @router.get("/telemetry/history")

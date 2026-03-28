@@ -27,6 +27,21 @@ from ..optimization import cache_response
 
 logger = logging.getLogger(__name__)
 
+
+def _client_output_path_is_forbidden(output_path: str) -> bool:
+    """Reject path traversal and non-filesystem schemes; allow Windows drive paths (C:\\...)."""
+    if ".." in output_path:
+        return True
+    normalized = output_path.replace("\\", "/")
+    if normalized.startswith("/"):
+        return True
+    if ":" in output_path:
+        if len(output_path) >= 2 and output_path[1] == ":" and output_path[0].isalpha():
+            return False
+        return True
+    return False
+
+
 router = APIRouter(prefix="/api/batch", tags=["batch"])
 
 # Disk-backed job state store for persistence across restarts
@@ -665,7 +680,7 @@ async def _process_batch_job(job_id: str):
             if job.output_path:
                 output_path = job.output_path
                 # Validate output path
-                if ".." in output_path or output_path.startswith("/") or ":" in output_path:
+                if _client_output_path_is_forbidden(output_path):
                     raise ValueError(
                         f"Invalid output path: {output_path}. Path contains invalid characters."
                     )
@@ -851,7 +866,11 @@ async def _process_batch_job(job_id: str):
                 quality_metrics = {}
 
             if audio is None:
-                raise HTTPException(status_code=500, detail="Engine returned None - synthesis may have failed")
+                # Some engines write only to output_path and return None in-memory.
+                if not (output_path and os.path.isfile(output_path)):
+                    raise RuntimeError(
+                        "Engine returned None and no output file was found — synthesis may have failed"
+                    )
 
             # Calculate quality score from metrics (IDEA 57)
             quality_score = None

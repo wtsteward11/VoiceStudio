@@ -308,73 +308,20 @@ async def prosody_control(req: ProsodyControlRequest) -> ProsodyControlResponse:
                 detail="Audio processing libraries not available. Install librosa and soundfile.",
             )
 
-        # Load audio
-        audio, sample_rate = sf.read(audio_path)
-        if len(audio.shape) > 1:
-            audio = np.mean(audio, axis=1)  # Convert to mono
+        # Load audio (validates file is readable); DSP path is not implemented below.
+        audio_probe, _sr = sf.read(audio_path)
+        if audio_probe.size == 0:
+            raise HTTPException(status_code=400, detail="Audio file is empty")
 
-        # Apply prosody adjustments
-        processed_audio = audio.copy()
-        prosody_applied: dict[str, Any] = {}
-        quality_improvement = 0.0
-
-        try:
-            # Apply pitch contour adjustments if provided
-            if req.pitch_contour:
-                # Simple pitch shifting based on contour
-                # In production, use more sophisticated pitch shifting
-                prosody_applied["pitch_contour"] = "applied"
-                quality_improvement += 0.1
-
-            # Apply rhythm adjustments
-            if req.rhythm_adjustments:
-                # Time-stretching based on rhythm adjustments
-                prosody_applied["rhythm"] = req.rhythm_adjustments
-                quality_improvement += 0.05
-
-            # Apply stress markers
-            if req.stress_markers:
-                # Emphasize stressed words (pitch and volume)
-                prosody_applied["stress_markers"] = len(req.stress_markers)
-                quality_improvement += 0.1
-
-            # Apply intonation pattern
-            if req.intonation_pattern:
-                # Adjust pitch pattern based on intonation
-                prosody_applied["intonation"] = req.intonation_pattern
-                if req.intonation_pattern in ["rising", "falling"]:
-                    quality_improvement += 0.15
-
-            # Apply prosody template
-            if req.prosody_template:
-                # Apply pre-configured prosody pattern
-                prosody_applied["template"] = req.prosody_template
-                quality_improvement += 0.1
-
-            # Save processed audio via artifact spine
-            if processed_audio.dtype != np.float32:
-                processed_audio = processed_audio.astype(np.float32)
-            processed_audio = np.clip(processed_audio, -1.0, 1.0)
-
-            processed_audio_id, _cached_path, _meta = create_audio_artifact_from_wav_array(
-                processed_audio,
-                sample_rate,
-                created_by="voice_processing_prosody",
-            )
-
-            quality_improvement = min(1.0, quality_improvement)
-
-            return ProsodyControlResponse(
-                audio_id=req.audio_id,
-                processed_audio_id=processed_audio_id,
-                processed_audio_url=f"/api/voice/audio/{processed_audio_id}",
-                prosody_applied=prosody_applied,
-                quality_improvement=quality_improvement,
-            )
-
-        except Exception as e:
-            logger.error(f"Prosody control processing error: {e}")
-            raise HTTPException(status_code=500, detail=f"Prosody control processing failed: {e!s}")
+        # Real pitch/time-stress DSP is not implemented — do not return an identical waveform
+        # as if prosody were applied.
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "Prosody control is not yet implemented. "
+                "No audio was modified."
+            ),
+        )
 
     except HTTPException:
         raise

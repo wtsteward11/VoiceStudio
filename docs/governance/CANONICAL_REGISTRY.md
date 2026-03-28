@@ -57,6 +57,8 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Workflow Coherence Advanced Lane Closure** | `docs/reports/verification/VOICESTUDIO_WORKFLOW_COHERENCE_ADVANCED_LANE_CLOSURE_2026-03-28.md` | 2026-03-28 | Consolidated closure matrix + mandatory §6 verification; honest limits §4 |
 | **Voice Cloning Integrity Lane Execution Row** | `docs/design/GOV_VOICESTUDIO_VOICE_CLONING_INTEGRITY_01_EXECUTION_ROW.md` | 2026-03-29 | Reference audio binding for clone wizard + API `reference_audio_bound`; **lane closed** Slices 1–4 |
 | **Voice Cloning Integrity Lane Closure** | `docs/reports/verification/VOICESTUDIO_VOICE_CLONING_INTEGRITY_LANE_CLOSURE_2026-03-29.md` | 2026-03-29 | Closure §4 verification; binding tests; honest scope §1 |
+| **Runtime Honesty Lane Execution Row** | `docs/design/GOV_VOICESTUDIO_RUNTIME_HONESTY_01_EXECUTION_ROW.md` | 2026-03-29 | Telemetry 503, training `simulation_complete`, prosody 501, batch disk-only synthesis; **lane closed** |
+| **Runtime Honesty Lane Closure** | `docs/reports/verification/VOICESTUDIO_RUNTIME_HONESTY_LANE_CLOSURE_2026-03-29.md` | 2026-03-29 | GAP-002/003 closure; honesty unit tests; `completion_guard` via committed proofs |
 | **Test Classification** | `docs/governance/TEST_CLASSIFICATION.md` | 2026-03-12 | Seam-aware vs transport-mock vs legacy; supports architectural completion claims |
 | **Training Lifecycle Async Patterns** | `docs/design/TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md` | 2026-03-12 | Fire-and-forget paths in TrainingViewModel; cancellation ownership |
 | **Retained Async Rule** | `docs/design/RETAINED_ASYNC_RULE.md` | 2026-03-13 | Unified rule for ViewModel fire-and-forget; aligns SceneBuilder, BatchProcessing, Training |

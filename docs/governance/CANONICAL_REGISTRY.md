@@ -3,7 +3,7 @@
 This registry is the single source of truth for all canonical documents in VoiceStudio.
 Before creating a new document, check this registry to ensure the topic isn't already covered.
 
-> **Last Updated**: 2026-03-28 — **`GOV-STASH0-T1-C3C-EXEC-01`** **closed** ([`STASH0_T1_C3C_EXECUTION_ROW.md`](../design/STASH0_T1_C3C_EXECUTION_ROW.md) **§8**). **T1-C3** locked slices **C3a**/**C3b**/**C3c** **landed** on **`main`**; **`stash@{0}`** **remainder** **parked** — **new** row + **§1** before further extract. **Repo-global Quick** ([`latest_pointer.json`](../../artifacts/verify/latest_pointer.json)): **`artifacts/verify/20260327_190856`** (PASS) — **`GOV-STASH0-T1-C3C-EXEC-01`**; **`commit_hash`** **`d70c7eac07aad88718857b3168b5ec352eba2d17`**. **Prior** (**C3B**): **`20260327_182409`** / **`9f550a0f`**. **Prior** (**C3A**): **`20260327_175838`** / **`ab52c3de`**. **Prior** (**R1A**): **`20260327_165459`** / **`0e0d0a91`**. **Prior** (**T1-S1**): **`20260326_230934`** / **`f6047797`**. **`run_verification`** **`timestamp_short`** **`20260327-191411`** (verbatim **`.buildlogs/verification/last_run.json`** after **C3C** closure sync / **Quick**). **`git rev-parse HEAD` / `main`** — **may** differ from **pointer** after docs-only commits. **T2** / **P05-A4** / **W8** / **W7** / Product trust / **Pass 06** — **historical** or **paused** per linked docs.
+> **Last Updated**: 2026-03-28 (Unified startup lane closed; Role 8 Project Intelligence Analyst guide/prompt registered)
 
 ---
 
@@ -21,10 +21,10 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Archive Policy | `docs/governance/ARCHIVE_POLICY.md` | — | **DEFERRED** — Use [document-lifecycle.mdc](.cursor/rules/workflows/document-lifecycle.mdc) and archive structure in `docs/archive/` |
 | Governance Lock | `docs/governance/GOVERNANCE_LOCK.md` | — | **DEFERRED** — Low priority |
 | Definition of Done | `docs/governance/DEFINITION_OF_DONE.md` | 2026-01-25 | Consolidated completion criteria |
-| Session State | `.cursor/STATE.md` | 2026-03-28 | **Global Quick** **`20260327_190856`** / **`d70c7eac`** (**C3C** §8); **`run_verification`** **`20260327-191411`**; **`GOV-STASH0-T1-C3C-EXEC-01`** **closed**; **T1** stash remainder **parked**; **W7** / Product trust / **W8** paused unless signed reopen. |
+| Session State | `.cursor/STATE.md` | 2026-03-28 | **Operational truth** — lane `GOV-VOICESTUDIO-UNIFIED-STARTUP-01` **closed** 2026-03-28; proof `docs/reports/verification/VOICESTUDIO_UNIFIED_STARTUP_LANE_CLOSURE_2026-03-28.md`; verify Quick `artifacts/verify/20260328_004504/` |
 | Memory Index | `openmemory.md` | 2026-01-25 | Living project index for AI context |
 | **Project Handoff Guide** | `docs/governance/PROJECT_HANDOFF_GUIDE.md` | 2026-01-30 | Maintainer entry point; gate status, build/test, structure, roles, task brief creation |
-| **Overseer Newcomer Handoff** | `docs/governance/overseer/OVERSEER_NEWCOMER_HANDOFF.md` | 2026-03-24 | New Overseer (Role 0) onboarding; **§2 project snapshot** (workflow passes, verify pointers, code-truth); Day 1 reads, first commands, daily cadence, non-negotiables |
+| **Overseer Newcomer Handoff** | `docs/governance/overseer/OVERSEER_NEWCOMER_HANDOFF.md` | 2026-03-12 | New Overseer (Role 0) onboarding; Day 1 reads, first commands, daily cadence, non-negotiables |
 | **Tech Debt Register** | `docs/governance/TECH_DEBT_REGISTER.md` | 2026-01-29 | Consolidated technical debt, limitations, and future enhancements; categorized by priority (High/Medium/Low) |
 | **Production Readiness Statement** | `docs/PRODUCTION_READINESS.md` | 2026-01-30 | Formal production readiness declaration for v1.0.0 BASELINE; capabilities, limitations, quality gates, support |
 | Task Brief System | `docs/tasks/README.md` | 2026-01-30 | Task brief workflow and conventions; lifecycle: Analyze → Blueprint → Construct → Validate |
@@ -42,6 +42,12 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Completion Roadmap v2.0** | `docs/governance/VOICESTUDIO_COMPLETION_ROADMAP_V2.md` | 2026-03-03 | CI-enforced hardened roadmap for v1.1.0; 7 gaps, 6 phases (0/A/B/C/D/E/F), 5 permanent CI invariants |
 | **Feature Catalog Master** | `docs/governance/FEATURE_CATALOG_MASTER.md` | 2026-03-05 | Single canonical feature inventory; 47 panels, API/engine/plugin surface; machine appendix: [FEATURE_CATALOG_MASTER.appendix.json](FEATURE_CATALOG_MASTER.appendix.json); CI drift check in `tests/ci/test_feature_catalog_appendix.py` |
 | **Finish Line: Personal Studio** | `docs/governance/FINISH_LINE_PERSONAL_STUDIO.md` | 2026-03-06 | Acceptance criteria for workspaces CRUD/import/export, tool catalog, docking/resize/collapse persistence, restore failure recovery; manual thrash test; build determinism rule |
+| **Unified Startup Lane Execution Row** | `docs/design/GOV_VOICESTUDIO_UNIFIED_STARTUP_01_EXECUTION_ROW.md` | 2026-03-28 | Frozen lane for app-native startup orchestrator; **lane closed** 2026-03-28 (Slices 1–4); §0 + §15.1 Closed |
+| **Unified Startup Baseline Audit** | `docs/reports/verification/VOICESTUDIO_UNIFIED_STARTUP_BASELINE_AUDIT_2026-03-28.md` | 2026-03-28 | Code-truth baseline and gap map before startup implementation slices |
+| **Unified Startup Slice 1 Proof** | `docs/reports/verification/VOICESTUDIO_UNIFIED_STARTUP_SLICE1_PROOF_2026-03-28.md` | 2026-03-28 | Reuse/spawn decision seam proof artifacts and baseline gate evidence |
+| **Unified Startup Slice 2 Proof** | `docs/reports/verification/VOICESTUDIO_UNIFIED_STARTUP_SLICE2_PROOF_2026-03-28.md` | 2026-03-28 | Startup gating and single-authority failure surface proof with targeted startup test artifacts |
+| **Unified Startup Slice 3 Proof** | `docs/reports/verification/VOICESTUDIO_UNIFIED_STARTUP_SLICE3_PROOF_2026-03-28.md` | 2026-03-28 | Port conflict + in-process repeat-launch proof; extended `startup_decision.json` fields; archived TRX |
+| **Unified Startup Lane Closure** | `docs/reports/verification/VOICESTUDIO_UNIFIED_STARTUP_LANE_CLOSURE_2026-03-28.md` | 2026-03-28 | Five-scenario closure matrix + mandatory §6 verification; cross-process repeat launch = code-truth / operator class |
 | **Test Classification** | `docs/governance/TEST_CLASSIFICATION.md` | 2026-03-12 | Seam-aware vs transport-mock vs legacy; supports architectural completion claims |
 | **Training Lifecycle Async Patterns** | `docs/design/TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md` | 2026-03-12 | Fire-and-forget paths in TrainingViewModel; cancellation ownership |
 | **Retained Async Rule** | `docs/design/RETAINED_ASYNC_RULE.md` | 2026-03-13 | Unified rule for ViewModel fire-and-forget; aligns SceneBuilder, BatchProcessing, Training |
@@ -62,8 +68,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Startup Orchestration Hardening** | `docs/design/STARTUP_ORCHESTRATION_HARDENING_PLAN.md` | 2026-03-16 | Backend auto-start hardening: explicit phases, startup states, production runtime discovery, readiness gate, failure recovery UX |
 | **Backend Ownership Policy** | `docs/design/BACKEND_OWNERSHIP_POLICY.md` | 2026-03-14 | Backend lifecycle rules: reuse, port conflict, stale backend, frontend exit, app root, runtime discovery |
 | **BackendClient transport extraction inventory** | `docs/design/BACKENDCLIENT_TRANSPORT_EXTRACTION_INVENTORY.md` | 2026-03-22 | PR-1–PR-12 extraction log; Post-PR-12 remainder pointer; stop criteria link |
-| **BackendClient remainder inventory** | `docs/design/BACKENDCLIENT_REMAINDER_INVENTORY.md` | 2026-03-24 | Post-PR-17 re-baseline from code; stop criteria; decision PAUSE; re-entry rule; date integrity repaired |
-| **STATE archived history** | `docs/archive/STATE_HISTORY.md` | 2026-02-24 | Archived from .cursor/STATE.md per STATE_TRIM_PLAN (Post-PR-17 remainder reassessment) |
+| **BackendClient remainder inventory** | `docs/design/BACKENDCLIENT_REMAINDER_INVENTORY.md` | 2026-03-22 | Post-PR-12 ranked clusters; thin client status; PR-13 Pipeline chosen |
 | **Extraction stop criteria** | `docs/design/EXTRACTION_STOP_CRITERIA.md` | 2026-03-22 | When NOT to extract; leverage threshold, fragmentation cost, sparse callers, DTO glue, cross-cutting |
 | **STATE trim plan** | `docs/design/STATE_TRIM_PLAN.md` | 2026-03-22 | Bounded plan for STATE.md archive; do not execute without approval |
 | **PR-13 Pipeline scope** | `docs/design/PR-13_PIPELINE_SCOPE.md` | 2026-03-22 | Frozen PR-13 slice: GetPipelineProvidersAsync, ProcessPipelineAsync to IPipelineConversationClient |
@@ -71,31 +76,6 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **PR-15 Models scope** | `docs/design/PR-15_MODELS_SCOPE.md` | 2026-03-23 | Frozen PR-15 slice: 9 model methods to IModelManagerClient / pipeline |
 | **PR-16 Video scope** | `docs/design/PR-16_VIDEO_SCOPE.md` | 2026-03-23 | Frozen PR-16 slice: 5 video methods to IVideoGenClient, IVideoEditClient / pipeline |
 | **PR-17 Mixer scope** | `docs/design/PR-17_MIXER_SCOPE.md` | 2026-03-23 | Frozen PR-17 slice: 19 mixer methods to IMixerStateClient / pipeline; 4 gap methods added to interface |
-| **Post-extraction transition plan** | `docs/design/POST_EXTRACTION_TRANSITION_PLAN.md` | 2026-03-24 | Next active lane after extraction pause; re-entry triggers; proof expectations |
-| **Cross-feature workflow backlog** | `docs/design/CROSS_FEATURE_WORKFLOW_BACKLOG.md` | 2026-03-27 | **Repo-global Quick** aligned to **R1A** **`20260327_165459`** / **`0e0d0a91`** (top paragraph). **Workflow 6** Pass 06 slices **1–5** — historical proofs in doc body. **Workflow 8** — **W8-C1/2/3** closed; hermetic **`8ba6363f`** historical. |
-| **Workflow Pass 01 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_01_PROFILE_SYNTHESIS_TIMELINE.md` | 2026-03-24 | Bounded pass: Profile → synthesis → timeline |
-| **Workflow Pass 02 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_02_PROJECT_TIMELINE_EFFECTS_MIXER.md` | 2026-03-24 | Bounded pass: Project → timeline → effects/mixer; closure §12–§14 |
-| **Workflow Pass 02 proof reconciliation** | `docs/design/WORKFLOW_PASS_02_ARTIFACT_RECONCILIATION.md` | 2026-03-24 | Incomplete verify runs vs latest_pointer; Pass 02 authoritative artifact |
-| **Workflow Pass 03 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_03_SEARCH_PANEL_FOCUS_NAVIGATION.md` | 2026-03-24 | **Complete** (2026-03-24): Search → panel focus → item navigation; proof `artifacts/verify/20260324_030133` |
-| **Workflow Pass 03 governance reconciliation** | `docs/design/WORKFLOW_PASS_03_GOVERNANCE_RECONCILIATION.md` | 2026-03-24 | Mapper path canon (`VoiceStudio.Core/Panels`); pointer rule; audit checklist vs split-brain |
-| **Workflow Pass 04 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_04_SCRIPT_EDITOR_SYNTHESIS_PREVIEW.md` | 2026-03-24 | **Complete** (2026-03-24): Script editor → synthesis / preview; proof `artifacts/verify/20260324_070722`; §10 implementation lock; C5 deferred |
-| **Workflow Pass 05 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_05_RECORD_IMPORT_TRANSCRIPTION_PROJECT.md` | 2026-03-24 | **Slices 1–3 complete** — C3 Option B (proof `20260324_190103`). Slices 1–2 proofs `20260324_173141`, `20260324_181021`. **§10.7** lock; matrix **C3-OptB**. Code-truth §1 (`TranscribeViewModel`, not `TranscriptionViewModel`) |
-| **Workflow Pass 06 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_06_BACKUP_RESTORE_PROJECT_SETTINGS_PROFILE_RECOVERY.md` | 2026-03-26 | **Pass 06 open; slices 1–5 complete** (§8). **Slice 5** D6 + global Quick **`20260326_145710`** / verified commit **`e2819074`**; seam **32** + pytest **8** (§7.2). **Slice 4** Quick **`20260325_055851`** (historical row). |
-| **Workflow Pass 07 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_07_TRAINING_DATASET_MODEL_PROFILE.md` | 2026-03-25 | **W7-C1 closed**; **lane paused after W7-C1** (**§8.4**) — Quick **`20260325_162114`**, seam **2**; [backlog](../design/CROSS_FEATURE_WORKFLOW_BACKLOG.md) Workflow 7 |
-| **Workflow Pass 08 scope** | `docs/design/WORKFLOW_COHERENCE_PASS_08_QUALITY_BENCHMARK_PROFILE_COMPARISON.md` | 2026-03-26 | **W8-C1** + **W8-C2** + **W8-C3** closed. **§8.3** / **§8.10** / **§8.7** proofs; **§8.8–§8.9** = W8-C2 freeze + sign-off. Hermetic baseline **`20260326_020644`** / **`8ba6363f`**. [backlog](../design/CROSS_FEATURE_WORKFLOW_BACKLOG.md) Workflow 8 |
-| **Product trust / release honesty Pass 01** | `docs/design/PRODUCT_TRUST_AND_RELEASE_HONESTY_PASS_01.md` | 2026-03-26 | **Paused after slice 4** (§8.9 **Option 1**); slices **1–4** closed; **no slice 5** authorized; reopen = new §8 sign-off; slice 4 Quick **`20260325_143041`** / seam **5** |
-| **Pass 05 C3 persistence policy** | `docs/design/PASS_05_C3_PROJECT_AUDIO_PERSISTENCE_POLICY.md` | 2026-03-24 | **Option B frozen** 2026-03-24 — decisions §2, OUT §5, matrix **C3-OptB**, pre-map §8 |
-| **Pass 05 persistence Option C follow-up** | `docs/design/WORKFLOW_COHERENCE_PASS_05_PERSISTENCE_OPTION_C_FOLLOWUP.md` | 2026-03-25 | Record-only `IProjectAudioClient` bridge; §8 execution |
-| **Pass 05 persistence follow-up (Option A — transcribe + import)** | `docs/design/WORKFLOW_COHERENCE_PASS_05_PERSISTENCE_OPTION_A_FOLLOWUP.md` | 2026-03-27 | **A1–A4 complete.** A4: Quick **`20260326_163358`**, seam **54** (§7); **`LibraryDragDropToProjectPersistence`** + `LibraryView` drag-drop; commit **`3ad39e35`**. |
-| **Stash T2 verify/CI execution row** | `docs/design/STASH0_T2_VERIFY_CI_EXECUTION_ROW.md` | 2026-03-26 | **`GOV-STASH0-T2-VERIFY-01`** — **closed**; six-path lock landed; Quick **`20260326_211554`** / **`dc07e515`**; §8 proof in doc; **`stash@{0}`** retained (selective checkout). |
-| **Stash T1-S1 synthesis vertical execution row** | `docs/design/STASH0_T1_S1_EXECUTION_ROW.md` | 2026-03-27 | **`GOV-STASH0-T1-S1-01`** — **closed** on **`main`**; merge/integration verify **`git branch --contains f6047797 main`**; eight-path **§4**; Quick **`20260326_230934`** / pointer **`f6047797`**; **`run_verification`** **`20260327-151108`**; §8; **`stash@{0}`** **parked**. |
-| **Stash T1 backend preflight (original decomposition)** | `docs/design/STASH0_T1_PREFLIGHT_EXECUTION_ROW.md` | 2026-03-27 | **`GOV-STASH0-T1-PREFLIGHT-01`** — **T1-C1–C4** clusters; **T1-S1** consumed **T1-C1**; **§3** baseline updated post-closure; remainder → **R1** row. |
-| **Stash T1 remainder preflight (post–T1-S1)** | `docs/design/STASH0_T1_R1_PREFLIGHT_EXECUTION_ROW.md` | 2026-03-27 | **`GOV-STASH0-T1-R1-PREFLIGHT-01`** — **`stash@{0}`** vs **`main`** re-baseline; **§5 Option A** slice choice **2026-03-27**; **planning-only** (no **§4** lock); next → **`GOV-STASH0-T1-R1A-EXEC-01`** ([`STASH0_T1_R1A_EXECUTION_ROW.md`](design/STASH0_T1_R1A_EXECUTION_ROW.md)). |
-| **Stash T1-R1A narrow T1-C2 execution row** | `docs/design/STASH0_T1_R1A_EXECUTION_ROW.md` | 2026-03-27 | **`GOV-STASH0-T1-R1A-EXEC-01`** — **closed**; **§8** Quick **`20260327_165459`** / **`0e0d0a91`**; **Partial** **`script_store`** + **`route_registry`** remain **`main`**; **eight** paths landed from **`stash@{0}`**; **`stash@{0}`** retained. |
-| **Stash T1-C3 cross-cutting preflight (post–R1A)** | `docs/design/STASH0_T1_C3_PREFLIGHT_EXECUTION_ROW.md` | 2026-03-28 | **`GOV-STASH0-T1-C3-PREFLIGHT-01`** — **§5 Option A** (**C3a**) **signed** **2026-03-28**; child **[`GOV-STASH0-T1-C3A-EXEC-01`](design/STASH0_T1_C3A_EXECUTION_ROW.md)**; **no** code under preflight row ID. |
-| **Stash T1-C3a rate limiting execution row** | `docs/design/STASH0_T1_C3A_EXECUTION_ROW.md` | 2026-03-28 | **`GOV-STASH0-T1-C3A-EXEC-01`** — **closed**; **§8** Quick **`20260327_175838`** / **`ab52c3de`**; **`run_verification`** **`20260327-180547`** (**C3A** closure-era ledger); children **C3B** / **C3C** **closed**. |
-| **Stash T1-C3b auth middleware execution row** | `docs/design/STASH0_T1_C3B_EXECUTION_ROW.md` | 2026-03-28 | **`GOV-STASH0-T1-C3B-EXEC-01`** — **closed**; **§8** Quick **`20260327_182409`** / **`9f550a0f`**; **`run_verification`** **`20260327-182920`**; child **C3C** **closed**. |
-| **Stash T1-C3c models_additional execution row** | `docs/design/STASH0_T1_C3C_EXECUTION_ROW.md` | 2026-03-28 | **`GOV-STASH0-T1-C3C-EXEC-01`** — **closed**; **§8** Quick **`20260327_190856`** / **`d70c7eac`**; **`run_verification`** **`20260327-191411`**; **§4** two-path selective **`stash@{0}`**; **T3** firewall held; **`stash@{0}`** retained; **T1** remainder **parked**. |
 | **PR-8 Telemetry/Diagnostics scope** | `docs/design/PR-8_TELEMETRY_DIAGNOSTICS_SCOPE.md` | 2026-03-22 | PR-8 extraction scope: Option A (DiagnosticsClient decoupling) or Option B (Macros) |
 | **Premium Software Coherence Audit** | `docs/design/PREMIUM_SOFTWARE_COHERENCE_AUDIT.md` | 2026-03-17 | Formal audit: startup, shell, transport, panel lifecycle, event wiring, backend seam, workflows, UX; gaps ranked S0–S2 |
 
@@ -210,6 +190,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Role 5: Engine Engineer | `docs/governance/roles/ROLE_5_ENGINE_ENGINEER_GUIDE.md` | 2026-01-25 | Quality metrics, adapters |
 | Role 6: Release Engineer | `docs/governance/roles/ROLE_6_RELEASE_ENGINEER_GUIDE.md` | 2026-01-25 | Installer, lifecycle, Gate H |
 | **Role 7: Debug Agent** | `docs/governance/roles/ROLE_7_DEBUG_AGENT_GUIDE.md` | 2026-01-25 | Root-cause analysis, issue triage, system-wide fixes, validation |
+| **Role 8: Project Intelligence Analyst** | `docs/governance/roles/ROLE_8_PROJECT_INTELLIGENCE_ANALYST_GUIDE.md` | 2026-03-28 | Read-only intelligence: implementation maps, workflow traces, contradiction memos, external research; no repo/git/STATE mutations |
 | Skeptical Validator (subagent) | `docs/governance/SKEPTICAL_VALIDATOR_GUIDE.md` | 2026-01-28 | Cross-cutting validation subagent; §7 "When to Use" |
 | Validator Escalation Protocol | `docs/governance/VALIDATOR_ESCALATION.md` | 2026-01-28 | Overseer queue, HIGH PRIORITY, escalation triggers |
 | **Overseer Final Handoff** | `docs/governance/overseer/handoffs/OVERSEER_FINAL_HANDOFF.md` | 2026-02-18 | Successor handoff: architecture, risks, file map, verification playbook, recommendations (10 sections) |
@@ -224,7 +205,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 
 | Topic | Canonical Source | Last Updated | Notes |
 | --- | --- | --- | --- |
-| **Role Prompts Index** | `.cursor/prompts/ROLE_PROMPTS_INDEX.md` | 2026-01-25 | Master index for all 7 role prompts |
+| **Role Prompts Index** | `.cursor/prompts/ROLE_PROMPTS_INDEX.md` | 2026-03-28 | Master index for Roles 0–8 prompts + Validator |
 | Role 0: Overseer Prompt | `.cursor/prompts/ROLE_0_OVERSEER_PROMPT.md` | 2026-01-25 | Complete system prompt for Overseer |
 | Role 1: System Architect Prompt | `.cursor/prompts/ROLE_1_SYSTEM_ARCHITECT_PROMPT.md` | 2026-01-25 | Complete system prompt for System Architect |
 | Role 2: Build & Tooling Prompt | `.cursor/prompts/ROLE_2_BUILD_TOOLING_PROMPT.md` | 2026-01-25 | Complete system prompt for Build & Tooling |
@@ -233,6 +214,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Role 5: Engine Engineer Prompt | `.cursor/prompts/ROLE_5_ENGINE_ENGINEER_PROMPT.md` | 2026-01-25 | Complete system prompt for Engine Engineer |
 | Role 6: Release Engineer Prompt | `.cursor/prompts/ROLE_6_RELEASE_ENGINEER_PROMPT.md` | 2026-01-25 | Complete system prompt for Release Engineer |
 | **Role 7: Debug Agent Prompt** | `.cursor/prompts/ROLE_7_DEBUG_AGENT_PROMPT.md` | 2026-01-25 | Complete system prompt for Debug Agent |
+| **Role 8: Project Intelligence Analyst Prompt** | `.cursor/prompts/ROLE_8_PROJECT_INTELLIGENCE_ANALYST_PROMPT.md` | 2026-03-28 | Read-only system prompt: repo truth, traces, research, handoffs — no mutations |
 | Skeptical Validator Prompt | `.cursor/prompts/SKEPTICAL_VALIDATOR_PROMPT.md` | 2026-01-28 | Kickoff prompt for Skeptical Validator subagent (v1.1.0: role identity fix, validator_workflow.py integration, Quality Ledger clarification) |
 | Onboarding Summary | `.cursor/prompts/ONBOARDING_COMPLETE_SUMMARY.md` | 2026-01-25 | Overseer onboarding completion report |
 

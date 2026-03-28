@@ -663,6 +663,12 @@ When facing any technical decision on VoiceStudio, apply this sequence:
 
 ---
 
+## Task-type prompt (read-only intelligence)
+
+For **deep dives, workflow traces, repo-vs-doc contradictions, and cited external research** without code or governance mutations, use **Role 8 — Project Intelligence Analyst**: [ROLE_8_PROJECT_INTELLIGENCE_ANALYST_GUIDE.md](docs/governance/roles/ROLE_8_PROJECT_INTELLIGENCE_ANALYST_GUIDE.md) and [.cursor/prompts/ROLE_8_PROJECT_INTELLIGENCE_ANALYST_PROMPT.md](.cursor/prompts/ROLE_8_PROJECT_INTELLIGENCE_ANALYST_PROMPT.md). A fuller task-to-role matrix lives in `.cursor/rules/workflows/context-strategy.mdc` (Overseer may add Role 8 there for tooling parity).
+
+---
+
 ## REFERENCE INDEX
 
 | Document | Purpose |
@@ -678,8 +684,9 @@ When facing any technical decision on VoiceStudio, apply this sequence:
 | `scripts/verify.ps1` | CI single source of truth |
 | `shared/` | JSON schema contracts (C# ↔ Python) |
 | `engines/*.json` | Engine manifests (v3 schema) |
+| `docs/governance/roles/ROLE_8_PROJECT_INTELLIGENCE_ANALYST_GUIDE.md` | Role 8 read-only intelligence (maps, traces, research); companion prompt in `.cursor/prompts/` |
 
 ---
 
 *This file is a living document. Update it when a new ADR is accepted that changes architectural laws.*
-*Last updated: 2026-03-11 | Governance remediation complete (ChatGPT review, plan f4de863d)*
+*Last updated: 2026-03-28 | Role 8 Project Intelligence Analyst registered; governance index sync*

@@ -1,11 +1,11 @@
-# VoiceStudio 7-Role System Prompts Index
+# VoiceStudio 9-Role System Prompts Index (Roles 0–8)
 
-> **Version**: 1.1.0
-> **Last Updated**: 2026-02-04
+> **Version**: 1.2.0
+> **Last Updated**: 2026-03-28
 > **Owner**: Overseer
 > **Status**: ACTIVE — Ultimate Master Plan 2026 (Optimized)
 
-This document is the navigation hub for VoiceStudio's 7-role system prompts. Each role has a comprehensive prompt file designed for use with AI agents (Claude, ChatGPT, Cursor, etc.) to ensure consistent, high-quality execution of role-specific responsibilities.
+This document is the navigation hub for VoiceStudio's **nine** execution roles (0–8) plus the **Skeptical Validator** subagent. Each numbered role has a comprehensive prompt file for AI agents (Claude, ChatGPT, Cursor, etc.). **Role 8** is read-only intelligence (no mutations); Validator prompts are listed separately below.
 
 ---
 
@@ -39,6 +39,8 @@ This document is the navigation hub for VoiceStudio's 7-role system prompts. Eac
 | **4** | [ROLE_4_CORE_PLATFORM_PROMPT.md](ROLE_4_CORE_PLATFORM_PROMPT.md) | `@.cursor/prompts/ROLE_4_CORE_PLATFORM_PROMPT.md` | C, D, E | Persistence, preflight, jobs, local-first stability |
 | **5** | [ROLE_5_ENGINE_ENGINEER_PROMPT.md](ROLE_5_ENGINE_ENGINEER_PROMPT.md) | `@.cursor/prompts/ROLE_5_ENGINE_ENGINEER_PROMPT.md` | E | Quality + functions, adapter-first, pinned deps |
 | **6** | [ROLE_6_RELEASE_ENGINEER_PROMPT.md](ROLE_6_RELEASE_ENGINEER_PROMPT.md) | `@.cursor/prompts/ROLE_6_RELEASE_ENGINEER_PROMPT.md` | C, H | Installer lifecycle proof, gate evidence, no MSIX |
+| **7** | [ROLE_7_DEBUG_AGENT_PROMPT.md](ROLE_7_DEBUG_AGENT_PROMPT.md) | `@.cursor/prompts/ROLE_7_DEBUG_AGENT_PROMPT.md` | B, C, D, E | Root-cause, triage, cross-layer fixes, validation |
+| **8** | [ROLE_8_PROJECT_INTELLIGENCE_ANALYST_PROMPT.md](ROLE_8_PROJECT_INTELLIGENCE_ANALYST_PROMPT.md) | `@.cursor/prompts/ROLE_8_PROJECT_INTELLIGENCE_ANALYST_PROMPT.md` | — (read-only) | Maps, traces, contradiction memos, official-doc research — **no edits** |
 
 ---
 
@@ -293,6 +295,7 @@ Worker Chats (Roles 1-6)
 | Build installer | Role 6 | ROLE_6_RELEASE_ENGINEER_PROMPT.md |
 | Review ADR | Role 1 | ROLE_1_SYSTEM_ARCHITECT_PROMPT.md |
 | Gate coordination | Role 0 | ROLE_0_OVERSEER_PROMPT.md |
+| Deep dive / research / trace (read-only) | Role 8 | ROLE_8_PROJECT_INTELLIGENCE_ANALYST_PROMPT.md |
 
 ---
 

@@ -1,14 +1,14 @@
 # Role Guides Index
 
 > **Owner**: Overseer (Role 0)  
-> **Last Updated**: 2026-01-30  
+> **Last Updated**: 2026-03-28  
 > **Purpose**: Master index for all role guides with phase-gate-role matrix and quick reference.
 
 ---
 
 ## Role System Overview
 
-VoiceStudio uses an **8-role system** (Roles 0–7) + **Skeptical Validator** (cross-cutting subagent) for governance, development, and quality assurance. Each role has:
+VoiceStudio uses a **9-role system** (Roles 0–8) + **Skeptical Validator** (cross-cutting subagent) for governance, development, and quality assurance. Each role has:
 - **Guide**: Detailed responsibilities, boundaries, workflows (in `docs/governance/roles/`)
 - **Prompt**: Complete system prompt for AI agent invocation (in `.cursor/prompts/`)
 - **Ownership**: Specific modules, gates, and deliverables
@@ -27,6 +27,7 @@ VoiceStudio uses an **8-role system** (Roles 0–7) + **Skeptical Validator** (c
 | **5** | **Engine Engineer** | [ROLE_5_ENGINE_ENGINEER_GUIDE.md](roles/ROLE_5_ENGINE_ENGINEER_GUIDE.md) | [ROLE_5_ENGINE_ENGINEER_PROMPT.md](../../.cursor/prompts/ROLE_5_ENGINE_ENGINEER_PROMPT.md) | Quality metrics, engine adapters, baseline proofs, SLO-6 |
 | **6** | **Release Engineer** | [ROLE_6_RELEASE_ENGINEER_GUIDE.md](roles/ROLE_6_RELEASE_ENGINEER_GUIDE.md) | [ROLE_6_RELEASE_ENGINEER_PROMPT.md](../../.cursor/prompts/ROLE_6_RELEASE_ENGINEER_PROMPT.md) | Installer, Gate H lifecycle, packaging, distribution |
 | **7** | **Debug Agent** | [ROLE_7_DEBUG_AGENT_GUIDE.md](roles/ROLE_7_DEBUG_AGENT_GUIDE.md) | [ROLE_7_DEBUG_AGENT_PROMPT.md](../../.cursor/prompts/ROLE_7_DEBUG_AGENT_PROMPT.md) | Root-cause analysis, issue triage, system-wide fixes, validation |
+| **8** | **Project Intelligence Analyst** | [ROLE_8_PROJECT_INTELLIGENCE_ANALYST_GUIDE.md](roles/ROLE_8_PROJECT_INTELLIGENCE_ANALYST_GUIDE.md) | [ROLE_8_PROJECT_INTELLIGENCE_ANALYST_PROMPT.md](../../.cursor/prompts/ROLE_8_PROJECT_INTELLIGENCE_ANALYST_PROMPT.md) | Read-only intelligence: maps, traces, contradiction memos, external research — **no repo mutations** |
 | **—** | **Skeptical Validator** | [SKEPTICAL_VALIDATOR_GUIDE.md](SKEPTICAL_VALIDATOR_GUIDE.md) | [SKEPTICAL_VALIDATOR_PROMPT.md](../../.cursor/prompts/SKEPTICAL_VALIDATOR_PROMPT.md) | Cross-cutting validation before task closure; read-only, fast model |
 
 ---
@@ -61,6 +62,7 @@ VoiceStudio uses an **8-role system** (Roles 0–7) + **Skeptical Validator** (c
 | `tools/overseer/` | Role 0 (Overseer) | Role 1 (Architect) |
 | `.cursor/` (Rules, prompts, STATE) | Role 0 (Overseer) | Role 1 (Architect) |
 | `docs/` (Governance, architecture) | Role 0 (Overseer), Role 1 (Architect) | All roles |
+| **All modules (read-only)** | — | Role 8 (Project Intelligence Analyst) — evidence-only analysis; no primary ownership |
 
 ---
 
@@ -98,6 +100,7 @@ Or use `.cursor/commands/` shortcuts (if available).
 | Engine proof | Engine Engineer | `/role-engine-engineer` |
 | Installer issue | Release Engineer | `/role-release-engineer` |
 | Root-cause analysis | Debug Agent | `/role-debug-agent` |
+| Deep dive / trace / research (read-only) | Project Intelligence Analyst | `/role-project-intelligence-analyst` |
 | ADR needed | System Architect | `/role-system-architect` |
 | Task closure validation | Skeptical Validator | `python scripts/validator_workflow.py --task TASK-NNNN` |
 

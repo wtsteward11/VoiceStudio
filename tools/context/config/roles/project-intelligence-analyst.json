@@ -1,0 +1,30 @@
+{
+  "weights": {
+    "state": 1.0,
+    "rules": 0.95,
+    "ledger": 0.95,
+    "audit": 1.0,
+    "task": 0.85,
+    "brief": 0.85,
+    "progress": 0.65,
+    "memory": 0.55,
+    "issues": 0.5
+  },
+  "budgets": {
+    "state_chars": 2800,
+    "rules_chars": 2600,
+    "ledger_chars": 2800,
+    "audit_chars": 3000,
+    "task_chars": 2200,
+    "brief_chars": 2400,
+    "progress_chars": 1200,
+    "memory_chars": 1500,
+    "issues_chars": 1800
+  },
+  "plan_phases": {
+    "primary": [],
+    "secondary": [],
+    "current_phase": null,
+    "current_task": null
+  }
+}

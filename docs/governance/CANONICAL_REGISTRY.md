@@ -3,7 +3,7 @@
 This registry is the single source of truth for all canonical documents in VoiceStudio.
 Before creating a new document, check this registry to ensure the topic isn't already covered.
 
-> **Last Updated**: 2026-03-29 (Professional Roadmap V3 + Gap Tracker registered; Completion Roadmap v2 / Unified Master Roadmap forward timeline superseded by V3; voice cloning integrity lane closed; Role 8 registered)
+> **Last Updated**: 2026-03-28 (Transport Authority lane **closed** GAP-009; Persistence Foundation next; Selection Authority closed; voice cloning + runtime honesty 2026-03-29)
 
 ---
 
@@ -21,7 +21,7 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | Archive Policy | `docs/governance/ARCHIVE_POLICY.md` | — | **DEFERRED** — Use [document-lifecycle.mdc](.cursor/rules/workflows/document-lifecycle.mdc) and archive structure in `docs/archive/` |
 | Governance Lock | `docs/governance/GOVERNANCE_LOCK.md` | — | **DEFERRED** — Low priority |
 | Definition of Done | `docs/governance/DEFINITION_OF_DONE.md` | 2026-01-25 | Consolidated completion criteria |
-| Session State | `.cursor/STATE.md` | 2026-03-29 | **Operational truth** — **Active Plan:** [VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md) + [PROFESSIONAL_GAP_TRACKER.md](../design/PROFESSIONAL_GAP_TRACKER.md); lanes **Voice Cloning Integrity** + **Runtime Honesty** closed 2026-03-29; proofs under `docs/reports/verification/VOICESTUDIO_*_LANE_CLOSURE_2026-03-29.md` |
+| Session State | `.cursor/STATE.md` | 2026-03-28 | **Operational truth** — **Active Plan:** [VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md) + [PROFESSIONAL_GAP_TRACKER.md](../design/PROFESSIONAL_GAP_TRACKER.md); post–V3 closures: **Voice Cloning Integrity** + **Runtime Honesty** (2026-03-29); **Selection Authority** closed 2026-03-28; **Transport Authority** closed 2026-03-28 (GAP-009); **next:** Persistence Foundation `GOV-VOICESTUDIO-PERSISTENCE-FOUNDATION-01` |
 | Memory Index | `openmemory.md` | 2026-01-25 | Living project index for AI context |
 | **Project Handoff Guide** | `docs/governance/PROJECT_HANDOFF_GUIDE.md` | 2026-01-30 | Maintainer entry point; gate status, build/test, structure, roles, task brief creation |
 | **Overseer Newcomer Handoff** | `docs/governance/overseer/OVERSEER_NEWCOMER_HANDOFF.md` | 2026-03-12 | New Overseer (Role 0) onboarding; Day 1 reads, first commands, daily cadence, non-negotiables |
@@ -59,6 +59,13 @@ Before creating a new document, check this registry to ensure the topic isn't al
 | **Voice Cloning Integrity Lane Closure** | `docs/reports/verification/VOICESTUDIO_VOICE_CLONING_INTEGRITY_LANE_CLOSURE_2026-03-29.md` | 2026-03-29 | Closure §4 verification; binding tests; honest scope §1 |
 | **Runtime Honesty Lane Execution Row** | `docs/design/GOV_VOICESTUDIO_RUNTIME_HONESTY_01_EXECUTION_ROW.md` | 2026-03-29 | Telemetry 503, training `simulation_complete`, prosody 501, batch disk-only synthesis; **lane closed** |
 | **Runtime Honesty Lane Closure** | `docs/reports/verification/VOICESTUDIO_RUNTIME_HONESTY_LANE_CLOSURE_2026-03-29.md` | 2026-03-29 | GAP-002/003 closure; honesty unit tests; `completion_guard` via committed proofs |
+| **Selection Authority Lane Execution Row** | `docs/design/GOV_VOICESTUDIO_SELECTION_AUTHORITY_01_EXECUTION_ROW.md` | 2026-03-28 | Canonical `ProfileSelectedEvent`; `IContextManager` timeline primary clip/track; **lane closed** |
+| **Selection Authority Lane Closure** | `docs/reports/verification/VOICESTUDIO_SELECTION_AUTHORITY_LANE_CLOSURE_2026-03-28.md` | 2026-03-28 | GAP-011 closure; MSTest + verify + `run_verification.py` §2 matrix |
+| **Transport Authority Lane Execution Row** | `docs/design/GOV_VOICESTUDIO_TRANSPORT_AUTHORITY_01_EXECUTION_ROW.md` | 2026-03-28 | **Closed** — Slices 1–4; GAP-009; closure [VOICESTUDIO_TRANSPORT_AUTHORITY_LANE_CLOSURE_2026-03-28.md](../reports/verification/VOICESTUDIO_TRANSPORT_AUTHORITY_LANE_CLOSURE_2026-03-28.md) |
+| **Transport Authority Lane Closure** | `docs/reports/verification/VOICESTUDIO_TRANSPORT_AUTHORITY_LANE_CLOSURE_2026-03-28.md` | 2026-03-28 | Closure matrix Slices 1–4; non-goals; verification on close; Persistence Foundation unblocked |
+| **Transport Authority Slice 1 Proof** | `docs/reports/verification/VOICESTUDIO_TRANSPORT_AUTHORITY_SLICE1_PROOF_2026-03-28.md` | 2026-03-28 | Timeline bar Record/Loop/time + tests; `artifacts/verify/20260328_044821/`; `completion_guard` PASS |
+| **Transport Authority Slice 2 Proof** | `docs/reports/verification/VOICESTUDIO_TRANSPORT_AUTHORITY_SLICE2_PROOF_2026-03-28.md` | 2026-03-28 | Global/timeline/keyboard convergence + orchestrator fallbacks + Ctrl+R navigate; `artifacts/verify/20260328_052954/`; `completion_guard` PASS |
+| **Transport Authority Slice 3 Proof** | `docs/reports/verification/VOICESTUDIO_TRANSPORT_AUTHORITY_SLICE3_PROOF_2026-03-28.md` | 2026-03-28 | Time truth: stop→0, preview VM cleanup, seek/playhead tests; `artifacts/verify/20260328_060039/`; `completion_guard` PASS |
 | **Test Classification** | `docs/governance/TEST_CLASSIFICATION.md` | 2026-03-12 | Seam-aware vs transport-mock vs legacy; supports architectural completion claims |
 | **Training Lifecycle Async Patterns** | `docs/design/TRAINING_VIEWMODEL_LIFECYCLE_ASYNC_PATTERNS.md` | 2026-03-12 | Fire-and-forget paths in TrainingViewModel; cancellation ownership |
 | **Retained Async Rule** | `docs/design/RETAINED_ASYNC_RULE.md` | 2026-03-13 | Unified rule for ViewModel fire-and-forget; aligns SceneBuilder, BatchProcessing, Training |

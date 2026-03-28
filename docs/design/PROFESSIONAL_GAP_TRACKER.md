@@ -1,6 +1,6 @@
 # Professional Gap Tracker
 
-**Companion:** [VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](../governance/VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md)  
+**Companion:** [VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](../governance/VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md) — **Last tracker sync:** 2026-03-28 (GAP-011 closed; **GAP-009 Closed** — [Transport Authority lane closure](../reports/verification/VOICESTUDIO_TRANSPORT_AUTHORITY_LANE_CLOSURE_2026-03-28.md); next execution lane: **Persistence Foundation** `GOV-VOICESTUDIO-PERSISTENCE-FOUNDATION-01`)  
 **Sources (merged + deduplicated):** [VOICESTUDIO_PROFESSIONAL_GRADE_AUDIT_2026-03-28.md](../reports/audit/VOICESTUDIO_PROFESSIONAL_GRADE_AUDIT_2026-03-28.md), [PREMIUM_SOFTWARE_COHERENCE_AUDIT.md](PREMIUM_SOFTWARE_COHERENCE_AUDIT.md), Desktop Commander technical gap list (transport, PanelHost, selection, SSML, undo, layout, HttpClient, GPU waveform, design tokens, Mica, jump lists, NAudio, circuit breaker, WorkspaceManager, notifications, NuGet), strategic 10-point vision (shell SLOs, backend surface, UX hierarchy, repo hygiene, docs truth).
 
 **Dedup rule:** One row per unique defect/capability. Overlaps (e.g. transport bar in audit + shell list) map to a single **GAP-ID**.
@@ -23,9 +23,9 @@
 | GAP-006 | 0 | Ops | ADR numbering collision (MCP / integration ADRs) | `docs/architecture/decisions/` | 2 | System Architect | — | Open |
 | GAP-007 | 0 | Broken | PanelHost `ContentProperty` shadows `UserControl` (Gate C / XAML) | `src/VoiceStudio.App/Controls/PanelHost.xaml.cs` (~L45) | 8 | UI Engineer | — | Open |
 | GAP-008 | 1 | Missing | MainWindow decomposition (lifecycle, nav, transport, session, dialogs) | `src/VoiceStudio.App/Views/MainWindow.xaml(.cs)` | 80 | UI Engineer | GAP-007 | Open |
-| GAP-009 | 1 | Wiring | Transport bar: Record, Loop, time ↔ orchestrator + Timeline | `MainWindow`, `TimelineView`, transport VMs | 24 | UI Engineer | GAP-008 | Open |
+| GAP-009 | 1 | Wiring | Transport bar: Record, Loop, time ↔ orchestrator + Timeline | `TimelineView.xaml`, `TimelineViewModel.cs`, `GlobalTransportOrchestrator.cs`, `GlobalTransportControl.*`, `TransportShortcutCoordinator.cs`, `MainWindow`; lane **GOV-VOICESTUDIO-TRANSPORT-AUTHORITY-01** — [GOV_VOICESTUDIO_TRANSPORT_AUTHORITY_01_EXECUTION_ROW.md](GOV_VOICESTUDIO_TRANSPORT_AUTHORITY_01_EXECUTION_ROW.md) | 24 | UI Engineer | GAP-008 | Closed — [VOICESTUDIO_TRANSPORT_AUTHORITY_LANE_CLOSURE_2026-03-28.md](../reports/verification/VOICESTUDIO_TRANSPORT_AUTHORITY_LANE_CLOSURE_2026-03-28.md); Slices 1–4 complete; Persistence Foundation unblocked |
 | GAP-010 | 1 | UX | Mica / `SystemBackdrop` + title bar integration | `MainWindow.xaml` | 8 | UI Engineer | GAP-008 | Open |
-| GAP-011 | 1 | Missing | Cross-panel selection service (profile / track / clip) | New `ISelectionService`, consumers | 40 | Core Platform | — | Open |
+| GAP-011 | 1 | Missing | Cross-panel selection service (profile / track / clip) | `IContextManager` timeline fields + `ProfileSelectedEvent` authority; optional `ISelectionService` deferred | 40 | Core Platform | — | Closed — `GOV-VOICESTUDIO-SELECTION-AUTHORITY-01` + `VOICESTUDIO_SELECTION_AUTHORITY_LANE_CLOSURE_2026-03-28.md` |
 | GAP-012 | 1 | Wiring | Undo/redo wired: ScriptEditor, EffectsMixer, Timeline | Respective ViewModels, `IUndoableCommand` | 32 | UI Engineer | GAP-011 | Open |
 | GAP-013 | 1 | Broken | PanelHost LRU eviction: dispose, events, `IsActive` | `PanelHost.xaml.cs`, `PanelStateService` | 16 | UI Engineer | GAP-007 | Open |
 | GAP-014 | 1 | Ops | Remove deprecated `WorkspaceManager` after `PanelStateService` parity | `WorkspaceManager.cs`, callers | 8 | UI Engineer | GAP-013 | Open |
@@ -124,6 +124,12 @@ Use the same shape when promoting any gap to active work (copy template).
 - **Required behavior:** No fabricated telemetry when the engine service or runtime cannot produce real metrics.
 - **Verification:** Unit tests + `GET /api/engine/telemetry` contract expectations updated for 503 on failure paths.
 
+### GAP-011 — Cross-panel selection authority
+
+- **Current behavior:** Closed 2026-03-28 — canonical `ProfileSelectedEvent` (no new `VoiceProfileSelectedEvent` publishes); Features `SynthesisViewModel` consumes the same bus as Profiles/Library/workflow; `IContextManager` holds `ActiveTimelinePrimaryClipId` / `ActiveTimelinePrimaryTrackId` with `TimelineViewModel` syncing selection; proof in `docs/reports/verification/VOICESTUDIO_SELECTION_AUTHORITY_LANE_CLOSURE_2026-03-28.md`.
+- **Required behavior (original intent):** One place to read “what is selected” for profile and timeline hero path; consumers do not fork parallel event types for the same intent.
+- **Deferred:** Optional thin `ISelectionService` facade if mock surface or DI ergonomics require it later.
+
 ### GAP-007 — PanelHost ContentProperty
 
 - **Current behavior:** `public static new readonly DependencyProperty ContentProperty` shadows `UserControl.ContentProperty` — compiler/analyzer risk and Gate C failure mode.
@@ -152,3 +158,4 @@ Use the same shape when promoting any gap to active work (copy template).
 |------|--------|
 | 2026-03-29 | Initial tracker; 69 deduplicated gaps; companion to Roadmap V3 |
 | 2026-03-29 | GAP-001/002/003 closed (cloning integrity + runtime honesty lane) |
+| 2026-03-28 | GAP-011 closed (selection authority lane: `ProfileSelectedEvent` + context timeline fields) |

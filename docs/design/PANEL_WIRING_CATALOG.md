@@ -47,7 +47,7 @@ Module panels: VoiceCloningWizard, MultiVoiceGenerator, RealTimeConverter, Emoti
 
 | Category | Details |
 |----------|---------|
-| **Publishes** | `PlaybackStateChangedEvent`, `TimelineSelectionChangedEvent`, `PlaybackRequestedEvent` |
+| **Publishes** | `PlaybackStateChangedEvent`, `TimelineSelectionChangedEvent`, `PlaybackRequestedEvent`, `ClipTranscriptSelectionEvent` (GAP-033) |
 | **Subscribes** | `NavigateToEvent`, `AddToTimelineEvent`, `TranscriptionCompletedEvent`, `SynthesisCompletedEvent` (GAP-W2) |
 | **Backend** | `/api/timeline/*`, `/api/projects/*`, `/api/audio/*` |
 | **Shared Services** | IBackendClient, IAudioPlayerService, MultiSelectService, ToastNotificationService, UndoRedoService, ISettingsService, RecentProjectsService, IEventAggregator |
@@ -125,11 +125,11 @@ Module panels: VoiceCloningWizard, MultiVoiceGenerator, RealTimeConverter, Emoti
 | Category | Details |
 |----------|---------|
 | **Publishes** | `TranscriptionCompletedEvent`, `NavigateToEvent` |
-| **Subscribes** | None (source panel) |
+| **Subscribes** | `ClipTranscriptSelectionEvent` (GAP-033 — follows timeline clip transcript linkage) |
 | **Backend** | `/api/transcribe/*` |
 | **Shared Services** | IEventAggregator |
 | **Throttle** | None |
-| **Unsubscribe** | N/A |
+| **Unsubscribe** | ✅ `ReleasePanelEventSubscriptions` (incl. `ClipTranscriptSelectionEvent`) |
 
 ### Recording (RecordingView / RecordingViewModel)
 
@@ -236,9 +236,13 @@ Events that MAY be used in `Publish<T>` and `Subscribe<T>`:
 - `CloneReferenceSelectedEvent`
 - `VoiceProfileSelectedEvent`
 - `PlaybackRequestedEvent`
+- `BackupRestoredEvent`
 - `SynthesisCompletedEvent`
 - `AddToTimelineEvent`
 - `TranscriptionCompletedEvent`
+- `ClipTranscriptSelectionEvent`
+- `ClipAudioArtifactReplacedEvent`
+- `TranscriptTruthStateChangedEvent`
 - `NavigateToEvent`
 - `PanelNavigationRequestEvent`
 - `WorkspaceChangedEvent`
@@ -252,7 +256,7 @@ Events that MAY be used in `Publish<T>` and `Subscribe<T>`:
 | Gap | Panel | Issue |
 |-----|-------|-------|
 | GAP-W1 | Library | ~~Missing `SynthesisCompletedEvent` subscription~~ **RESOLVED** |
-| GAP-W2 | Timeline | ~~Missing SynthesisCompletedEvent~~ **RESOLVED** — auto-add on synthesis complete |
+| GAP-W2 | Timeline | **RESOLVED (GAP-025)** — synthesis → timeline insertion is **explicit only** via `AddToTimelineEvent`; `SynthesisCompletedEvent` does **not** insert clips on Timeline |
 | GAP-W3 | Multiple | ~~No Unsubscribe~~ **Library, VoiceSynthesis, Timeline, Features/Timeline, Profiles**: IPanelLifecycle.OnDeactivatedAsync |
 | GAP-W4 | Timeline | PlaybackStateChangedEvent, TimelineSelectionChangedEvent need throttling (EffectsMixer uses MultiSelectService, not EventAggregator) |
 | GAP-W5 | Import flow | AssetAddedEvent published from Import; Library subscribes — verify ImportView/FileOperationsHandler wiring |

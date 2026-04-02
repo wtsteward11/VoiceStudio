@@ -2,6 +2,7 @@
 
 **Purpose:** Bounded product-facing pass for the profile → synthesis → timeline workflow.  
 **Date:** 2026-03-24  
+**Post-Pass note (GAP-025, 2026-04-02):** Synthesis → timeline clip insertion is **explicit only** via operator `AddToTimelineEvent` / **Add to Timeline**. `TimelineViewModel` does **not** subscribe to `SynthesisCompletedEvent` for insertion. See [GOV_VOICESTUDIO_GAP025_SYNTHESIS_TIMELINE_HANDOFF_01_EXECUTION_ROW.md](GOV_VOICESTUDIO_GAP025_SYNTHESIS_TIMELINE_HANDOFF_01_EXECUTION_ROW.md).  
 **Related:** [CROSS_FEATURE_WORKFLOW_BACKLOG.md](CROSS_FEATURE_WORKFLOW_BACKLOG.md), [POST_EXTRACTION_TRANSITION_PLAN.md](POST_EXTRACTION_TRANSITION_PLAN.md)
 
 ---
@@ -14,7 +15,7 @@
 | VoiceProfileViewModel | Alternative profile source; SelectedProfile |
 | VoiceSynthesisViewModel | Synthesis panel; subscribes to ProfileSelectedEvent in OnActivatedAsync (line 890); OnProfileSelected sets SelectedProfile |
 | VoiceSynthesisView | HandleProfileDropAsync for drag-drop profile → synthesis (line 141) |
-| TimelineViewModel | Subscribes to ProfileSelectedEvent (line 203), AddToTimelineEvent (line 515); OnAddToTimeline creates clip |
+| TimelineViewModel | Subscribes to ProfileSelectedEvent, `AddToTimelineEvent`; `OnAddToTimeline` creates clip (**GAP-025:** no `SynthesisCompletedEvent` subscription for insert) |
 | IContextManager | Profile state; publishes ProfileSelectedEvent on SetSelectedProfile |
 | IEventAggregator | ProfileSelectedEvent, AddToTimelineEvent |
 | ITimelineSynthesisService | SynthesizeAndSaveAsync(engine, profileId, text, ...) |
@@ -32,11 +33,11 @@
 - SynthesisViewModel (Features/Synthesis): Subscribes to VoiceProfileSelectedEvent for Library workflow.
 
 **Synthesis → Timeline:**
-- VoiceSynthesisViewModel: AddToTimelineCommand publishes AddToTimelineEvent(audioId, path, duration, clipName). ClipName includes SelectedProfile?.Name.
-- TimelineViewModel: OnAddToTimeline subscribes; creates AudioClip (no ProfileId); AddClipToTrack adds to track; CreateClipAsync persists. Requires SelectedProject != null.
-- AddToTimelineEvent: No ProfileId field. AudioClip created without ProfileId.
+- VoiceSynthesisViewModel / SynthesisViewModel: explicit **Add to Timeline** publishes `AddToTimelineEvent` with ProfileId (extended pass), audio path, optional insert hints (`InsertPosition`, `TargetTrackIndex` per GAP-025 resolver).
+- TimelineViewModel: `OnAddToTimeline` creates clip with ProfileId from event or `IContextManager` fallback; `AddClipToTrack`; `CreateClipAsync` persists. Requires SelectedProject != null.
+- **GAP-025:** Completing synthesis alone does **not** insert a clip; operator must use Add to Timeline.
 
-**Gaps:**
+**Historical gaps (pre–Pass 01 extended):**
 - TimelineViewModel.OnProfileSelected only logs; does not set default profile for new clips.
 - AddToTimelineEvent and AudioClip may omit ProfileId; backend CreateClipAsync expects profile_id (verify).
 
@@ -112,14 +113,14 @@
 ### State handoff points
 
 - Profile → Synthesis: `ProfileSelectedEvent` (Profiles/ContextManager) or `VoiceProfileSelectedEvent` (Library) → `VoiceSynthesisViewModel.OnProfileSelected` / `SynthesisViewModel.OnVoiceProfileSelected` → sets `SelectedProfile` / `CurrentVoice`.
-- Synthesis → Timeline: `AddToTimelineEvent(sourcePanelId, audioId, audioPath, duration, clipName)` — **no ProfileId**.
+- Synthesis → Timeline: `AddToTimelineEvent` (optional ProfileId, `InsertPosition`, `TargetTrackIndex`) — **explicit operator handoff** (GAP-025).
 
 ### Event flow
 
 - ProfileSelectedEvent: ProfilesViewModel, ContextManager → VoiceSynthesisViewModel (subscribes in OnActivatedAsync).
 - VoiceProfileSelectedEvent: LibraryViewModel, WorkflowCoordinatorService → SynthesisViewModel (Features).
 - AddToTimelineEvent: VoiceSynthesisViewModel.AddSynthesizedAudioToTimeline, SynthesisViewModel → Views/Panels/TimelineViewModel.OnAddToTimeline.
-- SynthesisCompletedEvent: Synthesis panels → TimelineViewModel.OnSynthesisCompleted → converts to AddToTimelineEvent → OnAddToTimeline.
+- SynthesisCompletedEvent: still published by synthesis panels for other subscribers (e.g. Library); **TimelineViewModel does not use it for clip insertion** (GAP-025).
 
 ### Service dependencies
 
@@ -127,7 +128,7 @@
 
 ### Places where context is dropped
 
-- AddToTimelineEvent has no ProfileId → TimelineViewModel.AddClipToTrack creates AudioClip without ProfileId → backend CreateClipAsync fails (profile_id required).
+- Missing ProfileId on **both** `AddToTimelineEvent` and `IContextManager` fallback → `AddClipToTrack` blocks insert / backend may reject (mitigated: Pass 01 extended passes ProfileId on explicit handoff).
 - VoiceSynthesisViewModel subscribes only when activated; if Synthesis panel never activated, ProfileSelectedEvent never reaches it.
 - Profile not in Profiles list: OnProfileSelected triggers LoadProfilesAsync then selects — race with async continuation.
 
@@ -138,12 +139,12 @@
 
 ---
 
-## 8. Current Defects / Coherence Gaps
+## 8. Defects / gaps (historical snapshot — pre Pass 01 closure)
 
 | Defect | Affected files | User symptom | Root cause | Priority |
 |--------|----------------|--------------|------------|----------|
-| ProfileId missing on clip creation | TimelineViewModel.AddClipToTrack, AddToTimelineEvent | Clip appears locally but backend CreateClipAsync fails 400 | AudioClip.ProfileId never set; AddToTimelineEvent has no ProfileId | P0 |
-| No timeline focus after insert | TimelineViewModel.AddClipToTrack | User cannot immediately see/select new clip | No MultiSelectService.Add or selection update after insert | P1 |
+| ProfileId missing on clip creation | TimelineViewModel.AddClipToTrack, AddToTimelineEvent | Clip appears locally but backend CreateClipAsync fails 400 | AudioClip.ProfileId never set; AddToTimelineEvent has no ProfileId | P0 — **Addressed** Pass 01 extended (see §10) |
+| No timeline focus after insert | TimelineViewModel.AddClipToTrack | User cannot immediately see/select new clip | No MultiSelectService.Add or selection update after insert | P1 — **Addressed** Pass 01 (see §10) |
 | Profile propagation depends on panel activation | VoiceSynthesisViewModel.OnActivatedAsync | Select profile → switch to Synthesis; profile may not appear if Synthesis never activated first | Subscription only in OnActivatedAsync | P2 |
 | Failure messages not workflow-step-specific | VoiceSynthesisViewModel, TimelineViewModel | Generic "Failed to add clip" | No profile/synthesis/insertion/navigation categorization | P2 |
 | Features TimelineViewModel OnProfileSelected no-op | Features/Timeline/TimelineViewModel | Profile selection from Profiles does not affect timeline default | OnProfileSelected only Debug.WriteLine | P3 (out-of-scope) |
@@ -159,7 +160,7 @@
 | C3 | Timeline sets ProfileId on AudioClip | Views/Panels/TimelineViewModel | IContextManager | AddClipToTrack, CreateClipAsync | Use event.ProfileId or IContextManager; set clip.ProfileId | Unit + integration |
 | C4 | Timeline focuses/selects inserted clip | TimelineViewModel | MultiSelectService | AddClipToTrack | After AddClipToTrack, add clip to multi-select and raise selection changed | Unit |
 | C5 | Workflow-step-specific error messages | VoiceSynthesisViewModel, TimelineViewModel | ErrorHandler | ToastNotificationService | Profile/synthesis/insertion/navigation message templates | Unit |
-| C6 | SynthesisCompletedEvent passes ProfileId | TimelineViewModel.OnSynthesisCompleted | SynthesisCompletedEvent | SynthesisCompletedEvent | Ensure ProfileId flows through for auto-add path | Verify event schema |
+| C6 | ~~SynthesisCompletedEvent → timeline auto-add~~ **Superseded by GAP-025 (2026-04-02)** | — | — | — | Insertion authority is **only** `AddToTimelineEvent` | `SynthesisCompletedEvent_DoesNotInsertClip_Gap025ExplicitHandoffOnly` |
 
 ---
 
@@ -172,7 +173,7 @@
 | `src/VoiceStudio.Core/Events/PanelEvents.cs` | AddToTimelineEvent: added optional `ProfileId` parameter; SynthesisCompletedEvent: carries ProfileId |
 | `src/VoiceStudio.App/Views/Panels/VoiceSynthesisViewModel.cs` | Publish AddToTimelineEvent with ProfileId = SelectedProfile?.Id; synthesis request and AddToTimelineEvent include ProfileId |
 | `src/VoiceStudio.App/Features/Synthesis/SynthesisViewModel.cs` | Publish AddToTimelineEvent with ProfileId; OnVoiceProfileSelected handles ProfileId |
-| `src/VoiceStudio.App/Views/Panels/TimelineViewModel.cs` | OnAddToTimeline: use e.ProfileId or IContextManager fallback; AddClipToTrack sets newClip.ProfileId; blocks add when no profile; MultiSelectState.SetSingle after insert; workflow-step-specific failure messages; OnSynthesisCompleted passes ProfileId to AddToTimelineEvent |
+| `src/VoiceStudio.App/Views/Panels/TimelineViewModel.cs` | OnAddToTimeline: use e.ProfileId or IContextManager fallback; AddClipToTrack sets newClip.ProfileId; blocks add when no profile; MultiSelectState.SetSingle after insert; workflow-step-specific failure messages; **GAP-025:** no `SynthesisCompletedEvent` subscription for insert; deterministic track/start resolution in handoff helper |
 | `src/VoiceStudio.Core/Models/AudioClip.cs` | ProfileId property (existing) |
 
 ### Behaviors fixed (C1–C6 mapping)
@@ -184,7 +185,7 @@
 | C3 | Timeline sets ProfileId on AudioClip | AddClipToTrack uses event.ProfileId or IContextManager; sets newClip.ProfileId |
 | C4 | Timeline focuses/selects inserted clip | MultiSelectState.SetSingle(newClip.Id) after AddClipToTrack |
 | C5 | Workflow-step-specific error messages | "Insertion failed", "Clip saved locally but failed to save to project", "Voice profile required" |
-| C6 | SynthesisCompletedEvent passes ProfileId | OnSynthesisCompleted creates AddToTimelineEvent with profileId: e.ProfileId |
+| C6 | **Superseded (GAP-025)** | Timeline does not auto-insert on `SynthesisCompletedEvent`; explicit `AddToTimelineEvent` only |
 
 ### Tests added/updated
 

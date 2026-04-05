@@ -11,6 +11,7 @@ using VoiceStudio.Core.Plugins;
 using VoiceStudio.Core.Services;
 using VoiceStudio.Core.State;
 using VoiceStudio.App.Core.Commands;
+using VoiceStudio.App.Core.Services;
 using VoiceStudio.App.Services.Stores;
 using VoiceStudio.App.UseCases;
 using VoiceStudio.App.Utilities;
@@ -35,6 +36,7 @@ namespace VoiceStudio.App.Services
   {
     private static IServiceProvider? _provider;
     private static ToastNotificationService? _toastOverride;
+    private static CompletionOsNotificationService? _completionOsNotification;
 
     /// <summary>
     /// Elapsed milliseconds for PanelRegistry initialization (RegisterAllPanels).
@@ -87,11 +89,7 @@ namespace VoiceStudio.App.Services
       // GAP-I12: Correlation ID provider for cross-layer request tracing
       services.AddSingleton<ICorrelationIdProvider, CorrelationIdProvider>();
 
-      var apiHost = Environment.GetEnvironmentVariable("VOICESTUDIO_API_HOST") ?? "localhost";
-      var apiPort = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT") ?? "8000";
-      var baseUrl = $"http://{apiHost}:{apiPort}";
-      var wsUrl = $"ws://{apiHost}:{apiPort}/ws/realtime";
-      services.AddSingleton(new BackendClientConfig { BaseUrl = baseUrl, WebSocketUrl = wsUrl });
+      services.AddSingleton(BackendClientConfig.FromEnvironment());
       services.AddSingleton<IRequestMetricsService, RequestMetricsService>();
       services.AddSingleton<IRequestCoordinator, RequestCoordinator>();
       services.AddSingleton<GracefulDegradationService>();
@@ -221,6 +219,46 @@ namespace VoiceStudio.App.Services
       // Recording facade (RecordingViewModel hardening)
       services.AddSingleton<IRecordingClient, RecordingClient>();
 
+      // Multitrack recording session authority (GAP-042 Slice 1)
+      services.AddSingleton<IRecordingSessionCoordinator, RecordingSessionCoordinator>();
+
+      // GAP-035: device availability + command-path mic selection (before fan-out; fan-out depends on availability)
+      services.AddSingleton<IRecordingInputCommandState, RecordingInputCommandState>();
+      services.AddSingleton<IRecordingDeviceAvailabilityService, RecordingDeviceAvailabilityService>();
+
+      // GAP-033: transcript–clip linkage (project JSON authority)
+      services.AddSingleton<IClipTranscriptLinkageService, ClipTranscriptLinkageService>();
+
+      // GAP-045: transcript segment → timeline target + edit-intent foundation
+      services.AddSingleton<ITimelineSelectedProjectGate, TimelineSelectedProjectGate>();
+      services.AddSingleton<ITranscriptSegmentTargetResolver, TranscriptSegmentTargetResolver>();
+      services.AddSingleton<ITranscriptRegenerationClient, TranscriptRegenerationClient>();
+      services.AddSingleton<TranscriptSegmentRegenerationCoordinator>(sp => new TranscriptSegmentRegenerationCoordinator(
+          sp.GetRequiredService<ITranscriptRegenerationClient>(),
+          sp.GetRequiredService<IJobProgressApiClient>(),
+          sp.GetRequiredService<IBackendClient>(),
+          sp.GetRequiredService<IClipTranscriptLinkageService>(),
+          sp.GetRequiredService<ITimelineSelectedProjectGate>(),
+          sp.GetRequiredService<ITranscriptSegmentTargetResolver>(),
+          sp.GetService<IProjectSessionDirtyState>(),
+          sp.GetService<UndoRedoService>(),
+          sp.GetService<IEventAggregator>(),
+          sp.GetService<IErrorLoggingService>(),
+          sp.GetService<ITranscriptionClient>()));
+      services.AddSingleton<ITranscriptTruthRefreshCoordinator>(sp => new TranscriptTruthRefreshCoordinator(
+          sp.GetRequiredService<ITranscriptionClient>(),
+          sp.GetRequiredService<IClipTranscriptLinkageService>(),
+          sp.GetService<IProjectSessionDirtyState>(),
+          sp.GetService<IEventAggregator>(),
+          sp.GetService<IErrorLoggingService>()));
+      services.AddSingleton<ITranscriptEditIntentService, TranscriptEditIntentService>();
+      services.AddSingleton<TranscriptEditHistoryService>();
+
+      // Multitrack capture fan-out (GAP-042 Slice 3 + GAP-035 churn subscription)
+      services.AddSingleton<IRecordingCaptureFanoutService>(sp => new RecordingCaptureFanoutService(
+          sp.GetRequiredService<IRecordingClient>(),
+          sp.GetRequiredService<IRecordingDeviceAvailabilityService>()));
+
       // Dataset QA facade (DatasetQAViewModel hardening)
       services.AddSingleton<IDatasetQAClient, DatasetQAClient>();
 
@@ -319,13 +357,13 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IRealTimeAudioVisualizerClient, RealTimeAudioVisualizerClient>();
       services.AddSingleton<ISpatialStageClient, SpatialStageClient>();
       services.AddSingleton<ITextHighlightingClient, TextHighlightingClient>();
-      services.AddSingleton<IVideoEditClient>(sp => new VideoEditClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
-      services.AddSingleton<IVideoGenClient>(sp => new VideoGenClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
+      services.AddSingleton<IVideoEditClient, VideoEditClient>();
+      services.AddSingleton<IVideoGenClient, VideoGenClient>();
       services.AddSingleton<IAdvancedRealTimeVisualizationClient, AdvancedRealTimeVisualizationClient>();
       services.AddSingleton<IAudioMonitoringDashboardClient, AudioMonitoringDashboardClient>();
       services.AddSingleton<IEffectsMeterClient, EffectsMeterClient>();
       services.AddSingleton<IEffectChainClient>(sp => new EffectChainClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
-      services.AddSingleton<IMixerStateClient>(sp => new MixerStateClient(sp.GetRequiredService<BackendHttpContext>().Pipeline));
+      services.AddSingleton<IMixerStateClient, MixerStateClient>();
       services.AddSingleton<IImageVideoEnhancementPipelineClient, ImageVideoEnhancementPipelineClient>();
       services.AddSingleton<ISLODashboardClient, SLODashboardClient>();
 
@@ -338,11 +376,14 @@ namespace VoiceStudio.App.Services
       // GAP-CS-001: WebSocket services for real-time streaming support
       services.AddSingleton<IWebSocketService>(sp => new WebSocketService(
           sp.GetRequiredService<BackendClientConfig>().WebSocketUrl));
+      services.AddSingleton<IMeterClient>(sp =>
+          new MeterWebSocketClient(sp.GetRequiredService<IWebSocketService>()));
       services.AddSingleton<IWebSocketClientFactory>(sp => new WebSocketClientFactory(
           sp.GetService<IWebSocketService>(),
           sp.GetRequiredService<BackendClientConfig>().BaseUrl));
 
       services.AddSingleton<IProfilesUseCase, ProfilesUseCase>();
+      services.AddSingleton<ITimelineUseCase>(sp => new TimelineUseCase(sp.GetRequiredService<IBackendClient>()));
     }
 
     /// <summary>
@@ -372,13 +413,6 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IContextManager>(sp => new ContextManager(
           sp.GetRequiredService<IEventAggregator>(),
           sp.GetService<AppStateStore>()));
-
-      // Library use case (batch import + P05-Persist-A3 project persistence); requires IContextManager
-      services.AddSingleton<ILibraryUseCase>(sp => new LibraryUseCase(
-          sp.GetRequiredService<IBackendClient>(),
-          sp.GetRequiredService<IContextManager>(),
-          sp.GetRequiredService<IProjectAudioClient>(),
-          sp.GetService<IErrorLoggingService>()));
 
       // Layout and Workspace services (Panel Architecture Phase 3)
       services.AddSingleton<ILayoutService, LayoutService>();
@@ -449,7 +483,13 @@ namespace VoiceStudio.App.Services
           ?? throw new InvalidOperationException("MainWindow not yet created. DialogService must be resolved after OnLaunched.");
         return new DialogService(window);
       });
+      services.AddSingleton<IExportLufsPresetUi>(sp =>
+          new ExportLufsPresetDialogService(sp.GetRequiredService<IDialogService>()));
       services.AddSingleton<ISettingsService, SettingsService>();
+      services.AddSingleton<IProjectSessionDirtyState, ProjectSessionDirtyState>();
+      services.AddSingleton<CrashRecoveryService>();
+      services.AddSingleton<IMultitrackRecoveryStateService, MultitrackRecoveryStateService>();
+      services.AddSingleton<IMultitrackRecoveryApplyService, MultitrackRecoveryApplyService>();
       services.AddSingleton<IErrorDialogService, ErrorDialogService>();
       // GAP-I12: Inject correlation provider into ErrorLoggingService
       services.AddSingleton<IErrorLoggingService>(sp => new ErrorLoggingService(
@@ -641,6 +681,12 @@ namespace VoiceStudio.App.Services
 
     public static void RegisterToastNotificationService(ToastNotificationService service) => _toastOverride = service;
 
+    /// <summary>GAP-034: lazy singleton OS completion notifications (no UI StackPanel required).</summary>
+    public static ICompletionOsNotificationService TryGetCompletionOsNotificationService()
+    {
+        return _completionOsNotification ??= new CompletionOsNotificationService();
+    }
+
     // Typed accessors (forward to GetService / GetRequiredService)
     public static IBackendClient GetBackendClient() => GetRequiredService<IBackendClient>();
     public static IProjectsClient GetProjectsClient() => GetRequiredService<IProjectsClient>();
@@ -703,6 +749,7 @@ namespace VoiceStudio.App.Services
     public static IAdvancedRealTimeVisualizationClient GetAdvancedRealTimeVisualizationClient() => GetRequiredService<IAdvancedRealTimeVisualizationClient>();
     public static IAudioMonitoringDashboardClient GetAudioMonitoringDashboardClient() => GetRequiredService<IAudioMonitoringDashboardClient>();
     public static IEffectsMeterClient GetEffectsMeterClient() => GetRequiredService<IEffectsMeterClient>();
+    public static IMeterClient GetMeterClient() => GetRequiredService<IMeterClient>();
     public static IEffectChainClient GetEffectChainClient() => GetRequiredService<IEffectChainClient>();
     public static IMixerStateClient GetMixerStateClient() => GetRequiredService<IMixerStateClient>();
     public static IImageVideoEnhancementPipelineClient GetImageVideoEnhancementPipelineClient() => GetRequiredService<IImageVideoEnhancementPipelineClient>();
@@ -711,6 +758,35 @@ namespace VoiceStudio.App.Services
     public static ITodoPanelClient GetTodoPanelClient() => GetRequiredService<ITodoPanelClient>();
     public static ITimelineClipService GetTimelineClipService() => GetRequiredService<ITimelineClipService>();
     public static ITimelineTrackService GetTimelineTrackService() => GetRequiredService<ITimelineTrackService>();
+
+    public static ITimelineTrackService? TryGetTimelineTrackService() => GetService<ITimelineTrackService>();
+
+    public static IRecordingClient? TryGetRecordingClient() => GetService<IRecordingClient>();
+
+    public static IRecordingDeviceAvailabilityService? TryGetRecordingDeviceAvailabilityService() =>
+        GetService<IRecordingDeviceAvailabilityService>();
+
+    public static IRecordingInputCommandState? TryGetRecordingInputCommandState() =>
+        GetService<IRecordingInputCommandState>();
+    public static IClipTranscriptLinkageService? TryGetClipTranscriptLinkageService() =>
+        GetService<IClipTranscriptLinkageService>();
+
+    public static ITimelineSelectedProjectGate? TryGetTimelineSelectedProjectGate() =>
+        GetService<ITimelineSelectedProjectGate>();
+
+    public static ITranscriptSegmentTargetResolver? TryGetTranscriptSegmentTargetResolver() =>
+        GetService<ITranscriptSegmentTargetResolver>();
+
+    public static ITranscriptEditIntentService? TryGetTranscriptEditIntentService() =>
+        GetService<ITranscriptEditIntentService>();
+
+    public static TranscriptSegmentRegenerationCoordinator? TryGetTranscriptSegmentRegenerationCoordinator() =>
+        GetService<TranscriptSegmentRegenerationCoordinator>();
+
+    public static TranscriptEditHistoryService? TryGetTranscriptEditHistoryService() =>
+        GetService<TranscriptEditHistoryService>();
+    public static ITranscriptTruthRefreshCoordinator? TryGetTranscriptTruthRefreshCoordinator() =>
+        GetService<ITranscriptTruthRefreshCoordinator>();
     public static ITimelineTranscriptionService GetTimelineTranscriptionService() => GetRequiredService<ITimelineTranscriptionService>();
     public static ITimelineSynthesisService GetTimelineSynthesisService() => GetRequiredService<ITimelineSynthesisService>();
     public static IRequestMetricsService? TryGetRequestMetricsService() => GetService<IRequestMetricsService>();
@@ -726,6 +802,8 @@ namespace VoiceStudio.App.Services
     public static GracefulDegradationService GetGracefulDegradationService() => GetRequiredService<GracefulDegradationService>();
     public static IUpdateService GetUpdateService() => GetRequiredService<IUpdateService>();
     public static ISettingsService GetSettingsService() => GetRequiredService<ISettingsService>();
+    public static IProjectSessionDirtyState GetProjectSessionDirtyState() => GetRequiredService<IProjectSessionDirtyState>();
+    public static CrashRecoveryService GetCrashRecoveryService() => GetRequiredService<CrashRecoveryService>();
     public static PluginManager GetPluginManager() => GetRequiredService<PluginManager>();
     public static PluginBridgeService GetPluginBridgeService() => GetRequiredService<PluginBridgeService>();
     public static PluginBridgeService? TryGetPluginBridgeService() => GetService<PluginBridgeService>();
@@ -772,6 +850,8 @@ namespace VoiceStudio.App.Services
     public static ISecretsService? TryGetSecretsService() => GetService<ISecretsService>();
     public static IProfilesUseCase GetProfilesUseCase() => GetRequiredService<IProfilesUseCase>();
     public static IProfilesUseCase? TryGetProfilesUseCase() => GetService<IProfilesUseCase>();
+    public static ITimelineUseCase GetTimelineUseCase() => GetRequiredService<ITimelineUseCase>();
+    public static ITimelineUseCase? TryGetTimelineUseCase() => GetService<ITimelineUseCase>();
     public static IProjectRepository GetProjectRepository() => GetRequiredService<IProjectRepository>();
     public static IProjectRepository? TryGetProjectRepository() => GetService<IProjectRepository>();
     public static ModuleLoader GetModuleLoader() => GetRequiredService<ModuleLoader>();
@@ -788,6 +868,8 @@ namespace VoiceStudio.App.Services
     public static ICommandQueueService? TryGetCommandQueueService() => GetService<ICommandQueueService>();
     public static IDialogService GetDialogService() => GetRequiredService<IDialogService>();
     public static IDialogService? TryGetDialogService() => GetService<IDialogService>();
+
+    public static IExportLufsPresetUi? TryGetExportLufsPresetUi() => GetService<IExportLufsPresetUi>();
     public static BackendProcessManager GetBackendProcessManager() => GetRequiredService<BackendProcessManager>();
     public static BackendProcessManager? TryGetBackendProcessManager() => GetService<BackendProcessManager>();
     public static IStartupStateService GetStartupStateService() => GetRequiredService<IStartupStateService>();
@@ -801,6 +883,10 @@ namespace VoiceStudio.App.Services
     public static ThrottledEventPublisher? TryGetThrottledEventPublisher() => GetService<ThrottledEventPublisher>();
     public static IContextManager GetContextManager() => GetRequiredService<IContextManager>();
     public static IContextManager? TryGetContextManager() => GetService<IContextManager>();
+
+    public static IRecordingSessionCoordinator? TryGetRecordingSessionCoordinator() => GetService<IRecordingSessionCoordinator>();
+
+    public static IRecordingCaptureFanoutService? TryGetRecordingCaptureFanoutService() => GetService<IRecordingCaptureFanoutService>();
     public static ILayoutService GetLayoutService() => GetRequiredService<ILayoutService>();
     public static ILayoutService? TryGetLayoutService() => GetService<ILayoutService>();
     public static IWorkspaceService GetWorkspaceService() => GetRequiredService<IWorkspaceService>();

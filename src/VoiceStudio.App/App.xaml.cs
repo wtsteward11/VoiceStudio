@@ -372,6 +372,7 @@ namespace VoiceStudio.App
 
       m_window.Activate();
       _startupProfiler?.Checkpoint("MainWindow Activated");
+      ErrorDialogService.ResetStartupDialogDiagnostics();
 
       if (IsSmokeHinted())
       {
@@ -400,6 +401,7 @@ namespace VoiceStudio.App
                 backend_failed = true,
                 failure_message = msg,
                 expected_port_message = hasPortMsg,
+                startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
               };
               WriteFailureSmokeSummary(GetCrashDir(), payload);
               Environment.Exit(hasPortMsg ? 0 : 1);
@@ -415,6 +417,7 @@ namespace VoiceStudio.App
                 failure_message = (string?)null,
                 expected_port_message = false,
                 error = "Expected BackendFailed (port occupied) but got BackendReady",
+                startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
               };
               WriteFailureSmokeSummary(GetCrashDir(), payload);
               Environment.Exit(1);
@@ -433,6 +436,7 @@ namespace VoiceStudio.App
               failure_message = (string?)null,
               expected_port_message = false,
               error = "Timeout: did not get BackendFailed within 30s",
+              startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
             };
             WriteFailureSmokeSummary(GetCrashDir(), payload);
             Environment.Exit(1);
@@ -461,6 +465,7 @@ namespace VoiceStudio.App
                 backend_failed = true,
                 failure_message = msg,
                 expected_runtime_message = hasRuntimeMsg,
+                startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
               };
               WriteFailureRuntimeSmokeSummary(GetCrashDir(), payload);
               _ = ErrorBoundary.TryExecute(() => Directory.Delete(tempDir, recursive: false), "cleanup temp dir before exit");
@@ -477,6 +482,7 @@ namespace VoiceStudio.App
                 failure_message = (string?)null,
                 expected_runtime_message = false,
                 error = "Expected BackendFailed (runtime missing) but got BackendReady",
+                startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
               };
               WriteFailureRuntimeSmokeSummary(GetCrashDir(), payload);
               _ = ErrorBoundary.TryExecute(() => Directory.Delete(tempDir, recursive: false), "cleanup temp dir before exit");
@@ -496,6 +502,7 @@ namespace VoiceStudio.App
               failure_message = (string?)null,
               expected_runtime_message = false,
               error = "Timeout: did not get BackendFailed within 30s",
+              startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
             };
             WriteFailureRuntimeSmokeSummary(GetCrashDir(), payload);
             _ = ErrorBoundary.TryExecute(() => Directory.Delete(tempDir, recursive: false), "cleanup temp dir before exit");
@@ -904,14 +911,20 @@ namespace VoiceStudio.App
       }
 
       var allSucceeded = action1Succeeded && action2Succeeded && action3Succeeded;
+      var startupDialog = ErrorDialogService.GetStartupDialogDiagnostics();
+      var startupDialogClean = startupDialog.StartupPendingDialogShown == 0;
       var failures = new List<object>();
       if (!action1Succeeded) failures.Add(new { step = "profiles_fetch", error = action1Error ?? "Unknown" });
       if (!action2Succeeded) failures.Add(new { step = "library_folders", error = action2Error ?? "Unknown" });
       if (!action3Succeeded) failures.Add(new { step = "nav_library", error = action3Error ?? "Unknown" });
+      if (!startupDialogClean)
+      {
+        failures.Add(new { step = "startup_modal_dialog_race", error = $"Dialogs shown during startup authority window: {startupDialog.StartupPendingDialogShown}" });
+      }
 
       var resultPayload = new
       {
-        status = allSucceeded ? "PASS" : "FAIL",
+        status = (allSucceeded && startupDialogClean) ? "PASS" : "FAIL",
         timestamp_utc = DateTime.UtcNow.ToString("o"),
         backend_ready = true,
         overlay_cleared_ms = overlayClearedMs,
@@ -922,9 +935,10 @@ namespace VoiceStudio.App
         action_3_succeeded = action3Succeeded,
         action_3_name = "nav_library",
         failures = failures,
+        startup_dialog = startupDialog,
       };
       WriteIconLaunchSmokeSummary(crashDir, resultPayload);
-      return allSucceeded ? 0 : 1;
+      return (allSucceeded && startupDialogClean) ? 0 : 1;
     }
 
     private static void WriteIconLaunchSmokeSummary(string crashDir, object payload)
@@ -1384,9 +1398,7 @@ namespace VoiceStudio.App
 
     private static string GetBackendBaseUrl()
     {
-      var host = Environment.GetEnvironmentVariable("VOICESTUDIO_API_HOST") ?? "localhost";
-      var port = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT") ?? "8000";
-      return $"http://{host}:{port}";
+      return BackendClientConfig.FromEnvironment().BaseUrl;
     }
 
     // WinUI 3 doesn't have OnSuspending - cleanup happens on app exit
@@ -1411,7 +1423,7 @@ namespace VoiceStudio.App
         return ServiceProvider.TryGetRecentProjectsService();
 
       if (serviceType == typeof(CrashRecoveryService))
-        return null; // CrashRecoveryService not exposed via ServiceProvider; init handled elsewhere
+        return ServiceProvider.GetCrashRecoveryService();
 
       if (serviceType == typeof(VoiceStudio.Core.Services.IBackendClient))
         return ServiceProvider.GetBackendClient();

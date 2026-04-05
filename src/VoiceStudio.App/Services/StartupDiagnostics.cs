@@ -15,6 +15,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Logging;
+using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Services
 {
@@ -59,8 +60,7 @@ namespace VoiceStudio.App.Services
         /// </summary>
         public StartupDiagnostics()
         {
-            _backendBaseUrl = Environment.GetEnvironmentVariable("VOICESTUDIO_BACKEND_URL")
-                ?? "http://localhost:8000";
+            _backendBaseUrl = BackendClientConfig.FromEnvironment().BaseUrl;
             _jsonOptions = new JsonSerializerOptions
             {
                 WriteIndented = true,

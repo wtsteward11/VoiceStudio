@@ -1,4 +1,5 @@
 using System;
+using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Config
 {
@@ -6,7 +7,8 @@ namespace VoiceStudio.App.Config
     /// Centralized application configuration with environment variable overrides.
     /// 
     /// Environment Variables:
-    ///     VOICESTUDIO_API_HOST: API host (default: localhost)
+    ///     VOICESTUDIO_BACKEND_URL: Full API base URL (http/https); wins over host/port when set.
+    ///     VOICESTUDIO_API_HOST: API host (default: 127.0.0.1; matches IPv4 uvicorn bind)
     ///     VOICESTUDIO_API_PORT: API port (default: 8000)
     ///     VOICESTUDIO_WS_PORT: WebSocket port (default: 8000, same as API)
     ///     VOICESTUDIO_HEALTH_CHECK_INTERVAL: Health check interval in ms (default: 5000)
@@ -19,10 +21,23 @@ namespace VoiceStudio.App.Config
         #region API Configuration
 
         /// <summary>
-        /// Get the API host address.
+        /// Get the API host address (parsed from <see cref="BackendClientConfig.FromEnvironment"/>).
         /// </summary>
-        public static string ApiHost =>
-            Environment.GetEnvironmentVariable("VOICESTUDIO_API_HOST") ?? "localhost";
+        public static string ApiHost
+        {
+            get
+            {
+                try
+                {
+                    var uri = new Uri(BackendClientConfig.FromEnvironment().BaseUrl);
+                    return uri.Host;
+                }
+                catch (UriFormatException)
+                {
+                    return "127.0.0.1";
+                }
+            }
+        }
 
         /// <summary>
         /// Get the API port.
@@ -31,20 +46,33 @@ namespace VoiceStudio.App.Config
             GetEnvInt("VOICESTUDIO_API_PORT", 8000);
 
         /// <summary>
-        /// Get the WebSocket port.
+        /// Get the WebSocket port (from resolved <see cref="WebSocketUrl"/>, including <c>VOICESTUDIO_WS_PORT</c> override).
         /// </summary>
-        public static int WebSocketPort =>
-            GetEnvInt("VOICESTUDIO_WS_PORT", 8000);
+        public static int WebSocketPort
+        {
+            get
+            {
+                try
+                {
+                    var uri = new Uri(BackendClientConfig.FromEnvironment().WebSocketUrl);
+                    return uri.Port;
+                }
+                catch (UriFormatException)
+                {
+                    return 8000;
+                }
+            }
+        }
 
         /// <summary>
-        /// Get the full API base URL.
+        /// Get the full API base URL (same authority as <see cref="BackendClientConfig.FromEnvironment"/>).
         /// </summary>
-        public static string ApiUrl => $"http://{ApiHost}:{ApiPort}";
+        public static string ApiUrl => BackendClientConfig.FromEnvironment().BaseUrl;
 
         /// <summary>
-        /// Get the WebSocket URL.
+        /// Get the WebSocket URL (includes <c>/ws/realtime</c> path).
         /// </summary>
-        public static string WebSocketUrl => $"ws://{ApiHost}:{WebSocketPort}";
+        public static string WebSocketUrl => BackendClientConfig.FromEnvironment().WebSocketUrl;
 
         #endregion
 

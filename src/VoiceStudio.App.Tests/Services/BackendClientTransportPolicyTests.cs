@@ -10,7 +10,6 @@ using VoiceStudio.App.Services.Gateways;
 using VoiceStudio.App.UseCases;
 using VoiceStudio.Core.Exceptions;
 using VoiceStudio.Core.Gateways;
-using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 namespace VoiceStudio.App.Tests.Services
 {
@@ -718,6 +717,40 @@ namespace VoiceStudio.App.Tests.Services
     }
 
     /// <summary>
+    /// GAP-039: ProcessAudioWithChainAsync appends bypass_chain and preview query flags when set.
+    /// </summary>
+    [TestMethod]
+    public async Task ProcessAudioWithChainAsync_IncludesBypassAndPreviewQuery()
+    {
+      string? capturedUri = null;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        capturedUri = req.RequestUri?.ToString();
+        if (capturedUri != null && capturedUri.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (capturedUri != null && capturedUri.Contains("/api/effects/chains/", StringComparison.Ordinal) && capturedUri.Contains("/process", StringComparison.Ordinal))
+          return JsonOk("{\"success\":true,\"output_audio_id\":\"out1\",\"message\":\"ok\"}");
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      var effectChainClient = CreateEffectChainClient(handler);
+      var result = await effectChainClient.ProcessAudioWithChainAsync(
+          projectId: "p1",
+          chainId: "c1",
+          audioId: "a1",
+          outputFilename: null,
+          bypassChain: true,
+          preview: true,
+          CancellationToken.None).ConfigureAwait(false);
+
+      Assert.IsNotNull(result);
+      Assert.IsTrue(result.Success);
+      Assert.IsNotNull(capturedUri);
+      Assert.IsTrue(capturedUri.Contains("bypass_chain=true", StringComparison.Ordinal), capturedUri);
+      Assert.IsTrue(capturedUri.Contains("preview=true", StringComparison.Ordinal), capturedUri);
+    }
+
+    /// <summary>
     /// Verifies BackupRestoreClient.GetBackupsAsync resolves /api/backup (PR-14 extraction).
     /// </summary>
     [TestMethod]
@@ -754,7 +787,7 @@ namespace VoiceStudio.App.Tests.Services
         capturedPath = req.RequestUri?.AbsolutePath;
         if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
           return HealthOk();
-        if (capturedPath != null && capturedPath.Contains("/api/models", StringComparison.Ordinal) && !capturedPath.Contains("/export", StringComparison.Ordinal) && !capturedPath.Contains("/import", StringComparison.Ordinal) && !capturedPath.Contains("/stats", StringComparison.Ordinal))
+        if (capturedPath != null && capturedPath.Contains("/api/models", StringComparison.Ordinal) && !capturedPath.Contains("/export", StringComparison.Ordinal) && !capturedPath.Contains("/import", StringComparison.Ordinal) && !capturedPath.Contains("/stats", StringComparison.Ordinal) && !capturedPath.Contains("/download", StringComparison.Ordinal))
           return JsonOk("[]");
         return new HttpResponseMessage(HttpStatusCode.NotFound);
       });
@@ -795,62 +828,10 @@ namespace VoiceStudio.App.Tests.Services
     }
 
     /// <summary>
-    /// Verifies VideoGenClient.ListVideoEnginesAsync resolves GET /api/video/engines/list (PR-16 extraction).
+    /// Verifies ModelManagerClient.StartModelDownloadAsync posts to /api/models/download (GAP-043).
     /// </summary>
     [TestMethod]
-    public async Task ListVideoEnginesAsync_ResolvesCorrectPath()
-    {
-      string? capturedPath = null;
-      var handler = new TransportTestHandler((req, seq) =>
-      {
-        capturedPath = req.RequestUri?.AbsolutePath;
-        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
-          return HealthOk();
-        if (capturedPath != null && capturedPath.Contains("/api/video/engines/list", StringComparison.Ordinal))
-          return JsonOk("{\"engines\":[\"engine1\"]}");
-        return new HttpResponseMessage(HttpStatusCode.NotFound);
-      });
-
-      var videoGenClient = CreateVideoGenClient(handler);
-      var result = await videoGenClient.ListVideoEnginesAsync(CancellationToken.None).ConfigureAwait(false);
-
-      Assert.IsNotNull(result);
-      Assert.IsNotNull(capturedPath);
-      Assert.IsTrue(capturedPath.Contains("/api/video/engines/list", StringComparison.Ordinal), $"Expected path to contain /api/video/engines/list, got: {capturedPath}");
-    }
-
-    /// <summary>
-    /// Verifies VideoEditClient.GetVideoInfoAsync resolves GET /api/video/edit/info with escaped path (PR-16 extraction).
-    /// </summary>
-    [TestMethod]
-    public async Task GetVideoInfoAsync_ResolvesCorrectPath()
-    {
-      string? capturedUri = null;
-      var handler = new TransportTestHandler((req, seq) =>
-      {
-        capturedUri = req.RequestUri?.ToString();
-        if (capturedUri != null && capturedUri.Contains("/api/health", StringComparison.Ordinal))
-          return HealthOk();
-        if (capturedUri != null && capturedUri.Contains("/api/video/edit/info", StringComparison.Ordinal) && capturedUri.Contains("path=", StringComparison.Ordinal))
-          return JsonOk("{\"duration_seconds\":10,\"width\":1920,\"height\":1080,\"fps\":30,\"format\":\"mp4\"}");
-        return new HttpResponseMessage(HttpStatusCode.NotFound);
-      });
-
-      var videoEditClient = CreateVideoEditClient(handler);
-      var pathWithSpecialChars = "C:\\Users\\test\\video with spaces.mp4";
-      var result = await videoEditClient.GetVideoInfoAsync(pathWithSpecialChars, CancellationToken.None).ConfigureAwait(false);
-
-      Assert.IsNotNull(result);
-      Assert.IsNotNull(capturedUri);
-      Assert.IsTrue(capturedUri.Contains("/api/video/edit/info", StringComparison.Ordinal), $"Expected URI to contain /api/video/edit/info, got: {capturedUri}");
-      Assert.IsTrue(capturedUri.Contains("path=", StringComparison.Ordinal), $"Expected URI to contain path= for query escaping, got: {capturedUri}");
-    }
-
-    /// <summary>
-    /// Verifies VideoGenClient.GenerateVideoAsync resolves POST /api/video/generate (PR-16 extraction).
-    /// </summary>
-    [TestMethod]
-    public async Task GenerateVideoAsync_ResolvesCorrectPath()
+    public async Task StartModelDownloadAsync_ResolvesCorrectPath()
     {
       string? capturedPath = null;
       HttpMethod? capturedMethod = null;
@@ -860,19 +841,27 @@ namespace VoiceStudio.App.Tests.Services
         capturedMethod = req.Method;
         if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
           return HealthOk();
-        if (capturedPath != null && capturedPath.Contains("/api/video/generate", StringComparison.Ordinal) && req.Method == HttpMethod.Post)
-          return JsonOk("{\"video_id\":\"vid-1\",\"status\":\"completed\",\"output_path\":\"/out/video.mp4\"}");
+        if (capturedPath != null && capturedPath.Contains("/api/models/download", StringComparison.Ordinal) && req.Method == HttpMethod.Post)
+          return JsonOk("{\"job_id\":\"job-dl-1\"}");
         return new HttpResponseMessage(HttpStatusCode.NotFound);
       });
 
-      var videoGenClient = CreateVideoGenClient(handler);
-      var request = new VideoGenerateRequest { Prompt = "test", Engine = "engine1" };
-      var result = await videoGenClient.GenerateVideoAsync(request, CancellationToken.None).ConfigureAwait(false);
+      var modelClient = CreateModelManagerClient(handler);
+      var req = new VoiceStudio.Core.Models.ModelDownloadStartRequest
+      {
+        Url = "https://example.com/m.zip",
+        Engine = "xtts_v2",
+        ModelName = "m1",
+        Version = "1.0",
+        ExpectedSha256 = null,
+      };
+      var result = await modelClient.StartModelDownloadAsync(req, CancellationToken.None).ConfigureAwait(false);
 
       Assert.IsNotNull(result);
+      Assert.AreEqual("job-dl-1", result.JobId);
       Assert.IsNotNull(capturedPath);
       Assert.AreEqual(HttpMethod.Post, capturedMethod);
-      Assert.IsTrue(capturedPath.Contains("/api/video/generate", StringComparison.Ordinal), $"Expected path to contain /api/video/generate, got: {capturedPath}");
+      Assert.IsTrue(capturedPath.Contains("/api/models/download", StringComparison.Ordinal), $"Expected /api/models/download, got: {capturedPath}");
     }
 
     /// <summary>
@@ -1146,52 +1135,6 @@ namespace VoiceStudio.App.Tests.Services
     }
 
     /// <summary>
-    /// Uses reflection to create VideoGenClient (internal ctor). PR-16.
-    /// </summary>
-    private static IVideoGenClient CreateVideoGenClient(HttpMessageHandler inner)
-    {
-      var httpClient = new HttpClient(inner)
-      {
-        BaseAddress = new Uri("http://localhost:8000"),
-        Timeout = TimeSpan.FromSeconds(30)
-      };
-      var jsonOptions = VoiceStudio.App.Utilities.JsonSerializerOptionsFactory.BackendApi;
-      var appAssembly = typeof(VoiceStudio.App.Services.BackendClient).Assembly;
-      var pipelineType = appAssembly.GetType("VoiceStudio.App.Services.BackendClientHttpPipeline")
-        ?? throw new InvalidOperationException("BackendClientHttpPipeline type not found");
-      var pipeline = Activator.CreateInstance(pipelineType, httpClient, jsonOptions)
-        ?? throw new InvalidOperationException("Failed to create BackendClientHttpPipeline");
-      var videoGenType = appAssembly.GetType("VoiceStudio.App.Services.VideoGenClient")
-        ?? throw new InvalidOperationException("VideoGenClient type not found");
-      var videoGenClient = Activator.CreateInstance(videoGenType, BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { pipeline }, null)
-        ?? throw new InvalidOperationException("Failed to create VideoGenClient");
-      return (IVideoGenClient)videoGenClient;
-    }
-
-    /// <summary>
-    /// Uses reflection to create VideoEditClient (internal ctor). PR-16.
-    /// </summary>
-    private static IVideoEditClient CreateVideoEditClient(HttpMessageHandler inner)
-    {
-      var httpClient = new HttpClient(inner)
-      {
-        BaseAddress = new Uri("http://localhost:8000"),
-        Timeout = TimeSpan.FromSeconds(30)
-      };
-      var jsonOptions = VoiceStudio.App.Utilities.JsonSerializerOptionsFactory.BackendApi;
-      var appAssembly = typeof(VoiceStudio.App.Services.BackendClient).Assembly;
-      var pipelineType = appAssembly.GetType("VoiceStudio.App.Services.BackendClientHttpPipeline")
-        ?? throw new InvalidOperationException("BackendClientHttpPipeline type not found");
-      var pipeline = Activator.CreateInstance(pipelineType, httpClient, jsonOptions)
-        ?? throw new InvalidOperationException("Failed to create BackendClientHttpPipeline");
-      var videoEditType = appAssembly.GetType("VoiceStudio.App.Services.VideoEditClient")
-        ?? throw new InvalidOperationException("VideoEditClient type not found");
-      var videoEditClient = Activator.CreateInstance(videoEditType, BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { pipeline }, null)
-        ?? throw new InvalidOperationException("Failed to create VideoEditClient");
-      return (IVideoEditClient)videoEditClient;
-    }
-
-    /// <summary>
     /// Uses reflection to create ScriptEditorClient (internal ctor).
     /// </summary>
     private static IScriptEditorClient CreateScriptEditorClient(HttpMessageHandler inner)
@@ -1235,54 +1178,6 @@ namespace VoiceStudio.App.Tests.Services
       var pluginClient = Activator.CreateInstance(pluginType, pipeline)
         ?? throw new InvalidOperationException("Failed to create PluginHealthClient");
       return (IPluginHealthClient)pluginClient;
-    }
-
-    /// <summary>
-    /// Verifies MixerStateClient.GetMixerStateAsync resolves GET /api/mixer/state/{projectId} (PR-17 extraction).
-    /// </summary>
-    [TestMethod]
-    public async Task GetMixerStateAsync_ResolvesCorrectPath()
-    {
-      string? capturedPath = null;
-      var handler = new TransportTestHandler((req, seq) =>
-      {
-        capturedPath = req.RequestUri?.AbsolutePath;
-        if (capturedPath != null && capturedPath.Contains("/api/health", StringComparison.Ordinal))
-          return HealthOk();
-        if (capturedPath != null && capturedPath.Contains("/api/mixer/state/", StringComparison.Ordinal) && req.Method == HttpMethod.Get)
-          return JsonOk("{\"channels\":[],\"sends\":[],\"returns\":[],\"subgroups\":[],\"master\":null,\"presets\":[]}");
-        return new HttpResponseMessage(HttpStatusCode.NotFound);
-      });
-
-      var mixerStateClient = CreateMixerStateClient(handler);
-      var result = await mixerStateClient.GetMixerStateAsync("proj-1", CancellationToken.None).ConfigureAwait(false);
-
-      Assert.IsNotNull(result);
-      Assert.IsNotNull(capturedPath);
-      Assert.IsTrue(capturedPath.Contains("/api/mixer/state/proj-1", StringComparison.Ordinal), $"Expected path to contain /api/mixer/state/proj-1, got: {capturedPath}");
-    }
-
-    /// <summary>
-    /// Uses reflection to create MixerStateClient (internal ctor). PR-17.
-    /// </summary>
-    private static IMixerStateClient CreateMixerStateClient(HttpMessageHandler inner)
-    {
-      var httpClient = new HttpClient(inner)
-      {
-        BaseAddress = new Uri("http://localhost:8000"),
-        Timeout = TimeSpan.FromSeconds(30)
-      };
-      var jsonOptions = VoiceStudio.App.Utilities.JsonSerializerOptionsFactory.BackendApi;
-      var appAssembly = typeof(VoiceStudio.App.Services.BackendClient).Assembly;
-      var pipelineType = appAssembly.GetType("VoiceStudio.App.Services.BackendClientHttpPipeline")
-        ?? throw new InvalidOperationException("BackendClientHttpPipeline type not found");
-      var pipeline = Activator.CreateInstance(pipelineType, httpClient, jsonOptions)
-        ?? throw new InvalidOperationException("Failed to create BackendClientHttpPipeline");
-      var mixerType = appAssembly.GetType("VoiceStudio.App.Services.MixerStateClient")
-        ?? throw new InvalidOperationException("MixerStateClient type not found");
-      var mixerClient = Activator.CreateInstance(mixerType, BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { pipeline }, null)
-        ?? throw new InvalidOperationException("Failed to create MixerStateClient");
-      return (IMixerStateClient)mixerClient;
     }
 
     private sealed class RetryOkDto

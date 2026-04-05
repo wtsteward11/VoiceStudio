@@ -29,7 +29,7 @@ project_root = str(Path(__file__).parent.parent.parent)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-BACKEND_URL = os.getenv("VOICESTUDIO_BACKEND_URL", "http://localhost:8000")
+BACKEND_URL = os.getenv("VOICESTUDIO_BACKEND_URL", "http://127.0.0.1:8000")
 CONCURRENT_REQUESTS = 5
 TEST_TEXT = "This is a test sentence for load testing the voice synthesis pipeline. " \
             "The quick brown fox jumps over the lazy dog near the river bank."

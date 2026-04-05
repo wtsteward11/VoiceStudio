@@ -1,10 +1,16 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Commands;
 using VoiceStudio.App.Core.Commands;
+using VoiceStudio.App.Services;
+using VoiceStudio.App.UseCases;
+using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.Commands
 {
@@ -214,6 +220,252 @@ namespace VoiceStudio.App.Tests.Commands
 
             // Assert
             Assert.IsTrue(_handler.HasUnsavedChanges);
+        }
+
+        #endregion
+
+        #region Export authority (GAP-029)
+
+        [TestMethod]
+        public async Task ExportAudio_CallsTimelineExport_NotDirectAudioExport()
+        {
+            var reg = new UnifiedCommandRegistry(MockShortcutService.Object);
+            var mockBackend = new Mock<IBackendClient>();
+            var mockTimeline = new Mock<ITimelineUseCase>();
+            var mockCtx = new Mock<IContextManager>();
+            mockCtx.Setup(c => c.ActiveEffectChainId).Returns((string?)null);
+
+            mockBackend.Setup(b => b.ListProjectAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ProjectAudioFile>
+                {
+                    new() { AudioId = "aid-fallback", Filename = "a.wav" },
+                });
+
+            mockTimeline.Setup(t => t.ExportAsync(It.IsAny<string>(), It.IsAny<ExportOptions>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(@"C:\export\mix.wav");
+
+            var handler = new FileOperationsHandler(
+                reg,
+                MockProjectRepository.Object,
+                MockDialogService.Object,
+                mockBackend.Object,
+                null,
+                mockTimeline.Object,
+                mockCtx.Object);
+
+            SetupInputDialog("Export Proj");
+            await reg.ExecuteAsync("file.new");
+            SetupSaveFileDialog(@"C:\export\mix.wav");
+
+            await handler.ExportAudioAsync();
+
+            mockTimeline.Verify(
+                t => t.ExportAsync(
+                    @"C:\export\mix.wav",
+                    It.Is<ExportOptions>(o =>
+                        o.FallbackProjectAudioId == "aid-fallback"
+                        && o.ProjectId == handler.CurrentProject!.Id
+                        && !o.ApplyEffectsDuringExport
+                        && o.LufsPreset == "podcast_stereo"),
+                    It.IsAny<CancellationToken>()),
+                Times.Once);
+
+            mockBackend.Verify(
+                b => b.ExportAudioAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<int?>(),
+                    It.IsAny<int?>(),
+                    It.IsAny<int?>(),
+                    It.IsAny<bool>(),
+                    It.IsAny<CancellationToken>()),
+                Times.Never);
+        }
+
+        /// <summary>GAP-031: Empty / invalid timeline export surfaces as non-fatal handler completion with user message path (toast).</summary>
+        [TestMethod]
+        public async Task ExportAudio_DoesNotRethrow_WhenTimelineExportThrowsInvalidOperation()
+        {
+            var reg = new UnifiedCommandRegistry(MockShortcutService.Object);
+            var mockBackend = new Mock<IBackendClient>();
+            var mockTimeline = new Mock<ITimelineUseCase>();
+            var mockCtx = new Mock<IContextManager>();
+            mockCtx.Setup(c => c.ActiveEffectChainId).Returns((string?)null);
+
+            mockBackend.Setup(b => b.ListProjectAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ProjectAudioFile>
+                {
+                    new() { AudioId = "aid-fallback", Filename = "a.wav" },
+                });
+
+            mockTimeline.Setup(t => t.ExportAsync(It.IsAny<string>(), It.IsAny<ExportOptions>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("Timeline has no audible audio to export."));
+
+            var handler = new FileOperationsHandler(
+                reg,
+                MockProjectRepository.Object,
+                MockDialogService.Object,
+                mockBackend.Object,
+                null,
+                mockTimeline.Object,
+                mockCtx.Object);
+
+            SetupInputDialog("Export Proj");
+            await reg.ExecuteAsync("file.new");
+            SetupSaveFileDialog(@"C:\export\mix.wav");
+
+            await handler.ExportAudioAsync();
+
+            mockTimeline.Verify(
+                t => t.ExportAsync(It.IsAny<string>(), It.IsAny<ExportOptions>(), It.IsAny<CancellationToken>()),
+                Times.Once);
+        }
+
+        [TestMethod]
+        public async Task ExportAudio_UsesSettingsDefaultLufsPreset_WhenNoPicker()
+        {
+            var reg = new UnifiedCommandRegistry(MockShortcutService.Object);
+            var mockBackend = new Mock<IBackendClient>();
+            var mockTimeline = new Mock<ITimelineUseCase>();
+            var mockCtx = new Mock<IContextManager>();
+            mockCtx.Setup(c => c.ActiveEffectChainId).Returns((string?)null);
+
+            var st = TestDataGenerators.CreateDefaultSettings();
+            st.General!.DefaultExportLufsPreset = "neutral";
+            MockSettingsService.Setup(s => s.LoadSettingsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(st);
+
+            mockBackend.Setup(b => b.ListProjectAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ProjectAudioFile>
+                {
+                    new() { AudioId = "aid-fallback", Filename = "a.wav" },
+                });
+
+            mockTimeline.Setup(t => t.ExportAsync(It.IsAny<string>(), It.IsAny<ExportOptions>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(@"C:\export\mix.wav");
+
+            var handler = new FileOperationsHandler(
+                reg,
+                MockProjectRepository.Object,
+                MockDialogService.Object,
+                mockBackend.Object,
+                null,
+                mockTimeline.Object,
+                mockCtx.Object,
+                MockSettingsService.Object,
+                null);
+
+            SetupInputDialog("Export Proj");
+            await reg.ExecuteAsync("file.new");
+            SetupSaveFileDialog(@"C:\export\mix.wav");
+
+            await handler.ExportAudioAsync();
+
+            mockTimeline.Verify(
+                t => t.ExportAsync(
+                    @"C:\export\mix.wav",
+                    It.Is<ExportOptions>(o => o.LufsPreset == "neutral"),
+                    It.IsAny<CancellationToken>()),
+                Times.Once);
+        }
+
+        [TestMethod]
+        public async Task ExportAudio_PresetPickerOverridesSettings()
+        {
+            var reg = new UnifiedCommandRegistry(MockShortcutService.Object);
+            var mockBackend = new Mock<IBackendClient>();
+            var mockTimeline = new Mock<ITimelineUseCase>();
+            var mockCtx = new Mock<IContextManager>();
+            mockCtx.Setup(c => c.ActiveEffectChainId).Returns((string?)null);
+
+            var st = TestDataGenerators.CreateDefaultSettings();
+            st.General!.DefaultExportLufsPreset = "podcast_stereo";
+            MockSettingsService.Setup(s => s.LoadSettingsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(st);
+
+            var mockPresetUi = new Mock<IExportLufsPresetUi>();
+            mockPresetUi
+                .Setup(u => u.PickPresetAsync("podcast_stereo", It.IsAny<CancellationToken>()))
+                .ReturnsAsync("streaming");
+
+            mockBackend.Setup(b => b.ListProjectAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ProjectAudioFile>
+                {
+                    new() { AudioId = "aid-fallback", Filename = "a.wav" },
+                });
+
+            mockTimeline.Setup(t => t.ExportAsync(It.IsAny<string>(), It.IsAny<ExportOptions>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(@"C:\export\mix.wav");
+
+            var handler = new FileOperationsHandler(
+                reg,
+                MockProjectRepository.Object,
+                MockDialogService.Object,
+                mockBackend.Object,
+                null,
+                mockTimeline.Object,
+                mockCtx.Object,
+                MockSettingsService.Object,
+                mockPresetUi.Object);
+
+            SetupInputDialog("Export Proj");
+            await reg.ExecuteAsync("file.new");
+            SetupSaveFileDialog(@"C:\export\mix.wav");
+
+            await handler.ExportAudioAsync();
+
+            mockTimeline.Verify(
+                t => t.ExportAsync(
+                    @"C:\export\mix.wav",
+                    It.Is<ExportOptions>(o => o.LufsPreset == "streaming"),
+                    It.IsAny<CancellationToken>()),
+                Times.Once);
+        }
+
+        [TestMethod]
+        public async Task ExportAudio_PresetPickerCancel_SkipsTimelineExport()
+        {
+            var reg = new UnifiedCommandRegistry(MockShortcutService.Object);
+            var mockBackend = new Mock<IBackendClient>();
+            var mockTimeline = new Mock<ITimelineUseCase>();
+            var mockCtx = new Mock<IContextManager>();
+            mockCtx.Setup(c => c.ActiveEffectChainId).Returns((string?)null);
+
+            var st = TestDataGenerators.CreateDefaultSettings();
+            MockSettingsService.Setup(s => s.LoadSettingsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(st);
+
+            var mockPresetUi = new Mock<IExportLufsPresetUi>();
+            mockPresetUi
+                .Setup(u => u.PickPresetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((string?)null);
+
+            mockBackend.Setup(b => b.ListProjectAudioAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ProjectAudioFile>
+                {
+                    new() { AudioId = "aid-fallback", Filename = "a.wav" },
+                });
+
+            var handler = new FileOperationsHandler(
+                reg,
+                MockProjectRepository.Object,
+                MockDialogService.Object,
+                mockBackend.Object,
+                null,
+                mockTimeline.Object,
+                mockCtx.Object,
+                MockSettingsService.Object,
+                mockPresetUi.Object);
+
+            SetupInputDialog("Export Proj");
+            await reg.ExecuteAsync("file.new");
+            SetupSaveFileDialog(@"C:\export\mix.wav");
+
+            await handler.ExportAudioAsync();
+
+            mockTimeline.Verify(
+                t => t.ExportAsync(It.IsAny<string>(), It.IsAny<ExportOptions>(), It.IsAny<CancellationToken>()),
+                Times.Never);
         }
 
         #endregion

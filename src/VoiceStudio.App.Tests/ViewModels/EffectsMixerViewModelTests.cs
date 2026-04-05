@@ -161,20 +161,24 @@ namespace VoiceStudio.App.Tests.ViewModels
       // Arrange
       var expectedResponse = new EffectProcessResponse
       {
-        AudioId = "processed-audio-123",
+        OutputAudioId = "processed-audio-123",
         Success = true
       };
 
       _mockEffectChainClient
-          .Setup(x => x.ProcessAudioWithChainAsync("proj-1", "chain-1", "audio-input", null, It.IsAny<CancellationToken>()))
+          .Setup(x => x.ProcessAudioWithChainAsync(
+              "proj-1", "chain-1", "audio-input", null,
+              false, false, It.IsAny<CancellationToken>()))
           .ReturnsAsync(expectedResponse);
 
       // Act
-      var result = await _mockEffectChainClient.Object.ProcessAudioWithChainAsync("proj-1", "chain-1", "audio-input", null, CancellationToken.None);
+      var result = await _mockEffectChainClient.Object.ProcessAudioWithChainAsync(
+          "proj-1", "chain-1", "audio-input", null,
+          bypassChain: false, preview: false, CancellationToken.None);
 
       // Assert
       Assert.IsNotNull(result);
-      Assert.AreEqual("processed-audio-123", result.AudioId);
+      Assert.AreEqual("processed-audio-123", result.OutputAudioId);
       Assert.IsTrue(result.Success);
     }
 
@@ -184,12 +188,17 @@ namespace VoiceStudio.App.Tests.ViewModels
       // Arrange
       string? capturedFilename = null;
       _mockEffectChainClient
-          .Setup(x => x.ProcessAudioWithChainAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-          .Callback<string, string, string, string?, CancellationToken>((proj, chain, audio, filename, ct) => capturedFilename = filename)
+          .Setup(x => x.ProcessAudioWithChainAsync(
+              It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(),
+              It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+          .Callback<string, string, string, string?, bool, bool, CancellationToken>(
+              (proj, chain, audio, filename, _b, _p, ct) => capturedFilename = filename)
           .ReturnsAsync(new EffectProcessResponse { Success = true });
 
       // Act
-      await _mockEffectChainClient.Object.ProcessAudioWithChainAsync("proj-1", "chain-1", "audio-input", "output.wav", CancellationToken.None);
+      await _mockEffectChainClient.Object.ProcessAudioWithChainAsync(
+          "proj-1", "chain-1", "audio-input", "output.wav",
+          bypassChain: false, preview: false, CancellationToken.None);
 
       // Assert
       Assert.AreEqual("output.wav", capturedFilename);

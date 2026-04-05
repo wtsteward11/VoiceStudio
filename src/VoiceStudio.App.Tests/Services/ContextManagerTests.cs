@@ -65,6 +65,20 @@ namespace VoiceStudio.App.Tests.Services
             Assert.IsNull(_contextManager.CurrentPlayableAudioId);
             Assert.IsNull(_contextManager.CurrentPlayableSource);
             Assert.IsNull(_contextManager.CurrentPlayableTitle);
+            Assert.IsNull(_contextManager.ActiveTimelinePrimaryClipId);
+            Assert.IsNull(_contextManager.ActiveTimelinePrimaryTrackId);
+        }
+
+        [TestMethod]
+        public void SetActiveTimelineSelection_UpdatesClipAndTrackIds()
+        {
+            _contextManager.SetActiveTimelineSelection("clip-a", "track-1");
+            Assert.AreEqual("clip-a", _contextManager.ActiveTimelinePrimaryClipId);
+            Assert.AreEqual("track-1", _contextManager.ActiveTimelinePrimaryTrackId);
+
+            _contextManager.SetActiveTimelineSelection(null, "track-2");
+            Assert.IsNull(_contextManager.ActiveTimelinePrimaryClipId);
+            Assert.AreEqual("track-2", _contextManager.ActiveTimelinePrimaryTrackId);
         }
 
         #endregion

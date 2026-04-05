@@ -27,7 +27,11 @@ namespace VoiceStudio.App.Tests
         [AssemblyCleanup]
         public static void AssemblyCleanup()
         {
-            TestAppServicesHelper.Cleanup();
+        TestAppServicesHelper.Cleanup();
+        // Encourage teardown of remaining COM/dispatcher resources to avoid testhost crash.
+        System.GC.Collect();
+        System.GC.WaitForPendingFinalizers();
+        System.GC.Collect();
         }
     }
 }

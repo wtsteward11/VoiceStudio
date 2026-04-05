@@ -9,6 +9,7 @@ using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.Utilities;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -170,6 +171,27 @@ namespace VoiceStudio.App.Tests.ViewModels
       await vm.ApplyPostLibraryUploadSuccessAsync(upload, @"C:\x\y.wav", CancellationToken.None);
 
       Assert.AreEqual("a1", vm.RecordedAudioId);
+    }
+
+    /// <summary>GAP-027: library focus + transcribe prefill contract — <see cref="PanelIds.Recording"/> source id.</summary>
+    [TestMethod]
+    public async Task ApplyPostLibraryUploadSuccessAsync_PublishesAssetAdded_WithRecordingPanelSource()
+    {
+      TestAppServicesHelper.EnsureInitialized();
+      AssetAddedEvent? published = null;
+      var agg = AppServices.GetService<IEventAggregator>();
+      Assert.IsNotNull(agg);
+      using var _ = agg.Subscribe<AssetAddedEvent>(e => published = e);
+
+      var vm = new RecordingViewModel(_context, _mockRecordingClient.Object, _mockProjectAudioClient.Object, _mockAudioPlayer.Object);
+      var upload = new AudioUploadResponse { Id = "lib-asset-99", Path = "http://backend/audio/lib-asset-99" };
+
+      await vm.ApplyPostLibraryUploadSuccessAsync(upload, @"C:\take.wav", CancellationToken.None);
+
+      Assert.IsNotNull(published);
+      Assert.AreEqual(PanelIds.Recording, published.SourcePanelId);
+      Assert.AreEqual("lib-asset-99", published.AssetId);
+      Assert.AreEqual("audio", published.AssetType);
     }
   }
 }

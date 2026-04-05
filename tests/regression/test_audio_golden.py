@@ -83,7 +83,7 @@ def get_backend_client():
     try:
         import httpx
 
-        backend_url = os.environ.get("VOICESTUDIO_BACKEND_URL", "http://localhost:8000")
+        backend_url = os.environ.get("VOICESTUDIO_BACKEND_URL", "http://127.0.0.1:8000")
         client = httpx.Client(base_url=backend_url, timeout=120.0)
 
         # Check if backend is available

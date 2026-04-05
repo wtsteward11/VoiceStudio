@@ -1,3 +1,5 @@
+using System;
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Dispatching;
@@ -15,7 +17,6 @@ namespace VoiceStudio.App.Tests.Fixtures
     public static class TestAppServicesHelper
     {
         private static DispatcherQueueController? _dispatcherController;
-        private static bool _initialized;
         private static readonly object _lock = new();
 
         /// <summary>
@@ -31,7 +32,7 @@ namespace VoiceStudio.App.Tests.Fixtures
             {
                 // Always check for required services first. DegradedModeIntegrationTests replaces
                 // AppServices with a minimal provider; we must re-initialize when EventAggregator
-                // is missing. Do NOT early-return on _initialized — that would skip this check.
+                // is missing.
                 try
                 {
                     var existingContext = AppServices.GetService<IViewModelContext>();
@@ -39,7 +40,6 @@ namespace VoiceStudio.App.Tests.Fixtures
                     var existingEventAggregator = AppServices.GetService<IEventAggregator>();
                     if (existingContext != null && existingMultiSelect != null && existingEventAggregator != null)
                     {
-                        _initialized = true;
                         return;
                     }
                 }
@@ -73,7 +73,42 @@ namespace VoiceStudio.App.Tests.Fixtures
                 // Note: Add more services here as needed based on test failures
 
                 AppServices.Initialize(services.BuildServiceProvider());
-                _initialized = true;
+            }
+        }
+
+        /// <summary>
+        /// Replaces <see cref="AppServices"/> with a fresh default test provider and dispatcher.
+        /// Use when a test temporarily calls <c>AppServices.Initialize</c> with a minimal container that still
+        /// exposes <see cref="IEventAggregator"/> — <see cref="EnsureInitialized"/> would incorrectly early-return
+        /// and leave downstream tests (e.g. workflow coherence) on the wrong provider.
+        /// </summary>
+        public static void RebuildDefaultProvider()
+        {
+            lock (_lock)
+            {
+                if (_dispatcherController != null)
+                {
+                    try
+                    {
+                        _dispatcherController.ShutdownQueueAsync().AsTask().Wait(2000);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"TestAppServicesHelper.RebuildDefaultProvider: shutdown failed: {ex.Message}");
+                    }
+
+                    _dispatcherController = null;
+                }
+
+                _dispatcherController = DispatcherQueueController.CreateOnDedicatedThread();
+                var dispatcher = _dispatcherController.DispatcherQueue;
+                var context = new ViewModelContext(NullLogger.Instance, dispatcher);
+                var services = new ServiceCollection();
+                services.AddSingleton<IViewModelContext>(context);
+                services.AddSingleton<MultiSelectService>();
+                services.AddSingleton<IEventAggregator, EventAggregator>();
+                services.AddSingleton<IWorkflowCoordinatorService, WorkflowCoordinatorService>();
+                AppServices.Initialize(services.BuildServiceProvider());
             }
         }
 
@@ -87,15 +122,62 @@ namespace VoiceStudio.App.Tests.Fixtures
         }
 
         /// <summary>
+        /// Rebuilds the test provider with <see cref="IContextManager"/> registered (e.g. GAP-026 activation sync tests).
+        /// Call <see cref="RebuildDefaultProvider"/> in test cleanup to restore the default provider without context.
+        /// </summary>
+        public static void EnsureInitializedWithContextManager(IContextManager contextManager)
+        {
+            if (contextManager == null)
+                throw new ArgumentNullException(nameof(contextManager));
+
+            lock (_lock)
+            {
+                if (_dispatcherController != null)
+                {
+                    try
+                    {
+                        _dispatcherController.ShutdownQueueAsync().AsTask().Wait(2000);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"TestAppServicesHelper.EnsureInitializedWithContextManager: shutdown failed: {ex.Message}");
+                    }
+
+                    _dispatcherController = null;
+                }
+
+                _dispatcherController = DispatcherQueueController.CreateOnDedicatedThread();
+                var dispatcher = _dispatcherController.DispatcherQueue;
+                var context = new ViewModelContext(NullLogger.Instance, dispatcher);
+                var services = new ServiceCollection();
+                services.AddSingleton<IViewModelContext>(context);
+                services.AddSingleton<MultiSelectService>();
+                services.AddSingleton<IEventAggregator, EventAggregator>();
+                services.AddSingleton<IWorkflowCoordinatorService, WorkflowCoordinatorService>();
+                services.AddSingleton<IContextManager>(_ => contextManager);
+                AppServices.Initialize(services.BuildServiceProvider());
+            }
+        }
+
+        /// <summary>
         /// Cleans up the dispatcher controller.
         /// Call this in [AssemblyCleanup] or at the end of test runs.
         /// Note: AppServices cannot be reset, so tests share the same instance.
-        /// Hardened: Skip ShutdownQueueAsync to avoid testhost crash during teardown (Stage 13 full-harness fix).
-        /// The dispatcher thread is abandoned; process exit will terminate it. ShutdownQueueAsync was
-        /// causing testhost process crash when run after many tests (Services shard, full harness).
         /// </summary>
         public static void Cleanup()
         {
+            if (_dispatcherController != null)
+            {
+                try
+                {
+                    // Attempt graceful shutdown to reduce lingering dispatcher threads that can crash testhost.
+                    _dispatcherController.ShutdownQueueAsync().AsTask().Wait(2000);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"TestAppServicesHelper.Cleanup: ShutdownQueueAsync failed: {ex.Message}");
+                }
+            }
             _dispatcherController = null;
         }
     }

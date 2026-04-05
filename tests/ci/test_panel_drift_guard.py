@@ -12,9 +12,14 @@ import re
 from pathlib import Path
 
 import pytest
+from _panel_registry_utils import (
+    extract_panel_ids_and_view_types,
+    extract_registered_panel_ids,
+)
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 SRC_APP = ROOT / "src" / "VoiceStudio.App"
+PANEL_IDS_CS = ROOT / "src" / "VoiceStudio.Core" / "Panels" / "PanelIds.cs"
 PANELS_DIR = SRC_APP / "Views" / "Panels"
 MAIN_WINDOW_CS = ROOT / "src" / "VoiceStudio.App" / "MainWindow.xaml.cs"
 WORKSPACES_DIR = SRC_APP / "Resources" / "Workspaces"
@@ -47,19 +52,7 @@ EXCLUDED_VIEWS = frozenset({
 
 def _extract_registered_panel_ids_and_view_types() -> tuple[set[str], set[str]]:
     """Extract (panel_ids, view_type_names) from all 3 registration services."""
-    panel_ids: set[str] = set()
-    view_types: set[str] = set()
-    panel_id_re = re.compile(r'PanelId\s*=\s*["\']([^"\']+)["\']')
-    view_type_re = re.compile(r'ViewType\s*=\s*typeof\s*\(\s*(\w+)\s*\)')
-    for path in REGISTRATION_SERVICES:
-        if not path.exists():
-            continue
-        text = path.read_text(encoding="utf-8-sig")
-        for pid_m in panel_id_re.finditer(text):
-            panel_ids.add(pid_m.group(1))
-        for vt_m in view_type_re.finditer(text):
-            view_types.add(vt_m.group(1))
-    return panel_ids, view_types
+    return extract_panel_ids_and_view_types(REGISTRATION_SERVICES, PANEL_IDS_CS)
 
 
 def _extract_legacy_panel_ids_and_view_types(main_window_content: str) -> tuple[set[str], set[str]]:

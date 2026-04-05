@@ -70,5 +70,143 @@ namespace VoiceStudio.App.Tests.ViewModels
     {
       _ = new AudioMonitoringDashboardViewModel(null!);
     }
+
+    [TestMethod]
+    public async Task RealtimeMeter_ProjectAndChannelMatch_AppliesLevelsFromLinearAsync()
+    {
+      var meter = new Mock<IMeterClient>();
+      meter.Setup(m => m.ConnectAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+      var ctx = new Mock<IContextManager>();
+      ctx.SetupGet(c => c.ActiveProjectId).Returns("proj-1");
+
+      var vm = new AudioMonitoringDashboardViewModel(_mockClient.Object, meter.Object, ctx.Object);
+      vm.AudioId = "ch-1";
+      vm.IsRealTimeEnabled = true;
+
+      await Task.Delay(150).ConfigureAwait(false);
+
+      meter.Raise(
+          m => m.LevelsUpdated += null,
+          meter.Object,
+          new MeterLevelUpdate
+          {
+            ProjectId = "proj-1",
+            ChannelId = "ch-1",
+            PeakLevelLinear = 0.5,
+            RmsLevelLinear = 0.3,
+          });
+
+      await Task.Delay(50).ConfigureAwait(false);
+
+      Assert.AreEqual(20.0 * Math.Log10(0.5), vm.PeakLevel, 1e-6);
+      Assert.AreEqual(20.0 * Math.Log10(0.3), vm.RmsLevel, 1e-6);
+
+      vm.IsRealTimeEnabled = false;
+      await Task.Delay(80).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    public async Task RealtimeMeter_WrongChannelId_DoesNotApplyAsync()
+    {
+      var meter = new Mock<IMeterClient>();
+      meter.Setup(m => m.ConnectAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+      var ctx = new Mock<IContextManager>();
+      ctx.SetupGet(c => c.ActiveProjectId).Returns("proj-1");
+
+      var vm = new AudioMonitoringDashboardViewModel(_mockClient.Object, meter.Object, ctx.Object);
+      vm.AudioId = "ch-1";
+      vm.IsRealTimeEnabled = true;
+
+      await Task.Delay(150).ConfigureAwait(false);
+
+      var peakBefore = vm.PeakLevel;
+
+      meter.Raise(
+          m => m.LevelsUpdated += null,
+          meter.Object,
+          new MeterLevelUpdate
+          {
+            ProjectId = "proj-1",
+            ChannelId = "other-channel",
+            PeakLevelLinear = 0.99,
+            RmsLevelLinear = 0.99,
+          });
+
+      await Task.Delay(50).ConfigureAwait(false);
+
+      Assert.AreEqual(peakBefore, vm.PeakLevel, 1e-6);
+
+      vm.IsRealTimeEnabled = false;
+      await Task.Delay(80).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    public async Task RealtimeMeter_WrongProjectId_DoesNotApplyAsync()
+    {
+      var meter = new Mock<IMeterClient>();
+      meter.Setup(m => m.ConnectAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+      var ctx = new Mock<IContextManager>();
+      ctx.SetupGet(c => c.ActiveProjectId).Returns("proj-1");
+
+      var vm = new AudioMonitoringDashboardViewModel(_mockClient.Object, meter.Object, ctx.Object);
+      vm.AudioId = "ch-1";
+      vm.IsRealTimeEnabled = true;
+
+      await Task.Delay(150).ConfigureAwait(false);
+
+      var peakBefore = vm.PeakLevel;
+
+      meter.Raise(
+          m => m.LevelsUpdated += null,
+          meter.Object,
+          new MeterLevelUpdate
+          {
+            ProjectId = "other-proj",
+            ChannelId = "ch-1",
+            PeakLevelLinear = 0.99,
+            RmsLevelLinear = 0.99,
+          });
+
+      await Task.Delay(50).ConfigureAwait(false);
+
+      Assert.AreEqual(peakBefore, vm.PeakLevel, 1e-6);
+
+      vm.IsRealTimeEnabled = false;
+      await Task.Delay(80).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    public async Task RealtimeMeter_EmptyWireProjectId_StillAppliesWhenChannelMatchesAsync()
+    {
+      var meter = new Mock<IMeterClient>();
+      meter.Setup(m => m.ConnectAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+      var ctx = new Mock<IContextManager>();
+      ctx.SetupGet(c => c.ActiveProjectId).Returns("proj-1");
+
+      var vm = new AudioMonitoringDashboardViewModel(_mockClient.Object, meter.Object, ctx.Object);
+      vm.AudioId = "ch-1";
+      vm.IsRealTimeEnabled = true;
+
+      await Task.Delay(150).ConfigureAwait(false);
+
+      meter.Raise(
+          m => m.LevelsUpdated += null,
+          meter.Object,
+          new MeterLevelUpdate
+          {
+            ProjectId = "",
+            ChannelId = "ch-1",
+            PeakLevelLinear = 0.25,
+            RmsLevelLinear = 0.25,
+          });
+
+      await Task.Delay(50).ConfigureAwait(false);
+
+      Assert.AreEqual(20.0 * Math.Log10(0.25), vm.PeakLevel, 1e-6);
+
+      vm.IsRealTimeEnabled = false;
+      await Task.Delay(80).ConfigureAwait(false);
+    }
   }
 }

@@ -7,9 +7,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using VoiceStudio.App.Core.Models;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Views.Panels;
+using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -41,6 +43,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
       var services = new ServiceCollection();
       services.AddSingleton<MultiSelectService>();
+      services.AddSingleton<IEventAggregator, EventAggregator>();
       _provider = services.BuildServiceProvider();
       AppServices.Initialize(_provider);
 
@@ -132,6 +135,163 @@ namespace VoiceStudio.App.Tests.ViewModels
         var text = vm.SurfaceMaturityFootnote;
         StringAssert.Contains(text, "partial", StringComparison.OrdinalIgnoreCase);
         StringAssert.Contains(text, "workflow", StringComparison.OrdinalIgnoreCase);
+      }
+      finally
+      {
+        vm.Dispose();
+      }
+    }
+
+    /// <summary>GAP-028: polling completion path publishes ProfileCreated + ProfileUpdated.</summary>
+    [TestMethod]
+    public void Gap028_PollingComplete_WithProfileId_PublishesProfileCreatedAndUpdated()
+    {
+      var vm = new TrainingViewModel(_context, _mockTrainingClient.Object);
+      try
+      {
+        var createdCount = 0;
+        var updatedCount = 0;
+        var agg = AppServices.TryGetEventAggregator();
+        Assert.IsNotNull(agg);
+        using var _ = agg.Subscribe<ProfileCreatedEvent>(_ => createdCount++);
+        using var __ = agg.Subscribe<ProfileUpdatedEvent>(_ => updatedCount++);
+
+        var status = new TrainingStatus
+        {
+          Id = "job-gap028-a",
+          Status = "completed",
+          ProfileId = "prof-gap028",
+          Engine = "xtts",
+        };
+        vm.SeamTryPublishPollingTrainingCompletion(status);
+
+        Assert.AreEqual(1, createdCount, "ProfileCreatedEvent expected once");
+        Assert.AreEqual(1, updatedCount, "ProfileUpdatedEvent expected once");
+      }
+      finally
+      {
+        vm.Dispose();
+      }
+    }
+
+    /// <summary>GAP-028: repeated polling for the same completed job must not republish.</summary>
+    [TestMethod]
+    public void Gap028_PollingComplete_DuplicatePoll_DoesNotPublishTwice()
+    {
+      var vm = new TrainingViewModel(_context, _mockTrainingClient.Object);
+      try
+      {
+        var createdCount = 0;
+        var updatedCount = 0;
+        var agg = AppServices.TryGetEventAggregator();
+        Assert.IsNotNull(agg);
+        using var _ = agg.Subscribe<ProfileCreatedEvent>(_ => createdCount++);
+        using var __ = agg.Subscribe<ProfileUpdatedEvent>(_ => updatedCount++);
+
+        var status = new TrainingStatus
+        {
+          Id = "job-gap028-dup",
+          Status = "completed",
+          ProfileId = "prof-dup",
+          Engine = "rvc",
+        };
+        vm.SeamTryPublishPollingTrainingCompletion(status);
+        vm.SeamTryPublishPollingTrainingCompletion(status);
+
+        Assert.AreEqual(1, createdCount);
+        Assert.AreEqual(1, updatedCount);
+      }
+      finally
+      {
+        vm.Dispose();
+      }
+    }
+
+    /// <summary>GAP-028: non-terminal status does not publish profile events.</summary>
+    [TestMethod]
+    public void Gap028_PollingRunning_DoesNotPublishProfileEvents()
+    {
+      var vm = new TrainingViewModel(_context, _mockTrainingClient.Object);
+      try
+      {
+        var eventCount = 0;
+        var agg = AppServices.TryGetEventAggregator();
+        Assert.IsNotNull(agg);
+        using var _ = agg.Subscribe<ProfileCreatedEvent>(_ => eventCount++);
+        using var __ = agg.Subscribe<ProfileUpdatedEvent>(_ => eventCount++);
+
+        var status = new TrainingStatus
+        {
+          Id = "job-run",
+          Status = "running",
+          ProfileId = "prof-x",
+          Engine = "xtts",
+        };
+        vm.SeamTryPublishPollingTrainingCompletion(status);
+
+        Assert.AreEqual(0, eventCount);
+      }
+      finally
+      {
+        vm.Dispose();
+      }
+    }
+
+    /// <summary>GAP-028: completed without profile id does not publish.</summary>
+    [TestMethod]
+    public void Gap028_PollingComplete_EmptyProfileId_DoesNotPublish()
+    {
+      var vm = new TrainingViewModel(_context, _mockTrainingClient.Object);
+      try
+      {
+        var eventCount = 0;
+        var agg = AppServices.TryGetEventAggregator();
+        Assert.IsNotNull(agg);
+        using var _ = agg.Subscribe<ProfileCreatedEvent>(_ => eventCount++);
+        using var __ = agg.Subscribe<ProfileUpdatedEvent>(_ => eventCount++);
+
+        var status = new TrainingStatus
+        {
+          Id = "job-noprof",
+          Status = "completed",
+          ProfileId = "",
+          Engine = "xtts",
+        };
+        vm.SeamTryPublishPollingTrainingCompletion(status);
+
+        Assert.AreEqual(0, eventCount);
+      }
+      finally
+      {
+        vm.Dispose();
+      }
+    }
+
+    /// <summary>GAP-028: seam helper emits both events (shared path with WebSocket completion).</summary>
+    [TestMethod]
+    public void Gap028_SeamPublishTrainingCompletedProfileEvents_EmitsCreatedAndUpdated()
+    {
+      var vm = new TrainingViewModel(_context, _mockTrainingClient.Object);
+      try
+      {
+        var createdCount = 0;
+        var updatedCount = 0;
+        var agg = AppServices.TryGetEventAggregator();
+        Assert.IsNotNull(agg);
+        using var _ = agg.Subscribe<ProfileCreatedEvent>(_ => createdCount++);
+        using var __ = agg.Subscribe<ProfileUpdatedEvent>(_ => updatedCount++);
+
+        var job = new TrainingStatus
+        {
+          Id = "job-ws-parity",
+          Status = "completed",
+          ProfileId = "prof-ws",
+          Engine = "coqui",
+        };
+        vm.SeamPublishTrainingCompletedProfileEvents(job);
+
+        Assert.AreEqual(1, createdCount);
+        Assert.AreEqual(1, updatedCount);
       }
       finally
       {

@@ -323,6 +323,19 @@ class TestClipEditing:
         data = response.json()
         assert data["start_time"] == 1.0
         assert data["end_time"] == 10.0  # Original end preserved
+        assert data.get("source_start", 0.0) == pytest.approx(1.0)
+
+    def test_set_clip_fade(self, timeline_client, setup_clip):
+        """PUT /clips/{id}/fade sets fade metadata."""
+        clip_id = setup_clip["clip"]["id"]
+        response = timeline_client.put(
+            f"/api/timeline/clips/{clip_id}/fade",
+            json={"fade_in_seconds": 0.2, "fade_out_seconds": 0.3},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["fade_in_seconds"] == pytest.approx(0.2)
+        assert data["fade_out_seconds"] == pytest.approx(0.3)
 
     def test_split_clip(self, timeline_client, setup_clip):
         """Test POST /api/timeline/clips/{id}/split splits a clip."""
@@ -408,23 +421,284 @@ class TestPlaybackControls:
 class TestExport:
     """Tests for timeline export."""
 
-    def test_export_timeline(self, timeline_client):
-        """Test POST /api/timeline/export exports timeline."""
+    def test_export_timeline(self, timeline_client, tmp_path):
+        """GAP-031: export requires audible timeline or valid fallback (no silent empty success)."""
+        import numpy as np
+        import soundfile as sf
+
+        wav_path = tmp_path / "clip.wav"
+        sf.write(str(wav_path), np.zeros(800, dtype=np.float32), 48000)
+
+        timeline_client.post("/api/timeline/tracks", json={"name": "T1", "type": "audio"})
+        st = timeline_client.get("/api/timeline/state").json()
+        tid = st["tracks"][0]["id"]
+        timeline_client.post(
+            "/api/timeline/clips",
+            json={
+                "track_id": tid,
+                "source_path": str(wav_path),
+                "start_time": 0.0,
+                "duration": 0.01,
+                "name": "c1",
+            },
+        )
+
         response = timeline_client.post(
             "/api/timeline/export",
             json={
                 "output_path": "/output/timeline.wav",
                 "format": "wav",
                 "sample_rate": 48000,
+                "lufs_preset": "neutral",
             },
         )
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        # Path may be sanitized to safe dir (relative/repo paths refused)
         assert isinstance(data["output_path"], str)
         assert data["output_path"].endswith(".wav")
         assert "duration" in data
+
+    def test_export_empty_timeline_returns_400_without_fallback(self, timeline_client):
+        """GAP-031: empty mix fails closed when fallback does not apply."""
+        timeline_client.post("/api/timeline/create", json={"name": "Empty", "sample_rate": 48000})
+        response = timeline_client.post(
+            "/api/timeline/export",
+            json={
+                "output_path": "/output/empty.wav",
+                "format": "wav",
+                "sample_rate": 48000,
+                "lufs_preset": "neutral",
+            },
+        )
+        assert response.status_code == 400
+        detail = response.json().get("detail", "")
+        assert "no audible" in detail.lower() or "timeline" in detail.lower()
+
+    def test_export_apply_effects_requires_chain(self, timeline_client):
+        """GAP-029: apply_effects without effect_chain_id is rejected."""
+        response = timeline_client.post(
+            "/api/timeline/export",
+            json={
+                "output_path": "/output/timeline.wav",
+                "format": "wav",
+                "apply_effects": True,
+                "project_id": "proj-x",
+                "lufs_preset": "neutral",
+            },
+        )
+        assert response.status_code == 422
+
+    def test_export_apply_effects_unknown_chain(self, timeline_client, tmp_path):
+        """GAP-029: unknown chain returns 404 (not silent success)."""
+        import numpy as np
+        import soundfile as sf
+
+        wav_path = tmp_path / "unk_chain.wav"
+        sf.write(str(wav_path), np.ones(1200, dtype=np.float32) * 0.1, 48000)
+        timeline_client.post("/api/timeline/create", json={"name": "UnkFx", "sample_rate": 48000})
+        timeline_client.post("/api/timeline/tracks", json={"name": "T", "type": "audio"})
+        st = timeline_client.get("/api/timeline/state").json()
+        tid = st["tracks"][0]["id"]
+        timeline_client.post(
+            "/api/timeline/clips",
+            json={
+                "track_id": tid,
+                "source_path": str(wav_path),
+                "start_time": 0.0,
+                "duration": 0.02,
+                "name": "clip1",
+            },
+        )
+
+        response = timeline_client.post(
+            "/api/timeline/export",
+            json={
+                "output_path": "/output/timeline.wav",
+                "format": "wav",
+                "apply_effects": True,
+                "project_id": "proj-x",
+                "effect_chain_id": "nonexistent-chain-12345",
+                "lufs_preset": "neutral",
+            },
+        )
+        assert response.status_code == 404
+
+    def test_export_with_effect_bake_success(self, timeline_client, tmp_path):
+        """Apply enabled chain during export when chain exists (GAP-029)."""
+        from datetime import datetime
+        from uuid import uuid4
+
+        import numpy as np
+        import soundfile as sf
+
+        from backend.audio.effects.effect_chain_store import get_effect_chain_store
+
+        wav_path = tmp_path / "bake_clip.wav"
+        sf.write(str(wav_path), np.zeros(1200, dtype=np.float32), 48000)
+        timeline_client.post("/api/timeline/tracks", json={"name": "FX", "type": "audio"})
+        st = timeline_client.get("/api/timeline/state").json()
+        tid = st["tracks"][0]["id"]
+        timeline_client.post(
+            "/api/timeline/clips",
+            json={
+                "track_id": tid,
+                "source_path": str(wav_path),
+                "start_time": 0.0,
+                "duration": 0.02,
+                "name": "fxclip",
+            },
+        )
+
+        pid = f"proj-fx-{uuid4().hex[:8]}"
+        cid = str(uuid4())
+        now = datetime.utcnow().isoformat()
+        get_effect_chain_store().save(
+            {
+                "id": cid,
+                "name": "BakeChain",
+                "description": None,
+                "project_id": pid,
+                "effects": [
+                    {
+                        "id": "e1",
+                        "type": "eq",
+                        "name": "EQ",
+                        "enabled": True,
+                        "order": 0,
+                        "parameters": [
+                            {"name": "low_gain", "value": 0.0, "min_value": -12.0, "max_value": 12.0}
+                        ],
+                    }
+                ],
+                "created": now,
+                "modified": now,
+            }
+        )
+
+        response = timeline_client.post(
+            "/api/timeline/export",
+            json={
+                "output_path": "/output/bake.wav",
+                "format": "wav",
+                "project_id": pid,
+                "apply_effects": True,
+                "effect_chain_id": cid,
+                "lufs_preset": "neutral",
+            },
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["success"] is True
+        assert data["output_path"].endswith(".wav")
+
+    def test_export_invalid_lufs_preset_returns_422(self, timeline_client, tmp_path):
+        """GAP/LUFS lane: unknown lufs_preset must not silently coerce."""
+        import numpy as np
+        import soundfile as sf
+
+        wav_path = tmp_path / "lufs_bad.wav"
+        sf.write(str(wav_path), np.ones(800, dtype=np.float32) * 0.1, 48000)
+        timeline_client.post("/api/timeline/create", json={"name": "Lufs", "sample_rate": 48000})
+        timeline_client.post("/api/timeline/tracks", json={"name": "T", "type": "audio"})
+        st = timeline_client.get("/api/timeline/state").json()
+        tid = st["tracks"][0]["id"]
+        timeline_client.post(
+            "/api/timeline/clips",
+            json={
+                "track_id": tid,
+                "source_path": str(wav_path),
+                "start_time": 0.0,
+                "duration": 0.015,
+                "name": "c",
+            },
+        )
+
+        response = timeline_client.post(
+            "/api/timeline/export",
+            json={
+                "output_path": "/output/timeline.wav",
+                "format": "wav",
+                "lufs_preset": "not_a_real_preset_id_12345",
+            },
+        )
+        assert response.status_code == 422
+
+    def test_export_lufs_neutral_skips_normalize(self, timeline_client, monkeypatch, tmp_path):
+        """Neutral preset must not invoke pyloudnorm path (patch raises if called)."""
+        import numpy as np
+        import soundfile as sf
+
+        wav_path = tmp_path / "neutral.wav"
+        sf.write(str(wav_path), np.zeros(400, dtype=np.float32), 48000)
+        timeline_client.post("/api/timeline/tracks", json={"name": "N", "type": "audio"})
+        st = timeline_client.get("/api/timeline/state").json()
+        tid = st["tracks"][0]["id"]
+        timeline_client.post(
+            "/api/timeline/clips",
+            json={
+                "track_id": tid,
+                "source_path": str(wav_path),
+                "start_time": 0.0,
+                "duration": 0.01,
+                "name": "n1",
+            },
+        )
+
+        def _should_not_run(*_args, **_kwargs):
+            raise AssertionError("normalize_lufs_for_export must not run for neutral preset")
+
+        monkeypatch.setattr(
+            "backend.services.timeline_export_loudness.normalize_lufs_for_export",
+            _should_not_run,
+        )
+        response = timeline_client.post(
+            "/api/timeline/export",
+            json={
+                "output_path": "/output/timeline.wav",
+                "format": "wav",
+                "lufs_preset": "neutral",
+            },
+        )
+        assert response.status_code == 200, response.text
+
+    def test_export_lufs_normalization_unavailable_returns_503(self, timeline_client, monkeypatch, tmp_path):
+        """When normalization is required but the LUFS path fails, return 503 (no silent wav)."""
+        import numpy as np
+        import soundfile as sf
+
+        wav_path = tmp_path / "lufs503.wav"
+        sf.write(str(wav_path), np.zeros(400, dtype=np.float32), 48000)
+        timeline_client.post("/api/timeline/tracks", json={"name": "L", "type": "audio"})
+        st = timeline_client.get("/api/timeline/state").json()
+        tid = st["tracks"][0]["id"]
+        timeline_client.post(
+            "/api/timeline/clips",
+            json={
+                "track_id": tid,
+                "source_path": str(wav_path),
+                "start_time": 0.0,
+                "duration": 0.01,
+                "name": "l1",
+            },
+        )
+
+        def _boom(*_args, **_kwargs):
+            raise ImportError("pyloudnorm unavailable")
+
+        monkeypatch.setattr(
+            "backend.services.timeline_export_loudness.normalize_lufs_for_export",
+            _boom,
+        )
+        response = timeline_client.post(
+            "/api/timeline/export",
+            json={
+                "output_path": "/output/timeline.wav",
+                "format": "wav",
+                "lufs_preset": "broadcast",
+            },
+        )
+        assert response.status_code == 503
 
 
 # =============================================================================

@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using VoiceStudio.App.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
@@ -680,7 +681,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       await sutWithAudio.PlaySegmentCommand.ExecuteAsync(segment);
 
       mockAudioPlayer.Verify(
-        x => x.PlayBackendAudioIdAsync("audio-123", "http://localhost:8000", It.IsAny<Action>()),
+        x => x.PlayBackendAudioIdAsync("audio-123", BackendClientConfig.DefaultHttpBaseUrl, It.IsAny<Action>()),
         Times.Once);
 
       sutWithAudio.Dispose();

@@ -18,8 +18,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from _panel_registry_utils import extract_registered_panel_ids, load_panel_id_constants
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 SRC_APP = ROOT / "src" / "VoiceStudio.App"
+PANEL_IDS_CS = ROOT / "src" / "VoiceStudio.Core" / "Panels" / "PanelIds.cs"
 
 COMMAND_WIRING_FILES = [
     SRC_APP / "Commands" / "NavigationHandler.cs",
@@ -28,6 +31,7 @@ COMMAND_WIRING_FILES = [
 PANEL_WIRING_FILES = [
     SRC_APP / "Services" / "CorePanelRegistrationService.cs",
     SRC_APP / "Services" / "AdvancedPanelRegistrationService.cs",
+    SRC_APP / "Services" / "ModulePanelRegistrationService.cs",
 ]
 
 REQUIRED_COMMANDS = {
@@ -61,6 +65,11 @@ PANEL_PATTERN = re.compile(
     re.MULTILINE,
 )
 
+PANEL_CONST_PATTERN = re.compile(
+    r"PanelId\s*=\s*PanelIds\.(\w+)",
+    re.MULTILINE,
+)
+
 
 def _scan_files(
     files: list[Path],
@@ -88,7 +97,23 @@ def get_ui_command_surface_results() -> dict:
     all_panels_registered, command_details, panel_details.
     """
     cmd_registered = _scan_files(COMMAND_WIRING_FILES, CMD_PATTERN)
-    panel_registered = _scan_files(PANEL_WIRING_FILES, PANEL_PATTERN)
+    reg_ids = extract_registered_panel_ids(PANEL_WIRING_FILES, PANEL_IDS_CS)
+    const_map = load_panel_id_constants(PANEL_IDS_CS)
+    panel_registered: dict[str, str] = {}
+    for cs in PANEL_WIRING_FILES:
+        if not cs.exists():
+            continue
+        text = cs.read_text(encoding="utf-8", errors="replace")
+        rel = str(cs.relative_to(ROOT)).replace("\\", "/")
+        for m in PANEL_PATTERN.finditer(text):
+            pid = m.group(1)
+            if pid in reg_ids:
+                panel_registered.setdefault(pid, rel)
+        for m in PANEL_CONST_PATTERN.finditer(text):
+            pid = const_map.get(m.group(1), m.group(1))
+            if pid in reg_ids:
+                panel_registered.setdefault(pid, rel)
+
     all_commands = all(cid in cmd_registered for cid in REQUIRED_COMMANDS)
     all_panels = all(pid in panel_registered for pid in REQUIRED_PANELS)
     command_details = {

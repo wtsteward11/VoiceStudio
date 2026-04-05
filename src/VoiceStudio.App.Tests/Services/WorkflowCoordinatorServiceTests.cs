@@ -37,7 +37,7 @@ namespace VoiceStudio.App.Tests.Services
       {
         _navSubscription = _eventAggregator.Subscribe<PanelNavigationRequestEvent>(e => _capturedEvents.Add(e));
         _cloneSubscription = _eventAggregator.Subscribe<CloneReferenceSelectedEvent>(e => _capturedEvents.Add(e));
-        _profileSubscription = _eventAggregator.Subscribe<VoiceProfileSelectedEvent>(e => _capturedEvents.Add(e));
+        _profileSubscription = _eventAggregator.Subscribe<ProfileSelectedEvent>(e => _capturedEvents.Add(e));
         _playbackSubscription = _eventAggregator.Subscribe<PlaybackRequestedEvent>(e => _capturedEvents.Add(e));
       }
     }
@@ -143,7 +143,7 @@ namespace VoiceStudio.App.Tests.Services
     }
 
     [TestMethod]
-    public async Task StartSynthesizeWithVoiceAsync_PublishesVoiceProfileSelectedEvent()
+    public async Task StartSynthesizeWithVoiceAsync_PublishesProfileSelectedEvent()
     {
       // Arrange
       var service = new WorkflowCoordinatorService();
@@ -154,10 +154,11 @@ namespace VoiceStudio.App.Tests.Services
       var context = await service.StartSynthesizeWithVoiceAsync(profileId, profileName);
 
       // Assert
-      var profileEvent = _capturedEvents.Find(e => e is VoiceProfileSelectedEvent) as VoiceProfileSelectedEvent;
-      Assert.IsNotNull(profileEvent, "VoiceProfileSelectedEvent should be published");
+      var profileEvent = _capturedEvents.Find(e => e is ProfileSelectedEvent) as ProfileSelectedEvent;
+      Assert.IsNotNull(profileEvent, "ProfileSelectedEvent should be published");
       Assert.AreEqual(profileId, profileEvent.ProfileId);
       Assert.AreEqual(profileName, profileEvent.ProfileName);
+      Assert.AreEqual("workflow-coordinator", profileEvent.SourcePanelId);
     }
 
     #endregion

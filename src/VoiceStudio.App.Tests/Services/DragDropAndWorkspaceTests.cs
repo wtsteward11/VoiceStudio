@@ -259,6 +259,44 @@ namespace VoiceStudio.App.Tests.Services
             Assert.IsNull(_service.CurrentPayload);
         }
 
+        /// <summary>GAP-032: Voice-profile library assets use Asset payload + AssetType metadata (Synthesis drop gate).</summary>
+        [TestMethod]
+        public void CanDrop_VoiceProfileLibraryAsset_MatchesSynthesisStylePredicate()
+        {
+            static bool CanAcceptSynthesis(DragPayload payload)
+            {
+                if (payload.PayloadType == DragPayloadType.Profile ||
+                    payload.PayloadType == DragPayloadType.ReferenceAudio)
+                    return true;
+                if (payload.PayloadType != DragPayloadType.Asset || payload.Items.Count == 0)
+                    return false;
+                if (payload.Items[0].Metadata == null ||
+                    !payload.Items[0].Metadata.TryGetValue("AssetType", out var raw))
+                    return false;
+                var t = (raw?.ToString() ?? string.Empty).ToLowerInvariant();
+                var voiceTypes = new[] { "voice", "voice_profile", "profile", "clone", "xtts", "rvc" };
+                return voiceTypes.Contains(t);
+            }
+
+            _service.RegisterDropTarget(PanelIds.VoiceSynthesis, CanAcceptSynthesis);
+            var payload = new DragPayload
+            {
+                PayloadType = DragPayloadType.Asset,
+                SourcePanelId = PanelIds.Library,
+                Items = new[]
+                {
+                    new DragItem
+                    {
+                        Id = "prof-9",
+                        DisplayName = "My voice",
+                        Metadata = new Dictionary<string, object> { ["AssetType"] = "voice_profile" },
+                    },
+                },
+            };
+            _service.StartDrag(payload);
+            Assert.IsTrue(_service.CanDrop(PanelIds.VoiceSynthesis));
+        }
+
         [TestMethod]
         public async Task ExecuteDropAsync_RaisesDropExecutedEvent()
         {

@@ -173,5 +173,62 @@ namespace VoiceStudio.App.Tests.ViewModels
 
       await tcs.Task;
     }
+
+    /// <summary>GAP-028: ProfileUpdatedEvent from Training triggers list reload for fresh metadata.</summary>
+    [TestMethod]
+    public async Task ProfileUpdatedEvent_FromTraining_TriggersSecondListLoad()
+    {
+      TestAppServicesHelper.EnsureInitialized();
+      var dq = TestAppServicesHelper.GetDispatcher();
+      Assert.IsNotNull(dq, "Test dispatcher required");
+
+      var listCalls = 0;
+      var mockUseCase = new Mock<IProfilesUseCase>();
+      mockUseCase.Setup(u => u.ListAsync(It.IsAny<CancellationToken>()))
+        .ReturnsAsync(() =>
+        {
+          listCalls++;
+          return new List<VoiceProfile>
+          {
+            new() { Id = "p1", Name = "One" },
+          };
+        });
+
+      var mockClient = new Mock<IProfilesClient>();
+      mockClient.Setup(c => c.GetProfilesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<VoiceProfile>());
+
+      var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+      dq.TryEnqueue(async () =>
+      {
+        try
+        {
+          var vm = CreateProfilesViewModel(mockClient.Object, mockUseCase.Object);
+          await vm.LoadProfilesCommand.ExecuteAsync(null);
+          Assert.AreEqual(1, listCalls, "Initial load");
+
+          var agg = AppServices.TryGetEventAggregator();
+          Assert.IsNotNull(agg);
+          agg.Publish(new ProfileUpdatedEvent(
+              PanelIds.Training,
+              "p1",
+              new Dictionary<string, object>
+              {
+                  ["training_completed"] = true,
+                  ["training_job_id"] = "job-1",
+              }));
+          await Task.Delay(500);
+
+          Assert.IsTrue(listCalls >= 2, "GAP-028: ProfileUpdated should enqueue LoadProfilesAsync");
+          await vm.OnDeactivatedAsync(CancellationToken.None);
+          tcs.TrySetResult(true);
+        }
+        catch (Exception ex)
+        {
+          tcs.TrySetException(ex);
+        }
+      });
+
+      await tcs.Task;
+    }
   }
 }

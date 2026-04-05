@@ -1,9 +1,12 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Commands;
 using VoiceStudio.App.Core.Commands;
+using VoiceStudio.App.Services;
+using VoiceStudio.Core.Recording;
 
 namespace VoiceStudio.App.Tests.Commands
 {
@@ -309,6 +312,39 @@ namespace VoiceStudio.App.Tests.Commands
         #endregion
 
         #region Record Tests
+
+        [TestMethod]
+        public async Task StartRecording_WithCoordinator_NoProject_DoesNotEnterRecordingState()
+        {
+            var coordinator = new RecordingSessionCoordinator();
+            var handler = new PlaybackOperationsHandler(
+                Registry,
+                MockAudioPlayer.Object,
+                null,
+                null,
+                coordinator);
+            await handler.StartRecordingAsync();
+            Assert.IsFalse(handler.IsRecording);
+            Assert.AreEqual(MultitrackRecordingSessionPhase.None, coordinator.Phase);
+        }
+
+        [TestMethod]
+        public async Task StartRecording_WithCoordinator_AuthorityResolverFails_DoesNotEnterRecordingState()
+        {
+            var coordinator = new RecordingSessionCoordinator();
+            static Task<RecordingAuthorityResolution> FailResolver(CancellationToken ct) =>
+                Task.FromResult(RecordingAuthorityResolution.Fail("Test authority block"));
+            var handler = new PlaybackOperationsHandler(
+                Registry,
+                MockAudioPlayer.Object,
+                null,
+                null,
+                coordinator,
+                FailResolver);
+            await handler.StartRecordingAsync();
+            Assert.IsFalse(handler.IsRecording);
+            Assert.AreEqual(MultitrackRecordingSessionPhase.None, coordinator.Phase);
+        }
 
         [TestMethod]
         public async Task Record_StartsRecording()

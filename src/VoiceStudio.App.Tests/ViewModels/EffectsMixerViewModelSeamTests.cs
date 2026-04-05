@@ -111,6 +111,117 @@ namespace VoiceStudio.App.Tests.ViewModels
     }
 
     /// <summary>
+    /// GAP-039 AC3: IsEffectChainBypassed defaults to false.
+    /// </summary>
+    [TestMethod]
+    public void IsEffectChainBypassed_DefaultsFalse()
+    {
+      var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
+      Assert.IsFalse(vm.IsEffectChainBypassed);
+    }
+
+    /// <summary>
+    /// GAP-039 AC3: ApplyEffectChainCommand invokes ProcessAudioWithChainAsync with bypassChain matching IsEffectChainBypassed=true.
+    /// </summary>
+    [TestMethod]
+    public async Task ApplyEffectChain_WhenBypassed_SendsBypassFlag()
+    {
+      _mockEffectChainClient
+          .Setup(x => x.GetEffectChainsAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<EffectChain> { new EffectChain { Id = "c1", Name = "C1", ProjectId = "proj-1" } });
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerStateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync((MixerState?)null);
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerPresetsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<MixerPreset>());
+
+      _mockEffectChainClient
+          .Setup(x => x.ProcessAudioWithChainAsync("proj-1", "c1", "audio-1", null, true, false, It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new EffectProcessResponse { Success = true, OutputAudioId = "audio-1", Message = "bypass" })
+          .Verifiable();
+
+      var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
+      vm.SelectedProjectId = "proj-1";
+      await Task.Delay(200);
+      vm.SelectedAudioId = "audio-1";
+      vm.IsEffectChainBypassed = true;
+      vm.ApplyEffectChainCommand.Execute("c1");
+      await Task.Delay(300);
+
+      _mockEffectChainClient.Verify(
+          x => x.ProcessAudioWithChainAsync("proj-1", "c1", "audio-1", null, true, false, It.IsAny<CancellationToken>()),
+          Times.Once);
+    }
+
+    /// <summary>
+    /// GAP-039 AC3: PreviewEffectChainCommand invokes ProcessAudioWithChainAsync with preview=true.
+    /// </summary>
+    [TestMethod]
+    public async Task PreviewEffectChain_SendsPreviewFlag()
+    {
+      _mockEffectChainClient
+          .Setup(x => x.GetEffectChainsAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<EffectChain> { new EffectChain { Id = "c1", Name = "C1", ProjectId = "proj-1" } });
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerStateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync((MixerState?)null);
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerPresetsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<MixerPreset>());
+
+      _mockEffectChainClient
+          .Setup(x => x.ProcessAudioWithChainAsync("proj-1", "c1", "audio-1", null, false, true, It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new EffectProcessResponse { Success = true, OutputAudioId = "out-1", Message = "ok [preview]" })
+          .Verifiable();
+
+      var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
+      vm.SelectedProjectId = "proj-1";
+      await Task.Delay(200);
+      vm.SelectedAudioId = "audio-1";
+      vm.PreviewEffectChainCommand.Execute("c1");
+      await Task.Delay(300);
+
+      _mockEffectChainClient.Verify(
+          x => x.ProcessAudioWithChainAsync("proj-1", "c1", "audio-1", null, false, true, It.IsAny<CancellationToken>()),
+          Times.Once);
+    }
+
+    /// <summary>
+    /// GAP-039 AC3: ApplyEffectChainCommand with bypass OFF sends bypassChain=false.
+    /// </summary>
+    [TestMethod]
+    public async Task ApplyEffectChain_WhenNotBypassed_SendsBypassFalse()
+    {
+      _mockEffectChainClient
+          .Setup(x => x.GetEffectChainsAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<EffectChain> { new EffectChain { Id = "c1", Name = "C1", ProjectId = "proj-1" } });
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerStateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync((MixerState?)null);
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerPresetsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<MixerPreset>());
+
+      _mockEffectChainClient
+          .Setup(x => x.ProcessAudioWithChainAsync("proj-1", "c1", "audio-1", null, false, false, It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new EffectProcessResponse { Success = true, OutputAudioId = "out-1", Message = "applied" })
+          .Verifiable();
+
+      var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
+      vm.SelectedProjectId = "proj-1";
+      await Task.Delay(200);
+      vm.SelectedAudioId = "audio-1";
+      Assert.IsFalse(vm.IsEffectChainBypassed);
+      vm.ApplyEffectChainCommand.Execute("c1");
+      await Task.Delay(300);
+
+      _mockEffectChainClient.Verify(
+          x => x.ProcessAudioWithChainAsync("proj-1", "c1", "audio-1", null, false, false, It.IsAny<CancellationToken>()),
+          Times.Once);
+    }
+
+    /// <summary>
     /// Pass 02 C6: SelectedProjectId set to null clears stale state (effect chains, mixer presets, etc).
     /// Prevents data from previous project leaking into cleared state.
     /// </summary>

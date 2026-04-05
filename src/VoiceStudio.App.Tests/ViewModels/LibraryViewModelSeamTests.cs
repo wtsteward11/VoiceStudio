@@ -8,6 +8,7 @@ using Moq;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
@@ -106,6 +107,111 @@ namespace VoiceStudio.App.Tests.ViewModels
       StringAssert.Contains(text, "import", StringComparison.OrdinalIgnoreCase);
       StringAssert.Contains(text, "drag", StringComparison.OrdinalIgnoreCase);
       StringAssert.Contains(text, "project", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>GAP-027: recording-origin <see cref="AssetAddedEvent"/> selects asset after reload.</summary>
+    [TestMethod]
+    public async Task AssetAdded_FromRecordingPanel_SelectsAssetAfterReload()
+    {
+      var assetId = "rec-lib-1";
+      _mockLibraryClient
+          .SetupSequence(x => x.SearchAssetsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new AssetSearchResponse { Assets = Array.Empty<LibraryAsset>(), Total = 0 })
+          .ReturnsAsync(new AssetSearchResponse
+          {
+            Assets = new[]
+            {
+              new LibraryAsset
+              {
+                Id = assetId,
+                Name = "Take",
+                Type = "audio",
+                Path = "http://localhost:8000/api/audio/file/x",
+                AudioId = assetId,
+                Duration = 2.5
+              }
+            },
+            Total = 1
+          });
+
+      var vm = new LibraryViewModel(_context, _mockLibraryClient.Object, _mockDialogService.Object);
+      await vm.OnActivatedAsync(CancellationToken.None);
+      var agg = AppServices.TryGetEventAggregator();
+      Assert.IsNotNull(agg);
+      agg.Publish(new AssetAddedEvent(PanelIds.Recording, assetId, "audio", @"C:\take.wav"));
+      await Task.Delay(500);
+      Assert.AreEqual(assetId, vm.SelectedAsset?.Id);
+    }
+
+    /// <summary>GAP-027: non-recording <see cref="AssetAddedEvent"/> does not force selection.</summary>
+    [TestMethod]
+    public async Task AssetAdded_FromImportWorkflow_DoesNotForceSelection()
+    {
+      var uploadedId = "imp-only-1";
+      _mockLibraryClient
+          .Setup(x => x.SearchAssetsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new AssetSearchResponse
+          {
+            Assets = new[] { new LibraryAsset { Id = uploadedId, Name = "I", Type = "audio", Path = "p.wav" } },
+            Total = 1
+          });
+
+      var vm = new LibraryViewModel(_context, _mockLibraryClient.Object, _mockDialogService.Object);
+      await vm.OnActivatedAsync(CancellationToken.None);
+      var agg = AppServices.TryGetEventAggregator();
+      agg!.Publish(new AssetAddedEvent("import-workflow", uploadedId, "audio", "x.wav"));
+      await Task.Delay(400);
+      Assert.IsNull(vm.SelectedAsset);
+    }
+
+    /// <summary>GAP-027: explicit operator command publishes <see cref="AddToTimelineEvent"/>.</summary>
+    [TestMethod]
+    public void AddAssetToTimelineCommand_PublishesHandoffEvent()
+    {
+      TestAppServicesHelper.EnsureInitialized();
+      AddToTimelineEvent? cap = null;
+      var agg = AppServices.GetService<IEventAggregator>();
+      Assert.IsNotNull(agg);
+      using var _ = agg.Subscribe<AddToTimelineEvent>(e => cap = e);
+      var vm = new LibraryViewModel(_context, _mockLibraryClient.Object, _mockDialogService.Object);
+      var asset = new LibraryAsset
+      {
+        Id = "la-1",
+        Name = "Clip",
+        Type = "audio",
+        Path = "http://localhost:8000/api/audio/file/aid1",
+        AudioId = "aid1",
+        Duration = 3.0
+      };
+      vm.AddAssetToTimelineCommand.Execute(asset);
+      Assert.IsNotNull(cap);
+      Assert.AreEqual("aid1", cap.AudioId);
+      Assert.AreEqual(PanelIds.Library, cap.SourcePanelId);
+    }
+
+    /// <summary>GAP-032: Library builds cross-panel drag payload with playback id + core3 metadata.</summary>
+    [TestMethod]
+    public void BuildCrossPanelDragPayload_PrefersAudioId_AndEmbedsMetadata()
+    {
+      var vm = new LibraryViewModel(_context, _mockLibraryClient.Object, _mockDialogService.Object);
+      var asset = new LibraryAsset
+      {
+        Id = "lib-row",
+        AudioId = "play-1",
+        Name = "Clip.wav",
+        Type = "audio",
+        Path = @"C:\media\Clip.wav",
+        Duration = 4.2
+      };
+      var p = vm.BuildCrossPanelDragPayload(asset);
+      Assert.AreEqual(DragPayloadType.Asset, p.PayloadType);
+      Assert.AreEqual(PanelIds.Library, p.SourcePanelId);
+      Assert.AreEqual("play-1", p.Items[0].Id);
+      Assert.IsNotNull(p.Items[0].Metadata);
+      Assert.AreEqual("audio", p.Items[0].Metadata!["AssetType"].ToString());
+      Assert.AreEqual(@"C:\media\Clip.wav", p.Items[0].Metadata["FilePath"].ToString());
+      Assert.AreEqual("lib-row", p.Items[0].Metadata["LibraryAssetId"].ToString());
+      Assert.AreEqual(4.2, (double)p.Items[0].Metadata["DurationSeconds"]);
     }
   }
 }

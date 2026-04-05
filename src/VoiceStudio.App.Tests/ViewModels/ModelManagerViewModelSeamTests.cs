@@ -4,11 +4,14 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Views.Panels;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using JobDto = VoiceStudio.App.Services.Job;
 
 namespace VoiceStudio.App.Tests.ViewModels
 {
@@ -67,6 +70,33 @@ namespace VoiceStudio.App.Tests.ViewModels
     public void Constructor_WithNullModelManagerClient_Throws()
     {
       _ = new ModelManagerViewModel(_context, null!);
+    }
+
+    [TestMethod]
+    public async Task StartModelDownloadCommand_InvokesModelManagerClient_StartModelDownloadAsync()
+    {
+      var jobs = new Mock<IJobProgressApiClient>();
+      _mockModelManagerClient
+          .Setup(x => x.StartModelDownloadAsync(It.IsAny<ModelDownloadStartRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new ModelDownloadStartResponse { JobId = "job-1" });
+      jobs.Setup(x => x.GetJobAsync("job-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync((JobDto?)new JobDto { Id = "job-1", Status = "completed", Progress = 1.0 });
+
+      var vm = new ModelManagerViewModel(_context, _mockModelManagerClient.Object, jobs.Object)
+      {
+        DownloadUrl = "https://example.com/m.zip",
+        DownloadModelName = "m1",
+        DownloadVersion = "1.0",
+        DownloadTargetEngine = "xtts_v2",
+      };
+
+      await vm.StartModelDownloadCommand.ExecuteAsync(null);
+
+      _mockModelManagerClient.Verify(
+          x => x.StartModelDownloadAsync(
+              It.Is<ModelDownloadStartRequest>(r => r.Url.Contains("example.com", StringComparison.Ordinal) && r.Engine == "xtts_v2"),
+              It.IsAny<CancellationToken>()),
+          Times.Once);
     }
   }
 }

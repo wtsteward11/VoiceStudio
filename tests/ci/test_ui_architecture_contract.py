@@ -12,9 +12,11 @@ import re
 from pathlib import Path
 
 import pytest
+from _panel_registry_utils import load_panel_id_constants
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 SRC_APP = ROOT / "src" / "VoiceStudio.App"
+PANEL_IDS_CS = ROOT / "src" / "VoiceStudio.Core" / "Panels" / "PanelIds.cs"
 MAIN_WINDOW_CS = ROOT / "src" / "VoiceStudio.App" / "MainWindow.xaml.cs"
 ALLOWLIST_JSON = ROOT / ".ci" / "ui_arch_legacy_allowlist.json"
 WORKSPACES_DIR = SRC_APP / "Resources" / "Workspaces"
@@ -181,12 +183,14 @@ def test_switchto_panel_not_called(main_window_content: str) -> None:
 def _panel_id_to_view_type() -> dict[str, str]:
     """Build panel_id -> view_type from all 3 registration services and legacy."""
     result: dict[str, str] = {}
-    panel_id_re = re.compile(r'PanelId\s*=\s*["\']([^"\']+)["\']')
+    panel_id_literal_re = re.compile(r'PanelId\s*=\s*["\']([^"\']+)["\']')
+    panel_id_const_re = re.compile(r"PanelId\s*=\s*PanelIds\.(\w+)")
     view_type_re = re.compile(r'ViewType\s*=\s*typeof\s*\(\s*(\w+)\s*\)')
+    const_map = load_panel_id_constants(PANEL_IDS_CS)
     for path in REGISTRATION_SERVICES:
         if not path.exists():
             continue
-        text = path.read_text(encoding="utf-8-sig")
+        text = path.read_text(encoding="utf-8-sig", errors="replace")
         parts = re.split(
             r"(?:RegisterIfNotExists|registry\.Register)\s*\(\s*(?:registry\s*,\s*)?new\s+PanelDescriptor\s*\{",
             text,
@@ -194,10 +198,18 @@ def _panel_id_to_view_type() -> dict[str, str]:
         for part in parts[1:]:
             block_end = part.find("});")
             block = part[:block_end] if block_end >= 0 else part
-            pid_m = panel_id_re.search(block)
+            pid: str | None = None
+            pid_const = panel_id_const_re.search(block)
+            if pid_const:
+                const_name = pid_const.group(1)
+                pid = const_map.get(const_name, const_name)
+            else:
+                pid_literal = panel_id_literal_re.search(block)
+                if pid_literal:
+                    pid = pid_literal.group(1)
             vt_m = view_type_re.search(block)
-            if pid_m and vt_m:
-                result[pid_m.group(1)] = vt_m.group(1)
+            if pid and vt_m:
+                result[pid] = vt_m.group(1)
     # Legacy: ["PanelId"] = (..., () => new ViewType())
     mw = MAIN_WINDOW_CS.read_text(encoding="utf-8")
     start = mw.find("_legacyPanelRegistry = new")

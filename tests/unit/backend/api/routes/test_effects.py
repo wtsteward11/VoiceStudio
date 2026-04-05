@@ -1,493 +1,193 @@
 """
-Unit Tests for Effects API Route
-Tests audio effects endpoints comprehensively.
+GAP-039: deterministic tests for effects routes (project process, bypass, preview query).
+
+Replaces skipped legacy module that targeted removed in-memory _effect_chains dict.
 """
 
-"""
-NOTE: This test module has been skipped because it tests mock
-attributes that don't exist in the actual implementation.
-These tests need refactoring to match the real API.
-"""
-import pytest
-
-pytest.skip(
-    "Tests mock non-existent module attributes - needs test refactoring",
-    allow_module_level=True,
-)
-
+from __future__ import annotations
 
 import sys
-import uuid
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
+import soundfile as sf
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-project_root = Path(__file__).parent.parent.parent.parent.parent
+project_root = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-# Import the route module
-try:
-    from backend.api.routes import effects
-except ImportError:
-    pytest.skip("Could not import effects route module", allow_module_level=True)
+from backend.api.routes import effects
+from backend.api.routes.effects import (
+    Effect,
+    EffectChain,
+    EffectParameter,
+    EffectProcessRequest,
+)
 
 
-class TestEffectsRouteImports:
-    """Test effects route module can be imported."""
-
-    def test_effects_module_imports(self):
-        """Test effects module can be imported."""
-        assert effects is not None, "Failed to import effects module"
-        assert hasattr(effects, "router"), "effects module missing router"
-
-    def test_router_exists(self):
-        """Test router exists and is configured."""
-        assert effects.router is not None, "Router should exist"
-        if hasattr(effects.router, "prefix"):
-            pass  # Router configuration is valid
-
-    def test_router_has_routes(self):
-        """Test router has registered routes."""
-        if hasattr(effects.router, "routes"):
-            routes = [route.path for route in effects.router.routes]
-            assert len(routes) > 0, "Router should have routes registered"
+@pytest.fixture()
+def effects_app() -> FastAPI:
+    app = FastAPI()
+    app.include_router(effects.router)
+    app.include_router(effects.project_effects_router)
+    return app
 
 
-class TestEffectChains:
-    """Test effect chain CRUD operations."""
+def _chain(
+    *,
+    chain_id: str = "chain-1",
+    project_id: str = "proj-1",
+    fx: list[Effect] | None = None,
+) -> EffectChain:
+    now = datetime.utcnow().isoformat()
+    return EffectChain(
+        id=chain_id,
+        name="Test Chain",
+        project_id=project_id,
+        effects=fx or [],
+        created=now,
+        modified=now,
+    )
 
-    def test_list_effect_chains_empty(self):
-        """Test listing effect chains when empty."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
 
-        effects._effect_chains.clear()
+def test_process_chain_in_memory_bypass_passthrough() -> None:
+    from backend.services.effect_chain_process import process_chain_in_memory
 
-        response = client.get("/api/effects/chains?project_id=test-project")
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 0
+    now = datetime.utcnow().isoformat()
+    chain = _chain(
+        fx=[
+            Effect(
+                id="e1",
+                type="eq",
+                name="EQ",
+                enabled=True,
+                order=0,
+                parameters=[
+                    EffectParameter(name="low_gain", value=0.0, min_value=-12.0, max_value=12.0)
+                ],
+            )
+        ],
+    )
+    audio = np.linspace(-0.1, 0.1, 64, dtype=np.float32)
+    out, passthrough = process_chain_in_memory(
+        chain, audio, 48000, bypass_chain=True, strict_no_enabled=True
+    )
+    assert passthrough is True
+    assert out.shape == audio.shape
+    assert np.allclose(out, audio)
 
-    def test_list_effect_chains_with_data(self):
-        """Test listing effect chains with data."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
 
-        effects._effect_chains.clear()
+def test_process_chain_in_memory_strict_raises_when_no_enabled() -> None:
+    from fastapi import HTTPException
 
-        chain_id = f"chain-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        effects._effect_chains[chain_id] = effects.EffectChain(
-            id=chain_id,
-            name="Test Chain",
-            project_id="test-project",
-            effects=[],
-            created=now,
-            modified=now,
+    from backend.services.effect_chain_process import process_chain_in_memory
+
+    chain = _chain(fx=[])
+    audio = np.zeros(32, dtype=np.float32)
+    with pytest.raises(HTTPException) as exc:
+        process_chain_in_memory(
+            chain, audio, 48000, bypass_chain=False, strict_no_enabled=True
         )
-
-        response = client.get("/api/effects/chains?project_id=test-project")
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 1
-
-    def test_list_effect_chains_missing_project_id(self):
-        """Test listing effect chains without project_id."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        response = client.get("/api/effects/chains")
-        assert response.status_code == 422  # Validation error
-
-    def test_get_effect_chain_success(self):
-        """Test successful effect chain retrieval."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_chains.clear()
-
-        chain_id = f"chain-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        effects._effect_chains[chain_id] = effects.EffectChain(
-            id=chain_id,
-            name="Test Chain",
-            project_id="test-project",
-            effects=[],
-            created=now,
-            modified=now,
-        )
-
-        response = client.get(f"/api/effects/chains/{chain_id}")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["id"] == chain_id
-
-    def test_get_effect_chain_not_found(self):
-        """Test getting non-existent effect chain."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_chains.clear()
-
-        response = client.get("/api/effects/chains/nonexistent")
-        assert response.status_code == 404
-
-    def test_create_effect_chain_success(self):
-        """Test successful effect chain creation."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_chains.clear()
-
-        request_data = {
-            "name": "New Chain",
-            "description": "A test chain",
-            "project_id": "test-project",
-        }
-
-        response = client.post("/api/effects/chains", json=request_data)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["name"] == "New Chain"
-        assert "id" in data
-
-    def test_create_effect_chain_missing_name(self):
-        """Test effect chain creation with missing name."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_chains.clear()
-
-        request_data = {"project_id": "test-project"}
-
-        response = client.post("/api/effects/chains", json=request_data)
-        assert response.status_code == 422  # Validation error
-
-    def test_update_effect_chain_success(self):
-        """Test successful effect chain update."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_chains.clear()
-
-        chain_id = f"chain-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        effects._effect_chains[chain_id] = effects.EffectChain(
-            id=chain_id,
-            name="Original Name",
-            project_id="test-project",
-            effects=[],
-            created=now,
-            modified=now,
-        )
-
-        update_data = {"name": "Updated Name", "description": "Updated"}
-
-        response = client.put(f"/api/effects/chains/{chain_id}", json=update_data)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["name"] == "Updated Name"
-
-    def test_update_effect_chain_not_found(self):
-        """Test updating non-existent effect chain."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_chains.clear()
-
-        update_data = {"name": "Updated Name"}
-
-        response = client.put("/api/effects/chains/nonexistent", json=update_data)
-        assert response.status_code == 404
-
-    def test_delete_effect_chain_success(self):
-        """Test successful effect chain deletion."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_chains.clear()
-
-        chain_id = f"chain-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        effects._effect_chains[chain_id] = effects.EffectChain(
-            id=chain_id,
-            name="To Delete",
-            project_id="test-project",
-            effects=[],
-            created=now,
-            modified=now,
-        )
-
-        response = client.delete(f"/api/effects/chains/{chain_id}")
-        assert response.status_code == 200
-
-        # Verify chain is deleted
-        get_response = client.get(f"/api/effects/chains/{chain_id}")
-        assert get_response.status_code == 404
-
-    def test_delete_effect_chain_not_found(self):
-        """Test deleting non-existent effect chain."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_chains.clear()
-
-        response = client.delete("/api/effects/chains/nonexistent")
-        assert response.status_code == 404
-
-    @patch("backend.api.routes.effects.HAS_POSTFX_PROCESSOR", True)
-    @patch("backend.api.routes.effects.PostFXProcessor")
-    @patch("backend.api.routes.effects.create_post_fx_processor")
-    def test_process_audio_with_postfxprocessor(self, mock_create_processor, mock_processor_class):
-        """Test audio processing using PostFXProcessor (professional quality)."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_chains.clear()
-
-        chain_id = f"chain-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        effects._effect_chains[chain_id] = effects.EffectChain(
-            id=chain_id,
-            name="Test Chain",
-            project_id="test-project",
-            effects=[],
-            created=now,
-            modified=now,
-        )
-
-        # Mock PostFXProcessor
-        mock_processor = MagicMock()
-        import numpy as np
-
-        mock_audio = np.random.randn(44100).astype(np.float32)
-        mock_processor.process.return_value = mock_audio
-        mock_create_processor.return_value = mock_processor
-
-        request_data = {"audio_id": "test-audio"}
-
-        with patch("os.path.exists", return_value=True):
-            with patch("backend.api.routes.voice._audio_storage") as mock_storage:
-                mock_storage.__contains__ = lambda x: x == "test-audio"
-                mock_storage.__getitem__ = lambda x: "/path/to/audio.wav"
-
-                with patch("backend.api.routes.effects._process_audio_with_chain") as mock_process:
-                    mock_process.return_value = {
-                        "success": True,
-                        "output_audio_id": "processed-audio",
-                        "message": "Processed successfully",
-                    }
-
-                    response = client.post(
-                        f"/api/effects/chains/{chain_id}/process", json=request_data
-                    )
-                    # May return 200 or 500 depending on dependencies
-                    assert response.status_code in [200, 500]
-
-    @patch("backend.api.routes.effects.HAS_POSTFX_PROCESSOR", False)
-    def test_process_audio_with_basic_fallback(self):
-        """Test audio processing using basic fallback when PostFXProcessor unavailable."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_chains.clear()
-
-        chain_id = f"chain-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        effects._effect_chains[chain_id] = effects.EffectChain(
-            id=chain_id,
-            name="Test Chain",
-            project_id="test-project",
-            effects=[],
-            created=now,
-            modified=now,
-        )
-
-        request_data = {"audio_id": "test-audio"}
-
-        with patch("os.path.exists", return_value=True):
-            with patch("backend.api.routes.voice._audio_storage") as mock_storage:
-                mock_storage.__contains__ = lambda x: x == "test-audio"
-                mock_storage.__getitem__ = lambda x: "/path/to/audio.wav"
-
-                with patch("backend.api.routes.effects._process_audio_with_chain") as mock_process:
-                    mock_process.return_value = {
-                        "success": True,
-                        "output_audio_id": "processed-audio",
-                        "message": "Processed successfully",
-                    }
-
-                    response = client.post(
-                        f"/api/effects/chains/{chain_id}/process", json=request_data
-                    )
-                    # Should fall back to basic implementation
-                    assert response.status_code in [200, 500]
-
-    def test_process_audio_with_chain_success(self):
-        """Test successful audio processing with effect chain."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_chains.clear()
-
-        chain_id = f"chain-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        effects._effect_chains[chain_id] = effects.EffectChain(
-            id=chain_id,
-            name="Test Chain",
-            project_id="test-project",
-            effects=[],
-            created=now,
-            modified=now,
-        )
-
-        request_data = {"audio_id": "test-audio"}
-
-        with patch("os.path.exists", return_value=True):
-            with patch("backend.api.routes.voice._audio_storage") as mock_storage:
-                mock_storage.__contains__ = lambda x: x == "test-audio"
-                mock_storage.__getitem__ = lambda x: "/path/to/audio.wav"
-
-                with patch("backend.api.routes.effects._process_audio_with_chain") as mock_process:
-                    mock_process.return_value = {
-                        "success": True,
-                        "output_audio_id": "processed-audio",
-                        "message": "Processed successfully",
-                    }
-
-                    response = client.post(
-                        f"/api/effects/chains/{chain_id}/process", json=request_data
-                    )
-                    # May return 200 or 500 depending on dependencies
-                    assert response.status_code in [200, 500]
-
-
-class TestEffectPresets:
-    """Test effect preset operations."""
-
-    def test_list_effect_presets_empty(self):
-        """Test listing effect presets when empty."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_presets.clear()
-
-        response = client.get("/api/effects/presets")
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 0
-
-    def test_list_effect_presets_with_data(self):
-        """Test listing effect presets with data."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_presets.clear()
-
-        preset_id = f"preset-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        effects._effect_presets[preset_id] = effects.EffectPreset(
-            id=preset_id,
-            effect_type="reverb",
-            name="Test Preset",
-            parameters=[],
-            created=now,
-            modified=now,
-        )
-
-        response = client.get("/api/effects/presets")
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 1
-
-    def test_create_effect_preset_success(self):
-        """Test successful effect preset creation."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_presets.clear()
-
-        request_data = {
-            "effect_type": "reverb",
-            "name": "New Preset",
-            "description": "A test preset",
-        }
-
-        response = client.post("/api/effects/presets", json=request_data)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["name"] == "New Preset"
-        assert "id" in data
-
-    def test_create_effect_preset_missing_type(self):
-        """Test effect preset creation with missing type."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_presets.clear()
-
-        request_data = {"name": "New Preset"}
-
-        response = client.post("/api/effects/presets", json=request_data)
-        assert response.status_code == 422  # Validation error
-
-    def test_delete_effect_preset_success(self):
-        """Test successful effect preset deletion."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_presets.clear()
-
-        preset_id = f"preset-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow().isoformat()
-        effects._effect_presets[preset_id] = effects.EffectPreset(
-            id=preset_id,
-            effect_type="reverb",
-            name="To Delete",
-            parameters=[],
-            created=now,
-            modified=now,
-        )
-
-        response = client.delete(f"/api/effects/presets/{preset_id}")
-        assert response.status_code == 200
-
-    def test_delete_effect_preset_not_found(self):
-        """Test deleting non-existent effect preset."""
-        app = FastAPI()
-        app.include_router(effects.router)
-        client = TestClient(app)
-
-        effects._effect_presets.clear()
-
-        response = client.delete("/api/effects/presets/nonexistent")
-        assert response.status_code == 404
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    assert exc.value.status_code == 400
+
+
+def _patch_audio_registry(monkeypatch: pytest.MonkeyPatch, wav: Path) -> None:
+    """Monkeypatch AudioRegistry.get_path to resolve 'audio-reg-1' to a temp WAV."""
+    from backend.services.audio_artifacts.registry import AudioRegistry
+
+    _orig_get = AudioRegistry.get_path
+
+    @staticmethod  # type: ignore[misc]
+    def _mock_get(audio_id: str) -> str | None:
+        if audio_id == "audio-reg-1":
+            return str(wav)
+        return None
+
+    monkeypatch.setattr(AudioRegistry, "get_path", _mock_get)
+
+
+def test_project_process_bypass_returns_input_audio_id(
+    effects_app: FastAPI, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    wav = tmp_path / "in.wav"
+    sf.write(str(wav), np.zeros(800, dtype=np.float32), 48000)
+
+    chain = _chain()
+
+    monkeypatch.setattr(effects, "_get_chain", lambda cid: chain if cid == "chain-1" else None)
+    _patch_audio_registry(monkeypatch, wav)
+
+    client = TestClient(effects_app)
+    r = client.post(
+        "/api/effects/chains/proj-1/chain-1/process",
+        params={"audio_id": "audio-reg-1", "bypass_chain": "true"},
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["success"] is True
+    assert data["output_audio_id"] == "audio-reg-1"
+    assert "bypass" in data["message"].lower()
+
+
+def test_project_process_preview_query_tags_message(
+    effects_app: FastAPI, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    wav = tmp_path / "in.wav"
+    sf.write(str(wav), np.zeros(800, dtype=np.float32), 48000)
+    chain = _chain()
+
+    monkeypatch.setattr(effects, "_get_chain", lambda cid: chain if cid == "chain-1" else None)
+    _patch_audio_registry(monkeypatch, wav)
+
+    client = TestClient(effects_app)
+    r = client.post(
+        "/api/effects/chains/proj-1/chain-1/process",
+        params={"audio_id": "audio-reg-1", "bypass_chain": "true", "preview": "true"},
+    )
+    assert r.status_code == 200, r.text
+    assert "[preview]" in r.json()["message"]
+
+
+def test_legacy_body_process_no_enabled_returns_400(
+    effects_app: FastAPI, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    wav = tmp_path / "in.wav"
+    sf.write(str(wav), np.zeros(400, dtype=np.float32), 48000)
+    chain = _chain()
+
+    monkeypatch.setattr(effects, "_get_chain", lambda cid: chain if cid == "chain-1" else None)
+    _patch_audio_registry(monkeypatch, wav)
+
+    client = TestClient(effects_app)
+    r = client.post(
+        "/api/effects/chains/chain-1/process?project_id=proj-1",
+        json=EffectProcessRequest(audio_id="audio-reg-1").model_dump(),
+    )
+    assert r.status_code == 400
+
+
+def test_legacy_body_process_bypass_ok_when_no_enabled(
+    effects_app: FastAPI, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    wav = tmp_path / "in.wav"
+    sf.write(str(wav), np.zeros(400, dtype=np.float32), 48000)
+    chain = _chain()
+
+    monkeypatch.setattr(effects, "_get_chain", lambda cid: chain if cid == "chain-1" else None)
+    _patch_audio_registry(monkeypatch, wav)
+
+    client = TestClient(effects_app)
+    r = client.post(
+        "/api/effects/chains/chain-1/process?project_id=proj-1&bypass_chain=true",
+        json=EffectProcessRequest(audio_id="audio-reg-1").model_dump(),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["output_audio_id"] == "audio-reg-1"
+
+
+def test_router_registers_process_routes(effects_app: FastAPI) -> None:
+    paths = [getattr(r, "path", "") for r in effects_app.routes]
+    assert any("process" in p and "{chain_id}" in p for p in paths)

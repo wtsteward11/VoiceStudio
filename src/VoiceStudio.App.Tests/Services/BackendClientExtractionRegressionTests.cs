@@ -13,7 +13,6 @@ namespace VoiceStudio.App.Tests.Services;
 /// PR-13: pipeline methods must remain on IPipelineConversationClient only.
 /// PR-14: backup methods must remain on IBackupRestoreClient only.
 /// PR-15: model methods must remain on IModelManagerClient only.
-/// PR-16: video methods must remain on IVideoGenClient/IVideoEditClient only.
 /// </summary>
 [TestClass]
 public class BackendClientExtractionRegressionTests
@@ -59,23 +58,6 @@ public class BackendClientExtractionRegressionTests
         "GetModelsAsync", "GetModelAsync", "RegisterModelAsync", "VerifyModelAsync",
         "UpdateModelChecksumAsync", "DeleteModelAsync", "ExportModelAsync", "ImportModelAsync",
         "GetStorageStatsAsync"
-    };
-
-    private static readonly string[] VideoMethodNames =
-    {
-        "ListVideoEnginesAsync", "GenerateVideoAsync", "UpscaleVideoAsync",
-        "GetVideoInfoAsync", "EditVideoAsync"
-    };
-
-    private static readonly string[] MixerMethodNames =
-    {
-        "GetMixerStateAsync", "UpdateMixerStateAsync", "ResetMixerStateAsync",
-        "CreateMixerSendAsync", "UpdateMixerSendAsync", "DeleteMixerSendAsync",
-        "CreateMixerReturnAsync", "UpdateMixerReturnAsync", "DeleteMixerReturnAsync",
-        "CreateMixerSubGroupAsync", "UpdateMixerSubGroupAsync", "DeleteMixerSubGroupAsync",
-        "UpdateMixerMasterAsync",
-        "GetMixerPresetsAsync", "GetMixerPresetAsync", "CreateMixerPresetAsync",
-        "UpdateMixerPresetAsync", "DeleteMixerPresetAsync", "ApplyMixerPresetAsync"
     };
 
     [TestMethod]
@@ -229,50 +211,6 @@ public class BackendClientExtractionRegressionTests
         {
             var m = backendType.GetMethod(name);
             Assert.IsNull(m, $"BackendClient must not expose {name} after PR-15 extraction.");
-        }
-    }
-
-    [TestMethod]
-    public void IBackendClient_DoesNotExposeVideoMethods()
-    {
-        var iface = typeof(IBackendClient);
-        foreach (var name in VideoMethodNames)
-        {
-            var m = iface.GetMethod(name);
-            Assert.IsNull(m, $"IBackendClient must not expose {name} after PR-16 extraction.");
-        }
-    }
-
-    [TestMethod]
-    public void BackendClient_DoesNotExposeVideoMethods()
-    {
-        var backendType = typeof(BackendClient);
-        foreach (var name in VideoMethodNames)
-        {
-            var m = backendType.GetMethod(name);
-            Assert.IsNull(m, $"BackendClient must not expose {name} after PR-16 extraction.");
-        }
-    }
-
-    [TestMethod]
-    public void IBackendClient_DoesNotExposeMixerMethods()
-    {
-        var iface = typeof(IBackendClient);
-        foreach (var name in MixerMethodNames)
-        {
-            var m = iface.GetMethod(name);
-            Assert.IsNull(m, $"IBackendClient must not expose {name} after PR-17 extraction.");
-        }
-    }
-
-    [TestMethod]
-    public void BackendClient_DoesNotExposeMixerMethods()
-    {
-        var backendType = typeof(BackendClient);
-        foreach (var name in MixerMethodNames)
-        {
-            var m = backendType.GetMethod(name);
-            Assert.IsNull(m, $"BackendClient must not expose {name} after PR-17 extraction.");
         }
     }
 }

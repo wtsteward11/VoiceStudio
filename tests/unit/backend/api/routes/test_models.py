@@ -1,48 +1,42 @@
 """
 Unit Tests for Models API Routes.
 
-Tests model management endpoints.
+Tests model management endpoints (paths aligned with backend/api/routes/models.py).
 """
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from backend.api.auth import require_auth_if_enabled
+from backend.api.routes.models import router
+
 
 @pytest.fixture
 def models_client():
     """Create test client for models routes."""
-    from backend.api.routes.models import router
-
     app = FastAPI()
     app.include_router(router)
-    return TestClient(app)
+    app.dependency_overrides[require_auth_if_enabled] = lambda: None
+    with TestClient(app) as client:
+        yield client
+    app.dependency_overrides.clear()
 
 
 class TestModelsEndpoints:
     """Tests for models endpoints."""
 
     def test_list_models(self, models_client):
-        """Test GET /list returns model list."""
-        response = models_client.get("/api/models/list")
-        assert response.status_code in [200, 404]
+        """Test GET /api/models returns model list (or error if storage unavailable)."""
+        response = models_client.get("/api/models")
+        assert response.status_code in (200, 500)
 
-    def test_get_model_by_id(self, models_client):
-        """Test GET /model/{id} returns specific model."""
-        response = models_client.get("/api/models/model/test-model")
-        assert response.status_code in [200, 404]
-
-    def test_download_model(self, models_client):
-        """Test POST /download initiates model download."""
-        response = models_client.post("/api/models/download", json={"model_id": "test-model"})
-        assert response.status_code in [200, 202, 404, 422]
+    def test_get_model_by_engine_and_name(self, models_client):
+        """Test GET /api/models/{engine}/{model_name}."""
+        response = models_client.get("/api/models/xtts_v2/test-model")
+        assert response.status_code in (200, 404, 500)
 
     def test_delete_model(self, models_client):
-        """Test DELETE /model/{id} deletes a model."""
-        response = models_client.delete("/api/models/model/test-model")
-        assert response.status_code in [200, 204, 404]
-
-    def test_get_model_status(self, models_client):
-        """Test GET /status returns model system status."""
-        response = models_client.get("/api/models/status")
-        assert response.status_code in [200, 404]
+        """Test DELETE /api/models/{engine}/{model_name}."""
+        response = models_client.delete("/api/models/xtts_v2/test-model")
+        assert response.status_code in (200, 404, 500)

@@ -46,6 +46,7 @@ ALLOWLIST = frozenset({
     "BatchQueueTimelineControl.xaml.cs",
     "EngineParameterTuningViewModel.cs",  # sample engine for UI
     "VideoGenViewModel.cs",  # video engines - uses /api/video/engines/list
+    "ProfileComparisonViewModel.cs",  # comparison panel uses fixed synthesis set (not registry)
 })
 
 

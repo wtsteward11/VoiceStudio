@@ -200,7 +200,8 @@ namespace VoiceStudio.App.Tests.Fixtures
                     Theme = "Dark",
                     Language = "en-US",
                     AutoSave = true,
-                    AutoSaveInterval = 300
+                    AutoSaveInterval = 300,
+                    DefaultExportLufsPreset = "podcast_stereo",
                 },
                 Engine = new EngineSettings
                 {

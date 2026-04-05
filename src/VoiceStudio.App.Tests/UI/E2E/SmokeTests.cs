@@ -67,8 +67,28 @@ namespace VoiceStudio.App.Tests.UI.E2E
         public static void ClassCleanup()
         {
             _mainWindow = null;
-            _app?.Close();
+
+            if (_app != null)
+            {
+                try
+                {
+                    if (!_app.HasExited)
+                    {
+                        _app.Close();
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    System.Diagnostics.Trace.WriteLine($"SmokeTests cleanup: application process no longer available: {ex.Message}");
+                }
+                finally
+                {
+                    _app = null;
+                }
+            }
+
             _automation?.Dispose();
+            _automation = null;
         }
 
         /// <summary>

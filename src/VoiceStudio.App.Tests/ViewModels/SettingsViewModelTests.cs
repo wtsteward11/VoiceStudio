@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Dispatching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using VoiceStudio.App.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Panels;
@@ -89,9 +90,9 @@ namespace VoiceStudio.App.Tests.ViewModels
         }
 
         [TestMethod]
-        public void ApiUrl_DefaultsToLocalhost8000()
+        public void ApiUrl_DefaultsToBackendClientConfigDefault()
         {
-            Assert.AreEqual("http://localhost:8000", _viewModel.ApiUrl);
+            Assert.AreEqual(BackendClientConfig.DefaultHttpBaseUrl, _viewModel.ApiUrl);
         }
 
         [TestMethod]

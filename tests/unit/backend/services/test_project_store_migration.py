@@ -1,32 +1,76 @@
 """
-Tests for ProjectStoreService migration logic.
+Tests for ProjectStoreService: SQLite authority + legacy JSON import (GAP-016 lane).
 """
 
+from __future__ import annotations
+
+import asyncio
 import json
+from pathlib import Path
 
 import pytest
 
-from backend.services.ProjectStoreService import (
+from backend.infrastructure.adapters.database import (
+    close_database_adapter,
+    get_database_adapter,
+    reset_database_adapter_singleton,
+)
+from backend.infrastructure.migrations.initial_schema import run_migrations
+from backend.infrastructure.repositories.project_repository import (
+    reset_project_repository_singleton,
+)
+from backend.project.management.project_store_service import (
     CURRENT_PROJECT_SCHEMA_VERSION,
     PROJECT_META_FILENAME,
     ProjectStoreService,
+    UnsupportedProjectPayloadError,
+    reset_project_store_service,
 )
 
 
 @pytest.fixture
-def store_service(tmp_path):
-    """Create a ProjectStoreService backed by a temporary directory."""
-    return ProjectStoreService(projects_dir=str(tmp_path))
+def store_with_db(tmp_path: Path) -> ProjectStoreService:
+    projects_root = tmp_path / "projects"
+    projects_root.mkdir()
+    db_file = tmp_path / "vs.db"
+
+    async def _setup() -> None:
+        await close_database_adapter()
+        reset_database_adapter_singleton()
+        reset_project_repository_singleton()
+        reset_project_store_service()
+        conn = f"sqlite:///{db_file}"
+        await run_migrations(db_path=conn)
+        db = get_database_adapter(conn)
+        await db.connect()
+
+    asyncio.run(_setup())
+    return ProjectStoreService(projects_dir=str(projects_root))
 
 
-def test_load_legacy_project_v0_migrates_to_current(store_service, tmp_path):
-    """Test that a legacy project (v0/missing version) is migrated to current version."""
+def _restore_event_loop_after_async() -> None:
+    """asyncio.run() clears the main-thread loop; restore for pytest global hooks."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+
+@pytest.fixture(autouse=True)
+def _teardown_sqlite_singletons() -> None:
+    yield
+    asyncio.run(close_database_adapter())
+    reset_database_adapter_singleton()
+    reset_project_repository_singleton()
+    reset_project_store_service()
+    _restore_event_loop_after_async()
+
+
+def test_load_legacy_project_v0_imports_to_sqlite(store_with_db: ProjectStoreService, tmp_path: Path) -> None:
+    """Legacy project.json (missing schema_version) imports into SQLite with v1 record."""
     project_id = "legacy-project-1"
-    project_dir = tmp_path / project_id
-    project_dir.mkdir()
+    project_dir = tmp_path / "projects" / project_id
+    project_dir.mkdir(parents=True)
     (project_dir / "audio").mkdir()
 
-    # Create a legacy project.json (missing schema_version)
     legacy_meta = {
         "id": project_id,
         "name": "Legacy Project",
@@ -34,30 +78,29 @@ def test_load_legacy_project_v0_migrates_to_current(store_service, tmp_path):
         "updated_at": "2024-01-01T00:00:00",
         "voice_profile_ids": [],
     }
+    (project_dir / PROJECT_META_FILENAME).write_text(json.dumps(legacy_meta), encoding="utf-8")
 
-    meta_path = project_dir / PROJECT_META_FILENAME
-    meta_path.write_text(json.dumps(legacy_meta))
-
-    # Load project
-    project = store_service.get_project(project_id)
-
-    # Assertions
+    project = store_with_db.get_project(project_id)
     assert project.id == project_id
     assert project.schema_version == CURRENT_PROJECT_SCHEMA_VERSION
 
-    # Verify persistence
-    saved_meta = json.loads(meta_path.read_text())
-    assert saved_meta["schema_version"] == CURRENT_PROJECT_SCHEMA_VERSION
+    async def _assert_sqlite() -> None:
+        from backend.infrastructure.repositories.project_repository import get_project_repository
+
+        row = await get_project_repository().get_by_id(project_id)
+        assert row is not None
+        assert row.name == "Legacy Project"
+
+    asyncio.run(_assert_sqlite())
 
 
-def test_migration_is_idempotent(store_service, tmp_path):
-    """Test that loading an already migrated project does not change it."""
+def test_migration_idempotent_in_sqlite(store_with_db: ProjectStoreService, tmp_path: Path) -> None:
+    """Repeated get_project returns stable SQLite-backed metadata."""
     project_id = "migrated-project-1"
-    project_dir = tmp_path / project_id
-    project_dir.mkdir()
+    project_dir = tmp_path / "projects" / project_id
+    project_dir.mkdir(parents=True)
     (project_dir / "audio").mkdir()
 
-    # Create a current version project.json
     current_meta = {
         "schema_version": CURRENT_PROJECT_SCHEMA_VERSION,
         "id": project_id,
@@ -66,30 +109,20 @@ def test_migration_is_idempotent(store_service, tmp_path):
         "updated_at": "2024-01-01T00:00:00",
         "voice_profile_ids": [],
     }
+    (project_dir / PROJECT_META_FILENAME).write_text(json.dumps(current_meta), encoding="utf-8")
 
-    meta_path = project_dir / PROJECT_META_FILENAME
-    meta_path.write_text(json.dumps(current_meta))
-
-    # Load project
-    project1 = store_service.get_project(project_id)
+    project1 = store_with_db.get_project(project_id)
     assert project1.schema_version == CURRENT_PROJECT_SCHEMA_VERSION
-
-    # Load again
-    project2 = store_service.get_project(project_id)
-    assert project2.schema_version == CURRENT_PROJECT_SCHEMA_VERSION
-
-    # Verify file wasn't unnecessarily modified (timestamp check might be flaky, so check content)
-    saved_meta = json.loads(meta_path.read_text())
-    assert saved_meta["schema_version"] == CURRENT_PROJECT_SCHEMA_VERSION
+    project2 = store_with_db.get_project(project_id)
+    assert project2.name == project1.name
 
 
-def test_invalid_schema_version_raises_error(store_service, tmp_path):
-    """Test that a project with invalid schema version raises an error."""
+def test_invalid_schema_version_on_disk_not_loaded(store_with_db: ProjectStoreService, tmp_path: Path) -> None:
+    """Invalid project.json fails validation and does not produce a record."""
     project_id = "invalid-project-1"
-    project_dir = tmp_path / project_id
+    project_dir = tmp_path / "projects" / project_id
     project_dir.mkdir()
 
-    # Create invalid version
     invalid_meta = {
         "schema_version": -1,
         "id": project_id,
@@ -97,16 +130,32 @@ def test_invalid_schema_version_raises_error(store_service, tmp_path):
         "created_at": "2024-01-01T00:00:00",
         "updated_at": "2024-01-01T00:00:00",
     }
-
-    meta_path = project_dir / PROJECT_META_FILENAME
-    meta_path.write_text(json.dumps(invalid_meta))
-
-    # Load should fail (or return None depending on implementation,
-    # but Pydantic validation usually raises ValidationError, caught and logged -> returns None)
-    # The current implementation logs error and returns None.
-
-    # However, if we manually invoke _migrate_record with an invalid object, it should raise.
-    # Let's test the public API behavior: get_project raises KeyError if not found/valid.
+    (project_dir / PROJECT_META_FILENAME).write_text(json.dumps(invalid_meta), encoding="utf-8")
 
     with pytest.raises(KeyError):
-        store_service.get_project(project_id)
+        store_with_db.get_project(project_id)
+
+
+def test_unsupported_sqlite_payload_version_raises(store_with_db: ProjectStoreService, tmp_path: Path) -> None:
+    import uuid
+
+    from backend.domain.entities.project import Project, ProjectStatus
+    from backend.infrastructure.repositories.project_repository import get_project_repository
+
+    project_id = str(uuid.uuid4())
+    store_with_db._ensure_project_dirs(project_id)
+
+    async def _seed() -> None:
+        p = Project(
+            id=project_id,
+            name="future",
+            description="",
+            status=ProjectStatus.ACTIVE,
+            metadata={"vs_payload_version": 99},
+        )
+        await get_project_repository().save(p)
+
+    asyncio.run(_seed())
+
+    with pytest.raises(UnsupportedProjectPayloadError):
+        store_with_db.get_project(project_id)

@@ -212,7 +212,7 @@ namespace VoiceStudio.App.Tests.Services
             var coordinator = CreateCoordinator(withRecents: false);
             await coordinator.SaveProjectAsync();
 
-            _mockSaveHandler.Verify(x => x.SaveMixerStateIfNeededAsync(It.IsAny<CancellationToken>()), Times.Once);
+            _mockSaveHandler.Verify(x => x.SaveProjectAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [TestMethod]
@@ -224,7 +224,7 @@ namespace VoiceStudio.App.Tests.Services
             var coordinator = CreateCoordinator(withRecents: false, toast: recordingToast);
             await coordinator.SaveProjectAsync();
 
-            _mockSaveHandler.Verify(x => x.SaveMixerStateIfNeededAsync(It.IsAny<CancellationToken>()), Times.Never);
+            _mockSaveHandler.Verify(x => x.SaveProjectAsync(It.IsAny<CancellationToken>()), Times.Never);
             Assert.IsTrue(recordingToast.LastInfoCall.HasValue,
                 "Not-ready path should show info toast");
             Assert.IsTrue(recordingToast.LastInfoCall!.Value.Message
@@ -236,7 +236,7 @@ namespace VoiceStudio.App.Tests.Services
         public async Task SaveProjectAsync_WhenHandlerThrows_SurfacesError()
         {
             _mockStartup.Setup(x => x.IsReady).Returns(true);
-            _mockSaveHandler.Setup(x => x.SaveMixerStateIfNeededAsync(It.IsAny<CancellationToken>()))
+            _mockSaveHandler.Setup(x => x.SaveProjectAsync(It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new System.Exception("Save failed"));
 
             var recordingToast = CreateRecordingToast();
@@ -295,7 +295,7 @@ namespace VoiceStudio.App.Tests.Services
         public async Task SaveProject_WhenHandlerThrows_LogsWarningWithOperationName()
         {
             _mockStartup.Setup(x => x.IsReady).Returns(true);
-            _mockSaveHandler.Setup(x => x.SaveMixerStateIfNeededAsync(It.IsAny<CancellationToken>()))
+            _mockSaveHandler.Setup(x => x.SaveProjectAsync(It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new System.Exception("Save failed"));
 
             var mockLogger = new Mock<ILogger<ProjectWorkflowCoordinator>>();
@@ -326,6 +326,50 @@ namespace VoiceStudio.App.Tests.Services
                 x => x.Log(LogLevel.Warning,
                     It.IsAny<EventId>(),
                     It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("OpenRecentProject")),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Once);
+        }
+
+        [TestMethod]
+        public async Task TryAutosaveProjectAsync_WhenReady_CallsSaveHandler()
+        {
+            _mockStartup.Setup(x => x.IsReady).Returns(true);
+
+            var coordinator = CreateCoordinator(withRecents: false);
+            await coordinator.TryAutosaveProjectAsync();
+
+            _mockSaveHandler.Verify(x => x.SaveProjectAsync(It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [TestMethod]
+        public async Task TryAutosaveProjectAsync_WhenNotReady_DoesNotCallSaveHandler()
+        {
+            _mockStartup.Setup(x => x.IsReady).Returns(false);
+
+            var coordinator = CreateCoordinator(withRecents: false);
+            await coordinator.TryAutosaveProjectAsync();
+
+            _mockSaveHandler.Verify(x => x.SaveProjectAsync(It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [TestMethod]
+        public async Task TryAutosaveProjectAsync_WhenHandlerThrows_LogsWithoutToast()
+        {
+            _mockStartup.Setup(x => x.IsReady).Returns(true);
+            _mockSaveHandler.Setup(x => x.SaveProjectAsync(It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new Exception("autosave boom"));
+
+            var recordingToast = CreateRecordingToast();
+            var mockLogger = new Mock<ILogger<ProjectWorkflowCoordinator>>();
+            var coordinator = CreateCoordinator(withRecents: false, toast: recordingToast, logger: mockLogger.Object);
+            await coordinator.TryAutosaveProjectAsync();
+
+            Assert.IsFalse(recordingToast.LastErrorCall.HasValue, "Autosave must not surface error toast");
+            mockLogger.Verify(
+                x => x.Log(LogLevel.Warning,
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Autosave", StringComparison.Ordinal)),
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);

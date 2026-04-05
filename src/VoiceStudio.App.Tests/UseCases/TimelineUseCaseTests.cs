@@ -3,7 +3,10 @@ using Moq;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.UseCases;
+using VoiceStudio.App.Utilities;
+using VoiceStudio.Core.Exceptions;
 using VoiceStudio.Core.Services;
+using System.Text.Json;
 
 namespace VoiceStudio.App.Tests.UseCases
 {
@@ -125,9 +128,9 @@ namespace VoiceStudio.App.Tests.UseCases
     {
       // Arrange
       _mockBackendClient
-          .Setup(x => x.PostAsync<object, TimelineUseCase.DeleteResponse>(
+          .Setup(x => x.PostAsync<TimelineUseCase.DeleteTimelineEntityRequest, TimelineUseCase.DeleteResponse>(
               "/api/timeline/tracks/delete",
-              It.IsAny<object>(),
+              It.IsAny<TimelineUseCase.DeleteTimelineEntityRequest>(),
               It.IsAny<CancellationToken>()))
           .ReturnsAsync(new TimelineUseCase.DeleteResponse { Success = true });
 
@@ -136,9 +139,9 @@ namespace VoiceStudio.App.Tests.UseCases
 
       // Assert
       Assert.IsTrue(result);
-      _mockBackendClient.Verify(x => x.PostAsync<object, TimelineUseCase.DeleteResponse>(
+      _mockBackendClient.Verify(x => x.PostAsync<TimelineUseCase.DeleteTimelineEntityRequest, TimelineUseCase.DeleteResponse>(
           "/api/timeline/tracks/delete",
-          It.IsAny<object>(),
+          It.Is<TimelineUseCase.DeleteTimelineEntityRequest>(r => r.Id == "track-123"),
           It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -147,9 +150,9 @@ namespace VoiceStudio.App.Tests.UseCases
     {
       // Arrange
       _mockBackendClient
-          .Setup(x => x.PostAsync<object, TimelineUseCase.DeleteResponse>(
+          .Setup(x => x.PostAsync<TimelineUseCase.DeleteTimelineEntityRequest, TimelineUseCase.DeleteResponse>(
               "/api/timeline/clips/delete",
-              It.IsAny<object>(),
+              It.IsAny<TimelineUseCase.DeleteTimelineEntityRequest>(),
               It.IsAny<CancellationToken>()))
           .ReturnsAsync(new TimelineUseCase.DeleteResponse { Success = true });
 
@@ -158,10 +161,102 @@ namespace VoiceStudio.App.Tests.UseCases
 
       // Assert
       Assert.IsTrue(result);
-      _mockBackendClient.Verify(x => x.PostAsync<object, TimelineUseCase.DeleteResponse>(
+      _mockBackendClient.Verify(x => x.PostAsync<TimelineUseCase.DeleteTimelineEntityRequest, TimelineUseCase.DeleteResponse>(
           "/api/timeline/clips/delete",
-          It.IsAny<object>(),
+          It.Is<TimelineUseCase.DeleteTimelineEntityRequest>(r => r.Id == "clip-456"),
           It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [TestMethod]
+    public async Task TrimClipAsync_SerializesNewStartNewEnd_SnakeCase()
+    {
+      var capturedJson = "";
+      _mockBackendClient
+          .Setup(x => x.PutAsync<TimelineUseCase.TrimClipApiRequest, Clip>(
+              It.IsAny<string>(),
+              It.IsAny<TimelineUseCase.TrimClipApiRequest>(),
+              It.IsAny<CancellationToken>()))
+          .Callback<string, TimelineUseCase.TrimClipApiRequest, CancellationToken>((_, body, _) =>
+              capturedJson = JsonSerializer.Serialize(body, JsonSerializerOptionsFactory.BackendApi))
+          .ReturnsAsync(new Clip { Id = "c1", StartTime = 2, Duration = 6, EndTimeSeconds = 8 });
+
+      _ = await _useCase.TrimClipAsync("c1", 2.0, 8.0);
+
+      StringAssert.Contains(capturedJson, "\"new_start\":2");
+      StringAssert.Contains(capturedJson, "\"new_end\":8");
+    }
+
+    [TestMethod]
+    public async Task MoveClipAsync_SerializesNewStartTime_SnakeCase()
+    {
+      var capturedJson = "";
+      _mockBackendClient
+          .Setup(x => x.PutAsync<TimelineUseCase.MoveClipApiRequest, Clip>(
+              It.IsAny<string>(),
+              It.IsAny<TimelineUseCase.MoveClipApiRequest>(),
+              It.IsAny<CancellationToken>()))
+          .Callback<string, TimelineUseCase.MoveClipApiRequest, CancellationToken>((_, body, _) =>
+              capturedJson = JsonSerializer.Serialize(body, JsonSerializerOptionsFactory.BackendApi))
+          .ReturnsAsync(new Clip { Id = "c1" });
+
+      _ = await _useCase.MoveClipAsync("c1", 3.5, "t2");
+
+      StringAssert.Contains(capturedJson, "\"new_start_time\":3.5");
+      StringAssert.Contains(capturedJson, "\"new_track_id\":\"t2\"");
+    }
+
+    [TestMethod]
+    public async Task SplitClipAsync_SerializesSplitPosition_AndReadsClipBeforeAfter()
+    {
+      var capturedJson = "";
+      _mockBackendClient
+          .Setup(x => x.PostAsync<TimelineUseCase.SplitClipApiRequest, TimelineUseCase.SplitClipApiResponse>(
+              It.IsAny<string>(),
+              It.IsAny<TimelineUseCase.SplitClipApiRequest>(),
+              It.IsAny<CancellationToken>()))
+          .Callback<string, TimelineUseCase.SplitClipApiRequest, CancellationToken>((_, body, _) =>
+              capturedJson = JsonSerializer.Serialize(body, JsonSerializerOptionsFactory.BackendApi))
+          .ReturnsAsync(new TimelineUseCase.SplitClipApiResponse
+          {
+            ClipBefore = new Clip { Id = "c1", StartTime = 0, EndTimeSeconds = 5, Duration = 5 },
+            ClipAfter = new Clip { Id = "c2", StartTime = 5, EndTimeSeconds = 10, Duration = 5 },
+          });
+
+      var (left, right) = await _useCase.SplitClipAsync("c1", 5.0);
+
+      StringAssert.Contains(capturedJson, "\"split_position\":5");
+      Assert.AreEqual("c1", left.Id);
+      Assert.AreEqual("c2", right.Id);
+      Assert.AreEqual(5.0, left.Duration, 1e-6);
+      Assert.AreEqual(5.0, right.Duration, 1e-6);
+    }
+
+    [TestMethod]
+    public async Task AddClipAsync_SendsTrackIdStartTimeDuration_Name()
+    {
+      var capturedJson = "";
+      _mockBackendClient
+          .Setup(x => x.PostAsync<TimelineUseCase.AddTimelineClipApiRequest, Clip>(
+              "/api/timeline/clips",
+              It.IsAny<TimelineUseCase.AddTimelineClipApiRequest>(),
+              It.IsAny<CancellationToken>()))
+          .Callback<string, TimelineUseCase.AddTimelineClipApiRequest, CancellationToken>((_, body, _) =>
+              capturedJson = JsonSerializer.Serialize(body, JsonSerializerOptionsFactory.BackendApi))
+          .ReturnsAsync(new Clip { Id = "new" });
+
+      var data = new ClipData
+      {
+        SourcePath = "/tmp/x.wav",
+        Duration = 4.2,
+        Name = "N1",
+      };
+      _ = await _useCase.AddClipAsync("trk", data, 1.5);
+
+      StringAssert.Contains(capturedJson, "\"track_id\":\"trk\"");
+      StringAssert.Contains(capturedJson, "\"start_time\":1.5");
+      StringAssert.Contains(capturedJson, "\"duration\":4.2");
+      StringAssert.Contains(capturedJson, "\"name\":\"N1\"");
+      StringAssert.Contains(capturedJson, "\"source_path\":\"/tmp/x.wav\"");
     }
 
     [TestMethod]
@@ -228,17 +323,150 @@ namespace VoiceStudio.App.Tests.UseCases
       var options = new ExportOptions { Format = "wav", SampleRate = 44100 };
 
       _mockBackendClient
-          .Setup(x => x.PostAsync<object, TimelineUseCase.ExportResponse?>(
+          .Setup(x => x.PostAsync<TimelineUseCase.TimelineExportApiRequest, TimelineUseCase.TimelineExportResponseDto>(
               "/api/timeline/export",
-              It.IsAny<object>(),
+              It.IsAny<TimelineUseCase.TimelineExportApiRequest>(),
               It.IsAny<CancellationToken>()))
-          .ReturnsAsync(new TimelineUseCase.ExportResponse { OutputPath = outputPath });
+          .ReturnsAsync(new TimelineUseCase.TimelineExportResponseDto
+          {
+            Success = true,
+            OutputPath = outputPath,
+          });
 
       // Act
       var result = await _useCase.ExportAsync(outputPath, options);
 
       // Assert
       Assert.AreEqual(outputPath, result);
+      _mockBackendClient.Verify(
+          x => x.PostAsync<TimelineUseCase.ImportProjectBody, TimelineUseCase.ImportProjectTimelineResponse>(
+              "/api/timeline/import-from-project",
+              It.IsAny<TimelineUseCase.ImportProjectBody>(),
+              It.IsAny<CancellationToken>()),
+          Times.Never);
+    }
+
+    [TestMethod]
+    public async Task ExportAsync_ImportsProject_WhenProjectIdSet()
+    {
+      var outputPath = "/output/timeline.wav";
+      var options = new ExportOptions
+      {
+        Format = "wav",
+        SampleRate = 44100,
+        ProjectId = "proj-99",
+      };
+
+      _mockBackendClient
+          .Setup(x => x.PostAsync<TimelineUseCase.ImportProjectBody, TimelineUseCase.ImportProjectTimelineResponse>(
+              "/api/timeline/import-from-project",
+              It.IsAny<TimelineUseCase.ImportProjectBody>(),
+              It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new TimelineUseCase.ImportProjectTimelineResponse { Id = "tl1" });
+
+      _mockBackendClient
+          .Setup(x => x.PostAsync<TimelineUseCase.TimelineExportApiRequest, TimelineUseCase.TimelineExportResponseDto>(
+              "/api/timeline/export",
+              It.IsAny<TimelineUseCase.TimelineExportApiRequest>(),
+              It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new TimelineUseCase.TimelineExportResponseDto
+          {
+            Success = true,
+            OutputPath = outputPath,
+          });
+
+      var result = await _useCase.ExportAsync(outputPath, options);
+
+      Assert.AreEqual(outputPath, result);
+      _mockBackendClient.Verify(
+          x => x.PostAsync<TimelineUseCase.ImportProjectBody, TimelineUseCase.ImportProjectTimelineResponse>(
+              "/api/timeline/import-from-project",
+              It.Is<TimelineUseCase.ImportProjectBody>(b => b.ProjectId == "proj-99"),
+              It.IsAny<CancellationToken>()),
+          Times.Once);
+    }
+
+    [TestMethod]
+    public async Task ExportAsync_WrapsBackendValidationMessage()
+    {
+      var options = new ExportOptions { Format = "wav", ProjectId = "p" };
+
+      _mockBackendClient
+          .Setup(x => x.PostAsync<TimelineUseCase.ImportProjectBody, TimelineUseCase.ImportProjectTimelineResponse>(
+              "/api/timeline/import-from-project",
+              It.IsAny<TimelineUseCase.ImportProjectBody>(),
+              It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new TimelineUseCase.ImportProjectTimelineResponse { Id = "x" });
+
+      _mockBackendClient
+          .Setup(x => x.PostAsync<TimelineUseCase.TimelineExportApiRequest, TimelineUseCase.TimelineExportResponseDto>(
+              "/api/timeline/export",
+              It.IsAny<TimelineUseCase.TimelineExportApiRequest>(),
+              It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new BackendValidationException("No audible audio."));
+
+      try
+      {
+        await _useCase.ExportAsync("/out.wav", options);
+        Assert.Fail("Expected exception");
+      }
+      catch (System.InvalidOperationException ex)
+      {
+        StringAssert.Contains(ex.Message, "No audible");
+      }
+    }
+
+    [TestMethod]
+    public async Task UpdateTimelineTrackAsync_CallsPutWithMutedAndSolo()
+    {
+      _mockBackendClient
+          .Setup(x => x.PutAsync<TimelineUseCase.UpdateTimelineTrackApiRequest, Track>(
+              "/api/timeline/tracks/track-7",
+              It.IsAny<TimelineUseCase.UpdateTimelineTrackApiRequest>(),
+              It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new Track { Id = "track-7" });
+
+      await _useCase.UpdateTimelineTrackAsync("track-7", isMuted: true, isSolo: false);
+
+      _mockBackendClient.Verify(
+          x => x.PutAsync<TimelineUseCase.UpdateTimelineTrackApiRequest, Track>(
+              "/api/timeline/tracks/track-7",
+              It.Is<TimelineUseCase.UpdateTimelineTrackApiRequest>(r => r.Muted == true && r.Solo == false),
+              It.IsAny<CancellationToken>()),
+          Times.Once);
+    }
+
+    [TestMethod]
+    public async Task ExportAsync_MapsLufsPresetToApiRequest()
+    {
+      var outputPath = "/output/timeline.wav";
+      var options = new ExportOptions
+      {
+        Format = "wav",
+        SampleRate = 44100,
+        LufsPreset = "broadcast",
+      };
+
+      _mockBackendClient
+          .Setup(x => x.PostAsync<TimelineUseCase.TimelineExportApiRequest, TimelineUseCase.TimelineExportResponseDto>(
+              "/api/timeline/export",
+              It.Is<TimelineUseCase.TimelineExportApiRequest>(r => r.LufsPreset == "broadcast"),
+              It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new TimelineUseCase.TimelineExportResponseDto
+          {
+            Success = true,
+            OutputPath = outputPath,
+          });
+
+      var result = await _useCase.ExportAsync(outputPath, options);
+
+      Assert.AreEqual(outputPath, result);
+      _mockBackendClient.Verify(
+          x => x.PostAsync<TimelineUseCase.TimelineExportApiRequest, TimelineUseCase.TimelineExportResponseDto>(
+              "/api/timeline/export",
+              It.Is<TimelineUseCase.TimelineExportApiRequest>(r => r.LufsPreset == "broadcast"),
+              It.IsAny<CancellationToken>()),
+          Times.Once);
     }
   }
 }

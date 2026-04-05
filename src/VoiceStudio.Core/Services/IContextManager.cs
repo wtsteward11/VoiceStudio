@@ -127,6 +127,21 @@ public interface IContextManager
     /// </summary>
     string? CurrentPlayableTitle { get; }
 
+    /// <summary>
+    /// Primary selected timeline clip ID (hero path), or null when no clip is selected.
+    /// </summary>
+    string? ActiveTimelinePrimaryClipId { get; }
+
+    /// <summary>
+    /// Track ID containing <see cref="ActiveTimelinePrimaryClipId"/>, or the timeline's focused track when no clip is selected.
+    /// </summary>
+    string? ActiveTimelinePrimaryTrackId { get; }
+
+    /// <summary>
+    /// Effect chain ID selected in the Effects Mixer for the current project context (export bake authority).
+    /// </summary>
+    string? ActiveEffectChainId { get; }
+
     #endregion
 
     #region State Setters
@@ -163,6 +178,17 @@ public interface IContextManager
     /// <param name="source">Typed transport source.</param>
     /// <param name="title">Display title.</param>
     void SetCurrentPlayable(string? audioId, TransportSource? source, string? title);
+
+    /// <summary>
+    /// Records the timeline panel's primary clip/track selection for cross-panel and transport-adjacent consumers.
+    /// Does not publish panel events; use the <see cref="ContextChanged"/> event for reactions.
+    /// </summary>
+    void SetActiveTimelineSelection(string? primaryClipId, string? primaryTrackId, InteractionIntent intent = InteractionIntent.Navigation);
+
+    /// <summary>
+    /// Records the active effect chain for export and cross-panel coordination.
+    /// </summary>
+    void SetActiveEffectChain(string? chainId, string? projectIdForScope = null, InteractionIntent intent = InteractionIntent.Navigation);
 
     #endregion
 

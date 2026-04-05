@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using VoiceStudio.Core.Models;
 
 namespace VoiceStudio.Core.Events
 {
@@ -47,8 +48,8 @@ namespace VoiceStudio.Core.Events
   #region Profile Events
 
   /// <summary>
-  /// Event published when a voice profile is selected.
-  /// Subscribers: SettingsPanel, TimelinePanel, BatchProcessingPanel
+  /// Canonical cross-panel event when a voice profile becomes the active synthesis/profile target.
+  /// Publishers: Profiles panel, Library (fallback), workflow coordinator, <see cref="VoiceStudio.Core.Services.IContextManager"/> (store-driven).
   /// </summary>
   public class ProfileSelectedEvent : PanelEventBase
   {
@@ -420,9 +421,9 @@ namespace VoiceStudio.Core.Events
   }
 
   /// <summary>
-  /// Event published when a voice profile is selected for synthesis.
-  /// Subscribers: SynthesisPanel, BatchProcessing
+  /// Legacy duplicate of <see cref="ProfileSelectedEvent"/>; do not publish new instances.
   /// </summary>
+  [Obsolete("Use ProfileSelectedEvent. Removed from publish paths in GOV-VOICESTUDIO-SELECTION-AUTHORITY-01.")]
   public class VoiceProfileSelectedEvent : PanelEventBase
   {
     public string ProfileId { get; }
@@ -612,11 +613,15 @@ namespace VoiceStudio.Core.Events
     public double EndTime { get; }
     public string Text { get; }
 
-    public SubtitleSegment(double startTime, double endTime, string text)
+    /// <summary>Stable backend segment id when available (GAP-033).</summary>
+    public string? SegmentId { get; }
+
+    public SubtitleSegment(double startTime, double endTime, string text, string? segmentId = null)
     {
       StartTime = startTime;
       EndTime = endTime;
       Text = text;
+      SegmentId = segmentId;
     }
   }
 
@@ -649,6 +654,88 @@ namespace VoiceStudio.Core.Events
       Segments = segments;
       Duration = duration;
       Language = language;
+    }
+  }
+
+  /// <summary>
+  /// Timeline primary clip selection resolved to transcript segment ids (GAP-033).
+  /// Transcribe panel follows; does not replace timeline as selection authority.
+  /// </summary>
+  public class ClipTranscriptSelectionEvent : PanelEventBase
+  {
+    public string ClipId { get; }
+    public string TranscriptionId { get; }
+    public IReadOnlyList<string> SegmentIds { get; }
+
+    public ClipTranscriptSelectionEvent(
+        string sourcePanelId,
+        string clipId,
+        string transcriptionId,
+        IReadOnlyList<string> segmentIds)
+        : base(sourcePanelId)
+    {
+      ClipId = clipId;
+      TranscriptionId = transcriptionId;
+      SegmentIds = segmentIds;
+    }
+  }
+
+  /// <summary>
+  /// GAP-046: clip audio artifact replaced after regeneration; panels sync local state to backend truth.
+  /// </summary>
+  public sealed class ClipAudioArtifactReplacedEvent : PanelEventBase
+  {
+    public string ProjectId { get; }
+    public string TrackId { get; }
+    public string ClipId { get; }
+    public string AudioId { get; }
+    public string AudioUrl { get; }
+    public double DurationSeconds { get; }
+
+    public ClipAudioArtifactReplacedEvent(
+        string sourcePanelId,
+        string projectId,
+        string trackId,
+        string clipId,
+        string audioId,
+        string audioUrl,
+        double durationSeconds)
+      : base(sourcePanelId, InteractionIntent.Edit)
+    {
+      ProjectId = projectId;
+      TrackId = trackId;
+      ClipId = clipId;
+      AudioId = audioId;
+      AudioUrl = audioUrl;
+      DurationSeconds = durationSeconds;
+    }
+  }
+
+  /// <summary>
+  /// GAP-045 Option B: transcript truth state changed on a timeline clip (stale, refresh in progress, current, failed refresh).
+  /// </summary>
+  public sealed class TranscriptTruthStateChangedEvent : PanelEventBase
+  {
+    public string ProjectId { get; }
+    public string TrackId { get; }
+    public string ClipId { get; }
+    public TranscriptTruthState State { get; }
+    public string? OperatorMessage { get; }
+
+    public TranscriptTruthStateChangedEvent(
+        string sourcePanelId,
+        string projectId,
+        string trackId,
+        string clipId,
+        TranscriptTruthState state,
+        string? operatorMessage = null)
+      : base(sourcePanelId, InteractionIntent.Edit)
+    {
+      ProjectId = projectId;
+      TrackId = trackId;
+      ClipId = clipId;
+      State = state;
+      OperatorMessage = operatorMessage;
     }
   }
 

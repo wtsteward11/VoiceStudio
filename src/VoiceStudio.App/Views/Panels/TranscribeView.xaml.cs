@@ -1,18 +1,34 @@
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Markup;
+using Microsoft.UI.Xaml.Media;
+using Windows.System;
+using Windows.UI.Core;
 using VoiceStudio.App.Services;
+using VoiceStudio.App.Utilities;
+using VoiceStudio.App.Core.Models;
 using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Transcription;
+using Windows.UI;
 using VoiceStudio.App.Services.UndoableActions;
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage;
+using Windows.Storage.Pickers;
 
 namespace VoiceStudio.App.Views.Panels
 {
   public sealed partial class TranscribeView : Microsoft.UI.Xaml.Controls.UserControl
   {
     public TranscribeViewModel ViewModel { get; }
+    /// <summary>GAP-045 multi-segment: anchor for Shift+click range edit (first segment tapped).</summary>
+    private VoiceStudio.Core.Models.TranscriptionSegment? _rangeEditAnchorSegment;
     private ContextMenuService? _contextMenuService;
     private ToastNotificationService? _toastService;
     private UndoRedoService? _undoRedoService;
@@ -50,17 +66,352 @@ namespace VoiceStudio.App.Views.Panels
       });
 
       // Subscribe to ViewModel events for toast notifications
-      ViewModel.PropertyChanged += (s, e) =>
+      ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+    }
+
+    private void OnViewModelPropertyChanged(object? s, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+      if (e.PropertyName == nameof(TranscribeViewModel.ErrorMessage) && !string.IsNullOrEmpty(ViewModel.ErrorMessage))
       {
-        if (e.PropertyName == nameof(TranscribeViewModel.ErrorMessage) && !string.IsNullOrEmpty(ViewModel.ErrorMessage))
+        _toastService?.ShowToast(ToastType.Error, "Transcribe Error", ViewModel.ErrorMessage);
+        return;
+      }
+
+      var name = e.PropertyName;
+      if (name == nameof(TranscribeViewModel.LinkedTranscriptSegmentIds)
+          || name == nameof(TranscribeViewModel.SelectedTranscription)
+          || name == nameof(TranscribeViewModel.EditingSegmentId)
+          || name == nameof(TranscribeViewModel.EditingRangeEndSegmentId)
+          || name == nameof(TranscribeViewModel.RegeneratingSegmentId)
+          || name == nameof(TranscribeViewModel.TranscriptSegmentLayoutRevision))
+      {
+        _ = DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, () =>
         {
-          _toastService?.ShowToast(ToastType.Error, "Transcribe Error", ViewModel.ErrorMessage);
+          if (name == nameof(TranscribeViewModel.SelectedTranscription)
+              || name == nameof(TranscribeViewModel.TranscriptSegmentLayoutRevision))
+            RefreshTranscriptSegmentsItemsSource();
+          RefreshSegmentRowVisuals();
+        });
+      }
+    }
+
+    private void TranscribeSegment_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+      if (sender is FrameworkElement fe && fe.DataContext is TranscriptionSegment seg)
+      {
+        var shift = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
+        if (shift && _rangeEditAnchorSegment != null)
+        {
+          ViewModel.BeginEditRange(_rangeEditAnchorSegment, seg);
+          if (ViewModel.IsMultiSegmentRangeEdit)
+            ShowSegmentTextEditFlyout(fe, seg);
+          else if (!ViewModel.IsEditingSegment && !string.IsNullOrEmpty(ViewModel.TranscriptOperatorMessage))
+          {
+            _toastService?.ShowToast(ToastType.Warning, "Range edit", ViewModel.TranscriptOperatorMessage);
+          }
         }
-        else if (e.PropertyName == nameof(TranscribeViewModel.StatusMessage) && !string.IsNullOrEmpty(ViewModel.StatusMessage))
+        else
         {
-          _toastService?.ShowToast(ToastType.Success, "Transcribe", ViewModel.StatusMessage);
+          ViewModel.OnTargetTranscriptionSegmentTapped(seg);
+          _rangeEditAnchorSegment = seg;
+        }
+
+        _ = DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, RefreshSegmentRowVisuals);
+        e.Handled = true;
+      }
+    }
+
+    private void TranscribeSegment_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+      if (sender is not FrameworkElement fe || fe.DataContext is not TranscriptionSegment seg)
+        return;
+      if (e.Key == VirtualKey.Enter || e.Key == VirtualKey.F2)
+      {
+        ViewModel.BeginEditSegment(seg);
+        _rangeEditAnchorSegment = seg;
+        ShowSegmentTextEditFlyout(fe, seg);
+        e.Handled = true;
+      }
+    }
+
+    private void TranscribeSegment_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+    {
+      if (sender is FrameworkElement fe && fe.DataContext is TranscriptionSegment seg)
+      {
+        ViewModel.BeginEditSegment(seg);
+        _rangeEditAnchorSegment = seg;
+        ShowSegmentTextEditFlyout(fe, seg);
+        e.Handled = true;
+      }
+    }
+
+    private void TranscribeSegment_RightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+      if (sender is not FrameworkElement fe || fe.DataContext is not TranscriptionSegment seg)
+        return;
+      e.Handled = true;
+      var menu = new MenuFlyout();
+      var editItem = new MenuFlyoutItem { Text = "Edit segment text…" };
+      editItem.Click += (_, _) =>
+      {
+        ViewModel.BeginEditSegment(seg);
+        _rangeEditAnchorSegment = seg;
+        ShowSegmentTextEditFlyout(fe, seg);
+      };
+      menu.Items.Add(editItem);
+      var regenItem = new MenuFlyoutItem { Text = "Regenerate segment audio" };
+      regenItem.Click += async (_, _) =>
+      {
+        var msg = await ViewModel.RegenerateSegmentAudioAsync(seg, cancellationToken: CancellationToken.None).ConfigureAwait(true);
+        if (!string.IsNullOrEmpty(msg))
+        {
+          ViewModel.TranscriptOperatorMessage = msg;
+          _toastService?.ShowToast(ToastType.Warning, "Regenerate", msg);
+        }
+        else
+        {
+          ViewModel.TranscriptOperatorMessage = "Segment audio regenerated and applied to the timeline clip.";
+          _toastService?.ShowToast(ToastType.Success, "Regenerate", "New audio applied to the linked timeline clip.");
         }
       };
+      menu.Items.Add(regenItem);
+      var opts = new FlyoutShowOptions { Position = e.GetPosition(fe) };
+      menu.ShowAt(fe, opts);
+    }
+
+    private void EditHistoryList_ItemClick(object sender, ItemClickEventArgs e)
+    {
+      if (e.ClickedItem is TranscriptEditHistoryEntry entry)
+        ViewModel.NavigateFromEditHistoryEntry(entry);
+    }
+
+    /// <summary>GOV-VOICESTUDIO-EDIT-APPLY-CONTEXT-JUMP-01: row tap jumps to source segment / timeline (Retry remains on its button).</summary>
+    private void ApplyJobStatusList_ItemClick(object sender, ItemClickEventArgs e)
+    {
+      if (e.ClickedItem is TranscriptApplyJobStatusEntry entry)
+        ViewModel.NavigateFromApplyJobStatusEntry(entry);
+    }
+
+    private static DataTemplate CreateFillerRemovalToggleItemTemplate()
+    {
+      const string xaml =
+          "<DataTemplate xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\">"
+          + "<CheckBox Margin=\"0,2,0,0\" Content=\"{Binding DisplayLabel}\" IsChecked=\"{Binding IsRemoveEnabled, Mode=TwoWay}\" />"
+          + "</DataTemplate>";
+      return (DataTemplate)XamlReader.Load(xaml);
+    }
+
+    /// <summary>GAP-045: buffered segment text edit; Apply runs regen with <c>replacement_text</c>.</summary>
+    private void ShowSegmentTextEditFlyout(FrameworkElement anchor, TranscriptionSegment seg)
+    {
+      var hint = new TextBlock
+      {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 12,
+        Opacity = 0.9,
+      };
+      hint.SetBinding(TextBlock.TextProperty, new Binding
+      {
+        Path = new PropertyPath(nameof(TranscribeViewModel.SegmentEditOperatorHint)),
+        Source = ViewModel,
+      });
+
+      var box = new TextBox
+      {
+        MinWidth = 320,
+        MinHeight = 80,
+        TextWrapping = TextWrapping.Wrap,
+        AcceptsReturn = true,
+      };
+      box.SetBinding(TextBox.TextProperty, new Binding
+      {
+        Path = new PropertyPath(nameof(TranscribeViewModel.EditingSegmentDraftText)),
+        Mode = BindingMode.TwoWay,
+        Source = ViewModel,
+      });
+
+      var fillerHeader = new TextBlock
+      {
+        Text = ResourceHelper.GetString("Transcribe.FillerRemovalReviewHeader", "Remove fillers (review toggles)"),
+        FontSize = 12,
+        Opacity = 0.9,
+        TextWrapping = TextWrapping.Wrap,
+      };
+      var fillerPreviewCaption = new TextBlock
+      {
+        Text = ResourceHelper.GetString("Transcribe.FillerRemovalPreviewCaption", "Preview"),
+        FontSize = 11,
+        Opacity = 0.85,
+      };
+      var fillerPreview = new TextBlock
+      {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 12,
+        Opacity = 0.95,
+      };
+      fillerPreview.SetBinding(TextBlock.TextProperty, new Binding
+      {
+        Path = new PropertyPath(nameof(TranscribeViewModel.FillerRemovalPreviewText)),
+        Mode = BindingMode.OneWay,
+        Source = ViewModel,
+      });
+      var fillerList = new ItemsControl
+      {
+        ItemTemplate = CreateFillerRemovalToggleItemTemplate(),
+      };
+      fillerList.SetBinding(ItemsControl.ItemsSourceProperty, new Binding
+      {
+        Path = new PropertyPath(nameof(TranscribeViewModel.FillerRemovalToggles)),
+        Mode = BindingMode.OneWay,
+        Source = ViewModel,
+      });
+      var fillerSection = new StackPanel { Spacing = 4 };
+      fillerSection.Children.Add(fillerHeader);
+      fillerSection.Children.Add(fillerPreviewCaption);
+      fillerSection.Children.Add(fillerPreview);
+      fillerSection.Children.Add(fillerList);
+
+      var removeFillersBtn = new Button { Content = ResourceHelper.GetString("Transcribe.RemoveFillersButton", "Remove fillers") };
+      var applyBtn = new Button { Content = "Apply" };
+      var cancelBtn = new Button { Content = "Cancel" };
+      var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+      buttons.Children.Add(removeFillersBtn);
+      buttons.Children.Add(applyBtn);
+      buttons.Children.Add(cancelBtn);
+      var panel = new StackPanel { Spacing = 8 };
+      panel.Children.Add(hint);
+      panel.Children.Add(box);
+      panel.Children.Add(fillerSection);
+      panel.Children.Add(buttons);
+
+      var flyout = new Flyout { Content = panel };
+
+      async System.Threading.Tasks.Task TryApplyAsync()
+      {
+        var wasMultiSegmentRange = ViewModel.IsMultiSegmentRangeEdit;
+        var msg = await ViewModel.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(true);
+        if (!string.IsNullOrEmpty(msg))
+        {
+          ViewModel.TranscriptOperatorMessage = msg;
+          _toastService?.ShowToast(ToastType.Warning, "Apply edit", msg);
+          return;
+        }
+
+        flyout.Hide();
+        var okMsg = wasMultiSegmentRange
+            ? "Regenerated clip audio for the edited range (first segment anchors regen)."
+            : "Regenerated segment audio with edited text.";
+        _toastService?.ShowToast(ToastType.Success, "Apply edit", okMsg);
+      }
+
+      box.KeyDown += (_, ke) =>
+      {
+        var ctrl = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
+        if (ctrl && ke.Key == VirtualKey.Enter)
+        {
+          ke.Handled = true;
+          _ = TryApplyAsync();
+          return;
+        }
+
+        if (ke.Key == VirtualKey.Escape)
+        {
+          ke.Handled = true;
+          flyout.Hide();
+        }
+      };
+
+      flyout.Closed += (_, _) =>
+      {
+        if (ViewModel.IsEditingSegment)
+          ViewModel.CancelSegmentEdit();
+      };
+
+      cancelBtn.Click += (_, _) =>
+      {
+        flyout.Hide();
+      };
+
+      removeFillersBtn.Click += (_, _) =>
+      {
+        var msg = ViewModel.TryRemoveFillersFromEditingDraft();
+        if (!string.IsNullOrEmpty(msg))
+          _toastService?.ShowToast(ToastType.Warning, ResourceHelper.GetString("Transcribe.RemoveFillersTitle", "Remove fillers"), msg);
+      };
+
+      applyBtn.Click += async (_, _) => await TryApplyAsync().ConfigureAwait(true);
+
+      flyout.ShowAt(anchor);
+    }
+
+    private void RefreshTranscriptSegmentsItemsSource()
+    {
+      if (SegmentsRepeater == null || ViewModel.SelectedTranscription?.Segments == null)
+        return;
+      var src = ViewModel.SelectedTranscription.Segments;
+      SegmentsRepeater.ItemsSource = null;
+      SegmentsRepeater.ItemsSource = src;
+    }
+
+    private void RefreshSegmentRowVisuals()
+    {
+      if (SegmentsRepeater == null || ViewModel.SelectedTranscription?.Segments == null)
+        return;
+      WalkSegmentRowVisuals(SegmentsRepeater);
+    }
+
+    private void WalkSegmentRowVisuals(DependencyObject parent)
+    {
+      var count = VisualTreeHelper.GetChildrenCount(parent);
+      for (var i = 0; i < count; i++)
+      {
+        var child = VisualTreeHelper.GetChild(parent, i);
+        if (child is Grid grid && grid.DataContext is TranscriptionSegment seg)
+        {
+          var id = seg.Id ?? string.Empty;
+          var linked = !string.IsNullOrEmpty(id) && ViewModel.LinkedTranscriptSegmentIds.Contains(id);
+          var regen = ViewModel.WasSegmentRegeneratedInSession(id);
+          var busy = !string.IsNullOrEmpty(id)
+              && string.Equals(ViewModel.RegeneratingSegmentId, id, StringComparison.Ordinal);
+
+          grid.Background = linked
+              ? new SolidColorBrush(Color.FromArgb(64, 0, 183, 194))
+              : null;
+
+          if (regen)
+          {
+            grid.BorderBrush = new SolidColorBrush(Color.FromArgb(255, 218, 165, 32));
+            grid.BorderThickness = new Thickness(3, 0, 0, 0);
+          }
+          else
+          {
+            grid.BorderBrush = null;
+            grid.BorderThickness = new Thickness(0);
+          }
+
+          var ring = FindFirstProgressRing(grid);
+          if (ring != null)
+            ring.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        WalkSegmentRowVisuals(child);
+      }
+    }
+
+    private static ProgressRing? FindFirstProgressRing(DependencyObject parent)
+    {
+      var n = VisualTreeHelper.GetChildrenCount(parent);
+      for (var i = 0; i < n; i++)
+      {
+        var c = VisualTreeHelper.GetChild(parent, i);
+        if (c is ProgressRing pr)
+          return pr;
+        var nested = FindFirstProgressRing(c);
+        if (nested != null)
+          return nested;
+      }
+
+      return null;
     }
 
     private void TranscribeView_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -162,11 +513,15 @@ namespace VoiceStudio.App.Views.Panels
       HelpOverlay.Shortcuts.Clear();
       HelpOverlay.Shortcuts.Add(new Controls.KeyboardShortcut { Key = "F5", Description = "Refresh transcriptions list" });
       HelpOverlay.Shortcuts.Add(new Controls.KeyboardShortcut { Key = "Ctrl+T", Description = "Start transcription" });
+      HelpOverlay.Shortcuts.Add(new Controls.KeyboardShortcut { Key = "F2 / Enter", Description = "Edit focused transcript segment (when segment row is focused)" });
+      HelpOverlay.Shortcuts.Add(new Controls.KeyboardShortcut { Key = "Ctrl+Enter", Description = "Apply segment text edit (in edit flyout)" });
+      HelpOverlay.Shortcuts.Add(new Controls.KeyboardShortcut { Key = "Escape", Description = "Cancel segment edit (in flyout) or clear transcription selection" });
 
       HelpOverlay.Tips.Clear();
       HelpOverlay.Tips.Add("Use 'auto' language detection for automatic language identification");
       HelpOverlay.Tips.Add("Word timestamps provide precise timing for each word in the transcription");
       HelpOverlay.Tips.Add("Diarization identifies different speakers (requires WhisperX engine)");
+      HelpOverlay.Tips.Add("Double-click a segment or press F2/Enter on a focused segment to edit text; Ctrl+Enter applies in the flyout");
       HelpOverlay.Tips.Add("Transcriptions can be edited directly in the text editor below");
       HelpOverlay.Tips.Add("Different engines offer different features - WhisperX supports diarization");
 
@@ -219,7 +574,7 @@ namespace VoiceStudio.App.Views.Panels
             _toastService?.ShowToast(ToastType.Info, "Edit Transcription", "Transcription selected for editing");
             break;
           case "export":
-            _toastService?.ShowToast(ToastType.Info, "Export", "Export functionality is planned for a future release. Use the download button to save transcription results.");
+            await ExportTranscriptionAsync(transcription as TranscriptionResponse).ConfigureAwait(true);
             break;
           case "delete":
             if (ViewModel.DeleteTranscriptionCommand.CanExecute(transcription))
@@ -262,6 +617,71 @@ namespace VoiceStudio.App.Views.Panels
       {
         _toastService?.ShowToast(ToastType.Error, "Error", $"Failed to {action}: {ex.Message}");
       }
+    }
+
+    private async System.Threading.Tasks.Task ExportTranscriptionAsync(TranscriptionResponse? transcription)
+    {
+      if (transcription == null)
+      {
+        _toastService?.ShowToast(ToastType.Warning, "Export", "No transcription selected.");
+        return;
+      }
+
+      if ((transcription.Segments == null || transcription.Segments.Count == 0)
+          && string.IsNullOrWhiteSpace(transcription.Text))
+      {
+        _toastService?.ShowToast(ToastType.Warning, "Export", "The selected transcription has no text to export.");
+        return;
+      }
+
+      var picker = new FileSavePicker
+      {
+        SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+        SuggestedFileName = BuildTranscriptExportBaseFileName(transcription),
+      };
+      picker.FileTypeChoices.Add("SubRip subtitle (.srt)", new List<string> { ".srt" });
+      picker.FileTypeChoices.Add("Plain text (.txt)", new List<string> { ".txt" });
+
+      if (App.MainWindowInstance != null)
+      {
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindowInstance);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+      }
+
+      var file = await picker.PickSaveFileAsync();
+      if (file == null)
+        return;
+
+      var extension = Path.GetExtension(file.Name);
+      var content = string.Equals(extension, ".srt", StringComparison.OrdinalIgnoreCase)
+          ? TranscriptionExportFormatter.BuildSrt(transcription)
+          : TranscriptionExportFormatter.BuildPlainText(transcription);
+
+      await FileIO.WriteTextAsync(file, content);
+      _toastService?.ShowToast(ToastType.Success, "Export", $"Transcript exported to {file.Name}");
+    }
+
+    private static string BuildTranscriptExportBaseFileName(TranscriptionResponse transcription)
+    {
+      var source = string.IsNullOrWhiteSpace(transcription.Id) ? "transcription" : transcription.Id;
+      var invalidChars = Path.GetInvalidFileNameChars();
+      var safeName = new char[source.Length];
+      for (var i = 0; i < source.Length; i++)
+      {
+        var ch = source[i];
+        var isInvalid = false;
+        for (var j = 0; j < invalidChars.Length; j++)
+        {
+          if (ch != invalidChars[j])
+            continue;
+          isInvalid = true;
+          break;
+        }
+
+        safeName[i] = isInvalid ? '_' : ch;
+      }
+
+      return $"{new string(safeName)}_{DateTime.Now:yyyyMMdd_HHmmss}";
     }
 
     // Drag-and-drop handlers for transcription item reordering
@@ -368,6 +788,13 @@ namespace VoiceStudio.App.Views.Panels
     private void Transcription_DragLeave(object sender, DragEventArgs e)
     {
       _dragDropService?.HideDropTargetIndicator();
+    }
+
+    /// <summary>GOV-VOICESTUDIO-EDIT-APPLY-RETRY-RECOVERY-01: session retry uses frozen job snapshot in the VM.</summary>
+    private void ApplyJobRetryButton_Click(object sender, RoutedEventArgs e)
+    {
+      if (sender is Button { DataContext: TranscriptApplyJobStatusEntry entry })
+        _ = ViewModel.RetryTranscriptApplyJobAsync(entry);
     }
 
     private async void TranscribeView_Loaded(object _, RoutedEventArgs __)

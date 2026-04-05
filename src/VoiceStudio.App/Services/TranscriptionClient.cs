@@ -40,6 +40,32 @@ namespace VoiceStudio.App.Services
       => _backend.ListTranscriptionsAsync(audioId, projectId, ct);
 
     /// <inheritdoc />
+    public Task<TranscriptionResponse> UpdateTranscriptionTextAsync(
+        string transcriptionId,
+        string text,
+        List<TranscriptionSegment> segments,
+        CancellationToken ct = default)
+    {
+      if (string.IsNullOrWhiteSpace(transcriptionId))
+        throw new ArgumentException("Transcription id is required.", nameof(transcriptionId));
+      if (string.IsNullOrWhiteSpace(text))
+        throw new ArgumentException("Transcription text is required.", nameof(text));
+      if (segments == null)
+        throw new ArgumentNullException(nameof(segments));
+      if (segments.Count == 0)
+        throw new ArgumentException("At least one segment is required.", nameof(segments));
+
+      return _backend.PutAsync<object, TranscriptionResponse>(
+          $"/api/transcribe/{Uri.EscapeDataString(transcriptionId)}",
+          new
+          {
+            text,
+            segments,
+          },
+          ct);
+    }
+
+    /// <inheritdoc />
     public Task<bool> DeleteTranscriptionAsync(string transcriptionId, CancellationToken ct = default)
       => _backend.DeleteTranscriptionAsync(transcriptionId, ct);
   }

@@ -16,6 +16,11 @@ namespace VoiceStudio.Core.Services
     Task<TranscriptionResponse> TranscribeAudioAsync(TranscriptionRequest request, string? projectId = null, CancellationToken ct = default);
     Task<TranscriptionResponse> GetTranscriptionAsync(string transcriptionId, CancellationToken ct = default);
     Task<List<TranscriptionResponse>> ListTranscriptionsAsync(string? audioId = null, string? projectId = null, CancellationToken ct = default);
+    Task<TranscriptionResponse> UpdateTranscriptionTextAsync(
+        string transcriptionId,
+        string text,
+        List<TranscriptionSegment> segments,
+        CancellationToken ct = default);
     Task<bool> DeleteTranscriptionAsync(string transcriptionId, CancellationToken ct = default);
   }
 }

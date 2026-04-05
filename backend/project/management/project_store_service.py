@@ -1,14 +1,10 @@
 """
-Disk-backed project metadata store for VoiceStudio backend.
+Project metadata store: SQLite is authoritative; disk holds artifacts only.
 
-This service provides CRUD operations for project metadata and persists each project
-as a JSON record stored in the project directory:
-
-  <projects_root>/<project_id>/project.json
-
-The existing API already uses the on-disk directory layout for project artifacts
-(for example audio under <project_id>/audio/). This service adds durable project
-metadata so projects can be listed and retrieved after backend restarts.
+- **Authority:** `projects` table via `SqliteProjectRepository` (JSON blob = domain `Project`).
+- **Disk:** `<projects_root>/<project_id>/audio/` (and optional legacy `project.json` for import-only).
+- **Legacy:** Strategy A — on first list (or lazy get), rows missing in SQLite are imported from
+  per-project `project.json` or bare directories, then reads use SQLite only.
 """
 
 from __future__ import annotations
@@ -21,17 +17,22 @@ import threading
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, ValidationError
 
-from backend.services.audio_registry_service import ensure_cached
+from backend.domain.entities.project import Project, ProjectStatus
+from backend.infrastructure.repositories.project_repository import get_project_repository
+from backend.project.persistence.async_bridge import run_isolated_async
 
 logger = logging.getLogger(__name__)
 
 ENV_PROJECTS_DIR = "VOICESTUDIO_PROJECTS_DIR"
 PROJECT_META_FILENAME = "project.json"
 CURRENT_PROJECT_SCHEMA_VERSION = 1
+SUPPORTED_PAYLOAD_VERSION = 1
+METADATA_API_SCHEMA_KEY = "vs_api_project_schema_version"
+METADATA_PAYLOAD_VERSION_KEY = "vs_payload_version"
 
 
 class ProjectRecord(BaseModel):
@@ -45,20 +46,59 @@ class ProjectRecord(BaseModel):
     voice_profile_ids: List[str] = Field(default_factory=list)
 
 
+class UnsupportedProjectPayloadError(ValueError):
+    """Raised when SQLite row payload version is newer than this backend supports."""
+
+
+def _parse_iso(dt: str) -> datetime:
+    if dt.endswith("Z"):
+        dt = dt[:-1] + "+00:00"
+    return datetime.fromisoformat(dt)
+
+
+def record_to_domain(record: ProjectRecord, projects_root: Path) -> Project:
+    meta = {
+        METADATA_API_SCHEMA_KEY: record.schema_version,
+        METADATA_PAYLOAD_VERSION_KEY: SUPPORTED_PAYLOAD_VERSION,
+    }
+    return Project(
+        id=record.id,
+        created_at=_parse_iso(record.created_at),
+        updated_at=_parse_iso(record.updated_at),
+        name=record.name,
+        description=record.description or "",
+        status=ProjectStatus.ACTIVE,
+        project_path=str(projects_root / record.id),
+        voice_profile_ids=list(record.voice_profile_ids),
+        metadata=meta,
+    )
+
+
+def domain_to_record(proj: Project) -> ProjectRecord:
+    meta = proj.metadata or {}
+    schema_v = int(meta.get(METADATA_API_SCHEMA_KEY, CURRENT_PROJECT_SCHEMA_VERSION))
+    return ProjectRecord(
+        schema_version=schema_v,
+        id=proj.id,
+        name=proj.name,
+        description=proj.description or None,
+        created_at=proj.created_at.isoformat(),
+        updated_at=proj.updated_at.isoformat(),
+        voice_profile_ids=list(proj.voice_profile_ids),
+    )
+
+
 class ProjectStoreService:
     """
-    Disk-backed project metadata store.
+    SQLite-backed project metadata with on-disk artifact directories.
 
-    - Persists metadata to a per-project JSON file.
-    - Loads metadata from disk at initialization (and on demand for missing IDs).
-    - Provides helpers for consistent project directory creation.
+    Legacy `project.json` files are import sources only after SQLite authority is in use.
     """
 
     def __init__(self, projects_dir: Optional[str] = None):
         self.projects_dir = self._resolve_projects_dir(projects_dir)
         self._lock = threading.RLock()
-        self._projects: Dict[str, ProjectRecord] = {}
-        self._load_all_from_disk()
+        self._legacy_disk_scan_done = False
 
     @staticmethod
     def _resolve_projects_dir(projects_dir: str | None) -> Path:
@@ -116,6 +156,8 @@ class ProjectStoreService:
         if not source.exists():
             raise FileNotFoundError(f"Audio file not found: {source}")
 
+        from backend.services.audio_registry_service import ensure_cached
+
         project_dir = self._ensure_project_dirs(project_id)
         audio_dir = project_dir / "audio"
         normalized = self._normalize_audio_filename(source, audio_id, filename)
@@ -133,18 +175,22 @@ class ProjectStoreService:
         shutil.copy2(str(cached_path), str(dest_path))
         return dest_path
 
-    def _atomic_write_json(self, path: Path, payload: dict) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = path.with_suffix(path.suffix + ".tmp")
-        data = json.dumps(payload, indent=2, ensure_ascii=False)
-        tmp_path.write_text(data, encoding="utf-8")
-        os.replace(tmp_path, path)
+    def _migrate_record(self, record: ProjectRecord) -> ProjectRecord:
+        current = record.schema_version
+        if current == CURRENT_PROJECT_SCHEMA_VERSION:
+            return record
 
-    def _write_record(self, record: ProjectRecord) -> None:
-        meta_path = self._project_meta_path(record.id)
-        self._atomic_write_json(meta_path, record.model_dump(mode="json"))
+        if current == 0:
+            logger.info("Migrating project %s from v0 to v1 (legacy JSON import)", record.id)
+            return record.model_copy(update={"schema_version": CURRENT_PROJECT_SCHEMA_VERSION})
 
-    def _load_record_from_dir(self, project_dir: Path) -> ProjectRecord | None:
+        if current < 1:
+            raise ValueError(f"Invalid project schema_version: {current}")
+
+        return record.model_copy(update={"schema_version": CURRENT_PROJECT_SCHEMA_VERSION})
+
+    def _peek_legacy_record_from_dir(self, project_dir: Path) -> ProjectRecord | None:
+        """Read legacy disk metadata for SQLite import (does not update SQLite)."""
         if not project_dir.is_dir():
             return None
 
@@ -154,37 +200,30 @@ class ProjectStoreService:
         if meta_path.exists():
             try:
                 data = json.loads(meta_path.read_text(encoding="utf-8"))
-
-                # Check for schema_version in raw data to detect legacy v0
                 if "schema_version" not in data:
-                    data["schema_version"] = 0  # Force legacy version 0
-
+                    data["schema_version"] = 0
                 record = ProjectRecord.model_validate(data)
             except (OSError, json.JSONDecodeError, ValidationError) as e:
-                logger.error(f"Failed to load project metadata for {project_id}: {e}")
+                logger.error("Failed to load legacy project metadata for %s: %s", project_id, e)
                 return None
 
             if record.id != project_id:
-                logger.error(f"Project metadata id mismatch for {project_id}: file has {record.id}")
+                logger.error(
+                    "Project metadata id mismatch for %s: file has %s", project_id, record.id
+                )
                 return None
 
             if record.schema_version != CURRENT_PROJECT_SCHEMA_VERSION:
                 record = self._migrate_record(record)
-                try:
-                    self._write_record(record)
-                except Exception as e:
-                    logger.error(f"Failed to persist migrated metadata for {project_id}: {e}")
-
             return record
 
-        # Legacy directory without metadata: create durable metadata using directory timestamps.
         try:
             ts = datetime.utcfromtimestamp(project_dir.stat().st_mtime).isoformat()
         except OSError as e:
-            logger.error(f"Failed to stat legacy project directory {project_id}: {e}")
+            logger.error("Failed to stat legacy project directory %s: %s", project_id, e)
             return None
 
-        record = ProjectRecord(
+        return ProjectRecord(
             schema_version=CURRENT_PROJECT_SCHEMA_VERSION,
             id=project_id,
             name=project_id,
@@ -194,71 +233,87 @@ class ProjectStoreService:
             voice_profile_ids=[],
         )
 
-        try:
-            self._write_record(record)
-        except Exception as e:
-            logger.warning(f"Failed to write legacy metadata for {project_id}: {e}")
-        return record
+    def _ensure_payload_supported(self, proj: Project) -> None:
+        meta = proj.metadata or {}
+        pv = int(meta.get(METADATA_PAYLOAD_VERSION_KEY, 1))
+        if pv > SUPPORTED_PAYLOAD_VERSION:
+            raise UnsupportedProjectPayloadError(
+                f"Project {proj.id} payload version {pv} is not supported "
+                f"(max {SUPPORTED_PAYLOAD_VERSION})"
+            )
 
-    def _load_all_from_disk(self) -> None:
+    async def _import_legacy_disk_projects_async(self) -> None:
+        self.projects_dir.mkdir(parents=True, exist_ok=True)
+        repo = get_project_repository()
+        existing = {p.id for p in await repo.list_all(limit=100_000, offset=0)}
+        for child in self.projects_dir.iterdir():
+            if not child.is_dir():
+                continue
+            pid = child.name
+            if pid in existing:
+                continue
+            record = self._peek_legacy_record_from_dir(child)
+            if record is None:
+                continue
+            await repo.save(record_to_domain(record, self.projects_dir))
+            existing.add(pid)
+            logger.info("Imported legacy disk project %s into SQLite", pid)
+
+    def _ensure_legacy_scan(self) -> None:
         with self._lock:
-            self.projects_dir.mkdir(parents=True, exist_ok=True)
-            self._projects.clear()
-            for child in self.projects_dir.iterdir():
-                record = self._load_record_from_dir(child)
-                if record is None:
-                    continue
-                self._projects[record.id] = record
+            if self._legacy_disk_scan_done:
+                return
+            run_isolated_async(self._import_legacy_disk_projects_async())
+            self._legacy_disk_scan_done = True
 
-    def _migrate_record(self, record: ProjectRecord) -> ProjectRecord:
-        """
-        Migrate a ProjectRecord to the current schema version.
+    async def _get_record_async(self, project_id: str) -> ProjectRecord:
+        repo = get_project_repository()
+        proj = await repo.get_by_id(project_id)
+        if proj is not None:
+            self._ensure_payload_supported(proj)
+            return domain_to_record(proj)
 
-        Migration is idempotent: it upgrades monotonically and never re-applies
-        steps once the schema_version matches the target.
-        """
-        current = record.schema_version
-        if current == CURRENT_PROJECT_SCHEMA_VERSION:
-            return record
-
-        # Handle v0 (pre-schema) -> v1
-        if current == 0:
-            logger.info(f"Migrating project {record.id} from v0 to v1")
-            return record.model_copy(update={"schema_version": CURRENT_PROJECT_SCHEMA_VERSION})
-
-        if current < 1:
-            raise ValueError(f"Invalid project schema_version: {current}")
-
-        # v1 is the baseline schema used by this backend.
-        # Future migrations should transform fields and increment schema_version.
-        return record.model_copy(update={"schema_version": CURRENT_PROJECT_SCHEMA_VERSION})
-
-    def list_projects(self) -> list[ProjectRecord]:
-        with self._lock:
-            return list(self._projects.values())
-
-    def exists(self, project_id: str) -> bool:
-        with self._lock:
-            if project_id in self._projects:
-                return True
-        return (
-            self._project_meta_path(project_id).exists() or self._project_dir(project_id).exists()
-        )
-
-    def get_project(self, project_id: str) -> ProjectRecord:
-        with self._lock:
-            record = self._projects.get(project_id)
-            if record is not None:
-                return record
-
-        project_dir = self._project_dir(project_id)
-        record = self._load_record_from_dir(project_dir)
+        record = self._peek_legacy_record_from_dir(self._project_dir(project_id))
         if record is None:
             raise KeyError(project_id)
+        await repo.save(record_to_domain(record, self.projects_dir))
+        proj2 = await repo.get_by_id(project_id)
+        if proj2 is None:
+            raise KeyError(project_id)
+        self._ensure_payload_supported(proj2)
+        return domain_to_record(proj2)
 
-        with self._lock:
-            self._projects[project_id] = record
-            return record
+    def list_projects(self) -> list[ProjectRecord]:
+        self._ensure_legacy_scan()
+
+        async def _list() -> list[ProjectRecord]:
+            repo = get_project_repository()
+            projects = await repo.list_all(limit=100_000, offset=0)
+            out: list[ProjectRecord] = []
+            for p in projects:
+                self._ensure_payload_supported(p)
+                out.append(domain_to_record(p))
+            return out
+
+        return run_isolated_async(_list())
+
+    def exists(self, project_id: str) -> bool:
+        async def _ex() -> bool:
+            repo = get_project_repository()
+            row = await repo.get_by_id(project_id)
+            if row is not None:
+                return True
+            return self._project_dir(project_id).is_dir()
+
+        return run_isolated_async(_ex())
+
+    def get_project(self, project_id: str) -> ProjectRecord:
+        self._ensure_legacy_scan()
+
+        async def _get() -> ProjectRecord:
+            return await self._get_record_async(project_id)
+
+        return run_isolated_async(_get())
 
     def create_project(self, name: str, description: str | None = None) -> ProjectRecord:
         project_id = str(uuid.uuid4())
@@ -274,11 +329,14 @@ class ProjectStoreService:
             voice_profile_ids=[],
         )
 
-        with self._lock:
-            self._ensure_project_dirs(project_id)
-            self._write_record(record)
-            self._projects[project_id] = record
-            return record
+        self._ensure_project_dirs(project_id)
+
+        async def _save() -> None:
+            await get_project_repository().save(record_to_domain(record, self.projects_dir))
+
+        run_isolated_async(_save())
+        self._invalidate_project_cache()
+        return record
 
     def update_project(
         self,
@@ -288,9 +346,14 @@ class ProjectStoreService:
         voice_profile_ids: list[str] | None = None,
         description_provided: bool = False,
     ) -> ProjectRecord:
-        with self._lock:
-            record = self.get_project(project_id)
+        self._ensure_legacy_scan()
 
+        async def _upd() -> ProjectRecord:
+            dom = await get_project_repository().get_by_id(project_id)
+            if dom is None:
+                raise KeyError(project_id)
+            self._ensure_payload_supported(dom)
+            rec = domain_to_record(dom)
             update: dict = {"updated_at": datetime.utcnow().isoformat()}
             if name is not None:
                 update["name"] = name
@@ -298,25 +361,37 @@ class ProjectStoreService:
                 update["description"] = description
             if voice_profile_ids is not None:
                 update["voice_profile_ids"] = voice_profile_ids
-
-            record = record.model_copy(update=update)
+            rec = rec.model_copy(update=update)
             self._ensure_project_dirs(project_id)
-            self._write_record(record)
-            self._projects[project_id] = record
-            return record
+            await get_project_repository().save(record_to_domain(rec, self.projects_dir))
+            return rec
+
+        result = run_isolated_async(_upd())
+        self._invalidate_project_cache()
+        return result
 
     def delete_project(self, project_id: str) -> None:
-        with self._lock:
-            self._projects.pop(project_id, None)
+        async def _del() -> None:
+            await get_project_repository().delete(project_id)
+
+        run_isolated_async(_del())
 
         project_dir = self._project_dir(project_id)
-        if not project_dir.exists():
-            return
+        if project_dir.exists():
+            try:
+                shutil.rmtree(project_dir)
+            except Exception as e:
+                logger.warning("Failed to delete project directory %s: %s", project_dir, e)
 
+        self._invalidate_project_cache()
+
+    def _invalidate_project_cache(self) -> None:
         try:
-            shutil.rmtree(project_dir)
+            from backend.api.optimization import invalidate_api_response_cache
+
+            invalidate_api_response_cache()
         except Exception as e:
-            logger.warning(f"Failed to delete project directory {project_dir}: {e}")
+            logger.debug("Response cache invalidation skipped: %s", e)
 
 
 _service_instance: ProjectStoreService | None = None

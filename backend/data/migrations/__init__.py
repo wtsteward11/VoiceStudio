@@ -14,9 +14,13 @@ from backend.data.migrations.v002_performance_indexes import (
 from backend.data.migrations.v003_library_tables import (
     LibraryTablesMigration,
 )
+from backend.data.migrations.v004_job_history_columns import (
+    JobHistoryColumnsMigration,
+)
 
 __all__ = [
     "CorePersistenceTablesMigration",
+    "JobHistoryColumnsMigration",
     "LibraryTablesMigration",
     "Migration",
     "MigrationRunner",
@@ -31,4 +35,5 @@ def get_all_migrations() -> list[type[Migration]]:
         CorePersistenceTablesMigration,
         PerformanceIndexesMigration,
         LibraryTablesMigration,
+        JobHistoryColumnsMigration,
     ]

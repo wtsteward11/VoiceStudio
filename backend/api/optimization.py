@@ -129,6 +129,11 @@ class ResponseCache:
 _response_cache = ResponseCache(max_size=_MAX_CACHE_SIZE, default_ttl=_CACHE_TTL)
 
 
+def invalidate_api_response_cache() -> None:
+    """Clear all entries (used after mutating project/track persistence)."""
+    _response_cache.clear()
+
+
 def cache_response(ttl: int = 300, key_func: Callable | None = None):
     """
     Decorator to cache API responses.
@@ -465,5 +470,6 @@ __all__ = [
     "async_task",
     "cache_response",
     "get_pagination_params",
+    "invalidate_api_response_cache",
     "optimize_json_serialization",
 ]

@@ -59,6 +59,73 @@ _processing_jobs: set[str] = set()  # Jobs currently being processed
 _state_lock = asyncio.Lock()
 
 
+async def _canonical_register_batch_job(
+    job_id: str,
+    name: str,
+    *,
+    project_id: str,
+    voice_profile_id: str,
+    engine_id: str,
+    language: str,
+) -> None:
+    """Register batch job in canonical SQLite job_history via /api/jobs helpers."""
+    from backend.api.routes.jobs import create_job
+    from backend.data.repositories.job_repository import JobType as CanonicalJobType
+
+    metadata = {
+        "domain": "batch",
+        "project_id": project_id,
+        "voice_profile_id": voice_profile_id,
+        "engine_id": engine_id,
+        "language": language,
+    }
+    await create_job(
+        job_id,
+        CanonicalJobType.BATCH.value,
+        name,
+        metadata=metadata,
+    )
+
+
+async def _canonical_batch_progress(
+    job_id: str,
+    progress: float,
+    message: str | None,
+) -> None:
+    """Best-effort progress sync to job_history (no full API cache invalidation)."""
+    from backend.api.routes.jobs import update_job_progress
+
+    try:
+        await update_job_progress(job_id, progress, message)
+    except Exception as e:
+        logger.debug("Canonical job progress sync failed (%s): %s", job_id, e)
+
+
+async def _canonical_batch_fail(job_id: str, error: str) -> None:
+    """Mark canonical job failed (invalidates jobs API cache)."""
+    from backend.api.routes.jobs import fail_job
+
+    try:
+        await fail_job(job_id, error)
+    except Exception as e:
+        logger.warning("Canonical job fail sync failed (%s): %s", job_id, e)
+
+
+async def _canonical_batch_complete(
+    job_id: str,
+    *,
+    result_path: str | None,
+    result_id: str | None,
+) -> None:
+    """Mark canonical job completed."""
+    from backend.api.routes.jobs import complete_job
+
+    try:
+        await complete_job(job_id, result_path=result_path, result_id=result_id)
+    except Exception as e:
+        logger.warning("Canonical job complete sync failed (%s): %s", job_id, e)
+
+
 def _persist_batch_job(job_id: str, job_data: dict) -> None:
     """Persist batch job state to disk."""
     try:
@@ -281,6 +348,33 @@ async def create_batch_job(
         _persist_batch_job(job_id, job_data)
         _job_queue.append(job_id)
 
+        try:
+            await _canonical_register_batch_job(
+                job_id,
+                job_request.name.strip(),
+                project_id=job_request.project_id,
+                voice_profile_id=job_request.voice_profile_id,
+                engine_id=job_request.engine_id,
+                language=job_request.language,
+            )
+        except Exception as sync_err:
+            if job_id in _job_queue:
+                _job_queue.remove(job_id)
+            _batch_jobs.pop(job_id, None)
+            try:
+                _batch_store.delete(job_id)
+            except Exception as cleanup_err:
+                logger.debug("Batch canonical rollback cleanup: %s", cleanup_err)
+            logger.error(
+                "Failed to register batch job in canonical job_history: %s",
+                sync_err,
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to register batch job in durable job store",
+            ) from sync_err
+
         logger.info(f"Created batch job {job_id}: {job_request.name}")
 
         return BatchJob(**job_data)
@@ -355,6 +449,18 @@ async def delete_batch_job(job_id: str):
         if job_id in _processing_jobs:
             _processing_jobs.remove(job_id)
 
+        from backend.api.routes.jobs import soft_delete_canonical_job
+
+        try:
+            await soft_delete_canonical_job(job_id)
+        except Exception as sync_err:
+            logger.warning(
+                "Canonical soft-delete failed for batch %s: %s",
+                job_id,
+                sync_err,
+                exc_info=True,
+            )
+
         del _batch_jobs[job_id]
         _batch_store.delete(job_id)
         logger.info(f"Deleted batch job {job_id}")
@@ -406,6 +512,28 @@ async def start_batch_job(
         if job_id in _job_queue:
             _job_queue.remove(job_id)
 
+        from backend.api.routes.jobs import mark_job_running
+
+        try:
+            await mark_job_running(job_id)
+        except Exception as sync_err:
+            logger.error(
+                "Failed to mark batch job running in canonical store: %s",
+                sync_err,
+                exc_info=True,
+            )
+            job.status = JobStatus.PENDING
+            job.started = None
+            job.progress = 0.0
+            job_data = job.model_dump()
+            _batch_jobs[job_id] = job_data
+            _persist_batch_job(job_id, job_data)
+            _job_queue.append(job_id)
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update durable job store when starting batch job",
+            ) from sync_err
+
         logger.info(f"Started batch job {job_id}")
 
         # Start processing asynchronously
@@ -453,6 +581,18 @@ async def cancel_batch_job(job_id: str):
         _batch_jobs[job_id] = job_data
         _persist_batch_job(job_id, job_data)
 
+        from backend.api.routes.jobs import cancel_canonical_job
+
+        try:
+            await cancel_canonical_job(job_id)
+        except Exception as sync_err:
+            logger.warning(
+                "Canonical cancel sync failed for batch %s: %s",
+                job_id,
+                sync_err,
+                exc_info=True,
+            )
+
         logger.info(f"Cancelled batch job {job_id}")
 
         return BatchJob(**job_data)
@@ -495,6 +635,46 @@ async def get_queue_status():
         raise HTTPException(status_code=500, detail=f"Failed to get queue status: {e!s}")
 
 
+def _store_batch_quality_history(
+    *,
+    job_id: str,
+    job_data: dict[str, Any],
+    quality_metrics: dict[str, Any],
+    quality_score: float,
+    quality_status: str | None,
+    audio_id: str | None,
+) -> None:
+    """GAP-030: store quality metrics from a completed batch job into the quality history service."""
+    from datetime import timezone
+
+    from backend.api.routes.quality import QualityHistoryEntry
+    from backend.services.quality_history_service import store_entry
+
+    profile_id = job_data.get("voice_profile_id") or "unknown"
+
+    entry = QualityHistoryEntry(
+        id=str(uuid.uuid4()),
+        profile_id=profile_id,
+        project_id=job_data.get("project_id"),
+        timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        engine=job_data.get("engine_id") or "unknown",
+        metrics=quality_metrics,
+        quality_score=quality_score,
+        synthesis_text=job_data.get("text", ""),
+        audio_url=None,
+        enhanced_quality=job_data.get("enhance_quality", False),
+        metadata={
+            "source": "batch",
+            "job_id": job_id,
+            "batch_name": job_data.get("name", ""),
+            "result_audio_id": audio_id,
+            "quality_status": quality_status,
+        },
+    )
+    store_entry(profile_id, entry)
+    logger.debug("Stored quality history entry for batch %s (profile %s)", job_id, profile_id)
+
+
 async def _process_batch_job(job_id: str):
     """
     Process a batch job by performing voice synthesis.
@@ -523,6 +703,7 @@ async def _process_batch_job(job_id: str):
     _processing_jobs.add(job_id)
 
     try:
+        await _canonical_batch_progress(job_id, 0.0, "Starting synthesis...")
         # Broadcast initial progress
         if HAS_WEBSOCKET:
             await realtime.broadcast_batch_progress(
@@ -543,6 +724,8 @@ async def _process_batch_job(job_id: str):
             job_data["error_message"] = error_msg
             job_data["completed"] = datetime.utcnow().isoformat()
             _batch_jobs[job_id] = job_data
+            _persist_batch_job(job_id, job_data)
+            await _canonical_batch_fail(job_id, error_msg)
 
             if HAS_WEBSOCKET:
                 await realtime.broadcast_batch_progress(
@@ -577,6 +760,8 @@ async def _process_batch_job(job_id: str):
             job_data["error_message"] = error_msg
             job_data["completed"] = datetime.utcnow().isoformat()
             _batch_jobs[job_id] = job_data
+            _persist_batch_job(job_id, job_data)
+            await _canonical_batch_fail(job_id, error_msg)
             if HAS_WEBSOCKET:
                 await realtime.broadcast_batch_progress(
                     batch_id=job_id,
@@ -595,6 +780,8 @@ async def _process_batch_job(job_id: str):
             job_data["error_message"] = error_msg
             job_data["completed"] = datetime.utcnow().isoformat()
             _batch_jobs[job_id] = job_data
+            _persist_batch_job(job_id, job_data)
+            await _canonical_batch_fail(job_id, error_msg)
 
             if HAS_WEBSOCKET:
                 await realtime.broadcast_batch_progress(
@@ -610,6 +797,9 @@ async def _process_batch_job(job_id: str):
         # Update progress: Engine loaded
         job_data["progress"] = 0.1
         _batch_jobs[job_id] = job_data
+        await _canonical_batch_progress(
+            job_id, 0.1, f"Engine '{job.engine_id}' loaded"
+        )
 
         if HAS_WEBSOCKET:
             await realtime.broadcast_batch_progress(
@@ -649,6 +839,8 @@ async def _process_batch_job(job_id: str):
             job_data["error_message"] = error_msg
             job_data["completed"] = datetime.utcnow().isoformat()
             _batch_jobs[job_id] = job_data
+            _persist_batch_job(job_id, job_data)
+            await _canonical_batch_fail(job_id, error_msg)
 
             if HAS_WEBSOCKET:
                 await realtime.broadcast_batch_progress(
@@ -664,6 +856,9 @@ async def _process_batch_job(job_id: str):
         # Update progress: Profile loaded
         job_data["progress"] = 0.2
         _batch_jobs[job_id] = job_data
+        await _canonical_batch_progress(
+            job_id, 0.2, "Profile loaded, starting synthesis..."
+        )
 
         if HAS_WEBSOCKET:
             await realtime.broadcast_batch_progress(
@@ -716,6 +911,8 @@ async def _process_batch_job(job_id: str):
                         job_data["error_message"] = error_msg
                         job_data["completed"] = datetime.utcnow().isoformat()
                         _batch_jobs[job_id] = job_data
+                        _persist_batch_job(job_id, job_data)
+                        await _canonical_batch_fail(job_id, error_msg)
                         if HAS_WEBSOCKET:
                             await realtime.broadcast_batch_progress(
                                 batch_id=job_id,
@@ -741,6 +938,8 @@ async def _process_batch_job(job_id: str):
                         job_data["error_message"] = error_msg
                         job_data["completed"] = datetime.utcnow().isoformat()
                         _batch_jobs[job_id] = job_data
+                        _persist_batch_job(job_id, job_data)
+                        await _canonical_batch_fail(job_id, error_msg)
                         if HAS_WEBSOCKET:
                             await realtime.broadcast_batch_progress(
                                 batch_id=job_id,
@@ -758,6 +957,8 @@ async def _process_batch_job(job_id: str):
             job_data["error_message"] = error_msg
             job_data["completed"] = datetime.utcnow().isoformat()
             _batch_jobs[job_id] = job_data
+            _persist_batch_job(job_id, job_data)
+            await _canonical_batch_fail(job_id, error_msg)
             if HAS_WEBSOCKET:
                 await realtime.broadcast_batch_progress(
                     batch_id=job_id,
@@ -775,6 +976,8 @@ async def _process_batch_job(job_id: str):
             job_data["error_message"] = error_msg
             job_data["completed"] = datetime.utcnow().isoformat()
             _batch_jobs[job_id] = job_data
+            _persist_batch_job(job_id, job_data)
+            await _canonical_batch_fail(job_id, error_msg)
             if HAS_WEBSOCKET:
                 await realtime.broadcast_batch_progress(
                     batch_id=job_id,
@@ -789,6 +992,7 @@ async def _process_batch_job(job_id: str):
         # Update progress: Starting synthesis
         job_data["progress"] = 0.3
         _batch_jobs[job_id] = job_data
+        await _canonical_batch_progress(job_id, 0.3, "Synthesizing audio...")
 
         if HAS_WEBSOCKET:
             await realtime.broadcast_batch_progress(
@@ -812,6 +1016,8 @@ async def _process_batch_job(job_id: str):
             job_data["error_message"] = error_msg
             job_data["completed"] = datetime.utcnow().isoformat()
             _batch_jobs[job_id] = job_data
+            _persist_batch_job(job_id, job_data)
+            await _canonical_batch_fail(job_id, error_msg)
 
             if HAS_WEBSOCKET:
                 await realtime.broadcast_batch_progress(
@@ -843,6 +1049,7 @@ async def _process_batch_job(job_id: str):
         # Update progress during synthesis
         job_data["progress"] = 0.5
         _batch_jobs[job_id] = job_data
+        await _canonical_batch_progress(job_id, 0.5, "Processing synthesis...")
 
         if HAS_WEBSOCKET:
             await realtime.broadcast_batch_progress(
@@ -908,6 +1115,9 @@ async def _process_batch_job(job_id: str):
             # Update progress: Synthesis complete
             job_data["progress"] = 0.9
             _batch_jobs[job_id] = job_data
+            await _canonical_batch_progress(
+                job_id, 0.9, "Synthesis complete, finalizing..."
+            )
 
             if HAS_WEBSOCKET:
                 await realtime.broadcast_batch_progress(
@@ -944,6 +1154,31 @@ async def _process_batch_job(job_id: str):
             _batch_jobs[job_id] = job_data
             _persist_batch_job(job_id, job_data)
 
+            out_path = output_path if os.path.isfile(output_path) else None
+            await _canonical_batch_complete(
+                job_id,
+                result_path=out_path,
+                result_id=audio_id,
+            )
+
+            # GAP-030: bridge batch quality metrics into quality history store
+            if quality_metrics and quality_score is not None:
+                try:
+                    _store_batch_quality_history(
+                        job_id=job_id,
+                        job_data=job_data,
+                        quality_metrics=quality_metrics,
+                        quality_score=quality_score,
+                        quality_status=quality_status,
+                        audio_id=audio_id,
+                    )
+                except Exception as qh_err:
+                    logger.warning(
+                        "Quality history store failed for batch %s: %s",
+                        job_id,
+                        qh_err,
+                    )
+
             logger.info(f"Batch job {job_id} completed successfully. Audio ID: {audio_id}")
 
             if HAS_WEBSOCKET:
@@ -966,6 +1201,7 @@ async def _process_batch_job(job_id: str):
             job_data["completed"] = datetime.utcnow().isoformat()
             _batch_jobs[job_id] = job_data
             _persist_batch_job(job_id, job_data)
+            await _canonical_batch_fail(job_id, error_msg)
 
             if HAS_WEBSOCKET:
                 await realtime.broadcast_batch_progress(
@@ -987,6 +1223,7 @@ async def _process_batch_job(job_id: str):
         job_data["completed"] = datetime.utcnow().isoformat()
         _batch_jobs[job_id] = job_data
         _persist_batch_job(job_id, job_data)
+        await _canonical_batch_fail(job_id, error_msg)
 
         if HAS_WEBSOCKET:
             await realtime.broadcast_batch_progress(

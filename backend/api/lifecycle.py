@@ -148,8 +148,14 @@ def _perform_contract_validation(app: FastAPI):
         logger.warning(f"Contract validation failed: {e}")
 
 
-async def on_startup(app: FastAPI) -> None:
-    """Load plugins and routes on application startup."""
+async def on_startup_prepare(app: FastAPI) -> None:
+    """
+    Blocking startup phase: must complete before the ASGI server accepts traffic.
+
+    Uvicorn/Starlette run this portion of lifespan *before* yielding; keeping it
+    bounded lets the desktop health probe (`GET /health`) succeed while heavier
+    work runs in `on_startup_heavy`.
+    """
     from .route_registry import register_all_routes
 
     app_config: Any = None
@@ -161,7 +167,7 @@ async def on_startup(app: FastAPI) -> None:
     except (ImportError, AttributeError):
         pass
 
-    startup_start = time.time()
+    app.state.startup_t0 = time.time()
 
     # Initialize temp file manager and perform startup cleanup
     try:
@@ -215,6 +221,27 @@ async def on_startup(app: FastAPI) -> None:
                 logger.info(
                     f"Database ready: {status['applied_count']} migration(s) applied, 0 pending"
                 )
+
+        # Durable job queue: reconcile orphaned running/paused rows after migrations
+        try:
+            from backend.data.repositories.job_repository import (
+                JobRepository,
+                get_job_repository,
+            )
+            from backend.services.job_queue_recovery import (
+                reconcile_job_history_after_restart,
+            )
+
+            repo = get_job_repository()
+            if isinstance(repo, JobRepository):
+                recovered = await reconcile_job_history_after_restart(repo)
+                if recovered:
+                    logger.info(
+                        "Job queue recovery: marked %s job(s) failed after backend restart",
+                        recovered,
+                    )
+        except Exception as rec_err:
+            logger.warning("Job queue recovery skipped: %s", rec_err, exc_info=True)
 
         # Task 2.3: Run infrastructure repository migrations and connect adapter
         from backend.infrastructure.migrations.initial_schema import (
@@ -308,7 +335,17 @@ async def on_startup(app: FastAPI) -> None:
             logger.info("Training progress broadcaster registered (WebSocket)")
         except ImportError as e:
             logger.debug("WebSocket realtime not available, training progress will not broadcast: %s", e)
+    except Exception as e:
+        logger.error(f"Error during startup prepare: {e}", exc_info=True)
 
+
+async def on_startup_heavy(app: FastAPI) -> None:
+    """
+    Deferred startup work: runs concurrently after the server begins accepting
+    connections (see `main._lifespan`). Engine/plugin load must not block
+    desktop readiness probes.
+    """
+    try:
         # Startup sanity checks: verify critical dependencies and assets
         _perform_startup_sanity_checks()
 
@@ -350,11 +387,13 @@ async def on_startup(app: FastAPI) -> None:
         plugin_count = load_all_plugins(app)
         logger.info(f"Loaded {plugin_count} plugin(s) on startup")
 
+        startup_start = getattr(app.state, "startup_t0", time.time())
         startup_time = (time.time() - startup_start) * 1000
         logger.info(f"FastAPI startup completed in {startup_time:.2f}ms")
 
         try:
             from .middleware.auth_middleware import AUTH_REQUIRED
+
             if AUTH_REQUIRED:
                 logger.info("Authentication: ENABLED (VOICESTUDIO_REQUIRE_AUTH=true)")
             else:
@@ -366,7 +405,13 @@ async def on_startup(app: FastAPI) -> None:
         except ImportError:
             pass
     except Exception as e:
-        logger.error(f"Error during startup: {e}", exc_info=True)
+        logger.error(f"Error during deferred startup: {e}", exc_info=True)
+
+
+async def on_startup(app: FastAPI) -> None:
+    """Full sequential startup (prepare then heavy) — for tests and manual invocation."""
+    await on_startup_prepare(app)
+    await on_startup_heavy(app)
 
 
 async def on_shutdown(app: FastAPI) -> None:

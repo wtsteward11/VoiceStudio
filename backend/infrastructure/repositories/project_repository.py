@@ -95,3 +95,9 @@ def get_project_repository() -> SqliteProjectRepository:
     if _project_repo is None:
         _project_repo = SqliteProjectRepository()
     return _project_repo
+
+
+def reset_project_repository_singleton() -> None:
+    """Clear repository singleton (tests / process isolation)."""
+    global _project_repo
+    _project_repo = None

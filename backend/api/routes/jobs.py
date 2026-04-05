@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import cast
+from typing import Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -23,12 +23,21 @@ from backend.data.repositories.job_repository import (
     get_job_repository,
 )
 from backend.data.repositories.job_repository import JobStatus as RepoJobStatus
+from backend.data.repositories.job_repository import JobType as RepoJobType
 from backend.data.repository_base import QueryOptions
 
 from ..middleware.auth_middleware import require_auth_if_enabled
-from ..optimization import cache_response
+from ..optimization import cache_response, invalidate_api_response_cache
 
 logger = logging.getLogger(__name__)
+
+
+def _invalidate_jobs_cache() -> None:
+    """Clear response cache so /api/jobs and related cached routes refresh."""
+    try:
+        invalidate_api_response_cache()
+    except Exception as e:
+        logger.debug("Jobs cache invalidation skipped: %s", e)
 
 router = APIRouter(
     prefix="/api/jobs",
@@ -50,6 +59,7 @@ class JobType(str):
     SYNTHESIS = "synthesis"
     EXPORT = "export"
     IMPORT = "import"
+    DOWNLOAD = "download"
     OTHER = "other"
 
 
@@ -285,6 +295,11 @@ async def retry_job(
         },
     )
     logger.info(f"Job {job_id} queued for retry")
+    _invalidate_jobs_cache()
+    if entity.job_type == RepoJobType.DOWNLOAD.value:
+        from backend.services.model_download_service import schedule_model_download
+
+        schedule_model_download(job_id)
     return {"success": True, "message": f"Job {job_id} queued for retry"}
 
 
@@ -295,6 +310,7 @@ async def clear_job_history(
     """Clear completed and failed jobs from history."""
     cleared_count = await repo.clear_completed()
     logger.info(f"Cleared {cleared_count} jobs from history")
+    _invalidate_jobs_cache()
     return {"success": True, "cleared_count": cleared_count}
 
 
@@ -319,6 +335,7 @@ async def cancel_job(
         )
 
     await repo.mark_cancelled(job_id)
+    _invalidate_jobs_cache()
     return {"success": True, "message": "Job cancelled"}
 
 
@@ -336,6 +353,7 @@ async def pause_job(
         raise HTTPException(status_code=400, detail="Can only pause running jobs")
 
     await repo.update(job_id, {"status": RepoJobStatus.PAUSED.value})
+    _invalidate_jobs_cache()
     return {"success": True, "message": "Job paused"}
 
 
@@ -353,6 +371,7 @@ async def resume_job(
         raise HTTPException(status_code=400, detail="Can only resume paused jobs")
 
     await repo.update(job_id, {"status": RepoJobStatus.RUNNING.value})
+    _invalidate_jobs_cache()
     return {"success": True, "message": "Job resumed"}
 
 
@@ -377,6 +396,7 @@ async def delete_job(
         )
 
     await repo.delete(job_id, soft=True)
+    _invalidate_jobs_cache()
     return {"success": True, "message": "Job deleted"}
 
 
@@ -386,6 +406,7 @@ async def clear_completed_jobs(
 ):
     """Clear all completed, failed, and cancelled jobs."""
     deleted_count = await repo.clear_completed()
+    _invalidate_jobs_cache()
     return {"success": True, "deleted_count": deleted_count}
 
 
@@ -418,26 +439,38 @@ async def create_job(
         updated_at=datetime.now(),
     )
 
-    return cast(JobEntity, await repo.create(entity))
+    created = cast(JobEntity, await repo.create(entity))
+    _invalidate_jobs_cache()
+    return created
 
 
 async def update_job_progress(
     job_id: str,
     progress: float,
     current_step: str | None = None,
+    current_step_index: int | None = None,
 ) -> JobEntity | None:
-    """Update job progress."""
+    """Update job progress (does not invalidate full API cache — TTL covers polling)."""
     repo = get_job_repository()
-    return cast(JobEntity | None, await repo.update_progress(job_id, progress, current_step))
+    return cast(
+        Optional[JobEntity],
+        await repo.update_progress(job_id, progress, current_step, current_step_index),
+    )
 
 
 async def complete_job(
     job_id: str,
     result_path: str | None = None,
+    result_id: str | None = None,
 ) -> JobEntity | None:
     """Mark job as completed."""
     repo = get_job_repository()
-    return cast(JobEntity | None, await repo.mark_completed(job_id, result_path))
+    entity = cast(
+        Optional[JobEntity],
+        await repo.mark_completed(job_id, result_path, result_id),
+    )
+    _invalidate_jobs_cache()
+    return entity
 
 
 async def fail_job(
@@ -446,4 +479,33 @@ async def fail_job(
 ) -> JobEntity | None:
     """Mark job as failed."""
     repo = get_job_repository()
-    return cast(JobEntity | None, await repo.mark_failed(job_id, error))
+    entity = cast(Optional[JobEntity], await repo.mark_failed(job_id, error))
+    _invalidate_jobs_cache()
+    return entity
+
+
+async def mark_job_running(job_id: str) -> JobEntity | None:
+    """Mark a pending job as running (canonical store)."""
+    repo = get_job_repository()
+    entity = cast(Optional[JobEntity], await repo.mark_started(job_id))
+    _invalidate_jobs_cache()
+    return entity
+
+
+async def cancel_canonical_job(job_id: str) -> JobEntity | None:
+    """Mark a job cancelled in the canonical store (used by adapters e.g. batch)."""
+    repo = get_job_repository()
+    entity = cast(Optional[JobEntity], await repo.mark_cancelled(job_id))
+    _invalidate_jobs_cache()
+    return entity
+
+
+async def soft_delete_canonical_job(job_id: str) -> bool:
+    """Soft-delete a job row if present (e.g. when a domain-specific job is removed)."""
+    repo = get_job_repository()
+    existing = await repo.get_by_id(job_id)
+    if not existing:
+        return False
+    await repo.delete(job_id, soft=True)
+    _invalidate_jobs_cache()
+    return True

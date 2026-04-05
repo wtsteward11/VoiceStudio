@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -194,6 +195,38 @@ class TranscriptionRepository(BaseRepository[TranscriptionEntity]):
 
         return await self.create(entity)
 
+    async def _persist_segments_json(self, transcription_id: str, segments_json: str) -> None:
+        """Update segments column only (transcriptions table has no updated_at in v001)."""
+        await self.connect()
+        await self._connection.execute(
+            f"UPDATE {self.table_name} SET segments = ? WHERE id = ?",
+            (segments_json, transcription_id),
+        )
+        await self._connection.commit()
+
+    def _ensure_segment_ids(self, entity: TranscriptionEntity) -> bool:
+        """Assign UUIDs to segments missing id. Returns True if entity.segments JSON was mutated."""
+        segments = entity.get_segments()
+        changed = False
+        out: list[Any] = []
+        for seg in segments:
+            if not isinstance(seg, dict):
+                out.append(seg)
+                continue
+            sid = seg.get("id")
+            if not sid or (isinstance(sid, str) and sid.strip() == ""):
+                seg = {**seg, "id": str(uuid.uuid4())}
+                changed = True
+            out.append(seg)
+        if changed:
+            entity.set_segments(out)
+        return changed
+
+    async def _backfill_segment_ids_if_needed(self, entity: TranscriptionEntity) -> None:
+        if not self._ensure_segment_ids(entity):
+            return
+        await self._persist_segments_json(entity.id, entity.segments)
+
     async def get_transcription(self, transcription_id: str) -> dict[str, Any] | None:
         """
         Get a transcription by ID, returned in the API response format.
@@ -203,6 +236,7 @@ class TranscriptionRepository(BaseRepository[TranscriptionEntity]):
         entity = await self.get_by_id(transcription_id)
         if entity is None:
             return None
+        await self._backfill_segment_ids_if_needed(entity)
         return self._entity_to_api_dict(entity)
 
     async def list_transcriptions(
@@ -242,7 +276,11 @@ class TranscriptionRepository(BaseRepository[TranscriptionEntity]):
         async with self._connection.execute(query, params) as cursor:
             rows = await cursor.fetchall()
             entities = [self._row_to_entity(dict(row)) for row in rows]
-            return [self._entity_to_api_dict(e) for e in entities]
+            out = []
+            for e in entities:
+                await self._backfill_segment_ids_if_needed(e)
+                out.append(self._entity_to_api_dict(e))
+            return out
 
     async def delete_transcription(self, transcription_id: str) -> bool:
         """
@@ -273,7 +311,16 @@ class TranscriptionRepository(BaseRepository[TranscriptionEntity]):
         if text is not None:
             updates["text"] = text
         if segments is not None:
-            updates["segments"] = json.dumps(segments, default=str)
+            normalized: list[Any] = []
+            for seg in segments:
+                if isinstance(seg, dict):
+                    sid = seg.get("id")
+                    if not sid or (isinstance(sid, str) and sid.strip() == ""):
+                        seg = {**seg, "id": str(uuid.uuid4())}
+                    normalized.append(seg)
+                else:
+                    normalized.append(seg)
+            updates["segments"] = json.dumps(normalized, default=str)
         if word_timestamps is not None:
             updates["word_timestamps"] = json.dumps(word_timestamps, default=str)
 

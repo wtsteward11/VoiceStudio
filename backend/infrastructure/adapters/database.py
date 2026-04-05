@@ -377,3 +377,14 @@ async def close_database_adapter() -> None:
     if _database_adapter is not None:
         await _database_adapter.disconnect()
         _database_adapter = None
+
+
+def reset_database_adapter_singleton() -> None:
+    """
+    Drop the adapter singleton without awaiting disconnect.
+
+    Intended for tests that will replace the database path; prefer
+    close_database_adapter() when an event loop is available.
+    """
+    global _database_adapter
+    _database_adapter = None

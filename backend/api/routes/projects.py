@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from backend.project.management.project_store_service import (
     ProjectRecord,
+    UnsupportedProjectPayloadError,
     get_project_store_service,
 )
 
@@ -102,6 +103,11 @@ def list_projects(request: Request) -> dict:
         result = pagination.paginate(all_projects)
 
         return result
+    except UnsupportedProjectPayloadError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "PROJECT_PAYLOAD_UNSUPPORTED", "message": str(e)},
+        ) from e
     except Exception as e:
         logger.error(f"Failed to list projects: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to list projects: {e!s}") from e
@@ -116,6 +122,11 @@ def get_project(project_id: str) -> Project:
             record = _store().get_project(project_id)
         except KeyError:
             raise HTTPException(status_code=404, detail="Project not found")
+        except UnsupportedProjectPayloadError as e:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "PROJECT_PAYLOAD_UNSUPPORTED", "message": str(e)},
+            ) from e
         return _to_api_project(record)
     except HTTPException:
         raise

@@ -43,6 +43,7 @@ class JobType(str, Enum):
     SYNTHESIS = "synthesis"
     EXPORT = "export"
     IMPORT = "import"
+    DOWNLOAD = "download"
     TRANSCRIPTION = "transcription"
     DEEPFAKE = "deepfake"
     OTHER = "other"
@@ -107,9 +108,12 @@ class JobRepository(BaseRepository[JobEntity]):
             "status": entity.status,
             "progress": entity.progress,
             "current_step": entity.current_step,
+            "current_step_index": entity.current_step_index,
             "total_steps": entity.total_steps,
             "error": entity.error,
             "result_path": entity.result_path,
+            "result_id": entity.result_id,
+            "estimated_time_remaining": entity.estimated_time_remaining,
             "metadata": entity.metadata,
             "user_id": entity.user_id,
             "created_at": (

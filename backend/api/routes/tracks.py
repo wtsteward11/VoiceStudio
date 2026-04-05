@@ -37,8 +37,14 @@ class AudioClip(BaseModel):
     audio_url: str
     duration_seconds: float
     start_time: float
+    source_start_seconds: float = 0.0
+    fade_in_seconds: float = 0.0
+    fade_out_seconds: float = 0.0
     engine: str | None = None
     quality_score: float | None = None
+    derived_from_clip_id: str | None = None
+
+    model_config = {"extra": "ignore"}
 
 
 class AudioTrack(BaseModel):
@@ -48,6 +54,8 @@ class AudioTrack(BaseModel):
     clips: list[AudioClip] = []
     track_number: int
     engine: str | None = None
+    is_muted: bool = False
+    is_solo: bool = False
 
 
 class TrackCreateRequest(BaseModel):
@@ -58,6 +66,8 @@ class TrackCreateRequest(BaseModel):
 class TrackUpdateRequest(BaseModel):
     name: str | None = None
     engine: str | None = None
+    is_muted: bool | None = None
+    is_solo: bool | None = None
 
 
 class ClipCreateRequest(BaseModel):
@@ -67,13 +77,25 @@ class ClipCreateRequest(BaseModel):
     audio_url: str
     duration_seconds: float
     start_time: float
+    id: str | None = None
+    source_start_seconds: float = 0.0
+    fade_in_seconds: float = 0.0
+    fade_out_seconds: float = 0.0
     engine: str | None = None
     quality_score: float | None = None
+    derived_from_clip_id: str | None = None
 
 
 class ClipUpdateRequest(BaseModel):
     name: str | None = None
     start_time: float | None = None
+    audio_id: str | None = None
+    audio_url: str | None = None
+    duration_seconds: float | None = None
+    source_start_seconds: float | None = None
+    fade_in_seconds: float | None = None
+    fade_out_seconds: float | None = None
+    derived_from_clip_id: str | None = None
 
 
 # TrackStore is now used for persistent storage
@@ -84,6 +106,8 @@ def _track_dict_to_model(track_data: dict) -> AudioTrack:
     """Convert track dict from store to AudioTrack model."""
     clips = []
     for clip_data in track_data.get("clips", []):
+        dfc = clip_data.get("derived_from_clip_id")
+        dfc_s = str(dfc).strip() if dfc is not None and str(dfc).strip() else None
         clips.append(
             AudioClip(
                 id=clip_data.get("id", ""),
@@ -93,8 +117,12 @@ def _track_dict_to_model(track_data: dict) -> AudioTrack:
                 audio_url=clip_data.get("audio_url", ""),
                 duration_seconds=clip_data.get("duration_seconds", 0.0),
                 start_time=clip_data.get("start_time", 0.0),
+                source_start_seconds=float(clip_data.get("source_start_seconds", 0.0) or 0.0),
+                fade_in_seconds=float(clip_data.get("fade_in_seconds", 0.0) or 0.0),
+                fade_out_seconds=float(clip_data.get("fade_out_seconds", 0.0) or 0.0),
                 engine=clip_data.get("engine"),
                 quality_score=clip_data.get("quality_score"),
+                derived_from_clip_id=dfc_s,
             )
         )
     return AudioTrack(
@@ -104,6 +132,8 @@ def _track_dict_to_model(track_data: dict) -> AudioTrack:
         clips=clips,
         track_number=track_data.get("track_number", 0),
         engine=track_data.get("engine"),
+        is_muted=bool(track_data.get("is_muted", False)),
+        is_solo=bool(track_data.get("is_solo", False)),
     )
 
 
@@ -194,6 +224,8 @@ def create_track(
             "clips": [],
             "track_number": track_number,
             "engine": req.engine,
+            "is_muted": False,
+            "is_solo": False,
         }
 
         # Save to persistent store
@@ -230,11 +262,15 @@ def update_track(
             raise HTTPException(status_code=404, detail="Track not found")
 
         # Apply updates
-        updates = {}
+        updates: dict[str, object] = {}
         if req.name is not None:
             updates["name"] = req.name.strip()
         if req.engine is not None:
             updates["engine"] = req.engine
+        if req.is_muted is not None:
+            updates["is_muted"] = req.is_muted
+        if req.is_solo is not None:
+            updates["is_solo"] = req.is_solo
 
         updated_track = track_store.update_track(project_id, track_id, updates)
         if updated_track is None:
@@ -328,7 +364,16 @@ def create_clip(
             )
             raise HTTPException(status_code=404, detail="Track not found")
 
-        clip_id = str(uuid.uuid4())
+        clip_id = (
+            req.id.strip()
+            if req.id and str(req.id).strip()
+            else str(uuid.uuid4())
+        )
+        dfc_create = (
+            req.derived_from_clip_id.strip()
+            if req.derived_from_clip_id and str(req.derived_from_clip_id).strip()
+            else None
+        )
         clip_data = {
             "id": clip_id,
             "name": req.name.strip(),
@@ -337,8 +382,12 @@ def create_clip(
             "audio_url": req.audio_url,
             "duration_seconds": req.duration_seconds,
             "start_time": req.start_time,
+            "source_start_seconds": float(req.source_start_seconds or 0.0),
+            "fade_in_seconds": float(req.fade_in_seconds or 0.0),
+            "fade_out_seconds": float(req.fade_out_seconds or 0.0),
             "engine": req.engine,
             "quality_score": req.quality_score,
+            "derived_from_clip_id": dfc_create,
         }
 
         # Add clip to track's clips list
@@ -357,8 +406,12 @@ def create_clip(
             audio_url=req.audio_url,
             duration_seconds=req.duration_seconds,
             start_time=req.start_time,
+            source_start_seconds=float(req.source_start_seconds or 0.0),
+            fade_in_seconds=float(req.fade_in_seconds or 0.0),
+            fade_out_seconds=float(req.fade_out_seconds or 0.0),
             engine=req.engine,
             quality_score=req.quality_score,
+            derived_from_clip_id=dfc_create,
         )
 
         logger.info(
@@ -382,6 +435,7 @@ def update_clip(
     clip_id: str,
     req: ClipUpdateRequest,
     track_store: TrackStoreDep,
+    ref_counter: ArtifactRefCounterDep,
 ) -> AudioClip:
     """Update a clip in a track."""
     try:
@@ -395,6 +449,10 @@ def update_clip(
             raise HTTPException(status_code=400, detail="Clip name cannot be empty")
         if req.start_time is not None and req.start_time < 0:
             raise HTTPException(status_code=400, detail="Start time cannot be negative")
+        if req.duration_seconds is not None and req.duration_seconds < 0:
+            raise HTTPException(status_code=400, detail="Duration cannot be negative")
+        if req.audio_id is not None and not req.audio_id.strip():
+            raise HTTPException(status_code=400, detail="audio_id cannot be empty when provided")
 
         track_data = track_store.get_track(project_id, track_id)
         if track_data is None:
@@ -413,12 +471,50 @@ def update_clip(
             clip_data["name"] = req.name.strip()
         if req.start_time is not None:
             clip_data["start_time"] = req.start_time
+        if req.audio_id is not None:
+            prev_audio = clip_data.get("audio_id")
+            new_audio = req.audio_id.strip()
+            prev_s = str(prev_audio).strip() if prev_audio else ""
+            if prev_s and prev_s != new_audio:
+                ref_counter.decrement(prev_s, clip_id)
+            if not prev_s or prev_s != new_audio:
+                ref_counter.increment(new_audio, clip_id)
+            clip_data["audio_id"] = new_audio
+        if req.audio_url is not None:
+            clip_data["audio_url"] = req.audio_url
+        if req.duration_seconds is not None:
+            clip_data["duration_seconds"] = req.duration_seconds
+        if req.source_start_seconds is not None:
+            clip_data["source_start_seconds"] = max(0.0, float(req.source_start_seconds))
+        if req.fade_in_seconds is not None:
+            clip_data["fade_in_seconds"] = max(0.0, float(req.fade_in_seconds))
+        if req.fade_out_seconds is not None:
+            clip_data["fade_out_seconds"] = max(0.0, float(req.fade_out_seconds))
+        if req.derived_from_clip_id is not None:
+            dfc_u = str(req.derived_from_clip_id).strip()
+            clip_data["derived_from_clip_id"] = dfc_u if dfc_u else None
 
         # Save updated clips list
         track_store.update_track(project_id, track_id, {"clips": clips})
 
         logger.info(f"Updated clip: {clip_id} in track: {track_id} of project: {project_id}")
-        return AudioClip(**clip_data)
+        dfc_out = clip_data.get("derived_from_clip_id")
+        dfc_out_s = str(dfc_out).strip() if dfc_out is not None and str(dfc_out).strip() else None
+        return AudioClip(
+            id=str(clip_data.get("id", "")),
+            name=str(clip_data.get("name", "")),
+            profile_id=str(clip_data.get("profile_id", "")),
+            audio_id=str(clip_data.get("audio_id", "")),
+            audio_url=str(clip_data.get("audio_url", "")),
+            duration_seconds=float(clip_data.get("duration_seconds", 0.0)),
+            start_time=float(clip_data.get("start_time", 0.0)),
+            source_start_seconds=float(clip_data.get("source_start_seconds", 0.0) or 0.0),
+            fade_in_seconds=float(clip_data.get("fade_in_seconds", 0.0) or 0.0),
+            fade_out_seconds=float(clip_data.get("fade_out_seconds", 0.0) or 0.0),
+            engine=clip_data.get("engine"),
+            quality_score=clip_data.get("quality_score"),
+            derived_from_clip_id=dfc_out_s,
+        )
     except HTTPException:
         raise
     except Exception as e:

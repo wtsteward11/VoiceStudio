@@ -1,0 +1,27 @@
+{
+  "id": "ede22a0f-68c5-44b4-b274-3f98d1ee3cd1",
+  "name": "BakeChain",
+  "description": null,
+  "project_id": "proj-fx-02c9ea74",
+  "effects": [
+    {
+      "id": "e1",
+      "type": "eq",
+      "name": "EQ",
+      "enabled": true,
+      "order": 0,
+      "parameters": [
+        {
+          "name": "low_gain",
+          "value": 0.0,
+          "min_value": -12.0,
+          "max_value": 12.0
+        }
+      ]
+    }
+  ],
+  "created": "2026-04-03T01:07:22.402599",
+  "modified": "2026-04-03T01:07:22.402599",
+  "_created_at": "2026-04-03T01:07:22.402599",
+  "_updated_at": "2026-04-03T01:07:22.402599"
+}

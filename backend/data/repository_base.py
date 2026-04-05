@@ -31,6 +31,7 @@ VALID_TABLE_NAMES: set[str] = {
     "settings",
     "api_keys",
     "projects",
+    "project_tracks",
     "presets",
     "quality_metrics",
     "audit_log",

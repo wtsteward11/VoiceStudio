@@ -17,6 +17,8 @@ import numpy as np
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from backend.services.effect_chain_process import process_chain_in_memory
+
 from ..optimization import cache_response
 
 logger = logging.getLogger(__name__)
@@ -380,11 +382,76 @@ def delete_effect_chain(
         raise HTTPException(status_code=500, detail=f"Failed to delete effect chain: {e!s}")
 
 
+def _preview_suffix(preview: bool) -> str:
+    """GAP-039: optional client-visible tag when preview=true (processing unchanged)."""
+    return " [preview]" if preview else ""
+
+
+def apply_chain_model_to_audio(
+    chain: EffectChain,
+    audio: np.ndarray,
+    sample_rate: int,
+) -> np.ndarray:
+    """Apply all enabled effects in *chain* to in-memory *audio* (mono float32)."""
+    enabled_effects = [e for e in chain.effects if e.enabled]
+    if not enabled_effects:
+        raise HTTPException(status_code=400, detail="Effect chain has no enabled effects")
+
+    processed_audio = audio.copy()
+    sorted_effects = sorted(enabled_effects, key=lambda e: e.order)
+
+    if HAS_POST_FX and _PostFXProcessor is not None:
+        try:
+            processor = _create_post_fx_processor(sample_rate=sample_rate)
+            effects_list = []
+            for effect in sorted_effects:
+                params = {p.name: p.value for p in effect.parameters}
+                params["use_pedalboard"] = True
+                effects_list.append(
+                    {
+                        "type": effect.type,
+                        "enabled": effect.enabled,
+                        "params": params,
+                        "order": effect.order,
+                    }
+                )
+            processed_audio = processor.process(
+                processed_audio, sample_rate=sample_rate, effects=effects_list
+            )
+            logger.debug(
+                "Processed in-memory audio with PostFXProcessor (%s effects)",
+                len(sorted_effects),
+            )
+        except Exception as e:
+            logger.warning("PostFXProcessor failed: %s. Falling back to basic effects.", e)
+            for effect in sorted_effects:
+                try:
+                    processed_audio = _apply_effect(processed_audio, sample_rate, effect)
+                except Exception as e2:
+                    logger.warning("Failed to apply effect %s: %s", effect.name, e2)
+    else:
+        for effect in sorted_effects:
+            try:
+                processed_audio = _apply_effect(processed_audio, sample_rate, effect)
+            except Exception as e:
+                logger.warning("Failed to apply effect %s: %s", effect.name, e)
+
+    return processed_audio
+
+
 @router.post("/chains/{chain_id}/process", response_model=EffectProcessResponse)
 def process_audio_with_chain(
     chain_id: str,
     request: EffectProcessRequest,
     project_id: str = Query(..., description="Project ID"),
+    bypass_chain: bool = Query(
+        False,
+        description="GAP-039: When true, skip DSP and return the input audio id (dry signal).",
+    ),
+    preview: bool = Query(
+        False,
+        description="GAP-039: Same processing; message tagged for UI/diagnostics.",
+    ),
 ) -> EffectProcessResponse:
     """
     Process audio with an effect chain.
@@ -407,11 +474,6 @@ def process_audio_with_chain(
         if chain.project_id != project_id:
             logger.warning(f"Effect chain {chain_id} does not belong to project {project_id}")
             raise HTTPException(status_code=404, detail=f"Effect chain not found: {chain_id}")
-
-        # Check if chain has effects
-        enabled_effects = [e for e in chain.effects if e.enabled]
-        if not enabled_effects:
-            raise HTTPException(status_code=400, detail="Effect chain has no enabled effects")
 
         # Load audio file
         from backend.services.audio_artifacts import AudioRegistry
@@ -437,52 +499,24 @@ def process_audio_with_chain(
             logger.error(f"Failed to load audio: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to load audio file: {e!s}")
 
-        # Apply effects in order
-        processed_audio = audio.copy()
+        processed_audio, passthrough = process_chain_in_memory(
+            chain,
+            audio,
+            sample_rate,
+            bypass_chain=bypass_chain,
+            strict_no_enabled=True,
+        )
 
-        # Sort effects by order
-        sorted_effects = sorted(enabled_effects, key=lambda e: e.order)
-
-        # Try using PostFXProcessor for better quality effects (if available)
-        if HAS_POST_FX and _PostFXProcessor is not None:
-            try:
-                processor = _create_post_fx_processor(sample_rate=sample_rate)
-                # Convert effects to PostFXProcessor format
-                effects_list = []
-                for effect in sorted_effects:
-                    params = {p.name: p.value for p in effect.parameters}
-                    # Enable pedalboard for professional effects
-                    params["use_pedalboard"] = True
-                    effects_list.append(
-                        {
-                            "type": effect.type,
-                            "enabled": effect.enabled,
-                            "params": params,
-                            "order": effect.order,
-                        }
-                    )
-                processed_audio = processor.process(
-                    processed_audio, sample_rate=sample_rate, effects=effects_list
-                )
-                logger.debug(
-                    f"Processed audio with PostFXProcessor ({len(sorted_effects)} effects)"
-                )
-            except Exception as e:
-                logger.warning(f"PostFXProcessor failed: {e}. Falling back to basic effects.")
-                # Fall back to basic effects
-                for effect in sorted_effects:
-                    try:
-                        processed_audio = _apply_effect(processed_audio, sample_rate, effect)
-                    except Exception as e2:
-                        logger.warning(f"Failed to apply effect {effect.name}: {e2}")
-        else:
-            # Use basic effect implementations
-            for effect in sorted_effects:
-                try:
-                    processed_audio = _apply_effect(processed_audio, sample_rate, effect)
-                except Exception as e:
-                    logger.warning(f"Failed to apply effect {effect.name}: {e}")
-                    # Continue with next effect
+        if passthrough:
+            # With strict_no_enabled=True, passthrough only occurs when bypass_chain=True.
+            return EffectProcessResponse(
+                success=True,
+                output_audio_id=request.audio_id,
+                message=(
+                    "Effect chain bypass: dry signal (input unchanged)"
+                    + _preview_suffix(preview)
+                ),
+            )
 
         # Save and register via artifact spine
         try:
@@ -500,10 +534,14 @@ def process_audio_with_chain(
                 f"(project {project_id}), output: {output_audio_id}"
             )
 
+            _n_eff = len([e for e in chain.effects if e.enabled])
             return EffectProcessResponse(
                 success=True,
                 output_audio_id=output_audio_id,
-                message=f"Audio processed successfully with {len(sorted_effects)} effects",
+                message=(
+                    f"Audio processed successfully with {_n_eff} effects"
+                    + _preview_suffix(preview)
+                ),
             )
         except Exception as e:
             logger.error(f"Failed to save processed audio: {e}")
@@ -1003,6 +1041,14 @@ async def process_project_effect_chain(
     chain_id: str,
     audio_id: str = Query(..., description="Audio file ID to process"),
     output_filename: str | None = Query(None, description="Output filename"),
+    bypass_chain: bool = Query(
+        False,
+        description="GAP-039: When true, skip DSP and return the input audio id (dry signal).",
+    ),
+    preview: bool = Query(
+        False,
+        description="GAP-039: Same processing; message tagged for UI/diagnostics.",
+    ),
 ) -> EffectProcessResponse:
     """
     Process audio through a project's effect chain.
@@ -1022,16 +1068,7 @@ async def process_project_effect_chain(
         if chain.project_id != project_id:
             raise HTTPException(status_code=404, detail=f"Effect chain not found: {chain_id}")
 
-        # Get enabled effects
-        enabled_effects = [e for e in chain.effects if e.enabled]
-        if not enabled_effects:
-            return EffectProcessResponse(
-                success=True,
-                output_audio_id=audio_id,
-                message="No enabled effects in chain, audio unchanged",
-            )
-
-        # Attempt to load and process audio
+        # Attempt to load and process audio (single authority: process_chain_in_memory)
         try:
             from backend.services.audio_artifacts import AudioRegistry
 
@@ -1052,21 +1089,25 @@ async def process_project_effect_chain(
 
             start_time = time.time()
 
-            processed_audio = audio.copy()
-            sorted_effects = sorted(enabled_effects, key=lambda e: e.order)
+            processed_audio, passthrough = process_chain_in_memory(
+                chain,
+                audio,
+                sample_rate,
+                bypass_chain=bypass_chain,
+                strict_no_enabled=False,
+            )
 
-            for effect in sorted_effects:
-                params = {p.name: p.value for p in effect.parameters}
-                if effect.type == "reverb":
-                    processed_audio = _apply_reverb(processed_audio, sample_rate, params)
-                elif effect.type == "eq":
-                    processed_audio = _apply_eq(processed_audio, sample_rate, params)
-                elif effect.type == "compressor":
-                    processed_audio = _apply_compressor(processed_audio, sample_rate, params)
-                elif effect.type == "delay":
-                    processed_audio = _apply_delay(processed_audio, sample_rate, params)
-                elif effect.type == "filter":
-                    processed_audio = _apply_filter(processed_audio, sample_rate, params)
+            if passthrough:
+                msg = (
+                    "Effect chain bypass: dry signal (input unchanged)"
+                    if bypass_chain
+                    else "No enabled effects in chain, audio unchanged"
+                )
+                return EffectProcessResponse(
+                    success=True,
+                    output_audio_id=audio_id,
+                    message=msg + _preview_suffix(preview),
+                )
 
             # Save and register via artifact spine
             output_audio_id, _, _ = create_audio_artifact_from_wav_array(
@@ -1077,13 +1118,16 @@ async def process_project_effect_chain(
             )
             processing_time = time.time() - start_time
 
+            n_applied = len([e for e in chain.effects if e.enabled])
             logger.info(
-                f"Processed audio with {len(sorted_effects)} effects in {processing_time:.2f}s"
+                f"Processed audio with {n_applied} effects in {processing_time:.2f}s"
             )
             return EffectProcessResponse(
                 success=True,
                 output_audio_id=output_audio_id,
-                message=f"Applied {len(sorted_effects)} effects successfully",
+                message=(
+                    f"Applied {n_applied} effects successfully" + _preview_suffix(preview)
+                ),
             )
 
         except ImportError as ie:

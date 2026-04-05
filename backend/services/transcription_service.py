@@ -69,6 +69,7 @@ class TranscriptionSegmentResult:
     text: str
     start: float
     end: float
+    id: str
     words: list[dict[str, Any]] | None = None
     speaker: str | None = None
 
@@ -97,6 +98,7 @@ class TranscriptionResult:
             "duration": self.duration,
             "segments": [
                 {
+                    "id": s.id,
                     "text": s.text,
                     "start": s.start,
                     "end": s.end,
@@ -175,6 +177,7 @@ def _normalize_segments(
     segments = []
     for seg in result.get("segments", []):
         seg_dict: dict[str, Any] = {
+            "id": str(uuid.uuid4()),
             "text": seg["text"],
             "start": seg["start"],
             "end": seg["end"],
@@ -370,6 +373,7 @@ async def transcribe_audio(
             text=s["text"],
             start=s["start"],
             end=s["end"],
+            id=s.get("id") or str(uuid.uuid4()),
             words=s.get("words"),
             speaker=s.get("speaker"),
         )

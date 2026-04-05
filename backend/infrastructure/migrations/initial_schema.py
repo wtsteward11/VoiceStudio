@@ -88,6 +88,16 @@ async def run_migrations(db_path: str | None = None) -> None:
         "CREATE INDEX IF NOT EXISTS idx_jobs_namespace ON jobs(namespace)",
         "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at)",
         "CREATE INDEX IF NOT EXISTS idx_jobs_updated_at ON jobs(updated_at)",
+        """
+        CREATE TABLE IF NOT EXISTS project_tracks (
+            project_id TEXT NOT NULL,
+            track_id TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            data TEXT NOT NULL,
+            PRIMARY KEY (project_id, track_id)
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_project_tracks_project ON project_tracks(project_id)",
     ]
 
     for stmt in statements:

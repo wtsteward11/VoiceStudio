@@ -79,8 +79,11 @@ except Exception as e:
 # ---------------------------------------------------------------------------
 # Core imports
 # ---------------------------------------------------------------------------
+import asyncio
 import importlib as _il
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any, cast
 
 from fastapi import FastAPI
@@ -125,7 +128,7 @@ from .error_handling import (
     service_error_handler,
     validation_exception_handler,
 )
-from .lifecycle import on_shutdown, on_startup
+from .lifecycle import on_shutdown, on_startup_heavy, on_startup_prepare
 from .middleware_setup import (
     get_performance_middleware as _get_performance_middleware,
 )
@@ -148,6 +151,28 @@ def _register_all_routes():
 # ---------------------------------------------------------------------------
 # FastAPI application
 # ---------------------------------------------------------------------------
+
+_logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """
+    ASGI lifespan: finish critical init before accepting connections, then allow
+    `/health` while engine/plugin load continues in the background.
+    """
+    await on_startup_prepare(app)
+    heavy_task = asyncio.create_task(on_startup_heavy(app))
+    try:
+        yield
+    finally:
+        try:
+            await heavy_task
+        except Exception:
+            _logger.exception("Deferred backend startup work failed")
+        await on_shutdown(app)
+
+
 app = FastAPI(
     title="VoiceStudio Quantum+ Backend API",
     description="""
@@ -229,32 +254,17 @@ app = FastAPI(
             "description": "API versioning and compatibility information.",
         },
     ],
+    lifespan=_lifespan,
 )
 
-logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Lifecycle hooks
-# ---------------------------------------------------------------------------
-
-
-async def _startup_wrapper():
-    await on_startup(app)
-
-
-async def _shutdown_wrapper():
-    await on_shutdown(app)
-
-
-app.add_event_handler("startup", _startup_wrapper)
-app.add_event_handler("shutdown", _shutdown_wrapper)
+logger = _logger
 
 # ---------------------------------------------------------------------------
 # Prometheus instrumentation
 # ---------------------------------------------------------------------------
 if HAS_PROMETHEUS and Instrumentator is not None:
     Instrumentator().instrument(app).expose(app, endpoint="/api/v1/metrics/prometheus")
-    logging.getLogger(__name__).info(
+    _logger.info(
         "Prometheus instrumentation activated at /api/v1/metrics/prometheus"
     )
 

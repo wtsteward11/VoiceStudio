@@ -13,6 +13,7 @@ import logging
 import os
 import shutil
 import tempfile
+import uuid
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -608,3 +609,76 @@ async def import_model(
         except Exception as e:
             logger.error(f"Failed to import model: {e}")
             raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------------------------------------------------------------------------
+# GAP-043: In-app model download (canonical job + verify + register)
+# -------------------------------------------------------------------------
+
+
+class ModelDownloadStartRequest(BaseModel):
+    """Start a URL-based model download tracked as job_type=download."""
+
+    url: str
+    engine: str
+    model_name: str
+    version: str = "1.0"
+    expected_sha256: str | None = None
+
+
+class ModelDownloadStartResponse(BaseModel):
+    """Response with canonical job id for progress via /api/jobs."""
+
+    job_id: str
+
+
+@router.post("/download", response_model=ModelDownloadStartResponse)
+async def start_model_download(
+    request: ModelDownloadStartRequest,
+    _: None = Depends(require_auth_if_enabled),
+):
+    """Create a canonical download job and begin staging the remote artifact."""
+    from backend.api.routes.jobs import create_job
+    from backend.data.repositories.job_repository import JobType as RepoJobType
+    from backend.services.model_download_service import (
+        find_active_download_job,
+        schedule_model_download,
+        validate_model_download_url,
+    )
+
+    try:
+        validate_model_download_url(request.url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    existing = await find_active_download_job(
+        request.engine,
+        request.model_name,
+        request.version,
+    )
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "DOWNLOAD_ACTIVE",
+                "message": "A download is already in progress for this engine/model/version",
+                "job_id": existing,
+            },
+        )
+
+    job_id = str(uuid.uuid4())
+    metadata = {
+        "url": request.url,
+        "engine_id": request.engine,
+        "model_name": request.model_name,
+        "version": request.version,
+        "expected_sha256": request.expected_sha256,
+    }
+    await create_job(
+        job_id,
+        RepoJobType.DOWNLOAD.value,
+        name=f"Download {request.engine}/{request.model_name}",
+        metadata=metadata,
+    )
+    schedule_model_download(job_id, model_storage=_model_storage)
+    return ModelDownloadStartResponse(job_id=job_id)

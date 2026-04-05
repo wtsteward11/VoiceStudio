@@ -3,7 +3,7 @@
 > **Purpose**: Get a new Overseer (Role 0) up to speed. Written for someone taking on this role for the first time.  
 > **Author**: Axiom (Advisor)  
 > **Last Updated**: 2026-03-12  
-> **Related**: [ROLE_0_OVERSEER_GUIDE.md](../roles/ROLE_0_OVERSEER_GUIDE.md), [ROLE_0_OVERSEER_PROMPT.md](../../.cursor/prompts/ROLE_0_OVERSEER_PROMPT.md), [PROJECT_HANDOFF_GUIDE.md](../PROJECT_HANDOFF_GUIDE.md)
+> **Related**: [ROLE_0_OVERSEER_GUIDE.md](../roles/ROLE_0_OVERSEER_GUIDE.md), [ROLE_0_OVERSEER_PROMPT.md](../../.cursor/prompts/ROLE_0_OVERSEER_PROMPT.md), [PROJECT_HANDOFF_GUIDE.md](../PROJECT_HANDOFF_GUIDE.md), [OVERSEER_DAILY_GATE_DISCIPLINE.md](OVERSEER_DAILY_GATE_DISCIPLINE.md) (daily proof checklist)
 
 ---
 

@@ -253,12 +253,318 @@ Grouped by first path segment after `/api/`. Endpoint **methods** stay in `Backe
 - `SystemStore` uses `IConnectionStatusClient` for `IsBackendConnected`; retains `IBackendClient` for `BaseAddress` cast only.
 - `IsConnected` and `CircuitState` removed from `IBackendClient` and `BackendClient` public surface.
 - Tests: `ConnectionStatusClientTests.ConnectionStatusClient_DelegatesToPipeline_IsConnectedAndCircuitState`, `IBackendClient_DoesNotExposeIsConnected`; `BackendClientTransportPolicyTests.CheckHealthAsync_FailureThenRecovery_ConnectionStateCorrect` uses `IConnectionStatusClient`.
-- **Proof (2026-03-22):** `dotnet build` PASS; `dotnet test --filter "FullyQualifiedName~DiagnosticsClient|FullyQualifiedName~ConnectionStatus|FullyQualifiedName~BackendClientTransportPolicy"` 29 passed; verify.ps1 -Quick artifact: `artifacts/verify/20260322_044739/` (or latest).
-- **Sweep:** No `IBackendClient.IsConnected`; no `backendClient.IsConnected` for connection status (tests use `IConnectionStatusClient`).
+- **Proof (2026-03-22):** `dotnet build` PASS; `dotnet test --filter "FullyQualifiedName~DiagnosticsClient|FullyQualifiedName~ConnectionStatus|FullyQualifiedName~BackendClientTransportPolicy"` 29 passed; verify.ps1 -Quick artifact: `artifacts/verify/20260322_040007/verification_report.md`.
+- **Ownership Sweep (2026-03-22):** Repo-wide `rg "IsConnected|CircuitState" src/` — classified all hits. Seam boundary clean.
 
-**Next recommended slice:** Macros (~11), Workflows (~6), Models (~9), Effects (~8).
+| Location | Classification | Action |
+|----------|-----------------|--------|
+| IConnectionStatusClient, ConnectionStatusClient, DiagnosticsClient, SystemStore | Owned by IConnectionStatusClient | None |
+| BackendClientHttpPipeline, RetryHelper.CircuitBreaker | Internal pipeline concern | None |
+| WebSocketService, JobProgressWebSocketClient, MeterWebSocketClient, PipelineStreamingWebSocketClient, RealtimeVoiceWebSocketClient | Different seam (WebSocket) | None |
+| BackendTransport, IBackendTransport, MockBackendTransport | Different transport (parallel to BackendClient) | None |
+| AppState, StateSelectors, StoreIntegration, DiagnosticsViewModel | Derived from SystemStore/DiagnosticsClient | None |
+| IDiagnosticsClient.IsConnected | Facade over IConnectionStatusClient | None |
 
-**What remains in BackendClient (Bucket D):** MCP, Voice, Audio, Projects, Macros, Workflows, Models/engine, Effects, Batch, Transcribe, Training, Ensemble, Mixer, Video, Quality, Pipeline. Search, Health/Version, Telemetry, Script editor, and Connection status are fully extracted.
+No stale backend connection-status usage. No migration required.
+
+### PR-9 — Macros extraction (done 2026-03-22)
+
+**Single extraction:** `/api/macros`, `/api/macros/automation` → `IMacroClient` / `MacroClient` (already existed; migrated from IBackendClient delegation to pipeline ownership).
+
+| Method | Notes |
+|--------|-------|
+| GetMacrosAsync | MacroClient owns; uses pipeline.GetAsync |
+| GetMacroAsync | MacroClient owns |
+| CreateMacroAsync | MacroClient owns |
+| UpdateMacroAsync | MacroClient owns |
+| DeleteMacroAsync | MacroClient owns |
+| ExecuteMacroAsync | MacroClient owns |
+| GetMacroExecutionStatusAsync | MacroClient owns |
+| GetAutomationCurvesAsync | MacroClient owns |
+| CreateAutomationCurveAsync | MacroClient owns |
+| UpdateAutomationCurveAsync | MacroClient owns |
+| DeleteAutomationCurveAsync | MacroClient owns |
+
+**PR-9 — IN**
+
+- `MacroClient` uses `BackendClientHttpPipeline` via DI; internal ctor for testability.
+- AppServices: `services.AddSingleton<IMacroClient>(sp => new MacroClient(sp.GetRequiredService<BackendHttpContext>().Pipeline))`.
+- All 11 methods removed from `IBackendClient`, `BackendClient`.
+- Test: `GetMacrosAsync_ResolvesCorrectPath` in `BackendClientTransportPolicyTests`.
+- **Proof (2026-03-22):** Artifact: `artifacts/verify/20260322_040007/verification_report.md` (PASS). See [PR-9_ARTIFACT_RECONCILIATION.md](PR-9_ARTIFACT_RECONCILIATION.md).
+- **Call sites:** MacroViewModel, MacroActions (CreateMacroAction, DeleteMacroAction, etc.), AutomationActions, MacroView. MacroViewModelSeamTests mocks IMacroClient.
+- **Seam tests:** `GetMacrosAsync_ResolvesCorrectPath` (BackendClientTransportPolicyTests); `IBackendClient_DoesNotExposeMacroMethods`, `BackendClient_DoesNotExposeMacroMethods` (BackendClientExtractionRegressionTests).
+- **Ownership Sweep (2026-03-22):**
+
+| Search | Result |
+|--------|--------|
+| `rg "GetMacrosAsync|GetMacroAsync|...|DeleteAutomationCurveAsync" src/ --glob "**/IBackendClient*.cs"` | Zero hits |
+| `rg "GetMacrosAsync|...|DeleteAutomationCurveAsync" src/ --glob "**/BackendClient.cs"` | Zero hits |
+| `rg "_backend\.(GetMacro|CreateMacro|...|DeleteAutomationCurve)" src/` | Zero hits |
+
+No macro methods on IBackendClient or BackendClient. No stale callers. Seam boundary clean.
+
+**PR-9 — OUT**
+
+- Macros UI changes; Workflows/Models bundling.
+
+### PR-10 — Workflows extraction (done 2026-03-22)
+
+**Single extraction:** `/api/workflows` → `IWorkflowAutomationClient` / `WorkflowAutomationClient` (already existed; migrated from IBackendClient delegation to pipeline ownership).
+
+| Method | Notes |
+|--------|-------|
+| GetWorkflowsAsync | WorkflowAutomationClient owns; uses pipeline.GetAsync |
+| GetWorkflowAsync | WorkflowAutomationClient owns |
+| CreateWorkflowAsync | WorkflowAutomationClient owns |
+| UpdateWorkflowAsync | WorkflowAutomationClient owns |
+| DeleteWorkflowAsync | WorkflowAutomationClient owns |
+| ExecuteWorkflowAsync | WorkflowAutomationClient owns |
+
+**PR-10 — IN**
+
+- `WorkflowAutomationClient` uses `BackendClientHttpPipeline` via DI; internal ctor for testability.
+- AppServices: `services.AddSingleton<IWorkflowAutomationClient>(sp => new WorkflowAutomationClient(sp.GetRequiredService<BackendHttpContext>().Pipeline))`.
+- All 6 methods removed from `IBackendClient`, `BackendClient`.
+- Test: `GetWorkflowsAsync_ResolvesCorrectPath` in `BackendClientTransportPolicyTests`.
+- Anti-regression: `IBackendClient_DoesNotExposeWorkflowMethods`, `BackendClient_DoesNotExposeWorkflowMethods` in `BackendClientExtractionRegressionTests`.
+- **Proof (2026-03-22):** Build PASS; targeted tests (Workflow, BackendClientExtractionRegression) 85 passed; verify.ps1 -Quick artifact: `artifacts/verify/20260322_130417/verification_report.md`. See [PR-10_ARTIFACT_RECONCILIATION.md](PR-10_ARTIFACT_RECONCILIATION.md).
+- **Call sites:** WorkflowAutomationViewModel (only `IWorkflowAutomationClient _workflowClient`; zero IBackendClient). WorkflowAutomationViewModelSeamTests mocks IWorkflowAutomationClient.
+- **Seam tests:** `GetWorkflowsAsync_ResolvesCorrectPath` (BackendClientTransportPolicyTests); `IBackendClient_DoesNotExposeWorkflowMethods`, `BackendClient_DoesNotExposeWorkflowMethods` (BackendClientExtractionRegressionTests).
+- **Ownership Sweep (2026-03-22):**
+
+| Search | Result |
+|--------|--------|
+| `rg "GetWorkflowsAsync|GetWorkflowAsync|CreateWorkflowAsync|UpdateWorkflowAsync|DeleteWorkflowAsync|ExecuteWorkflowAsync" src/ --glob "**/IBackendClient*.cs"` | Zero hits |
+| `rg "GetWorkflowsAsync|...|ExecuteWorkflowAsync" src/ --glob "**/BackendClient.cs"` | Zero hits |
+| `rg "_backend\.(GetWorkflow|CreateWorkflow|...|ExecuteWorkflow)" src/` | Zero hits |
+
+| Location | Classification | Action |
+|----------|-----------------|--------|
+| IWorkflowAutomationClient, WorkflowAutomationClient | Owned by IWorkflowAutomationClient | None |
+| WorkflowAutomationViewModel | Uses _workflowClient only; no IBackendClient | None |
+| WorkflowAutomationViewModelSeamTests, BackendClientTransportPolicyTests, BackendClientExtractionRegressionTests | Test mocks / seam / anti-regression | None |
+
+No workflow methods on IBackendClient or BackendClient. WorkflowAutomationViewModel uses IWorkflowAutomationClient exclusively. Caller audit: zero monolith leakage.
+
+**PR-10 — OUT**
+
+- Workflows UI changes; Effects bundling.
+
+### PR-11 — Effects extraction (done 2026-03-22)
+
+**Single extraction:** `/api/effects/chains`, `/api/effects/presets` (read) → `IEffectChainClient` / `EffectChainClient` (already existed; migrated from IBackendClient delegation to pipeline ownership).
+
+| Method | Notes |
+|--------|-------|
+| GetEffectChainsAsync | EffectChainClient owns; uses pipeline.GetAsync |
+| GetEffectChainAsync | EffectChainClient owns |
+| CreateEffectChainAsync | EffectChainClient owns |
+| UpdateEffectChainAsync | EffectChainClient owns |
+| DeleteEffectChainAsync | EffectChainClient owns |
+| ProcessAudioWithChainAsync | EffectChainClient owns |
+| GetEffectPresetsAsync | EffectChainClient owns |
+
+**PR-11 — IN**
+
+- `EffectChainClient` uses `BackendClientHttpPipeline` via DI; internal ctor for testability.
+- AppServices: `services.AddSingleton<IEffectChainClient>(sp => new EffectChainClient(sp.GetRequiredService<BackendHttpContext>().Pipeline))`.
+- All 7 methods removed from `IBackendClient`, `BackendClient`.
+- Test: `GetEffectChainsAsync_ResolvesCorrectPath` in `BackendClientTransportPolicyTests`.
+- Anti-regression: `IBackendClient_DoesNotExposeEffectChainMethods`, `BackendClient_DoesNotExposeEffectChainMethods` in `BackendClientExtractionRegressionTests`.
+- **Proof (2026-03-22):** Build PASS; targeted tests (EffectChain, EffectsMixer, BackendClientExtractionRegression) 34 passed; verify.ps1 -Quick artifact: `artifacts/verify/20260322_133436/verification_report.md`.
+- **Call sites:** EffectsMixerViewModel (only `_effectChainClient`; zero IBackendClient for effect chain/preset). CreateEffectChainAction, DeleteEffectChainAction via ViewModel. EffectsMixerViewModelTests mocks IEffectChainClient.
+- **Seam tests:** `GetEffectChainsAsync_ResolvesCorrectPath` (BackendClientTransportPolicyTests); `IBackendClient_DoesNotExposeEffectChainMethods`, `BackendClient_DoesNotExposeEffectChainMethods` (BackendClientExtractionRegressionTests).
+- **Ownership Sweep (2026-03-22):**
+
+| Search | Result |
+|--------|--------|
+| `rg "GetEffectChainsAsync|GetEffectChainAsync|CreateEffectChainAsync|UpdateEffectChainAsync|DeleteEffectChainAsync|ProcessAudioWithChainAsync|GetEffectPresetsAsync" src/ --glob "**/IBackendClient*.cs"` | Zero hits |
+| `rg "GetEffectChainsAsync|...|GetEffectPresetsAsync" src/ --glob "**/BackendClient.cs"` | Zero hits |
+| EffectsMixerViewModel, EffectsMixerViewModelTests | Use _effectChainClient / IEffectChainClient only | None |
+
+No effect chain methods on IBackendClient or BackendClient. All callers use IEffectChainClient. **Retained on IBackendClient (until PR-12):** CreateEffectPresetAsync, DeleteEffectPresetAsync.
+
+**PR-11 — OUT**
+
+- Effect preset create/delete (extracted in PR-12).
+- UI redesign.
+
+### PR-12 — Effect presets create/delete (done 2026-03-22)
+
+**Single extraction:** `CreateEffectPresetAsync`, `DeleteEffectPresetAsync` → `IEffectChainClient` / `EffectChainClient`. Presets stay in same effects seam (PR-11 recommended).
+
+| Method | Notes |
+|--------|-------|
+| CreateEffectPresetAsync | EffectChainClient owns; POST /api/effects/presets |
+| DeleteEffectPresetAsync | EffectChainClient owns; DELETE /api/effects/presets/{presetId} |
+
+**PR-12 — IN**
+
+- Added to `IEffectChainClient`; implemented in `EffectChainClient` via `BackendClientHttpPipeline`.
+- Both methods removed from `IBackendClient`, `BackendClient`.
+- Tests: `CreateEffectPresetAsync_ResolvesCorrectPath`, `DeleteEffectPresetAsync_ResolvesCorrectPath` in `BackendClientTransportPolicyTests`.
+- Anti-regression: `IBackendClient_DoesNotExposeEffectPresetMethods`, `BackendClient_DoesNotExposeEffectPresetMethods` in `BackendClientExtractionRegressionTests`.
+- **Proof (2026-03-22):** Build PASS; targeted tests 36 passed; verify.ps1 -Quick artifact: `artifacts/verify/20260322_135530/verification_report.md`.
+- **Call sites:** EffectsMixerViewModelTests only (no runtime ViewModel caller; preset create/delete exercised via mock).
+- **Seam tests:** CreateEffectPresetAsync_ResolvesCorrectPath, DeleteEffectPresetAsync_ResolvesCorrectPath.
+- **Ownership Sweep (2026-03-22):**
+
+| Search | Result |
+|--------|--------|
+| `rg "CreateEffectPresetAsync|DeleteEffectPresetAsync" src/ --glob "**/IBackendClient*.cs"` | Zero hits |
+| `rg "CreateEffectPresetAsync|DeleteEffectPresetAsync" src/ --glob "**/BackendClient.cs"` | Zero hits |
+| IEffectChainClient, EffectChainClient, EffectsMixerViewModelTests | Valid ownership | None |
+
+Effects domain fully extracted. No preset methods on IBackendClient or BackendClient.
+
+**PR-12 — OUT**
+
+- Models extraction (defer; reassess after PR-12).
+- STATE.md bloat trim (secondary governance task).
+
+### PR-13 — Pipeline (GetPipelineProvidersAsync, ProcessPipelineAsync) (done 2026-03-22)
+
+**Single extraction:** `GetPipelineProvidersAsync`, `ProcessPipelineAsync` → `IPipelineConversationClient` / `PipelineConversationClient`. Uses `BackendClientHttpPipeline`.
+
+**Exact caller ownership:** PipelineConversationViewModel only. Uses `IPipelineConversationClient _client`; no `IBackendClient` reference. PipelineConversationView resolves via `ServiceProvider.GetPipelineConversationClient()`.
+
+| Method | Notes |
+|--------|-------|
+| GetPipelineProvidersAsync | PipelineConversationClient owns; GET `/api/pipeline/providers` |
+| ProcessPipelineAsync | PipelineConversationClient owns; POST `/api/pipeline/process` |
+
+**PR-13 — IN**
+
+- `PipelineConversationClient` uses `BackendClientHttpPipeline` via DI; internal ctor `(pipeline, IWebSocketService?)`.
+- AppServices: `services.AddSingleton<IPipelineConversationClient>(sp => new PipelineConversationClient(sp.GetRequiredService<BackendHttpContext>().Pipeline, sp.GetService<IWebSocketService>()))`.
+- Both methods removed from `IBackendClient`, `BackendClient`.
+- Tests: `GetPipelineProvidersAsync_ResolvesCorrectPath`, `ProcessPipelineAsync_ResolvesCorrectPath` in `BackendClientTransportPolicyTests`.
+- Anti-regression: `IBackendClient_DoesNotExposePipelineMethods`, `BackendClient_DoesNotExposePipelineMethods` in `BackendClientExtractionRegressionTests`.
+- Scope: [PR-13_PIPELINE_SCOPE.md](PR-13_PIPELINE_SCOPE.md).
+- **Authoritative proof path:** `artifacts/verify/20260322_143514/verification_report.md` (PR-13_ARTIFACT_RECONCILIATION.md).
+
+**PR-13 — OUT**
+
+- **What remains in pipeline domain:** GetPipelineMetricsAsync on IBackendClient (metrics UI). Intentional; different concern than providers/process.
+- WebSocket streaming (different seam).
+
+**Ownership Sweep (2026-03-22):**
+
+| Search | Result |
+|--------|--------|
+| `rg "GetPipelineProvidersAsync\|ProcessPipelineAsync" src/.../IBackendClient.cs` | Zero method signatures (comment only at line 338) |
+| `rg "GetPipelineProvidersAsync\|ProcessPipelineAsync" src/.../BackendClient.cs` | Zero method definitions (comment only at line 3184) |
+| `rg "_backend\|IBackendClient" src/.../PipelineConversationViewModel.cs` | Zero hits |
+| PipelineConversationViewModel | Uses IPipelineConversationClient only; _client.GetPipelineProvidersAsync, _client.ProcessPipelineAsync |
+
+Pipeline domain (providers/process) fully extracted. No pipeline methods on IBackendClient or BackendClient.
+
+### PR-14 — BackupRestore (7 methods) (done 2026-03-22)
+
+**Single extraction:** `GetBackupsAsync`, `GetBackupAsync`, `CreateBackupAsync`, `DownloadBackupAsync`, `RestoreBackupAsync`, `UploadBackupAsync`, `DeleteBackupAsync` → `IBackupRestoreClient` / `BackupRestoreClient`. Uses `BackendClientHttpPipeline`.
+
+**Exact caller ownership:** BackupRestoreViewModel only. Uses `IBackupRestoreClient _backupRestoreClient`; no `IBackendClient` reference.
+
+| Method | Notes |
+|--------|-------|
+| GetBackupsAsync | GET `/api/backup` |
+| GetBackupAsync | GET `/api/backup/{id}` |
+| CreateBackupAsync | POST `/api/backup` |
+| DownloadBackupAsync | GET `/api/backup/{id}/download` (stream via GetStreamAsync) |
+| RestoreBackupAsync | POST `/api/backup/{id}/restore` |
+| UploadBackupAsync | POST `/api/backup/upload` (multipart via PostMultipartAsync) |
+| DeleteBackupAsync | DELETE `/api/backup/{id}` |
+
+**PR-14 — IN**
+
+- `BackupRestoreClient` uses `BackendClientHttpPipeline` via DI; internal ctor `(pipeline)`.
+- Pipeline extended: `GetStreamAsync`, `PostMultipartAsync` (PR-14).
+- AppServices: `services.AddSingleton<IBackupRestoreClient>(sp => new BackupRestoreClient(sp.GetRequiredService<BackendHttpContext>().Pipeline))`.
+- All 7 methods removed from `IBackendClient`, `BackendClient`.
+- Tests: `GetBackupsAsync_ResolvesCorrectPath` in `BackendClientTransportPolicyTests`.
+- Anti-regression: `IBackendClient_DoesNotExposeBackupMethods`, `BackendClient_DoesNotExposeBackupMethods` in `BackendClientExtractionRegressionTests`.
+- Scope: [PR-14_BACKUP_RESTORE_SCOPE.md](PR-14_BACKUP_RESTORE_SCOPE.md).
+- **Proof:** dotnet build PASS; dotnet test `BackupRestore|BackendClientExtractionRegression` 16 passed; verify.ps1 -Quick `artifacts/verify/20260323_030840` (authoritative).
+
+**PR-14 — OUT**
+
+- DataBackupService (local backup; different seam).
+- UI changes.
+
+**Ownership Sweep (2026-03-23):**
+
+| Search | Result |
+|--------|--------|
+| `GetBackupsAsync` etc. in IBackendClient.cs | Zero method signatures |
+| `GetBackupsAsync` etc. in BackendClient.cs | Zero method definitions |
+| `_backend` / IBackendClient in BackupRestoreViewModel.cs | Zero hits; uses _backupRestoreClient only |
+| BackupRestoreViewModel | Uses IBackupRestoreClient only; all 7 methods via _backupRestoreClient |
+| DataBackupService.CreateBackupAsync, RestoreBackupAsync | Local-file only (BackupResult, RestoreResult); distinct seam, not IBackupRestoreClient |
+| IBackupRestoreClient, BackupRestoreClient | Valid ownership; pipeline-based |
+| BackupRestoreViewModelSeamTests, BackendClientTransportPolicyTests, BackendClientExtractionRegressionTests | Tests; mock or assert extraction |
+
+Backup domain (7 methods) fully extracted. No backup methods on IBackendClient or BackendClient.
+
+- **Authoritative proof path:** `artifacts/verify/20260323_030840/verification_report.md` (verify.ps1 fix + rerun).
+
+### PR-15 — Models (9 methods) (done 2026-03-23)
+
+**Single extraction:** `GetModelsAsync`, `GetModelAsync`, `RegisterModelAsync`, `VerifyModelAsync`, `UpdateModelChecksumAsync`, `DeleteModelAsync`, `ExportModelAsync`, `ImportModelAsync`, `GetStorageStatsAsync` → `IModelManagerClient` / `ModelManagerClient`. Uses `BackendClientHttpPipeline`.
+
+**Exact caller ownership:** ModelManagerViewModel only. Uses `IModelManagerClient _modelManagerClient`; no `IBackendClient` reference. ModelManagerView, ModelActions use IModelManagerClient via DI.
+
+| Method | Notes |
+|--------|-------|
+| GetModelsAsync | GET `/api/models` optional `?engine=` |
+| GetModelAsync | GET `/api/models/{engine}/{modelName}` |
+| RegisterModelAsync | POST `/api/models` JSON body |
+| VerifyModelAsync | POST `/api/models/{engine}/{modelName}/verify` |
+| UpdateModelChecksumAsync | PUT `/api/models/{engine}/{modelName}/update-checksum` |
+| DeleteModelAsync | DELETE `/api/models/{engine}/{modelName}` |
+| ExportModelAsync | GET `/api/models/{engine}/{modelName}/export` (stream via GetStreamAsync) |
+| ImportModelAsync | POST `/api/models/import` (multipart via PostMultipartAsync) |
+| GetStorageStatsAsync | GET `/api/models/stats/storage` |
+
+**PR-15 — IN**
+
+- `ModelManagerClient` uses `BackendClientHttpPipeline` via DI; internal ctor `(pipeline)`.
+- AppServices: `services.AddSingleton<IModelManagerClient>(sp => new ModelManagerClient(sp.GetRequiredService<BackendHttpContext>().Pipeline))`.
+- All 9 methods removed from `IBackendClient`, `BackendClient`.
+- Tests: `GetModelsAsync_ResolvesCorrectPath`, `GetModelAsync_ResolvesCorrectPath` in `BackendClientTransportPolicyTests`.
+- Anti-regression: `IBackendClient_DoesNotExposeModelMethods`, `BackendClient_DoesNotExposeModelMethods` in `BackendClientExtractionRegressionTests`.
+- Scope: [PR-15_MODELS_SCOPE.md](PR-15_MODELS_SCOPE.md).
+- **Proof:** dotnet build PASS; 63 targeted tests; verify.ps1 -Quick `artifacts/verify/20260323_053529` (authoritative).
+
+**PR-15 — OUT**
+
+- TrainingViewModelTests model tests migrated to `IModelManagerClient`; no IBackendClient model mocks.
+
+**Ownership Sweep (2026-03-23):**
+
+| Search | Result |
+|--------|--------|
+| GetModelsAsync etc. in IBackendClient.cs | Zero method signatures |
+| GetModelsAsync etc. in BackendClient.cs | Zero method definitions |
+| _backend / IBackendClient model calls in ModelManagerViewModel | Zero hits; uses _modelManagerClient only |
+| ModelManagerViewModel | Uses IModelManagerClient only; all 9 methods via _modelManagerClient |
+| IModelManagerClient, ModelManagerClient | Valid ownership; pipeline-based |
+
+Model domain (9 methods) fully extracted. No model methods on IBackendClient or BackendClient.
+
+**Next recommended slice after PR-15:** Video or Mixer per [BACKENDCLIENT_REMAINDER_INVENTORY.md](BACKENDCLIENT_REMAINDER_INVENTORY.md).
+
+**What remains in BackendClient (Bucket D):** MCP, Voice, Audio, Projects, Batch, Transcribe, Training, Ensemble, Mixer, Video, Quality, Pipeline (GetPipelineMetricsAsync only). Search, Health/Version, Telemetry, Script editor, Connection status, Macros, Workflows, Effects (chains + presets), Pipeline (providers/process), BackupRestore, and Models are fully extracted.
+
+---
+
+## Post-PR-12 Remainder
+
+See dedicated inventory: [BACKENDCLIENT_REMAINDER_INVENTORY.md](BACKENDCLIENT_REMAINDER_INVENTORY.md).
+
+Summary: Two thin clients (MixerState, VideoGen/VideoEdit) still delegate to IBackendClient. PipelineConversation migrated (PR-13). BackupRestore migrated (PR-14). ModelManager migrated (PR-15). PR-13 done: Pipeline providers/process extracted. PR-14 done: BackupRestore 7 methods extracted. PR-15 done: Models 9 methods extracted.
+
+**Stop criteria:** See [EXTRACTION_STOP_CRITERIA.md](EXTRACTION_STOP_CRITERIA.md) for when not to extract.
 
 ---
 

@@ -1,3 +1,5 @@
+> **↩ Superseded for forward-looking phase authority (2026-03-29):** Use **[VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md)** and **[PROFESSIONAL_GAP_TRACKER.md](../design/PROFESSIONAL_GAP_TRACKER.md)** for hero workflows, Phases 0–7, and execution gaps. This document remains a **historical milestone and vision** reference (Quantum+ phases); it does not override V3 sequencing.
+
 # VoiceStudio Quantum+ Master Roadmap (Unified)
 
 > **Version**: 1.0.0  
@@ -6,9 +8,9 @@
 > **Status**: Vision/Spec — phase and milestone reference  
 > **Supersedes**: MASTER_ROADMAP.md, MASTER_ROADMAP_SUMMARY.md, MASTER_ROADMAP_INDEX.md (archived to `docs/archive/governance/`)
 
-> **For active execution, see [.cursor/STATE.md](../../.cursor/STATE.md) and active hardening plans.** This roadmap is the canonical phase/milestone reference; current task, next steps, and blockers live in STATE.md ACTIVE WINDOW.
+> **For active execution, see [.cursor/STATE.md](../../.cursor/STATE.md), **Professional Roadmap V3**, and the **Gap Tracker** (see supersede note above). Current task, next steps, and blockers live in STATE.md ACTIVE WINDOW.
 
-This is the **single source of truth** for VoiceStudio's development roadmap phases and milestones. All other roadmap documents are superseded or archived.
+This document is the **historical single source** for Quantum+ phase/milestone narrative (pre-V3). **Forward-looking phase sequencing** is defined in [VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md). Older pre-unified roadmaps remain archived under `docs/archive/governance/`.
 
 ---
 

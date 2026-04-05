@@ -1,18 +1,9 @@
-# BackendClient Post-PR-17 Remainder Inventory
+# BackendClient Post-PR-12 Remainder Inventory
 
-**Purpose:** Code-backed inventory of remaining `IBackendClient` method clusters for PR-18 stop-decision. Derived from current `IBackendClient.cs` and `BackendClient.cs`, not from stale post-PR-12 fiction.  
-**Date:** 2026-03-24  
+**Purpose:** Evidence-based ranking of remaining `IBackendClient` method clusters for PR-13 slice selection.  
+**Date:** 2026-03-22  
 **Source:** [IBackendClient.cs](../../src/VoiceStudio.App/Core/Services/IBackendClient.cs), [BackendClient.cs](../../src/VoiceStudio.App/Services/BackendClient.cs)  
-**Related:** [BACKENDCLIENT_TRANSPORT_EXTRACTION_INVENTORY.md](BACKENDCLIENT_TRANSPORT_EXTRACTION_INVENTORY.md), [EXTRACTION_STOP_CRITERIA.md](EXTRACTION_STOP_CRITERIA.md)
-
----
-
-## Changelog
-
-| Date       | Change |
-|------------|--------|
-| 2026-03-24 | **Re-baseline from code.** Replaced Post-PR-12 ranked clusters with table derived from current IBackendClient/BackendClient. PR-13 through PR-17 (Pipeline, BackupRestore, Models, Video, Mixer) confirmed extracted; remainder clusters rebuilt from scratch. Added cluster table with exact methods, endpoint families, caller sets, thin-client status, extraction difficulty, blast radius, and recommendation. Date corrected: must be after PR-17 (2026-03-23). |
-| 2026-03-22 | Original Post-PR-12 inventory (superseded by 2026-03-24 re-baseline) |
+**Related:** [BACKENDCLIENT_TRANSPORT_EXTRACTION_INVENTORY.md](BACKENDCLIENT_TRANSPORT_EXTRACTION_INVENTORY.md), PR-13 Slice Selection plan
 
 ---
 
@@ -26,124 +17,150 @@
 
 ---
 
-## Post-PR-17 Remainder Clusters (Code-Backed)
+## Post-PR-12 Remainder Clusters (Ranked)
 
-**Confirmed extracted (PR-13–PR-17):** Pipeline (2), BackupRestore (7), Models (9), Video (5), Mixer (19). These methods are **not** on IBackendClient/BackendClient.
+### Rank 1 — Thin clients (easiest: migrate to pipeline, remove from monolith)
 
-**Excluded from extraction (per EXTRACTION_STOP_CRITERIA):** `SendRequestAsync` (2 overloads), `SendMcpOperationAsync`, `GetAsync`, `PostAsync`, `PutAsync` — generic/cross-cutting; must stay on monolith.
+| Cluster | Size | Thin client | Callers | Endpoint | DTO risk | Verdict |
+|---------|------|--------------|---------|----------|----------|---------|
+| **Models** | 9 | IModelManagerClient (7) | ModelManagerViewModel, ModelManagerView, ModelActions, TrainingViewModelTests (GetModel), Training datasets | `/api/models/*` | Low | **Extract** — Add GetModelAsync, RegisterModelAsync to IModelManagerClient; migrate ModelManagerClient to pipeline; remove all 9 from monolith |
+| **Mixer** | 22 | IMixerStateClient (16) | EffectsMixerViewModel, MixerStateClient | `/api/mixer/*` | Low | **Extract** — Add GetMixerPresetAsync, UpdateMixerPresetAsync, DeleteMixerPresetAsync, UpdateMixerMasterAsync, UpdateChannelRoutingAsync to IMixerStateClient; migrate to pipeline |
+| **Backup/Restore** | 7 | IBackupRestoreClient | BackupRestoreViewModel, DataBackupService | `/api/backups/*` | Low | **Extract** — Migrate BackupRestoreClient to pipeline; remove from monolith |
+| **Pipeline** | 2 | IPipelineConversationClient | PipelineConversationViewModel | `/api/pipeline/*` | Low | **Extract** — Migrate to pipeline; remove from monolith |
+| **Video** | 4 | IVideoGenClient (2), IVideoEditClient (2) | VideoGenViewModel, VideoEditViewModel | `/api/video/*` | Low | **Extract** — Migrate both to pipeline; consolidate or keep split |
 
----
+### Rank 2 — Bounded clusters, no thin client
 
-### Cluster Table (One Table Per Remaining Cluster)
+| Cluster | Size | Callers | Endpoint | DTO risk | Verdict |
+|---------|------|---------|----------|----------|---------|
+| **Emotion presets** | 6 | EmotionStyleClient (delegates), EmotionActions, EmotionControlViewModel, EmotionStyleControlViewModel | `/api/emotion/*` | Medium (IEmotionStyleClient uses different DTOs) | **Mixed** — Two APIs: emotion-style vs emotion presets CRUD. Assess before extracting |
+| **Ensemble** | 2 | Unknown | `/api/ensemble/*` | Low | **Extract** — Small; create IEnsembleClient or fold into existing |
 
-| Cluster name | Exact remaining methods | Endpoint family | Caller set (grep-backed) | Thin client exists? | Extraction difficulty | Blast radius | Recommendation |
-|--------------|-------------------------|-----------------|--------------------------|---------------------|----------------------|--------------|----------------|
-| **Voice** | SynthesizeVoiceAsync, AnalyzeVoiceAsync, CloneVoiceAsync | `/api/voice/*` | VoiceSynthesisViewModel, VoiceQuickCloneClient, VoiceGateway, VoiceSynthesisService, ReferenceAudioQualityAnalyzer, TimelineSynthesisService, ProfilePreviewService, ScriptEditorViewModel, VoiceProfileViewModel, QualityOptimizationWizardViewModel, EmotionStylePresetEditorViewModel | No (IVoiceGateway delegates; VoiceQuickCloneClient uses _backend.CloneVoiceAsync) | L | High | **defer** — core synthesis path, cross-cutting |
-| **Profiles** | GetProfilesAsync, GetProfileAsync, CreateProfileAsync, UpdateProfileAsync, DeleteProfileAsync | `/api/profiles/*` | ProfilesClient (delegates), ProfilesViewModel, TimelineViewModel, VoiceSynthesisViewModel, ProfileComparisonViewModel, ABTestingViewModel, QualityBenchmarkViewModel, QualityOptimizationWizardViewModel, ProfileHealthDashboardViewModel, TagOrganizationViewModel, EmbeddingExplorerViewModel, VoiceMorphViewModel, VoiceMorphingBlendingViewModel, PronunciationLexiconViewModel, TextBasedSpeechEditorViewModel, TextSpeechEditorViewModel, StyleTransferViewModel, ProfilesUseCase, ProfileOperationsHandler | Y — IProfilesClient / ProfilesClient | M | High | **split first** — complete thin client migration |
-| **Projects** | GetProjectsAsync, GetProjectAsync, CreateProjectAsync, UpdateProjectAsync, DeleteProjectAsync | `/api/projects/*` | ProjectsClient (delegates), TimelineViewModel, EmbeddingExplorerViewModel, TextSpeechEditorViewModel, MixAssistantViewModel, AssistantViewModel, StyleTransferViewModel, SpatialStageViewModel, VoiceMorphViewModel, TextHighlightingViewModel, SonographyVisualizationViewModel, AdvancedWaveformVisualizationViewModel, AdvancedSpectrogramVisualizationViewModel, ProjectStore, TimelineProjectHandlers | Y — IProjectsClient / ProjectsClient | M | High | **split first** — complete thin client migration |
-| **Project audio** | SaveAudioToProjectAsync, ListProjectAudioAsync, GetProjectAudioAsync | `/api/projects/*/audio` | ProjectAudioClient (delegates), TimelineViewModel, SpatialStageViewModel, SonographyVisualizationViewModel, StyleTransferViewModel, VoiceMorphViewModel, TextHighlightingViewModel, EmbeddingExplorerViewModel | Y — IProjectAudioClient / ProjectAudioClient | S | Med | **extract now** — complete IProjectAudioClient migration |
-| **Audio retrieval** | GetAudioStreamAsync | `/api/audio/*` | Many (playback, timeline) | No | S | High | **defer** — cross-cutting playback |
-| **Audio export** | ExportAudioAsync, GetSupportedAudioFormatsAsync, UploadAudioFileAsync | `/api/audio/*`, `/api/upload/*` | RecordingClient, AnalyzerClient, many panels | No | M | High | **defer** — cross-cutting |
-| **Upload helpers** | UploadFileWithProgressAsync, UploadFilesWithProgressAsync | N/A (generic) | Multiple clients | No | — | — | **stop** — cross-cutting; keep on monolith |
-| **Audio visualization** | GetWaveformDataAsync, GetSpectrogramDataAsync, GetAudioMetersAsync, GetRadarDataAsync, GetLoudnessDataAsync, GetPhaseDataAsync | `/api/audio/*` (waveform, spectrogram, etc.) | SpectrogramClient (SendRequest), AnalyzerClient (GetRadarDataAsync, GetLoudnessDataAsync, GetPhaseDataAsync) | No | M | Med | **defer** — fragmented callers |
-| **Timeline tracks** | GetTracksAsync, GetTrackAsync, CreateTrackAsync, UpdateTrackAsync, DeleteTrackAsync | `/api/projects/*/tracks` | TimelineTrackService (direct _backend) | No | S | Med | **extract now** — bounded; TimelineTrackService sole direct caller |
-| **Timeline clips** | CreateClipAsync, UpdateClipAsync, DeleteClipAsync | `/api/projects/*/clips` | TimelineClipService (direct _backend) | No | S | Med | **extract now** — bounded |
-| **Timeline markers** | GetMarkersAsync, GetMarkerAsync, CreateMarkerAsync, UpdateMarkerAsync, DeleteMarkerAsync | `/api/projects/*/markers` | MarkerManagerClient (SendRequest — different API?) | No | M | Med | **split first** — MarkerManagerClient uses /api/markers; IBackendClient uses project-scoped markers; verify endpoint alignment |
-| **Batch core** | CreateBatchJobAsync, GetBatchJobsAsync | `/api/batch/*` | BatchViewModel, JobProgressApiClient | No | M | Med | **defer** — assess with Batch quality |
-| **Batch quality** | GetBatchJobQualityAsync, GetBatchQualityReportAsync, GetBatchQualityStatisticsAsync, RetryBatchJobWithQualityAsync | `/api/batch/*/quality` | Batch quality panel | No | M | Med | **defer** |
-| **Transcription** | GetSupportedLanguagesAsync, GetTranscriptionEnginesAsync, TranscribeAudioAsync, GetTranscriptionAsync, ListTranscriptionsAsync, DeleteTranscriptionAsync | `/api/transcribe/*` | TranscriptionClient (delegates), TimelineTranscriptionService, TranscribeViewModel | Y — ITranscriptionClient / TranscriptionClient | M | Med | **split first** — complete thin client migration |
-| **Training** | CreateDatasetAsync, ListDatasetsAsync, GetDatasetAsync, DeleteDatasetAsync, StartTrainingAsync, GetTrainingStatusAsync, ListTrainingJobsAsync, CancelTrainingAsync, GetTrainingLogsAsync, DeleteTrainingJobAsync, GetTrainingQualityHistoryAsync | `/api/training/*` | TrainingViewModel, DatasetQAClient, TrainingDatasetEditorClient | No (DatasetQAClient uses GetTrainingDatasetsAsync, GetTrainingDatasetAsync) | L | High | **defer** — large surface |
-| **Ensemble** | CreateMultiEngineEnsembleAsync, GetMultiEngineEnsembleStatusAsync | `/api/ensemble/*` | EnsembleService/panel | No | S | Low | **extract now** — 2 methods, small blast |
-| **Channel routing** | UpdateChannelRoutingAsync | `/api/mixer/*` or `/api/projects/*` | EffectsMixerViewModel? (Mixer extracted; verify) | No | S | Low | **split first** — Mixer extracted; may belong with IMixerStateClient or separate |
-| **Settings** | GetSettingsAsync, GetSettingsCategoryAsync, SaveSettingsAsync, UpdateSettingsCategoryAsync, ResetSettingsAsync | `/api/settings/*` | SettingsService, AdvancedSettingsClient, SettingsViewModel, SettingsOperationsHandler, AccessibilityService | Y — IAdvancedSettingsClient (partial) | M | Med | **split first** — complete Settings client |
-| **Quality** | 31 methods: presets, analysis, optimization, A/B, benchmark, dashboard, history, degradation, baseline, text analysis, pipeline presets, engines, consistency, heatmap, correlations, anomalies, prediction, insights | `/api/quality/*`, `/api/engines/*` | QualityOptimizationWizardViewModel, QualityBenchmarkViewModel, ABTestingViewModel, many quality panels | No | L | High | **stop** — huge cluster; IDEA-* endpoints; not worth yet |
-| **Emotion presets** | GetEmotionPresetsAsync, GetEmotionPresetAsync, CreateEmotionPresetAsync, UpdateEmotionPresetAsync, DeleteEmotionPresetAsync, GetAvailableEmotionsAsync | `/api/emotion/*` | EmotionStyleClient (delegates?), EmotionActions | Y (partial — emotion-style vs presets CRUD) | M | Med | **defer** — assess DTO split |
-| **Batch lifecycle** | DeleteBatchJobAsync, StartBatchJobAsync, CancelBatchJobAsync, GetBatchQueueStatusAsync | `/api/batch/*` | BatchViewModel, JobProgressApiClient | No | S | Med | **extract now** — combine with Batch core for full Batch client |
-| **Training datasets alias** | GetTrainingDatasetsAsync, GetTrainingDatasetAsync | `/api/training/datasets` | DatasetQAClient | No | S | Low | **defer** — fold into Training if extracted |
+### Rank 3 — Larger clusters, higher blast radius
 
----
+| Cluster | Size | Callers | Endpoint | DTO risk | Verdict |
+|---------|------|---------|----------|----------|---------|
+| **Profiles** | 5 | ProfilesViewModel, multiple panels | `/api/profiles/*` | Low | Medium — High caller count |
+| **Projects** | 6 | ProjectViewModel, Timeline, multiple | `/api/projects/*` | Low | Medium |
+| **Project audio** | 3 | Project/timeline related | `/api/projects/*/audio` | Low | Medium |
+| **Timeline (tracks/clips)** | 9 | TimelineViewModel, clip/track actions | `/api/projects/*/tracks`, `clips` | Low | Medium |
+| **Timeline (markers)** | 5 | TimelineViewModel, marker actions | `/api/projects/*/markers` | Low | Medium |
+| **Transcription** | 6 | TranscriptionViewModel, panels | `/api/transcribe/*` | Low | Medium |
+| **Batch (core)** | 4 | BatchViewModel, job actions | `/api/batch/*` | Low | Medium |
+| **Batch quality** | 4 | Batch quality panel | `/api/batch/*/quality` | Low | Medium |
 
-## Stop-Criteria Matrix (Task 2)
+### Rank 4 — Cross-cutting or high complexity
 
-See [EXTRACTION_STOP_CRITERIA.md](EXTRACTION_STOP_CRITERIA.md) for criteria definitions.
-
-| Cluster | C1 Leverage (≥3 callers or thin client) | C2 Fragmentation (≥5% methods) | C3 Sparse callers | C4 DTO glue | C5 Cross-cutting | Overall |
-|---------|----------------------------------------|------------------------------|-------------------|-------------|------------------|---------|
-| Voice | Pass (many) | Fail (3 methods, ~3%) | Fail | Fail | **Stop** — core synthesis | **Stop** |
-| Profiles | Pass (thin client) | Pass (5) | Pass | Pass | Pass | Continue |
-| Projects | Pass (thin client) | Pass (5) | Pass | Pass | Pass | Continue |
-| Project audio | Pass (thin client) | Fail (3, ~2.5%) | Pass | Pass | Pass | Exception — complete thin client |
-| Audio retrieval | Pass | Fail (1) | Pass | Pass | **Stop** — playback | **Stop** |
-| Audio export | Pass | Fail (3) | Pass | Pass | **Stop** — cross-cutting | **Stop** |
-| Upload helpers | — | — | — | — | **Stop** — generic | **Stop** |
-| Audio viz | Pass | Pass (6) | Pass | Pass | Pass | Defer — fragmented |
-| Timeline tracks | Pass | Fail (5, ~4%) | Pass | Pass | Pass | Borderline |
-| Timeline clips | Pass | Fail (3) | Pass | Pass | Pass | Borderline |
-| Timeline markers | Pass | Pass (5) | Pass | Pass | Pass | Split first |
-| Batch core | Pass | Fail (2) | Pass | Pass | Pass | Defer |
-| Batch quality | Pass | Pass (4) | Pass | Pass | Pass | Defer |
-| Transcription | Pass (thin client) | Pass (6) | Pass | Pass | Pass | Continue |
-| Training | Pass | Pass (11) | Pass | Pass | Pass | Defer — large |
-| Ensemble | Fail (1–2 callers) | Fail (2) | Pass | Pass | Pass | Borderline — small |
-| Channel routing | Fail | Fail (1) | Pass | Pass | Pass | Split first |
-| Settings | Pass (thin client) | Pass (5) | Pass | Pass | Pass | Continue |
-| Quality | Pass | Pass (31) | Pass | Pass | **Stop** — huge, IDEA-* | **Stop** |
-| Emotion presets | Pass | Pass (6) | Pass | Pass | Pass | Defer |
-| Batch lifecycle | Pass | Fail (4) | Pass | Pass | Pass | Extract with Batch core |
+| Cluster | Size | Callers | Endpoint | DTO risk | Verdict |
+|---------|------|---------|----------|----------|---------|
+| **Voice** | 3 | SynthesisViewModel, CloneViewModel | `/api/voice/*` | Low | High — Core synthesis path |
+| **Audio retrieval/export** | 5+ | Many (timeline, export, playback) | `/api/audio/*` | Medium | High — Cross-cutting |
+| **Audio visualization** | 6 | Waveform, spectrogram panels | waveform, spectrogram, meters, etc. | Low | Medium |
+| **Training** | 11+ | TrainingViewModel, training panel | `/api/training/*` | Medium | High — Large surface |
+| **Settings** | 5 | SettingsService, SettingsViewModel | `/api/settings/*` | Low | Medium |
+| **Quality** | 25+ | Quality panels, benchmarking | `/api/quality/*` | High | **Not worth yet** — Huge, mixed, IDEA-* endpoints |
+| **MCP** | 1 | MCP bridge | `/api/mcp/*` | N/A | **Keep** — Cross-cutting |
+| **Generic helpers** | 4 | Many (GetAsync, PostAsync, PutAsync, SendRequestAsync) | N/A | N/A | **Keep** — Must stay |
 
 ---
 
-## Explicit Decision (Task 3)
+## Recommended PR-13 Candidates (Evidence-Based)
 
-**Decision: PAUSE**
+**Decision rule:** Smallest caller graph, cleanest endpoint family, least DTO churn, easiest closure.
 
-**Rationale:**
+### Option A: Pipeline (2 methods) — smallest surface
 
-1. **Leverage:** After PR-13–PR-17, the remaining thin-client clusters (Profiles, Projects, Project audio, Transcription, Settings) would each require pipeline migration + DI + caller sweep. No cluster clears "≥5% of remaining methods" with low fragmentation cost except Quality — and Quality fails C5 (huge, IDEA-* endpoints) as a hard stop.
+- **Methods:** GetPipelineProvidersAsync, ProcessPipelineAsync
+- **Destination:** IPipelineConversationClient (already exists; migrate to pipeline)
+- **Callers:** PipelineConversationViewModel only
+- **Blast radius:** 1 ViewModel
+- **Verdict:** Cleanest next slice
 
-2. **Fragmentation cost:** Extracting Project audio (3 methods), Ensemble (2), or Batch lifecycle (4) adds new client types for &lt;5% reduction. The "complete thin client" exception applies to Profiles, Projects, Transcription, Settings — but each has high blast radius (10+ ViewModels).
+### Option B: Models (complete) — thin client exists
 
-3. **Sparse caller risk:** Ensemble, Channel routing have 1–2 callers. Extraction would add types without meaningful coupling reduction.
+- **Methods:** All 9 (GetModels, GetModel, RegisterModel, VerifyModel, UpdateModelChecksum, DeleteModel, GetStorageStats, ExportModel, ImportModel)
+- **Destination:** IModelManagerClient (add GetModelAsync, RegisterModelAsync; migrate to pipeline)
+- **Callers:** ModelManagerViewModel, ModelActions, TrainingViewModelTests
+- **Blast radius:** 2–3 ViewModels/panels
+- **Verdict:** Good — thin client exists; complete the migration
 
-4. **DTO-glue risk:** ProfilesClient, ProjectsClient are thin delegators. Migrating to pipeline is correct but does not reduce DTO knowledge — callers still depend on same models.
+### Option C: Backup/Restore (7 methods) — thin client exists
 
-5. **Cross-cutting:** Voice, Audio retrieval, Audio export, Upload helpers, Quality are cross-cutting or core-path. Stop.
+- **Methods:** GetBackupsAsync, GetBackupAsync, CreateBackupAsync, DownloadBackupAsync, RestoreBackupAsync, UploadBackupAsync, DeleteBackupAsync
+- **Destination:** IBackupRestoreClient (migrate to pipeline)
+- **Callers:** BackupRestoreViewModel, DataBackupService
+- **Blast radius:** 2 callers
+- **Verdict:** Good — bounded, thin client exists
 
-**Conclusion:** Pause PR-18 extraction. Execute STATE_TRIM_PLAN; archive historical bulk; preserve ACTIVE WINDOW, LATEST MILESTONE, PROOF INDEX. Revisit extraction when product reasons justify the migration cost.
+### Option D: Video (4 methods) — two thin clients
+
+- **Methods:** ListVideoEnginesAsync, GenerateVideoAsync, UpscaleVideoAsync, GetVideoInfoAsync, EditVideoAsync (split across IVideoGenClient, IVideoEditClient)
+- **Destination:** Consolidate or migrate both to pipeline
+- **Callers:** VideoGenViewModel, VideoEditViewModel
+- **Blast radius:** 2 ViewModels
+- **Verdict:** Good — thin clients exist
 
 ---
 
-## Re-entry Rule (when to resume extraction)
+## PR-13 Recommendation
 
-Extraction should be resumed when one or more of the following applies:
+**Primary recommendation: Option A — Pipeline (2 methods)**
 
-- **Product requirement changes:** A new feature or refactor demands domain isolation (e.g., a bounded caller cluster emerges for a new panel).
-- **Monolith residue blocker:** Remaining IBackendClient methods block UX, performance, or maintainability (e.g., profiling shows coupling bottleneck).
-- **Thin-client migration request:** Product or architecture decision explicitly requests completing a thin-client migration (Profiles, Projects, Transcription, Settings, Project audio).
-- **Stop criteria re-assessment:** A cluster that previously failed leverage/fragmentation thresholds gains enough callers or a cleaner endpoint family to clear the bar.
+- Smallest surface
+- Single caller
+- IPipelineConversationClient already exists
+- Lowest risk, fastest closure
 
-Do **not** resume extraction purely for purity or momentum. The pause is intentional.
+**Fallback: Option B (Models) or Option C (Backup)** if Pipeline has unexpected coupling.
 
 ---
 
-## Classification Summary (Post-PR-17)
+## PR-13 Track Decision (2026-03-22)
+
+**Chosen: Track A — PR-13 extraction**
+
+**Rationale:** Remainder inventory revealed a clean slice (Pipeline, 2 methods, 1 caller). Stop-extraction criteria satisfied (thin client exists, not DTO glue, not cross-cutting).
+
+**Scope doc:** [PR-13_PIPELINE_SCOPE.md](PR-13_PIPELINE_SCOPE.md)
+
+**Next action:** Execute PR-13 per scope doc (migrate PipelineConversationClient to pipeline, remove from monolith, seam tests, anti-regression, proof).
+
+---
+
+## PR-14 Selection (2026-03-22)
+
+**Chosen: BackupRestore**
+
+**Ranking rationale:**
+
+| Rank | Slice | Size | Rationale |
+|------|-------|------|------------|
+| 1 | **BackupRestore** | 7 methods | Thin client exists; bounded endpoint family; 1 primary caller (BackupRestoreViewModel); low blast radius; no training/model weirdness |
+| 2 | Models | 9 methods | Thin client exists; may drag more incidental behavior |
+| 3 | Video | 4 methods | Two thin clients (IVideoGenClient, IVideoEditClient); split surfaces |
+| 4 | Mixer | 22 methods | Large; higher risk of mistakes |
+
+**Rationale:** BackupRestore is the cleanest next slice — 7 methods, IBackupRestoreClient exists, BackupRestoreViewModel is the sole API caller (DataBackupService does local file backup, not IBackupRestoreClient). Lower blast radius than Mixer; cleaner than Models.
+
+---
+
+## Classification Summary
 
 | Category | Cluster count | Action |
 |----------|---------------|--------|
-| Hard stop (cross-cutting, generic) | 5 (Voice, Audio retrieval, Audio export, Upload helpers, Quality) | Do not extract |
-| Thin client, complete migration | 4 (Profiles, Projects, Project audio, Transcription, Settings) | Pause — high blast radius |
-| Bounded, extractable | 3 (Timeline tracks, Timeline clips, Ensemble, Batch lifecycle) | Pause — leverage too low |
-| Split first / defer | 4 (Timeline markers, Batch core, Batch quality, Training, Emotion, Channel routing) | Pause |
+| Thin client, migrate to pipeline | 5 (Models, Mixer, Backup, Pipeline, Video) | PR-13+ candidates |
+| Bounded, no client | 2 (Emotion, Ensemble) | Assess after thin-client migrations |
+| Larger, medium complexity | 8 (Profiles, Projects, Timeline, Transcription, Batch, Audio viz, Settings) | Defer |
+| High complexity / keep | 4 (Voice, Audio retrieval, Training, Quality, MCP, Generic) | Defer or never |
 
 ---
 
-## Caller Counts (Production, Excluding Tests)
+## Caller Counts (Excluding Tests, Interface, Implementation)
 
 | Method family | Source files (src/, excl. IBackendClient, BackendClient, *Tests) |
 |---------------|------------------------------------------------------------------|
-| Profiles | ProfilesClient, ProfilesViewModel, TimelineViewModel, VoiceSynthesisViewModel, ProfileComparisonViewModel, ABTestingViewModel, QualityBenchmarkViewModel, QualityOptimizationWizardViewModel, ProfileHealthDashboardViewModel, TagOrganizationViewModel, EmbeddingExplorerViewModel, VoiceMorphViewModel, VoiceMorphingBlendingViewModel, PronunciationLexiconViewModel, TextBasedSpeechEditorViewModel, TextSpeechEditorViewModel, StyleTransferViewModel, ProfilesUseCase, ProfileOperationsHandler |
-| Projects | ProjectsClient, TimelineViewModel, EmbeddingExplorerViewModel, TextSpeechEditorViewModel, MixAssistantViewModel, AssistantViewModel, StyleTransferViewModel, SpatialStageViewModel, VoiceMorphViewModel, TextHighlightingViewModel, SonographyVisualizationViewModel, AdvancedWaveformVisualizationViewModel, AdvancedSpectrogramVisualizationViewModel, ProjectStore, TimelineProjectHandlers |
-| Project audio | ProjectAudioClient, TimelineViewModel, SpatialStageViewModel, SonographyVisualizationViewModel, StyleTransferViewModel, VoiceMorphViewModel, TextHighlightingViewModel, EmbeddingExplorerViewModel |
-| Transcription | TranscriptionClient, TimelineTranscriptionService, TranscribeViewModel |
-| Timeline tracks | TimelineTrackService |
-| Timeline clips | TimelineClipService |
+| Pipeline | PipelineConversationViewModel, PipelineConversationClient |
+| Models | ModelManagerViewModel, ModelManagerView, ModelActions, ModelManagerClient |
+| Backup | BackupRestoreViewModel, DataBackupService, BackupRestoreClient |
+| Video | VideoGenViewModel, VideoEditViewModel, VideoGenClient, VideoEditClient |
+| Mixer | EffectsMixerViewModel, MixerStateClient |

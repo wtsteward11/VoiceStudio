@@ -21,6 +21,13 @@ This file is the canonical ledger for **every** bug, crash, build failure, missi
 - **No “close” without evidence** (commands + results).
 - **Functionality gates before features** (see Plan gates A–H).
 
+### Oversight — IDE / Project Access connector instability (2026-04-01)
+
+- **Symptom:** Intermittent **424/502** or workspace read failures on Project Access / connector paths.
+- **Impact:** Agents MUST label verification **Independently repo-verified locally** vs **Connector-limited architectural review only** when closure proofs cannot be reproduced; see `docs/design/GOV_VOICESTUDIO_EDIT_APPLY_RETRY_RECOVERY_01_EXECUTION_ROW.md` §0 and §10.
+- **Owner:** Overseer + environment / connector restore.
+- **State:** OPEN (oversight item; not a product defect tracked as VS-XXXX unless promoted).
+
 ---
 
 ## Status states (required)

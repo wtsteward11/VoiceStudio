@@ -1,3 +1,5 @@
+> **↩ Superseded for forward-looking phase scheduling (2026-03-29):** **[VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md)** and **[PROFESSIONAL_GAP_TRACKER.md](../design/PROFESSIONAL_GAP_TRACKER.md)** are the active north-star and gap list. This document remains authoritative for **v1.1.0 CI invariants (I-1 through I-5)** and **completed v1.1.0 closure evidence** recorded herein.
+
 # VoiceStudio Completion Roadmap v2.0 — CI-Enforced Edition
 
 **Date**: March 3, 2026 | **Target**: v1.1.0 | **Confidential**

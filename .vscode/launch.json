@@ -30,7 +30,7 @@
       "console": "internalConsole",
       "stopAtEntry": false,
       "env": {
-        "VOICESTUDIO_BACKEND_URL": "http://localhost:8000",
+        "VOICESTUDIO_BACKEND_URL": "http://127.0.0.1:8000",
         "VOICESTUDIO_LOG_LEVEL": "INFO",
         "VOICESTUDIO_ENABLE_ANALYTICS": "false",
         "VOICESTUDIO_ENABLE_PERFORMANCE_PROFILING": "false"
@@ -47,7 +47,7 @@
       "console": "internalConsole",
       "stopAtEntry": false,
       "env": {
-        "VOICESTUDIO_BACKEND_URL": "http://localhost:8000",
+        "VOICESTUDIO_BACKEND_URL": "http://127.0.0.1:8000",
         "VOICESTUDIO_LOG_LEVEL": "INFO",
         "VOICESTUDIO_SKIP_HEAVY_PANELS": "true",
         "VOICESTUDIO_ENABLE_ANALYTICS": "false",
@@ -65,7 +65,7 @@
       "console": "internalConsole",
       "stopAtEntry": false,
       "env": {
-        "VOICESTUDIO_BACKEND_URL": "http://localhost:8000",
+        "VOICESTUDIO_BACKEND_URL": "http://127.0.0.1:8000",
         "VOICESTUDIO_LOG_LEVEL": "DEBUG",
         "VOICESTUDIO_STRESS_TEST": "true",
         "VOICESTUDIO_ENABLE_ANALYTICS": "true",

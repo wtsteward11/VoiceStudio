@@ -1,6 +1,7 @@
 # Build output (dotnet)
 **/bin/
 **/obj/
+**/TestResults/
 artifacts/
 *.binlog
 *.log

@@ -1,7 +1,7 @@
 # AutomationId Registry
 
 > **Version**: 1.0.0  
-> **Last Updated**: 2026-03-25  
+> **Last Updated**: 2026-04-04  
 > **Status**: ACTIVE  
 > **Owner**: UI Engineer (Role 3)
 
@@ -129,6 +129,23 @@ Voice profile management.
 | `ProfilesView_BatchExportButton` | Button | Batch export profiles | v1.0.0 |
 | `ProfilesView_BatchDeleteButton` | Button | Batch delete profiles | v1.0.0 |
 
+#### ModelManagerView
+Model storage, import, and URL download (GAP-043).
+
+| AutomationId | Control Type | Purpose | Stable Since |
+|--------------|--------------|---------|--------------|
+| `ModelManagerView_Root` | Grid | Panel root container | v1.0.0 |
+| `ModelManager.DownloadUrl` | TextBox | Remote model URL | v1.1.0 |
+| `ModelManager.DownloadModelName` | TextBox | Target model name | v1.1.0 |
+| `ModelManager.DownloadVersion` | TextBox | Model version | v1.1.0 |
+| `ModelManager.DownloadExpectedSha256` | TextBox | Optional SHA-256 gate | v1.1.0 |
+| `ModelManager.DownloadEngine` | ComboBox | Engine for download | v1.1.0 |
+| `ModelManager.StartDownload` | Button | Start canonical download job | v1.1.0 |
+| `ModelManager.CancelDownload` | Button | Cancel job via `/api/jobs` | v1.1.0 |
+| `ModelManager.RetryDownload` | Button | Retry failed download job | v1.1.0 |
+| `ModelManager.PauseDownload` | Button | Pause running download job | v1.1.0 |
+| `ModelManager.ResumeDownload` | Button | Resume paused download job | v1.1.0 |
+
 #### EffectsMixerView
 Audio effects and mixing.
 
@@ -214,6 +231,7 @@ Every panel has a `_Root` AutomationId for test navigation:
 | TrainingView | `TrainingView_Root` |
 | QualityBenchmarkView | `QualityBenchmarkView_Root` |
 | LibraryView | `LibraryView_Root` |
+| LibraryView (context — Add to Timeline, GAP-027) | `LibraryView_Menu_AddToTimeline` |
 | SettingsView | `SettingsView_Root` |
 | DiagnosticsView | `DiagnosticsView_Root` |
 | JobProgressView | `JobProgressView_Root` |
@@ -235,6 +253,13 @@ Every panel has a `_Root` AutomationId for test navigation:
 | BackupRestoreView (restore busy) | `BackupRestore_RestoreBusyRow` |
 | BackupRestoreView (cancel restore) | `BackupRestore_CancelRestoreButton` |
 | TranscribeView (persistence scope footnote, Pass 01) | `TranscribeView_PersistenceScopeFootnote` |
+| TranscribeView (GAP-045 inline segment edit hint) | `TranscribeView_SegmentEditOperatorHint` |
+| TranscribeView (segment row busy ring; one per segment in ItemsRepeater template) | `TranscribeView_SegmentBusyRing` |
+| TranscribeView (GAP-045 session edit history list) | `TranscribeView_EditHistoryList` |
+| TranscribeView (GAP-045 clear session edit history) | `TranscribeView_ClearEditHistoryButton` |
+| TranscribeView (GOV-EDIT-APPLY-JOB-STATUS: apply/regenerate job status list) | `TranscribeView_ApplyJobStatusList` |
+| TranscribeView (GOV-VOICESTUDIO-EDIT-APPLY-RETRY-RECOVERY-01: retry failed job row) | `TranscribeView_ApplyJobRetryButton` |
+| TranscribeView (GOV-EDIT-APPLY-JOB-STATUS: clear job status rows) | `TranscribeView_ClearApplyJobStatusButton` |
 | LibraryView (import vs drag-drop scope footnote, Pass 01 slice 2) | `LibraryView_ImportDragDropScopeFootnote` |
 | TrainingView (surface maturity footnote, Pass 01 slice 3) | `TrainingView_SurfaceMaturityFootnote` |
 | QualityBenchmarkView (surface maturity footnote, Pass 01 slice 4) | `QualityBenchmarkView_SurfaceMaturityFootnote` |

@@ -9,9 +9,12 @@ namespace VoiceStudio.Core.Services
   /// </summary>
   public interface IJobProgressApiClient
   {
+    Task<Job?> GetJobAsync(string jobId, CancellationToken cancellationToken = default);
+
     Task<Job[]?> GetJobsAsync(string? jobType = null, string? status = null, CancellationToken cancellationToken = default);
     Task<JobSummary?> GetJobSummaryAsync(CancellationToken cancellationToken = default);
     Task CancelJobAsync(string jobId, CancellationToken cancellationToken = default);
+    Task RetryJobAsync(string jobId, CancellationToken cancellationToken = default);
     Task PauseJobAsync(string jobId, CancellationToken cancellationToken = default);
     Task ResumeJobAsync(string jobId, CancellationToken cancellationToken = default);
     Task DeleteJobAsync(string jobId, CancellationToken cancellationToken = default);

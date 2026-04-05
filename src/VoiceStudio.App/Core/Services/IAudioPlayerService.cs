@@ -39,7 +39,7 @@ namespace VoiceStudio.Core.Services
     /// Plays audio by backend audio ID via the canonical /api/audio/file/{id} endpoint.
     /// </summary>
     /// <param name="audioId">Backend audio ID (from upload or synthesis)</param>
-    /// <param name="baseUrl">Backend base URL (e.g., http://localhost:8000)</param>
+    /// <param name="baseUrl">Backend base URL (e.g., http://127.0.0.1:8000)</param>
     /// <param name="onPlaybackComplete">Optional callback when playback completes</param>
     /// <returns>Task representing the playback operation</returns>
     Task PlayBackendAudioIdAsync(string audioId, string baseUrl, Action? onPlaybackComplete = null);

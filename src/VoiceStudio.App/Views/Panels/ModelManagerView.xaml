@@ -20,6 +20,59 @@
                        Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
         </Border>
 
+        <ScrollViewer Grid.Row="1"
+                      Padding="{StaticResource VSQ.Spacing.Medium}"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="{StaticResource VSQ.Spacing.Value.Relaxed}">
+                <TextBlock Text="Download from URL"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
+                <TextBox x:Name="DownloadUrlBox"
+                         AutomationProperties.AutomationId="ModelManager.DownloadUrl"
+                         Header="URL"
+                         Text="{x:Bind ViewModel.DownloadUrl, Mode=TwoWay}" />
+                <TextBox AutomationProperties.AutomationId="ModelManager.DownloadModelName"
+                         Header="Model name"
+                         Text="{x:Bind ViewModel.DownloadModelName, Mode=TwoWay}" />
+                <TextBox AutomationProperties.AutomationId="ModelManager.DownloadVersion"
+                         Header="Version"
+                         Text="{x:Bind ViewModel.DownloadVersion, Mode=TwoWay}" />
+                <TextBox AutomationProperties.AutomationId="ModelManager.DownloadExpectedSha256"
+                         Header="Expected SHA-256 (optional)"
+                         Text="{x:Bind ViewModel.DownloadExpectedSha256, Mode=TwoWay}" />
+                <ComboBox x:Name="DownloadEngineCombo"
+                          AutomationProperties.AutomationId="ModelManager.DownloadEngine"
+                          Header="Engine"
+                          ItemsSource="{x:Bind ViewModel.Engines}"
+                          SelectedItem="{x:Bind ViewModel.DownloadTargetEngine, Mode=TwoWay}" />
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource VSQ.Spacing.Value.Medium}">
+                    <TextBlock Foreground="{StaticResource VSQ.Text.SecondaryBrush}" Text="Job:" />
+                    <TextBlock Foreground="{StaticResource VSQ.Text.SecondaryBrush}" Text="{x:Bind ViewModel.ActiveDownloadJobId, Mode=OneWay}" />
+                    <TextBlock Foreground="{StaticResource VSQ.Text.SecondaryBrush}" Text="Status:" />
+                    <TextBlock Foreground="{StaticResource VSQ.Text.SecondaryBrush}" Text="{x:Bind ViewModel.DownloadJobStatus, Mode=OneWay}" />
+                    <TextBlock Foreground="{StaticResource VSQ.Text.SecondaryBrush}" Text="Progress:" />
+                    <TextBlock Foreground="{StaticResource VSQ.Text.SecondaryBrush}" Text="{x:Bind ViewModel.DownloadJobProgress, Mode=OneWay}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource VSQ.Spacing.Value.Medium}">
+                    <Button AutomationProperties.AutomationId="ModelManager.StartDownload"
+                            Content="Start download"
+                            Command="{x:Bind ViewModel.StartModelDownloadCommand}" />
+                    <Button AutomationProperties.AutomationId="ModelManager.CancelDownload"
+                            Content="Cancel"
+                            Command="{x:Bind ViewModel.CancelModelDownloadCommand}" />
+                    <Button AutomationProperties.AutomationId="ModelManager.RetryDownload"
+                            Content="Retry"
+                            Command="{x:Bind ViewModel.RetryModelDownloadCommand}" />
+                    <Button AutomationProperties.AutomationId="ModelManager.PauseDownload"
+                            Content="Pause"
+                            Command="{x:Bind ViewModel.PauseModelDownloadCommand}" />
+                    <Button AutomationProperties.AutomationId="ModelManager.ResumeDownload"
+                            Content="Resume"
+                            Command="{x:Bind ViewModel.ResumeModelDownloadCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
         <controls:HelpOverlay x:Name="HelpOverlay" 
                               Grid.RowSpan="2"
                               IsVisible="False" 

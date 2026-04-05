@@ -576,7 +576,7 @@ namespace VoiceStudio.App.ViewModels
         if (!string.IsNullOrEmpty(PreviewAudioId))
         {
           var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
-              ?? "http://localhost:8000";
+              ?? BackendClientConfig.DefaultHttpBaseUrl;
           await _audioPlayer.PlayBackendAudioIdAsync(PreviewAudioId, baseUrl);
         }
         else if (!string.IsNullOrEmpty(PreviewAudioUrl))
@@ -589,7 +589,7 @@ namespace VoiceStudio.App.ViewModels
           else
           {
             var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
-                ?? "http://localhost:8000";
+                ?? BackendClientConfig.DefaultHttpBaseUrl;
             var audioId = PreviewAudioUrl.TrimStart('/').Replace("api/audio/", "");
             if (!string.IsNullOrEmpty(audioId))
               await _audioPlayer.PlayBackendAudioIdAsync(audioId, baseUrl);

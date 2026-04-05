@@ -20,7 +20,8 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new QualityDashboardViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          AppServices.GetRequiredService<VoiceStudio.Core.Services.IQualityControlClient>()
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IQualityControlClient>(),
+          AppServices.TryGetEventAggregator()
       );
       this.DataContext = ViewModel;
 

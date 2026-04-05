@@ -1,9 +1,15 @@
 <UserControl x:Class="VoiceStudio.App.Controls.SpectrogramControl"
   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml"
   xmlns:local="using:VoiceStudio.App.Controls"
   x:DataType="local:SpectrogramControl">
   <Grid x:Name="SpectrogramContainer" Background="Black">
+    <canvas:CanvasControl x:Name="SpecCanvas"
+      ClearColor="Black"
+      HorizontalAlignment="Stretch"
+      VerticalAlignment="Stretch"
+      Visibility="Collapsed" />
     <Image x:Name="SpectrogramImage"
       Stretch="Fill"
       HorizontalAlignment="Stretch"

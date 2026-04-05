@@ -11,6 +11,8 @@ using MultiSelectSelectionChangedEventArgs = VoiceStudio.App.Services.SelectionC
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using VoiceStudio.Core.Events;
+using VoiceStudio.App.Core.Services;
 using Windows.Foundation;
 using Windows.System;
 using Windows.ApplicationModel.DataTransfer;
@@ -34,6 +36,7 @@ namespace VoiceStudio.App.Views.Panels
     private Storyboard? _playheadPulseAnimation;
     private DragDropVisualFeedbackService? _dragDropService;
     private IDragDropService? _panelDragDropService;
+    private IEventAggregator? _eventAggregator;
     private ToastNotificationService? _toastService;
     private UndoRedoService? _undoRedoService;
     private IDialogService? _dialogService;
@@ -62,13 +65,16 @@ namespace VoiceStudio.App.Views.Panels
           AppServices.TryGetErrorPresentationService(),
           AppServices.TryGetErrorLoggingService(),
           AppServices.GetService<ISettingsService>(),
-          AppServices.TryGetRecentProjectsService()
+          AppServices.TryGetRecentProjectsService(),
+          AppServices.GetProjectSessionDirtyState(),
+          timelineUseCase: AppServices.GetTimelineUseCase()
       );
       this.DataContext = ViewModel;
 
       // Initialize services
       _dragDropService = AppServices.GetDragDropVisualFeedbackService();
       _panelDragDropService = AppServices.TryGetDragDropService();
+      _eventAggregator = AppServices.TryGetEventAggregator();
       _toastService = AppServices.TryGetToastNotificationService();
       _undoRedoService = AppServices.TryGetUndoRedoService();
       _keyboardShortcutService = AppServices.TryGetKeyboardShortcutService();
@@ -171,56 +177,164 @@ namespace VoiceStudio.App.Views.Panels
 
     /// <summary>
     /// Handles a dropped Asset, Profile, or external file payload from cross-panel drag.
+    /// GAP-032: audio library assets route through <see cref="AddToTimelineEvent"/> (same authority as Library context menu).
     /// </summary>
-    private async Task HandleCrossPanelDropAsync(DragPayload payload, CancellationToken cancellationToken)
+    private async Task<DropResult> HandleCrossPanelDropAsync(DragPayload payload, CancellationToken cancellationToken)
     {
-      if (ViewModel.SelectedTrack == null || ViewModel.SelectedProject == null)
+      _ = cancellationToken;
+      var panelId = ViewModel.PanelId;
+      if (_eventAggregator == null)
       {
-        _toastService?.ShowToast(ToastType.Warning, "Drop Failed", "Select a track first to add clips");
-        return;
+        _toastService?.ShowToast(ToastType.Warning, "Drop Failed", "Timeline cannot receive library drops (events unavailable).");
+        return new DropResult { Success = false, TargetPanelId = panelId, ErrorMessage = "Event aggregator unavailable" };
       }
 
       switch (payload.PayloadType)
       {
         case DragPayloadType.Asset:
+          var anyAssetPublished = false;
           foreach (var item in payload.Items)
           {
-            // Create clip from asset
-            var clip = new AudioClip
+            if (!IsLibraryAudioAssetForTimeline(item))
             {
-              Id = Guid.NewGuid().ToString(),
-              Name = item.DisplayName,
-              AudioId = item.Id,
-              StartTime = ViewModel.SelectedTrack.Clips.Count > 0
-                  ? ViewModel.SelectedTrack.Clips.Max(c => c.EndTime)
-                  : 0.0,
-              Duration = TimeSpan.FromSeconds(5), // Default duration, will be updated by backend
-            };
+              _toastService?.ShowToast(
+                  ToastType.Warning,
+                  "Timeline",
+                  $"Only audio library assets can be added to the timeline ({item.DisplayName}).");
+              continue;
+            }
 
-            ViewModel.SelectedTrack.Clips.Add(clip);
-            _toastService?.ShowToast(ToastType.Success, "Asset Added", $"Added '{item.DisplayName}' to timeline");
+            var duration = TimeSpan.FromSeconds(GetDurationSecondsFromDragItem(item));
+            var path = ResolveLibraryAssetPathForTimelineHandoff(item);
+            var clipName = string.IsNullOrWhiteSpace(item.DisplayName) ? "Library audio" : item.DisplayName;
+
+            _eventAggregator.Publish(new AddToTimelineEvent(
+                payload.SourcePanelId,
+                item.Id,
+                path,
+                duration,
+                clipName,
+                targetTrackIndex: null,
+                insertPosition: null,
+                profileId: null));
+            anyAssetPublished = true;
+            _toastService?.ShowToast(ToastType.Success, "Timeline", $"'{clipName}' sent to Timeline");
           }
-          break;
+          if (payload.Items.Count > 0 && !anyAssetPublished)
+          {
+            return new DropResult
+            {
+              Success = false,
+              TargetPanelId = panelId,
+              ErrorMessage = "No eligible audio assets in drop payload",
+            };
+          }
+          return new DropResult { Success = true, TargetPanelId = panelId, Action = nameof(AddToTimelineEvent) };
 
         case DragPayloadType.Profile:
-          // When a profile is dropped, it could set the default voice for new clips
-          var profileId = payload.Items.FirstOrDefault()?.Id;
-          if (!string.IsNullOrEmpty(profileId))
+          var profileItem = payload.Items.FirstOrDefault();
+          if (profileItem == null || string.IsNullOrEmpty(profileItem.Id))
           {
-            _toastService?.ShowToast(ToastType.Info, "Profile Selected", $"Profile '{payload.Items.First().DisplayName}' selected for new clips");
+            _toastService?.ShowToast(ToastType.Warning, "Timeline", "Drop did not include a profile id.");
+            return new DropResult { Success = false, TargetPanelId = panelId, ErrorMessage = "Missing profile" };
           }
-          break;
+          _eventAggregator.Publish(new ProfileSelectedEvent(
+              payload.SourcePanelId,
+              profileItem.Id,
+              profileItem.DisplayName,
+              InteractionIntent.ImmediateUse));
+          _toastService?.ShowToast(
+              ToastType.Info,
+              "Profile",
+              $"Profile '{profileItem.DisplayName}' selected (context).");
+          return new DropResult { Success = true, TargetPanelId = panelId, Action = nameof(ProfileSelectedEvent) };
 
         case DragPayloadType.ExternalFile:
           foreach (var item in payload.Items)
           {
-            // Import external audio file
-            _toastService?.ShowToast(ToastType.Info, "Import Started", $"Importing '{item.DisplayName}'...");
+            _toastService?.ShowToast(ToastType.Info, "Import Started", $"Importing '{item.DisplayName}' is not wired in this lane — use Library import.");
           }
-          break;
-      }
+          return new DropResult { Success = false, TargetPanelId = panelId, ErrorMessage = "External file import deferred" };
 
-      await Task.CompletedTask;
+        case DragPayloadType.TimelineClip:
+          await Task.CompletedTask.ConfigureAwait(true);
+          return new DropResult { Success = true, TargetPanelId = panelId, Action = "IgnoredTimelineClip" };
+
+        default:
+          await Task.CompletedTask.ConfigureAwait(true);
+          return new DropResult { Success = false, TargetPanelId = panelId, ErrorMessage = "Unsupported payload" };
+      }
+    }
+
+    private static bool IsLibraryAudioAssetForTimeline(DragItem item)
+    {
+      string? t = null;
+      if (item.Metadata != null && item.Metadata.TryGetValue("AssetType", out var raw))
+        t = raw?.ToString();
+      if (string.IsNullOrEmpty(t))
+        return true;
+      var voiceTypes = new[] { "voice", "voice_profile", "profile", "clone", "xtts", "rvc" };
+      if (voiceTypes.Contains(t.ToLowerInvariant()))
+        return false;
+      var audioTypes = new[] { "audio", "wav", "mp3", "flac", "ogg", "m4a", "recording" };
+      return audioTypes.Contains(t.ToLowerInvariant());
+    }
+
+    private static double GetDurationSecondsFromDragItem(DragItem item)
+    {
+      if (item.Metadata == null || !item.Metadata.TryGetValue("DurationSeconds", out var raw))
+        return 0.01;
+      switch (raw)
+      {
+        case double d:
+          return d > 0 ? d : 0.01;
+        case float f:
+          return f > 0 ? f : 0.01;
+        case int i:
+          return i > 0 ? i : 0.01;
+        default:
+          if (double.TryParse(raw?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var p))
+            return p > 0 ? p : 0.01;
+          return 0.01;
+      }
+    }
+
+    private static string ResolveLibraryAssetPathForTimelineHandoff(DragItem item)
+    {
+      if (item.Metadata != null && item.Metadata.TryGetValue("FilePath", out var fp) && fp != null)
+      {
+        var local = fp.ToString();
+        if (!string.IsNullOrWhiteSpace(local) && System.IO.File.Exists(local))
+          return local;
+      }
+      var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+          ?? BackendClientConfig.DefaultHttpBaseUrl;
+      return $"{baseUrl}/api/audio/file/{Uri.EscapeDataString(item.Id)}";
+    }
+
+    private void TimelineView_Root_DragOver(object sender, DragEventArgs e)
+    {
+      _ = sender;
+      if (_panelDragDropService is { IsDragging: true } && _panelDragDropService.CanDrop(ViewModel.PanelId))
+      {
+        e.AcceptedOperation = DataPackageOperation.Copy;
+        _panelDragDropService.UpdateDragTarget(ViewModel.PanelId);
+        e.Handled = true;
+      }
+    }
+
+    private async void TimelineView_Root_Drop(object sender, DragEventArgs e)
+    {
+      _ = sender;
+      if (_panelDragDropService is { IsDragging: true } && _panelDragDropService.CanDrop(ViewModel.PanelId))
+      {
+        _ = await _panelDragDropService.ExecuteDropAsync(
+            ViewModel.PanelId,
+            HandleCrossPanelDropAsync,
+            CancellationToken.None).ConfigureAwait(true);
+        e.Handled = true;
+      }
+      await Task.CompletedTask.ConfigureAwait(true);
     }
 
     private void RegisterKeyboardShortcuts()
@@ -408,6 +522,8 @@ namespace VoiceStudio.App.Views.Panels
         {
           var audioPlayerService = ServiceProvider.GetAudioPlayerService() as AudioPlayerService;
           audioPlayerService?.StopPreview();
+          // Slice 3: completion callback may not run if preview was cancelled — clear VM flag deterministically.
+          ViewModel.IsPreviewing = false;
         }
       }
     }
@@ -530,6 +646,21 @@ namespace VoiceStudio.App.Views.Panels
             break;
           case "properties":
             ShowClipProperties(clip);
+            break;
+          case "split at playhead":
+            await ViewModel.SplitClipAtPlayheadAsync(clip);
+            break;
+          case "trim start to playhead":
+            await ViewModel.TrimClipStartToPlayheadAsync(clip);
+            break;
+          case "trim end to playhead":
+            await ViewModel.TrimClipEndToPlayheadAsync(clip);
+            break;
+          case "fade in 0.5s":
+            await ViewModel.SetClipFadeAsync(clip, fadeInSeconds: 0.5, fadeOutSeconds: clip.FadeOutSeconds);
+            break;
+          case "fade out 0.5s":
+            await ViewModel.SetClipFadeAsync(clip, fadeInSeconds: clip.FadeInSeconds, fadeOutSeconds: 0.5);
             break;
           case "delete":
             await DeleteClipAsync(clip);
@@ -709,7 +840,7 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    private void HandleTrackMenuClick(string action, AudioTrack track)
+    private async void HandleTrackMenuClick(string action, AudioTrack track)
     {
       try
       {
@@ -725,11 +856,11 @@ namespace VoiceStudio.App.Views.Panels
             break;
           case "mute":
             track.IsMuted = !track.IsMuted;
-            System.Diagnostics.Debug.WriteLine($"Toggle mute for track: {track.Name}");
+            await ViewModel.PersistTrackMixStateAsync(track).ConfigureAwait(true);
             break;
           case "solo":
             track.IsSolo = !track.IsSolo;
-            System.Diagnostics.Debug.WriteLine($"Toggle solo for track: {track.Name}");
+            await ViewModel.PersistTrackMixStateAsync(track).ConfigureAwait(true);
             break;
           case "rename":
             // Note: Track rename will be implemented when rename command is available

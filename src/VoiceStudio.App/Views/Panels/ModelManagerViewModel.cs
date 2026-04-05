@@ -21,7 +21,9 @@ namespace VoiceStudio.App.Views.Panels
   public partial class ModelManagerViewModel : BaseViewModel, IPanelView
   {
     private readonly IModelManagerClient _modelManagerClient;
+    private readonly IJobProgressApiClient? _jobProgressClient;
     private readonly UndoRedoService? _undoRedoService;
+    private CancellationTokenSource? _downloadPollCts;
 
     public string PanelId => PanelIds.ModelManager;
     public string DisplayName => ResourceHelper.GetString("Panel.ModelManager.DisplayName", "Model Manager");
@@ -54,6 +56,33 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private string? verificationResult;
 
+    [ObservableProperty]
+    private bool isDownloading;
+
+    [ObservableProperty]
+    private string downloadUrl = "";
+
+    [ObservableProperty]
+    private string downloadModelName = "";
+
+    [ObservableProperty]
+    private string downloadVersion = "1.0";
+
+    [ObservableProperty]
+    private string? downloadExpectedSha256;
+
+    [ObservableProperty]
+    private string? downloadTargetEngine;
+
+    [ObservableProperty]
+    private string? activeDownloadJobId;
+
+    [ObservableProperty]
+    private double downloadJobProgress;
+
+    [ObservableProperty]
+    private string? downloadJobStatus;
+
     // CS0108 fix: Intentionally hiding base HasError with local ErrorMessage binding
     public new bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
@@ -69,10 +98,11 @@ namespace VoiceStudio.App.Views.Panels
             "svd"
         };
 
-    public ModelManagerViewModel(IViewModelContext context, IModelManagerClient modelManagerClient)
+    public ModelManagerViewModel(IViewModelContext context, IModelManagerClient modelManagerClient, IJobProgressApiClient? jobProgressClient = null)
         : base(context)
     {
       _modelManagerClient = modelManagerClient ?? throw new ArgumentNullException(nameof(modelManagerClient));
+      _jobProgressClient = jobProgressClient;
 
       // Get undo/redo service (may be null if not initialized)
       try
@@ -93,6 +123,12 @@ namespace VoiceStudio.App.Views.Panels
       LoadStorageStatsCommand = new EnhancedAsyncRelayCommand(async (ct) => await LoadStorageStatsAsync(ct), () => !IsLoading);
       ExportModelCommand = new EnhancedAsyncRelayCommand<ModelInfo>(async (model, ct) => await ExportModelAsync(model, ct), model => model != null && !IsLoading);
       ImportModelCommand = new EnhancedAsyncRelayCommand(async (ct) => await ImportModelAsync(ct), () => !IsLoading);
+      DownloadTargetEngine = Engines.Count > 0 ? Engines[0] : "xtts_v2";
+      StartModelDownloadCommand = new EnhancedAsyncRelayCommand(async (ct) => await StartModelDownloadAsync(ct), () => !IsDownloading && !IsLoading && !string.IsNullOrWhiteSpace(DownloadUrl) && !string.IsNullOrWhiteSpace(DownloadModelName));
+      CancelModelDownloadCommand = new EnhancedAsyncRelayCommand(async (ct) => await CancelModelDownloadAsync(ct), () => _jobProgressClient != null && !string.IsNullOrEmpty(ActiveDownloadJobId) && IsDownloading);
+      RetryModelDownloadCommand = new EnhancedAsyncRelayCommand(async (ct) => await RetryModelDownloadAsync(ct), () => _jobProgressClient != null && !string.IsNullOrEmpty(ActiveDownloadJobId));
+      PauseModelDownloadCommand = new EnhancedAsyncRelayCommand(async (ct) => await PauseModelDownloadAsync(ct), () => _jobProgressClient != null && !string.IsNullOrEmpty(ActiveDownloadJobId) && IsDownloading);
+      ResumeModelDownloadCommand = new EnhancedAsyncRelayCommand(async (ct) => await ResumeModelDownloadAsync(ct), () => _jobProgressClient != null && !string.IsNullOrEmpty(ActiveDownloadJobId));
     }
 
     public IAsyncRelayCommand LoadModelsCommand { get; }
@@ -103,10 +139,19 @@ namespace VoiceStudio.App.Views.Panels
     public IAsyncRelayCommand LoadStorageStatsCommand { get; }
     public IAsyncRelayCommand<ModelInfo> ExportModelCommand { get; }
     public IAsyncRelayCommand ImportModelCommand { get; }
+    public IAsyncRelayCommand StartModelDownloadCommand { get; }
+    public IAsyncRelayCommand CancelModelDownloadCommand { get; }
+    public IAsyncRelayCommand RetryModelDownloadCommand { get; }
+    public IAsyncRelayCommand PauseModelDownloadCommand { get; }
+    public IAsyncRelayCommand ResumeModelDownloadCommand { get; }
 
     partial void OnSelectedEngineChanged(string? value)
     {
       _ = LoadModelsAsync(CancellationToken.None);
+      if (string.IsNullOrEmpty(DownloadTargetEngine) && !string.IsNullOrEmpty(value))
+      {
+        DownloadTargetEngine = value;
+      }
     }
 
     private async Task LoadModelsAsync(CancellationToken cancellationToken)
@@ -409,6 +454,192 @@ namespace VoiceStudio.App.Views.Panels
       finally
       {
         IsLoading = false;
+      }
+    }
+
+    private async Task StartModelDownloadAsync(CancellationToken cancellationToken)
+    {
+      ErrorMessage = null;
+      _downloadPollCts?.Cancel();
+      _downloadPollCts?.Dispose();
+      _downloadPollCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+      var pollCt = _downloadPollCts.Token;
+      try
+      {
+        IsDownloading = true;
+        DownloadJobProgress = 0;
+        DownloadJobStatus = "pending";
+        var engine = !string.IsNullOrEmpty(DownloadTargetEngine)
+            ? DownloadTargetEngine!
+            : (SelectedEngine ?? Engines.FirstOrDefault() ?? "xtts_v2");
+        var ver = string.IsNullOrWhiteSpace(DownloadVersion) ? "1.0" : DownloadVersion.Trim();
+        var req = new ModelDownloadStartRequest
+        {
+          Url = DownloadUrl.Trim(),
+          Engine = engine,
+          ModelName = DownloadModelName.Trim(),
+          Version = ver,
+          ExpectedSha256 = string.IsNullOrWhiteSpace(DownloadExpectedSha256)
+              ? null
+              : DownloadExpectedSha256.Trim()
+        };
+        var res = await _modelManagerClient.StartModelDownloadAsync(req, pollCt);
+        ActiveDownloadJobId = res.JobId;
+        StatusMessage = $"Download started (job {res.JobId})";
+        await PollActiveDownloadJobAsync(pollCt);
+      }
+      catch (OperationCanceledException)
+      {
+        return;
+      }
+      catch (Exception ex)
+      {
+        ErrorMessage = $"Download start failed: {ex.Message}";
+        await HandleErrorAsync(ex, "StartModelDownload");
+      }
+      finally
+      {
+        IsDownloading = false;
+      }
+    }
+
+    private async Task PollActiveDownloadJobAsync(CancellationToken cancellationToken)
+    {
+      if (_jobProgressClient == null || string.IsNullOrEmpty(ActiveDownloadJobId))
+      {
+        return;
+      }
+
+      try
+      {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+          var job = await _jobProgressClient.GetJobAsync(ActiveDownloadJobId, cancellationToken);
+          if (job == null)
+          {
+            break;
+          }
+
+          DownloadJobProgress = job.Progress;
+          DownloadJobStatus = job.Status;
+          var s = job.Status?.ToLowerInvariant() ?? "";
+          if (s is "completed" or "failed" or "cancelled")
+          {
+            if (s == "completed")
+            {
+              StatusMessage = "Model download completed";
+              await LoadModelsAsync(cancellationToken);
+              await LoadStorageStatsAsync(cancellationToken);
+            }
+            else if (s == "failed")
+            {
+              ErrorMessage = job.ErrorMessage ?? "Download failed";
+            }
+
+            break;
+          }
+
+          await Task.Delay(1500, cancellationToken);
+        }
+      }
+      catch (OperationCanceledException)
+      {
+        return;
+      }
+    }
+
+    private async Task CancelModelDownloadAsync(CancellationToken cancellationToken)
+    {
+      if (_jobProgressClient == null || string.IsNullOrEmpty(ActiveDownloadJobId))
+      {
+        return;
+      }
+
+      try
+      {
+        await _jobProgressClient.CancelJobAsync(ActiveDownloadJobId, cancellationToken);
+        _downloadPollCts?.Cancel();
+        StatusMessage = "Download cancel requested";
+      }
+      catch (Exception ex)
+      {
+        ErrorMessage = ex.Message;
+        await HandleErrorAsync(ex, "CancelModelDownload");
+      }
+    }
+
+    private async Task RetryModelDownloadAsync(CancellationToken cancellationToken)
+    {
+      if (_jobProgressClient == null || string.IsNullOrEmpty(ActiveDownloadJobId))
+      {
+        return;
+      }
+
+      try
+      {
+        _downloadPollCts?.Cancel();
+        _downloadPollCts?.Dispose();
+        _downloadPollCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        await _jobProgressClient.RetryJobAsync(ActiveDownloadJobId, cancellationToken);
+        StatusMessage = "Download retry queued";
+        IsDownloading = true;
+        await PollActiveDownloadJobAsync(_downloadPollCts.Token);
+      }
+      catch (Exception ex)
+      {
+        ErrorMessage = ex.Message;
+        await HandleErrorAsync(ex, "RetryModelDownload");
+      }
+      finally
+      {
+        IsDownloading = false;
+      }
+    }
+
+    private async Task PauseModelDownloadAsync(CancellationToken cancellationToken)
+    {
+      if (_jobProgressClient == null || string.IsNullOrEmpty(ActiveDownloadJobId))
+      {
+        return;
+      }
+
+      try
+      {
+        await _jobProgressClient.PauseJobAsync(ActiveDownloadJobId, cancellationToken);
+        StatusMessage = "Download pause requested";
+      }
+      catch (Exception ex)
+      {
+        ErrorMessage = ex.Message;
+        await HandleErrorAsync(ex, "PauseModelDownload");
+      }
+    }
+
+    private async Task ResumeModelDownloadAsync(CancellationToken cancellationToken)
+    {
+      if (_jobProgressClient == null || string.IsNullOrEmpty(ActiveDownloadJobId))
+      {
+        return;
+      }
+
+      try
+      {
+        _downloadPollCts?.Cancel();
+        _downloadPollCts?.Dispose();
+        _downloadPollCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        await _jobProgressClient.ResumeJobAsync(ActiveDownloadJobId, cancellationToken);
+        StatusMessage = "Download resume requested";
+        IsDownloading = true;
+        await PollActiveDownloadJobAsync(_downloadPollCts.Token);
+      }
+      catch (Exception ex)
+      {
+        ErrorMessage = ex.Message;
+        await HandleErrorAsync(ex, "ResumeModelDownload");
+      }
+      finally
+      {
+        IsDownloading = false;
       }
     }
   }

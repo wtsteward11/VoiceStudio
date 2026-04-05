@@ -20,7 +20,10 @@
   d:DataContext="{d:DesignInstance Type=local:VoiceSynthesisViewModel, IsDesignTimeCreatable=False}"
   x:DataType="local:VoiceSynthesisViewModel">
   
-  <Grid AutomationProperties.AutomationId="VoiceSynthesisView_Root" Padding="16">
+  <Grid AutomationProperties.AutomationId="VoiceSynthesisView_Root" Padding="16"
+        AllowDrop="True"
+        DragOver="VoiceSynthesisPanel_DragOver"
+        Drop="VoiceSynthesisPanel_Drop">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>

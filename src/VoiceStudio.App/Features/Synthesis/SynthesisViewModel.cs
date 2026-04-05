@@ -116,7 +116,7 @@ public partial class SynthesisViewModel : BaseViewModel
     private readonly IVoiceGateway _voiceGateway;
     private readonly IEngineGateway _engineGateway;
     private readonly IEventAggregator? _eventAggregator;
-    private ISubscriptionToken? _voiceProfileSelectedSubscription;
+    private ISubscriptionToken? _profileSelectedSubscription;
 
     private string _inputText = "";
     private EngineInfo? _selectedEngine;
@@ -149,9 +149,9 @@ public partial class SynthesisViewModel : BaseViewModel
         ClearHistoryCommand = new RelayCommand(ClearHistory);
         AddToTimelineCommand = new RelayCommand(AddToTimeline, CanAddToTimeline);
         
-        // Subscribe to VoiceProfileSelectedEvent for inter-panel workflow
+        // Subscribe to canonical profile selection (same bus as Profiles / Library / workflow coordinator)
         _eventAggregator = AppServices.TryGetEventAggregator();
-        _voiceProfileSelectedSubscription = _eventAggregator?.Subscribe<VoiceProfileSelectedEvent>(OnVoiceProfileSelected);
+        _profileSelectedSubscription = _eventAggregator?.Subscribe<ProfileSelectedEvent>(OnProfileSelectedFromEventBus);
     }
 
     // Input
@@ -640,10 +640,9 @@ public partial class SynthesisViewModel : BaseViewModel
     #region Inter-Panel Workflow
 
     /// <summary>
-    /// Handles the VoiceProfileSelectedEvent from Library or other panels.
-    /// Sets the selected voice profile for synthesis.
+    /// Handles <see cref="ProfileSelectedEvent"/> from Library, workflow coordinator, or ContextManager-backed flows.
     /// </summary>
-    private void OnVoiceProfileSelected(VoiceProfileSelectedEvent e)
+    private void OnProfileSelectedFromEventBus(ProfileSelectedEvent e)
     {
         try
         {
@@ -709,8 +708,8 @@ public partial class SynthesisViewModel : BaseViewModel
     {
         if (disposing)
         {
-            _voiceProfileSelectedSubscription?.Dispose();
-            _voiceProfileSelectedSubscription = null;
+            _profileSelectedSubscription?.Dispose();
+            _profileSelectedSubscription = null;
         }
         base.Dispose(disposing);
     }

@@ -11,6 +11,7 @@ using VoiceStudio.App.Helpers;
 using VoiceStudio.App.Logging;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Utilities;
+using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Views;
 
@@ -292,7 +293,9 @@ public sealed partial class FirstRunWizard : Window
 
       try
       {
-        var response = await httpClient.GetAsync("http://localhost:8000/health", _cts.Token);
+        var backendBase = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+            ?? BackendClientConfig.DefaultHttpBaseUrl;
+        var response = await httpClient.GetAsync($"{backendBase}/health", _cts.Token);
         _backendRunning = response.IsSuccessStatusCode;
 
         SetCheckStatus(BackendIcon, BackendStatus, _backendRunning,
@@ -306,7 +309,7 @@ public sealed partial class FirstRunWizard : Window
 
           try
           {
-            var enginesResponse = await httpClient.GetAsync("http://localhost:8000/api/engines", _cts.Token);
+            var enginesResponse = await httpClient.GetAsync($"{backendBase}/api/engines", _cts.Token);
             var enginesOk = enginesResponse.IsSuccessStatusCode;
             SetCheckStatus(EnginesIcon, EnginesStatus, enginesOk,
                 enginesOk ? "Available" : "Error loading");

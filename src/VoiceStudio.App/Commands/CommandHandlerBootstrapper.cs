@@ -100,10 +100,23 @@ namespace VoiceStudio.App.Commands
                 var dialogService = GetService<IDialogService>();
                 var backendClient = TryGetService<IBackendClient>();
                 var toastService = TryGetService<ToastNotificationService>();
+                var timelineUseCase = TryGetService<ITimelineUseCase>();
+                var contextManager = TryGetService<IContextManager>();
+                var settingsService = TryGetService<ISettingsService>();
+                var exportLufsPresetUi = TryGetService<IExportLufsPresetUi>();
 
                 if (projectRepo != null && dialogService != null)
                 {
-                    _fileHandler = new FileOperationsHandler(_registry, projectRepo, dialogService, backendClient, toastService);
+                    _fileHandler = new FileOperationsHandler(
+                        _registry,
+                        projectRepo,
+                        dialogService,
+                        backendClient,
+                        toastService,
+                        timelineUseCase,
+                        contextManager,
+                        settingsService,
+                        exportLufsPresetUi);
                     Debug.WriteLine("[CommandHandlerBootstrapper] FileOperationsHandler initialized");
                 }
                 else
@@ -151,7 +164,13 @@ namespace VoiceStudio.App.Commands
                 if (audioPlayer != null)
                 {
                     var orchestrator = TryGetService<IGlobalTransportOrchestrator>();
-                    _playbackHandler = new PlaybackOperationsHandler(_registry, audioPlayer, toastService, orchestrator);
+                    var recordingCoordinator = TryGetService<IRecordingSessionCoordinator>();
+                    _playbackHandler = new PlaybackOperationsHandler(
+                        _registry,
+                        audioPlayer,
+                        toastService,
+                        orchestrator,
+                        recordingCoordinator);
                     Debug.WriteLine("[CommandHandlerBootstrapper] PlaybackOperationsHandler initialized");
                 }
                 else
@@ -253,14 +272,22 @@ namespace VoiceStudio.App.Commands
                 return AppServices.TryGetToastNotificationService();
             if (serviceType == typeof(IProfilesUseCase))
                 return AppServices.TryGetProfilesUseCase();
+            if (serviceType == typeof(ITimelineUseCase))
+                return AppServices.TryGetTimelineUseCase();
+            if (serviceType == typeof(IContextManager))
+                return AppServices.TryGetContextManager();
             if (serviceType == typeof(IAudioPlayerService))
                 return AppServices.GetService<IAudioPlayerService>();
             if (serviceType == typeof(IGlobalTransportOrchestrator))
                 return AppServices.GetService<IGlobalTransportOrchestrator>();
+            if (serviceType == typeof(IRecordingSessionCoordinator))
+                return AppServices.TryGetRecordingSessionCoordinator();
             if (serviceType == typeof(INavigationService))
                 return AppServices.TryGetNavigationService();
             if (serviceType == typeof(ISettingsService))
                 return AppServices.GetService<ISettingsService>();
+            if (serviceType == typeof(IExportLufsPresetUi))
+                return AppServices.TryGetExportLufsPresetUi();
             if (serviceType == typeof(IUnifiedCommandRegistry))
                 return AppServices.TryGetCommandRegistry();
 

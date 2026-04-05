@@ -426,7 +426,7 @@ namespace VoiceStudio.App
 
         private async Task RunSynthesisAndPlaybackAsync(Action<string> appendStepLog, SynthesisProof proof)
         {
-            var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? "http://localhost:8000";
+            var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? BackendClientConfig.DefaultHttpBaseUrl;
             var dispatcher = this.DispatcherQueue;
 
             Task RunOnUiAsync(Func<Task> action)
@@ -779,7 +779,7 @@ namespace VoiceStudio.App
         /// </summary>
         private async Task RunLibraryImportAndPlaybackAsync(Action<string> appendStepLog, LibraryProof proof)
         {
-            var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? "http://localhost:8000";
+            var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? BackendClientConfig.DefaultHttpBaseUrl;
 
             appendStepLog("IMPORT_BACKEND_POLL_BEGIN");
             await Task.Run(async () =>
@@ -959,7 +959,7 @@ namespace VoiceStudio.App
         /// </summary>
         private async Task RunRepeatedLibraryImportPlaybackAsync(Action<string> appendStepLog)
         {
-            var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? "http://localhost:8000";
+            var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? BackendClientConfig.DefaultHttpBaseUrl;
             appendStepLog("REPEATED_BACKEND_POLL_BEGIN");
             await Task.Run(async () =>
             {

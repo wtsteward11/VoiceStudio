@@ -116,7 +116,7 @@ namespace VoiceStudio.App.ViewModels
     {
       if (string.IsNullOrEmpty(TestAudioId) && string.IsNullOrEmpty(TestAudioUrl))
         return;
-      var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? "http://localhost:8000";
+      var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? BackendClientConfig.DefaultHttpBaseUrl;
       if (!string.IsNullOrEmpty(TestAudioId))
         await _audioPlayer.PlayBackendAudioIdAsync(TestAudioId, baseUrl);
       else if (!string.IsNullOrEmpty(TestAudioUrl))

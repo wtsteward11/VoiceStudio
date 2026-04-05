@@ -18,6 +18,8 @@ namespace VoiceStudio.App.Commands
         private readonly IGlobalTransportOrchestrator? _orchestrator;
         private readonly ToastNotificationService? _toastService;
         private readonly Services.MicrophoneRecordingService _recordingService;
+        private readonly IRecordingSessionCoordinator? _recordingSessionCoordinator;
+        private readonly Func<CancellationToken, Task<RecordingAuthorityResolution>> _resolveRecordingAuthority;
 
         private bool _isPlaying;
         private bool _isPaused;
@@ -35,12 +37,17 @@ namespace VoiceStudio.App.Commands
             IUnifiedCommandRegistry registry,
             IAudioPlayerService audioPlayer,
             ToastNotificationService? toastService = null,
-            IGlobalTransportOrchestrator? orchestrator = null)
+            IGlobalTransportOrchestrator? orchestrator = null,
+            IRecordingSessionCoordinator? recordingSessionCoordinator = null,
+            Func<CancellationToken, Task<RecordingAuthorityResolution>>? resolveRecordingAuthority = null)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _audioPlayer = audioPlayer ?? throw new ArgumentNullException(nameof(audioPlayer));
             _toastService = toastService;
             _orchestrator = orchestrator;
+            _recordingSessionCoordinator = recordingSessionCoordinator;
+            _resolveRecordingAuthority = resolveRecordingAuthority
+                ?? RecordingAuthorityResolver.ResolveForCommandPathAsync;
 
             // Initialize microphone recording service
             _recordingService = new Services.MicrophoneRecordingService();
@@ -250,6 +257,13 @@ namespace VoiceStudio.App.Commands
 
         public async Task PauseAsync(CancellationToken ct = default)
         {
+            if (_orchestrator != null)
+            {
+                _orchestrator.PausePlayback();
+                await Task.CompletedTask;
+                return;
+            }
+
             try
             {
                 _audioPlayer.Pause();
@@ -269,6 +283,12 @@ namespace VoiceStudio.App.Commands
 
         public async Task TogglePlayPauseAsync(CancellationToken ct = default)
         {
+            if (_orchestrator != null)
+            {
+                await _orchestrator.TogglePlaybackAsync();
+                return;
+            }
+
             if (_isPlaying && !_isPaused)
             {
                 await PauseAsync(ct);
@@ -331,21 +351,98 @@ namespace VoiceStudio.App.Commands
                     await StopAsync(ct);
                 }
 
-                // Start microphone capture via NAudio
-                await _recordingService.StartRecordingAsync();
+                if (_recordingSessionCoordinator != null)
+                {
+                    // Slice 3: Ctrl+R is always single-track — never inherit multitrack arms from the panel.
+                    _recordingSessionCoordinator.CancelSession();
+
+                    var authority = await _resolveRecordingAuthority(ct).ConfigureAwait(false);
+                    if (!authority.Success)
+                    {
+                        _toastService?.ShowError(
+                            "Recording",
+                            authority.ErrorMessage ?? "Cannot start recording.");
+                        return;
+                    }
+
+                    var recordingClient = AppServices.TryGetRecordingClient();
+                    if (recordingClient == null)
+                    {
+                        _toastService?.ShowError("Recording", "Recording client is not available.");
+                        return;
+                    }
+
+                    var projectId = AppServices.TryGetContextManager()?.ActiveProjectId;
+                    _recordingSessionCoordinator.BindProject(projectId);
+                    if (!_recordingSessionCoordinator.TryCreateSession(out var createErr))
+                    {
+                        _toastService?.ShowError("Recording", createErr ?? "Cannot open recording session.");
+                        return;
+                    }
+
+                    if (!_recordingSessionCoordinator.TryArmTrack(authority.TrackId!, authority.InputSourceId!, out var armErr))
+                    {
+                        _toastService?.ShowError("Recording", armErr ?? "Cannot arm recording track.");
+                        return;
+                    }
+
+                    var availability = AppServices.TryGetRecordingDeviceAvailabilityService();
+                    if (availability != null)
+                      await availability.RefreshAsync(ct).ConfigureAwait(false);
+
+                    var (resOk, deviceNumber, resErr) = await RecordingInputDeviceResolver.TryResolveAsync(
+                            recordingClient,
+                            availability,
+                            authority.InputSourceId!,
+                            ct)
+                        .ConfigureAwait(false);
+                    if (!resOk)
+                    {
+                        _toastService?.ShowError("Recording", resErr ?? "Cannot resolve microphone.");
+                        return;
+                    }
+
+                    if (!_recordingSessionCoordinator.TryStartRecording(out var startErr))
+                    {
+                        _toastService?.ShowError("Recording", startErr ?? "Cannot start recording session.");
+                        return;
+                    }
+
+                    try
+                    {
+                        await _recordingService.StartRecordingAsync(null, 44100, 1, deviceNumber).ConfigureAwait(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[PlaybackOperationsHandler] Capture start failed after coordinator start: {ex.Message}");
+                        RecordingSessionLifecycleGate.NotifyCaptureStartFailed(_recordingSessionCoordinator);
+                        throw;
+                    }
+                }
+                else
+                {
+                    await _recordingService.StartRecordingAsync().ConfigureAwait(true);
+                }
 
                 _isRecording = true;
                 PlaybackStateChanged?.Invoke(this, PlaybackState.Recording);
                 _toastService?.ShowInfo("Recording started - speak into your microphone");
                 Debug.WriteLine("[PlaybackOperationsHandler] Recording started via MicrophoneRecordingService");
             }
+            catch (OperationCanceledException)
+            {
+                RecordingSessionLifecycleGate.NotifyCaptureStartFailed(_recordingSessionCoordinator);
+                throw;
+            }
             catch (InvalidOperationException ex) when (ex.Message.Contains("No audio input"))
             {
+                RecordingSessionLifecycleGate.NotifyCaptureStartFailed(_recordingSessionCoordinator);
                 _toastService?.ShowError("No Microphone", "No microphone found. Please connect a microphone and try again.");
                 Debug.WriteLine($"[PlaybackOperationsHandler] No microphone: {ex.Message}");
             }
             catch (Exception ex)
             {
+                RecordingSessionLifecycleGate.NotifyCaptureStartFailed(_recordingSessionCoordinator);
                 _toastService?.ShowError("Recording Failed", $"Failed to start recording: {ex.Message}");
                 Debug.WriteLine($"[PlaybackOperationsHandler] Start recording failed: {ex.Message}");
                 throw;
@@ -366,6 +463,7 @@ namespace VoiceStudio.App.Commands
                 var duration = _recordingService.Duration;
 
                 _isRecording = false;
+                RecordingSessionLifecycleGate.NotifyCaptureStopped(_recordingSessionCoordinator);
                 PlaybackStateChanged?.Invoke(this, PlaybackState.Stopped);
 
                 _toastService?.ShowSuccess($"Recording saved ({duration.TotalSeconds:F1}s)");
@@ -376,6 +474,7 @@ namespace VoiceStudio.App.Commands
             catch (Exception ex)
             {
                 _isRecording = false;
+                RecordingSessionLifecycleGate.NotifyCaptureStartFailed(_recordingSessionCoordinator);
                 PlaybackStateChanged?.Invoke(this, PlaybackState.Stopped);
                 Debug.WriteLine($"[PlaybackOperationsHandler] Stop recording failed: {ex.Message}");
                 throw;
@@ -442,6 +541,7 @@ namespace VoiceStudio.App.Commands
         private void OnRecordingError(object? sender, string errorMessage)
         {
             _isRecording = false;
+            RecordingSessionLifecycleGate.NotifyCaptureStartFailed(_recordingSessionCoordinator);
             PlaybackStateChanged?.Invoke(this, PlaybackState.Stopped);
             _toastService?.ShowError("Recording Error", errorMessage);
             Debug.WriteLine(

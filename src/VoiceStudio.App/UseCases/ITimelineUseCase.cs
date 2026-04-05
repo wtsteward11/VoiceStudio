@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -57,6 +58,11 @@ namespace VoiceStudio.App.UseCases
     Task<(Clip left, Clip right)> SplitClipAsync(string clipId, double splitTime, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Set linear fade-in/out on a clip (seconds), applied at mixdown/export.
+    /// </summary>
+    Task<Clip> SetClipFadeAsync(string clipId, double fadeInSeconds, double fadeOutSeconds, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Set playback position.
     /// </summary>
     Task SetPlayheadAsync(double position, CancellationToken cancellationToken = default);
@@ -65,6 +71,20 @@ namespace VoiceStudio.App.UseCases
     /// Set loop region.
     /// </summary>
     Task SetLoopRegionAsync(double start, double end, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Hydrate the backend mix graph from persisted project tracks (GAP-031). No-op if project id is empty.
+    /// </summary>
+    Task ImportProjectTimelineAsync(string projectId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update mix fields on an in-memory timeline track (<c>PUT /api/timeline/tracks/{trackId}</c>, GAP-031).
+    /// </summary>
+    Task UpdateTimelineTrackAsync(
+        string trackId,
+        bool? isMuted = null,
+        bool? isSolo = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Export the timeline to an audio file.
@@ -150,6 +170,21 @@ namespace VoiceStudio.App.UseCases
     public int Channels { get; set; } = 2;
     public bool NormalizeLoudness { get; set; } = true;
     public double TargetLufs { get; set; } = -14.0;
+
+    /// <summary>Backend project id (required server-side when applying effects).</summary>
+    public string? ProjectId { get; set; }
+
+    /// <summary>When true, server bakes <see cref="EffectChainId"/> after mixdown.</summary>
+    public bool ApplyEffectsDuringExport { get; set; }
+
+    /// <summary>Effect chain to bake (from context / Effects Mixer selection).</summary>
+    public string? EffectChainId { get; set; }
+
+    /// <summary>Registered audio id used when timeline has no mixable clips.</summary>
+    public string? FallbackProjectAudioId { get; set; }
+
+    /// <summary>Backend <c>lufs_preset</c> id (GAP-041). Default <c>podcast_stereo</c>.</summary>
+    public string LufsPreset { get; set; } = "podcast_stereo";
   }
 
   /// <summary>
@@ -191,6 +226,20 @@ namespace VoiceStudio.App.UseCases
     public string? Name { get; set; }
     public double StartTime { get; set; }
     public double Duration { get; set; }
+
+    /// <summary>Timeline end boundary in seconds (API <c>end_time</c>).</summary>
+    [JsonPropertyName("end_time")]
+    public double EndTimeSeconds { get; set; }
+
+    [JsonPropertyName("source_start")]
+    public double SourceStart { get; set; }
+
+    [JsonPropertyName("fade_in_seconds")]
+    public double FadeInSeconds { get; set; }
+
+    [JsonPropertyName("fade_out_seconds")]
+    public double FadeOutSeconds { get; set; }
+
     public double TrimStart { get; set; }
     public double TrimEnd { get; set; }
     public double Volume { get; set; } = 1.0;

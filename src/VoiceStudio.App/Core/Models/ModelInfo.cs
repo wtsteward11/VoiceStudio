@@ -41,4 +41,24 @@ namespace VoiceStudio.Core.Models
     public Dictionary<string, int> Engines { get; set; } = new();
     public string BaseDir { get; set; } = string.Empty;
   }
+
+  /// <summary>
+  /// GAP-043: Start an in-app model download (canonical backend job).
+  /// </summary>
+  public class ModelDownloadStartRequest
+  {
+    public string Url { get; set; } = string.Empty;
+    public string Engine { get; set; } = string.Empty;
+    public string ModelName { get; set; } = string.Empty;
+    public string Version { get; set; } = "1.0";
+    public string? ExpectedSha256 { get; set; }
+  }
+
+  /// <summary>
+  /// Response from POST /api/models/download.
+  /// </summary>
+  public class ModelDownloadStartResponse
+  {
+    public string JobId { get; set; } = string.Empty;
+  }
 }

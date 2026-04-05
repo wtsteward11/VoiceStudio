@@ -22,6 +22,7 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IEffectsMeterClient _effectsMeterClient;
     private readonly IEffectChainClient _effectChainClient;
     private readonly IMixerStateClient _mixerStateClient;
+    private readonly IMeterClient? _meterClient;
     private readonly UndoRedoService? _undoRedoService;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly MultiSelectService _multiSelectService;
@@ -94,6 +95,10 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private bool showEffectChainsView = true; // Toggle between Chains and Presets
 
+    /// <summary>GAP-039: When true, effect chain process requests use bypass_chain (dry signal).</summary>
+    [ObservableProperty]
+    private bool isEffectChainBypassed;
+
     [ObservableProperty]
     private MixerMaster master = new();
 
@@ -137,11 +142,12 @@ namespace VoiceStudio.App.Views.Panels
             "vocoder"
         };
 
-    public EffectsMixerViewModel(IEffectsMeterClient effectsMeterClient, IEffectChainClient effectChainClient, IMixerStateClient mixerStateClient)
+    public EffectsMixerViewModel(IEffectsMeterClient effectsMeterClient, IEffectChainClient effectChainClient, IMixerStateClient mixerStateClient, IMeterClient? meterClient = null)
     {
       _effectsMeterClient = effectsMeterClient ?? throw new ArgumentNullException(nameof(effectsMeterClient));
       _effectChainClient = effectChainClient ?? throw new ArgumentNullException(nameof(effectChainClient));
       _mixerStateClient = mixerStateClient ?? throw new ArgumentNullException(nameof(mixerStateClient));
+      _meterClient = meterClient;
       _disposalCts = new CancellationTokenSource();
 
       // Get multi-select service
@@ -228,7 +234,13 @@ namespace VoiceStudio.App.Views.Panels
       ApplyEffectChainCommand = new EnhancedAsyncRelayCommand<string>(async (string? chainId, CancellationToken ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("ApplyEffectChain");
-        await ApplyEffectChainAsync(chainId, ct);
+        await RunEffectChainProcessAsync(chainId, isPreview: false, ct);
+      }, (string? _) => !IsLoading && !string.IsNullOrWhiteSpace(SelectedProjectId) && !string.IsNullOrWhiteSpace(SelectedAudioId));
+
+      PreviewEffectChainCommand = new EnhancedAsyncRelayCommand<string>(async (string? chainId, CancellationToken ct) =>
+      {
+        using var profiler = PerformanceProfiler.StartCommand("PreviewEffectChain");
+        await RunEffectChainProcessAsync(chainId, isPreview: true, ct);
       }, (string? _) => !IsLoading && !string.IsNullOrWhiteSpace(SelectedProjectId) && !string.IsNullOrWhiteSpace(SelectedAudioId));
 
       AddEffectCommand = new EnhancedAsyncRelayCommand<string>(async (string? effectType, CancellationToken ct) =>
@@ -377,6 +389,7 @@ namespace VoiceStudio.App.Views.Panels
     public EnhancedAsyncRelayCommand<string> CreateEffectChainCommand { get; }
     public EnhancedAsyncRelayCommand<string> DeleteEffectChainCommand { get; }
     public EnhancedAsyncRelayCommand<string> ApplyEffectChainCommand { get; }
+    public EnhancedAsyncRelayCommand<string> PreviewEffectChainCommand { get; }
     public EnhancedAsyncRelayCommand<string> AddEffectCommand { get; }
     public EnhancedAsyncRelayCommand<string> RemoveEffectCommand { get; }
     public EnhancedAsyncRelayCommand<string> MoveEffectUpCommand { get; }
@@ -412,9 +425,12 @@ namespace VoiceStudio.App.Views.Panels
 
     partial void OnSelectedProjectIdChanged(string? value)
     {
+      _contextManager?.SetActiveEffectChain(null, null);
+
       LoadEffectChainsCommand.NotifyCanExecuteChanged();
       CreateEffectChainCommand.NotifyCanExecuteChanged();
       ApplyEffectChainCommand.NotifyCanExecuteChanged();
+      PreviewEffectChainCommand.NotifyCanExecuteChanged();
       LoadMixerStateCommand.NotifyCanExecuteChanged();
       SaveMixerStateCommand.NotifyCanExecuteChanged();
       ResetMixerStateCommand.NotifyCanExecuteChanged();
@@ -448,6 +464,11 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    partial void OnSelectedEffectChainChanged(EffectChain? value)
+    {
+      _contextManager?.SetActiveEffectChain(value?.Id, SelectedProjectId);
+    }
+
     partial void OnIsLoadingChanged(bool value)
     {
       LoadMixerStateCommand.NotifyCanExecuteChanged();
@@ -456,6 +477,8 @@ namespace VoiceStudio.App.Views.Panels
       LoadMixerPresetsCommand.NotifyCanExecuteChanged();
       CreateMixerPresetCommand.NotifyCanExecuteChanged();
       ApplyMixerPresetCommand.NotifyCanExecuteChanged();
+      ApplyEffectChainCommand.NotifyCanExecuteChanged();
+      PreviewEffectChainCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnMixerStateChanged(MixerState? value)
@@ -467,6 +490,8 @@ namespace VoiceStudio.App.Views.Panels
     {
       LoadMetersCommand.NotifyCanExecuteChanged();
       ToggleRealTimeUpdatesCommand.NotifyCanExecuteChanged();
+      ApplyEffectChainCommand.NotifyCanExecuteChanged();
+      PreviewEffectChainCommand.NotifyCanExecuteChanged();
 
       // Stop polling if audio ID changes
       if (IsRealTimeUpdatesEnabled)
@@ -634,6 +659,12 @@ namespace VoiceStudio.App.Views.Panels
 
     private async Task PollMetersAsync(CancellationToken cancellationToken)
     {
+      if (_meterClient != null)
+      {
+        await RunRealtimeMetersAsync(cancellationToken);
+        return;
+      }
+
       while (!cancellationToken.IsCancellationRequested && _isPolling)
       {
         try
@@ -652,6 +683,91 @@ namespace VoiceStudio.App.Views.Panels
           System.Diagnostics.Debug.WriteLine($"Error polling meters: {ex.Message}");
           await Task.Delay(2000, cancellationToken); // Back off on error
         }
+      }
+    }
+
+    /// <summary>
+    /// WebSocket-first metering: one-shot HTTP seed then <see cref="IMeterClient"/> until cancelled.
+    /// </summary>
+    private async Task RunRealtimeMetersAsync(CancellationToken cancellationToken)
+    {
+      try
+      {
+        if (!string.IsNullOrWhiteSpace(SelectedAudioId))
+          await LoadMetersForAudioAsync(SelectedAudioId, cancellationToken);
+
+        await _meterClient!.ConnectAsync(cancellationToken);
+        _meterClient.LevelsUpdated += OnRealtimeMeterLevelsUpdated;
+        try
+        {
+          await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+        // ALLOWED: empty catch - cancellation ends infinite wait for WS metering loop (user disables realtime or changes selection)
+        catch (OperationCanceledException)
+        {
+          // Expected when realtime is disabled or audio selection changes
+        }
+        finally
+        {
+          _meterClient.LevelsUpdated -= OnRealtimeMeterLevelsUpdated;
+        }
+      }
+      // ALLOWED: empty catch - outer cancellation when PollMetersAsync CTS is cancelled during teardown
+      catch (OperationCanceledException)
+      {
+        // Selection/teardown
+      }
+      catch (Exception ex)
+      {
+        _logService?.LogError(ex, "RunRealtimeMeters");
+        System.Diagnostics.Debug.WriteLine($"Realtime meters error: {ex.Message}");
+      }
+    }
+
+    private void OnRealtimeMeterLevelsUpdated(object? sender, MeterLevelUpdate e)
+    {
+      if (_disposed || !_isPolling)
+        return;
+
+      if (!string.IsNullOrEmpty(e.ProjectId) &&
+          !string.Equals(e.ProjectId, SelectedProjectId, StringComparison.Ordinal))
+      {
+        return;
+      }
+
+      MixerChannel? target = null;
+      if (!string.IsNullOrEmpty(e.ChannelId))
+      {
+        target = Channels.FirstOrDefault(c => c.Id == e.ChannelId);
+      }
+
+      if (target == null &&
+          !string.IsNullOrEmpty(SelectedAudioId) &&
+          string.Equals(e.ChannelId, SelectedAudioId, StringComparison.Ordinal) &&
+          Channels.Count > 0)
+      {
+        target = Channels[0];
+      }
+
+      if (target == null && Channels.Count == 1)
+      {
+        target = Channels[0];
+      }
+
+      if (target == null)
+      {
+        return;
+      }
+
+      var peak = e.PeakLevelLinear;
+      var rms = e.RmsLevelLinear;
+      if (Math.Abs(target.PeakLevel - peak) > 0.001)
+      {
+        target.PeakLevel = peak;
+      }
+      if (Math.Abs(target.RmsLevel - rms) > 0.001)
+      {
+        target.RmsLevel = rms;
       }
     }
 
@@ -973,7 +1089,8 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    private async Task ApplyEffectChainAsync(string? chainId, CancellationToken cancellationToken)
+    /// <summary>GAP-039: Single path for apply vs preview; bypass is explicit via <see cref="IsEffectChainBypassed"/>.</summary>
+    private async Task RunEffectChainProcessAsync(string? chainId, bool isPreview, CancellationToken cancellationToken)
     {
       if (string.IsNullOrWhiteSpace(chainId) || string.IsNullOrWhiteSpace(SelectedProjectId) || string.IsNullOrWhiteSpace(SelectedAudioId))
         return;
@@ -983,7 +1100,14 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var response = await _effectChainClient.ProcessAudioWithChainAsync(SelectedProjectId, chainId, SelectedAudioId, null, cancellationToken);
+        var response = await _effectChainClient.ProcessAudioWithChainAsync(
+            SelectedProjectId,
+            chainId,
+            SelectedAudioId,
+            outputFilename: null,
+            bypassChain: IsEffectChainBypassed,
+            preview: isPreview,
+            cancellationToken);
         if (!response.Success)
         {
           ErrorMessage = response.ErrorMessage ?? ResourceHelper.GetString("EffectsMixer.EffectChainApplyFailed", "Failed to apply effect chain");
@@ -995,9 +1119,18 @@ namespace VoiceStudio.App.Views.Panels
         {
           var chain = EffectChains.FirstOrDefault(c => c.Id == chainId);
           var chainName = chain?.Name ?? ResourceHelper.GetString("EffectsMixer.UnknownChain", "Unknown Chain");
-          _toastNotificationService?.ShowSuccess(
-              ResourceHelper.GetString("EffectsMixer.EffectChainApplied", "Effect Chain Applied"),
-              ResourceHelper.FormatString("EffectsMixer.EffectChainAppliedDetail", chainName));
+          if (isPreview)
+          {
+            _toastNotificationService?.ShowSuccess(
+                ResourceHelper.GetString("EffectsMixer.EffectChainPreviewed", "Effect Chain Preview"),
+                ResourceHelper.FormatString("EffectsMixer.EffectChainPreviewedDetail", chainName));
+          }
+          else
+          {
+            _toastNotificationService?.ShowSuccess(
+                ResourceHelper.GetString("EffectsMixer.EffectChainApplied", "Effect Chain Applied"),
+                ResourceHelper.FormatString("EffectsMixer.EffectChainAppliedDetail", chainName));
+          }
         }
       }
       catch (OperationCanceledException)
@@ -1009,7 +1142,7 @@ namespace VoiceStudio.App.Views.Panels
       {
         ErrorMessage = ErrorHandler.GetUserFriendlyMessage(ex);
         _errorService?.ShowError(ex, ResourceHelper.GetString("EffectsMixer.EffectChainApplyFailed", "Failed to apply effect chain"));
-        _logService?.LogError(ex, "ApplyEffectChain");
+        _logService?.LogError(ex, isPreview ? "PreviewEffectChain" : "ApplyEffectChain");
         _toastNotificationService?.ShowError(
             ResourceHelper.GetString("EffectsMixer.EffectChainApplyFailed", "Failed to Apply Effect Chain"),
             ErrorHandler.GetUserFriendlyMessage(ex));

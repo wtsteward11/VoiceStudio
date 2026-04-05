@@ -12,6 +12,7 @@
       <RowDefinition Height="*"/>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
     </Grid.RowDefinitions>
 
     <TextBlock Grid.Row="0" Text="Recording" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,0,0,12"/>
@@ -24,8 +25,9 @@
 
       <StackPanel Grid.Column="0" Spacing="8">
         <ComboBox Header="Input Device"
-                  ItemsSource="{x:Bind ViewModel.AvailableDevices, Mode=OneWay}"
-                  SelectedItem="{x:Bind ViewModel.SelectedDevice, Mode=TwoWay}"
+                  ItemsSource="{x:Bind ViewModel.AvailableInputDevices, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.SelectedInputDevice, Mode=TwoWay}"
+                  DisplayMemberPath="Name"
                   HorizontalAlignment="Stretch"/>
         <Grid>
           <Grid.ColumnDefinitions>
@@ -48,6 +50,8 @@
       </StackPanel>
 
       <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Bottom" Margin="12,0,0,0">
+        <Button Command="{x:Bind ViewModel.ArmForMultitrackCommand}" Content="Arm track" Width="140"
+                ToolTipService.ToolTip="Arm the current timeline track and selected device. Repeat for multiple tracks, then Record."/>
         <Button Command="{x:Bind ViewModel.LoadDevicesCommand}" Content="Refresh Devices" Width="140"/>
       </StackPanel>
     </Grid>
@@ -80,7 +84,13 @@
       <Button Command="{x:Bind ViewModel.PlayCommand}" Width="100" Content="Play"/>
     </StackPanel>
 
-    <InfoBar Grid.Row="4" IsOpen="{x:Bind ViewModel.IsRecording, Mode=OneWay}"
+    <InfoBar Grid.Row="4" IsOpen="{x:Bind ViewModel.IsSessionOutcomeBarOpen, Mode=TwoWay}"
+             Severity="{x:Bind ViewModel.SessionOutcomeSeverity, Mode=OneWay}"
+             Title="{x:Bind ViewModel.SessionOutcomeTitle, Mode=OneWay}"
+             Message="{x:Bind ViewModel.SessionOutcomeMessage, Mode=OneWay}"
+             IsClosable="True"/>
+
+    <InfoBar Grid.Row="5" IsOpen="{x:Bind ViewModel.IsRecording, Mode=OneWay}"
              Severity="Informational" Title="Recording"
              Message="{x:Bind ViewModel.RecordingDurationDisplay, Mode=OneWay}"/>
 

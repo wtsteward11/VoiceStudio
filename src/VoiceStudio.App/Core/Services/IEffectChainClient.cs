@@ -16,7 +16,16 @@ namespace VoiceStudio.Core.Services
     Task<EffectChain> CreateEffectChainAsync(string projectId, EffectChain chain, CancellationToken cancellationToken = default);
     Task<EffectChain> UpdateEffectChainAsync(string projectId, string chainId, EffectChain chain, CancellationToken cancellationToken = default);
     Task<bool> DeleteEffectChainAsync(string projectId, string chainId, CancellationToken cancellationToken = default);
-    Task<EffectProcessResponse> ProcessAudioWithChainAsync(string projectId, string chainId, string audioId, string? outputFilename = null, CancellationToken cancellationToken = default);
+    /// <param name="bypassChain">GAP-039: When true, POST includes bypass_chain=true (dry signal; input audio id returned).</param>
+    /// <param name="preview">GAP-039: When true, POST includes preview=true (same processing; message tagged on server).</param>
+    Task<EffectProcessResponse> ProcessAudioWithChainAsync(
+        string projectId,
+        string chainId,
+        string audioId,
+        string? outputFilename = null,
+        bool bypassChain = false,
+        bool preview = false,
+        CancellationToken cancellationToken = default);
     Task<List<EffectPreset>> GetEffectPresetsAsync(string? effectType = null, CancellationToken cancellationToken = default);
     Task<EffectPreset> CreateEffectPresetAsync(EffectPreset preset, CancellationToken cancellationToken = default);
     Task<bool> DeleteEffectPresetAsync(string presetId, CancellationToken cancellationToken = default);

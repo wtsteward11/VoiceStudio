@@ -19,6 +19,9 @@ namespace VoiceStudio.Core.Models
   /// </summary>
   public class TranscriptionSegment
   {
+    /// <summary>Stable segment identity (UUID) from backend; used for clip linkage.</summary>
+    public string Id { get; set; } = string.Empty;
+
     public string Text { get; set; } = string.Empty;
     public double Start { get; set; }
     public double End { get; set; }

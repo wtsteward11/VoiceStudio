@@ -4,9 +4,11 @@
     xmlns:controls="using:VoiceStudio.App.Controls"
     xmlns:converters="using:VoiceStudio.App.Converters"
     xmlns:local="using:VoiceStudio.App.Views.Panels"
+    xmlns:services="using:VoiceStudio.App.Services"
     x:DataType="local:TranscribeView">
     <UserControl.Resources>
         <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
+        <converters:BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </UserControl.Resources>
     <Grid x:Name="TranscribeView_Root" 
           AutomationProperties.AutomationId="TranscribeView_Root"
@@ -151,6 +153,21 @@
                                   OnContent="On"
                                   ToolTipService.ToolTip="Improves accuracy by detecting voice segments before transcription" />
                 </Grid>
+
+                <InfoBar
+                    AutomationProperties.AutomationId="TranscribeView_TranscriptTruthInfoBar"
+                    IsOpen="{x:Bind ViewModel.ShowTranscriptTruthReconciliationBar, Mode=OneWay}"
+                    Severity="Warning"
+                    IsClosable="False"
+                    Title="Transcript truth"
+                    Message="{x:Bind ViewModel.TranscriptTruthReconciliationHint, Mode=OneWay}">
+                    <InfoBar.ActionButton>
+                        <Button
+                            AutomationProperties.AutomationId="TranscribeView_RefreshTranscriptTruthButton"
+                            Content="Refresh transcript linkage"
+                            Command="{x:Bind ViewModel.RefreshTranscriptTruthCommand}" />
+                    </InfoBar.ActionButton>
+                </InfoBar>
             </StackPanel>
         </Border>
 
@@ -373,7 +390,8 @@
                         Visibility="{x:Bind ViewModel.SelectedTranscription, Converter={StaticResource NullToVisibilityConverter}, Mode=OneWay, FallbackValue=Collapsed}">
                     <StackPanel Spacing="4">
                         <TextBlock Text="Segments" FontSize="12" FontWeight="SemiBold" Opacity="0.7" />
-                        <ItemsRepeater AutomationProperties.AutomationId="TranscribeView_SegmentsList"
+                        <ItemsRepeater x:Name="SegmentsRepeater"
+                                       AutomationProperties.AutomationId="TranscribeView_SegmentsList"
                                        ItemsSource="{x:Bind ViewModel.SelectedTranscription.Segments, Mode=OneWay}"
                                        MaxHeight="120">
                             <ItemsRepeater.Layout>
@@ -381,28 +399,127 @@
                             </ItemsRepeater.Layout>
                             <ItemsRepeater.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid Padding="4,2" ColumnSpacing="8">
+                                    <Grid Padding="4,2" ColumnSpacing="8"
+                                          TabIndex="0"
+                                          IsTabStop="True"
+                                          Tapped="TranscribeSegment_Tapped"
+                                          DoubleTapped="TranscribeSegment_DoubleTapped"
+                                          RightTapped="TranscribeSegment_RightTapped"
+                                          KeyDown="TranscribeSegment_KeyDown">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="60" />
-                                            <ColumnDefinition Width="60" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="56" />
+                                            <ColumnDefinition Width="56" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" FontSize="11" Opacity="0.6">
+                                        <ProgressRing Grid.Column="0"
+                                                      Width="16"
+                                                      Height="16"
+                                                      Margin="0,0,4,0"
+                                                      IsActive="True"
+                                                      Visibility="Collapsed"
+                                                      AutomationProperties.AutomationId="TranscribeView_SegmentBusyRing" />
+                                        <TextBlock Grid.Column="1" FontSize="11" Opacity="0.6" VerticalAlignment="Center">
                                             <Run Text="{Binding Start}" />
                                             <Run Text="s" />
                                         </TextBlock>
-                                        <TextBlock Grid.Column="1" FontSize="11" Opacity="0.6">
+                                        <TextBlock Grid.Column="2" FontSize="11" Opacity="0.6" VerticalAlignment="Center">
                                             <Run Text="{Binding End}" />
                                             <Run Text="s" />
                                         </TextBlock>
-                                        <TextBlock Grid.Column="2"
+                                        <TextBlock Grid.Column="3"
                                                    Text="{Binding Text}"
                                                    FontSize="11"
+                                                   VerticalAlignment="Center"
                                                    TextTrimming="CharacterEllipsis" />
                                     </Grid>
                                 </DataTemplate>
                             </ItemsRepeater.ItemTemplate>
                         </ItemsRepeater>
+                        <StackPanel Spacing="6" Margin="0,12,0,0">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="Apply / regenerate jobs (session)"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Opacity="0.85" />
+                                <Button Grid.Column="1"
+                                        AutomationProperties.AutomationId="TranscribeView_ClearApplyJobStatusButton"
+                                        Content="Clear"
+                                        Padding="8,4"
+                                        FontSize="11"
+                                        Command="{x:Bind ViewModel.ClearTranscriptApplyJobStatusCommand}" />
+                            </Grid>
+                            <ListView MaxHeight="120"
+                                      AutomationProperties.AutomationId="TranscribeView_ApplyJobStatusList"
+                                      ItemsSource="{x:Bind ViewModel.TranscriptApplyJobStatusEntries, Mode=OneWay}"
+                                      IsItemClickEnabled="True"
+                                      SelectionMode="None"
+                                      ItemClick="ApplyJobStatusList_ItemClick">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="services:TranscriptApplyJobStatusEntry">
+                                        <Grid ColumnSpacing="8"
+                                              Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{x:Bind StatusSummaryLine, Mode=OneWay}"
+                                                       TextWrapping="WrapWholeWords"
+                                                       FontSize="11"
+                                                       VerticalAlignment="Center" />
+                                            <Button Grid.Column="1"
+                                                    AutomationProperties.AutomationId="TranscribeView_ApplyJobRetryButton"
+                                                    Content="Retry"
+                                                    Padding="8,2"
+                                                    FontSize="11"
+                                                    VerticalAlignment="Center"
+                                                    Visibility="{x:Bind CanShowRetry, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                    Click="ApplyJobRetryButton_Click" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                        <StackPanel Spacing="6" Margin="0,12,0,0">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="Session edit history"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Opacity="0.85" />
+                                <Button Grid.Column="1"
+                                        AutomationProperties.AutomationId="TranscribeView_ClearEditHistoryButton"
+                                        Content="Clear"
+                                        Padding="8,4"
+                                        FontSize="11"
+                                        Command="{x:Bind ViewModel.ClearTranscriptEditHistoryCommand}" />
+                            </Grid>
+                            <ListView MaxHeight="160"
+                                      AutomationProperties.AutomationId="TranscribeView_EditHistoryList"
+                                      ItemsSource="{x:Bind ViewModel.TranscriptEditHistoryEntries, Mode=OneWay}"
+                                      IsItemClickEnabled="True"
+                                      SelectionMode="None"
+                                      ItemClick="EditHistoryList_ItemClick">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="services:TranscriptEditHistoryEntry">
+                                        <TextBlock Text="{x:Bind SummaryLine, Mode=OneWay}"
+                                                   TextWrapping="WrapWholeWords"
+                                                   FontSize="11"
+                                                   Margin="0,2" />
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -437,6 +554,18 @@
                                FontSize="12"
                                TextTrimming="CharacterEllipsis"
                                Visibility="{x:Bind ViewModel.ErrorMessage, Converter={StaticResource NullToVisibilityConverter}, Mode=OneWay, FallbackValue=Collapsed}" />
+                    <TextBlock AutomationProperties.AutomationId="TranscribeView_TranscriptOperatorMessage"
+                               Text="{x:Bind ViewModel.TranscriptOperatorMessage, Mode=OneWay}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               FontSize="12"
+                               TextWrapping="WrapWholeWords"
+                               Visibility="{x:Bind ViewModel.TranscriptOperatorMessage, Converter={StaticResource NullToVisibilityConverter}, Mode=OneWay, FallbackValue=Collapsed}" />
+                    <TextBlock AutomationProperties.AutomationId="TranscribeView_SegmentEditOperatorHint"
+                               Text="{x:Bind ViewModel.SegmentEditOperatorHint, Mode=OneWay}"
+                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                               FontSize="12"
+                               TextWrapping="WrapWholeWords"
+                               Visibility="{x:Bind ViewModel.SegmentEditOperatorHint, Converter={StaticResource NullToVisibilityConverter}, Mode=OneWay, FallbackValue=Collapsed}" />
                     <TextBlock AutomationProperties.AutomationId="TranscribeView_PersistenceSemanticsHint"
                                Text="{x:Bind ViewModel.AudioPersistenceSemanticsHint, Mode=OneWay}"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"

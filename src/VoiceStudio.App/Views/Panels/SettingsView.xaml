@@ -214,6 +214,16 @@
                   Minimum="30" Maximum="3600"
                   Width="200" />
               </StackPanel>
+
+              <StackPanel Orientation="Horizontal"
+                Spacing="{StaticResource VSQ.Spacing.Value.Small}">
+                <TextBlock Text="Default export LUFS preset:" Width="150"
+                  Style="{StaticResource VSQ.Text.Body}" VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{x:Bind ViewModel.AvailableExportLufsPresets, Mode=OneWay}"
+                  SelectedItem="{x:Bind ViewModel.DefaultExportLufsPreset, Mode=TwoWay}"
+                  Width="360"
+                  AutomationProperties.AutomationId="SettingsView_DefaultExportLufsPresetComboBox" />
+              </StackPanel>
             </StackPanel>
           </Border>
 
@@ -391,7 +401,7 @@
                   VerticalAlignment="Center" />
                 <TextBox Text="{x:Bind ViewModel.ApiUrl, Mode=TwoWay}"
                   Width="300"
-                  PlaceholderText="http://localhost:8000" />
+                  PlaceholderText="http://127.0.0.1:8000" />
               </StackPanel>
 
               <StackPanel Orientation="Horizontal"

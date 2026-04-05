@@ -17,6 +17,9 @@ namespace VoiceStudio.App.Views.Panels
 {
   public sealed partial class EffectsMixerView : UserControl
   {
+    private static void MarkProjectSessionDirty(string reason) =>
+        AppServices.GetProjectSessionDirtyState().MarkProjectDirty(reason);
+
     public EffectsMixerViewModel ViewModel { get; }
     private ContextMenuService? _contextMenuService;
     private ToastNotificationService? _toastService;
@@ -32,7 +35,8 @@ namespace VoiceStudio.App.Views.Panels
       ViewModel = new EffectsMixerViewModel(
           ServiceProvider.GetEffectsMeterClient(),
           ServiceProvider.GetEffectChainClient(),
-          ServiceProvider.GetMixerStateClient()
+          ServiceProvider.GetMixerStateClient(),
+          ServiceProvider.GetMeterClient()
       );
       this.DataContext = ViewModel;
 
@@ -406,6 +410,7 @@ namespace VoiceStudio.App.Views.Panels
             // Auto-save if project is selected
             if (!string.IsNullOrWhiteSpace(ViewModel.SelectedProjectId))
             {
+              MarkProjectSessionDirty("effects_mixer");
               await ViewModel.SaveMixerStateCommand.ExecuteAsync(null);
             }
           }
@@ -443,6 +448,7 @@ namespace VoiceStudio.App.Views.Panels
             // Auto-save if project is selected
             if (!string.IsNullOrWhiteSpace(ViewModel.SelectedProjectId))
             {
+              MarkProjectSessionDirty("effects_mixer");
               await ViewModel.SaveMixerStateCommand.ExecuteAsync(null);
             }
           }
@@ -509,6 +515,7 @@ namespace VoiceStudio.App.Views.Panels
             // Auto-save if project is selected
             if (!string.IsNullOrWhiteSpace(ViewModel.SelectedProjectId))
             {
+              MarkProjectSessionDirty("effects_mixer");
               await ViewModel.SaveMixerStateCommand.ExecuteAsync(null);
             }
           }
@@ -537,6 +544,7 @@ namespace VoiceStudio.App.Views.Panels
             // Auto-save if project is selected
             if (!string.IsNullOrWhiteSpace(ViewModel.SelectedProjectId))
             {
+              MarkProjectSessionDirty("effects_mixer");
               await ViewModel.SaveMixerStateCommand.ExecuteAsync(null);
             }
           }
@@ -882,6 +890,10 @@ namespace VoiceStudio.App.Views.Panels
       applyItem.Click += async (s, e) => await HandleEffectChainMenuClick("Apply", chain);
       menu.Items.Add(applyItem);
 
+      var previewItem = new MenuFlyoutItem { Text = "Preview (process)" };
+      previewItem.Click += async (s, e) => await HandleEffectChainMenuClick("Preview", chain);
+      menu.Items.Add(previewItem);
+
       menu.Items.Add(new MenuFlyoutSeparator());
 
       var duplicateItem = new MenuFlyoutItem { Text = "Duplicate" };
@@ -1006,7 +1018,12 @@ namespace VoiceStudio.App.Views.Panels
             if (ViewModel.ApplyEffectChainCommand.CanExecute(chain.Id))
             {
               await ViewModel.ApplyEffectChainCommand.ExecuteAsync(chain.Id);
-              _toastService?.ShowToast(ToastType.Success, "Applied", $"Applied effect chain '{chain.Name}' to channels");
+            }
+            break;
+          case "preview":
+            if (ViewModel.PreviewEffectChainCommand.CanExecute(chain.Id))
+            {
+              await ViewModel.PreviewEffectChainCommand.ExecuteAsync(chain.Id);
             }
             break;
           case "duplicate":

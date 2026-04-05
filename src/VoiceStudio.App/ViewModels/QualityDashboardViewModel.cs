@@ -11,6 +11,7 @@ using VoiceStudio.Core.Services;
 using VoiceStudio.Core.Models;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Utilities;
+using VoiceStudio.Core.Events;
 using QualityTrendDataModel = VoiceStudio.App.ViewModels.QualityDashboardViewModel.QualityTrendData;
 
 namespace VoiceStudio.App.ViewModels
@@ -22,6 +23,8 @@ namespace VoiceStudio.App.ViewModels
   public partial class QualityDashboardViewModel : BaseViewModel, IPanelView
   {
     private readonly IQualityControlClient _qualityClient;
+    private readonly IEventAggregator? _eventAggregator;
+    private ISubscriptionToken? _jobCompletedToken;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly IErrorPresentationService? _errorService;
     private readonly IErrorLoggingService? _logService;
@@ -66,10 +69,14 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private string? distributionVisualizationImageUrl;
 
-    public QualityDashboardViewModel(IViewModelContext context, IQualityControlClient qualityClient)
+    public QualityDashboardViewModel(
+        IViewModelContext context,
+        IQualityControlClient qualityClient,
+        IEventAggregator? eventAggregator = null)
         : base(context)
     {
       _qualityClient = qualityClient ?? throw new ArgumentNullException(nameof(qualityClient));
+      _eventAggregator = eventAggregator;
 
       // Get toast notification service using helper (reduces code duplication)
       _toastNotificationService = ServiceInitializationHelper.TryGetService(() => AppServices.TryGetToastNotificationService());
@@ -110,8 +117,20 @@ namespace VoiceStudio.App.ViewModels
       if (_isInitialized)
         return;
       _isInitialized = true;
+
+      // GAP-030: subscribe to batch completion events for auto-refresh
+      _jobCompletedToken ??= _eventAggregator?.Subscribe<JobCompletedEvent>(OnJobCompleted);
+
       await LoadPresetsAsync(cancellationToken);
       await LoadOverviewAsync(cancellationToken);
+    }
+
+    private void OnJobCompleted(JobCompletedEvent e)
+    {
+      if (!e.Success || !string.Equals(e.JobType, "batch", StringComparison.OrdinalIgnoreCase))
+        return;
+
+      _ = LoadOverviewAsync(CancellationToken.None);
     }
 
     public EnhancedAsyncRelayCommand LoadOverviewCommand { get; }
@@ -161,7 +180,7 @@ namespace VoiceStudio.App.ViewModels
         // Backend will generate matplotlib/plotly charts and return image URLs
         // These endpoints will be created when visualization libraries are integrated
         var timeRangeDays = GetDaysFromTimeRange(SelectedTimeRange);
-        const string baseUrl = "http://localhost:8000"; // Default backend URL
+        var baseUrl = BackendClientConfig.DefaultHttpBaseUrl;
 
         // For trends visualization - construct URL for backend endpoint
         // Endpoint: /api/quality/trends/visualization?type={type}&days={days}

@@ -137,11 +137,31 @@ namespace VoiceStudio.Core.Services
     Task<List<AudioTrack>> GetTracksAsync(string projectId, CancellationToken cancellationToken = default);
     Task<AudioTrack> GetTrackAsync(string projectId, string trackId, CancellationToken cancellationToken = default);
     Task<AudioTrack> CreateTrackAsync(string projectId, string name, string? engine = null, CancellationToken cancellationToken = default);
-    Task<AudioTrack> UpdateTrackAsync(string projectId, string trackId, string? name = null, string? engine = null, CancellationToken cancellationToken = default);
+    Task<AudioTrack> UpdateTrackAsync(
+        string projectId,
+        string trackId,
+        string? name = null,
+        string? engine = null,
+        bool? isMuted = null,
+        bool? isSolo = null,
+        CancellationToken cancellationToken = default);
     Task<bool> DeleteTrackAsync(string projectId, string trackId, CancellationToken cancellationToken = default);
 
     Task<AudioClip> CreateClipAsync(string projectId, string trackId, AudioClip clip, CancellationToken cancellationToken = default);
-    Task<AudioClip> UpdateClipAsync(string projectId, string trackId, string clipId, string? name = null, double? startTime = null, CancellationToken cancellationToken = default);
+    Task<AudioClip> UpdateClipAsync(
+        string projectId,
+        string trackId,
+        string clipId,
+        string? name = null,
+        double? startTime = null,
+        string? audioId = null,
+        string? audioUrl = null,
+        double? durationSeconds = null,
+        double? sourceStartSeconds = null,
+        double? fadeInSeconds = null,
+        double? fadeOutSeconds = null,
+        string? derivedFromClipId = null,
+        CancellationToken cancellationToken = default);
     Task<bool> DeleteClipAsync(string projectId, string trackId, string clipId, CancellationToken cancellationToken = default);
 
     // Timeline markers management
@@ -189,10 +209,37 @@ namespace VoiceStudio.Core.Services
     Task<MultiEngineEnsembleResponse> CreateMultiEngineEnsembleAsync(MultiEngineEnsembleRequest request, CancellationToken cancellationToken = default);
     Task<MultiEngineEnsembleStatus> GetMultiEngineEnsembleStatusAsync(string jobId, CancellationToken cancellationToken = default);
 
-    // Mixer management — extracted to IMixerStateClient / MixerStateClient (PR-17)
+    // Mixer management
+    Task<MixerState> GetMixerStateAsync(string projectId, CancellationToken cancellationToken = default);
+    Task<MixerState> UpdateMixerStateAsync(string projectId, MixerState state, CancellationToken cancellationToken = default);
+    Task<MixerState> ResetMixerStateAsync(string projectId, CancellationToken cancellationToken = default);
+
+    // Mixer sends/returns
+    Task<MixerSend> CreateMixerSendAsync(string projectId, MixerSend send, CancellationToken cancellationToken = default);
+    Task<MixerSend> UpdateMixerSendAsync(string projectId, string sendId, MixerSend send, CancellationToken cancellationToken = default);
+    Task<bool> DeleteMixerSendAsync(string projectId, string sendId, CancellationToken cancellationToken = default);
+    Task<MixerReturn> CreateMixerReturnAsync(string projectId, MixerReturn returnBus, CancellationToken cancellationToken = default);
+    Task<MixerReturn> UpdateMixerReturnAsync(string projectId, string returnId, MixerReturn returnBus, CancellationToken cancellationToken = default);
+    Task<bool> DeleteMixerReturnAsync(string projectId, string returnId, CancellationToken cancellationToken = default);
+
+    // Mixer sub-groups
+    Task<MixerSubGroup> CreateMixerSubGroupAsync(string projectId, MixerSubGroup subgroup, CancellationToken cancellationToken = default);
+    Task<MixerSubGroup> UpdateMixerSubGroupAsync(string projectId, string subgroupId, MixerSubGroup subgroup, CancellationToken cancellationToken = default);
+    Task<bool> DeleteMixerSubGroupAsync(string projectId, string subgroupId, CancellationToken cancellationToken = default);
+
+    // Mixer master
+    Task<MixerMaster> UpdateMixerMasterAsync(string projectId, MixerMaster master, CancellationToken cancellationToken = default);
 
     // Channel routing
     Task<ChannelRouting> UpdateChannelRoutingAsync(string projectId, string channelId, ChannelRouting routing, CancellationToken cancellationToken = default);
+
+    // Mixer presets
+    Task<List<MixerPreset>> GetMixerPresetsAsync(string projectId, CancellationToken cancellationToken = default);
+    Task<MixerPreset> GetMixerPresetAsync(string projectId, string presetId, CancellationToken cancellationToken = default);
+    Task<MixerPreset> CreateMixerPresetAsync(string projectId, MixerPreset preset, CancellationToken cancellationToken = default);
+    Task<MixerPreset> UpdateMixerPresetAsync(string projectId, string presetId, MixerPreset preset, CancellationToken cancellationToken = default);
+    Task<bool> DeleteMixerPresetAsync(string projectId, string presetId, CancellationToken cancellationToken = default);
+    Task<MixerState> ApplyMixerPresetAsync(string projectId, string presetId, CancellationToken cancellationToken = default);
 
     // Backup and restore — use IBackupRestoreClient (PR-14)
 
@@ -281,7 +328,12 @@ namespace VoiceStudio.Core.Services
     Task<List<TrainingDataset>> GetTrainingDatasetsAsync(CancellationToken cancellationToken = default);
     Task<TrainingDataset> GetTrainingDatasetAsync(string datasetId, CancellationToken cancellationToken = default);
 
-    // Video generation — ListVideoEnginesAsync, GenerateVideoAsync, UpscaleVideoAsync, GetVideoInfoAsync, EditVideoAsync extracted to IVideoGenClient/IVideoEditClient (PR-16)
+    // Video generation
+    Task<List<string>> ListVideoEnginesAsync(CancellationToken cancellationToken = default);
+    Task<VideoGenerateResponse> GenerateVideoAsync(VideoGenerateRequest request, CancellationToken cancellationToken = default);
+    Task<VideoUpscaleResponse> UpscaleVideoAsync(VideoUpscaleRequest request, CancellationToken cancellationToken = default);
+    Task<VideoInfo> GetVideoInfoAsync(string videoPath, CancellationToken cancellationToken = default);
+    Task<VideoEditResponse> EditVideoAsync(VideoEditRequest request, CancellationToken cancellationToken = default);
 
     // Voice AI Pipeline — GetPipelineProvidersAsync, ProcessPipelineAsync extracted to IPipelineConversationClient (PR-13)
 

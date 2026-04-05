@@ -11,6 +11,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using VoiceStudio.App.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.Core.Models;
 using VoiceStudio.App.Services.UndoableActions;
@@ -98,6 +99,8 @@ namespace VoiceStudio.App.ViewModels
     private readonly CancellationTokenSource _disposalCts = new();
     private CancellationTokenSource? _loadAssetsCts;
     private int _loadingCount;
+    /// <summary>GAP-027: After recording uploads, select this asset id once the library reload completes.</summary>
+    private string? _pendingPostReloadFocusAssetId;
     private EventHandler<VoiceStudio.App.Services.SelectionChangedEventArgs>? _selectionChangedHandler;
 
     public LibraryViewModel(IViewModelContext context, ILibraryClient libraryClient, IDialogService dialogService, Action? triggerImport = null)
@@ -173,6 +176,8 @@ namespace VoiceStudio.App.ViewModels
       UseAsCloneReferenceCommand = new RelayCommand<LibraryAsset>(UseAsCloneReference, CanUseAsCloneReference);
       UseSynthesisVoiceCommand = new RelayCommand<LibraryAsset>(UseSynthesisVoice, CanUseSynthesisVoice);
       PlayAssetCommand = new RelayCommand<LibraryAsset>(PlayAsset, CanPlayAsset);
+      AddAssetToTimelineCommand = new RelayCommand<LibraryAsset>(AddAssetToTimeline, CanAddAssetToTimeline);
+      AddSelectedAssetToTimelineCommand = new RelayCommand(AddSelectedAssetToTimeline, CanAddSelectedAssetToTimeline);
 
       // Subscribe to selection changes (stored for Dispose unsubscribe)
       _selectionChangedHandler = (_, e) =>
@@ -232,8 +237,15 @@ namespace VoiceStudio.App.ViewModels
     {
       System.Diagnostics.Debug.WriteLine(
           $"LibraryViewModel: Asset added - {e.AssetId} ({e.AssetType}) from {e.SourcePanelId}");
+      // GAP-027: deterministic focus after recording upload (not for every importer to avoid batch noise)
+      if (IsRecordingPanelAssetSource(e.SourcePanelId))
+        _pendingPostReloadFocusAssetId = e.AssetId;
       _ = CoalescedLoadAssetsAsync();
     }
+
+    private static bool IsRecordingPanelAssetSource(string? sourcePanelId) =>
+        string.Equals(sourcePanelId, PanelIds.Recording, StringComparison.Ordinal)
+        || string.Equals(sourcePanelId, "recording-panel", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Auto-refresh library when a voice profile is created (clone wizard).
@@ -294,6 +306,10 @@ namespace VoiceStudio.App.ViewModels
     public IRelayCommand<LibraryAsset> UseAsCloneReferenceCommand { get; }
     public IRelayCommand<LibraryAsset> UseSynthesisVoiceCommand { get; }
     public IRelayCommand<LibraryAsset> PlayAssetCommand { get; }
+    /// <summary>GAP-027: Context menu — publish <see cref="AddToTimelineEvent"/> for one audio asset.</summary>
+    public IRelayCommand<LibraryAsset> AddAssetToTimelineCommand { get; }
+    /// <summary>GAP-027: Toolbar/shortcut hook — use <see cref="SelectedAsset"/>.</summary>
+    public IRelayCommand AddSelectedAssetToTimelineCommand { get; }
 
     /// <inheritdoc />
     public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
@@ -479,6 +495,7 @@ namespace VoiceStudio.App.ViewModels
         }
 
         TotalAssets = response?.Total ?? 0;
+        TryApplyPendingRecordingAssetFocus();
       }
       catch (OperationCanceledException)
       {
@@ -734,7 +751,121 @@ namespace VoiceStudio.App.ViewModels
         _contextManager.SetActiveAsset(null, null, null);
         _contextManager.SetCurrentPlayable(null, null, null);
       }
+
+      AddSelectedAssetToTimelineCommand.NotifyCanExecuteChanged();
     }
+
+    /// <summary>GAP-027: After reload from recording <see cref="AssetAddedEvent"/>, select the new row when it appears.</summary>
+    private void TryApplyPendingRecordingAssetFocus()
+    {
+      if (string.IsNullOrWhiteSpace(_pendingPostReloadFocusAssetId))
+        return;
+      var want = _pendingPostReloadFocusAssetId;
+      _pendingPostReloadFocusAssetId = null;
+      var match = Assets.FirstOrDefault(a =>
+          string.Equals(a.Id, want, StringComparison.Ordinal)
+          || (a.AudioId != null && string.Equals(a.AudioId, want, StringComparison.Ordinal)));
+      if (match == null)
+        return;
+      SelectedAsset = match;
+      _multiSelectState?.SetSingle(match.Id);
+      UpdateAssetSelectionProperties();
+      if (_multiSelectService != null && _multiSelectState != null)
+        _multiSelectService.OnSelectionChanged(PanelId, _multiSelectState);
+    }
+
+    private bool CanAddAssetToTimeline(LibraryAsset? asset) =>
+        asset != null && IsAudioAsset(asset) && _eventAggregator != null;
+
+    private void AddAssetToTimeline(LibraryAsset? asset)
+    {
+      if (!CanAddAssetToTimeline(asset) || asset == null || _eventAggregator == null)
+        return;
+
+      var playbackId = GetPlaybackAudioId(asset) ?? asset.Id;
+      if (string.IsNullOrWhiteSpace(playbackId))
+        return;
+
+      var path = asset.Path;
+      if (string.IsNullOrWhiteSpace(path))
+      {
+        var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+            ?? BackendClientConfig.DefaultHttpBaseUrl;
+        path = $"{baseUrl}/api/audio/file/{Uri.EscapeDataString(playbackId)}";
+      }
+
+      var durSec = asset.Duration ?? 0.0;
+      if (durSec <= 0)
+        durSec = 0.01;
+
+      var duration = TimeSpan.FromSeconds(durSec);
+      var clipName = string.IsNullOrWhiteSpace(asset.Name) ? "Library audio" : asset.Name;
+
+      _eventAggregator.Publish(new AddToTimelineEvent(
+          PanelId,
+          playbackId,
+          path,
+          duration,
+          clipName,
+          targetTrackIndex: null,
+          insertPosition: null,
+          profileId: null));
+
+      _toastNotificationService?.ShowToast(
+          ToastType.Success,
+          "Timeline",
+          $"'{clipName}' sent to Timeline");
+    }
+
+    /// <summary>
+    /// GAP-032: Build a cross-panel <see cref="DragPayload"/> with playback id, URL fallback path, duration,
+    /// and metadata consumed by Timeline / Synthesis / Cloning wizard drop targets.
+    /// </summary>
+    public DragPayload BuildCrossPanelDragPayload(LibraryAsset asset)
+    {
+      if (asset == null)
+        throw new ArgumentNullException(nameof(asset));
+
+      var playbackId = GetPlaybackAudioId(asset) ?? asset.Id;
+      var path = asset.Path;
+      if (string.IsNullOrWhiteSpace(path))
+      {
+        var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
+            ?? BackendClientConfig.DefaultHttpBaseUrl;
+        path = $"{baseUrl}/api/audio/file/{Uri.EscapeDataString(playbackId)}";
+      }
+
+      var durSec = asset.Duration ?? 0.0;
+      if (durSec <= 0)
+        durSec = 0.01;
+
+      var meta = new Dictionary<string, object>
+      {
+        ["AssetType"] = asset.Type ?? string.Empty,
+        ["FilePath"] = asset.Path ?? string.Empty,
+        ["DurationSeconds"] = durSec,
+        ["LibraryAssetId"] = asset.Id,
+      };
+
+      return new DragPayload
+      {
+        PayloadType = DragPayloadType.Asset,
+        SourcePanelId = PanelId,
+        Items = new[]
+        {
+          new DragItem
+          {
+            Id = playbackId,
+            DisplayName = string.IsNullOrWhiteSpace(asset.Name) ? "Library asset" : asset.Name!,
+            Metadata = meta,
+          },
+        },
+      };
+    }
+
+    private bool CanAddSelectedAssetToTimeline() => CanAddAssetToTimeline(SelectedAsset);
+
+    private void AddSelectedAssetToTimeline() => AddAssetToTimeline(SelectedAsset);
 
     private async Task<string?> ShowFolderNameDialogAsync()
     {
@@ -841,7 +972,7 @@ namespace VoiceStudio.App.ViewModels
       else
       {
         // Fallback: Publish event directly
-        _eventAggregator?.Publish(new VoiceProfileSelectedEvent(PanelId, asset.Id, asset.Name));
+        _eventAggregator?.Publish(new ProfileSelectedEvent(PanelId, asset.Id, asset.Name));
         _toastNotificationService?.ShowInfo(
             $"'{asset.Name}' selected for synthesis. Open Synthesis panel to use.",
             "Voice Selected");
@@ -882,7 +1013,7 @@ namespace VoiceStudio.App.ViewModels
           if (!string.IsNullOrEmpty(playbackId))
           {
             var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
-                ?? "http://localhost:8000";
+                ?? BackendClientConfig.DefaultHttpBaseUrl;
             await _audioPlayer.PlayBackendAudioIdAsync(playbackId, baseUrl, () =>
               _toastNotificationService?.ShowToast(ToastType.Info, "Playback Complete", $"Finished playing {asset.Name}"));
             _toastNotificationService?.ShowToast(ToastType.Success, "Playing", $"Now playing: {asset.Name}");

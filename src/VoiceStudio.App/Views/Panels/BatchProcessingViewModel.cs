@@ -444,6 +444,21 @@ namespace VoiceStudio.App.Views.Panels
           _toastNotificationService?.ShowSuccess($"Job '{job.Name}' completed successfully");
         }
 
+        // GAP-030: publish cross-panel event so QualityDashboardViewModel can refresh
+        _eventAggregator?.Publish(JobCompletedEvent.Succeeded(
+            PanelId, update.JobId, "batch", result: update.ResultId));
+
+        var osCompletion = AppServices.TryGetCompletionOsNotificationService();
+        var batchBody = job != null
+            ? CompletionOsNotificationMessages.Shorten(job.Name)
+            : CompletionOsNotificationMessages.Shorten(update.ResultId ?? "Completed");
+        osCompletion?.TryNotifyTerminalCompletion(
+            CompletionOsNotificationCategory.Batch,
+            update.JobId,
+            true,
+            CompletionOsNotificationMessages.BatchCompleteTitle,
+            batchBody);
+
         // Refresh quality statistics when a job completes (use _disposalCts so disposal cancels)
         await LoadQualityStatisticsAsync(_disposalCts.Token);
       });
@@ -463,6 +478,20 @@ namespace VoiceStudio.App.Views.Panels
           // Show error notification
           _toastNotificationService?.ShowError($"Job '{job.Name}' failed: {update.Error}");
         }
+
+        // GAP-030: publish failure event for cross-panel awareness
+        _eventAggregator?.Publish(JobCompletedEvent.Failed(
+            PanelId, update.JobId, "batch", update.Error ?? "Batch job failed"));
+
+        var osCompletion = AppServices.TryGetCompletionOsNotificationService();
+        var failBody = CompletionOsNotificationMessages.Shorten(
+            job != null ? $"{job.Name}: {update.Error}" : (update.Error ?? "Batch job failed"));
+        osCompletion?.TryNotifyTerminalCompletion(
+            CompletionOsNotificationCategory.Batch,
+            update.JobId,
+            false,
+            CompletionOsNotificationMessages.BatchFailedTitle,
+            failBody);
       });
     }
 

@@ -130,7 +130,7 @@ namespace VoiceStudio.App.ViewModels
       _dialogService = dialogService ?? AppServices.GetService<IDialogService>();
 
       _backendBaseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
-          ?? "http://localhost:8000";
+          ?? BackendClientConfig.DefaultHttpBaseUrl;
 
       // Get services (may be null if not initialized)
       try

@@ -101,6 +101,12 @@ public static class AutomationIds
         public const string VadToggle = "TranscribeView_VadToggle";
         public const string TranscriptionList = "TranscribeView_TranscriptionList";
         public const string TextDisplay = "TranscribeView_TextDisplay";
+        /// <summary>GOV-VOICESTUDIO-EDIT-APPLY-JOB-STATUS-01: session apply/regenerate job status list.</summary>
+        public const string ApplyJobStatusList = "TranscribeView_ApplyJobStatusList";
+        /// <summary>GOV-VOICESTUDIO-EDIT-APPLY-RETRY-RECOVERY-01: retry failed apply/regenerate job row.</summary>
+        public const string ApplyJobRetryButton = "TranscribeView_ApplyJobRetryButton";
+        /// <summary>GOV-VOICESTUDIO-EDIT-APPLY-JOB-STATUS-01: clear session job status rows.</summary>
+        public const string ClearApplyJobStatusButton = "TranscribeView_ClearApplyJobStatusButton";
     }
     
     // =========================================================================
@@ -129,6 +135,8 @@ public static class AutomationIds
         public const string FilterButton = "LibraryView_FilterButton";
         public const string ImportButton = "LibraryView_ImportButton";
         public const string DragDropCanvas = "LibraryView_DragDropCanvas";
+        /// <summary>GAP-027: Context flyout — send selected library audio to timeline.</summary>
+        public const string MenuAddToTimeline = "LibraryView_Menu_AddToTimeline";
     }
     
     // =========================================================================
@@ -179,6 +187,8 @@ public static class AutomationIds
         public const string ApplyButton = "EffectsMixerView_ApplyButton";
         public const string ExportButton = "EffectsMixerView_ExportButton";
         public const string PresetComboBox = "EffectsMixerView_PresetComboBox";
+        /// <summary>GAP-039: Master bypass for effect chain process (bypass_chain query).</summary>
+        public const string EffectChainBypassToggle = "EffectsMixerView_EffectChainBypassToggle";
     }
     
     // =========================================================================

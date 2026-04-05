@@ -28,6 +28,7 @@ using VoiceStudio.App.Logging;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
+using VoiceStudio.Core.Events;
 
 namespace VoiceStudio.App
 {
@@ -73,6 +74,10 @@ namespace VoiceStudio.App
         private IShellNavigationCoordinator? _shellNavigationCoordinator;
         private ISearchOverlayCoordinator? _searchOverlayCoordinator;
         private IProjectWorkflowCoordinator? _projectWorkflowCoordinator;
+        private readonly MainWindowSessionLifecycle _sessionLifecycle = new();
+
+        internal IProjectWorkflowCoordinator? GetProjectWorkflowCoordinatorForSessionLifecycle() =>
+            _projectWorkflowCoordinator;
 
         private Debouncer? _layoutSaveDebouncer;
         private double _splitterStartX;
@@ -183,6 +188,7 @@ namespace VoiceStudio.App
         private sealed record WorkflowDependencies(
             IStartupStateService Startup,
             IBackendClient Backend,
+            IProjectsClient ProjectsClient,
             RecentProjectsService? RecentProjects,
             IToastNotificationService? Toast,
             ILogger<ProjectWorkflowCoordinator>? Logger);
@@ -195,7 +201,19 @@ namespace VoiceStudio.App
         {
             var getTimeline = () => (FindNameOnContent("CenterPanelHost") as Controls.PanelHost)?.Content is TimelineView tv ? tv.ViewModel : null;
             var getMixer = () => (FindNameOnContent("RightPanelHost") as Controls.PanelHost)?.Content is EffectsMixerView em ? em.ViewModel : null;
-            return ProjectWorkflowBootstrap.Create(shellNav, getTimeline, getMixer, SetActiveNavButton, deps.Startup, deps.Backend, deps.RecentProjects, deps.Toast, deps.Logger);
+            return ProjectWorkflowBootstrap.Create(
+                shellNav,
+                getTimeline,
+                getMixer,
+                SetActiveNavButton,
+                deps.Startup,
+                deps.Backend,
+                deps.ProjectsClient,
+                deps.RecentProjects,
+                deps.Toast,
+                deps.Logger,
+                ServiceProvider.GetProjectSessionDirtyState(),
+                ServiceProvider.GetCrashRecoveryService());
         }
 
         public MainWindow()
@@ -257,6 +275,7 @@ namespace VoiceStudio.App
             var workflowDeps = new WorkflowDependencies(
                 ServiceProvider.GetStartupStateService(),
                 ServiceProvider.GetBackendClient(),
+                AppServices.GetProjectsClient(),
                 ServiceProvider.TryGetRecentProjectsService(),
                 ServiceProvider.TryGetToastNotificationService(),
                 AppServices.GetService<ILogger<ProjectWorkflowCoordinator>>());
@@ -308,6 +327,8 @@ namespace VoiceStudio.App
                 {
                     // Initialize canonical XamlRoot for dialogs (prevents "XamlRoot must be explicitly set for unparented popup")
                     ErrorDialogService.Root = contentFE.XamlRoot;
+
+                    _sessionLifecycle.AttachRecoveryHandlers(this, contentFE);
 
                     // Initialize theme service with root element
                     try
@@ -367,7 +388,7 @@ namespace VoiceStudio.App
 #endif
                 // Transport shortcut orchestration (Transport Coherence Wave 4 Phase 1)
                 _transportShortcutCoordinator = AppServices.GetService<TransportShortcutCoordinator>();
-                _transportShortcutCoordinator?.Attach(_keyboardShortcutService, () => ToggleRecording());
+                _transportShortcutCoordinator?.Attach(_keyboardShortcutService, OpenRecordingPanelFromTransportShortcut);
 
                 // FIX: Defer panel initialization to the Loaded event.
                 // XamlRoot is guaranteed non-null here; it is still null during the constructor,
@@ -2062,6 +2083,24 @@ namespace VoiceStudio.App
             orchestrator?.StopPlayback();
         }
 
+        /// <summary>
+        /// Ctrl+R / transport shortcut: same policy as timeline Record — navigate to Recording panel (Transport Authority Slice 2).
+        /// </summary>
+        private void OpenRecordingPanelFromTransportShortcut()
+        {
+            if (!ServiceProvider.GetStartupStateService().IsReady)
+            {
+                AppServices.TryGetToastNotificationService()?.ShowInfo("Starting VoiceStudio services…", "Please wait");
+                return;
+            }
+
+            var aggregator = AppServices.TryGetEventAggregator();
+            if (aggregator == null)
+                return;
+
+            aggregator.Publish(new NavigateToEvent(PanelIds.Timeline, PanelIds.Recording, null));
+        }
+
         private async void ToggleRecording()
         {
             if (!ServiceProvider.GetStartupStateService().IsReady)
@@ -2152,6 +2191,7 @@ namespace VoiceStudio.App
             _statusBarTimer?.Stop();
             _layoutSaveDebouncer?.Cancel();
             SaveWorkspaceLayout();
+            _sessionLifecycle.TryMarkCleanShutdown();
             Cleanup();
         }
 
@@ -2212,6 +2252,8 @@ namespace VoiceStudio.App
             }
 
             // Transport/status event cleanup (Transport Coherence Wave 3 Task 1, 5; Wave 4 Phase 1)
+            _sessionLifecycle.Dispose();
+
             _transportShortcutCoordinator?.Detach();
             _transportShortcutCoordinator = null;
             _statusBarCoordinator?.Unsubscribe();

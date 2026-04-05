@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -7,6 +8,7 @@ using System.Threading.Tasks;
 using VoiceStudio.App.Core.Audio;
 using VoiceStudio.App.Core.Commands;
 using VoiceStudio.App.Services;
+using VoiceStudio.App.UseCases;
 using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
@@ -23,6 +25,19 @@ namespace VoiceStudio.App.Commands
         private readonly IDialogService _dialogService;
         private readonly IBackendClient? _backendClient;
         private readonly ToastNotificationService? _toastService;
+        private readonly ITimelineUseCase? _timelineUseCase;
+        private readonly IContextManager? _contextManager;
+        private readonly ISettingsService? _settingsService;
+        private readonly IExportLufsPresetUi? _exportLufsPresetUi;
+
+        private static readonly HashSet<string> AllowedExportLufsPresetIds = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "podcast_stereo",
+            "podcast_mono",
+            "broadcast",
+            "streaming",
+            "neutral",
+        };
 
         private Project? _currentProject;
         private string? _currentProjectPath;
@@ -34,15 +49,42 @@ namespace VoiceStudio.App.Commands
             IProjectRepository projectRepository,
             IDialogService dialogService,
             IBackendClient? backendClient = null,
-            ToastNotificationService? toastService = null)
+            ToastNotificationService? toastService = null,
+            ITimelineUseCase? timelineUseCase = null,
+            IContextManager? contextManager = null,
+            ISettingsService? settingsService = null,
+            IExportLufsPresetUi? exportLufsPresetUi = null)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _projectRepository = projectRepository ?? throw new ArgumentNullException(nameof(projectRepository));
             _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
             _backendClient = backendClient;
             _toastService = toastService;
+            _timelineUseCase = timelineUseCase;
+            _contextManager = contextManager;
+            _settingsService = settingsService;
+            _exportLufsPresetUi = exportLufsPresetUi;
 
             RegisterCommands();
+        }
+
+        private static string SanitizeExportLufsPresetId(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return "podcast_stereo";
+            var t = value.Trim().ToLowerInvariant();
+            return AllowedExportLufsPresetIds.Contains(t) ? t : "podcast_stereo";
+        }
+
+        /// <summary>GAP-034: per-export correlation id → one terminal OS notification per attempt.</summary>
+        private static void TryNotifyExportCompletion(string operationId, bool success, string bodyFragment)
+        {
+            AppServices.TryGetCompletionOsNotificationService()?.TryNotifyTerminalCompletion(
+                CompletionOsNotificationCategory.Export,
+                operationId,
+                success,
+                success ? CompletionOsNotificationMessages.ExportCompleteTitle : CompletionOsNotificationMessages.ExportFailedTitle,
+                CompletionOsNotificationMessages.Shorten(bodyFragment));
         }
 
         public Project? CurrentProject => _currentProject;
@@ -470,64 +512,91 @@ namespace VoiceStudio.App.Commands
                 return; // User cancelled
             }
 
+            var lufsPreset = "podcast_stereo";
+            if (_settingsService != null)
+            {
+                try
+                {
+                    var st = await _settingsService.LoadSettingsAsync(ct).ConfigureAwait(false);
+                    lufsPreset = SanitizeExportLufsPresetId(st.General?.DefaultExportLufsPreset);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[FileOperationsHandler] Export LUFS preset from settings: {ex.Message}");
+                }
+            }
+
+            if (_exportLufsPresetUi != null)
+            {
+                var picked = await _exportLufsPresetUi.PickPresetAsync(lufsPreset, ct).ConfigureAwait(true);
+                if (picked == null)
+                    return;
+                lufsPreset = SanitizeExportLufsPresetId(picked);
+            }
+
             var progress = await _dialogService.ShowProgressAsync(
                 "Exporting Audio",
                 "Preparing export...",
                 true);
 
+            string? exportOpId = null;
             try
             {
                 progress.SetMessage("Exporting audio...");
                 progress.SetProgress(0.25);
+                exportOpId = Guid.NewGuid().ToString();
 
                 if (_backendClient != null && _currentProject != null)
                 {
-                    // Get audio files from project
                     var audioFiles = await _backendClient.ListProjectAudioAsync(_currentProject.Id, ct);
                     progress.SetProgress(0.4);
 
-                    if (audioFiles.Count > 0)
-                    {
-                        // Export the first/main audio file
-                        var mainAudio = audioFiles[0];
-                        
-                        // Determine target format from the selected file extension
-                        var targetExtension = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
-                        var sourceFilename = mainAudio.Filename;
-                        
-                        progress.SetMessage($"Converting to {targetExtension.ToUpperInvariant()}...");
-                        progress.SetProgress(0.5);
-
-                        // Get default bitrate for lossy formats
-                        var targetFormat = AudioFileFormats.GetFormatByExtension(targetExtension);
-                        int? bitrateKbps = null;
-                        if (targetFormat.HasValue)
-                        {
-                            var formatInfo = AudioFileFormats.GetInfo(targetFormat.Value);
-                            bitrateKbps = formatInfo.DefaultBitrateKbps;
-                        }
-
-                        // Use the new export API with format conversion
-                        using var audioStream = await _backendClient.ExportAudioAsync(
-                            source: mainAudio.AudioId ?? sourceFilename,
-                            targetFormat: targetExtension,
-                            bitrateKbps: bitrateKbps,
-                            cancellationToken: ct);
-                        
-                        progress.SetProgress(0.75);
-
-                        // Write to file
-                        using var fileStream = File.Create(path);
-                        await audioStream.CopyToAsync(fileStream, ct);
-                        progress.SetProgress(1.0);
-
-                        _toastService?.ShowSuccess($"Audio exported to: {Path.GetFileName(path)}");
-                        Debug.WriteLine($"[FileOperationsHandler] Exported to: {path} (format: {targetExtension})");
-                    }
-                    else
+                    if (audioFiles.Count == 0)
                     {
                         _toastService?.ShowWarning("Export", "No audio files in project to export");
                         Debug.WriteLine("[FileOperationsHandler] No audio files to export");
+                        TryNotifyExportCompletion(exportOpId, false, "No audio files in project to export");
+                    }
+                    else if (_timelineUseCase != null)
+                    {
+                        var targetExtension = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
+                        if (string.IsNullOrEmpty(targetExtension))
+                        {
+                            targetExtension = "wav";
+                        }
+
+                        progress.SetMessage($"Exporting timeline mix ({targetExtension.ToUpperInvariant()})...");
+                        progress.SetProgress(0.5);
+
+                        var mainAudio = audioFiles[0];
+                        var chainId = _contextManager?.ActiveEffectChainId;
+                        var applyFx = !string.IsNullOrWhiteSpace(chainId);
+
+                        var exportOptions = new ExportOptions
+                        {
+                            Format = targetExtension,
+                            SampleRate = 48000,
+                            ProjectId = _currentProject.Id,
+                            ApplyEffectsDuringExport = applyFx,
+                            EffectChainId = chainId,
+                            FallbackProjectAudioId = mainAudio.AudioId ?? mainAudio.Filename,
+                            LufsPreset = lufsPreset,
+                        };
+
+                        var outPath = await _timelineUseCase.ExportAsync(path, exportOptions, ct);
+                        progress.SetProgress(1.0);
+
+                        _toastService?.ShowSuccess($"Audio exported to: {Path.GetFileName(outPath)}");
+                        Debug.WriteLine($"[FileOperationsHandler] Timeline export to: {outPath} (format: {targetExtension}, effects: {applyFx})");
+                        TryNotifyExportCompletion(exportOpId, true, Path.GetFileName(outPath));
+                    }
+                    else
+                    {
+                        _toastService?.ShowWarning(
+                            "Export",
+                            "Timeline export coordinator unavailable. Update the application or restart.");
+                        Debug.WriteLine("[FileOperationsHandler] ITimelineUseCase not registered; export skipped");
+                        TryNotifyExportCompletion(exportOpId, false, "Timeline export coordinator unavailable");
                     }
                 }
                 else
@@ -536,12 +605,15 @@ namespace VoiceStudio.App.Commands
                     progress.SetProgress(1.0);
                     _toastService?.ShowWarning("Export", "Backend service not available for export");
                     Debug.WriteLine("[FileOperationsHandler] Backend not available for export");
+                    TryNotifyExportCompletion(exportOpId, false, "Backend service not available for export");
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[FileOperationsHandler] Export failed: {ex.Message}");
                 _toastService?.ShowError("Export Failed", ex.Message);
+                var opId = exportOpId ?? Guid.NewGuid().ToString();
+                TryNotifyExportCompletion(opId, false, ex.Message);
             }
             finally
             {

@@ -14,6 +14,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI;
 using Microsoft.UI.Xaml.Media;
 using VoiceStudio.Core.Panels;
+using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -102,7 +103,7 @@ namespace VoiceStudio.App.Views.Panels
             _httpClient = VoiceStudio.App.Services.AppServices.GetService<HttpClient>()
                 ?? throw new InvalidOperationException("HttpClient not available");
             _backendBaseUrl = Environment.GetEnvironmentVariable("VOICESTUDIO_BACKEND_URL")
-                ?? "http://localhost:8000";
+                ?? BackendClientConfig.DefaultHttpBaseUrl;
 
             RefreshCommand = new AsyncRelayCommand(LoadHealthChecksAsync);
         }

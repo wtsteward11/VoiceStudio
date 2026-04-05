@@ -297,7 +297,14 @@
                                    Foreground="{StaticResource VSQ.Text.PrimaryBrush}"
                                    VerticalAlignment="Center" />
 
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <ToggleSwitch MinWidth="120"
+                                          Header="Bypass chain"
+                                          IsOn="{x:Bind ViewModel.IsEffectChainBypassed, Mode=TwoWay}"
+                                          OnContent="On"
+                                          OffContent="Off"
+                                          VerticalAlignment="Center"
+                                          AutomationProperties.AutomationId="EffectsMixerView_EffectChainBypassToggle" />
                             <Button AutomationProperties.AutomationId="EffectsMixerView_AddChainButton"
                                     ToolTipService.ToolTip="Create Effect Chain"
                                     Padding="4">

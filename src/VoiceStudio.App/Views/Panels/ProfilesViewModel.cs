@@ -28,6 +28,7 @@ namespace VoiceStudio.App.Views.Panels
   {
     private readonly IProfilesClient _profilesClient;
     private ISubscriptionToken? _profileCreatedToken;
+    private ISubscriptionToken? _profileUpdatedToken;
     private ISubscriptionToken? _backupRestoredToken;
     private readonly IProfilesUseCase _profilesUseCase;
     private readonly IAudioPlayerService _audioPlayer;
@@ -392,6 +393,7 @@ namespace VoiceStudio.App.Views.Panels
       // GAP-B05: Subscribe to ProfileCreatedEvent to refresh list when new profiles
       // are created in other panels (e.g., TrainingView, VoiceCloningWizard)
       _profileCreatedToken = _eventAggregator?.Subscribe<ProfileCreatedEvent>(OnProfileCreatedRefresh);
+      _profileUpdatedToken = _eventAggregator?.Subscribe<ProfileUpdatedEvent>(OnProfileUpdatedRefresh);
       _backupRestoredToken = _eventAggregator?.Subscribe<BackupRestoredEvent>(
           async evt => await RunOnDispatcherQueueAsync(() => ApplyBackupRestoredAsync(evt, CancellationToken.None)));
 
@@ -412,6 +414,8 @@ namespace VoiceStudio.App.Views.Panels
     {
       _profileCreatedToken?.Dispose();
       _profileCreatedToken = null;
+      _profileUpdatedToken?.Dispose();
+      _profileUpdatedToken = null;
       _backupRestoredToken?.Dispose();
       _backupRestoredToken = null;
       return Task.CompletedTask;
@@ -517,6 +521,26 @@ namespace VoiceStudio.App.Views.Panels
       }
 
       // GAP-I15 / W7-C1: Reload then select the new profile so context + synthesis see it without manual hunt
+      Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()?.TryEnqueue(async () =>
+      {
+        await LoadProfilesAsync(_disposalCts.Token);
+        var match = Profiles.FirstOrDefault(p => p.Id == evt.ProfileId);
+        if (match != null)
+          SelectedProfile = match;
+      });
+    }
+
+    /// <summary>
+    /// GAP-028: Reload profile list when another panel reports metadata changes (e.g. training completion).
+    /// </summary>
+    private void OnProfileUpdatedRefresh(ProfileUpdatedEvent evt)
+    {
+      if (evt.SourcePanelId == PanelId)
+        return;
+
+      System.Diagnostics.Debug.WriteLine(
+          $"[ProfilesViewModel] ProfileUpdatedEvent from {evt.SourcePanelId}: {evt.ProfileId}");
+
       Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()?.TryEnqueue(async () =>
       {
         await LoadProfilesAsync(_disposalCts.Token);

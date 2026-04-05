@@ -25,8 +25,11 @@ namespace VoiceStudio.App.Views.Panels
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IRecordingClient>(),
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IProjectAudioClient>(),
-          ServiceProvider.GetAudioPlayerService()
-      );
+          ServiceProvider.GetAudioPlayerService(),
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IRecordingSessionCoordinator>(),
+          AppServices.GetRequiredService<IRecordingCaptureFanoutService>(),
+          AppServices.TryGetRecordingInputCommandState(),
+          AppServices.TryGetRecordingDeviceAvailabilityService());
       DataContext = ViewModel;
 
       // Initialize services

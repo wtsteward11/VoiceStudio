@@ -21,7 +21,8 @@ namespace VoiceStudio.App.Views.Panels
       this.InitializeComponent();
       ViewModel = new ModelManagerViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
-          AppServices.GetRequiredService<VoiceStudio.Core.Services.IModelManagerClient>()
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IModelManagerClient>(),
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IJobProgressApiClient>()
       );
       this.DataContext = ViewModel;
 

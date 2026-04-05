@@ -16,8 +16,9 @@ namespace VoiceStudio.App.Views.Panels
     {
       this.InitializeComponent();
       ViewModel = new AudioMonitoringDashboardViewModel(
-          ServiceProvider.GetAudioMonitoringDashboardClient()
-      );
+          ServiceProvider.GetAudioMonitoringDashboardClient(),
+          ServiceProvider.GetMeterClient(),
+          AppServices.TryGetContextManager());
       this.DataContext = ViewModel;
 
       // Setup keyboard navigation

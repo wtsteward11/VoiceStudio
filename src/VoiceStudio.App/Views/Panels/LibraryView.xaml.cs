@@ -264,6 +264,12 @@ namespace VoiceStudio.App.Views.Panels
                   // Only enable for voice profile assets
                   menuItem.IsEnabled = IsVoiceProfileType(asset.Type);
                   break;
+                case "AddToTimelineMenuItem":
+                  menuItem.Click -= AddToTimelineMenuItem_Click;
+                  menuItem.Click += AddToTimelineMenuItem_Click;
+                  menuItem.Tag = asset;
+                  menuItem.IsEnabled = IsAudioAssetType(asset.Type);
+                  break;
                 case "DeleteMenuItem":
                   menuItem.Click -= DeleteMenuItem_Click;
                   menuItem.Click += DeleteMenuItem_Click;
@@ -298,6 +304,12 @@ namespace VoiceStudio.App.Views.Panels
       {
         ViewModel.UseSynthesisVoiceCommand?.Execute(asset);
       }
+    }
+
+    private void AddToTimelineMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+      if (sender is MenuFlyoutItem menuItem && menuItem.Tag is LibraryAsset asset)
+        ViewModel.AddAssetToTimelineCommand?.Execute(asset);
     }
 
     private void DeleteMenuItem_Click(object sender, RoutedEventArgs e)
@@ -565,7 +577,7 @@ namespace VoiceStudio.App.Views.Panels
         if (!string.IsNullOrEmpty(assetId))
         {
           var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
-              ?? "http://localhost:8000";
+              ?? BackendClientConfig.DefaultHttpBaseUrl;
           await _audioPlayer.PlayBackendAudioIdAsync(assetId, baseUrl, () => _toastService?.ShowToast(ToastType.Info, "Playback Complete", $"Finished playing {assetName}"));
           _toastService?.ShowToast(ToastType.Success, "Playing", $"Now playing: {assetName}");
           return;
@@ -877,6 +889,7 @@ namespace VoiceStudio.App.Views.Panels
 
     private Task AddAssetToTimelineAsync(string assetId, string assetName, string assetUrl)
     {
+      _ = assetUrl;
       if (string.IsNullOrEmpty(assetId))
       {
         _toastService?.ShowToast(ToastType.Warning, "Timeline", "Asset ID required");
@@ -885,14 +898,28 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        // Note: Adding asset to timeline will be implemented when TimelineViewModel integration is available
-        // This will require:
-        // 1. Get current project from TimelineViewModel
-        // 2. Create AudioClip from asset
-        // 3. Add clip to selected track
+        var asset = ViewModel.Assets.FirstOrDefault(a =>
+            string.Equals(a.Id, assetId, StringComparison.Ordinal)
+            || (!string.IsNullOrEmpty(a.AudioId) && string.Equals(a.AudioId, assetId, StringComparison.Ordinal)));
 
-        _toastService?.ShowToast(ToastType.Info, "Timeline", $"Adding {assetName} to timeline...");
-        System.Diagnostics.Debug.WriteLine($"Add asset {assetId} to timeline");
+        if (asset == null)
+        {
+          _toastService?.ShowToast(
+              ToastType.Warning,
+              "Timeline",
+              "Asset not found in the current library list. Refresh the library and try again.");
+          return Task.CompletedTask;
+        }
+
+        if (ViewModel.AddAssetToTimelineCommand.CanExecute(asset))
+          ViewModel.AddAssetToTimelineCommand.Execute(asset);
+        else
+        {
+          _toastService?.ShowToast(
+              ToastType.Warning,
+              "Timeline",
+              $"Cannot add '{assetName}' to the timeline (requires an audio library asset).");
+        }
       }
       catch (Exception ex)
       {
@@ -1325,11 +1352,7 @@ namespace VoiceStudio.App.Views.Panels
         border.Opacity = 0.5;
 
         // Notify cross-panel drag service (Panel Architecture Phase 4)
-        var payload = DragPayload.FromAsset(
-          ViewModel.PanelId,
-          asset.Id,
-          asset.Name ?? "Unnamed Asset",
-          asset.Type);
+        var payload = ViewModel.BuildCrossPanelDragPayload(asset);
         _panelDragDropService?.StartDrag(payload);
       }
     }

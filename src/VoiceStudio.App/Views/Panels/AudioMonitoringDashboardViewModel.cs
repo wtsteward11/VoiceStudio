@@ -10,6 +10,7 @@ using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 using Windows.UI;
 using VoiceStudio.App.Logging;
+using VoiceStudio.App.Services;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -20,6 +21,8 @@ namespace VoiceStudio.App.Views.Panels
   public partial class AudioMonitoringDashboardViewModel : ObservableObject
   {
     private readonly IAudioMonitoringDashboardClient _client;
+    private readonly IMeterClient? _meterClient;
+    private readonly IContextManager? _contextManager;
     private CancellationTokenSource? _pollingCts;
     private bool _isPolling;
     private double _maxPeakSeen = double.MinValue;
@@ -103,9 +106,14 @@ namespace VoiceStudio.App.Views.Panels
     public bool HasMultiChannel => ChannelMeters.Count > 1;
     public bool HasAlerts => Alerts.Count > 0;
 
-    public AudioMonitoringDashboardViewModel(IAudioMonitoringDashboardClient client)
+    public AudioMonitoringDashboardViewModel(
+        IAudioMonitoringDashboardClient client,
+        IMeterClient? meterClient = null,
+        IContextManager? contextManager = null)
     {
       _client = client ?? throw new ArgumentNullException(nameof(client));
+      _meterClient = meterClient;
+      _contextManager = contextManager;
       LoadAudioCommand = new AsyncRelayCommand(LoadAudioAsync, () => !string.IsNullOrWhiteSpace(AudioId));
       ToggleRealTimeCommand = new RelayCommand(ToggleRealTime, () => !string.IsNullOrWhiteSpace(AudioId));
       ResetCommand = new RelayCommand(Reset);
@@ -123,6 +131,7 @@ namespace VoiceStudio.App.Views.Panels
       if (IsRealTimeEnabled)
       {
         StopPolling();
+        StartPolling();
       }
     }
 
@@ -163,6 +172,12 @@ namespace VoiceStudio.App.Views.Panels
 
     private async Task PollMetersAsync(CancellationToken cancellationToken)
     {
+      if (_meterClient != null)
+      {
+        await RunRealtimeMetersAsync(cancellationToken);
+        return;
+      }
+
       while (!cancellationToken.IsCancellationRequested && _isPolling)
       {
         try
@@ -180,6 +195,70 @@ namespace VoiceStudio.App.Views.Panels
           await Task.Delay(2000, cancellationToken);
         }
       }
+    }
+
+    /// <summary>
+    /// WebSocket-first metering (GAP-036 Phase B, Option A): HTTP seed then <see cref="IMeterClient"/>.
+    /// Applies updates only when <c>channel_id</c> matches <see cref="AudioId"/> (mixer-aligned asset id)
+    /// and, if the wire carries <c>project_id</c>, it matches <see cref="IContextManager.ActiveProjectId"/>.
+    /// </summary>
+    private async Task RunRealtimeMetersAsync(CancellationToken cancellationToken)
+    {
+      try
+      {
+        await LoadMetersAsync();
+        await _meterClient!.ConnectAsync(cancellationToken);
+        _meterClient.LevelsUpdated += OnRealtimeMeterLevelsUpdated;
+        try
+        {
+          await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+        // ALLOWED: empty catch - cancellation ends infinite wait for WS metering loop (user disables realtime or changes audio id)
+        catch (OperationCanceledException)
+        {
+          // Expected when realtime is disabled or audio id changes
+        }
+        finally
+        {
+          _meterClient.LevelsUpdated -= OnRealtimeMeterLevelsUpdated;
+        }
+      }
+      // ALLOWED: empty catch - outer cancellation when PollMetersAsync CTS is cancelled during teardown
+      catch (OperationCanceledException)
+      {
+        // Teardown
+      }
+      catch (Exception ex)
+      {
+        System.Diagnostics.Debug.WriteLine($"Realtime meters error: {ex.Message}");
+        ErrorLogger.LogWarning($"Audio monitoring realtime meters: {ex.Message}", "AudioMonitoringDashboardViewModel.RunRealtimeMetersAsync");
+      }
+    }
+
+    private void OnRealtimeMeterLevelsUpdated(object? sender, MeterLevelUpdate e)
+    {
+      if (!_isPolling || string.IsNullOrWhiteSpace(AudioId))
+        return;
+
+      if (!string.IsNullOrEmpty(e.ProjectId) &&
+          !string.Equals(e.ProjectId, _contextManager?.ActiveProjectId, StringComparison.Ordinal))
+      {
+        return;
+      }
+
+      if (!string.Equals(e.ChannelId, AudioId, StringComparison.Ordinal))
+        return;
+
+      ApplyLinearMeterLevels(e.PeakLevelLinear, e.RmsLevelLinear);
+    }
+
+    private void ApplyLinearMeterLevels(double peakLinear, double rmsLinear)
+    {
+      PeakLevel = peakLinear > 0 ? 20.0 * Math.Log10(peakLinear) : -60.0;
+      RmsLevel = rmsLinear > 0 ? 20.0 * Math.Log10(rmsLinear) : -60.0;
+      TruePeakLevel = PeakLevel;
+      UpdateStatistics();
+      CheckClipping();
     }
 
     private async Task LoadAudioAsync()
@@ -205,9 +284,9 @@ namespace VoiceStudio.App.Views.Panels
           }
         }
         catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "AudioMonitoringDashboardViewModel.LoadAudioAsync");
-      }
+        {
+          ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "AudioMonitoringDashboardViewModel.LoadAudioAsync");
+        }
 
         StatusText = "Monitoring active";
       }

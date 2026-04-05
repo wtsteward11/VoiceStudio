@@ -150,16 +150,16 @@
     <PackageReference Include="MessagePack" Version="3.1.4" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.3.2" />
+    <PackageReference Include="Microsoft.Graphics.Win2D" Version="$(VoiceStudioGraphicsWin2DVersion)" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="$(MicrosoftWindowsAppSDKVersion)" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="$(VoiceStudioWindowsSdkBuildToolsPackageVersion)" />
     <!-- Required for in-proc XAML compiler task dependency -->
     <PackageReference Include="System.Security.Permissions" Version="6.0.0" />
-    <PackageReference Include="CommunityToolkit.WinUI.UI.Controls" Version="7.1.2">
+    <PackageReference Include="CommunityToolkit.WinUI.UI.Controls" Version="$(VoiceStudioCommunityToolkitWinUIVersion)">
       <PrivateAssets>none</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
-    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="$(VoiceStudioCommunityToolkitMvvmVersion)" />
+    <PackageReference Include="NAudio" Version="$(VoiceStudioNAudioVersion)" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.1" />
     <PackageReference Include="Roslynator.Analyzers" Version="4.11.0">
       <PrivateAssets>all</PrivateAssets>

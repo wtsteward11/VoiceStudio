@@ -239,7 +239,7 @@ namespace VoiceStudio.App.Views.Panels
 
       // Use BackendClientConfig as single source of truth (Phase 3: API URL alignment)
       _backendBaseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
-          ?? "http://localhost:8000";
+          ?? BackendClientConfig.DefaultHttpBaseUrl;
 
       // Try to get quality service (may not be available)
       try
@@ -888,6 +888,19 @@ namespace VoiceStudio.App.Views.Panels
       _profileSelectedToken = null;
       if (_eventAggregator != null)
         _profileSelectedToken = _eventAggregator.Subscribe<ProfileSelectedEvent>(OnProfileSelected);
+
+      // GAP-026: pick up profile activated while this panel was inactive (event may have fired before subscribe).
+      var ctx = AppServices.TryGetContextManager();
+      var activeId = ctx?.ActiveProfileId;
+      if (!string.IsNullOrEmpty(activeId) && activeId != SelectedProfile?.Id)
+      {
+        OnProfileSelected(new ProfileSelectedEvent(
+            "context-manager-sync",
+            activeId,
+            ctx?.ActiveProfileName,
+            InteractionIntent.Navigation));
+      }
+
       return Task.CompletedTask;
     }
 

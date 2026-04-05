@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 using Microsoft.UI.Xaml;
+using VoiceStudio.App.Services;
 
 namespace VoiceStudio.App.Core.Commands;
 
@@ -139,7 +140,7 @@ public static class CommandBinding
             return;
 
         // Get the command from the registry
-        var registry = Services.AppServices.TryGetCommandRegistry();
+        var registry = AppServices.TryGetCommandRegistry();
         if (registry == null)
         {
             System.Diagnostics.Debug.WriteLine(

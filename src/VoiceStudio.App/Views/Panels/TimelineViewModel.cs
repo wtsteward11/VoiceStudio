@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,6 +18,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using VoiceStudio.App.Logging;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.App.UseCases;
 using VoiceStudio.Core.Events;
 
 namespace VoiceStudio.App.Views.Panels
@@ -38,8 +40,9 @@ namespace VoiceStudio.App.Views.Panels
     private ISubscriptionToken? _navigateToken;
     private ISubscriptionToken? _addToTimelineToken;
     private ISubscriptionToken? _transcriptionCompletedToken;
-    private ISubscriptionToken? _synthesisCompletedToken;
     private ISubscriptionToken? _backupRestoredToken;
+    private ISubscriptionToken? _clipAudioReplacedToken;
+    private ISubscriptionToken? _transcriptTruthStateToken;
     private readonly IAudioPlayerService _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly UndoRedoService? _undoRedoService;
@@ -47,6 +50,10 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IErrorLoggingService? _logService;
     private readonly ISettingsService? _settingsService;
     private readonly RecentProjectsService? _recentProjectsService;
+    private readonly IProjectSessionDirtyState? _sessionDirty;
+    private readonly IClipTranscriptLinkageService? _linkageService;
+    private readonly ITimelineSelectedProjectGate? _timelineProjectGate;
+    private readonly ITimelineUseCase? _timelineUseCase;
 
     public string PanelId => PanelIds.Timeline;
     public string DisplayName => ResourceHelper.GetString("Panel.Timeline.DisplayName", "Timeline");
@@ -106,6 +113,10 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private double currentPlaybackPosition;
 
+    /// <summary>Bound to timeline transport loop toggle; forwards to <see cref="IAudioPlayerService.IsLooping"/>.</summary>
+    [ObservableProperty]
+    private bool isTimelineLoopEnabled;
+
     [ObservableProperty]
     private bool isPreviewing;
 
@@ -121,7 +132,19 @@ namespace VoiceStudio.App.Views.Panels
     {
       OnPropertyChanged(nameof(PlayheadPosition));
       OnPropertyChanged(nameof(IsPlayheadVisible));
+      OnPropertyChanged(nameof(TransportTimeDisplay));
+      RefreshWaveformViewportDisplay();
     }
+
+    partial void OnIsTimelineLoopEnabledChanged(bool value)
+    {
+      if (_audioPlayer.IsLooping != value)
+        _audioPlayer.IsLooping = value;
+    }
+
+    /// <summary>Playback time for the timeline transport bar (same source as <see cref="CurrentPlaybackPosition"/>).</summary>
+    public string TransportTimeDisplay =>
+        TimeSpan.FromSeconds(CurrentPlaybackPosition).ToString(@"mm\:ss\.fff", CultureInfo.InvariantCulture);
 
     partial void OnIsPreviewingChanged(bool value)
     {
@@ -191,6 +214,13 @@ namespace VoiceStudio.App.Views.Panels
     {
       OnPropertyChanged(nameof(ZoomLevelDisplay));
       OnPropertyChanged(nameof(PixelsPerSecond));
+      RefreshWaveformViewportDisplay();
+    }
+
+    partial void OnWaveformSamplesChanged(List<float> value)
+    {
+      _waveformViewportIsFullWindow = false;
+      RefreshWaveformViewportDisplay();
     }
 
     private double ComputeTotalDuration()
@@ -221,6 +251,16 @@ namespace VoiceStudio.App.Views.Panels
 
     [ObservableProperty]
     private List<float> waveformSamples = new();
+
+    /// <summary>Windowed samples passed to <see cref="WaveformControl"/> (GAP-038 slice 2 — VM-owned viewport policy).</summary>
+    [ObservableProperty]
+    private List<float> waveformDisplaySamples = new();
+
+    /// <summary>Playhead 0..1 inside <see cref="WaveformDisplaySamples"/>; -1 hides the line.</summary>
+    [ObservableProperty]
+    private double waveformVisualizerPlaybackNormalized = -1;
+
+    private bool _waveformViewportIsFullWindow;
 
     [ObservableProperty]
     private ProjectAudioFile? selectedAudioFile;
@@ -308,11 +348,28 @@ namespace VoiceStudio.App.Views.Panels
               Text = seg.Text ?? "",
               StartSeconds = seg.Start,
               EndSeconds = seg.End,
+              SegmentId = string.IsNullOrWhiteSpace(seg.Id) ? null : seg.Id,
               PositionPixels = seg.Start * PIXELS_PER_SECOND * TimelineZoom,
               WidthPixels = Math.Max(
                   (seg.End - seg.Start) * PIXELS_PER_SECOND * TimelineZoom,
                   30) // Minimum 30px width
             });
+          }
+
+          if (SelectedProject != null && _linkageService != null)
+          {
+            var inputs = response.Segments
+                .Select(s => new TranscriptionSegmentLinkInput(
+                    string.IsNullOrWhiteSpace(s.Id) ? string.Empty : s.Id,
+                    s.Start,
+                    s.End))
+                .ToList();
+            _linkageService.UpsertLinksForTranscription(
+                SelectedProject,
+                response.Id,
+                response.AudioId,
+                inputs);
+            _sessionDirty?.MarkProjectDirty("clip_transcript_links");
           }
 
           ShowTranscriptTrack = true;
@@ -362,7 +419,10 @@ namespace VoiceStudio.App.Views.Panels
       IErrorPresentationService? errorService = null,
       IErrorLoggingService? logService = null,
       ISettingsService? settingsService = null,
-      RecentProjectsService? recentProjectsService = null)
+      RecentProjectsService? recentProjectsService = null,
+      IProjectSessionDirtyState? sessionDirty = null,
+      IClipTranscriptLinkageService? clipTranscriptLinkageService = null,
+      ITimelineUseCase? timelineUseCase = null)
         : base(AppServices.GetViewModelContext())
     {
       _synthesisService = synthesisService ?? throw new ArgumentNullException(nameof(synthesisService));
@@ -378,6 +438,10 @@ namespace VoiceStudio.App.Views.Panels
       _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
       _multiSelectState = _multiSelectService.GetState(PanelId);
 
+      // Cross-panel services before commands that publish (transport Slice 1: NavigateToEvent from Record).
+      _eventAggregator = AppServices.TryGetEventAggregator();
+      _contextManager = AppServices.TryGetContextManager();
+
       // Get optional services using helper (reduces code duplication)
       _toastNotificationService = toastNotificationService;
       _undoRedoService = undoRedoService;
@@ -385,6 +449,17 @@ namespace VoiceStudio.App.Views.Panels
       _logService = logService;
       _settingsService = settingsService;
       _recentProjectsService = recentProjectsService;
+      _sessionDirty = sessionDirty;
+      _linkageService = clipTranscriptLinkageService ?? AppServices.TryGetClipTranscriptLinkageService();
+      _timelineProjectGate = AppServices.TryGetTimelineSelectedProjectGate();
+      _timelineUseCase = timelineUseCase;
+
+      Tracks.CollectionChanged += (_, _) =>
+      {
+        if (IsLoading)
+          return;
+        _sessionDirty?.MarkProjectDirty("timeline_tracks");
+      };
 
       LoadProjectsCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -419,12 +494,22 @@ namespace VoiceStudio.App.Views.Panels
       PlayAudioCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
         using var profiler = PerformanceProfiler.StartCommand("PlayAudio");
+        if (_audioPlayer.IsPaused)
+        {
+          ResumeAudio();
+          return;
+        }
+
         await PlayAudioAsync(ct);
-      }, () => CanPlayAudio && !IsLoading && !IsPlaying);
+      }, () => CanPlayAudio && !IsLoading && (!IsPlaying || _audioPlayer.IsPaused));
 
       StopAudioCommand = new RelayCommand(StopAudio, () => IsPlaying || _audioPlayer.IsPlaying);
       PauseAudioCommand = new RelayCommand(PauseAudio, () => IsPlaying || _audioPlayer.IsPlaying);
       ResumeAudioCommand = new RelayCommand(ResumeAudio, () => _audioPlayer.IsPaused);
+
+      OpenRecordingFromTimelineCommand = new RelayCommand(
+          OpenRecordingFromTimeline,
+          () => _eventAggregator != null);
 
       AddTrackCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -511,20 +596,70 @@ namespace VoiceStudio.App.Views.Panels
       _audioPlayer.PositionChanged += (s, position) => CurrentPlaybackPosition = position;
 
       // Subscribe to cross-panel events (Audit X-3, X-6, C.3, C.4; GAP-W2)
-      _eventAggregator = AppServices.TryGetEventAggregator();
-      _contextManager = AppServices.TryGetContextManager();
       if (_eventAggregator != null)
       {
         _navigateToken = _eventAggregator.Subscribe<NavigateToEvent>(OnNavigateToTimeline);
         _addToTimelineToken = _eventAggregator.Subscribe<AddToTimelineEvent>(OnAddToTimeline);
         _transcriptionCompletedToken = _eventAggregator.Subscribe<TranscriptionCompletedEvent>(OnTranscriptionCompleted);
-        _synthesisCompletedToken = _eventAggregator.Subscribe<SynthesisCompletedEvent>(OnSynthesisCompleted);
+        // GAP-025: explicit handoff only — do not auto-insert on SynthesisCompletedEvent (Library still subscribes).
         _backupRestoredToken = _eventAggregator.Subscribe<BackupRestoredEvent>(
             async evt => await RunOnDispatcherQueueAsync(() => ApplyBackupRestoredAsync(evt, CancellationToken.None)));
+        _clipAudioReplacedToken = _eventAggregator.Subscribe<ClipAudioArtifactReplacedEvent>(OnClipAudioArtifactReplaced);
+        _transcriptTruthStateToken = _eventAggregator.Subscribe<TranscriptTruthStateChangedEvent>(OnTranscriptTruthStateChanged);
       }
+
+      IsTimelineLoopEnabled = _audioPlayer.IsLooping;
 
       // Load preview settings
       _ = LoadPreviewSettingsAsync();
+
+      RefreshWaveformViewportDisplay();
+    }
+
+    /// <summary>
+    /// Rebuilds <see cref="WaveformDisplaySamples"/> from <see cref="WaveformSamples"/> using <see cref="WaveformViewportPolicy"/>.
+    /// </summary>
+    private void RefreshWaveformViewportDisplay()
+    {
+      if (WaveformSamples == null || WaveformSamples.Count == 0)
+      {
+        _waveformViewportIsFullWindow = false;
+        WaveformDisplaySamples = new List<float>();
+        WaveformVisualizerPlaybackNormalized = -1;
+        return;
+      }
+
+      var dur = _audioPlayer.Duration;
+      var (s, w) = WaveformViewportPolicy.ComputeNormalizedViewport(CurrentPlaybackPosition, dur, TimelineZoom);
+
+      if (WaveformViewportPolicy.IsFullViewport(s, w))
+      {
+        if (!_waveformViewportIsFullWindow || WaveformDisplaySamples.Count != WaveformSamples.Count)
+        {
+          WaveformDisplaySamples = new List<float>(WaveformSamples);
+        }
+
+        _waveformViewportIsFullWindow = true;
+      }
+      else
+      {
+        _waveformViewportIsFullWindow = false;
+        WaveformDisplaySamples = WaveformViewportPolicy.SliceSamples(WaveformSamples, s, w);
+      }
+
+      WaveformVisualizerPlaybackNormalized = WaveformViewportPolicy.ComputePlaybackNormalizedInViewport(
+          CurrentPlaybackPosition,
+          dur,
+          s,
+          w);
+    }
+
+    private void OpenRecordingFromTimeline()
+    {
+      if (_eventAggregator == null)
+        return;
+
+      _eventAggregator.Publish(new NavigateToEvent(PanelId, PanelIds.Recording, null));
     }
 
     /// <summary>
@@ -548,6 +683,38 @@ namespace VoiceStudio.App.Views.Panels
             if (parameters.TryGetValue("transcriptionId", out var tidObj) && tidObj is string tid)
             {
               _ = LoadTranscriptSegmentsAsync(tid);
+            }
+            break;
+
+          case "seekPlayhead":
+            if (parameters.TryGetValue("clipId", out var clipFocusObj) && clipFocusObj is string focusClipId &&
+                !string.IsNullOrWhiteSpace(focusClipId))
+            {
+              ApplyExternalClipFocus(focusClipId);
+            }
+
+            if (parameters.TryGetValue("timeSeconds", out var timeObj))
+            {
+              double? sec = timeObj switch
+              {
+                double d => d,
+                float f => f,
+                int i => i,
+                long l => l,
+                _ => double.TryParse(
+                    timeObj?.ToString(),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var p)
+                    ? p
+                    : (double?)null
+              };
+              if (sec.HasValue && sec.Value >= 0)
+              {
+                var t = sec.Value;
+                _audioPlayer.Seek(t);
+                CurrentPlaybackPosition = t;
+              }
             }
             break;
 
@@ -577,8 +744,8 @@ namespace VoiceStudio.App.Views.Panels
         return;
       }
 
-      // Ensure we have a track
-      var targetTrack = SelectedTrack ?? Tracks.FirstOrDefault();
+      // Ensure we have a track (GAP-025: TargetTrackIndex when valid, else selection / first)
+      var targetTrack = ResolveTargetTrackForSynthesisHandoff(e);
       if (targetTrack == null)
       {
         _toastNotificationService?.ShowWarning(
@@ -594,21 +761,38 @@ namespace VoiceStudio.App.Views.Panels
     }
 
     /// <summary>
-    /// GAP-W2: Handle SynthesisCompletedEvent for auto-add to timeline when synthesis completes.
-    /// Converts to AddToTimelineEvent and reuses existing add logic. Pass 01: ProfileId for backend.
+    /// GAP-025: resolve target track for synthesis handoff. <see cref="AddToTimelineEvent.TargetTrackIndex"/> is 0-based into <see cref="Tracks"/>.
     /// </summary>
-    private void OnSynthesisCompleted(SynthesisCompletedEvent e)
+    private AudioTrack? ResolveTargetTrackForSynthesisHandoff(AddToTimelineEvent e)
     {
-      var addEvent = new AddToTimelineEvent(
-          e.SourcePanelId,
-          e.AudioId,
-          e.AudioPath,
-          e.Duration,
-          clipName: $"Synthesis - {e.VoiceName ?? "Unknown"}",
-          targetTrackIndex: null,
-          insertPosition: null,
-          profileId: e.ProfileId);
-      OnAddToTimeline(addEvent);
+      if (e.TargetTrackIndex is int idx && idx >= 0 && idx < Tracks.Count)
+      {
+        return Tracks[idx];
+      }
+
+      return SelectedTrack ?? Tracks.FirstOrDefault();
+    }
+
+    /// <summary>
+    /// GAP-025: start time for new clip — InsertPosition, else valid playhead, else append after last clip.
+    /// </summary>
+    private double ResolveSynthesisHandoffStartSeconds(AudioTrack track, AddToTimelineEvent e)
+    {
+      if (e.InsertPosition is { } ip)
+      {
+        var sec = ip.TotalSeconds;
+        return sec < 0 ? 0.0 : sec;
+      }
+
+      var playhead = CurrentPlaybackPosition;
+      if (playhead >= 0 && !double.IsNaN(playhead) && !double.IsInfinity(playhead))
+      {
+        return playhead;
+      }
+
+      return track.Clips.Count > 0
+          ? track.Clips.Max(c => c.EndTime)
+          : 0.0;
     }
 
     /// <summary>
@@ -633,9 +817,22 @@ namespace VoiceStudio.App.Views.Panels
           Text = segment.Text,
           StartSeconds = segment.StartTime,
           EndSeconds = segment.EndTime,
+          SegmentId = string.IsNullOrWhiteSpace(segment.SegmentId) ? null : segment.SegmentId,
           PositionPixels = segment.StartTime * TimelineZoom * 100 // Initial calculation
         };
         TranscriptSegments.Add(displaySegment);
+      }
+
+      if (SelectedProject != null && _linkageService != null)
+      {
+        var inputs = e.Segments
+            .Select(s => new TranscriptionSegmentLinkInput(
+                s.SegmentId ?? string.Empty,
+                s.StartTime,
+                s.EndTime))
+            .ToList();
+        _linkageService.UpsertLinksForTranscription(SelectedProject, e.TranscriptionId, e.AudioId, inputs);
+        _sessionDirty?.MarkProjectDirty("clip_transcript_links");
       }
 
       // Show the transcript overlay
@@ -665,10 +862,12 @@ namespace VoiceStudio.App.Views.Panels
       _addToTimelineToken = null;
       _transcriptionCompletedToken?.Dispose();
       _transcriptionCompletedToken = null;
-      _synthesisCompletedToken?.Dispose();
-      _synthesisCompletedToken = null;
       _backupRestoredToken?.Dispose();
       _backupRestoredToken = null;
+      _clipAudioReplacedToken?.Dispose();
+      _clipAudioReplacedToken = null;
+      _transcriptTruthStateToken?.Dispose();
+      _transcriptTruthStateToken = null;
       return Task.CompletedTask;
     }
 
@@ -695,6 +894,62 @@ namespace VoiceStudio.App.Views.Panels
       if (evt.RestoreProfiles)
       {
         await LoadProfilesAsync(cancellationToken);
+      }
+    }
+
+    /// <summary>GAP-046: sync observable tracks when transcript regen (or undo/redo) replaces clip audio; may arrive off UI thread.</summary>
+    private void OnClipAudioArtifactReplaced(ClipAudioArtifactReplacedEvent e)
+    {
+      if (e == null)
+        return;
+      _ = RunOnDispatcherQueueAsync(() =>
+      {
+        ApplyClipAudioArtifactReplaced(e);
+        return Task.CompletedTask;
+      });
+    }
+
+    private void ApplyClipAudioArtifactReplaced(ClipAudioArtifactReplacedEvent e)
+    {
+      if (SelectedProject == null
+          || !string.Equals(SelectedProject.Id, e.ProjectId, StringComparison.Ordinal))
+        return;
+
+      var track = Tracks.FirstOrDefault(t => string.Equals(t.Id, e.TrackId, StringComparison.Ordinal));
+      var clip = track?.Clips?.FirstOrDefault(c => string.Equals(c.Id, e.ClipId, StringComparison.Ordinal));
+      if (clip == null)
+        return;
+
+      clip.AudioId = e.AudioId;
+      clip.AudioUrl = e.AudioUrl ?? string.Empty;
+      clip.Duration = TimeSpan.FromSeconds(e.DurationSeconds);
+      // TranscriptTruth is set on the same in-memory clip by regen coordinator; do not reset here.
+      SnapTracksOntoSelectedProject();
+      NotifyTotalDurationChanged();
+    }
+
+    /// <summary>GAP-045 Option B: operator toasts for stale / refresh / current transcript truth.</summary>
+    private void OnTranscriptTruthStateChanged(TranscriptTruthStateChangedEvent e)
+    {
+      if (e == null)
+        return;
+      if (SelectedProject == null || !string.Equals(SelectedProject.Id, e.ProjectId, StringComparison.Ordinal))
+        return;
+      var msg = e.OperatorMessage ?? "Transcript truth state updated.";
+      switch (e.State)
+      {
+        case TranscriptTruthState.StaleAfterClipRegeneration:
+          _toastNotificationService?.ShowWarning(msg, "Transcript truth");
+          break;
+        case TranscriptTruthState.RefreshInProgress:
+          _toastNotificationService?.ShowInfo(msg, "Transcript truth");
+          break;
+        case TranscriptTruthState.Current:
+          _toastNotificationService?.ShowSuccess(msg, "Transcript truth");
+          break;
+        default:
+          _toastNotificationService?.ShowInfo(msg, "Transcript truth");
+          break;
       }
     }
 
@@ -749,10 +1004,18 @@ namespace VoiceStudio.App.Views.Panels
     {
       try
       {
-        // Calculate start time (end of last clip or 0)
-        var startTime = track.Clips.Count > 0
-            ? track.Clips.Max(c => c.EndTime)
-            : 0.0;
+        var startTime = ResolveSynthesisHandoffStartSeconds(track, e);
+
+        // GAP-027 / handoff idempotency: duplicate publish same audio + start on this track → no second clip
+        if (track.Clips.Any(c =>
+                string.Equals(c.AudioId, e.AudioId, StringComparison.Ordinal)
+                && Math.Abs(c.StartTime - startTime) < 0.0001))
+        {
+          _toastNotificationService?.ShowInfo(
+              "Timeline",
+              "This audio is already placed at this position on the track.");
+          return;
+        }
 
         // Pass 01: ProfileId required by backend; fallback to IContextManager when event has none
         var profileId = e.ProfileId;
@@ -833,6 +1096,278 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    private async Task EnsureTimelineHydratedFromProjectAsync(CancellationToken cancellationToken)
+    {
+      if (_timelineUseCase == null || SelectedProject == null)
+        return;
+      await _timelineUseCase.ImportProjectTimelineAsync(SelectedProject.Id, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>GAP-012 successor: full-track clip snapshot for project-coherent undo (trim/split/fade).</summary>
+    private static List<AudioClip> SnapshotTrackClipsForUndo(AudioTrack? track) =>
+      track?.Clips?.Select(TimelineTrackClipsCoherenceUndoAction.Clone).ToList() ?? new List<AudioClip>();
+
+    /// <summary>
+    /// Registers <see cref="TimelineTrackClipsCoherenceUndoAction"/> so Undo restores project clips + re-imports timeline graph.
+    /// </summary>
+    private void TryRegisterTimelineTrackCoherenceUndo(string actionName, AudioTrack track, IReadOnlyList<AudioClip> beforeSnapshot)
+    {
+      if (_undoRedoService == null || SelectedProject == null || _timelineUseCase == null)
+        return;
+
+      var afterSnapshot = SnapshotTrackClipsForUndo(track);
+      try
+      {
+        var backend = AppServices.GetBackendClient();
+        var action = new TimelineTrackClipsCoherenceUndoAction(
+            backend,
+            _timelineUseCase,
+            _sessionDirty,
+            SelectedProject.Id,
+            track.Id,
+            track,
+            beforeSnapshot,
+            afterSnapshot,
+            actionName,
+            _logService,
+            NotifyTotalDurationChanged,
+            projectForLinkHygiene: SelectedProject,
+            linkage: _linkageService);
+        _undoRedoService.RegisterAction(action);
+      }
+      catch (Exception ex)
+      {
+        _logService?.LogError(ex, "TryRegisterTimelineTrackCoherenceUndo");
+      }
+    }
+
+    private static void ApplyUseCaseClipToAudioClip(Clip tc, AudioClip dest)
+    {
+      dest.StartTime = tc.StartTime;
+      dest.Duration = TimeSpan.FromSeconds(tc.Duration);
+      dest.SourceStartSeconds = tc.SourceStart;
+      dest.FadeInSeconds = tc.FadeInSeconds;
+      dest.FadeOutSeconds = tc.FadeOutSeconds;
+    }
+
+    /// <summary>GAP-037: Split clip at current playhead via timeline API + project persistence.</summary>
+    public async Task SplitClipAtPlayheadAsync(AudioClip clip, CancellationToken cancellationToken = default)
+    {
+      if (_timelineUseCase == null || SelectedProject == null || SelectedTrack == null)
+      {
+        _toastNotificationService?.ShowWarning(
+            "Timeline",
+            "Split requires a project, track, and timeline connection.");
+        return;
+      }
+
+      var playhead = CurrentPlaybackPosition;
+      if (playhead <= clip.StartTime || playhead >= clip.EndTime)
+      {
+        _toastNotificationService?.ShowWarning("Split", "Move the playhead inside the clip first.");
+        return;
+      }
+
+      IsLoading = true;
+      try
+      {
+        await EnsureTimelineHydratedFromProjectAsync(cancellationToken).ConfigureAwait(false);
+        var beforeUndo = SnapshotTrackClipsForUndo(SelectedTrack);
+        var (left, right) = await _timelineUseCase.SplitClipAsync(clip.Id, playhead, cancellationToken).ConfigureAwait(false);
+        var backend = AppServices.GetBackendClient();
+        ApplyUseCaseClipToAudioClip(left, clip);
+        _ = await backend.UpdateClipAsync(
+            SelectedProject.Id,
+            SelectedTrack.Id,
+            clip.Id,
+            startTime: clip.StartTime,
+            durationSeconds: clip.Duration.TotalSeconds,
+            sourceStartSeconds: clip.SourceStartSeconds,
+            fadeInSeconds: clip.FadeInSeconds,
+            fadeOutSeconds: clip.FadeOutSeconds,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var rightClip = new AudioClip
+        {
+          Id = right.Id,
+          Name = string.IsNullOrWhiteSpace(right.Name) ? $"{clip.Name} (2)" : right.Name!,
+          ProfileId = clip.ProfileId,
+          AudioId = clip.AudioId,
+          AudioUrl = clip.AudioUrl,
+          StartTime = right.StartTime,
+          Duration = TimeSpan.FromSeconds(right.Duration),
+          SourceStartSeconds = right.SourceStart,
+          FadeInSeconds = right.FadeInSeconds,
+          FadeOutSeconds = right.FadeOutSeconds,
+          Engine = clip.Engine,
+          QualityScore = clip.QualityScore,
+          DerivedFromClipId = clip.Id,
+        };
+        _ = await backend.CreateClipAsync(SelectedProject.Id, SelectedTrack.Id, rightClip, cancellationToken).ConfigureAwait(false);
+        SelectedTrack.Clips ??= new List<AudioClip>();
+        SelectedTrack.Clips.Add(rightClip);
+        _linkageService?.CopyTranscriptLinksToNewClip(SelectedProject, clip.Id, rightClip.Id);
+        _sessionDirty?.MarkProjectDirty("clip_transcript_links");
+
+        _sessionDirty?.MarkProjectDirty("timeline_tracks");
+        await EnsureTimelineHydratedFromProjectAsync(cancellationToken).ConfigureAwait(false);
+        NotifyTotalDurationChanged();
+        TryRegisterTimelineTrackCoherenceUndo("Split clip at playhead", SelectedTrack, beforeUndo);
+        _toastNotificationService?.ShowSuccess("Split", "Clip split at playhead.");
+      }
+      catch (Exception ex)
+      {
+        _logService?.LogError(ex, "SplitClipAtPlayheadAsync");
+        _toastNotificationService?.ShowError("Split failed", ErrorHandler.GetUserFriendlyMessage(ex));
+      }
+      finally
+      {
+        IsLoading = false;
+      }
+    }
+
+    /// <summary>GAP-037: Trim clip start to current playhead.</summary>
+    public async Task TrimClipStartToPlayheadAsync(AudioClip clip, CancellationToken cancellationToken = default)
+    {
+      if (_timelineUseCase == null || SelectedProject == null || SelectedTrack == null)
+      {
+        _toastNotificationService?.ShowWarning("Timeline", "Trim requires a project and track.");
+        return;
+      }
+
+      var playhead = CurrentPlaybackPosition;
+      if (playhead <= clip.StartTime || playhead >= clip.EndTime)
+      {
+        _toastNotificationService?.ShowWarning("Trim", "Playhead must be strictly inside the clip.");
+        return;
+      }
+
+      IsLoading = true;
+      try
+      {
+        await EnsureTimelineHydratedFromProjectAsync(cancellationToken).ConfigureAwait(false);
+        var beforeUndo = SnapshotTrackClipsForUndo(SelectedTrack);
+        var trimmed = await _timelineUseCase.TrimClipAsync(clip.Id, playhead, clip.EndTime, cancellationToken).ConfigureAwait(false);
+        ApplyUseCaseClipToAudioClip(trimmed, clip);
+        var backend = AppServices.GetBackendClient();
+        _ = await backend.UpdateClipAsync(
+            SelectedProject.Id,
+            SelectedTrack.Id,
+            clip.Id,
+            startTime: clip.StartTime,
+            durationSeconds: clip.Duration.TotalSeconds,
+            sourceStartSeconds: clip.SourceStartSeconds,
+            fadeInSeconds: clip.FadeInSeconds,
+            fadeOutSeconds: clip.FadeOutSeconds,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        _sessionDirty?.MarkProjectDirty("timeline_tracks");
+        await EnsureTimelineHydratedFromProjectAsync(cancellationToken).ConfigureAwait(false);
+        NotifyTotalDurationChanged();
+        TryRegisterTimelineTrackCoherenceUndo("Trim clip start to playhead", SelectedTrack, beforeUndo);
+        _toastNotificationService?.ShowSuccess("Trim", "Trimmed clip start to playhead.");
+      }
+      catch (Exception ex)
+      {
+        _logService?.LogError(ex, "TrimClipStartToPlayheadAsync");
+        _toastNotificationService?.ShowError("Trim failed", ErrorHandler.GetUserFriendlyMessage(ex));
+      }
+      finally
+      {
+        IsLoading = false;
+      }
+    }
+
+    /// <summary>GAP-037: Trim clip end to current playhead.</summary>
+    public async Task TrimClipEndToPlayheadAsync(AudioClip clip, CancellationToken cancellationToken = default)
+    {
+      if (_timelineUseCase == null || SelectedProject == null || SelectedTrack == null)
+      {
+        _toastNotificationService?.ShowWarning("Timeline", "Trim requires a project and track.");
+        return;
+      }
+
+      var playhead = CurrentPlaybackPosition;
+      if (playhead <= clip.StartTime || playhead >= clip.EndTime)
+      {
+        _toastNotificationService?.ShowWarning("Trim", "Playhead must be strictly inside the clip.");
+        return;
+      }
+
+      IsLoading = true;
+      try
+      {
+        await EnsureTimelineHydratedFromProjectAsync(cancellationToken).ConfigureAwait(false);
+        var beforeUndo = SnapshotTrackClipsForUndo(SelectedTrack);
+        var trimmed = await _timelineUseCase.TrimClipAsync(clip.Id, clip.StartTime, playhead, cancellationToken).ConfigureAwait(false);
+        ApplyUseCaseClipToAudioClip(trimmed, clip);
+        var backend = AppServices.GetBackendClient();
+        _ = await backend.UpdateClipAsync(
+            SelectedProject.Id,
+            SelectedTrack.Id,
+            clip.Id,
+            startTime: clip.StartTime,
+            durationSeconds: clip.Duration.TotalSeconds,
+            sourceStartSeconds: clip.SourceStartSeconds,
+            fadeInSeconds: clip.FadeInSeconds,
+            fadeOutSeconds: clip.FadeOutSeconds,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        _sessionDirty?.MarkProjectDirty("timeline_tracks");
+        await EnsureTimelineHydratedFromProjectAsync(cancellationToken).ConfigureAwait(false);
+        NotifyTotalDurationChanged();
+        TryRegisterTimelineTrackCoherenceUndo("Trim clip end to playhead", SelectedTrack, beforeUndo);
+        _toastNotificationService?.ShowSuccess("Trim", "Trimmed clip end to playhead.");
+      }
+      catch (Exception ex)
+      {
+        _logService?.LogError(ex, "TrimClipEndToPlayheadAsync");
+        _toastNotificationService?.ShowError("Trim failed", ErrorHandler.GetUserFriendlyMessage(ex));
+      }
+      finally
+      {
+        IsLoading = false;
+      }
+    }
+
+    /// <summary>GAP-037: Set linear fades on clip (export/mixdown).</summary>
+    public async Task SetClipFadeAsync(AudioClip clip, double fadeInSeconds, double fadeOutSeconds, CancellationToken cancellationToken = default)
+    {
+      if (_timelineUseCase == null || SelectedProject == null || SelectedTrack == null)
+      {
+        _toastNotificationService?.ShowWarning("Timeline", "Fade requires a project and track.");
+        return;
+      }
+
+      IsLoading = true;
+      try
+      {
+        await EnsureTimelineHydratedFromProjectAsync(cancellationToken).ConfigureAwait(false);
+        var beforeUndo = SnapshotTrackClipsForUndo(SelectedTrack);
+        var updated = await _timelineUseCase.SetClipFadeAsync(clip.Id, fadeInSeconds, fadeOutSeconds, cancellationToken).ConfigureAwait(false);
+        ApplyUseCaseClipToAudioClip(updated, clip);
+        var backend = AppServices.GetBackendClient();
+        _ = await backend.UpdateClipAsync(
+            SelectedProject.Id,
+            SelectedTrack.Id,
+            clip.Id,
+            fadeInSeconds: clip.FadeInSeconds,
+            fadeOutSeconds: clip.FadeOutSeconds,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        _sessionDirty?.MarkProjectDirty("timeline_tracks");
+        await EnsureTimelineHydratedFromProjectAsync(cancellationToken).ConfigureAwait(false);
+        TryRegisterTimelineTrackCoherenceUndo("Set clip fade", SelectedTrack, beforeUndo);
+        _toastNotificationService?.ShowSuccess("Fade", "Fade settings updated.");
+      }
+      catch (Exception ex)
+      {
+        _logService?.LogError(ex, "SetClipFadeAsync");
+        _toastNotificationService?.ShowError("Fade failed", ErrorHandler.GetUserFriendlyMessage(ex));
+      }
+      finally
+      {
+        IsLoading = false;
+      }
+    }
+
     private async Task LoadPreviewSettingsAsync()
     {
       try
@@ -864,6 +1399,10 @@ namespace VoiceStudio.App.Views.Panels
     public IRelayCommand StopAudioCommand { get; }
     public IRelayCommand PauseAudioCommand { get; }
     public IRelayCommand ResumeAudioCommand { get; }
+
+    /// <summary>Opens the Recording panel; timeline record-arm is not implemented in this lane.</summary>
+    public IRelayCommand OpenRecordingFromTimelineCommand { get; }
+
     public EnhancedAsyncRelayCommand AddTrackCommand { get; }
     public EnhancedAsyncRelayCommand AddClipToTrackCommand { get; }
     public EnhancedAsyncRelayCommand LoadProjectAudioCommand { get; }
@@ -1044,6 +1583,8 @@ namespace VoiceStudio.App.Views.Panels
       {
         await _clipService.DeleteClipAsync(project.Id, track.Id, clip.Id);
         track.Clips?.Remove(clip);
+        _linkageService?.RemoveLinksByClipId(project, clip.Id);
+        _sessionDirty?.MarkProjectDirty("clip_transcript_links");
 
         if (_undoRedoService != null)
         {
@@ -1071,6 +1612,7 @@ namespace VoiceStudio.App.Views.Panels
       IsLoading = true;
       ErrorMessage = null;
 
+      _sessionDirty?.EnterSuppressDirtyNotifications();
       try
       {
         var projectsList = await _projectsClient.GetProjectsAsync(cancellationToken);
@@ -1095,6 +1637,7 @@ namespace VoiceStudio.App.Views.Panels
       finally
       {
         IsLoading = false;
+        _sessionDirty?.ExitSuppressDirtyNotifications();
       }
     }
 
@@ -1399,6 +1942,8 @@ namespace VoiceStudio.App.Views.Panels
       {
         _audioPlayer.Stop();
         IsPlaying = false;
+        // Transport Authority Slice 3: deterministic stop — PositionChanged may not fire to zero after reader disposal.
+        CurrentPlaybackPosition = 0.0;
       }
       catch (Exception ex)
       {
@@ -1433,6 +1978,12 @@ namespace VoiceStudio.App.Views.Panels
     // ITimelineTransportController: decouples orchestration from UI-tree lookup
     Task ITimelineTransportController.PlayAsync()
     {
+      if (_audioPlayer.IsPaused && ResumeAudioCommand.CanExecute(null))
+      {
+        ResumeAudioCommand.Execute(null);
+        return Task.CompletedTask;
+      }
+
       if (PlayAudioCommand.CanExecute(null))
         return PlayAudioCommand.ExecuteAsync(null);
       return Task.CompletedTask;
@@ -1452,6 +2003,8 @@ namespace VoiceStudio.App.Views.Panels
 
     partial void OnSelectedProjectChanged(Project? value)
     {
+      _timelineProjectGate?.SetSelectedProject(value);
+
       SynthesizeCommand.NotifyCanExecuteChanged();
       AddTrackCommand.NotifyCanExecuteChanged();
       LoadProjectAudioCommand.NotifyCanExecuteChanged();
@@ -1474,9 +2027,9 @@ namespace VoiceStudio.App.Views.Panels
           }
         }
         catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "TimelineViewModel.OnSelectedProjectChanged");
-      }
+        {
+          ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "TimelineViewModel.OnSelectedProjectChanged");
+        }
 
         // Load tracks for the selected project
         var ct = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
@@ -1497,11 +2050,23 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    /// <summary>
+    /// Copies in-memory <see cref="Tracks"/> onto <see cref="SelectedProject"/> before shell Save persists JSON + backend metadata.
+    /// </summary>
+    public void SnapTracksOntoSelectedProject()
+    {
+      if (SelectedProject == null)
+        return;
+      SelectedProject.Tracks = Tracks.Where(t => t != null).ToList();
+      SelectedProject.UpdatedAt = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+    }
+
     partial void OnSelectedTrackChanged(AudioTrack? value)
     {
       AddClipToTrackCommand.NotifyCanExecuteChanged();
       PasteClipCommand.NotifyCanExecuteChanged();
       DuplicateClipCommand.NotifyCanExecuteChanged();
+      SyncTimelineSelectionToContext();
     }
 
     partial void OnVisualizationModeChanged(string value)
@@ -1559,6 +2124,9 @@ namespace VoiceStudio.App.Views.Panels
         {
           SelectedTrack = Tracks.FirstOrDefault();
         }
+
+        // GAP-046: align gate project.Tracks with backend-loaded clips so transcript resolution and linkage stay coherent.
+        SnapTracksOntoSelectedProject();
       }
       catch (OperationCanceledException)
       {
@@ -1688,6 +2256,40 @@ namespace VoiceStudio.App.Views.Panels
       finally
       {
         IsLoading = false;
+      }
+    }
+
+    /// <summary>
+    /// GAP-031: Persist track mute/solo to project TrackStore so export import-from-project sees mix state.
+    /// Also syncs in-memory <c>_timeline_state</c> via <see cref="ITimelineUseCase.UpdateTimelineTrackAsync"/> when available.
+    /// </summary>
+    public async Task PersistTrackMixStateAsync(AudioTrack track)
+    {
+      if (SelectedProject == null || track == null)
+        return;
+
+      try
+      {
+        await _trackService.UpdateTrackAsync(
+            SelectedProject.Id,
+            track.Id,
+            isMuted: track.IsMuted,
+            isSolo: track.IsSolo).ConfigureAwait(false);
+
+        if (_timelineUseCase != null)
+        {
+          await _timelineUseCase.UpdateTimelineTrackAsync(
+              track.Id,
+              isMuted: track.IsMuted,
+              isSolo: track.IsSolo).ConfigureAwait(false);
+        }
+      }
+      catch (Exception ex)
+      {
+        _logService?.LogError(ex, "PersistTrackMixState");
+        _toastNotificationService?.ShowError(
+            ResourceHelper.GetString("Timeline.TrackMixStateFailed", "Could not save track mute/solo state"),
+            ErrorHandler.GetUserFriendlyMessage(ex));
       }
     }
 
@@ -2207,9 +2809,12 @@ namespace VoiceStudio.App.Views.Panels
 
             // Remove from track
             track.Clips?.Remove(clip);
+            _linkageService?.RemoveLinksByClipId(SelectedProject, clip.Id);
             deletedCount++;
           }
         }
+
+        _sessionDirty?.MarkProjectDirty("clip_transcript_links");
 
         // Register batch undo action if any clips were deleted
         if (deletedCount > 0 && _undoRedoService != null && clipsToDelete.Count > 0)
@@ -2274,6 +2879,85 @@ namespace VoiceStudio.App.Views.Panels
       OnPropertyChanged(nameof(SelectedClipCount));
       OnPropertyChanged(nameof(HasMultipleClipSelection));
       DeleteSelectedClipsCommand.NotifyCanExecuteChanged();
+      SyncTimelineSelectionToContext();
+      PublishClipTranscriptSelectionFromPrimaryClip();
+    }
+
+    /// <summary>
+    /// GAP-033: notify Transcribe panel which transcript segments match the primary selected clip.
+    /// </summary>
+    private void PublishClipTranscriptSelectionFromPrimaryClip()
+    {
+      if (_eventAggregator == null || SelectedProject == null || _linkageService == null || _multiSelectState == null ||
+          !_multiSelectState.HasSelection)
+        return;
+
+      var clipId = _multiSelectState.RangeAnchorId != null &&
+          _multiSelectState.SelectedIds.Contains(_multiSelectState.RangeAnchorId)
+            ? _multiSelectState.RangeAnchorId
+            : _multiSelectState.SelectedIds[0];
+      var links = _linkageService.GetLinksForClip(SelectedProject, clipId);
+      if (links.Count == 0)
+        return;
+
+      var link = links[0];
+      var segmentIds = _linkageService.ResolveSegmentIdsForClip(SelectedProject, clipId);
+      _eventAggregator.Publish(new ClipTranscriptSelectionEvent(PanelId, clipId, link.TranscriptionId, segmentIds));
+    }
+
+    /// <summary>
+    /// Pushes primary clip/track IDs to <see cref="IContextManager"/> so transport-adjacent and cross-panel code share one authority.
+    /// </summary>
+    private void SyncTimelineSelectionToContext()
+    {
+      if (_contextManager == null)
+        return;
+
+      string? clipId = null;
+      string? trackId = null;
+      if (_multiSelectState != null && _multiSelectState.HasSelection)
+      {
+        clipId = _multiSelectState.RangeAnchorId != null && _multiSelectState.SelectedIds.Contains(_multiSelectState.RangeAnchorId)
+            ? _multiSelectState.RangeAnchorId
+            : _multiSelectState.SelectedIds[0];
+        trackId = FindTrackIdForClip(clipId);
+      }
+      else
+      {
+        trackId = SelectedTrack?.Id;
+      }
+
+      _contextManager.SetActiveTimelineSelection(clipId, trackId);
+    }
+
+    private string? FindTrackIdForClip(string clipId)
+    {
+      foreach (var t in Tracks)
+      {
+        if (t.Clips != null && t.Clips.Any(c => c.Id == clipId))
+          return t.Id;
+      }
+
+      return null;
+    }
+
+    /// <summary>
+    /// GAP-045: focus a clip from cross-panel navigation (e.g. Transcribe segment → timeline clip + seek).
+    /// </summary>
+    private void ApplyExternalClipFocus(string clipId)
+    {
+      if (_multiSelectState == null || string.IsNullOrWhiteSpace(clipId))
+        return;
+      var trackId = FindTrackIdForClip(clipId);
+      if (trackId == null)
+        return;
+      var track = Tracks.FirstOrDefault(t => t.Id == trackId);
+      if (track == null)
+        return;
+      SelectedTrack = track;
+      _multiSelectState.SetSingle(clipId);
+      UpdateClipSelectionProperties();
+      _multiSelectService.OnSelectionChanged(PanelId, _multiSelectState);
     }
   }
 }

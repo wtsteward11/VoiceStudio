@@ -156,6 +156,8 @@ namespace VoiceStudio.App
                     Debug.WriteLine($"[Startup] Failed to write startup_failure.txt: {ex.Message}");
                 }
             }
+
+            _sessionLifecycle.StartAutosave(this);
             }
             catch (Exception ex)
             {

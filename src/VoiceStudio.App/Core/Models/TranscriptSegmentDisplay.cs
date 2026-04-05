@@ -12,6 +12,9 @@ namespace VoiceStudio.Core.Models
     /// <summary>Segment text content.</summary>
     public string Text { get; set; } = string.Empty;
 
+    /// <summary>Backend segment id when transcript is linked (GAP-033).</summary>
+    public string? SegmentId { get; set; }
+
     /// <summary>Start time in seconds.</summary>
     public double StartSeconds { get; set; }
 

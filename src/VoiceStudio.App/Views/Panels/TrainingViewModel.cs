@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -44,6 +45,9 @@ namespace VoiceStudio.App.Views.Panels
 
     // Phase 4: EventAggregator for cross-panel synchronization
     private readonly IEventAggregator? _eventAggregator;
+
+    /// <summary>GAP-028: avoid duplicate ProfileCreated/ProfileUpdated publishes when polling re-reads the same completed job.</summary>
+    private string? _lastPublishedCompletedTrainingJobId;
 
     public string PanelId => PanelIds.Training;
     public string DisplayName => ResourceHelper.GetString("Panel.Training.DisplayName", "Training");
@@ -1005,16 +1009,27 @@ namespace VoiceStudio.App.Views.Panels
           // Show success notification
           _toastNotificationService?.ShowSuccess($"Training job completed successfully");
 
-          // GAP-B05: Publish ProfileCreatedEvent for cross-panel synchronization
-          // This allows ProfilesView to refresh and show the newly trained profile
-          if (!string.IsNullOrEmpty(job.ProfileId) && _eventAggregator != null)
+          // GAP-B05 / GAP-028: cross-panel profile list + metadata refresh (skip if polling path already published)
+          if (!string.IsNullOrEmpty(job.ProfileId) && _eventAggregator != null
+              && job.Id != _lastPublishedCompletedTrainingJobId)
           {
-            var profileName = $"Trained Profile ({job.Engine})";
-            _eventAggregator.Publish(new ProfileCreatedEvent(PanelId, job.ProfileId, profileName));
+            _lastPublishedCompletedTrainingJobId = job.Id;
+            PublishTrainingCompletedProfileEvents(job);
             System.Diagnostics.Debug.WriteLine(
-              $"[TrainingViewModel] Published ProfileCreatedEvent: {job.ProfileId}");
+              $"[TrainingViewModel] Published training completion profile events: {job.ProfileId}");
           }
         }
+
+        var osCompletion = AppServices.TryGetCompletionOsNotificationService();
+        var trainingBody = job != null
+            ? CompletionOsNotificationMessages.Shorten($"{job.Engine} · {job.ProfileId}")
+            : CompletionOsNotificationMessages.Shorten("Training job completed");
+        osCompletion?.TryNotifyTerminalCompletion(
+            CompletionOsNotificationCategory.Training,
+            update.JobId,
+            true,
+            CompletionOsNotificationMessages.TrainingCompleteTitle,
+            trainingBody);
 
         // GAP-I15: Refresh logs and jobs to get final state using disposal token
         await LoadLogsAsync(_disposalCts.Token);
@@ -1039,8 +1054,56 @@ namespace VoiceStudio.App.Views.Panels
           // Show error notification
           _toastNotificationService?.ShowError($"Training failed: {update.Error}");
         }
+
+        var osCompletion = AppServices.TryGetCompletionOsNotificationService();
+        var failBody = CompletionOsNotificationMessages.Shorten(update.Error ?? "Training failed");
+        osCompletion?.TryNotifyTerminalCompletion(
+            CompletionOsNotificationCategory.Training,
+            update.JobId,
+            false,
+            CompletionOsNotificationMessages.TrainingFailedTitle,
+            failBody);
       });
     }
+
+    /// <summary>GAP-028: publishes the same cross-panel events as training job completion (WebSocket and polling).</summary>
+    private void PublishTrainingCompletedProfileEvents(TrainingStatus job)
+    {
+      if (_eventAggregator == null || string.IsNullOrEmpty(job.ProfileId))
+        return;
+
+      var profileName = $"Trained Profile ({job.Engine})";
+      _eventAggregator.Publish(new ProfileCreatedEvent(PanelId, job.ProfileId, profileName));
+      _eventAggregator.Publish(new ProfileUpdatedEvent(
+          PanelId,
+          job.ProfileId,
+          new Dictionary<string, object>
+          {
+              ["training_completed"] = true,
+              ["training_job_id"] = job.Id ?? string.Empty,
+          }));
+    }
+
+    /// <summary>GAP-028: polling observes <c>completed</c> once per job id; avoids duplicate event storms.</summary>
+    private void TryPublishPollingTrainingCompletion(TrainingStatus updatedStatus)
+    {
+      if (_eventAggregator == null || string.IsNullOrEmpty(updatedStatus.ProfileId))
+        return;
+      if (!string.Equals(updatedStatus.Status, "completed", StringComparison.OrdinalIgnoreCase))
+        return;
+      if (updatedStatus.Id == _lastPublishedCompletedTrainingJobId)
+        return;
+      _lastPublishedCompletedTrainingJobId = updatedStatus.Id;
+      PublishTrainingCompletedProfileEvents(updatedStatus);
+    }
+
+    /// <summary>GAP-028 seam tests: exposes polling completion publish + idempotent guard.</summary>
+    public void SeamTryPublishPollingTrainingCompletion(TrainingStatus updatedStatus) =>
+      TryPublishPollingTrainingCompletion(updatedStatus);
+
+    /// <summary>GAP-028 seam tests: emits ProfileCreated + ProfileUpdated without guard.</summary>
+    public void SeamPublishTrainingCompletedProfileEvents(TrainingStatus job) =>
+      PublishTrainingCompletedProfileEvents(job);
 
     #endregion
 
@@ -1132,6 +1195,9 @@ namespace VoiceStudio.App.Views.Panels
               TrainingJobs[index] = updatedStatus;
               SelectedTrainingJob = updatedStatus;
             }
+
+            // GAP-028: polling path parity with WebSocket completion (profiles refresh + metadata signal)
+            TryPublishPollingTrainingCompletion(updatedStatus);
 
             // Reload logs if training is running
             if (updatedStatus.Status == "running")

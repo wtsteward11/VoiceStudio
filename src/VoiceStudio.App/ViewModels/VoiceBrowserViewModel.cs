@@ -155,7 +155,7 @@ namespace VoiceStudio.App.ViewModels
       var voice = SelectedVoice;
       if (voice == null || string.IsNullOrEmpty(voice.PreviewAudioId))
         return;
-      var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? "http://localhost:8000";
+      var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/') ?? BackendClientConfig.DefaultHttpBaseUrl;
       await _audioPlayer.PlayBackendAudioIdAsync(voice.PreviewAudioId, baseUrl);
     }
 

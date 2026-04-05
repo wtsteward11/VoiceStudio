@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using VoiceStudio.Core.Events;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -20,6 +21,7 @@ namespace VoiceStudio.App.Views.Panels
     private ContextMenuService? _contextMenuService;
     private ToastNotificationService? _toastService;
     private IDragDropService? _panelDragDropService;
+    private IEventAggregator? _eventAggregator;
 
     public VoiceSynthesisView()
     {
@@ -40,6 +42,7 @@ namespace VoiceStudio.App.Views.Panels
       _contextMenuService = ServiceProvider.GetContextMenuService();
       _toastService = ServiceProvider.GetToastNotificationService();
       _panelDragDropService = AppServices.TryGetDragDropService();
+      _eventAggregator = AppServices.TryGetEventAggregator();
 
       // Subscribe to quality metrics updates
       ViewModel.PropertyChanged += ViewModel_PropertyChanged;
@@ -113,10 +116,10 @@ namespace VoiceStudio.App.Views.Panels
       // Setup Tab navigation order for this panel
       KeyboardNavigationHelper.SetupTabNavigation(this, 0);
 
-      // Register as drop target for Profile payloads (Panel Architecture Phase 4)
+      // Register as drop target for Profile / voice-profile library assets (GAP-032)
       _panelDragDropService?.RegisterDropTarget(
           ViewModel.PanelId,
-          CanAcceptDrop);
+          CanAcceptSynthesisDrop);
     }
 
     private void VoiceSynthesisView_Unloaded(object sender, RoutedEventArgs e)
@@ -126,45 +129,90 @@ namespace VoiceStudio.App.Views.Panels
     }
 
     /// <summary>
-    /// Determines if this panel can accept a drag payload.
-    /// Accepts Profile and ReferenceAudio for voice synthesis.
+    /// GAP-032: Voice profile payloads and library voice-profile assets (via ProfileSelectedEvent path).
     /// </summary>
-    private static bool CanAcceptDrop(DragPayload payload)
+    private static bool CanAcceptSynthesisDrop(DragPayload payload)
     {
-      return payload.PayloadType == DragPayloadType.Profile ||
-             payload.PayloadType == DragPayloadType.ReferenceAudio;
+      if (payload.PayloadType == DragPayloadType.Profile ||
+          payload.PayloadType == DragPayloadType.ReferenceAudio)
+        return true;
+      if (payload.PayloadType != DragPayloadType.Asset || payload.Items.Count == 0)
+        return false;
+      return IsVoiceProfileLibraryAsset(payload.Items[0]);
     }
 
-    /// <summary>
-    /// Handles a dropped Profile or ReferenceAudio payload.
-    /// </summary>
-    private async Task HandleProfileDropAsync(DragPayload payload, CancellationToken cancellationToken)
+    private static bool IsVoiceProfileLibraryAsset(DragItem item)
     {
-      if (payload.PayloadType == DragPayloadType.Profile)
+      if (item.Metadata == null || !item.Metadata.TryGetValue("AssetType", out var raw))
+        return false;
+      var t = raw?.ToString() ?? string.Empty;
+      var voiceTypes = new[] { "voice", "voice_profile", "profile", "clone", "xtts", "rvc" };
+      return voiceTypes.Contains(t.ToLowerInvariant());
+    }
+
+    private async Task<DropResult> HandleSynthesisDropAsync(DragPayload payload, CancellationToken cancellationToken)
+    {
+      _ = cancellationToken;
+      if (_eventAggregator == null)
       {
-        var profileId = payload.Items.FirstOrDefault()?.Id;
-        if (!string.IsNullOrEmpty(profileId))
-        {
-          // Find and select the profile in the ViewModel
-          var profile = ViewModel.Profiles.FirstOrDefault(p => p.Id == profileId);
-          if (profile != null)
-          {
-            ViewModel.SelectedProfile = profile;
-            _toastService?.ShowToast(ToastType.Success, "Profile Selected", $"Selected '{profile.Name}' for synthesis");
-          }
-        }
+        _toastService?.ShowToast(ToastType.Warning, "Drop Failed", "Cannot apply profile (events unavailable).");
+        return new DropResult { Success = false, TargetPanelId = ViewModel.PanelId, ErrorMessage = "Event aggregator unavailable" };
       }
-      else if (payload.PayloadType == DragPayloadType.ReferenceAudio)
+
+      if (payload.PayloadType == DragPayloadType.Profile ||
+          (payload.PayloadType == DragPayloadType.Asset && IsVoiceProfileLibraryAsset(payload.Items[0])))
+      {
+        var item = payload.Items.FirstOrDefault();
+        if (item == null || string.IsNullOrEmpty(item.Id))
+        {
+          _toastService?.ShowToast(ToastType.Warning, "Drop Failed", "Missing profile identifier on drag payload.");
+          return new DropResult { Success = false, TargetPanelId = ViewModel.PanelId, ErrorMessage = "Missing profile id" };
+        }
+        _eventAggregator.Publish(new ProfileSelectedEvent(
+            payload.SourcePanelId,
+            item.Id,
+            item.DisplayName,
+            InteractionIntent.ImmediateUse));
+        _toastService?.ShowToast(ToastType.Success, "Voice Selected", $"'{item.DisplayName}' selected for synthesis");
+        await Task.CompletedTask.ConfigureAwait(true);
+        return new DropResult { Success = true, TargetPanelId = ViewModel.PanelId, Action = nameof(ProfileSelectedEvent) };
+      }
+
+      if (payload.PayloadType == DragPayloadType.ReferenceAudio)
       {
         var audioPath = payload.Items.FirstOrDefault()?.Id;
         if (!string.IsNullOrEmpty(audioPath))
-        {
-          // Load reference audio for voice cloning synthesis
-          _toastService?.ShowToast(ToastType.Info, "Reference Audio", $"Reference audio loaded: {audioPath}");
-        }
+          _toastService?.ShowToast(ToastType.Info, "Reference Audio", $"Reference audio path: {audioPath}");
+        await Task.CompletedTask.ConfigureAwait(true);
+        return new DropResult { Success = true, TargetPanelId = ViewModel.PanelId, Action = "ReferenceAudio" };
       }
 
-      await Task.CompletedTask;
+      await Task.CompletedTask.ConfigureAwait(true);
+      return new DropResult { Success = false, TargetPanelId = ViewModel.PanelId, ErrorMessage = "Unsupported synthesis drop" };
+    }
+
+    private void VoiceSynthesisPanel_DragOver(object sender, DragEventArgs e)
+    {
+      _ = sender;
+      if (_panelDragDropService is { IsDragging: true } && _panelDragDropService.CanDrop(ViewModel.PanelId))
+      {
+        e.AcceptedOperation = DataPackageOperation.Copy;
+        _panelDragDropService.UpdateDragTarget(ViewModel.PanelId);
+        e.Handled = true;
+      }
+    }
+
+    private async void VoiceSynthesisPanel_Drop(object sender, DragEventArgs e)
+    {
+      _ = sender;
+      if (_panelDragDropService is { IsDragging: true } && _panelDragDropService.CanDrop(ViewModel.PanelId))
+      {
+        _ = await _panelDragDropService.ExecuteDropAsync(
+            ViewModel.PanelId,
+            HandleSynthesisDropAsync,
+            CancellationToken.None).ConfigureAwait(true);
+        e.Handled = true;
+      }
     }
 
     private PanelHost? FindParentPanelHost(DependencyObject element)

@@ -26,7 +26,10 @@
     <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
     <converters:StringFormatConverter x:Key="StringFormatConverter" />
   </UserControl.Resources>
-  <Grid AutomationProperties.AutomationId="VoiceCloningWizardView_Root">
+  <Grid AutomationProperties.AutomationId="VoiceCloningWizardView_Root"
+        AllowDrop="True"
+        DragOver="VoiceCloningWizard_DragOver"
+        Drop="VoiceCloningWizard_Drop">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />

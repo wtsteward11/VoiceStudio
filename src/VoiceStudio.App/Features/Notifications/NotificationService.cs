@@ -229,9 +229,9 @@ public class NotificationService
             var notification = builder.BuildNotification();
             AppNotificationManager.Default.Show(notification);
         }
-        // ALLOWED: empty catch - toast notifications may not be available on all systems
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[NotificationService] ShowToast failed: {ex.Message}");
         }
     }
 

@@ -97,6 +97,9 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem x:Name="CloneReferenceMenuItem" Text="Use as Clone Reference" />
                                     <MenuFlyoutItem x:Name="UseSynthesisVoiceMenuItem" Text="Use for Synthesis" />
+                                    <MenuFlyoutItem x:Name="AddToTimelineMenuItem"
+                                                    Text="Add to Timeline"
+                                                    AutomationProperties.AutomationId="LibraryView_Menu_AddToTimeline" />
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem x:Name="DeleteMenuItem" Text="Delete" Icon="Delete" />
                                 </MenuFlyout>

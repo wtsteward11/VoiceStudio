@@ -10,6 +10,8 @@ using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using VoiceStudio.Core.Transcription;
+using VoiceStudio.App.Core.Models;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.Utilities;
@@ -26,12 +28,20 @@ namespace VoiceStudio.App.Views.Panels
     private bool _isInitialized;
     private ISubscriptionToken? _projectChangedToken;
     private ISubscriptionToken? _assetAddedToken;
+    private ISubscriptionToken? _clipTranscriptToken;
+    private ISubscriptionToken? _transcriptTruthStateToken;
+    private string? _truthRefreshTrackId;
+    private string? _truthRefreshClipId;
 
-    /// <summary>Must match <see cref="RecordingViewModel"/> upload success publisher.</summary>
-    private const string AssetSourceRecordingPanel = "recording-panel";
+    /// <summary>GAP-045 feedback: segment ids regenerated this session (cleared on transcription/project context change or truth refresh).</summary>
+    private readonly HashSet<string> _sessionRegeneratedSegmentIds = new(StringComparer.Ordinal);
 
     /// <summary>Must match <see cref="ImportWorkflowService"/>.</summary>
     private const string AssetSourceImportWorkflow = "import-workflow";
+
+    private static bool IsRecordingDerivedAssetSource(string? sourcePanelId) =>
+        string.Equals(sourcePanelId, PanelIds.Recording, StringComparison.Ordinal)
+        || string.Equals(sourcePanelId, "recording-panel", StringComparison.OrdinalIgnoreCase);
     private readonly UndoRedoService? _undoRedoService;
     private readonly MultiSelectService _multiSelectService;
     private MultiSelectState? _multiSelectState;
@@ -103,6 +113,84 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private bool isLoadingEngines;
 
+    /// <summary>GAP-033: segment ids highlighted from timeline clip selection.</summary>
+    [ObservableProperty]
+    private IReadOnlyList<string> linkedTranscriptSegmentIds = System.Array.Empty<string>();
+
+    /// <summary>GAP-045: operator-visible status for transcript→timeline targeting and edit-intent (non-error path).</summary>
+    [ObservableProperty]
+    private string? transcriptOperatorMessage;
+
+    /// <summary>GAP-045 Option B: stale transcript truth / refresh messaging bindable to InfoBar.</summary>
+    [ObservableProperty]
+    private string? transcriptTruthReconciliationHint;
+
+    /// <summary>GAP-045 Option B: show transcript truth InfoBar when <see cref="TranscriptTruthReconciliationHint"/> is set.</summary>
+    [ObservableProperty]
+    private bool showTranscriptTruthReconciliationBar;
+
+    /// <summary>GAP-045 inline edit/apply: stable segment id being edited in the Transcribe panel (UI-owned draft until Apply).</summary>
+    [ObservableProperty]
+    private string? editingSegmentId;
+
+    /// <summary>GAP-045 inline edit/apply: canonical segment text when edit started (for dirty compare).</summary>
+    [ObservableProperty]
+    private string? editingSegmentOriginalText;
+
+    /// <summary>GAP-045 inline edit/apply: operator draft; Apply sends trimmed value as regen <c>replacement_text</c>.</summary>
+    [ObservableProperty]
+    private string? editingSegmentDraftText;
+
+    /// <summary>GAP-045 multi-segment: inclusive end segment id when editing a contiguous range; null or same as <see cref="EditingSegmentId"/> = single segment.</summary>
+    [ObservableProperty]
+    private string? editingRangeEndSegmentId;
+
+    /// <summary>GAP-045 inline edit/apply: status strip hint for flyout edit session.</summary>
+    [ObservableProperty]
+    private string? segmentEditOperatorHint;
+
+    /// <summary>GAP-047 review lane: session-local filler removal toggles (flyout only; not persisted).</summary>
+    public ObservableCollection<FillerRemovalToggleItem> FillerRemovalToggles { get; } = new();
+
+    /// <summary>GAP-047: preview of draft text if only enabled filler terms are stripped.</summary>
+    [ObservableProperty]
+    private string? fillerRemovalPreviewText;
+
+    /// <summary>GAP-045 transcript edit history: fallback when <see cref="TranscriptEditHistoryService"/> is not registered (tests).</summary>
+    private readonly ObservableCollection<TranscriptEditHistoryEntry> _emptyTranscriptEditHistory = new();
+
+    /// <summary>GAP-045: session-visible edit history (newest-first ring buffer via service).</summary>
+    public ObservableCollection<TranscriptEditHistoryEntry> TranscriptEditHistoryEntries =>
+        AppServices.TryGetTranscriptEditHistoryService()?.Entries ?? _emptyTranscriptEditHistory;
+
+    /// <summary>GOV-VOICESTUDIO-EDIT-APPLY-JOB-STATUS-01: session-local transcript apply/regenerate job rows (newest-first, capped).</summary>
+    public ObservableCollection<TranscriptApplyJobStatusEntry> TranscriptApplyJobStatusEntries { get; } = new();
+
+    private const int MaxTranscriptApplyJobStatusEntries = 15;
+
+    /// <summary>GAP-045 feedback: segment id currently running regeneration (busy UI).</summary>
+    [ObservableProperty]
+    private string? regeneratingSegmentId;
+
+    /// <summary>GAP-045 feedback: bump when segment rows must rebind (ItemsRepeater + non-INPC segments).</summary>
+    [ObservableProperty]
+    private int transcriptSegmentLayoutRevision;
+
+    public bool IsEditingSegment => !string.IsNullOrWhiteSpace(EditingSegmentId);
+
+    public bool IsEditDirty =>
+        IsEditingSegment
+        && !string.Equals(
+            (EditingSegmentDraftText ?? string.Empty).Trim(),
+            (EditingSegmentOriginalText ?? string.Empty).Trim(),
+            StringComparison.Ordinal);
+
+    /// <summary>True when flyout is editing more than one segment (contiguous range on same clip).</summary>
+    public bool IsMultiSegmentRangeEdit =>
+        IsEditingSegment
+        && !string.IsNullOrWhiteSpace(EditingRangeEndSegmentId)
+        && !string.Equals(EditingSegmentId, EditingRangeEndSegmentId, StringComparison.Ordinal);
+
     public ObservableCollection<SupportedLanguage> Languages { get; } = new();
 
     public TranscribeViewModel(
@@ -169,6 +257,38 @@ namespace VoiceStudio.App.Views.Panels
           SendSelectedTranscriptionToTimeline,
           () => SelectedTranscription != null);
 
+      RefreshTranscriptTruthCommand = new EnhancedAsyncRelayCommand(
+          async (ct) =>
+          {
+            using var profiler = PerformanceProfiler.StartCommand("RefreshTranscriptTruth");
+            await RefreshTranscriptTruthAsync(ct);
+          },
+          () => !IsLoading && CanRefreshTranscriptTruth());
+
+      ApplyEditedSegmentCommand = new EnhancedAsyncRelayCommand(
+          async (ct) =>
+          {
+            using var profiler = PerformanceProfiler.StartCommand("ApplyEditedSegment");
+            _ = await ApplyEditedSegmentAsync(ct).ConfigureAwait(true);
+          },
+          () =>
+              !IsLoading
+              && IsEditingSegment
+              && IsEditDirty
+              && string.IsNullOrWhiteSpace(RegeneratingSegmentId));
+
+      RemoveFillersFromEditingDraftCommand = new RelayCommand(
+          RemoveFillersFromEditingDraftCore,
+          () =>
+              !IsLoading
+              && IsEditingSegment
+              && string.IsNullOrWhiteSpace(RegeneratingSegmentId));
+
+      ClearTranscriptEditHistoryCommand = new RelayCommand(
+          () => AppServices.TryGetTranscriptEditHistoryService()?.ClearSession());
+
+      ClearTranscriptApplyJobStatusCommand = new RelayCommand(() => TranscriptApplyJobStatusEntries.Clear());
+
       // Subscribe to selection changes
       _multiSelectService.SelectionChanged += (s, e) =>
       {
@@ -191,6 +311,9 @@ namespace VoiceStudio.App.Views.Panels
       _isInitialized = true;
       await LoadLanguagesAsync(cancellationToken);
       await LoadEnginesAsync(cancellationToken);
+      EnsureClipTranscriptSelectionSubscription();
+      EnsureTranscriptTruthStateSubscription();
+      RefreshTranscriptTruthHints();
     }
 
     /// <inheritdoc />
@@ -201,6 +324,9 @@ namespace VoiceStudio.App.Views.Panels
       EnsureAssetAddedSubscription();
       if (!_isInitialized)
         await InitializeAsync(cancellationToken);
+      EnsureClipTranscriptSelectionSubscription();
+      EnsureTranscriptTruthStateSubscription();
+      RefreshTranscriptTruthHints();
     }
 
     /// <inheritdoc />
@@ -214,6 +340,7 @@ namespace VoiceStudio.App.Views.Panels
     public Task RefreshAsync(CancellationToken cancellationToken = default)
     {
       SyncSelectedProjectFromContext();
+      RefreshTranscriptTruthHints();
       return Task.CompletedTask;
     }
 
@@ -263,6 +390,1211 @@ namespace VoiceStudio.App.Views.Panels
         agg?.Unsubscribe(_assetAddedToken);
         _assetAddedToken = null;
       }
+
+      if (_clipTranscriptToken != null)
+      {
+        agg?.Unsubscribe(_clipTranscriptToken);
+        _clipTranscriptToken = null;
+      }
+
+      if (_transcriptTruthStateToken != null)
+      {
+        agg?.Unsubscribe(_transcriptTruthStateToken);
+        _transcriptTruthStateToken = null;
+      }
+    }
+
+    private void EnsureClipTranscriptSelectionSubscription()
+    {
+      if (_clipTranscriptToken != null)
+        return;
+      var agg = AppServices.TryGetEventAggregator();
+      if (agg == null)
+        return;
+      _clipTranscriptToken = agg.Subscribe<ClipTranscriptSelectionEvent>(OnClipTranscriptSelectionFromTimeline);
+    }
+
+    private void OnClipTranscriptSelectionFromTimeline(ClipTranscriptSelectionEvent e)
+    {
+      Dispatcher.TryEnqueue(() =>
+      {
+        LinkedTranscriptSegmentIds = e.SegmentIds;
+        var match = Transcriptions.FirstOrDefault(t => t.Id == e.TranscriptionId);
+        if (match != null)
+          SelectedTranscription = match;
+        RefreshTranscriptTruthHints();
+      });
+    }
+
+    private void EnsureTranscriptTruthStateSubscription()
+    {
+      if (_transcriptTruthStateToken != null)
+        return;
+      var agg = AppServices.TryGetEventAggregator();
+      if (agg == null)
+        return;
+      _transcriptTruthStateToken = agg.Subscribe<TranscriptTruthStateChangedEvent>(OnTranscriptTruthStateChangedForUi);
+    }
+
+    private void OnTranscriptTruthStateChangedForUi(TranscriptTruthStateChangedEvent e)
+    {
+      Dispatcher.TryEnqueue(RefreshTranscriptTruthHints);
+    }
+
+    private void RefreshTranscriptTruthHints()
+    {
+      _truthRefreshTrackId = null;
+      _truthRefreshClipId = null;
+
+      var gate = AppServices.TryGetTimelineSelectedProjectGate();
+      var project = gate?.SelectedProject;
+      if (project == null
+          || string.IsNullOrWhiteSpace(SelectedAudioId)
+          || string.IsNullOrWhiteSpace(SelectedProjectId)
+          || !string.Equals(project.Id, SelectedProjectId, StringComparison.Ordinal))
+      {
+        TranscriptTruthReconciliationHint = null;
+        ShowTranscriptTruthReconciliationBar = false;
+        RefreshTranscriptTruthCommand.NotifyCanExecuteChanged();
+        return;
+      }
+
+      var staleClips = new List<(string TrackId, string ClipId)>();
+      foreach (var t in project.Tracks ?? Enumerable.Empty<AudioTrack>())
+      {
+        foreach (var c in t.Clips ?? Enumerable.Empty<AudioClip>())
+        {
+          if (!string.Equals(c.AudioId, SelectedAudioId, StringComparison.Ordinal))
+            continue;
+          if (c.TranscriptTruth != TranscriptTruthState.StaleAfterClipRegeneration)
+            continue;
+          staleClips.Add((t.Id, c.Id));
+        }
+      }
+
+      if (staleClips.Count == 0)
+      {
+        TranscriptTruthReconciliationHint = null;
+        ShowTranscriptTruthReconciliationBar = false;
+        RefreshTranscriptTruthCommand.NotifyCanExecuteChanged();
+        return;
+      }
+
+      if (staleClips.Count > 1)
+      {
+        TranscriptTruthReconciliationHint =
+            "Multiple timeline clips with this audio id are marked stale; reconciliation is ambiguous. Resolve duplicates before refresh.";
+        ShowTranscriptTruthReconciliationBar = true;
+        RefreshTranscriptTruthCommand.NotifyCanExecuteChanged();
+        return;
+      }
+
+      _truthRefreshTrackId = staleClips[0].TrackId;
+      _truthRefreshClipId = staleClips[0].ClipId;
+      TranscriptTruthReconciliationHint =
+          "Transcript linkage was removed after clip audio changed. Refresh to transcribe current audio and rebuild linkage.";
+      ShowTranscriptTruthReconciliationBar = true;
+      RefreshTranscriptTruthCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanRefreshTranscriptTruth() =>
+        !string.IsNullOrWhiteSpace(_truthRefreshTrackId)
+        && !string.IsNullOrWhiteSpace(_truthRefreshClipId)
+        && !string.IsNullOrWhiteSpace(SelectedProjectId);
+
+    private async Task RefreshTranscriptTruthAsync(CancellationToken cancellationToken)
+    {
+      var coord = AppServices.TryGetTranscriptTruthRefreshCoordinator();
+      var gate = AppServices.TryGetTimelineSelectedProjectGate();
+      var project = gate?.SelectedProject;
+      if (coord == null || project == null || !CanRefreshTranscriptTruth())
+      {
+        _toastNotificationService?.ShowWarning(
+            ResourceHelper.GetString("Transcribe.TruthRefreshUnavailable", "Refresh unavailable."),
+            ResourceHelper.GetString("Transcribe.TruthRefreshUnavailableTitle", "Transcript refresh"));
+        return;
+      }
+
+      var err = await coord
+          .TryRefreshStaleTranscriptForClipAsync(
+              project,
+              _truthRefreshTrackId!,
+              _truthRefreshClipId!,
+              SelectedEngine,
+              SelectedLanguage,
+              WordTimestamps,
+              Diarization,
+              UseVad,
+              PanelId,
+              SelectedProjectId,
+              cancellationToken)
+          .ConfigureAwait(true);
+
+      if (err != null)
+      {
+        _toastNotificationService?.ShowToast(ToastType.Error, "Transcript refresh", err);
+        return;
+      }
+
+      ClearSessionRegeneratedSegmentTracking();
+      await LoadTranscriptionsAsync(cancellationToken).ConfigureAwait(true);
+      RefreshTranscriptTruthHints();
+      _toastNotificationService?.ShowSuccess(
+          ResourceHelper.GetString(
+              "Transcribe.TruthRefreshCompleteDetail",
+              "Transcript refreshed; timeline linkage rebuilt for the clip."),
+          ResourceHelper.GetString("Transcribe.TruthRefreshCompleteTitle", "Transcript truth"));
+    }
+
+    /// <summary>
+    /// GAP-033: seek timeline playhead from transcript context (source-audio seconds).
+    /// </summary>
+    public void RequestSeekTimelineToSeconds(double timeSeconds)
+    {
+      if (timeSeconds < 0 || double.IsNaN(timeSeconds) || double.IsInfinity(timeSeconds))
+        return;
+      var agg = AppServices.TryGetEventAggregator();
+      if (agg == null)
+        return;
+      agg.Publish(new NavigateToEvent(
+          PanelId,
+          "timeline",
+          new Dictionary<string, object>
+          {
+            { "action", "seekPlayhead" },
+            { "timeSeconds", timeSeconds },
+          }));
+    }
+
+    /// <summary>
+    /// GAP-045: segment tap → deterministic clip + timeline seek (segment times in source-audio space; seek uses clip <c>StartTime</c> offset).
+    /// </summary>
+    /// <param name="expectedClipId">When non-null, jump-from-row preflight: resolved clip must still match (GOV-VOICESTUDIO-EDIT-APPLY-CONTEXT-JUMP-01).</param>
+    public void OnTargetTranscriptionSegmentTapped(TranscriptionSegment? segment, string? expectedClipId = null)
+    {
+      if (segment == null || SelectedTranscription == null)
+        return;
+
+      var resolver = AppServices.TryGetTranscriptSegmentTargetResolver();
+      if (resolver == null)
+      {
+        TranscriptOperatorMessage = TranscriptStaleContextExplainability.JumpResolverNotRegistered;
+        return;
+      }
+
+      var r = resolver.Resolve(SelectedTranscription.Id, segment.Id, segment.Start, segment.End);
+      if (r.Kind != TranscriptSegmentTargetResolutionKind.Resolved)
+      {
+        TranscriptOperatorMessage = TranscriptStaleContextExplainability.JumpResolverFailure(r);
+        return;
+      }
+
+      if (!string.IsNullOrWhiteSpace(expectedClipId)
+          && !string.Equals(r.ClipId, expectedClipId, StringComparison.Ordinal))
+      {
+        TranscriptOperatorMessage = TranscriptStaleContextExplainability.JumpClipMismatchRowVsResolve;
+        return;
+      }
+
+      TranscriptOperatorMessage = "Timeline: focused linked clip and applied seek.";
+      PublishTranscriptResolutionNavigate(r);
+    }
+
+    /// <summary>
+    /// GAP-045: record edit intent after resolution. For <see cref="TranscriptEditIntentKind.ReplaceRange"/>, pass <paramref name="replacementText"/> (required non-empty).
+    /// </summary>
+    public bool TryRecordTranscriptEditIntent(
+        TranscriptEditIntentKind kind,
+        TranscriptionSegment? segment,
+        out string? errorMessage,
+        string? replacementText = null)
+    {
+      errorMessage = null;
+      if (segment == null || SelectedTranscription == null)
+      {
+        errorMessage = "Select a transcription and segment first.";
+        return false;
+      }
+
+      var svc = AppServices.TryGetTranscriptEditIntentService();
+      if (svc == null)
+      {
+        errorMessage = "Edit intent service is unavailable.";
+        return false;
+      }
+
+      if (!svc.TryRecordIntent(
+              kind,
+              SelectedTranscription.Id,
+              segment.Id,
+              segment.Start,
+              segment.End,
+              out errorMessage,
+              replacementText))
+        return false;
+
+      if (svc.Current != null)
+      {
+        TranscriptOperatorMessage = svc.Current.DownstreamExecutable
+            ? $"Recorded {kind} intent (executable)."
+            : $"Recorded {kind} intent (non-executing). {svc.Current.ExecutionBlockedReason}";
+      }
+
+      return true;
+    }
+
+    /// <summary>GAP-046: run backend regen job and apply audio to the linked timeline clip. Optional <paramref name="replacementText"/> overrides stored segment text for synthesis.</summary>
+    /// <param name="rangeEndInclusiveIndex">When set with multi-segment apply, updates local segment display for indices from segment through this index (inclusive).</param>
+    /// <param name="historyOperationKind">GAP-045: logical operation for session edit history (draft-only filler cleanup is not passed here).</param>
+    public async Task<string?> RegenerateSegmentAudioAsync(
+        TranscriptionSegment? segment,
+        string? replacementText = null,
+        CancellationToken cancellationToken = default,
+        int? rangeEndInclusiveIndex = null,
+        TranscriptEditOperationKind historyOperationKind = TranscriptEditOperationKind.RegenerateSegment)
+    {
+      if (segment == null || SelectedTranscription == null)
+        return "Select a transcription and segment first.";
+
+      var effectiveHistoryKind = string.IsNullOrWhiteSpace(replacementText)
+          ? TranscriptEditOperationKind.RegenerateSegment
+          : historyOperationKind;
+
+      var coordinator = AppServices.TryGetTranscriptSegmentRegenerationCoordinator();
+      if (coordinator == null)
+      {
+        EnqueueFailedTranscriptApplyJobStatus(
+            effectiveHistoryKind,
+            segment,
+            rangeEndInclusiveIndex,
+            TryResolveClipIdForApplyJobStatus(segment),
+            "Regeneration is unavailable (coordinator not registered).",
+            replacementText);
+        return "Regeneration is unavailable (coordinator not registered).";
+      }
+
+      var segId = string.IsNullOrWhiteSpace(segment.Id) ? null : segment.Id;
+      RegeneratingSegmentId = segId;
+      ApplyEditedSegmentCommand.NotifyCanExecuteChanged();
+      TranscriptSegmentLayoutRevision++;
+      try
+      {
+        string? historyClipId = null;
+        var snapshotResolver = AppServices.TryGetTranscriptSegmentTargetResolver();
+        if (snapshotResolver != null && !string.IsNullOrWhiteSpace(segment.Id))
+        {
+          var snap = snapshotResolver.Resolve(
+              SelectedTranscription.Id,
+              segment.Id,
+              segment.Start,
+              segment.End);
+          if (snap.Kind == TranscriptSegmentTargetResolutionKind.Resolved)
+            historyClipId = snap.ClipId;
+        }
+
+        var opId = Guid.NewGuid().ToString("N");
+        var segmentIdsForStatus = BuildHistorySegmentIds(segment, rangeEndInclusiveIndex, SelectedTranscription);
+        var statusEntry = new TranscriptApplyJobStatusEntry(
+            opId,
+            effectiveHistoryKind,
+            segmentIdsForStatus,
+            historyClipId,
+            DateTimeOffset.UtcNow,
+            SelectedTranscription.Id,
+            SelectedProjectId,
+            replacementText,
+            rangeEndInclusiveIndex,
+            segment.Start,
+            segment.End);
+        InsertTranscriptApplyJobStatusEntry(statusEntry);
+        var progress = CreateTranscriptApplyJobProgressReporter(opId, statusEntry);
+
+        var err = await coordinator
+            .TryExecuteAsync(
+                SelectedTranscription,
+                segment,
+                PanelId,
+                replacementText,
+                cancellationToken,
+                progress,
+                opId,
+                rangeEndInclusiveIndex)
+            .ConfigureAwait(true);
+        FinalizeTranscriptApplyJobStatusAfterCoordinator(statusEntry, err);
+        if (err == null)
+        {
+          RefreshTranscriptTruthHints();
+          if (rangeEndInclusiveIndex is { } endIdx
+              && SelectedTranscription.Segments != null
+              && endIdx >= 0)
+          {
+            var startIdx = SelectedTranscription.Segments.FindIndex(s => s.Id == segment.Id);
+            if (startIdx >= 0 && endIdx >= startIdx)
+              ApplyLocalRangeAfterRegen(startIdx, endIdx, replacementText);
+            else
+              ApplyLocalSegmentTextAfterSuccessfulRegen(segment, replacementText);
+          }
+          else
+            ApplyLocalSegmentTextAfterSuccessfulRegen(segment, replacementText);
+        }
+
+        RecordTranscriptEditHistoryAfterRegenAttempt(
+            effectiveHistoryKind,
+            segment,
+            rangeEndInclusiveIndex,
+            err,
+            historyClipId);
+        return err;
+      }
+      finally
+      {
+        RegeneratingSegmentId = null;
+        ApplyEditedSegmentCommand.NotifyCanExecuteChanged();
+        TranscriptSegmentLayoutRevision++;
+      }
+    }
+
+    private string? TryResolveClipIdForApplyJobStatus(TranscriptionSegment segment)
+    {
+      if (SelectedTranscription == null || string.IsNullOrWhiteSpace(segment.Id))
+        return null;
+      var snapshotResolver = AppServices.TryGetTranscriptSegmentTargetResolver();
+      if (snapshotResolver == null)
+        return null;
+      var snap = snapshotResolver.Resolve(
+          SelectedTranscription.Id,
+          segment.Id,
+          segment.Start,
+          segment.End);
+      return snap.Kind == TranscriptSegmentTargetResolutionKind.Resolved ? snap.ClipId : null;
+    }
+
+    private void EnqueueFailedTranscriptApplyJobStatus(
+        TranscriptEditOperationKind kind,
+        TranscriptionSegment segment,
+        int? rangeEndInclusiveIndex,
+        string? clipId,
+        string message,
+        string? replacementTextSnapshot)
+    {
+      if (SelectedTranscription == null)
+        return;
+      var opId = Guid.NewGuid().ToString("N");
+      var segmentIds = BuildHistorySegmentIds(segment, rangeEndInclusiveIndex, SelectedTranscription);
+      var entry = new TranscriptApplyJobStatusEntry(
+          opId,
+          kind,
+          segmentIds,
+          clipId,
+          DateTimeOffset.UtcNow,
+          SelectedTranscription.Id,
+          SelectedProjectId,
+          replacementTextSnapshot,
+          rangeEndInclusiveIndex,
+          segment.Start,
+          segment.End)
+      {
+        OperatorStatus = TranscriptApplyOperatorJobStatus.Failed,
+        StatusMessage = message,
+        CompletedUtc = DateTimeOffset.UtcNow,
+      };
+      InsertTranscriptApplyJobStatusEntry(entry);
+    }
+
+    /// <summary>GOV-VOICESTUDIO-EDIT-APPLY-RETRY-RECOVERY-01: replay a failed job from its frozen snapshot (not live draft).</summary>
+    public async Task RetryTranscriptApplyJobAsync(
+        TranscriptApplyJobStatusEntry? entry,
+        CancellationToken cancellationToken = default)
+    {
+      if (entry == null || !entry.CanShowRetry)
+        return;
+
+      if (!string.IsNullOrWhiteSpace(RegeneratingSegmentId))
+      {
+        _toastNotificationService?.ShowToast(
+            ToastType.Warning,
+            TranscriptStaleContextExplainability.RetryAnotherRegenerationInProgress,
+            "Retry");
+        return;
+      }
+
+      if (SelectedTranscription == null)
+      {
+        _toastNotificationService?.ShowToast(
+            ToastType.Warning,
+            TranscriptStaleContextExplainability.RetryNoTranscriptionSelected,
+            "Retry unavailable");
+        return;
+      }
+
+      if (!string.Equals(SelectedTranscription.Id, entry.TranscriptionId, StringComparison.Ordinal))
+      {
+        _toastNotificationService?.ShowToast(
+            ToastType.Warning,
+            TranscriptStaleContextExplainability.RetryTranscriptionMismatch,
+            "Retry unavailable");
+        return;
+      }
+
+      if (!string.IsNullOrEmpty(entry.ProjectId)
+          && !string.Equals(SelectedProjectId ?? string.Empty, entry.ProjectId, StringComparison.Ordinal))
+      {
+        _toastNotificationService?.ShowToast(
+            ToastType.Warning,
+            TranscriptStaleContextExplainability.RetryProjectMismatch,
+            "Retry unavailable");
+        return;
+      }
+
+      var anchorId = entry.SegmentIds[0];
+      var segment = SelectedTranscription.Segments?.FirstOrDefault(s => s.Id == anchorId);
+      if (segment == null)
+      {
+        _toastNotificationService?.ShowToast(
+            ToastType.Warning,
+            TranscriptStaleContextExplainability.RetrySegmentMissing,
+            "Retry unavailable");
+        return;
+      }
+
+      var eps = TranscriptApplyJobStatusEntry.RetryAnchorTimingEpsilonSeconds;
+      if (Math.Abs(segment.Start - entry.AnchorSegmentStart) > eps
+          || Math.Abs(segment.End - entry.AnchorSegmentEnd) > eps)
+      {
+        _toastNotificationService?.ShowToast(
+            ToastType.Warning,
+            TranscriptStaleContextExplainability.RetryRangeTimingInvalidated,
+            "Retry unavailable");
+        return;
+      }
+
+      if (!string.IsNullOrWhiteSpace(entry.ClipId))
+      {
+        var resolver = AppServices.TryGetTranscriptSegmentTargetResolver();
+        if (resolver == null)
+        {
+          _toastNotificationService?.ShowToast(
+              ToastType.Warning,
+              TranscriptStaleContextExplainability.RetryResolverUnavailable,
+              "Retry unavailable");
+          return;
+        }
+
+        if (string.IsNullOrWhiteSpace(segment.Id))
+        {
+          _toastNotificationService?.ShowToast(
+              ToastType.Warning,
+              TranscriptStaleContextExplainability.RetrySegmentIdMissing,
+              "Retry unavailable");
+          return;
+        }
+
+        var snap = resolver.Resolve(
+            SelectedTranscription.Id,
+            segment.Id,
+            segment.Start,
+            segment.End);
+        if (snap.Kind != TranscriptSegmentTargetResolutionKind.Resolved
+            || !string.Equals(snap.ClipId, entry.ClipId, StringComparison.Ordinal))
+        {
+          _toastNotificationService?.ShowToast(
+              ToastType.Warning,
+              TranscriptStaleContextExplainability.RetryClipMismatch,
+              "Retry unavailable");
+          return;
+        }
+      }
+
+      _ = await RegenerateSegmentAudioAsync(
+              segment,
+              entry.ReplacementTextSnapshot,
+              cancellationToken,
+              entry.RangeEndInclusiveIndex,
+              entry.OperationKind)
+          .ConfigureAwait(true);
+    }
+
+    private void InsertTranscriptApplyJobStatusEntry(TranscriptApplyJobStatusEntry entry)
+    {
+      while (TranscriptApplyJobStatusEntries.Count >= MaxTranscriptApplyJobStatusEntries)
+        TranscriptApplyJobStatusEntries.RemoveAt(TranscriptApplyJobStatusEntries.Count - 1);
+      TranscriptApplyJobStatusEntries.Insert(0, entry);
+    }
+
+    private IProgress<TranscriptRegenerationJobProgressReport> CreateTranscriptApplyJobProgressReporter(
+        string operationCorrelationId,
+        TranscriptApplyJobStatusEntry entry)
+    {
+      return new Progress<TranscriptRegenerationJobProgressReport>(report =>
+      {
+        if (!string.Equals(report.OperationCorrelationId, operationCorrelationId, StringComparison.Ordinal))
+          return;
+
+        void Apply()
+        {
+          if (!string.IsNullOrWhiteSpace(report.JobId))
+            entry.JobId = report.JobId;
+          entry.JobProgress = report.Progress;
+          entry.CurrentStep = report.CurrentStep;
+          var op = TranscriptApplyJobStatusMapper.MapToOperator(report.BackendStatus);
+          entry.OperatorStatus = op;
+          entry.StatusMessage = TranscriptApplyJobStatusMapper.BuildStatusMessage(report, op);
+          if (op is TranscriptApplyOperatorJobStatus.Succeeded or TranscriptApplyOperatorJobStatus.Failed)
+            entry.CompletedUtc = DateTimeOffset.UtcNow;
+          else
+            entry.CompletedUtc = null;
+        }
+
+        if (!Dispatcher.TryEnqueue(Apply))
+          Apply();
+      });
+    }
+
+    private void FinalizeTranscriptApplyJobStatusAfterCoordinator(TranscriptApplyJobStatusEntry entry, string? err)
+    {
+      void FinalizeCore()
+      {
+        if (err != null)
+        {
+          if (entry.OperatorStatus != TranscriptApplyOperatorJobStatus.Failed)
+          {
+            entry.OperatorStatus = TranscriptApplyOperatorJobStatus.Failed;
+            entry.StatusMessage = err;
+            entry.CompletedUtc = DateTimeOffset.UtcNow;
+          }
+          else if (entry.CompletedUtc == null)
+            entry.CompletedUtc = DateTimeOffset.UtcNow;
+        }
+        else
+        {
+          if (entry.OperatorStatus != TranscriptApplyOperatorJobStatus.Succeeded)
+          {
+            entry.OperatorStatus = TranscriptApplyOperatorJobStatus.Succeeded;
+            entry.StatusMessage = "Regeneration complete; clip updated.";
+            entry.CompletedUtc = DateTimeOffset.UtcNow;
+          }
+          else if (entry.CompletedUtc == null)
+            entry.CompletedUtc = DateTimeOffset.UtcNow;
+        }
+      }
+
+      if (!Dispatcher.TryEnqueue(FinalizeCore))
+        FinalizeCore();
+    }
+
+    /// <summary>GAP-045 feedback: session-scoped regen marker for segment row accent.</summary>
+    public bool WasSegmentRegeneratedInSession(string? segmentId) =>
+        !string.IsNullOrWhiteSpace(segmentId)
+        && _sessionRegeneratedSegmentIds.Contains(segmentId!);
+
+    private void ClearSessionRegeneratedSegmentTracking()
+    {
+      var had = _sessionRegeneratedSegmentIds.Count > 0;
+      _sessionRegeneratedSegmentIds.Clear();
+      if (had)
+        TranscriptSegmentLayoutRevision++;
+    }
+
+    private void ApplyLocalSegmentTextAfterSuccessfulRegen(TranscriptionSegment segment, string? replacementText)
+    {
+      if (SelectedTranscription?.Segments == null)
+        return;
+      var segId = segment.Id;
+      if (string.IsNullOrWhiteSpace(segId))
+        return;
+
+      _ = _sessionRegeneratedSegmentIds.Add(segId);
+
+      var trimmed = (replacementText ?? string.Empty).Trim();
+      if (!string.IsNullOrEmpty(trimmed))
+      {
+        var list = SelectedTranscription.Segments;
+        var idx = list.FindIndex(s => s.Id == segId);
+        if (idx >= 0)
+        {
+          var old = list[idx];
+          var copy = new List<TranscriptionSegment>(list.Count);
+          for (var i = 0; i < list.Count; i++)
+          {
+            if (i != idx)
+            {
+              copy.Add(list[i]);
+              continue;
+            }
+
+            copy.Add(
+                new TranscriptionSegment
+                {
+                  Id = old.Id,
+                  Start = old.Start,
+                  End = old.End,
+                  Text = trimmed,
+                  Words = old.Words,
+                });
+          }
+
+          SelectedTranscription.Segments = copy;
+        }
+      }
+
+      TranscriptSegmentLayoutRevision++;
+    }
+
+    /// <summary>GAP-045 multi-segment: after successful regen, show full draft on the first row; clear text on other rows in range (execution row §5).</summary>
+    private void ApplyLocalRangeAfterRegen(int startIdx, int endIdx, string? replacementText)
+    {
+      if (SelectedTranscription?.Segments == null)
+        return;
+      var list = SelectedTranscription.Segments;
+      if (startIdx < 0 || endIdx >= list.Count || startIdx > endIdx)
+        return;
+
+      var trimmed = (replacementText ?? string.Empty).Trim();
+      if (string.IsNullOrEmpty(trimmed))
+        return;
+
+      var copy = new List<TranscriptionSegment>(list.Count);
+      for (var i = 0; i < list.Count; i++)
+      {
+        if (i < startIdx || i > endIdx)
+        {
+          copy.Add(list[i]);
+          continue;
+        }
+
+        var old = list[i];
+        _ = _sessionRegeneratedSegmentIds.Add(old.Id ?? string.Empty);
+
+        var newText = i == startIdx ? trimmed : string.Empty;
+        copy.Add(
+            new TranscriptionSegment
+            {
+              Id = old.Id ?? string.Empty,
+              Start = old.Start,
+              End = old.End,
+              Text = newText,
+              Words = old.Words,
+            });
+      }
+
+      SelectedTranscription.Segments = copy;
+      TranscriptSegmentLayoutRevision++;
+    }
+
+    private static string CombineRangeOriginalText(IReadOnlyList<TranscriptionSegment> list, int start, int end)
+    {
+      var sb = new System.Text.StringBuilder();
+      for (var i = start; i <= end; i++)
+      {
+        if (i > start)
+          sb.Append(' ');
+        sb.Append((list[i].Text ?? string.Empty).Trim());
+      }
+
+      return sb.ToString();
+    }
+
+    private bool TryGetRangeIndices(out int startIdx, out int endIdx, out string? error)
+    {
+      startIdx = endIdx = -1;
+      error = null;
+      if (SelectedTranscription?.Segments == null || string.IsNullOrWhiteSpace(EditingSegmentId))
+      {
+        error = "No segment edit in progress.";
+        return false;
+      }
+
+      var list = SelectedTranscription.Segments;
+      var ia = list.FindIndex(s => s.Id == EditingSegmentId);
+      if (ia < 0)
+      {
+        error = "Editing segment not found on the selected transcription.";
+        return false;
+      }
+
+      if (string.IsNullOrWhiteSpace(EditingRangeEndSegmentId)
+          || string.Equals(EditingRangeEndSegmentId, EditingSegmentId, StringComparison.Ordinal))
+      {
+        startIdx = endIdx = ia;
+        return true;
+      }
+
+      var ib = list.FindIndex(s => s.Id == EditingRangeEndSegmentId);
+      if (ib < 0)
+      {
+        error = "Range end segment not found on the selected transcription.";
+        return false;
+      }
+
+      startIdx = Math.Min(ia, ib);
+      endIdx = Math.Max(ia, ib);
+      return true;
+    }
+
+    /// <summary>GAP-045 multi-segment: every index in [start,end] must resolve to the same timeline clip.</summary>
+    private string? TryValidateContiguousSameClip(int startIdx, int endIdx)
+    {
+      if (SelectedTranscription?.Segments == null)
+        return "No transcription segments loaded.";
+      var list = SelectedTranscription.Segments;
+      var s = Math.Min(startIdx, endIdx);
+      var e = Math.Max(startIdx, endIdx);
+      if (s < 0 || e >= list.Count)
+        return "Invalid segment range.";
+
+      var resolver = AppServices.TryGetTranscriptSegmentTargetResolver();
+      if (resolver == null)
+        return "Transcript targeting is unavailable (resolver not registered).";
+
+      string? clipId = null;
+      for (var i = s; i <= e; i++)
+      {
+        var seg = list[i];
+        if (string.IsNullOrWhiteSpace(seg.Id))
+          return "A segment in the range has no id.";
+        var r = resolver.Resolve(SelectedTranscription.Id, seg.Id, seg.Start, seg.End);
+        if (r.Kind != TranscriptSegmentTargetResolutionKind.Resolved)
+          return r.Reason ?? "A segment in the range could not be resolved to the timeline.";
+        if (clipId == null)
+          clipId = r.ClipId;
+        else if (!string.Equals(clipId, r.ClipId, StringComparison.Ordinal))
+          return "This range spans multiple timeline clips. Edit one clip at a time.";
+      }
+
+      return null;
+    }
+
+    /// <summary>GAP-045 inline edit/apply: start a UI-only buffered edit for one segment.</summary>
+    public void BeginEditSegment(TranscriptionSegment? segment)
+    {
+      if (segment == null || SelectedTranscription == null)
+        return;
+      EditingRangeEndSegmentId = null;
+      EditingSegmentId = string.IsNullOrWhiteSpace(segment.Id) ? null : segment.Id;
+      EditingSegmentOriginalText = segment.Text ?? string.Empty;
+      EditingSegmentDraftText = segment.Text ?? string.Empty;
+      RebuildFillerRemovalTogglesAndPreview();
+    }
+
+    /// <summary>GAP-045 multi-segment: buffered edit for inclusive contiguous range [a,b] on the same clip (display order).</summary>
+    public void BeginEditRange(TranscriptionSegment? a, TranscriptionSegment? b)
+    {
+      if (a == null || b == null || SelectedTranscription?.Segments == null || string.IsNullOrWhiteSpace(a.Id) || string.IsNullOrWhiteSpace(b.Id))
+        return;
+      var list = SelectedTranscription.Segments;
+      var ia = list.FindIndex(s => s.Id == a.Id);
+      var ib = list.FindIndex(s => s.Id == b.Id);
+      if (ia < 0 || ib < 0)
+      {
+        TranscriptOperatorMessage = "Segments must belong to the current transcription list.";
+        return;
+      }
+
+      var start = Math.Min(ia, ib);
+      var end = Math.Max(ia, ib);
+      var err = TryValidateContiguousSameClip(start, end);
+      if (err != null)
+      {
+        TranscriptOperatorMessage = err;
+        return;
+      }
+
+      EditingSegmentId = list[start].Id;
+      EditingRangeEndSegmentId = list[end].Id;
+      EditingSegmentOriginalText = CombineRangeOriginalText(list, start, end);
+      EditingSegmentDraftText = EditingSegmentOriginalText;
+      TranscriptOperatorMessage =
+          start == end
+              ? null
+              : "Editing a contiguous segment range on one timeline clip — Apply replaces audio using the first segment as the regen anchor.";
+      RebuildFillerRemovalTogglesAndPreview();
+    }
+
+    /// <summary>GAP-045 inline edit/apply: discard draft without backend calls.</summary>
+    public void CancelSegmentEdit()
+    {
+      EditingSegmentId = null;
+      EditingRangeEndSegmentId = null;
+      EditingSegmentOriginalText = null;
+      EditingSegmentDraftText = null;
+      SegmentEditOperatorHint = null;
+      ClearFillerRemovalReviewState();
+    }
+
+    private void ClearFillerRemovalReviewState()
+    {
+      FillerRemovalToggles.Clear();
+      FillerRemovalPreviewText = null;
+    }
+
+    private void RebuildFillerRemovalTogglesAndPreview()
+    {
+      if (!IsEditingSegment)
+        return;
+
+      var draft = EditingSegmentDraftText ?? string.Empty;
+      if (string.IsNullOrEmpty(draft))
+      {
+        FillerRemovalToggles.Clear();
+        FillerRemovalPreviewText = null;
+        return;
+      }
+
+      var plan = TranscriptFillerCleanupHelper.GetRemovalPlan(draft, null, null);
+      var previous = FillerRemovalToggles.ToDictionary(t => t.Key, t => t.IsRemoveEnabled, StringComparer.OrdinalIgnoreCase);
+      FillerRemovalToggles.Clear();
+      if (plan.Count == 0)
+      {
+        FillerRemovalPreviewText = draft;
+        return;
+      }
+
+      foreach (var entry in plan)
+      {
+        var risky = !entry.IsPhrase && TranscriptFillerCleanupHelper.RiskySingleTokenKeys.Contains(entry.CatalogKey);
+        var defaultOn = !risky;
+        var enabled = previous.TryGetValue(entry.CatalogKey, out var prior) ? prior : defaultOn;
+        FillerRemovalToggles.Add(new FillerRemovalToggleItem(
+            entry.CatalogKey,
+            entry.OccurrenceCount,
+            risky,
+            enabled,
+            RefreshFillerRemovalPreview));
+      }
+
+      RefreshFillerRemovalPreview();
+    }
+
+    private void RefreshFillerRemovalPreview()
+    {
+      if (!IsEditingSegment)
+      {
+        FillerRemovalPreviewText = null;
+        return;
+      }
+
+      var draft = EditingSegmentDraftText ?? string.Empty;
+      if (string.IsNullOrEmpty(draft))
+      {
+        FillerRemovalPreviewText = null;
+        return;
+      }
+
+      FillerRemovalPreviewText = TranscriptFillerCleanupHelper.GetPreviewAfterRemoval(
+          draft,
+          BuildEnabledPhraseKeys(),
+          BuildEnabledTokenKeys());
+    }
+
+    private HashSet<string> BuildEnabledPhraseKeys()
+    {
+      var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      foreach (var t in FillerRemovalToggles)
+      {
+        if (t.IsRemoveEnabled && TranscriptFillerCleanupHelper.IsPhraseCatalogKey(t.Key))
+          keys.Add(t.Key);
+      }
+
+      return keys;
+    }
+
+    private HashSet<string> BuildEnabledTokenKeys()
+    {
+      var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      foreach (var t in FillerRemovalToggles)
+      {
+        if (t.IsRemoveEnabled && !TranscriptFillerCleanupHelper.IsPhraseCatalogKey(t.Key))
+          keys.Add(t.Key);
+      }
+
+      return keys;
+    }
+
+    /// <summary>GAP-045 inline edit/apply: record ReplaceRange + run regen with draft text; clears edit state on success only.</summary>
+    public async Task<string?> ApplyEditedSegmentAsync(CancellationToken cancellationToken = default)
+    {
+      if (!IsEditingSegment || SelectedTranscription == null || string.IsNullOrWhiteSpace(EditingSegmentId))
+        return "No segment edit in progress.";
+
+      var segment = SelectedTranscription.Segments?.FirstOrDefault(s => s.Id == EditingSegmentId);
+      if (segment == null)
+        return "Segment not found on the selected transcription.";
+
+      var draft = (EditingSegmentDraftText ?? string.Empty).Trim();
+      if (string.IsNullOrEmpty(draft))
+        return "Replacement text cannot be empty.";
+
+      var svc = AppServices.TryGetTranscriptEditIntentService();
+      if (svc == null)
+        return "Edit intent service is unavailable.";
+
+      int? rangeEndInclusiveIndex = null;
+      TranscriptionSegment? lastInRange = null;
+      if (IsMultiSegmentRangeEdit)
+      {
+        if (!TryGetRangeIndices(out var i0, out var i1, out var rangeErr))
+          return rangeErr;
+        var clipErr = TryValidateContiguousSameClip(i0, i1);
+        if (clipErr != null)
+          return clipErr;
+        lastInRange = SelectedTranscription.Segments![i1];
+        if (!svc.TryRecordIntent(
+                TranscriptEditIntentKind.ReplaceRange,
+                SelectedTranscription.Id,
+                segment.Id,
+                segment.Start,
+                lastInRange.End,
+                out var intentErr,
+                draft))
+          return intentErr;
+        rangeEndInclusiveIndex = i1;
+      }
+      else
+      {
+        if (!svc.TryRecordIntent(
+                TranscriptEditIntentKind.ReplaceRange,
+                SelectedTranscription.Id,
+                segment.Id,
+                segment.Start,
+                segment.End,
+                out var intentErr,
+                draft))
+          return intentErr;
+      }
+
+      if (svc.Current != null)
+      {
+        TranscriptOperatorMessage = svc.Current.DownstreamExecutable
+            ? "Replace-range intent recorded (executable); applying regeneration."
+            : $"Replace-range intent (non-executing). {svc.Current.ExecutionBlockedReason}";
+      }
+
+      var historyKind = IsMultiSegmentRangeEdit
+          ? TranscriptEditOperationKind.MultiSegmentRangeApply
+          : TranscriptEditOperationKind.SingleSegmentApply;
+      var err = await RegenerateSegmentAudioAsync(segment, draft, cancellationToken, rangeEndInclusiveIndex, historyKind).ConfigureAwait(true);
+      if (err == null)
+        CancelSegmentEdit();
+      return err;
+    }
+
+    private void RecordTranscriptEditHistoryAfterRegenAttempt(
+        TranscriptEditOperationKind operationKind,
+        TranscriptionSegment anchorSegment,
+        int? rangeEndInclusiveIndex,
+        string? coordinatorError,
+        string? preResolvedClipId)
+    {
+      if (SelectedTranscription == null)
+        return;
+      var historySvc = AppServices.TryGetTranscriptEditHistoryService();
+      if (historySvc == null)
+        return;
+
+      var segmentIds = BuildHistorySegmentIds(anchorSegment, rangeEndInclusiveIndex, SelectedTranscription);
+      var succeeded = coordinatorError == null;
+      var clipId = preResolvedClipId;
+
+      var wasRegenerated = succeeded;
+      var msg = succeeded
+          ? (operationKind == TranscriptEditOperationKind.RegenerateSegment
+              ? "Segment audio regenerated."
+              : "Edit applied; timeline clip audio updated.")
+          : (coordinatorError ?? "Regeneration failed.");
+      if (msg.Length > 160)
+        msg = msg.Substring(0, 160);
+
+      historySvc.AddEntry(
+          new TranscriptEditHistoryEntry
+          {
+            OperationKind = operationKind,
+            ProjectId = SelectedProjectId,
+            ClipId = clipId,
+            TranscriptionId = SelectedTranscription.Id,
+            SegmentIds = segmentIds,
+            WasRegenerated = wasRegenerated,
+            Succeeded = succeeded,
+            MessageSummary = msg,
+          });
+    }
+
+    private static IReadOnlyList<string> BuildHistorySegmentIds(
+        TranscriptionSegment anchorSegment,
+        int? rangeEndInclusiveIndex,
+        TranscriptionResponse transcription)
+    {
+      if (transcription.Segments == null)
+        return new List<string> { anchorSegment.Id ?? string.Empty };
+      if (rangeEndInclusiveIndex is not int endIdx)
+        return new List<string> { anchorSegment.Id ?? string.Empty };
+
+      var startIdx = transcription.Segments.FindIndex(s => s.Id == anchorSegment.Id);
+      if (startIdx < 0 || endIdx < startIdx || endIdx >= transcription.Segments.Count)
+        return new List<string> { anchorSegment.Id ?? string.Empty };
+
+      var ids = new List<string>();
+      for (var i = startIdx; i <= endIdx; i++)
+        ids.Add(transcription.Segments[i].Id ?? string.Empty);
+      return ids;
+    }
+
+    private IReadOnlyList<string> GetEditingScopeSegmentIdsForHistory()
+    {
+      if (SelectedTranscription?.Segments == null || string.IsNullOrWhiteSpace(EditingSegmentId))
+        return Array.Empty<string>();
+      if (!IsMultiSegmentRangeEdit)
+        return new List<string> { EditingSegmentId };
+      if (!TryGetRangeIndices(out var i0, out var i1, out _))
+        return new List<string> { EditingSegmentId };
+      var ids = new List<string>();
+      for (var i = i0; i <= i1; i++)
+        ids.Add(SelectedTranscription.Segments[i].Id ?? string.Empty);
+      return ids;
+    }
+
+    private void RecordFillerCleanupDraftHistory(TranscriptFillerCleanupHelper.FillerCleanupResult result)
+    {
+      var historySvc = AppServices.TryGetTranscriptEditHistoryService();
+      if (historySvc == null || SelectedTranscription == null || result.RemovedOccurrenceCount <= 0)
+        return;
+
+      string? clipId = null;
+      var resolver = AppServices.TryGetTranscriptSegmentTargetResolver();
+      var segmentIds = GetEditingScopeSegmentIdsForHistory();
+      if (segmentIds.Count > 0 && resolver != null && !string.IsNullOrWhiteSpace(EditingSegmentId))
+      {
+        var anchor = SelectedTranscription.Segments?.FirstOrDefault(s => s.Id == EditingSegmentId);
+        if (anchor != null)
+        {
+          var r = resolver.Resolve(SelectedTranscription.Id, anchor.Id, anchor.Start, anchor.End);
+          if (r.Kind == TranscriptSegmentTargetResolutionKind.Resolved)
+            clipId = r.ClipId;
+        }
+      }
+
+      var terms = string.IsNullOrEmpty(result.TermsSummary) ? $"{result.RemovedOccurrenceCount} occurrence(s)" : result.TermsSummary;
+      var msg = $"Removed {result.RemovedOccurrenceCount}: {terms}";
+      if (msg.Length > 160)
+        msg = msg.Substring(0, 160);
+
+      historySvc.AddEntry(
+          new TranscriptEditHistoryEntry
+          {
+            OperationKind = TranscriptEditOperationKind.FillerCleanupDraft,
+            ProjectId = SelectedProjectId,
+            ClipId = clipId,
+            TranscriptionId = SelectedTranscription.Id,
+            SegmentIds = segmentIds,
+            WasRegenerated = false,
+            Succeeded = true,
+            MessageSummary = msg,
+          });
+    }
+
+    /// <summary>GAP-045: focus transcription + segment from a history row (timeline seek when resolvable).</summary>
+    public void NavigateFromEditHistoryEntry(TranscriptEditHistoryEntry? entry)
+    {
+      if (entry == null)
+        return;
+      if (string.IsNullOrWhiteSpace(entry.TranscriptionId))
+      {
+        TranscriptOperatorMessage = TranscriptStaleContextExplainability.JumpNoTranscriptionId;
+        return;
+      }
+
+      Dispatcher.TryEnqueue(() => NavigateFromEditHistoryEntryCore(entry));
+    }
+
+    private void NavigateFromEditHistoryEntryCore(TranscriptEditHistoryEntry entry) =>
+        JumpTranscriptRowToSourceContext(
+            entry.TranscriptionId,
+            entry.ProjectId,
+            entry.SegmentIds,
+            entry.ClipId);
+
+    /// <summary>GOV-VOICESTUDIO-EDIT-APPLY-CONTEXT-JUMP-01: jump from apply/regenerate job status row.</summary>
+    public void NavigateFromApplyJobStatusEntry(TranscriptApplyJobStatusEntry? entry)
+    {
+      if (entry == null)
+        return;
+      if (string.IsNullOrWhiteSpace(entry.TranscriptionId))
+      {
+        TranscriptOperatorMessage = TranscriptStaleContextExplainability.JumpNoTranscriptionId;
+        return;
+      }
+
+      Dispatcher.TryEnqueue(() => JumpTranscriptRowToSourceContext(
+          entry.TranscriptionId,
+          entry.ProjectId,
+          entry.SegmentIds,
+          entry.ClipId));
+    }
+
+    /// <summary>
+    /// Shared fail-closed jump for edit history and job-status rows (no live draft; segment from current <see cref="SelectedTranscription"/>).
+    /// </summary>
+    private void JumpTranscriptRowToSourceContext(
+        string transcriptionId,
+        string? projectId,
+        IReadOnlyList<string> segmentIds,
+        string? clipIdSnapshot)
+    {
+      if (string.IsNullOrWhiteSpace(transcriptionId))
+      {
+        TranscriptOperatorMessage = TranscriptStaleContextExplainability.JumpNoTranscriptionId;
+        return;
+      }
+
+      if (!string.IsNullOrEmpty(projectId)
+          && !string.Equals(SelectedProjectId ?? string.Empty, projectId, StringComparison.Ordinal))
+      {
+        TranscriptOperatorMessage = TranscriptStaleContextExplainability.JumpProjectMismatch;
+        return;
+      }
+
+      var match = Transcriptions.FirstOrDefault(t =>
+          string.Equals(t.Id, transcriptionId, StringComparison.Ordinal));
+      if (match == null)
+      {
+        TranscriptOperatorMessage = TranscriptStaleContextExplainability.JumpTranscriptionNotInSessionList;
+        return;
+      }
+
+      SelectedTranscription = match;
+
+      var firstSegId = segmentIds.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s));
+      if (string.IsNullOrWhiteSpace(firstSegId) || SelectedTranscription.Segments == null)
+      {
+        TranscriptOperatorMessage = TranscriptStaleContextExplainability.JumpNoSegmentTarget;
+        return;
+      }
+
+      var seg = SelectedTranscription.Segments.FirstOrDefault(s => s.Id == firstSegId);
+      if (seg == null)
+      {
+        TranscriptOperatorMessage = TranscriptStaleContextExplainability.JumpSegmentNotInTranscription;
+        return;
+      }
+
+      OnTargetTranscriptionSegmentTapped(seg, clipIdSnapshot);
+    }
+
+    private void PublishTranscriptResolutionNavigate(TranscriptSegmentTargetResolution r)
+    {
+      if (r.Kind != TranscriptSegmentTargetResolutionKind.Resolved || string.IsNullOrWhiteSpace(r.ClipId))
+        return;
+      var agg = AppServices.TryGetEventAggregator();
+      if (agg == null)
+        return;
+      agg.Publish(new NavigateToEvent(
+          PanelId,
+          "timeline",
+          new Dictionary<string, object>
+          {
+            { "action", "seekPlayhead" },
+            { "timeSeconds", r.TimelineSeekSeconds },
+            { "clipId", r.ClipId },
+          }));
     }
 
     private void OnProjectChanged(ProjectChangedEvent e)
@@ -271,6 +1603,7 @@ namespace VoiceStudio.App.Views.Panels
       {
         if (SelectedProjectId != e.ProjectId)
           SelectedProjectId = e.ProjectId;
+        RefreshTranscriptTruthHints();
       });
     }
 
@@ -282,7 +1615,7 @@ namespace VoiceStudio.App.Views.Panels
         return;
       if (string.IsNullOrWhiteSpace(e.AssetId))
         return;
-      if (e.SourcePanelId != AssetSourceRecordingPanel && e.SourcePanelId != AssetSourceImportWorkflow)
+      if (!IsRecordingDerivedAssetSource(e.SourcePanelId) && e.SourcePanelId != AssetSourceImportWorkflow)
         return;
 
       Dispatcher.TryEnqueue(() =>
@@ -319,6 +1652,71 @@ namespace VoiceStudio.App.Views.Panels
     /// <summary>Send selected transcription to Timeline as a subtitle track.</summary>
     public IRelayCommand SendToTimelineCommand { get; }
 
+    /// <summary>GAP-045 Option B: operator-triggered canonical transcript refresh for stale clip audio.</summary>
+    public IAsyncRelayCommand RefreshTranscriptTruthCommand { get; }
+
+    /// <summary>GAP-045 inline edit/apply: apply buffered segment draft via regen <c>replacement_text</c>.</summary>
+    public IAsyncRelayCommand ApplyEditedSegmentCommand { get; }
+
+    /// <summary>GAP-047: remove common fillers from <see cref="EditingSegmentDraftText"/> only (no Apply).</summary>
+    public IRelayCommand RemoveFillersFromEditingDraftCommand { get; }
+
+    /// <summary>GAP-045: clear session transcript edit history ring buffer.</summary>
+    public IRelayCommand ClearTranscriptEditHistoryCommand { get; }
+
+    /// <summary>GOV-VOICESTUDIO-EDIT-APPLY-JOB-STATUS-01: clear session apply/regenerate job status rows.</summary>
+    public IRelayCommand ClearTranscriptApplyJobStatusCommand { get; }
+
+    private void RemoveFillersFromEditingDraftCore()
+    {
+      var err = TryRemoveFillersFromEditingDraft();
+      if (string.IsNullOrEmpty(err))
+        return;
+      _toastNotificationService?.ShowToast(
+          ToastType.Warning,
+          ResourceHelper.GetString("Transcribe.RemoveFillersTitle", "Remove fillers"),
+          err);
+    }
+
+    /// <summary>GAP-047: deterministic filler cleanup on current edit draft; returns operator error or null on success.</summary>
+    public string? TryRemoveFillersFromEditingDraft()
+    {
+      if (!IsEditingSegment)
+        return "No segment edit in progress.";
+      var draft = EditingSegmentDraftText ?? string.Empty;
+      if (string.IsNullOrWhiteSpace(draft))
+        return "Nothing to clean up.";
+
+      RebuildFillerRemovalTogglesAndPreview();
+
+      if (FillerRemovalToggles.Count == 0)
+      {
+        TranscriptOperatorMessage = "No matching filler words in the draft.";
+        return null;
+      }
+
+      if (!FillerRemovalToggles.Any(t => t.IsRemoveEnabled))
+        return "Enable at least one filler term to remove (check the list in the flyout).";
+
+      var result = TranscriptFillerCleanupHelper.RemoveFillers(draft, BuildEnabledPhraseKeys(), BuildEnabledTokenKeys());
+      if (string.IsNullOrWhiteSpace(result.CleanedText))
+        return "Filler cleanup would remove all text; cancelled.";
+      EditingSegmentDraftText = result.CleanedText.Trim();
+      if (result.RemovedOccurrenceCount == 0)
+        TranscriptOperatorMessage = "No matching filler words in the draft.";
+      else
+      {
+        TranscriptOperatorMessage =
+            string.IsNullOrEmpty(result.TermsSummary)
+                ? $"Removed {result.RemovedOccurrenceCount} filler occurrence(s)."
+                : $"Removed {result.RemovedOccurrenceCount} filler occurrence(s): {result.TermsSummary}.";
+        RecordFillerCleanupDraftHistory(result);
+      }
+
+      RefreshSegmentEditHint();
+      return null;
+    }
+
     private bool CanTranscribe()
     {
       return !string.IsNullOrWhiteSpace(SelectedAudioId);
@@ -328,14 +1726,93 @@ namespace VoiceStudio.App.Views.Panels
     {
       AudioPersistenceSemanticsHint = null;
       TranscribeCommand.NotifyCanExecuteChanged();
+      RefreshTranscriptTruthHints();
+      RefreshTranscriptTruthCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnSelectedProjectIdChanged(string? value)
+    {
+      ClearSessionRegeneratedSegmentTracking();
+      TranscriptSegmentLayoutRevision++;
+      RefreshTranscriptTruthHints();
+      RefreshTranscriptTruthCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnEditingSegmentIdChanged(string? value)
+    {
+      OnPropertyChanged(nameof(IsEditingSegment));
+      OnPropertyChanged(nameof(IsMultiSegmentRangeEdit));
+      OnPropertyChanged(nameof(IsEditDirty));
+      RefreshSegmentEditHint();
+      ApplyEditedSegmentCommand.NotifyCanExecuteChanged();
+      RemoveFillersFromEditingDraftCommand.NotifyCanExecuteChanged();
+      if (string.IsNullOrWhiteSpace(value))
+        ClearFillerRemovalReviewState();
+    }
+
+    partial void OnEditingSegmentOriginalTextChanged(string? value)
+    {
+      OnPropertyChanged(nameof(IsEditDirty));
+      RefreshSegmentEditHint();
+      ApplyEditedSegmentCommand.NotifyCanExecuteChanged();
+      RemoveFillersFromEditingDraftCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnEditingSegmentDraftTextChanged(string? value)
+    {
+      OnPropertyChanged(nameof(IsEditDirty));
+      RefreshSegmentEditHint();
+      ApplyEditedSegmentCommand.NotifyCanExecuteChanged();
+      RemoveFillersFromEditingDraftCommand.NotifyCanExecuteChanged();
+      if (IsEditingSegment)
+        RebuildFillerRemovalTogglesAndPreview();
+    }
+
+    partial void OnEditingRangeEndSegmentIdChanged(string? value)
+    {
+      OnPropertyChanged(nameof(IsMultiSegmentRangeEdit));
+      OnPropertyChanged(nameof(IsEditDirty));
+      RefreshSegmentEditHint();
+      ApplyEditedSegmentCommand.NotifyCanExecuteChanged();
+      RemoveFillersFromEditingDraftCommand.NotifyCanExecuteChanged();
+    }
+
+    private void RefreshSegmentEditHint()
+    {
+      if (!IsEditingSegment)
+      {
+        SegmentEditOperatorHint = null;
+        return;
+      }
+
+      if (IsMultiSegmentRangeEdit)
+      {
+        SegmentEditOperatorHint = IsEditDirty
+            ? "Range text edited — Apply regenerates clip audio from the full replacement string (first segment anchors the job). Cancel to discard."
+            : "Editing a contiguous range — type one replacement for the whole span, then Apply. Tip: click a segment, then Shift+click another on the same clip.";
+        return;
+      }
+
+      SegmentEditOperatorHint = IsEditDirty
+          ? "Segment text edited — Apply to regenerate audio with the new wording, or Cancel."
+          : "Editing segment text — change the text, then Apply.";
+    }
+
+    partial void OnRegeneratingSegmentIdChanged(string? value)
+    {
+      ApplyEditedSegmentCommand.NotifyCanExecuteChanged();
+      RemoveFillersFromEditingDraftCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnIsLoadingChanged(bool value)
     {
+      ApplyEditedSegmentCommand.NotifyCanExecuteChanged();
+      RemoveFillersFromEditingDraftCommand.NotifyCanExecuteChanged();
       LoadLanguagesCommand.NotifyCanExecuteChanged();
       TranscribeCommand.NotifyCanExecuteChanged();
       LoadTranscriptionsCommand.NotifyCanExecuteChanged();
       DeleteTranscriptionCommand.NotifyCanExecuteChanged();
+      RefreshTranscriptTruthCommand.NotifyCanExecuteChanged();
     }
 
     private async Task LoadLanguagesAsync(CancellationToken cancellationToken)
@@ -475,7 +1952,11 @@ namespace VoiceStudio.App.Views.Panels
         if (eventAggregator != null && transcription.Segments.Count > 0)
         {
           var subtitleSegments = transcription.Segments
-            .Select(s => new VoiceStudio.Core.Events.SubtitleSegment(s.Start, s.End, s.Text))
+            .Select(s => new VoiceStudio.Core.Events.SubtitleSegment(
+                s.Start,
+                s.End,
+                s.Text,
+                string.IsNullOrWhiteSpace(s.Id) ? null : s.Id))
             .ToList();
 
           eventAggregator.Publish(new VoiceStudio.Core.Events.TranscriptionCompletedEvent(
@@ -661,6 +2142,7 @@ namespace VoiceStudio.App.Views.Panels
 
     partial void OnSelectedTranscriptionChanged(TranscriptionResponse? value)
     {
+      ClearSessionRegeneratedSegmentTracking();
       if (value != null)
       {
         TranscriptionText = value.Text;
@@ -671,6 +2153,7 @@ namespace VoiceStudio.App.Views.Panels
       }
 
       SendToTimelineCommand.NotifyCanExecuteChanged();
+      TranscriptSegmentLayoutRevision++;
     }
 
     /// <summary>

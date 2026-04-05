@@ -12,7 +12,10 @@
 
     <Grid x:Name="TimelineView_Root" 
           AutomationProperties.AutomationId="TimelineView_Root"
-          Background="{StaticResource VSQ.Panel.Background}">
+          Background="{StaticResource VSQ.Panel.Background}"
+          AllowDrop="True"
+          DragOver="TimelineView_Root_DragOver"
+          Drop="TimelineView_Root_Drop">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -46,15 +49,17 @@
                     <Button Command="{x:Bind ViewModel.StopAudioCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Stop">
                         <FontIcon Glyph="&#xE71A;" FontSize="16" FontFamily="Segoe Fluent Icons" />
                     </Button>
-                    <Button MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Record">
+                    <Button Command="{x:Bind ViewModel.OpenRecordingFromTimelineCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Open Recording panel (in-app capture). Timeline record-arm is not implemented.">
                         <FontIcon Glyph="&#xE7C8;" FontSize="16" Foreground="#FF4060" FontFamily="Segoe Fluent Icons" />
                     </Button>
                     <Rectangle Width="1" Height="24" Fill="{StaticResource VSQ.Panel.BorderBrush}" Margin="4,0" />
-                    <ToggleButton MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Loop">
-                        <FontIcon Glyph="&#xE8EE;" FontSize="14" FontFamily="Segoe Fluent Icons" />
-                    </ToggleButton>
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.IsTimelineLoopEnabled, Mode=TwoWay}"
+                                  MinWidth="{StaticResource VSQ.Touch.MinSize}"
+                                  OffContent="Loop"
+                                  OnContent="Loop"
+                                  ToolTipService.ToolTip="Loop playback (audio player)" />
                 </StackPanel>
-                <TextBlock Grid.Column="1" x:Name="TimePositionDisplay" Text="00:00.000" FontSize="16" FontWeight="SemiBold"
+                <TextBlock Grid.Column="1" x:Name="TimePositionDisplay" Text="{x:Bind ViewModel.TransportTimeDisplay, Mode=OneWay}" FontSize="16" FontWeight="SemiBold"
                            Foreground="{StaticResource VSQ.Accent.CyanBrush}" FontFamily="Consolas"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
@@ -100,10 +105,10 @@
                                     <TextBlock Grid.Row="0" Text="{Binding Name, FallbackValue='Track'}"
                                                FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
                                     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="2" Margin="0,4,0,0">
-                                        <ToggleButton Content="M" Width="24" Height="20" FontSize="9" Padding="0" ToolTipService.ToolTip="Mute" />
-                                        <ToggleButton Content="S" Width="24" Height="20" FontSize="9" Padding="0" ToolTipService.ToolTip="Solo" />
-                                        <ToggleButton Content="R" Width="24" Height="20" FontSize="9" Padding="0" Foreground="#FF4060" ToolTipService.ToolTip="Record Arm" />
-                                        <Slider Minimum="0" Maximum="1" Value="0.8" Width="50" Height="16" Margin="4,0,0,0" />
+                                        <ToggleButton Content="M" Width="24" Height="20" FontSize="9" Padding="0" IsEnabled="False" ToolTipService.ToolTip="Not implemented (track mixer out of scope for this lane)" />
+                                        <ToggleButton Content="S" Width="24" Height="20" FontSize="9" Padding="0" IsEnabled="False" ToolTipService.ToolTip="Not implemented (track mixer out of scope for this lane)" />
+                                        <ToggleButton Content="R" Width="24" Height="20" FontSize="9" Padding="0" Foreground="#FF4060" IsEnabled="False" ToolTipService.ToolTip="Not implemented (track mixer out of scope for this lane)" />
+                                        <Slider Minimum="0" Maximum="1" Value="0.8" Width="50" Height="16" Margin="4,0,0,0" IsEnabled="False" ToolTipService.ToolTip="Not implemented (track mixer out of scope for this lane)" />
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -202,8 +207,17 @@
 
         <!-- Visualizer Row -->
         <Grid Grid.Row="5" Background="{StaticResource VSQ.Panel.Background.DarkerBrush}">
-            <controls:SpectrogramControl x:Name="SpectrogramVisualizer" />
-            <controls:WaveformControl x:Name="WaveformVisualizer" />
+            <controls:SpectrogramControl x:Name="SpectrogramVisualizer"
+                                         Visibility="{Binding SpectrogramVisibility}"
+                                         Frames="{Binding SpectrogramFrames}"
+                                         ZoomLevel="1"
+                                         PlaybackPosition="{Binding CurrentPlaybackPosition}" />
+            <controls:WaveformControl x:Name="WaveformVisualizer"
+                                      Visibility="{Binding WaveformVisibility}"
+                                      Samples="{Binding WaveformDisplaySamples}"
+                                      ZoomLevel="1"
+                                      Mode="peak"
+                                      PlaybackPosition="{Binding WaveformVisualizerPlaybackNormalized}" />
         </Grid>
 
         <!-- Help Overlay -->

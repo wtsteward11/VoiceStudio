@@ -20,7 +20,14 @@ namespace VoiceStudio.Core.Services
     Task<List<AudioTrack>> GetTracksAsync(string projectId, CancellationToken cancellationToken = default);
     /// <summary>Creates a track. When name is null/whitespace, generates "Track N" from existing count.</summary>
     Task<AudioTrack> CreateTrackAsync(string projectId, string? name, string? engine = null, CancellationToken cancellationToken = default);
-    Task<AudioTrack> UpdateTrackAsync(string projectId, string trackId, string? name = null, string? engine = null, CancellationToken cancellationToken = default);
+    Task<AudioTrack> UpdateTrackAsync(
+        string projectId,
+        string trackId,
+        string? name = null,
+        string? engine = null,
+        bool? isMuted = null,
+        bool? isSolo = null,
+        CancellationToken cancellationToken = default);
     Task<bool> DeleteTrackAsync(string projectId, string trackId, CancellationToken cancellationToken = default);
   }
 }

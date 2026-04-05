@@ -11,6 +11,8 @@ namespace VoiceStudio.Core.Models
     public string Language { get; set; } = "en-US";
     public bool AutoSave { get; set; } = true;
     public int AutoSaveInterval { get; set; } = 300; // seconds
+    /// <summary>Default <c>lufs_preset</c> for timeline/file export (see GOV-VOICESTUDIO-LUFS-PRESETS-01).</summary>
+    public string DefaultExportLufsPreset { get; set; } = "podcast_stereo";
   }
 
   /// <summary>

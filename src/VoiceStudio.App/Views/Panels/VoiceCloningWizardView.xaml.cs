@@ -2,6 +2,9 @@ using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using VoiceStudio.Core.Events;
+using Windows.ApplicationModel.DataTransfer;
+using System.IO;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using System.Linq;
@@ -18,6 +21,7 @@ namespace VoiceStudio.App.Views.Panels
     public VoiceCloningWizardViewModel ViewModel { get; }
     private ToastNotificationService? _toastService;
     private IDragDropService? _panelDragDropService;
+    private IEventAggregator? _eventAggregator;
 
     public VoiceCloningWizardView()
     {
@@ -31,6 +35,7 @@ namespace VoiceStudio.App.Views.Panels
       // Initialize services
       _toastService = ServiceProvider.GetToastNotificationService();
       _panelDragDropService = AppServices.TryGetDragDropService();
+      _eventAggregator = AppServices.TryGetEventAggregator();
 
       // Add keyboard navigation
       this.KeyDown += VoiceCloningWizardView_KeyDown;
@@ -143,10 +148,10 @@ namespace VoiceStudio.App.Views.Panels
     {
       KeyboardNavigationHelper.SetupTabNavigation(this);
 
-      // Register as drop target for ReferenceAudio and Asset payloads (Panel Architecture Phase 4)
+      // Register as drop target for reference audio / library audio assets (GAP-032)
       _panelDragDropService?.RegisterDropTarget(
           ViewModel.PanelId,
-          CanAcceptDrop);
+          CanAcceptCloneWizardDrop);
 
       // Initialize wizard data from Loaded (ADR-047: no constructor fire-and-forget)
       ViewModel.InitializeAsync();
@@ -159,47 +164,143 @@ namespace VoiceStudio.App.Views.Panels
     }
 
     /// <summary>
-    /// Determines if this panel can accept a drag payload.
-    /// Accepts ReferenceAudio, Assets (audio files), and external files.
+    /// GAP-032: Local reference audio paths only (wizard loads via <see cref="CloneReferenceSelectedEvent"/> semantics).
     /// </summary>
-    private static bool CanAcceptDrop(DragPayload payload)
+    private static bool CanAcceptCloneWizardDrop(DragPayload payload)
     {
-      return payload.PayloadType == DragPayloadType.ReferenceAudio ||
-             payload.PayloadType == DragPayloadType.Asset ||
-             payload.PayloadType == DragPayloadType.ExternalFile;
+      if (payload.PayloadType == DragPayloadType.ReferenceAudio ||
+          payload.PayloadType == DragPayloadType.ExternalFile)
+        return true;
+      if (payload.PayloadType != DragPayloadType.Asset || payload.Items.Count == 0)
+        return false;
+      return IsAudioLibraryAssetForClone(payload.Items[0]);
+    }
+
+    private static bool IsAudioLibraryAssetForClone(DragItem item)
+    {
+      string? t = null;
+      if (item.Metadata != null && item.Metadata.TryGetValue("AssetType", out var raw))
+        t = raw?.ToString();
+      if (string.IsNullOrEmpty(t))
+        return true;
+      var voiceTypes = new[] { "voice", "voice_profile", "profile", "clone", "xtts", "rvc" };
+      if (voiceTypes.Contains(t.ToLowerInvariant()))
+        return false;
+      var audioTypes = new[] { "audio", "wav", "mp3", "flac", "ogg", "m4a", "recording" };
+      return audioTypes.Contains(t.ToLowerInvariant());
+    }
+
+    private static string? ResolveLocalPathForCloneReference(DragItem item)
+    {
+      if (item.Metadata != null && item.Metadata.TryGetValue("FilePath", out var fp) && fp != null)
+      {
+        var p = fp.ToString();
+        if (!string.IsNullOrWhiteSpace(p) && File.Exists(p))
+          return p;
+      }
+      return null;
     }
 
     /// <summary>
-    /// Handles a dropped audio file for voice cloning.
+    /// Publishes <see cref="CloneReferenceSelectedEvent"/> when a resolvable local file path exists (fail-closed otherwise).
     /// </summary>
-    private async Task HandleReferenceAudioDropAsync(DragPayload payload, CancellationToken cancellationToken)
+    private async Task<DropResult> HandleReferenceAudioDropAsync(DragPayload payload, CancellationToken cancellationToken)
     {
-      // Only accept drops on Step 1 (audio selection)
+      _ = cancellationToken;
       if (ViewModel.CurrentStep != 1)
       {
         _toastService?.ShowToast(ToastType.Warning, "Cannot Drop", "Return to Step 1 to add reference audio");
-        return;
+        return new DropResult { Success = false, TargetPanelId = ViewModel.PanelId, ErrorMessage = "Wrong wizard step" };
+      }
+
+      if (_eventAggregator == null)
+      {
+        _toastService?.ShowToast(ToastType.Warning, "Drop Failed", "Cannot set clone reference (events unavailable).");
+        return new DropResult { Success = false, TargetPanelId = ViewModel.PanelId, ErrorMessage = "Event aggregator unavailable" };
       }
 
       var audioItem = payload.Items.FirstOrDefault();
       if (audioItem == null)
-        return;
+      {
+        return new DropResult { Success = false, TargetPanelId = ViewModel.PanelId, ErrorMessage = "Empty drag payload" };
+      }
 
       switch (payload.PayloadType)
       {
         case DragPayloadType.ReferenceAudio:
         case DragPayloadType.Asset:
-          // Use the dropped audio as reference
-          _toastService?.ShowToast(ToastType.Success, "Reference Audio Added", $"Using '{audioItem.DisplayName}' as reference");
-          break;
-
+        {
+          var localPath = ResolveLocalPathForCloneReference(audioItem);
+          if (string.IsNullOrEmpty(localPath))
+          {
+            _toastService?.ShowToast(
+                ToastType.Warning,
+                "Clone reference",
+                "This library item has no local file path. Use a file on disk or import, then try again.");
+            await Task.CompletedTask.ConfigureAwait(true);
+            return new DropResult { Success = false, TargetPanelId = ViewModel.PanelId, ErrorMessage = "No local path" };
+          }
+          var assetId = audioItem.Id;
+          if (audioItem.Metadata != null && audioItem.Metadata.TryGetValue("LibraryAssetId", out var lid) && lid != null)
+            assetId = lid.ToString() ?? assetId;
+          _eventAggregator.Publish(new CloneReferenceSelectedEvent(
+              payload.SourcePanelId,
+              assetId,
+              localPath,
+              audioItem.DisplayName));
+          _toastService?.ShowToast(
+              ToastType.Success,
+              "Reference Audio",
+              $"Using '{audioItem.DisplayName}' as clone reference");
+          await Task.CompletedTask.ConfigureAwait(true);
+          return new DropResult { Success = true, TargetPanelId = ViewModel.PanelId, Action = nameof(CloneReferenceSelectedEvent) };
+        }
         case DragPayloadType.ExternalFile:
-          // Load external audio file path
+        {
+          var path = audioItem.Id;
+          if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+          {
+            _toastService?.ShowToast(ToastType.Warning, "Clone reference", "External file path is not available on disk.");
+            await Task.CompletedTask.ConfigureAwait(true);
+            return new DropResult { Success = false, TargetPanelId = ViewModel.PanelId, ErrorMessage = "Invalid external path" };
+          }
+          _eventAggregator.Publish(new CloneReferenceSelectedEvent(
+              payload.SourcePanelId,
+              audioItem.Id,
+              path,
+              audioItem.DisplayName));
           _toastService?.ShowToast(ToastType.Info, "Loading Audio", $"Loading '{audioItem.DisplayName}'...");
-          break;
+          await Task.CompletedTask.ConfigureAwait(true);
+          return new DropResult { Success = true, TargetPanelId = ViewModel.PanelId, Action = nameof(CloneReferenceSelectedEvent) };
+        }
+        default:
+          await Task.CompletedTask.ConfigureAwait(true);
+          return new DropResult { Success = false, TargetPanelId = ViewModel.PanelId, ErrorMessage = "Unsupported payload" };
       }
+    }
 
-      await Task.CompletedTask;
+    private void VoiceCloningWizard_DragOver(object sender, Microsoft.UI.Xaml.DragEventArgs e)
+    {
+      _ = sender;
+      if (_panelDragDropService is { IsDragging: true } && _panelDragDropService.CanDrop(ViewModel.PanelId))
+      {
+        e.AcceptedOperation = DataPackageOperation.Copy;
+        _panelDragDropService.UpdateDragTarget(ViewModel.PanelId);
+        e.Handled = true;
+      }
+    }
+
+    private async void VoiceCloningWizard_Drop(object sender, Microsoft.UI.Xaml.DragEventArgs e)
+    {
+      _ = sender;
+      if (_panelDragDropService is { IsDragging: true } && _panelDragDropService.CanDrop(ViewModel.PanelId))
+      {
+        _ = await _panelDragDropService.ExecuteDropAsync(
+            ViewModel.PanelId,
+            HandleReferenceAudioDropAsync,
+            CancellationToken.None).ConfigureAwait(true);
+        e.Handled = true;
+      }
     }
 
     private void UpdateStepVisibility()

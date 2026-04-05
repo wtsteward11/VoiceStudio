@@ -20,5 +20,6 @@ namespace VoiceStudio.Core.Services
     Task<StorageStats> GetStorageStatsAsync(CancellationToken cancellationToken = default);
     Task<Stream> ExportModelAsync(string engine, string modelName, CancellationToken cancellationToken = default);
     Task<ModelInfo> ImportModelAsync(Stream modelArchive, string? engine = null, CancellationToken cancellationToken = default);
+    Task<ModelDownloadStartResponse> StartModelDownloadAsync(ModelDownloadStartRequest request, CancellationToken cancellationToken = default);
   }
 }

@@ -49,6 +49,18 @@ namespace VoiceStudio.App.ViewModels
     [ObservableProperty]
     private int autoSaveInterval = 300; // seconds
 
+    [ObservableProperty]
+    private string defaultExportLufsPreset = "podcast_stereo";
+
+    public ObservableCollection<string> AvailableExportLufsPresets { get; } = new()
+    {
+      "podcast_stereo",
+      "podcast_mono",
+      "broadcast",
+      "streaming",
+      "neutral",
+    };
+
     // Engine Settings
     [ObservableProperty]
     private string defaultAudioEngine = "xtts";
@@ -93,7 +105,7 @@ namespace VoiceStudio.App.ViewModels
 
     // Backend Settings
     [ObservableProperty]
-    private string apiUrl = "http://localhost:8000";
+    private string apiUrl = BackendClientConfig.DefaultHttpBaseUrl;
 
     [ObservableProperty]
     private int apiTimeout = 30; // seconds
@@ -531,6 +543,9 @@ namespace VoiceStudio.App.ViewModels
       Language = settings.General?.Language ?? "en-US";
       AutoSave = settings.General?.AutoSave ?? true;
       AutoSaveInterval = settings.General?.AutoSaveInterval ?? 300;
+      DefaultExportLufsPreset = string.IsNullOrWhiteSpace(settings.General?.DefaultExportLufsPreset)
+          ? "podcast_stereo"
+          : settings.General!.DefaultExportLufsPreset!;
 
       // Engine
       DefaultAudioEngine = settings.Engine?.DefaultAudioEngine ?? "xtts";
@@ -552,7 +567,7 @@ namespace VoiceStudio.App.ViewModels
       GridInterval = settings.Timeline?.GridInterval ?? 1.0;
 
       // Backend
-      ApiUrl = settings.Backend?.ApiUrl ?? "http://localhost:8000";
+      ApiUrl = settings.Backend?.ApiUrl ?? BackendClientConfig.DefaultHttpBaseUrl;
       ApiTimeout = settings.Backend?.Timeout ?? 30;
       ApiRetryCount = settings.Backend?.RetryCount ?? 3;
 
@@ -587,7 +602,8 @@ namespace VoiceStudio.App.ViewModels
           Theme = Theme,
           Language = Language,
           AutoSave = AutoSave,
-          AutoSaveInterval = AutoSaveInterval
+          AutoSaveInterval = AutoSaveInterval,
+          DefaultExportLufsPreset = DefaultExportLufsPreset
         },
         Engine = new VoiceStudio.Core.Models.EngineSettings
         {
@@ -650,6 +666,7 @@ namespace VoiceStudio.App.ViewModels
       Language = "en-US";
       AutoSave = true;
       AutoSaveInterval = 300;
+      DefaultExportLufsPreset = "podcast_stereo";
       DefaultAudioEngine = "xtts";
       DefaultImageEngine = "sdxl";
       DefaultVideoEngine = "svd";
@@ -663,7 +680,7 @@ namespace VoiceStudio.App.ViewModels
       SnapInterval = 0.1;
       GridEnabled = true;
       GridInterval = 1.0;
-      ApiUrl = "http://localhost:8000";
+      ApiUrl = BackendClientConfig.DefaultHttpBaseUrl;
       ApiTimeout = 30;
       ApiRetryCount = 3;
       CachingEnabled = true;
@@ -695,6 +712,9 @@ namespace VoiceStudio.App.ViewModels
             Language = general.Language;
             AutoSave = general.AutoSave;
             AutoSaveInterval = general.AutoSaveInterval;
+            DefaultExportLufsPreset = string.IsNullOrWhiteSpace(general.DefaultExportLufsPreset)
+                ? "podcast_stereo"
+                : general.DefaultExportLufsPreset!;
           }
         }
 
@@ -1076,6 +1096,7 @@ namespace VoiceStudio.App.ViewModels
     public string Language { get; set; } = "en-US";
     public bool AutoSave { get; set; } = true;
     public int AutoSaveInterval { get; set; } = 300;
+    public string DefaultExportLufsPreset { get; set; } = "podcast_stereo";
   }
 
   public class EngineSettings
@@ -1105,7 +1126,7 @@ namespace VoiceStudio.App.ViewModels
 
   public class BackendSettings
   {
-    public string ApiUrl { get; set; } = "http://localhost:8000";
+    public string ApiUrl { get; set; } = BackendClientConfig.DefaultHttpBaseUrl;
     public int Timeout { get; set; } = 30;
     public int RetryCount { get; set; } = 3;
   }

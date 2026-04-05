@@ -689,7 +689,14 @@ namespace VoiceStudio.App.ViewModels
                 response.ProfileId,
                 response.ProfileName ?? ProfileName ?? "Cloned Voice"));
 
-            // Navigate to Synthesis panel with the new profile pre-selected (X-5)
+            // GAP-026: synthesis panel (if already activated) selects immediately without waiting for Profiles panel chain.
+            eventAggregator.Publish(new ProfileSelectedEvent(
+                PanelId,
+                response.ProfileId,
+                response.ProfileName ?? ProfileName ?? "Cloned Voice",
+                InteractionIntent.ImmediateUse));
+
+            // GAP-026: NavigateToEvent is published for future shell wiring; no handler switches center panel today.
             eventAggregator.Publish(new NavigateToEvent(
                 PanelId,
                 "voice-synthesis",

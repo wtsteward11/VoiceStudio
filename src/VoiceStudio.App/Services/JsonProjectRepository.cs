@@ -21,9 +21,24 @@ namespace VoiceStudio.App.Services
   /// </remarks>
   public sealed class JsonProjectRepository : IProjectRepository
   {
+    /// <summary>
+    /// Bump when persisted JSON shape changes incompatibly; see GOV-VOICESTUDIO-PERSISTENCE-FOUNDATION-01.
+    /// </summary>
+    public const int CurrentPersistedProjectSchemaVersion = 2;
+
     private readonly string _projectsDirectory;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private readonly JsonSerializerOptions _jsonOptions;
+
+    private static void EnsureReadableSchemaVersion(Project project)
+    {
+      var v = project.PersistedProjectSchemaVersion;
+      if (v > CurrentPersistedProjectSchemaVersion)
+      {
+        throw new InvalidDataException(
+          $"Project file schema version {v} is newer than this app supports (max {CurrentPersistedProjectSchemaVersion}).");
+      }
+    }
 
     public JsonProjectRepository(string? projectsDirectory = null)
     {
@@ -62,9 +77,9 @@ namespace VoiceStudio.App.Services
             }
           }
           catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "JsonProjectRepository.Task");
-      }
+          {
+            ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "JsonProjectRepository.Task");
+          }
         }
 
         return metadataList.OrderByDescending(m => m.Modified).ToList();
@@ -88,7 +103,11 @@ namespace VoiceStudio.App.Services
           return null;
 
         var json = await File.ReadAllTextAsync(path, cancellationToken);
-        return JsonSerializer.Deserialize<Project>(json, _jsonOptions);
+        var project = JsonSerializer.Deserialize<Project>(json, _jsonOptions);
+        if (project == null)
+          return null;
+        EnsureReadableSchemaVersion(project);
+        return project;
       }
       finally
       {
@@ -108,6 +127,8 @@ namespace VoiceStudio.App.Services
 
       if (string.IsNullOrEmpty(project.CreatedAt))
         project.CreatedAt = project.UpdatedAt;
+
+      project.PersistedProjectSchemaVersion = CurrentPersistedProjectSchemaVersion;
 
       await _lock.WaitAsync(cancellationToken);
       try

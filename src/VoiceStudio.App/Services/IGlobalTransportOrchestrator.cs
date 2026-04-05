@@ -17,4 +17,10 @@ public interface IGlobalTransportOrchestrator
     /// Stops playback based on current transport context.
     /// </summary>
     void StopPlayback();
+
+    /// <summary>
+    /// Pauses playback if currently playing (command palette / unified pause path).
+    /// Timeline branch uses the resolved timeline transport controller when available; otherwise falls back to the audio player service.
+    /// </summary>
+    void PausePlayback();
 }

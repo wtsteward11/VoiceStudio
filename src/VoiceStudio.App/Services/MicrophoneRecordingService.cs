@@ -21,6 +21,7 @@ namespace VoiceStudio.App.Services
     private DateTime _recordingStartTime;
     private bool _disposed;
     private readonly object _lockObject = new();
+    private TaskCompletionSource<string>? _stopCompletion;
 
     // Recording configuration
     private const int DefaultSampleRate = 44100;
@@ -71,10 +72,12 @@ namespace VoiceStudio.App.Services
     /// </param>
     /// <param name="sampleRate">Sample rate in Hz (default 44100).</param>
     /// <param name="channels">Number of channels (default 1 = mono).</param>
+    /// <param name="waveInDeviceNumber">NAudio WaveIn device index; default 0 (system default ordering).</param>
     public Task StartRecordingAsync(
         string? outputPath = null,
         int sampleRate = DefaultSampleRate,
-        int channels = DefaultChannels)
+        int channels = DefaultChannels,
+        int? waveInDeviceNumber = null)
     {
       lock (_lockObject)
       {
@@ -106,12 +109,20 @@ namespace VoiceStudio.App.Services
               "No audio input devices found. Please connect a microphone.");
         }
 
+        var deviceNumber = waveInDeviceNumber ?? 0;
+        if (deviceNumber < 0 || deviceNumber >= WaveInEvent.DeviceCount)
+        {
+          var msg = $"Microphone device index {deviceNumber} is not available.";
+          RecordingError?.Invoke(this, msg);
+          throw new InvalidOperationException(msg);
+        }
+
         try
         {
           // Configure WaveInEvent for microphone capture
           _waveIn = new WaveInEvent
           {
-            DeviceNumber = 0,  // Default input device
+            DeviceNumber = deviceNumber,
             WaveFormat = new WaveFormat(sampleRate, DefaultBitDepth, channels),
             BufferMilliseconds = 50  // 50ms buffer for low latency
           };
@@ -150,9 +161,10 @@ namespace VoiceStudio.App.Services
     /// <summary>
     /// Stop the current recording and finalize the WAV file.
     /// </summary>
-    /// <returns>Path to the recorded WAV file.</returns>
+    /// <returns>Path to the recorded WAV file after NAudio finalizes buffers.</returns>
     public Task<string> StopRecordingAsync()
     {
+      TaskCompletionSource<string> tcs;
       lock (_lockObject)
       {
         if (!IsRecording)
@@ -160,21 +172,23 @@ namespace VoiceStudio.App.Services
           throw new InvalidOperationException("No recording is in progress.");
         }
 
+        tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _stopCompletion = tcs;
+
         try
         {
           _waveIn?.StopRecording();
-          // The WaveIn_RecordingStopped event handler will finalize
         }
         catch (Exception ex)
         {
+          _stopCompletion = null;
           Debug.WriteLine($"[MicrophoneRecordingService] Error stopping recording: {ex.Message}");
           CleanupRecordingResources();
           throw;
         }
       }
 
-      var path = _currentRecordingPath ?? string.Empty;
-      return Task.FromResult(path);
+      return tcs.Task;
     }
 
     private void WaveIn_DataAvailable(object? sender, WaveInEventArgs e)
@@ -206,11 +220,14 @@ namespace VoiceStudio.App.Services
 
     private void WaveIn_RecordingStopped(object? sender, StoppedEventArgs e)
     {
+      TaskCompletionSource<string>? stopWaiter;
       lock (_lockObject)
       {
         _lastRecordingDuration = DateTime.UtcNow - _recordingStartTime;
         IsRecording = false;
         LastRecordingPath = _currentRecordingPath;
+        stopWaiter = _stopCompletion;
+        _stopCompletion = null;
 
         // Finalize and close the WAV file
         CleanupRecordingResources();
@@ -219,17 +236,19 @@ namespace VoiceStudio.App.Services
         {
           Debug.WriteLine($"[MicrophoneRecordingService] Recording error: {e.Exception.Message}");
           RecordingError?.Invoke(this, $"Recording error: {e.Exception.Message}");
+          stopWaiter?.TrySetException(e.Exception);
+          return;
         }
-        else
-        {
-          Debug.WriteLine(
-              $"[MicrophoneRecordingService] Recording stopped: " +
-              $"{_lastRecordingDuration.TotalSeconds:F1}s -> {LastRecordingPath}");
 
-          RecordingStopped?.Invoke(this, new RecordingCompletedEventArgs(
-              LastRecordingPath ?? string.Empty,
-              _lastRecordingDuration));
-        }
+        var path = LastRecordingPath ?? string.Empty;
+        Debug.WriteLine(
+            $"[MicrophoneRecordingService] Recording stopped: " +
+            $"{_lastRecordingDuration.TotalSeconds:F1}s -> {path}");
+
+        RecordingStopped?.Invoke(this, new RecordingCompletedEventArgs(
+            path,
+            _lastRecordingDuration));
+        stopWaiter?.TrySetResult(path);
       }
     }
 
@@ -268,16 +287,22 @@ namespace VoiceStudio.App.Services
 
       _disposed = true;
 
-      if (IsRecording)
+      lock (_lockObject)
       {
-        try
+        if (IsRecording)
         {
-          _waveIn?.StopRecording();
+          try
+          {
+            _waveIn?.StopRecording();
+          }
+          catch (Exception ex)
+          {
+            Debug.WriteLine($"[MicrophoneRecordingService] Dispose stop error: {ex.Message}");
+          }
         }
-        catch (Exception ex)
-        {
-          Debug.WriteLine($"[MicrophoneRecordingService] Dispose stop error: {ex.Message}");
-        }
+
+        _stopCompletion?.TrySetException(new ObjectDisposedException(nameof(MicrophoneRecordingService)));
+        _stopCompletion = null;
       }
 
       CleanupRecordingResources();

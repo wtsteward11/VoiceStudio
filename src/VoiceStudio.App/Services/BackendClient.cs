@@ -343,7 +343,7 @@ namespace VoiceStudio.App.Services
     /// <summary>
     /// Static health probe for UI self-test. Does not require a BackendClient instance.
     /// </summary>
-    /// <param name="baseUrl">Backend base URL (e.g. http://localhost:8000).</param>
+    /// <param name="baseUrl">Backend base URL (e.g. same host as spawned uvicorn, typically http://127.0.0.1:8000).</param>
     /// <param name="timeoutMs">Timeout in milliseconds. Default 3000.</param>
     /// <returns>True if GET /api/health returns success.</returns>
     public static async Task<bool> TryCheckHealthAsync(string baseUrl, int timeoutMs = 3000)
@@ -841,13 +841,22 @@ namespace VoiceStudio.App.Services
       });
     }
 
-    public async Task<AudioTrack> UpdateTrackAsync(string projectId, string trackId, string? name = null, string? engine = null, CancellationToken cancellationToken = default)
+    public async Task<AudioTrack> UpdateTrackAsync(
+        string projectId,
+        string trackId,
+        string? name = null,
+        string? engine = null,
+        bool? isMuted = null,
+        bool? isSolo = null,
+        CancellationToken cancellationToken = default)
     {
       return await ExecuteWithRetryAsync(async () =>
       {
         var request = new Dictionary<string, object?>();
         if (name != null) request["name"] = name;
         if (engine != null) request["engine"] = engine;
+        if (isMuted.HasValue) request["is_muted"] = isMuted.Value;
+        if (isSolo.HasValue) request["is_solo"] = isSolo.Value;
 
         var response = await _httpClient.PutAsJsonAsync($"/api/projects/{projectId}/tracks/{trackId}", request, _jsonOptions, cancellationToken);
 
@@ -877,14 +886,19 @@ namespace VoiceStudio.App.Services
         // Convert AudioClip to backend format
         var request = new
         {
+          id = string.IsNullOrWhiteSpace(clip.Id) ? null : clip.Id,
           name = clip.Name,
           profile_id = clip.ProfileId,
           audio_id = clip.AudioId,
           audio_url = clip.AudioUrl,
           duration_seconds = clip.Duration.TotalSeconds,
           start_time = clip.StartTime,
+          source_start_seconds = clip.SourceStartSeconds,
+          fade_in_seconds = clip.FadeInSeconds,
+          fade_out_seconds = clip.FadeOutSeconds,
           engine = clip.Engine,
-          quality_score = clip.QualityScore
+          quality_score = clip.QualityScore,
+          derived_from_clip_id = string.IsNullOrWhiteSpace(clip.DerivedFromClipId) ? null : clip.DerivedFromClipId,
         };
 
         var response = await _httpClient.PostAsJsonAsync($"/api/projects/{projectId}/tracks/{trackId}/clips", request, _jsonOptions, cancellationToken);
@@ -907,19 +921,44 @@ namespace VoiceStudio.App.Services
           AudioUrl = backendClip.AudioUrl,
           Duration = TimeSpan.FromSeconds(backendClip.DurationSeconds),
           StartTime = backendClip.StartTime,
+          SourceStartSeconds = backendClip.SourceStartSeconds,
+          FadeInSeconds = backendClip.FadeInSeconds,
+          FadeOutSeconds = backendClip.FadeOutSeconds,
           Engine = backendClip.Engine,
-          QualityScore = backendClip.QualityScore
+          QualityScore = backendClip.QualityScore,
+          DerivedFromClipId = string.IsNullOrWhiteSpace(backendClip.DerivedFromClipId) ? null : backendClip.DerivedFromClipId,
         };
       });
     }
 
-    public async Task<AudioClip> UpdateClipAsync(string projectId, string trackId, string clipId, string? name = null, double? startTime = null, CancellationToken cancellationToken = default)
+    public async Task<AudioClip> UpdateClipAsync(
+        string projectId,
+        string trackId,
+        string clipId,
+        string? name = null,
+        double? startTime = null,
+        string? audioId = null,
+        string? audioUrl = null,
+        double? durationSeconds = null,
+        double? sourceStartSeconds = null,
+        double? fadeInSeconds = null,
+        double? fadeOutSeconds = null,
+        string? derivedFromClipId = null,
+        CancellationToken cancellationToken = default)
     {
       return await ExecuteWithRetryAsync(async () =>
       {
         var request = new Dictionary<string, object?>();
         if (name != null) request["name"] = name;
         if (startTime.HasValue) request["start_time"] = startTime.Value;
+        if (audioId != null) request["audio_id"] = audioId;
+        if (audioUrl != null) request["audio_url"] = audioUrl;
+        if (durationSeconds.HasValue) request["duration_seconds"] = durationSeconds.Value;
+        if (sourceStartSeconds.HasValue) request["source_start_seconds"] = sourceStartSeconds.Value;
+        if (fadeInSeconds.HasValue) request["fade_in_seconds"] = fadeInSeconds.Value;
+        if (fadeOutSeconds.HasValue) request["fade_out_seconds"] = fadeOutSeconds.Value;
+        if (derivedFromClipId != null)
+          request["derived_from_clip_id"] = string.IsNullOrWhiteSpace(derivedFromClipId) ? null : derivedFromClipId;
 
         var response = await _httpClient.PutAsJsonAsync($"/api/projects/{projectId}/tracks/{trackId}/clips/{clipId}", request, _jsonOptions, cancellationToken);
 
@@ -941,8 +980,12 @@ namespace VoiceStudio.App.Services
           AudioUrl = backendClip.AudioUrl,
           Duration = TimeSpan.FromSeconds(backendClip.DurationSeconds),
           StartTime = backendClip.StartTime,
+          SourceStartSeconds = backendClip.SourceStartSeconds,
+          FadeInSeconds = backendClip.FadeInSeconds,
+          FadeOutSeconds = backendClip.FadeOutSeconds,
           Engine = backendClip.Engine,
-          QualityScore = backendClip.QualityScore
+          QualityScore = backendClip.QualityScore,
+          DerivedFromClipId = string.IsNullOrWhiteSpace(backendClip.DerivedFromClipId) ? null : backendClip.DerivedFromClipId,
         };
       });
     }
@@ -1012,8 +1055,12 @@ namespace VoiceStudio.App.Services
       public string AudioUrl { get; set; } = string.Empty;
       public double DurationSeconds { get; set; }
       public double StartTime { get; set; }
+      public double SourceStartSeconds { get; set; }
+      public double FadeInSeconds { get; set; }
+      public double FadeOutSeconds { get; set; }
       public string? Engine { get; set; }
       public double? QualityScore { get; set; }
+      public string? DerivedFromClipId { get; set; }
     }
 
     private Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation) => _pipeline.ExecuteWithRetryAsync(operation);
@@ -1591,7 +1638,110 @@ namespace VoiceStudio.App.Services
       return await CreateDatasetAsync(name, description, audioFiles, cancellationToken);
     }
 
-    // Mixer management — extracted to IMixerStateClient / MixerStateClient (PR-17)
+    // Mixer management
+    public async Task<MixerState> GetMixerStateAsync(string projectId, CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.GetAsync($"/api/mixer/state/{Uri.EscapeDataString(projectId)}", cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        return await response.Content.ReadFromJsonAsync<MixerState>(_jsonOptions, cancellationToken)
+                  ?? throw new BackendDeserializationException("Failed to deserialize mixer state");
+      });
+    }
+
+    public async Task<MixerState> UpdateMixerStateAsync(string projectId, MixerState state, CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.PutAsJsonAsync($"/api/mixer/state/{Uri.EscapeDataString(projectId)}", state, _jsonOptions, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        return await response.Content.ReadFromJsonAsync<MixerState>(_jsonOptions, cancellationToken)
+                  ?? throw new BackendDeserializationException("Failed to deserialize mixer state");
+      });
+    }
+
+    public async Task<MixerState> ResetMixerStateAsync(string projectId, CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.PostAsync($"/api/mixer/state/{Uri.EscapeDataString(projectId)}/reset", null, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        return await response.Content.ReadFromJsonAsync<MixerState>(_jsonOptions, cancellationToken)
+                  ?? throw new BackendDeserializationException("Failed to deserialize mixer state");
+      });
+    }
+
+    // Mixer sends/returns (interface methods)
+    public async Task<MixerSend> CreateMixerSendAsync(string projectId, MixerSend send, CancellationToken cancellationToken = default)
+    {
+      return await CreateSendAsync(projectId, send, cancellationToken);
+    }
+
+    public async Task<MixerSend> UpdateMixerSendAsync(string projectId, string sendId, MixerSend send, CancellationToken cancellationToken = default)
+    {
+      return await UpdateSendAsync(projectId, sendId, send, cancellationToken);
+    }
+
+    public async Task<bool> DeleteMixerSendAsync(string projectId, string sendId, CancellationToken cancellationToken = default)
+    {
+      return await DeleteSendAsync(projectId, sendId, cancellationToken);
+    }
+
+    public async Task<MixerReturn> CreateMixerReturnAsync(string projectId, MixerReturn returnBus, CancellationToken cancellationToken = default)
+    {
+      return await CreateReturnAsync(projectId, returnBus, cancellationToken);
+    }
+
+    public async Task<MixerReturn> UpdateMixerReturnAsync(string projectId, string returnId, MixerReturn returnBus, CancellationToken cancellationToken = default)
+    {
+      return await UpdateReturnAsync(projectId, returnId, returnBus, cancellationToken);
+    }
+
+    public async Task<bool> DeleteMixerReturnAsync(string projectId, string returnId, CancellationToken cancellationToken = default)
+    {
+      return await DeleteReturnAsync(projectId, returnId, cancellationToken);
+    }
+
+    public async Task<MixerSubGroup> CreateMixerSubGroupAsync(string projectId, MixerSubGroup subgroup, CancellationToken cancellationToken = default)
+    {
+      return await CreateSubGroupAsync(projectId, subgroup, cancellationToken);
+    }
+
+    public async Task<MixerSubGroup> UpdateMixerSubGroupAsync(string projectId, string subgroupId, MixerSubGroup subgroup, CancellationToken cancellationToken = default)
+    {
+      return await UpdateSubGroupAsync(projectId, subgroupId, subgroup, cancellationToken);
+    }
+
+    public async Task<bool> DeleteMixerSubGroupAsync(string projectId, string subgroupId, CancellationToken cancellationToken = default)
+    {
+      return await DeleteSubGroupAsync(projectId, subgroupId, cancellationToken);
+    }
+
+    public async Task<MixerMaster> UpdateMixerMasterAsync(string projectId, MixerMaster master, CancellationToken cancellationToken = default)
+    {
+      return await UpdateMasterAsync(projectId, master, cancellationToken);
+    }
+
+    public async Task<List<MixerPreset>> GetMixerPresetsAsync(string projectId, CancellationToken cancellationToken = default)
+    {
+      return await ListMixerPresetsAsync(projectId, cancellationToken);
+    }
 
     // Mixer sends (implementation)
     public async Task<MixerSend> CreateSendAsync(string projectId, MixerSend send, CancellationToken cancellationToken = default)
@@ -1771,9 +1921,165 @@ namespace VoiceStudio.App.Services
       });
     }
 
-    // Mixer presets — extracted to IMixerStateClient / MixerStateClient (PR-17)
+    // Mixer presets
+    public async Task<List<MixerPreset>> ListMixerPresetsAsync(string projectId, CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.GetAsync($"/api/mixer/presets/{Uri.EscapeDataString(projectId)}", cancellationToken);
 
-    // Video Generation — GenerateVideoAsync, UpscaleVideoAsync, ListVideoEnginesAsync extracted to IVideoGenClient (PR-16)
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        return await response.Content.ReadFromJsonAsync<List<MixerPreset>>(_jsonOptions, cancellationToken)
+                  ?? throw new BackendDeserializationException("Failed to deserialize mixer presets");
+      });
+    }
+
+    public async Task<MixerPreset> GetMixerPresetAsync(string projectId, string presetId, CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.GetAsync($"/api/mixer/presets/{Uri.EscapeDataString(projectId)}/{Uri.EscapeDataString(presetId)}", cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        return await response.Content.ReadFromJsonAsync<MixerPreset>(_jsonOptions, cancellationToken)
+                  ?? throw new BackendDeserializationException("Failed to deserialize mixer preset");
+      });
+    }
+
+    public async Task<MixerPreset> CreateMixerPresetAsync(string projectId, MixerPreset preset, CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.PostAsJsonAsync($"/api/mixer/presets/{Uri.EscapeDataString(projectId)}", preset, _jsonOptions, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        return await response.Content.ReadFromJsonAsync<MixerPreset>(_jsonOptions, cancellationToken)
+                  ?? throw new BackendDeserializationException("Failed to deserialize mixer preset");
+      });
+    }
+
+    public async Task<MixerPreset> UpdateMixerPresetAsync(string projectId, string presetId, MixerPreset preset, CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.PutAsJsonAsync($"/api/mixer/presets/{Uri.EscapeDataString(projectId)}/{Uri.EscapeDataString(presetId)}", preset, _jsonOptions, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        return await response.Content.ReadFromJsonAsync<MixerPreset>(_jsonOptions, cancellationToken)
+                  ?? throw new BackendDeserializationException("Failed to deserialize mixer preset");
+      });
+    }
+
+    public async Task<bool> DeleteMixerPresetAsync(string projectId, string presetId, CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.DeleteAsync($"/api/mixer/presets/{Uri.EscapeDataString(projectId)}/{Uri.EscapeDataString(presetId)}", cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        return true;
+      });
+    }
+
+    public async Task<MixerState> ApplyMixerPresetAsync(string projectId, string presetId, CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.PostAsync($"/api/mixer/presets/{Uri.EscapeDataString(projectId)}/{Uri.EscapeDataString(presetId)}/apply", null, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        return await response.Content.ReadFromJsonAsync<MixerState>(_jsonOptions, cancellationToken)
+                  ?? throw new BackendDeserializationException("Failed to deserialize mixer state");
+      });
+    }
+
+    // Video Generation
+    public async Task<VideoGenerateResponse> GenerateVideoAsync(
+        VideoGenerateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.PostAsJsonAsync(
+                  "/api/video/generate",
+                  request,
+                  _jsonOptions,
+                  cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        return await response.Content.ReadFromJsonAsync<VideoGenerateResponse>(_jsonOptions, cancellationToken)
+                  ?? throw new BackendDeserializationException("Failed to deserialize video generation response");
+      });
+    }
+
+    public async Task<VideoUpscaleResponse> UpscaleVideoAsync(
+        VideoUpscaleRequest request,
+        CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.PostAsJsonAsync(
+                  "/api/video/upscale",
+                  request,
+                  _jsonOptions,
+                  cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        return await response.Content.ReadFromJsonAsync<VideoUpscaleResponse>(_jsonOptions, cancellationToken)
+                  ?? throw new BackendDeserializationException("Failed to deserialize video upscale response");
+      });
+    }
+
+    public async Task<List<string>> ListVideoEnginesAsync(CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.GetAsync("/api/video/engines/list", cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<VideoEnginesListResponse>(_jsonOptions, cancellationToken)
+                  ?? throw new BackendDeserializationException("Failed to deserialize video engines list");
+
+        return result.Engines ?? new List<string>();
+      });
+    }
+
     public async Task<Stream> GetVideoAsync(string videoId, CancellationToken cancellationToken = default)
     {
       return await ExecuteWithRetryAsync(async () =>
@@ -1877,7 +2183,72 @@ namespace VoiceStudio.App.Services
       return _pipeline.PutAsync<TRequest, TResponse>(endpoint, request, cancellationToken);
     }
 
-    // Video Editing — GetVideoInfoAsync, EditVideoAsync extracted to IVideoEditClient (PR-16)
+    // Video Editing
+    /// <summary>
+    /// Get video information (duration, dimensions, FPS, format).
+    /// </summary>
+    public async Task<VideoInfo> GetVideoInfoAsync(
+        string videoPath,
+        CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.GetAsync(
+                  $"/api/video/edit/info?path={Uri.EscapeDataString(videoPath)}",
+                  cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        try
+        {
+          return await response.Content.ReadFromJsonAsync<VideoInfo>(_jsonOptions, cancellationToken)
+                    ?? throw new BackendDeserializationException("Failed to deserialize video info");
+        }
+        catch (JsonException ex)
+        {
+          throw new BackendDeserializationException(
+                    "The backend returned an invalid response format for video info.",
+                    ex);
+        }
+      });
+    }
+
+    /// <summary>
+    /// Edit video using the video editing API.
+    /// </summary>
+    public async Task<VideoEditResponse> EditVideoAsync(
+        VideoEditRequest request,
+        CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.PostAsJsonAsync(
+                  "/api/video/edit",
+                  request,
+                  _jsonOptions,
+                  cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        try
+        {
+          return await response.Content.ReadFromJsonAsync<VideoEditResponse>(_jsonOptions, cancellationToken)
+                    ?? throw new BackendDeserializationException("Failed to deserialize video edit response");
+        }
+        catch (JsonException ex)
+        {
+          throw new BackendDeserializationException(
+                    "The backend returned an invalid response format for video editing.",
+                    ex);
+        }
+      });
+    }
 
     // Backup and restore — use IBackupRestoreClient (PR-14)
 

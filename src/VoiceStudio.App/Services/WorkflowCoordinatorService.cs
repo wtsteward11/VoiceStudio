@@ -190,7 +190,7 @@ namespace VoiceStudio.App.Services
     /// Starts a "Synthesize with Voice" workflow.
     /// This workflow:
     /// 1. Navigates to the Synthesis panel
-    /// 2. Publishes VoiceProfileSelectedEvent with the profile
+    /// 2. Publishes ProfileSelectedEvent with the profile
     /// 3. The Synthesis panel receives the event and selects the voice
     /// </summary>
     /// <param name="profileId">The unique identifier of the voice profile</param>
@@ -215,10 +215,10 @@ namespace VoiceStudio.App.Services
           "workflow-coordinator",
           "synthesis-panel"));
 
-        // Step 2: Publish the voice profile selection event
+        // Step 2: Publish canonical profile selection (Selection Authority lane)
         context.CurrentStep = 2;
-        _eventAggregator?.Publish(new VoiceProfileSelectedEvent(
-          "library-panel",
+        _eventAggregator?.Publish(new ProfileSelectedEvent(
+          "workflow-coordinator",
           profileId,
           profileName));
 

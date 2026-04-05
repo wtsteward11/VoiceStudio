@@ -273,6 +273,17 @@ namespace VoiceStudio.App.Services
           errorMessage = "Auto-save interval must be non-negative";
           return false;
         }
+
+        var allowed = new[]
+        {
+          "podcast_stereo", "podcast_mono", "broadcast", "streaming", "neutral",
+        };
+        var preset = settings.General.DefaultExportLufsPreset?.Trim().ToLowerInvariant() ?? "podcast_stereo";
+        if (Array.IndexOf(allowed, preset) < 0)
+        {
+          errorMessage = "DefaultExportLufsPreset must be a known export loudness preset id";
+          return false;
+        }
       }
 
       // Validate engine settings
@@ -370,7 +381,8 @@ namespace VoiceStudio.App.Services
           Theme = "Dark",
           Language = "en-US",
           AutoSave = true,
-          AutoSaveInterval = 300
+          AutoSaveInterval = 300,
+          DefaultExportLufsPreset = "podcast_stereo"
         },
         Engine = new EngineSettings
         {
@@ -396,7 +408,7 @@ namespace VoiceStudio.App.Services
         },
         Backend = new BackendSettings
         {
-          ApiUrl = "http://localhost:8000",
+          ApiUrl = BackendClientConfig.DefaultHttpBaseUrl,
           Timeout = 30,
           RetryCount = 3
         },

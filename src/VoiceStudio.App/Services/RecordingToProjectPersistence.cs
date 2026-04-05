@@ -21,7 +21,8 @@ public static class RecordingToProjectPersistence
     string? projectId,
     string libraryAudioId,
     string? localSourcePath,
-    CancellationToken cancellationToken)
+    CancellationToken cancellationToken,
+    string? projectSaveFilenameHint = null)
   {
     ArgumentNullException.ThrowIfNull(projectAudioClient);
     if (string.IsNullOrWhiteSpace(projectId))
@@ -31,9 +32,11 @@ public static class RecordingToProjectPersistence
 
     try
     {
-      var filename = string.IsNullOrWhiteSpace(localSourcePath)
-        ? null
-        : Path.GetFileName(localSourcePath);
+      string? filename = projectSaveFilenameHint;
+      if (string.IsNullOrWhiteSpace(filename) && !string.IsNullOrWhiteSpace(localSourcePath))
+        filename = Path.GetFileName(localSourcePath);
+      if (string.IsNullOrWhiteSpace(localSourcePath) && string.IsNullOrWhiteSpace(filename))
+        filename = null;
       await projectAudioClient
         .SaveAudioToProjectAsync(projectId!, libraryAudioId, filename, cancellationToken)
         .ConfigureAwait(false);

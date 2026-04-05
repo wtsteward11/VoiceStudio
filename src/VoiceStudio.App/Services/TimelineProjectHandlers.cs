@@ -6,7 +6,6 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using VoiceStudio.App.Logging;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
@@ -42,11 +41,16 @@ public sealed class TimelineProjectOpenHandler : IProjectOpenHandler
 {
     private readonly Func<TimelineViewModel?> _getTimeline;
     private readonly IBackendClient _backendClient;
+    private readonly IProjectSessionDirtyState? _sessionDirty;
 
-    public TimelineProjectOpenHandler(Func<TimelineViewModel?> getTimeline, IBackendClient backendClient)
+    public TimelineProjectOpenHandler(
+        Func<TimelineViewModel?> getTimeline,
+        IBackendClient backendClient,
+        IProjectSessionDirtyState? sessionDirty = null)
     {
         _getTimeline = getTimeline ?? throw new ArgumentNullException(nameof(getTimeline));
         _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+        _sessionDirty = sessionDirty;
     }
 
     public async Task OpenProjectPickerAsync(CancellationToken ct = default)
@@ -63,18 +67,19 @@ public sealed class TimelineProjectOpenHandler : IProjectOpenHandler
         if (vm == null)
             return;
 
-        if (vm.Projects.Count == 0)
-            await vm.LoadProjectsCommand.ExecuteAsync(null);
-
-        var project = vm.Projects.OfType<Project>().FirstOrDefault(p => p.Id == projectId);
-        if (project != null)
-        {
-            vm.SelectedProject = project;
-            return;
-        }
-
+        _sessionDirty?.EnterSuppressDirtyNotifications();
         try
         {
+            if (vm.Projects.Count == 0)
+                await vm.LoadProjectsCommand.ExecuteAsync(null);
+
+            var project = vm.Projects.OfType<Project>().FirstOrDefault(p => p.Id == projectId);
+            if (project != null)
+            {
+                vm.SelectedProject = project;
+                return;
+            }
+
             var loadedProject = await _backendClient.GetProjectAsync(projectId);
             if (loadedProject != null)
             {
@@ -84,48 +89,60 @@ public sealed class TimelineProjectOpenHandler : IProjectOpenHandler
             else
                 throw new Exception("Project not found");
         }
-        catch
+        finally
         {
-            throw;
+            _sessionDirty?.ExitSuppressDirtyNotifications();
         }
     }
 }
 
 /// <summary>
-/// Handles saving mixer state when a project is selected.
+/// Shell Save: timeline track snapshot, mixer state, and backend project update (SQLite authority — no parallel local JSON write).
 /// </summary>
-public sealed class MixerProjectSaveHandler : IProjectSaveHandler
+public sealed class UnifiedProjectSaveHandler : IProjectSaveHandler
 {
     private readonly Func<TimelineViewModel?> _getTimeline;
     private readonly Func<EffectsMixerViewModel?> _getMixer;
+    private readonly IProjectsClient _projectsClient;
+    private readonly IProjectSessionDirtyState? _sessionDirty;
+    private readonly CrashRecoveryService? _crashRecovery;
 
-    public MixerProjectSaveHandler(Func<TimelineViewModel?> getTimeline, Func<EffectsMixerViewModel?> getMixer)
+    public UnifiedProjectSaveHandler(
+        Func<TimelineViewModel?> getTimeline,
+        Func<EffectsMixerViewModel?> getMixer,
+        IProjectsClient projectsClient,
+        IProjectSessionDirtyState? sessionDirty = null,
+        CrashRecoveryService? crashRecovery = null)
     {
         _getTimeline = getTimeline ?? throw new ArgumentNullException(nameof(getTimeline));
         _getMixer = getMixer ?? throw new ArgumentNullException(nameof(getMixer));
+        _projectsClient = projectsClient ?? throw new ArgumentNullException(nameof(projectsClient));
+        _sessionDirty = sessionDirty;
+        _crashRecovery = crashRecovery;
     }
 
-    public async Task SaveMixerStateIfNeededAsync(CancellationToken ct = default)
+    public async Task SaveProjectAsync(CancellationToken cancellationToken = default)
     {
         var timelineVm = _getTimeline();
         if (timelineVm?.SelectedProject == null)
         {
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             return;
         }
 
+        timelineVm.SnapTracksOntoSelectedProject();
+        var project = timelineVm.SelectedProject;
+
         var mixerVm = _getMixer();
         if (mixerVm?.SaveMixerStateCommand.CanExecute(null) == true)
-        {
-            try
-            {
-                await mixerVm.SaveMixerStateCommand.ExecuteAsync(null);
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "MixerProjectSaveHandler");
-            }
-        }
-        await Task.CompletedTask;
+            await mixerVm.SaveMixerStateCommand.ExecuteAsync(null).ConfigureAwait(false);
+
+        await _projectsClient
+            .UpdateProjectAsync(project.Id, project.Name, project.Description, project.VoiceProfileIds, cancellationToken)
+            .ConfigureAwait(false);
+
+        _sessionDirty?.MarkProjectClean();
+        _crashRecovery?.SetActiveProject(project.Id, null, project.Name);
+        await (_crashRecovery?.SaveSessionAsync() ?? Task.CompletedTask).ConfigureAwait(false);
     }
 }

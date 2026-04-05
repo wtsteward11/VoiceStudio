@@ -640,7 +640,7 @@ namespace VoiceStudio.App.Services
         if (!string.IsNullOrEmpty(e.AssetId))
         {
           var baseUrl = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
-              ?? "http://localhost:8000";
+              ?? BackendClientConfig.DefaultHttpBaseUrl;
           System.Diagnostics.Debug.WriteLine($"[AudioPlayer] Fallback to backend ID: {e.AssetId}");
           await PlayBackendAudioIdAsync(e.AssetId, baseUrl);
           System.Diagnostics.Debug.WriteLine($"[AudioPlayer] Playing backend audio: {e.AssetName ?? e.AssetId}");

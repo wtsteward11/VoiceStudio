@@ -48,8 +48,15 @@ namespace VoiceStudio.App.Services
       return $"Track {nextNumber}";
     }
 
-    public Task<AudioTrack> UpdateTrackAsync(string projectId, string trackId, string? name = null, string? engine = null, CancellationToken cancellationToken = default)
-      => _backend.UpdateTrackAsync(projectId, trackId, name, engine, cancellationToken);
+    public Task<AudioTrack> UpdateTrackAsync(
+        string projectId,
+        string trackId,
+        string? name = null,
+        string? engine = null,
+        bool? isMuted = null,
+        bool? isSolo = null,
+        CancellationToken cancellationToken = default)
+      => _backend.UpdateTrackAsync(projectId, trackId, name, engine, isMuted, isSolo, cancellationToken);
 
     public Task<bool> DeleteTrackAsync(string projectId, string trackId, CancellationToken cancellationToken = default)
       => _backend.DeleteTrackAsync(projectId, trackId, cancellationToken);

@@ -34,7 +34,7 @@ public sealed class GlobalTransportOrchestrator : IGlobalTransportOrchestrator
     {
         var source = _contextManager.CurrentPlayableSource;
         var audioId = _contextManager.CurrentPlayableAudioId;
-        var baseUrl = _config.BaseUrl?.TrimEnd('/') ?? "http://localhost:8000";
+        var baseUrl = _config.BaseUrl?.TrimEnd('/') ?? BackendClientConfig.DefaultHttpBaseUrl;
 
         // Timeline path: when Timeline owns transport
         if (source == TransportSource.Timeline)
@@ -46,6 +46,19 @@ public sealed class GlobalTransportOrchestrator : IGlobalTransportOrchestrator
                     controller.Pause();
                 else
                     await controller.PlayAsync();
+                return;
+            }
+
+            // Controller not resolved (e.g. panel not loaded): still drive shared player so global/keyboard match physical state.
+            if (_audioPlayer.IsPlaying)
+            {
+                _audioPlayer.Pause();
+                return;
+            }
+
+            if (_audioPlayer.IsPaused)
+            {
+                _audioPlayer.Resume();
                 return;
             }
         }
@@ -88,6 +101,9 @@ public sealed class GlobalTransportOrchestrator : IGlobalTransportOrchestrator
                 controller.Stop();
                 return;
             }
+
+            _audioPlayer.Stop();
+            return;
         }
 
         // Library / Synthesis / Recording / Analyzer: stop via IAudioPlayerService
@@ -98,5 +114,25 @@ public sealed class GlobalTransportOrchestrator : IGlobalTransportOrchestrator
         {
             _audioPlayer.Stop();
         }
+    }
+
+    /// <inheritdoc />
+    public void PausePlayback()
+    {
+        var source = _contextManager.CurrentPlayableSource;
+
+        if (source == TransportSource.Timeline)
+        {
+            var controller = _bootstrap.GetTimelineController();
+            if (controller != null)
+            {
+                if (controller.IsPlaying)
+                    controller.Pause();
+                return;
+            }
+        }
+
+        if (_audioPlayer.IsPlaying)
+            _audioPlayer.Pause();
     }
 }

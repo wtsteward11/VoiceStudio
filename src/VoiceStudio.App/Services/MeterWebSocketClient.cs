@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Logging;
+using VoiceStudio.App.Utilities;
 
 namespace VoiceStudio.App.Services
 {
@@ -43,11 +44,8 @@ namespace VoiceStudio.App.Services
     public MeterWebSocketClient(IWebSocketService webSocketService)
     {
       _webSocketService = webSocketService ?? throw new ArgumentNullException(nameof(webSocketService));
-      _jsonOptions = new JsonSerializerOptions
-      {
-        PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-      };
+      // Align with WebSocketService + backend: snake_case wire (GOV-VOICESTUDIO-REALTIME-METERING-01 §2).
+      _jsonOptions = JsonSerializerOptionsFactory.BackendApi;
 
       // Subscribe to WebSocket messages
       _webSocketService.MessageReceived += OnWebSocketMessageReceived;
@@ -159,34 +157,45 @@ namespace VoiceStudio.App.Services
 
       try
       {
+        if (message.Payload is JsonElement directElement)
+        {
+          DispatchPayloadElement(directElement);
+          return;
+        }
+
+        if (message.Payload is null)
+          return;
+
         var payloadJson = JsonSerializer.Serialize(message.Payload, _jsonOptions);
         using var doc = JsonDocument.Parse(payloadJson);
-        var root = doc.RootElement;
-
-        // Determine message type
-        var messageType = root.TryGetProperty("type", out var typeProp)
-            ? typeProp.GetString()
-            : "levels";
-
-        switch (messageType?.ToLowerInvariant())
-        {
-          case "levels":
-            HandleLevelsUpdate(root);
-            break;
-          case "peak":
-            HandlePeakUpdate(root);
-            break;
-          case "clip":
-            HandleClipUpdate(root);
-            break;
-          case "spectrum":
-            HandleSpectrumUpdate(root);
-            break;
-        }
+        DispatchPayloadElement(doc.RootElement);
       }
       catch (Exception ex)
       {
         System.Diagnostics.Debug.WriteLine($"Failed to process meter message: {ex.Message}");
+      }
+    }
+
+    private void DispatchPayloadElement(JsonElement root)
+    {
+      var messageType = root.TryGetProperty("type", out var typeProp)
+          ? typeProp.GetString()
+          : "levels";
+
+      switch (messageType?.ToLowerInvariant())
+      {
+        case "levels":
+          HandleLevelsUpdate(root);
+          break;
+        case "peak":
+          HandlePeakUpdate(root);
+          break;
+        case "clip":
+          HandleClipUpdate(root);
+          break;
+        case "spectrum":
+          HandleSpectrumUpdate(root);
+          break;
       }
     }
 
@@ -195,7 +204,9 @@ namespace VoiceStudio.App.Services
       try
       {
         var update = JsonSerializer.Deserialize<MeterLevelUpdate>(root.GetRawText(), _jsonOptions);
-        if (update != null)
+        if (update != null &&
+            (!string.IsNullOrEmpty(update.ChannelId) ||
+             !string.IsNullOrEmpty(update.ProjectId)))
         {
           LevelsUpdated?.Invoke(this, update);
         }
@@ -298,86 +309,43 @@ namespace VoiceStudio.App.Services
 
   /// <summary>
   /// Real-time meter level update.
+  /// Uses explicit <c>JsonPropertyName</c> (no dual snake/Pascal shadow props) so <see cref="JsonSerializerOptionsFactory.BackendApi"/>
+  /// snake_case naming does not collide with wire keys (GAP-036 deserialization).
   /// </summary>
   public class MeterLevelUpdate
   {
-    public string ChannelId { get; set; } = string.Empty;
-    
     [System.Text.Json.Serialization.JsonPropertyName("channel_id")]
-    public string? ChannelIdSnakeCase
-    {
-      get => null;
-      set
-      {
-        if (!string.IsNullOrEmpty(value) && string.IsNullOrEmpty(ChannelId))
-          ChannelId = value;
-      }
-    }
+    public string ChannelId { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Left channel level in dB.
-    /// </summary>
-    public double LeftDb { get; set; }
-    
+    /// <summary>Left channel level in dB.</summary>
     [System.Text.Json.Serialization.JsonPropertyName("left_db")]
-    public double? LeftDbSnakeCase
-    {
-      get => null;
-      set
-      {
-        if (value.HasValue)
-          LeftDb = value.Value;
-      }
-    }
+    public double LeftDb { get; set; }
 
-    /// <summary>
-    /// Right channel level in dB.
-    /// </summary>
-    public double RightDb { get; set; }
-    
+    /// <summary>Right channel level in dB.</summary>
     [System.Text.Json.Serialization.JsonPropertyName("right_db")]
-    public double? RightDbSnakeCase
-    {
-      get => null;
-      set
-      {
-        if (value.HasValue)
-          RightDb = value.Value;
-      }
-    }
+    public double RightDb { get; set; }
 
-    /// <summary>
-    /// Left channel RMS level in dB.
-    /// </summary>
-    public double LeftRmsDb { get; set; }
-    
+    /// <summary>Left channel RMS level in dB.</summary>
     [System.Text.Json.Serialization.JsonPropertyName("left_rms_db")]
-    public double? LeftRmsDbSnakeCase
-    {
-      get => null;
-      set
-      {
-        if (value.HasValue)
-          LeftRmsDb = value.Value;
-      }
-    }
+    public double LeftRmsDb { get; set; }
 
-    /// <summary>
-    /// Right channel RMS level in dB.
-    /// </summary>
-    public double RightRmsDb { get; set; }
-    
+    /// <summary>Right channel RMS level in dB.</summary>
     [System.Text.Json.Serialization.JsonPropertyName("right_rms_db")]
-    public double? RightRmsDbSnakeCase
-    {
-      get => null;
-      set
-      {
-        if (value.HasValue)
-          RightRmsDb = value.Value;
-      }
-    }
+    public double RightRmsDb { get; set; }
 
+    /// <summary>Backend mixer scope (<c>broadcast_meter_updates</c>).</summary>
+    [System.Text.Json.Serialization.JsonPropertyName("project_id")]
+    public string ProjectId { get; set; } = "";
+
+    /// <summary>Normalized peak 0–1 from backend <c>peak_level</c>.</summary>
+    [System.Text.Json.Serialization.JsonPropertyName("peak_level")]
+    public double PeakLevelLinear { get; set; }
+
+    /// <summary>Normalized RMS 0–1 from backend <c>rms_level</c>.</summary>
+    [System.Text.Json.Serialization.JsonPropertyName("rms_level")]
+    public double RmsLevelLinear { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("timestamp")]
     public DateTime Timestamp { get; set; }
   }
 
@@ -386,40 +354,17 @@ namespace VoiceStudio.App.Services
   /// </summary>
   public class PeakLevelUpdate
   {
-    public string ChannelId { get; set; } = string.Empty;
-    
     [System.Text.Json.Serialization.JsonPropertyName("channel_id")]
-    public string? ChannelIdSnakeCase
-    {
-      get => null;
-      set
-      {
-        if (!string.IsNullOrEmpty(value) && string.IsNullOrEmpty(ChannelId))
-          ChannelId = value;
-      }
-    }
+    public string ChannelId { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Peak level in dB.
-    /// </summary>
-    public double PeakDb { get; set; }
-    
     [System.Text.Json.Serialization.JsonPropertyName("peak_db")]
-    public double? PeakDbSnakeCase
-    {
-      get => null;
-      set
-      {
-        if (value.HasValue)
-          PeakDb = value.Value;
-      }
-    }
+    public double PeakDb { get; set; }
 
-    /// <summary>
-    /// Channel (left/right/mono).
-    /// </summary>
+    /// <summary>Channel (left/right/mono).</summary>
+    [System.Text.Json.Serialization.JsonPropertyName("channel")]
     public string Channel { get; set; } = "mono";
 
+    [System.Text.Json.Serialization.JsonPropertyName("timestamp")]
     public DateTime Timestamp { get; set; }
   }
 
@@ -428,56 +373,19 @@ namespace VoiceStudio.App.Services
   /// </summary>
   public class ClipDetectedUpdate
   {
-    public string ChannelId { get; set; } = string.Empty;
-    
     [System.Text.Json.Serialization.JsonPropertyName("channel_id")]
-    public string? ChannelIdSnakeCase
-    {
-      get => null;
-      set
-      {
-        if (!string.IsNullOrEmpty(value) && string.IsNullOrEmpty(ChannelId))
-          ChannelId = value;
-      }
-    }
+    public string ChannelId { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Level that caused clipping in dB.
-    /// </summary>
-    public double ClipLevelDb { get; set; }
-    
     [System.Text.Json.Serialization.JsonPropertyName("clip_level_db")]
-    public double? ClipLevelDbSnakeCase
-    {
-      get => null;
-      set
-      {
-        if (value.HasValue)
-          ClipLevelDb = value.Value;
-      }
-    }
+    public double ClipLevelDb { get; set; }
 
-    /// <summary>
-    /// Number of consecutive samples clipping.
-    /// </summary>
-    public int ClipCount { get; set; }
-    
     [System.Text.Json.Serialization.JsonPropertyName("clip_count")]
-    public int? ClipCountSnakeCase
-    {
-      get => null;
-      set
-      {
-        if (value.HasValue)
-          ClipCount = value.Value;
-      }
-    }
+    public int ClipCount { get; set; }
 
-    /// <summary>
-    /// Channel (left/right/mono).
-    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("channel")]
     public string Channel { get; set; } = "mono";
 
+    [System.Text.Json.Serialization.JsonPropertyName("timestamp")]
     public DateTime Timestamp { get; set; }
   }
 
@@ -486,29 +394,16 @@ namespace VoiceStudio.App.Services
   /// </summary>
   public class SpectrumUpdate
   {
-    public string ChannelId { get; set; } = string.Empty;
-    
     [System.Text.Json.Serialization.JsonPropertyName("channel_id")]
-    public string? ChannelIdSnakeCase
-    {
-      get => null;
-      set
-      {
-        if (!string.IsNullOrEmpty(value) && string.IsNullOrEmpty(ChannelId))
-          ChannelId = value;
-      }
-    }
+    public string ChannelId { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Frequency band magnitudes in dB.
-    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("bands")]
     public double[] Bands { get; set; } = Array.Empty<double>();
 
-    /// <summary>
-    /// Center frequencies for each band in Hz.
-    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("frequencies")]
     public double[] Frequencies { get; set; } = Array.Empty<double>();
 
+    [System.Text.Json.Serialization.JsonPropertyName("timestamp")]
     public DateTime Timestamp { get; set; }
   }
 

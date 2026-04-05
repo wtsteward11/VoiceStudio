@@ -4,9 +4,9 @@ using System.Threading.Tasks;
 namespace VoiceStudio.App.Services;
 
 /// <summary>
-/// Handles saving project-related state (e.g. mixer state). Implemented by mixer/timeline adapter.
+/// Authoritative shell save: mixer, backend project metadata, and local JSON snapshot (lane GOV-VOICESTUDIO-PERSISTENCE-FOUNDATION-01).
 /// </summary>
 public interface IProjectSaveHandler
 {
-    Task SaveMixerStateIfNeededAsync(CancellationToken ct = default);
+    Task SaveProjectAsync(CancellationToken cancellationToken = default);
 }

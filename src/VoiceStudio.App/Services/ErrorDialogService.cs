@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -15,6 +16,9 @@ namespace VoiceStudio.App.Services
   public class ErrorDialogService : IErrorDialogService
   {
     private readonly IErrorLoggingService? _errorLoggingService;
+    private static int _startupPendingDialogAttempts;
+    private static int _startupPendingDialogSuppressed;
+    private static int _startupPendingDialogShown;
 
     /// <summary>Canonical XamlRoot for dialogs. Set by MainWindow in Loaded.</summary>
     public static Microsoft.UI.Xaml.XamlRoot? Root { get; set; }
@@ -24,10 +28,35 @@ namespace VoiceStudio.App.Services
       _errorLoggingService = errorLoggingService;
     }
 
+    public static void ResetStartupDialogDiagnostics()
+    {
+      Interlocked.Exchange(ref _startupPendingDialogAttempts, 0);
+      Interlocked.Exchange(ref _startupPendingDialogSuppressed, 0);
+      Interlocked.Exchange(ref _startupPendingDialogShown, 0);
+    }
+
+    public static StartupDialogDiagnostics GetStartupDialogDiagnostics()
+    {
+      return new StartupDialogDiagnostics(
+        Interlocked.CompareExchange(ref _startupPendingDialogAttempts, 0, 0),
+        Interlocked.CompareExchange(ref _startupPendingDialogSuppressed, 0, 0),
+        Interlocked.CompareExchange(ref _startupPendingDialogShown, 0, 0));
+    }
+
     public async Task ShowErrorAsync(Exception exception, string? title = null, string? context = null)
     {
       if (exception == null)
         return;
+
+      if (ShouldRouteToStartupAuthority())
+      {
+        Interlocked.Increment(ref _startupPendingDialogAttempts);
+        Interlocked.Increment(ref _startupPendingDialogSuppressed);
+        _errorLoggingService?.LogWarning(
+          $"Suppressed modal error dialog during startup authority window. Title={title ?? "(null)"}, Context={context ?? "(null)"}, Exception={exception.GetType().Name}: {exception.Message}",
+          "Startup.Gating");
+        return;
+      }
 
       // 429 rate limit: route through ErrorPresentationService for deduplication
       if (ErrorHandler.IsRateLimitException(exception))
@@ -51,6 +80,16 @@ namespace VoiceStudio.App.Services
     {
       if (string.IsNullOrWhiteSpace(message))
         return;
+
+      if (ShouldRouteToStartupAuthority())
+      {
+        Interlocked.Increment(ref _startupPendingDialogAttempts);
+        Interlocked.Increment(ref _startupPendingDialogSuppressed);
+        _errorLoggingService?.LogWarning(
+          $"Suppressed modal string error dialog during startup authority window. Title={title ?? "(null)"}, Message={message}",
+          "Startup.Gating");
+        return;
+      }
 
       _errorLoggingService?.LogWarning(message, "User Error");
 
@@ -181,6 +220,16 @@ namespace VoiceStudio.App.Services
         return;
       }
 
+      if (ShouldRouteToStartupAuthority())
+      {
+        Interlocked.Increment(ref _startupPendingDialogAttempts);
+        Interlocked.Increment(ref _startupPendingDialogSuppressed);
+        _errorLoggingService?.LogWarning(
+          $"Suppressed modal error dialog render during startup authority window. Title={title}, Message={message}",
+          "Startup.Gating");
+        return;
+      }
+
       var dialog = new ContentDialog
       {
         Title = title,
@@ -189,6 +238,8 @@ namespace VoiceStudio.App.Services
         XamlRoot = root,
         DefaultButton = ContentDialogButton.Primary
       };
+
+      Interlocked.Increment(ref _startupPendingDialogShown);
 
       // Add retry button for transient errors
       if (exception != null && ErrorHandler.IsTransientError(exception))
@@ -203,6 +254,26 @@ namespace VoiceStudio.App.Services
       {
         // Note: This is a simple implementation. In a real scenario, you might want
         // to return a value or use a callback to handle retry logic.
+      }
+    }
+
+    private static bool ShouldRouteToStartupAuthority()
+    {
+      try
+      {
+        var startupState = AppServices.GetService<IStartupStateService>();
+        if (startupState == null)
+        {
+          return false;
+        }
+
+        return startupState.CurrentState == StartupState.Starting
+            || startupState.CurrentState == StartupState.BackendStarting
+            || startupState.CurrentState == StartupState.BackendFailed;
+      }
+      catch
+      {
+        return false;
       }
     }
 
@@ -231,4 +302,9 @@ namespace VoiceStudio.App.Services
       return null;
     }
   }
+
+  public readonly record struct StartupDialogDiagnostics(
+    int StartupPendingDialogAttempts,
+    int StartupPendingDialogSuppressed,
+    int StartupPendingDialogShown);
 }

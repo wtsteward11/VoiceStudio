@@ -36,6 +36,9 @@ public class ContextManager : IContextManager
     private string? _currentPlayableAudioId;
     private TransportSource? _currentPlayableSource;
     private string? _currentPlayableTitle;
+    private string? _activeTimelinePrimaryClipId;
+    private string? _activeTimelinePrimaryTrackId;
+    private string? _activeEffectChainId;
 
     /// <summary>
     /// Source panel ID used when publishing events.
@@ -110,6 +113,21 @@ public class ContextManager : IContextManager
         // Detect project changes
         if (e.PreviousState.Project.CurrentProjectId != e.NewState.Project.CurrentProjectId)
         {
+            string? oldChain;
+            lock (_lock)
+            {
+                oldChain = _activeEffectChainId;
+                _activeEffectChainId = null;
+            }
+            if (oldChain != null)
+            {
+                OnContextChanged(new ContextChangedEventArgs(
+                    nameof(ActiveEffectChainId),
+                    InteractionIntent.Navigation,
+                    oldChain,
+                    null));
+            }
+
             OnContextChanged(new ContextChangedEventArgs(
                 nameof(ActiveProjectId),
                 InteractionIntent.Navigation,
@@ -210,6 +228,21 @@ public class ContextManager : IContextManager
         get { lock (_lock) return _currentPlayableTitle; }
     }
 
+    public string? ActiveTimelinePrimaryClipId
+    {
+        get { lock (_lock) return _activeTimelinePrimaryClipId; }
+    }
+
+    public string? ActiveTimelinePrimaryTrackId
+    {
+        get { lock (_lock) return _activeTimelinePrimaryTrackId; }
+    }
+
+    public string? ActiveEffectChainId
+    {
+        get { lock (_lock) return _activeEffectChainId; }
+    }
+
     #endregion
 
     #region IContextManager Setters
@@ -276,6 +309,7 @@ public class ContextManager : IContextManager
 
         // Fallback to local state
         string? oldValue;
+        string? clearedChain = null;
         lock (_lock)
         {
             if (_activeProjectId == projectId)
@@ -284,6 +318,17 @@ public class ContextManager : IContextManager
             oldValue = _activeProjectId;
             _activeProjectId = projectId;
             _activeProjectName = projectName;
+            clearedChain = _activeEffectChainId;
+            _activeEffectChainId = null;
+        }
+
+        if (clearedChain != null)
+        {
+            OnContextChanged(new ContextChangedEventArgs(
+                nameof(ActiveEffectChainId),
+                intent,
+                clearedChain,
+                null));
         }
 
         OnContextChanged(new ContextChangedEventArgs(
@@ -296,6 +341,30 @@ public class ContextManager : IContextManager
             SourcePanelId,
             projectId,
             projectName));
+    }
+
+    public void SetActiveEffectChain(
+        string? chainId,
+        string? projectIdForScope = null,
+        InteractionIntent intent = InteractionIntent.Navigation)
+    {
+        _ = projectIdForScope;
+
+        string? oldValue;
+        lock (_lock)
+        {
+            if (_activeEffectChainId == chainId)
+                return;
+
+            oldValue = _activeEffectChainId;
+            _activeEffectChainId = chainId;
+        }
+
+        OnContextChanged(new ContextChangedEventArgs(
+            nameof(ActiveEffectChainId),
+            intent,
+            oldValue,
+            chainId));
     }
 
     public void SetActiveAsset(string? assetId, string? assetType = null, string? assetName = null, InteractionIntent intent = InteractionIntent.Navigation)
@@ -347,6 +416,40 @@ public class ContextManager : IContextManager
                 oldAudioId,
                 audioId));
             TransportContextChanged?.Invoke(this, new TransportContextChangedEventArgs(audioId, source, title));
+        }
+    }
+
+    public void SetActiveTimelineSelection(string? primaryClipId, string? primaryTrackId, InteractionIntent intent = InteractionIntent.Navigation)
+    {
+        string? oldClip;
+        string? oldTrack;
+        lock (_lock)
+        {
+            if (_activeTimelinePrimaryClipId == primaryClipId && _activeTimelinePrimaryTrackId == primaryTrackId)
+                return;
+
+            oldClip = _activeTimelinePrimaryClipId;
+            oldTrack = _activeTimelinePrimaryTrackId;
+            _activeTimelinePrimaryClipId = primaryClipId;
+            _activeTimelinePrimaryTrackId = primaryTrackId;
+        }
+
+        if (oldClip != primaryClipId)
+        {
+            OnContextChanged(new ContextChangedEventArgs(
+                nameof(ActiveTimelinePrimaryClipId),
+                intent,
+                oldClip,
+                primaryClipId));
+        }
+
+        if (oldTrack != primaryTrackId)
+        {
+            OnContextChanged(new ContextChangedEventArgs(
+                nameof(ActiveTimelinePrimaryTrackId),
+                intent,
+                oldTrack,
+                primaryTrackId));
         }
     }
 

@@ -8,13 +8,13 @@ namespace VoiceStudio.App.Services;
 
 /// <summary>
 /// Owns transport keyboard shortcut registration (Space, S, Ctrl+R).
-/// Delegates play/stop to IGlobalTransportOrchestrator; record via callback until unified.
+/// Delegates play/stop to <see cref="IGlobalTransportOrchestrator"/>; Ctrl+R invokes the same recording navigation policy as the timeline Record button (caller-supplied action).
 /// </summary>
 public sealed class TransportShortcutCoordinator
 {
     private readonly IGlobalTransportOrchestrator? _orchestrator;
     private KeyboardShortcutService? _shortcutService;
-    private Action? _toggleRecord;
+    private Action? _openRecordingPanel;
     private bool _attached;
 
     /// <summary>
@@ -29,14 +29,14 @@ public sealed class TransportShortcutCoordinator
     /// Registers playback shortcuts. Call from MainWindow Loaded.
     /// </summary>
     /// <param name="shortcutService">Keyboard shortcut service.</param>
-    /// <param name="toggleRecord">Record callback until recording transport is unified.</param>
-    public void Attach(KeyboardShortcutService shortcutService, Action? toggleRecord = null)
+    /// <param name="openRecordingPanel">Opens the Recording panel (same policy as timeline Record): typically <c>NavigateToEvent</c> to <see cref="VoiceStudio.Core.Panels.PanelIds.Recording"/>.</param>
+    public void Attach(KeyboardShortcutService shortcutService, Action? openRecordingPanel = null)
     {
         if (_attached)
             return;
 
         _shortcutService = shortcutService ?? throw new ArgumentNullException(nameof(shortcutService));
-        _toggleRecord = toggleRecord;
+        _openRecordingPanel = openRecordingPanel;
 
         // Play: Space — delegate to orchestrator only
         _shortcutService.RegisterShortcut(
@@ -54,12 +54,12 @@ public sealed class TransportShortcutCoordinator
             () => _orchestrator?.StopPlayback(),
             "Stop");
 
-        // Record: Ctrl+R — callback until recording is unified
+        // Record: Ctrl+R — same navigation policy as timeline Record (no shell-only record toggle)
         _shortcutService.RegisterShortcut(
             "playback.record",
             VirtualKey.R,
             VirtualKeyModifiers.Control,
-            () => _toggleRecord?.Invoke(),
+            () => _openRecordingPanel?.Invoke(),
             "Record");
 
         _attached = true;
@@ -78,7 +78,7 @@ public sealed class TransportShortcutCoordinator
         _shortcutService.UnregisterShortcut("playback.record");
 
         _shortcutService = null;
-        _toggleRecord = null;
+        _openRecordingPanel = null;
         _attached = false;
     }
 }

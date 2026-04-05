@@ -110,5 +110,14 @@ namespace VoiceStudio.App.Services
       var result = await _pipeline.GetAsync<StorageStats>("/api/models/stats/storage", cancellationToken);
       return result ?? throw new BackendDeserializationException("Failed to deserialize storage stats");
     }
+
+    /// <inheritdoc />
+    public Task<ModelDownloadStartResponse> StartModelDownloadAsync(ModelDownloadStartRequest request, CancellationToken cancellationToken = default)
+    {
+      return _pipeline.PostAsync<ModelDownloadStartRequest, ModelDownloadStartResponse>(
+          "/api/models/download",
+          request,
+          cancellationToken);
+    }
   }
 }

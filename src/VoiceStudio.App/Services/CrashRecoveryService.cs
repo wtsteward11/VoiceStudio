@@ -1,17 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Logging;
 
 namespace VoiceStudio.App.Services
 {
     /// <summary>
-    /// Provides automatic crash recovery with session state save/restore capabilities.
-    /// Saves session state periodically and on critical events for recovery after crashes.
+    /// Crash recovery metadata under %LocalAppData%/VoiceStudio/Recovery/.
+    /// Session snapshot is written after unified saves; recovery from crash is user-confirmed (no silent restore).
     /// </summary>
     public class CrashRecoveryService : IDisposable
     {
@@ -19,17 +17,17 @@ namespace VoiceStudio.App.Services
         private readonly string _sessionFilePath;
         private readonly string _crashMarkerPath;
         private readonly JsonSerializerOptions _jsonOptions;
-        private readonly Timer? _autoSaveTimer;
         private readonly object _saveLock = new();
         
         private SessionState? _currentState;
+        private SessionState? _pendingRecoveryState;
         private bool _disposed;
-        
-        // Auto-save interval (default: 60 seconds)
-        private const int AutoSaveIntervalMs = 60000;
         
         public event EventHandler<SessionRecoveredEventArgs>? SessionRecovered;
         public event EventHandler<RecoveryFailedEventArgs>? RecoveryFailed;
+        
+        /// <summary>Fired after <see cref="InitializeAsync"/> determines whether a user recovery prompt may be needed.</summary>
+        public event EventHandler? PendingRecoveryDetermined;
         
         public CrashRecoveryService()
         {
@@ -45,13 +43,6 @@ namespace VoiceStudio.App.Services
                 WriteIndented = true,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
-            
-            // Start auto-save timer
-            _autoSaveTimer = new Timer(
-                OnAutoSaveTimer, 
-                null, 
-                AutoSaveIntervalMs, 
-                AutoSaveIntervalMs);
         }
         
         /// <summary>
@@ -61,29 +52,59 @@ namespace VoiceStudio.App.Services
         {
             return File.Exists(_crashMarkerPath) && File.Exists(_sessionFilePath);
         }
+
+        /// <summary>True when a prior session left a snapshot the user should explicitly restore or discard.</summary>
+        public bool HasPendingUserRecoveryPrompt => _pendingRecoveryState != null;
         
         /// <summary>
-        /// Initializes the crash recovery system. Call on application startup.
-        /// Creates a crash marker that is removed on clean shutdown.
+        /// Initializes the crash recovery system. Call on application startup (deferred).
+        /// Loads optional pending recovery into memory without applying it; creates a crash marker for this run.
         /// </summary>
         public async Task InitializeAsync()
         {
-            // Check for crash marker from previous session
+            _pendingRecoveryState = null;
             if (HasRecoverableSession())
             {
-                await TryRecoverSessionAsync();
+                try
+                {
+                    var json = await File.ReadAllTextAsync(_sessionFilePath).ConfigureAwait(false);
+                    var recovered = JsonSerializer.Deserialize<SessionState>(json, _jsonOptions);
+                    if (recovered != null)
+                        _pendingRecoveryState = recovered;
+                }
+                catch (Exception ex)
+                {
+                    RecoveryFailed?.Invoke(this, new RecoveryFailedEventArgs(ex.Message));
+                    ErrorLogger.LogWarning($"Crash recovery: could not read session snapshot: {ex.Message}", CrashRecoveryLogCategory);
+                }
             }
             
-            // Create crash marker for this session
-            await File.WriteAllTextAsync(_crashMarkerPath, DateTime.UtcNow.ToString("O"));
+            try
+            {
+                await File.WriteAllTextAsync(_crashMarkerPath, DateTime.UtcNow.ToString("O")).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Crash recovery: failed to write crash marker: {ex.Message}", CrashRecoveryLogCategory);
+            }
             
-            // Initialize empty session state
             _currentState = new SessionState
             {
                 SessionId = Guid.NewGuid().ToString(),
                 StartTime = DateTime.UtcNow
             };
+
+            try
+            {
+                PendingRecoveryDetermined?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Crash recovery: PendingRecoveryDetermined handler failed: {ex.Message}", CrashRecoveryLogCategory);
+            }
         }
+
+        private const string CrashRecoveryLogCategory = "CrashRecovery";
         
         /// <summary>
         /// Marks clean shutdown. Call on normal application exit.
@@ -94,21 +115,51 @@ namespace VoiceStudio.App.Services
             try
             {
                 if (File.Exists(_crashMarkerPath))
-                {
                     File.Delete(_crashMarkerPath);
-                }
                 
-                // Optionally clean up session file on clean exit
                 if (File.Exists(_sessionFilePath))
-                {
                     File.Delete(_sessionFilePath);
-                }
             }
-            // ALLOWED: empty catch - Best effort cleanup, failure is acceptable
-            catch
+            catch (Exception ex)
             {
+                ErrorLogger.LogWarning($"Crash recovery: clean shutdown cleanup failed: {ex.Message}", CrashRecoveryLogCategory);
             }
         }
+
+        /// <summary>User declined restore — remove recovery snapshot only.</summary>
+        public void DiscardPendingRecovery()
+        {
+            _pendingRecoveryState = null;
+            try
+            {
+                if (File.Exists(_sessionFilePath))
+                    File.Delete(_sessionFilePath);
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Crash recovery: discard session file failed: {ex.Message}", CrashRecoveryLogCategory);
+            }
+        }
+
+        /// <summary>Optional hook after user successfully restores; clears pending and raises <see cref="SessionRecovered"/>.</summary>
+        public void NotifyRecoveryAccepted(SessionState state)
+        {
+            _pendingRecoveryState = null;
+            try
+            {
+                if (File.Exists(_sessionFilePath))
+                    File.Delete(_sessionFilePath);
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Crash recovery: remove session file after accept failed: {ex.Message}", CrashRecoveryLogCategory);
+            }
+
+            SessionRecovered?.Invoke(this, new SessionRecoveredEventArgs(state));
+        }
+
+        /// <summary>Snapshot state for UI/tests when prompting.</summary>
+        public SessionState? PeekPendingRecovery() => _pendingRecoveryState;
         
         /// <summary>
         /// Updates the current session state. Call when significant state changes occur.
@@ -126,12 +177,13 @@ namespace VoiceStudio.App.Services
         }
         
         /// <summary>
-        /// Sets the currently open project for recovery purposes.
+        /// Sets the currently open project for recovery metadata (after unified save).
         /// </summary>
-        public void SetActiveProject(string? projectPath, string? projectName)
+        public void SetActiveProject(string? projectId, string? projectPath, string? projectName)
         {
             UpdateState(state =>
             {
+                state.ActiveProjectId = projectId;
                 state.ActiveProjectPath = projectPath;
                 state.ActiveProjectName = projectName;
             });
@@ -195,41 +247,12 @@ namespace VoiceStudio.App.Services
             }
         }
         
-        /// <summary>
-        /// Attempts to recover the previous session.
-        /// </summary>
-        private async Task TryRecoverSessionAsync()
-        {
-            try
-            {
-                var json = await File.ReadAllTextAsync(_sessionFilePath);
-                var recoveredState = JsonSerializer.Deserialize<SessionState>(json, _jsonOptions);
-                
-                if (recoveredState != null)
-                {
-                    SessionRecovered?.Invoke(this, new SessionRecoveredEventArgs(recoveredState));
-                    Debug.WriteLine($"[CrashRecovery] Session recovered from crash. Session ID: {recoveredState.SessionId}");
-                }
-            }
-            catch (Exception ex)
-            {
-                RecoveryFailed?.Invoke(this, new RecoveryFailedEventArgs(ex.Message));
-                ErrorLogger.LogWarning($"Failed to recover session: {ex.Message}", "CrashRecovery");
-            }
-        }
-        
-        private void OnAutoSaveTimer(object? state)
-        {
-            _ = SaveSessionAsync();
-        }
-        
         public void Dispose()
         {
             if (_disposed)
                 return;
                 
             _disposed = true;
-            _autoSaveTimer?.Dispose();
         }
     }
     
@@ -241,6 +264,7 @@ namespace VoiceStudio.App.Services
         public string SessionId { get; set; } = string.Empty;
         public DateTime StartTime { get; set; }
         public DateTime LastModified { get; set; }
+        public string? ActiveProjectId { get; set; }
         public string? ActiveProjectPath { get; set; }
         public string? ActiveProjectName { get; set; }
         public Dictionary<string, UnsavedChangeInfo> UnsavedChanges { get; set; } = new();
@@ -254,6 +278,7 @@ namespace VoiceStudio.App.Services
                 SessionId = SessionId,
                 StartTime = StartTime,
                 LastModified = LastModified,
+                ActiveProjectId = ActiveProjectId,
                 ActiveProjectPath = ActiveProjectPath,
                 ActiveProjectName = ActiveProjectName,
                 UnsavedChanges = new Dictionary<string, UnsavedChangeInfo>(UnsavedChanges),

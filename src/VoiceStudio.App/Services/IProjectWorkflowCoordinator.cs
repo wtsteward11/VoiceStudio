@@ -15,5 +15,11 @@ public interface IProjectWorkflowCoordinator
     Task CreateNewProjectAsync(CancellationToken ct = default);
     Task OpenProjectAsync(CancellationToken ct = default);
     Task SaveProjectAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Autosave path: same <see cref="IProjectSaveHandler"/> as manual save; failures are logged, not toast-spammed.
+    /// </summary>
+    Task TryAutosaveProjectAsync(CancellationToken ct = default);
+
     Task OpenRecentProjectAsync(string projectId, string projectName, CancellationToken ct = default);
 }

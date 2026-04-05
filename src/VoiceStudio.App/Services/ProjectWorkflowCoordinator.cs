@@ -107,12 +107,27 @@ public sealed class ProjectWorkflowCoordinator : IProjectWorkflowCoordinator
         }
         try
         {
-            await _saveHandler.SaveMixerStateIfNeededAsync(ct);
+            await _saveHandler.SaveProjectAsync(ct);
         }
         catch (Exception ex)
         {
             _toastService?.ShowToast(ToastType.Error, "Save Project Failed", ex.Message);
             _logger?.LogWarning(ex, "Workflow failed: {Operation}", "SaveProject");
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task TryAutosaveProjectAsync(CancellationToken ct = default)
+    {
+        if (!_startup.IsReady)
+            return;
+        try
+        {
+            await _saveHandler.SaveProjectAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Autosave failed: {Operation}", "SaveProject");
         }
     }
 

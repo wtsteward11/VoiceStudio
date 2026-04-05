@@ -55,11 +55,22 @@ namespace VoiceStudio.App.Services
     }
 
     /// <inheritdoc />
-    public async Task<EffectProcessResponse> ProcessAudioWithChainAsync(string projectId, string chainId, string audioId, string? outputFilename = null, CancellationToken cancellationToken = default)
+    public async Task<EffectProcessResponse> ProcessAudioWithChainAsync(
+        string projectId,
+        string chainId,
+        string audioId,
+        string? outputFilename = null,
+        bool bypassChain = false,
+        bool preview = false,
+        CancellationToken cancellationToken = default)
     {
       var url = $"/api/effects/chains/{Uri.EscapeDataString(projectId)}/{Uri.EscapeDataString(chainId)}/process?audio_id={Uri.EscapeDataString(audioId)}";
       if (!string.IsNullOrWhiteSpace(outputFilename))
         url += $"&output_filename={Uri.EscapeDataString(outputFilename)}";
+      if (bypassChain)
+        url += "&bypass_chain=true";
+      if (preview)
+        url += "&preview=true";
       var result = await _pipeline.SendRequestAsync<object, EffectProcessResponse>(url, null, HttpMethod.Post, cancellationToken);
       return result ?? throw new BackendDeserializationException("Failed to deserialize process response");
     }

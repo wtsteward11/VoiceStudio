@@ -143,7 +143,7 @@ public sealed class BackendConnectionMonitor : IDisposable
   private Uri GetHealthUrl()
   {
     var baseAddr = _backendClient.BaseAddress;
-    return baseAddr != null ? new Uri(baseAddr, "/api/health") : new Uri("http://localhost:8000/api/health");
+    return baseAddr != null ? new Uri(baseAddr, "/api/health") : new Uri($"{BackendClientConfig.DefaultHttpBaseUrl}/api/health");
   }
 
   private async Task<bool> CheckHealthAsync(CancellationToken cancellationToken)

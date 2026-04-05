@@ -20,6 +20,14 @@ namespace VoiceStudio.App.Services
     }
 
     /// <inheritdoc />
+    public Task<Job?> GetJobAsync(string jobId, CancellationToken cancellationToken = default) =>
+      _backend.SendRequestAsync<object, Job>(
+          $"/api/jobs/{jobId}",
+          null,
+          HttpMethod.Get,
+          cancellationToken);
+
+    /// <inheritdoc />
     public async Task<Job[]?> GetJobsAsync(string? jobType = null, string? status = null, CancellationToken cancellationToken = default)
     {
       var queryParams = new NameValueCollection();
@@ -58,6 +66,14 @@ namespace VoiceStudio.App.Services
     public Task CancelJobAsync(string jobId, CancellationToken cancellationToken = default)
       => _backend.SendRequestAsync<object, object>(
           $"/api/jobs/{jobId}/cancel",
+          null,
+          HttpMethod.Post,
+          cancellationToken);
+
+    /// <inheritdoc />
+    public Task RetryJobAsync(string jobId, CancellationToken cancellationToken = default)
+      => _backend.SendRequestAsync<object, object>(
+          $"/api/jobs/{jobId}/retry",
           null,
           HttpMethod.Post,
           cancellationToken);

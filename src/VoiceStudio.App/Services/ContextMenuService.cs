@@ -125,6 +125,12 @@ namespace VoiceStudio.App.Services
       menu.Items.Add(CreateMenuItem("Play", "Space", null));
       menu.Items.Add(CreateMenuItem("Edit", "Enter", null));
       menu.Items.Add(new MenuFlyoutSeparator());
+      menu.Items.Add(CreateMenuItem("Split at playhead", null, null));
+      menu.Items.Add(CreateMenuItem("Trim start to playhead", null, null));
+      menu.Items.Add(CreateMenuItem("Trim end to playhead", null, null));
+      menu.Items.Add(CreateMenuItem("Fade in 0.5s", null, null));
+      menu.Items.Add(CreateMenuItem("Fade out 0.5s", null, null));
+      menu.Items.Add(new MenuFlyoutSeparator());
       menu.Items.Add(CreateMenuItem("Cut", "Ctrl+X", null));
       menu.Items.Add(CreateMenuItem("Copy", "Ctrl+C", null));
       menu.Items.Add(CreateMenuItem("Paste", "Ctrl+V", null));

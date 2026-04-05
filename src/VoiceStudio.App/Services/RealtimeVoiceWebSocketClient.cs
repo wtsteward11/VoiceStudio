@@ -67,7 +67,7 @@ namespace VoiceStudio.App.Services
     /// <summary>
     /// Creates a client that connects directly to the RVC real-time WebSocket endpoint.
     /// </summary>
-    /// <param name="backendBaseUrl">Base URL of the backend (e.g., http://localhost:8000)</param>
+    /// <param name="backendBaseUrl">Base URL of the backend (e.g., http://127.0.0.1:8000)</param>
     public RealtimeVoiceWebSocketClient(string backendBaseUrl)
     {
       if (string.IsNullOrEmpty(backendBaseUrl))

@@ -54,6 +54,7 @@ namespace VoiceStudio.App.Services
     public static IAdvancedRealTimeVisualizationClient GetAdvancedRealTimeVisualizationClient() => AppServices.GetAdvancedRealTimeVisualizationClient();
     public static IAudioMonitoringDashboardClient GetAudioMonitoringDashboardClient() => AppServices.GetAudioMonitoringDashboardClient();
     public static IEffectsMeterClient GetEffectsMeterClient() => AppServices.GetEffectsMeterClient();
+    public static IMeterClient GetMeterClient() => AppServices.GetMeterClient();
     public static IEffectChainClient GetEffectChainClient() => AppServices.GetEffectChainClient();
     public static IMixerStateClient GetMixerStateClient() => AppServices.GetMixerStateClient();
     public static IImageVideoEnhancementPipelineClient GetImageVideoEnhancementPipelineClient() => AppServices.GetImageVideoEnhancementPipelineClient();
@@ -83,6 +84,8 @@ namespace VoiceStudio.App.Services
     public static GracefulDegradationService GetGracefulDegradationService() => AppServices.GetGracefulDegradationService();
     public static IUpdateService GetUpdateService() => AppServices.GetUpdateService();
     public static ISettingsService GetSettingsService() => AppServices.GetSettingsService();
+    public static IProjectSessionDirtyState GetProjectSessionDirtyState() => AppServices.GetProjectSessionDirtyState();
+    public static CrashRecoveryService GetCrashRecoveryService() => AppServices.GetCrashRecoveryService();
     public static PluginManager GetPluginManager() => AppServices.GetPluginManager();
     public static PluginBridgeService GetPluginBridgeService() => AppServices.GetPluginBridgeService();
     public static PluginBridgeService? TryGetPluginBridgeService() => AppServices.TryGetPluginBridgeService();

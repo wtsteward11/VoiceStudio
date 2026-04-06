@@ -9,8 +9,8 @@ using VoiceStudio.App.Core.Models;
 using VoiceStudio.App.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
-using JobDto = VoiceStudio.App.Services.Job;
 using VoiceStudio.Core.Events;
+using JobDto = VoiceStudio.App.Services.Job;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -279,6 +279,137 @@ public sealed class TranscriptSegmentRegenerationCoordinatorTests
     txClient.VerifyAll();
     Assert.AreEqual("new words", transcription.Text);
     Assert.AreEqual("new words", transcription.Segments![0].Text);
+  }
+
+  /// <summary>GAP-047: registered undo restores pre-apply transcript via <see cref="ITranscriptionClient"/> and publishes coherence navigation.</summary>
+  [TestMethod]
+  public async Task TryExecuteAsync_WithReplacementText_UndoRestoresTranscriptSnapshotAndCoherenceNavigate()
+  {
+    var project = BuildProject("p1", "t1", "c1");
+    var gate = new Mock<ITimelineSelectedProjectGate>();
+    gate.SetupGet(g => g.SelectedProject).Returns(project);
+
+    var resolver = new Mock<ITranscriptSegmentTargetResolver>();
+    resolver
+        .Setup(r => r.Resolve("tr1", "seg1", It.IsAny<double>(), It.IsAny<double>()))
+        .Returns(TranscriptSegmentTargetResolution.Resolved("t1", "c1", "tr1", 0, 1, 0));
+
+    var regen = new Mock<ITranscriptRegenerationClient>();
+    regen
+        .Setup(x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new RegenerateSegmentJobStartResponse { JobId = "job-undo-tx", Status = "pending" });
+
+    var jobs = new Mock<IJobProgressApiClient>();
+    jobs.Setup(j => j.GetJobAsync("job-undo-tx", It.IsAny<CancellationToken>())).ReturnsAsync(new JobDto
+    {
+      Id = "job-undo-tx",
+      Status = "completed",
+      ResultId = "audio-new",
+      Metadata = new Dictionary<string, object>
+      {
+        ["audio_url"] = "/new.wav",
+        ["duration_seconds"] = 4.2,
+      },
+    });
+
+    var backend = new Mock<IBackendClient>();
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-new", "/new.wav", 4.2, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-new" });
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-old", "/old", 2, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-old" });
+
+    var linkage = new Mock<IClipTranscriptLinkageService>();
+    linkage.Setup(l => l.GetLinksForClip(project, "c1")).Returns(Array.Empty<ClipTranscriptLink>());
+
+    var txClient = new Mock<ITranscriptionClient>();
+    txClient
+        .Setup(t => t.UpdateTranscriptionTextAsync(
+            "tr1",
+            "new words",
+            It.IsAny<List<TranscriptionSegment>>(),
+            It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new TranscriptionResponse
+        {
+          Id = "tr1",
+          Text = "new words",
+          Segments = new List<TranscriptionSegment>
+          {
+            new() { Id = "seg1", Start = 0, End = 1, Text = "new words" },
+          },
+        });
+    txClient
+        .Setup(t => t.UpdateTranscriptionTextAsync(
+            "tr1",
+            "original",
+            It.Is<List<TranscriptionSegment>>(l => l.Count == 1 && l[0].Text == "original"),
+            It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new TranscriptionResponse
+        {
+          Id = "tr1",
+          Text = "original",
+          Segments = new List<TranscriptionSegment>
+          {
+            new() { Id = "seg1", Start = 0, End = 1, Text = "original" },
+          },
+        });
+
+    var events = new Mock<IEventAggregator>();
+    events.Setup(e => e.Publish(It.IsAny<ClipAudioArtifactReplacedEvent>()));
+    events.Setup(e => e.Publish(It.IsAny<TranscriptTruthStateChangedEvent>()));
+    NavigateToEvent? coherenceNav = null;
+    events
+        .Setup(e => e.Publish(It.IsAny<NavigateToEvent>()))
+        .Callback<NavigateToEvent>(ev => coherenceNav = ev);
+
+    var undo = new UndoRedoService();
+    var sut = new TranscriptSegmentRegenerationCoordinator(
+        regen.Object,
+        jobs.Object,
+        backend.Object,
+        linkage.Object,
+        gate.Object,
+        resolver.Object,
+        null,
+        undo,
+        events.Object,
+        null,
+        txClient.Object);
+
+    var transcription = new TranscriptionResponse
+    {
+      Id = "tr1",
+      Text = "original",
+      Segments = new List<TranscriptionSegment>
+      {
+        new() { Id = "seg1", Start = 0, End = 1, Text = "original" },
+      },
+    };
+    var segment = new TranscriptionSegment { Id = "seg1", Start = 0, End = 1, Text = "original" };
+
+    var msg = await sut.TryExecuteAsync(
+        transcription,
+        segment,
+        PanelIds.Transcribe,
+        "new words",
+        CancellationToken.None);
+
+    Assert.IsNull(msg);
+    Assert.AreEqual("new words", transcription.Segments![0].Text);
+
+    Assert.IsTrue(undo.Undo());
+    Assert.AreEqual("original", transcription.Segments[0].Text);
+    txClient.Verify(
+        t => t.UpdateTranscriptionTextAsync(
+            "tr1",
+            It.IsAny<string>(),
+            It.IsAny<List<TranscriptionSegment>>(),
+            It.IsAny<CancellationToken>()),
+        Times.Exactly(2));
+    Assert.IsNotNull(coherenceNav);
+    Assert.IsTrue(coherenceNav!.Parameters!.TryGetValue("action", out var a));
+    Assert.AreEqual("coherentReloadAfterSegmentApply", a?.ToString());
   }
 
   [TestMethod]

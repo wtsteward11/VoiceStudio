@@ -237,4 +237,103 @@ public sealed class TranscriptClipAudioReplaceUndoActionTests
     dirty.Verify(d => d.MarkProjectDirty("transcript_segment_regenerate_undo"), Times.Once);
     dirty.Verify(d => d.MarkProjectDirty("transcript_segment_regenerate_redo"), Times.Once);
   }
+
+  /// <summary>GAP-047: transcript payload path persists pre-apply text and publishes one coherence NavigateToEvent.</summary>
+  [TestMethod]
+  public void Undo_WithTranscriptPayload_CallsTranscriptionClient_PublishesCoherenceNavigate()
+  {
+    var project = ProjectWithClip("p1", "t1", "c1", "new-audio", "/new", 3);
+    var backend = new Mock<IBackendClient>();
+    var linkage = new Mock<IClipTranscriptLinkageService>();
+    var dirty = new Mock<IProjectSessionDirtyState>();
+    var events = new Mock<IEventAggregator>();
+    NavigateToEvent? nav = null;
+    events
+        .Setup(e => e.Publish(It.IsAny<NavigateToEvent>()))
+        .Callback<NavigateToEvent>(e => nav = e);
+    events.Setup(e => e.Publish(It.IsAny<TranscriptTruthStateChangedEvent>()));
+    events.Setup(e => e.Publish(It.IsAny<ClipAudioArtifactReplacedEvent>()));
+
+    var tx = new Mock<ITranscriptionClient>();
+    tx.Setup(t => t.UpdateTranscriptionTextAsync(
+            "tr1",
+            "original",
+            It.Is<List<TranscriptionSegment>>(l => l.Count == 1 && l[0].Text == "original"),
+            It.IsAny<CancellationToken>()))
+        .ReturnsAsync(
+            new TranscriptionResponse
+            {
+              Id = "tr1",
+              Text = "original",
+              Segments = new List<TranscriptionSegment>
+              {
+                new() { Id = "s1", Start = 0, End = 1, Text = "original" },
+              },
+            });
+
+    var syncModel = new TranscriptionResponse
+    {
+      Id = "tr1",
+      Text = "new",
+      Segments = new List<TranscriptionSegment>
+      {
+        new() { Id = "s1", Start = 0, End = 1, Text = "new" },
+      },
+    };
+    var pre = new TranscriptTextUndoPayload(
+        "original",
+        new List<TranscriptionSegment>
+        {
+          new() { Id = "s1", Start = 0, End = 1, Text = "original" },
+        });
+    var post = new TranscriptTextUndoPayload(
+        "new",
+        new List<TranscriptionSegment>
+        {
+          new() { Id = "s1", Start = 0, End = 1, Text = "new" },
+        });
+
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "old-audio", "/old", 2.5, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1" });
+
+    var sut = new TranscriptClipAudioReplaceUndoAction(
+        backend.Object,
+        linkage.Object,
+        project,
+        "p1",
+        "t1",
+        "c1",
+        "old-audio",
+        "/old",
+        2.5,
+        "new-audio",
+        "/new",
+        3,
+        Array.Empty<ClipTranscriptLink>(),
+        dirty.Object,
+        events.Object,
+        PanelIds.Transcribe,
+        null,
+        tx.Object,
+        "tr1",
+        syncModel,
+        pre,
+        post,
+        "p1");
+
+    sut.Undo();
+
+    tx.Verify(
+        t => t.UpdateTranscriptionTextAsync(
+            "tr1",
+            "original",
+            It.IsAny<List<TranscriptionSegment>>(),
+            It.IsAny<CancellationToken>()),
+        Times.Once);
+    Assert.IsNotNull(nav);
+    Assert.IsTrue(nav!.Parameters!.TryGetValue("action", out var a));
+    Assert.AreEqual("coherentReloadAfterSegmentApply", a?.ToString());
+    Assert.AreEqual("original", syncModel.Segments[0].Text);
+  }
 }

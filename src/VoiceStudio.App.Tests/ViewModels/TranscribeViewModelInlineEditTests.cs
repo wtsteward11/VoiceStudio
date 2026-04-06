@@ -13,6 +13,7 @@ using VoiceStudio.App.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.Core.Events;
+using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Models;
@@ -34,6 +35,7 @@ public sealed class TranscribeViewModelInlineEditTests
 
   private DispatcherQueueController? _dispatcherController;
   private Mock<ITranscriptRegenerationClient>? _regenMock;
+  private Mock<ITranscriptionClient>? _overrideVmTranscriptionClientMock;
 
   [TestInitialize]
   public async Task TestInitializeAsync()
@@ -45,6 +47,7 @@ public sealed class TranscribeViewModelInlineEditTests
   [TestCleanup]
   public void TestCleanup()
   {
+    _overrideVmTranscriptionClientMock = null;
     try
     {
       if (_dispatcherController != null)
@@ -121,18 +124,40 @@ public sealed class TranscribeViewModelInlineEditTests
             null,
             It.IsAny<CancellationToken>()))
         .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-new" });
+    backendMock
+        .Setup(b => b.UpdateClipAsync(
+            "p1",
+            "t1",
+            "c1",
+            null,
+            null,
+            "audio-old",
+            "/old",
+            2,
+            null,
+            null,
+            null,
+            null,
+            It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-old" });
 
-    var coordinator = new TranscriptSegmentRegenerationCoordinator(
-        _regenMock.Object,
-        jobsMock.Object,
-        backendMock.Object,
-        linkage,
-        gate,
-        resolver,
-        null,
-        null,
-        null,
-        null);
+    var coordinationTxMock = new Mock<ITranscriptionClient>();
+    coordinationTxMock
+        .Setup(t => t.UpdateTranscriptionTextAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<List<TranscriptionSegment>>(),
+            It.IsAny<CancellationToken>()))
+        .ReturnsAsync(
+            (string id, string text, List<TranscriptionSegment> segs, CancellationToken _) =>
+                new TranscriptionResponse
+                {
+                  Id = id,
+                  Text = text,
+                  Segments = TranscriptTextUndoPayload.CloneSegmentList(segs),
+                });
+
+    var undoRedo = new UndoRedoService();
 
     var services = new ServiceCollection();
     services.AddSingleton<IViewModelContext>(context);
@@ -145,7 +170,19 @@ public sealed class TranscribeViewModelInlineEditTests
     services.AddSingleton<ITranscriptEditIntentService>(sp => new TranscriptEditIntentService(
         sp.GetRequiredService<ITranscriptSegmentTargetResolver>(),
         sp.GetRequiredService<ITimelineSelectedProjectGate>()));
-    services.AddSingleton(coordinator);
+    services.AddSingleton(undoRedo);
+    services.AddSingleton(sp => new TranscriptSegmentRegenerationCoordinator(
+        _regenMock.Object,
+        jobsMock.Object,
+        backendMock.Object,
+        linkage,
+        gate,
+        resolver,
+        null,
+        undoRedo,
+        sp.GetRequiredService<IEventAggregator>(),
+        null,
+        coordinationTxMock.Object));
     services.AddSingleton<TranscriptEditHistoryService>();
     AppServices.Initialize(services.BuildServiceProvider());
   }
@@ -218,18 +255,40 @@ public sealed class TranscribeViewModelInlineEditTests
             null,
             It.IsAny<CancellationToken>()))
         .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-new" });
+    backendMock
+        .Setup(b => b.UpdateClipAsync(
+            "p1",
+            "t1",
+            "c1",
+            null,
+            null,
+            "audio-old",
+            "/old",
+            2,
+            null,
+            null,
+            null,
+            null,
+            It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-old" });
 
-    var coordinator = new TranscriptSegmentRegenerationCoordinator(
-        _regenMock.Object,
-        jobsMock.Object,
-        backendMock.Object,
-        linkage,
-        gate,
-        resolver,
-        null,
-        null,
-        null,
-        null);
+    var coordinationTxMock = new Mock<ITranscriptionClient>();
+    coordinationTxMock
+        .Setup(t => t.UpdateTranscriptionTextAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<List<TranscriptionSegment>>(),
+            It.IsAny<CancellationToken>()))
+        .ReturnsAsync(
+            (string id, string text, List<TranscriptionSegment> segs, CancellationToken _) =>
+                new TranscriptionResponse
+                {
+                  Id = id,
+                  Text = text,
+                  Segments = TranscriptTextUndoPayload.CloneSegmentList(segs),
+                });
+
+    var undoRedo = new UndoRedoService();
 
     var services = new ServiceCollection();
     services.AddSingleton<IViewModelContext>(context);
@@ -242,7 +301,19 @@ public sealed class TranscribeViewModelInlineEditTests
     services.AddSingleton<ITranscriptEditIntentService>(sp => new TranscriptEditIntentService(
         sp.GetRequiredService<ITranscriptSegmentTargetResolver>(),
         sp.GetRequiredService<ITimelineSelectedProjectGate>()));
-    services.AddSingleton(coordinator);
+    services.AddSingleton(undoRedo);
+    services.AddSingleton(sp => new TranscriptSegmentRegenerationCoordinator(
+        _regenMock.Object,
+        jobsMock.Object,
+        backendMock.Object,
+        linkage,
+        gate,
+        resolver,
+        null,
+        undoRedo,
+        sp.GetRequiredService<IEventAggregator>(),
+        null,
+        coordinationTxMock.Object));
     services.AddSingleton<TranscriptEditHistoryService>();
     AppServices.Initialize(services.BuildServiceProvider());
   }
@@ -305,7 +376,8 @@ public sealed class TranscribeViewModelInlineEditTests
   private TranscribeViewModel CreateSut()
   {
     var context = new ViewModelContext(NullLogger.Instance, _dispatcherController!.DispatcherQueue);
-    return new TranscribeViewModel(context, CreateTranscriptionClientMock().Object, CreateProjectAudioMock().Object);
+    var tx = _overrideVmTranscriptionClientMock ?? CreateTranscriptionClientMock();
+    return new TranscribeViewModel(context, tx.Object, CreateProjectAudioMock().Object);
   }
 
   private Task PumpDispatcherOnceAsync()
@@ -1318,6 +1390,190 @@ public sealed class TranscribeViewModelInlineEditTests
     await PumpDispatcherOnceAsync().ConfigureAwait(false);
 
     Assert.AreEqual(0, segmentApplyCoherenceCount);
+  }
+
+  /// <summary>GAP-047 undo: single-segment filler cleanup Apply then Undo restores canonical segment text.</summary>
+  [TestMethod]
+  public async Task FillerCleanupApply_Undo_RestoresCanonicalSingleSegmentText()
+  {
+    InstallHarness(jobFails: false);
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "new um words";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+
+    var err = await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false);
+    Assert.IsNull(err);
+    await PumpUntilApplyJobRowSucceededAsync(vm).ConfigureAwait(false);
+
+    Assert.AreEqual("new words", vm.SelectedTranscription!.Segments![0].Text.Trim());
+
+    var undo = AppServices.TryGetUndoRedoService();
+    Assert.IsNotNull(undo);
+    Assert.IsTrue(undo!.Undo());
+
+    Assert.AreEqual("original", vm.SelectedTranscription.Segments[0].Text);
+  }
+
+  /// <summary>GAP-047 undo: range filler cleanup Apply then Undo restores canonical multi-segment text.</summary>
+  [TestMethod]
+  public async Task FillerCleanupRangeApply_Undo_RestoresCanonicalRangeText()
+  {
+    InstallHarness(jobFails: false, BuildLinkedProjectThreeSegmentsOneClip());
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    var tr = BuildTranscriptionThreeSegments();
+    vm.SelectedTranscription = tr;
+    vm.BeginEditRange(tr.Segments![0], tr.Segments![2]);
+    vm.EditingSegmentDraftText = "aa uh bb cc";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+
+    var err = await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false);
+    Assert.IsNull(err);
+    await PumpUntilApplyJobRowSucceededAsync(vm).ConfigureAwait(false);
+
+    Assert.AreEqual("aa bb cc", tr.Segments[0].Text.Trim());
+    Assert.AreEqual(string.Empty, tr.Segments[1].Text.Trim());
+    Assert.AreEqual(string.Empty, tr.Segments[2].Text.Trim());
+
+    var undo = AppServices.TryGetUndoRedoService();
+    Assert.IsNotNull(undo);
+    Assert.IsTrue(undo!.Undo());
+
+    Assert.AreEqual("aa", tr.Segments[0].Text);
+    Assert.AreEqual("bb", tr.Segments[1].Text);
+    Assert.AreEqual("cc", tr.Segments[2].Text);
+  }
+
+  /// <summary>GAP-047 undo: one coherence NavigateToEvent per Undo (no duplicate reload signal).</summary>
+  [TestMethod]
+  public async Task UndoAfterFillerCleanup_DoesNotDuplicateCoherenceReload()
+  {
+    InstallHarness(jobFails: false);
+    var bus = AppServices.TryGetEventAggregator();
+    Assert.IsNotNull(bus);
+    var coherenceDuringUndo = 0;
+    using var sub = bus!.Subscribe<NavigateToEvent>(ev =>
+    {
+      if (ev.Parameters != null
+          && ev.Parameters.TryGetValue("action", out var a)
+          && string.Equals(a?.ToString(), "coherentReloadAfterSegmentApply", StringComparison.Ordinal))
+      {
+        coherenceDuringUndo++;
+      }
+    });
+
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "x um y";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+    Assert.IsNull(await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false));
+    await PumpUntilApplyJobRowSucceededAsync(vm).ConfigureAwait(false);
+
+    coherenceDuringUndo = 0;
+    Assert.IsTrue(AppServices.TryGetUndoRedoService()!.Undo());
+    Assert.AreEqual(1, coherenceDuringUndo);
+  }
+
+  /// <summary>GAP-047 history: draft-only filler cleanup never creates committed apply/regeneration history rows.</summary>
+  [TestMethod]
+  public void DraftOnlyFillerCleanup_DoesNotCreateCommittedHistoryEntry()
+  {
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "hello um";
+    var hist = AppServices.TryGetTranscriptEditHistoryService();
+    hist!.ClearSession();
+
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+
+    Assert.AreEqual(1, hist.Entries.Count);
+    Assert.AreEqual(TranscriptEditOperationKind.FillerCleanupDraft, hist.Entries[0].OperationKind);
+    Assert.IsFalse(
+        hist.Entries.Any(
+            e => e.OperationKind == TranscriptEditOperationKind.SingleSegmentApply
+                || e.OperationKind == TranscriptEditOperationKind.MultiSegmentRangeApply));
+  }
+
+  /// <summary>GAP-047 undo: cancel after draft cleanup does not register coordinator undo.</summary>
+  [TestMethod]
+  public async Task CancelAfterFillerCleanup_DoesNotCreateUndoableMutation()
+  {
+    InstallHarness(jobFails: false);
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "speech um here";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+    vm.CancelSegmentEdit();
+    await PumpDispatcherOnceAsync().ConfigureAwait(false);
+
+    var undo = AppServices.TryGetUndoRedoService();
+    Assert.IsNotNull(undo);
+    Assert.IsFalse(undo!.CanUndo);
+  }
+
+  /// <summary>GAP-047 seam: after Apply + Undo, list rehydrate replaces selection with authoritative backend transcript.</summary>
+  [TestMethod]
+  public async Task ApplyUndoRehydrate_UsesAuthoritativeBackendTruth()
+  {
+    InstallHarness(jobFails: false);
+    _overrideVmTranscriptionClientMock = CreateTranscriptionClientMock();
+    _overrideVmTranscriptionClientMock
+        .Setup(x => x.ListTranscriptionsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<TranscriptionResponse>());
+    _overrideVmTranscriptionClientMock
+        .Setup(x => x.ListTranscriptionsAsync("aud-gap047", "proj-gap047", It.IsAny<CancellationToken>()))
+        .ReturnsAsync(
+            new List<TranscriptionResponse>
+            {
+              new()
+              {
+                Id = "tr1",
+                Text = "rehydrated authority",
+                Segments = new List<TranscriptionSegment>
+                {
+                  new() { Id = "s9", Start = 1, End = 4, Text = "rehydrated authority" },
+                },
+              },
+            });
+
+    var vm = CreateSut();
+    await vm.InitializeAsync(CancellationToken.None).ConfigureAwait(false);
+    vm.SelectedProjectId = "proj-gap047";
+    vm.SelectedAudioId = "aud-gap047";
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "new um words";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+    Assert.IsNull(await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false));
+    await PumpUntilApplyJobRowSucceededAsync(vm).ConfigureAwait(false);
+    Assert.IsTrue(AppServices.TryGetUndoRedoService()!.Undo());
+
+    await vm.LoadTranscriptionsCommand.ExecuteAsync(null).ConfigureAwait(false);
+    for (var i = 0; i < 40; i++)
+    {
+      await PumpDispatcherOnceAsync().ConfigureAwait(false);
+      if (string.Equals(
+              vm.SelectedTranscription?.Segments?[0].Text,
+              "rehydrated authority",
+              StringComparison.Ordinal))
+        break;
+      await Task.Delay(25).ConfigureAwait(false);
+    }
+
+    Assert.IsNotNull(vm.SelectedTranscription);
+    Assert.AreEqual("rehydrated authority", vm.SelectedTranscription!.Segments![0].Text);
+    _overrideVmTranscriptionClientMock.Verify(
+        x => x.ListTranscriptionsAsync("aud-gap047", "proj-gap047", It.IsAny<CancellationToken>()),
+        Times.AtLeastOnce);
   }
 
   /// <summary>GAP-047 range parity: draft-only range filler cleanup does not publish coherence or mutate committed segments.</summary>

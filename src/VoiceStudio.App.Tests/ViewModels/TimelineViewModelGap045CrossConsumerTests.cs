@@ -562,4 +562,141 @@ public sealed class TimelineViewModelGap045CrossConsumerTests
     Assert.AreEqual("keep", _sut.TranscriptSegments[0].Text);
     _mockTranscriptionService.Verify(x => x.GetTranscriptionAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
   }
+
+  /// <summary>GAP-047 undo coherence: simulated post-undo reload updates overlay when loaded subtitle + project match.</summary>
+  [TestMethod]
+  public async Task UndoAfterFillerCleanup_UpdatesTimelineOverlay_WhenOwnershipMatches()
+  {
+    const string tid = "tx-undo-coherence-1";
+    const string pid = "proj-undo-coherence-1";
+    var proj = new Project { Id = pid, Name = "UndoCoherence" };
+    _sut.Projects.Add(proj);
+    _mockTrackService
+        .Setup(x => x.GetTracksAsync(pid, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<AudioTrack> { new() { Id = "trk", Name = "T", ProjectId = pid, Clips = new List<AudioClip>() } });
+    _sut.SelectedProject = proj;
+
+    var before = new TranscriptionResponse
+    {
+      Id = tid,
+      AudioId = "a1",
+      Segments = new List<TranscriptionSegment>
+      {
+        new() { Id = "s1", Text = "canonical before undo", Start = 0, End = 1 },
+      },
+    };
+    var afterApply = new TranscriptionResponse
+    {
+      Id = tid,
+      AudioId = "a1",
+      Segments = new List<TranscriptionSegment>
+      {
+        new() { Id = "s1", Text = "after apply cleaned", Start = 0, End = 1 },
+      },
+    };
+    var call = 0;
+    _mockTranscriptionService
+        .Setup(x => x.GetTranscriptionAsync(tid, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(() => call++ switch
+        {
+          0 => before,
+          1 => afterApply,
+          _ => before,
+        });
+
+    await _sut.LoadTranscriptSegmentsAsync(tid).ConfigureAwait(false);
+    Assert.AreEqual("canonical before undo", _sut.TranscriptSegments[0].Text);
+
+    var agg = AppServices.TryGetEventAggregator();
+    Assert.IsNotNull(agg);
+    agg!.Publish(
+        new NavigateToEvent(
+            PanelIds.Transcribe,
+            "timeline",
+            new Dictionary<string, object>
+            {
+                { "action", "coherentReloadAfterSegmentApply" },
+                { "transcriptionId", tid },
+                { "projectId", pid },
+            }));
+
+    await PumpNavigateAsync().ConfigureAwait(false);
+    Assert.AreEqual("after apply cleaned", _sut.TranscriptSegments[0].Text);
+
+    agg.Publish(
+        new NavigateToEvent(
+            PanelIds.Transcribe,
+            "timeline",
+            new Dictionary<string, object>
+            {
+                { "action", "coherentReloadAfterSegmentApply" },
+                { "transcriptionId", tid },
+                { "projectId", pid },
+            }));
+
+    await PumpNavigateAsync().ConfigureAwait(false);
+    Assert.AreEqual("canonical before undo", _sut.TranscriptSegments[0].Text);
+    _mockTranscriptionService.Verify(x => x.GetTranscriptionAsync(tid, It.IsAny<CancellationToken>()), Times.Exactly(3));
+  }
+
+  /// <summary>GAP-047 undo coherence: each reload signal performs exactly one quiet refetch (no duplicate suppression bug).</summary>
+  [TestMethod]
+  public async Task UndoAfterFillerCleanup_DoesNotDuplicateCoherenceReload()
+  {
+    const string tid = "tx-undo-dedupe-1";
+    const string pid = "proj-undo-dedupe-1";
+    var proj = new Project { Id = pid, Name = "UndoDedupe" };
+    _sut.Projects.Add(proj);
+    _mockTrackService
+        .Setup(x => x.GetTracksAsync(pid, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<AudioTrack> { new() { Id = "trk", Name = "T", ProjectId = pid, Clips = new List<AudioClip>() } });
+    _sut.SelectedProject = proj;
+
+    var first = new TranscriptionResponse
+    {
+      Id = tid,
+      AudioId = "a1",
+      Segments = new List<TranscriptionSegment>
+      {
+        new() { Id = "s1", Text = "v1", Start = 0, End = 1 },
+      },
+    };
+    var second = new TranscriptionResponse
+    {
+      Id = tid,
+      AudioId = "a1",
+      Segments = new List<TranscriptionSegment>
+      {
+        new() { Id = "s1", Text = "v2", Start = 0, End = 1 },
+      },
+    };
+    var call = 0;
+    _mockTranscriptionService
+        .Setup(x => x.GetTranscriptionAsync(tid, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(() => call++ == 0 ? first : second);
+
+    await _sut.LoadTranscriptSegmentsAsync(tid).ConfigureAwait(false);
+    var agg = AppServices.TryGetEventAggregator();
+    Assert.IsNotNull(agg);
+
+    void PublishCoherence() =>
+        agg!.Publish(
+            new NavigateToEvent(
+                PanelIds.Transcribe,
+                "timeline",
+                new Dictionary<string, object>
+                {
+                    { "action", "coherentReloadAfterSegmentApply" },
+                    { "transcriptionId", tid },
+                    { "projectId", pid },
+                }));
+
+    PublishCoherence();
+    await PumpNavigateAsync().ConfigureAwait(false);
+    PublishCoherence();
+    await PumpNavigateAsync().ConfigureAwait(false);
+
+    Assert.AreEqual("v2", _sut.TranscriptSegments[0].Text);
+    _mockTranscriptionService.Verify(x => x.GetTranscriptionAsync(tid, It.IsAny<CancellationToken>()), Times.Exactly(3));
+  }
 }

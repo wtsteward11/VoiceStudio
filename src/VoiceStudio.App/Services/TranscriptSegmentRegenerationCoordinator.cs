@@ -184,6 +184,16 @@ public sealed class TranscriptSegmentRegenerationCoordinator
       return $"Regeneration succeeded but applying the new audio to the clip failed: {ex.Message}";
     }
 
+    TranscriptTextUndoPayload? preApplyTranscriptCapture = null;
+    var trimmedReplacement = (replacementText ?? string.Empty).Trim();
+    if (_transcriptionClient != null
+        && !string.IsNullOrWhiteSpace(transcription.Id)
+        && transcription.Segments != null
+        && !string.IsNullOrWhiteSpace(trimmedReplacement))
+    {
+      preApplyTranscriptCapture = TranscriptTextUndoPayload.FromTranscription(transcription);
+    }
+
     var persistenceMessage = await TryPersistUpdatedTranscriptionAsync(
             transcription,
             segment,
@@ -191,6 +201,14 @@ public sealed class TranscriptSegmentRegenerationCoordinator
             rangeEndInclusiveIndex,
             cancellationToken)
         .ConfigureAwait(false);
+
+    TranscriptTextUndoPayload? preForUndo = null;
+    TranscriptTextUndoPayload? postForUndo = null;
+    if (preApplyTranscriptCapture != null && persistenceMessage == null)
+    {
+      preForUndo = preApplyTranscriptCapture;
+      postForUndo = TranscriptTextUndoPayload.FromTranscription(transcription);
+    }
 
     _linkage.RemoveLinksByClipId(project, r.ClipId);
     clip.AudioId = newAudioId;
@@ -236,7 +254,13 @@ public sealed class TranscriptSegmentRegenerationCoordinator
           _dirty,
           _eventAggregator,
           sourcePanelId,
-          _log);
+          _log,
+          _transcriptionClient,
+          transcription.Id,
+          transcription,
+          preForUndo,
+          postForUndo,
+          project.Id);
       _undo.RegisterAction(action);
     }
 

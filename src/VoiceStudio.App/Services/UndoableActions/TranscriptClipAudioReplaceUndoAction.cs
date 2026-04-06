@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using VoiceStudio.App.Core.Services;
 using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Services.UndoableActions;
@@ -30,6 +32,12 @@ public sealed class TranscriptClipAudioReplaceUndoAction : IUndoableAction
   private readonly IEventAggregator? _eventAggregator;
   private readonly string _sourcePanelId;
   private readonly IErrorLoggingService? _log;
+  private readonly ITranscriptionClient? _transcriptionClient;
+  private readonly string? _transcriptionId;
+  private readonly TranscriptionResponse? _transcriptionToSynchronize;
+  private readonly TranscriptTextUndoPayload? _preApplyTranscript;
+  private readonly TranscriptTextUndoPayload? _postApplyTranscript;
+  private readonly string? _coherenceProjectId;
 
   public TranscriptClipAudioReplaceUndoAction(
       IBackendClient backend,
@@ -48,7 +56,13 @@ public sealed class TranscriptClipAudioReplaceUndoAction : IUndoableAction
       IProjectSessionDirtyState? dirty = null,
       IEventAggregator? eventAggregator = null,
       string sourcePanelId = "",
-      IErrorLoggingService? log = null)
+      IErrorLoggingService? log = null,
+      ITranscriptionClient? transcriptionClient = null,
+      string? transcriptionId = null,
+      TranscriptionResponse? transcriptionToSynchronize = null,
+      TranscriptTextUndoPayload? preApplyTranscript = null,
+      TranscriptTextUndoPayload? postApplyTranscript = null,
+      string? coherenceProjectId = null)
   {
     _backend = backend ?? throw new ArgumentNullException(nameof(backend));
     _linkage = linkage ?? throw new ArgumentNullException(nameof(linkage));
@@ -67,6 +81,12 @@ public sealed class TranscriptClipAudioReplaceUndoAction : IUndoableAction
     _eventAggregator = eventAggregator;
     _sourcePanelId = sourcePanelId ?? string.Empty;
     _log = log;
+    _transcriptionClient = transcriptionClient;
+    _transcriptionId = transcriptionId;
+    _transcriptionToSynchronize = transcriptionToSynchronize;
+    _preApplyTranscript = preApplyTranscript;
+    _postApplyTranscript = postApplyTranscript;
+    _coherenceProjectId = coherenceProjectId;
   }
 
   public string ActionName => "Regenerate transcript segment (clip audio)";
@@ -117,6 +137,9 @@ public sealed class TranscriptClipAudioReplaceUndoAction : IUndoableAction
             _prevAudioId,
             _prevAudioUrl,
             _prevDurationSeconds));
+
+    ApplyPersistedTranscriptSnapshot(_preApplyTranscript);
+    PublishCoherentReloadAfterTranscriptMutation();
   }
 
   public void Redo()
@@ -163,6 +186,71 @@ public sealed class TranscriptClipAudioReplaceUndoAction : IUndoableAction
             _newAudioId,
             _newAudioUrl,
             _newDurationSeconds));
+
+    ApplyPersistedTranscriptSnapshot(_postApplyTranscript);
+    PublishCoherentReloadAfterTranscriptMutation();
+  }
+
+  private void ApplyPersistedTranscriptSnapshot(TranscriptTextUndoPayload? snapshot)
+  {
+    if (snapshot == null
+        || _transcriptionClient == null
+        || string.IsNullOrWhiteSpace(_transcriptionId))
+      return;
+
+    try
+    {
+      var mergedText = TranscriptTextUndoPayload.BuildTranscriptionText(snapshot.Segments);
+      var persisted = _transcriptionClient
+          .UpdateTranscriptionTextAsync(
+              _transcriptionId,
+              mergedText,
+              TranscriptTextUndoPayload.CloneSegmentList(snapshot.Segments),
+              CancellationToken.None)
+          .ConfigureAwait(false)
+          .GetAwaiter()
+          .GetResult();
+
+      if (persisted != null && _transcriptionToSynchronize != null)
+      {
+        _transcriptionToSynchronize.Text = persisted.Text;
+        _transcriptionToSynchronize.Segments = persisted.Segments != null
+            ? TranscriptTextUndoPayload.CloneSegmentList(persisted.Segments)
+            : TranscriptTextUndoPayload.CloneSegmentList(snapshot.Segments);
+      }
+      else if (_transcriptionToSynchronize != null)
+      {
+        _transcriptionToSynchronize.Text = mergedText;
+        _transcriptionToSynchronize.Segments = TranscriptTextUndoPayload.CloneSegmentList(snapshot.Segments);
+      }
+    }
+    catch (Exception ex)
+    {
+      _log?.LogError(ex, "TranscriptClipAudioTranscriptUndo");
+      throw;
+    }
+  }
+
+  private void PublishCoherentReloadAfterTranscriptMutation()
+  {
+    if (_preApplyTranscript == null)
+      return;
+    if (_eventAggregator == null
+        || string.IsNullOrWhiteSpace(_transcriptionId)
+        || string.IsNullOrWhiteSpace(_coherenceProjectId))
+      return;
+
+    var panelId = string.IsNullOrWhiteSpace(_sourcePanelId) ? PanelIds.Transcribe : _sourcePanelId;
+    _eventAggregator.Publish(
+        new NavigateToEvent(
+            panelId,
+            "timeline",
+            new Dictionary<string, object>
+            {
+              { "action", "coherentReloadAfterSegmentApply" },
+              { "transcriptionId", _transcriptionId },
+              { "projectId", _coherenceProjectId },
+            }));
   }
 
   private void ApplyLocalClip(string audioId, string audioUrl, double durationSeconds)

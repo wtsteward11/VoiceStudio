@@ -593,5 +593,64 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.AreEqual(string.Empty, vm.SelectedTranscription.Segments[1].Text);
       Assert.AreEqual(string.Empty, vm.SelectedTranscription.Segments[2].Text);
     }
+
+    /// <summary>
+    /// GAP-047 undo lane: list reload reflects authoritative backend after local segment drift (paired with
+    /// <see cref="TranscribeViewModelInlineEditTests.ApplyUndoRehydrate_UsesAuthoritativeBackendTruth"/> coordinator path).
+    /// </summary>
+    [TestMethod]
+    public async Task ApplyUndoRehydrate_UsesAuthoritativeBackendTruth()
+    {
+      const string tid = "tr-apply-undo-rehyd-seam";
+      var staleLocal = new TranscriptionResponse
+      {
+        Id = tid,
+        Text = string.Empty,
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>
+        {
+          new() { Id = "seg-u1", Start = 0, End = 1, Text = "local after apply drift" },
+        },
+      };
+      var authoritative = new TranscriptionResponse
+      {
+        Id = tid,
+        Text = string.Empty,
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>
+        {
+          new() { Id = "seg-u1", Start = 0, End = 1, Text = "post-undo backend truth" },
+        },
+      };
+
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync("aud-u", "proj-u", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse> { authoritative });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedProjectId = "proj-u";
+      vm.SelectedAudioId = "aud-u";
+      vm.Transcriptions.Clear();
+      vm.Transcriptions.Add(staleLocal);
+      vm.SelectedTranscription = staleLocal;
+
+      await vm.LoadTranscriptionsCommand.ExecuteAsync(null);
+
+      for (var i = 0; i < 40; i++)
+      {
+        await Task.Delay(25).ConfigureAwait(false);
+        await PumpDispatcherQueueAsync().ConfigureAwait(false);
+        if (vm.SelectedTranscription?.Segments is { Count: > 0 } segs
+            && string.Equals(segs[0].Text, "post-undo backend truth", StringComparison.Ordinal))
+        {
+          break;
+        }
+      }
+
+      Assert.IsNotNull(vm.SelectedTranscription);
+      Assert.AreEqual(1, vm.SelectedTranscription.Segments.Count);
+      Assert.AreEqual("post-undo backend truth", vm.SelectedTranscription.Segments[0].Text);
+    }
   }
 }

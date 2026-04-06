@@ -16,7 +16,7 @@ Diagnose and fix persistent desktop health-timeout failures by proving machine-t
 
 ## 2. Root cause (frozen)
 
-1. **Blocking startup before accept:** Starlette/FastAPI lifespan runs the pre-yield phase before the server handles requests. The previous `on_startup` path included **engine manifest load**, **route conflict scan**, **OpenAPI contract validation**, and **plugin load** in that blocking phase, so `/health` could not succeed until all of that finished—often beyond `StartupReadinessTimeoutSeconds` (45s) on cold machines.
+1. **Blocking startup before accept:** Starlette/FastAPI lifespan runs the pre-yield phase before the server handles requests. The previous `on_startup` path included **engine manifest load**, **route conflict scan**, **OpenAPI contract validation**, and **plugin load** in that blocking phase, so `/health` could not succeed until all of that finished—often beyond the desktop health budget on cold machines (historical note: **45s** at time of this lane; **current** `StartupReadinessTimeoutSeconds` **60** + UI boundary proof [VOICESTUDIO_UI_STARTUP_BOUNDARY_2026-04-05.md](../reports/verification/VOICESTUDIO_UI_STARTUP_BOUNDARY_2026-04-05.md)).
 2. **Loopback mismatch risk:** Uvicorn is spawned with `--host 127.0.0.1` while defaults used `http://localhost:8000`, which can misbehave on Windows IPv6 resolution. Defaults now align to `127.0.0.1`.
 
 ---

@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **State:** **Closed** (2026-04-06) — bounded slice; product **GAP-047** remains **Open** until full product closure criteria are met.
+- **State:** **Closed** (2026-04-06) — bounded slice; product **GAP-047** **Closed** at reliability exit 2026-04-07 — [GOV_VOICESTUDIO_GAP047_PRODUCT_EXIT_CHECKLIST_01_EXECUTION_ROW.md](GOV_VOICESTUDIO_GAP047_PRODUCT_EXIT_CHECKLIST_01_EXECUTION_ROW.md).
 - **Product scope:** **GAP-047** — when `UpdateClipAsync` succeeds but `UpdateTranscriptionTextAsync` fails, the coordinator must not leave a half-committed operator state.
 - **Depends on:** [GOV_VOICESTUDIO_GAP047_FILLER_CLEANUP_UNDO_HISTORY_COHERENCE_01_EXECUTION_ROW.md](GOV_VOICESTUDIO_GAP047_FILLER_CLEANUP_UNDO_HISTORY_COHERENCE_01_EXECUTION_ROW.md) **Closed**.
 - **Closure:** [VOICESTUDIO_GAP047_PERSIST_FAILURE_AFTER_CLIP_APPLY_RECOVERY_LANE_CLOSURE_2026-04-06.md](../reports/verification/VOICESTUDIO_GAP047_PERSIST_FAILURE_AFTER_CLIP_APPLY_RECOVERY_LANE_CLOSURE_2026-04-06.md)

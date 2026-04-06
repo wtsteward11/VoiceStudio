@@ -24,8 +24,8 @@ VoiceStudio is feature-heavy with 47+ panels, 164+ API endpoints, and 44 engine 
 | Staged readiness telemetry | ✅ Implemented | `BackendProcessManager` logs: process started, stdout/stderr, TCP reachability, `/health` success |
 | Startup diagnostics | ✅ Implemented | `%LOCALAPPDATA%\VoiceStudio\logs\startup-{timestamp}.log`; categorized failures |
 | Installed layout | ✅ Documented | `docs/design/INSTALLED_LAYOUT_REFERENCE.md`; `FindAppRoot`, `HasBackendMarker` validated |
-| Icon-launch smoke | ✅ Implemented | verify.ps1 Stage 8.6; smoke script `icon-launch-smoke.ps1` |
-| Failure-path smoke | ✅ Implemented | verify.ps1 Stage 8.7; `failure-path-smoke.ps1` |
+| Icon-launch smoke | ✅ Implemented | verify.ps1 Stage 8.6; app run with `--icon-launch-smoke` |
+| Failure-path smoke | ✅ Implemented | verify.ps1 Stage 8.7; `scripts/icon-launch-failure-smoke.ps1` (port-occupied path) |
 | Runtime-missing smoke | ✅ Implemented | verify.ps1 Stage 8.8; `runtime-missing-failure-smoke.ps1` |
 
 **Gaps:**
@@ -33,7 +33,7 @@ VoiceStudio is feature-heavy with 47+ panels, 164+ API endpoints, and 44 engine 
 | Severity | Gap | Location |
 |----------|-----|----------|
 | S2 | Full verify.ps1 not run in CI; manual run recommended | `.cursor/STATE.md`; verify.ps1 ~15+ min |
-| S2 | First-launch timeout 45–60s for cold backend; user may perceive delay | `BackendProcessManager.WaitForHealthAsync` |
+| S2 | First-launch cold backend can take ~40s+; UI budget must exceed worst case | `BackendProcessManager` `StartupReadinessTimeoutSeconds` + [UI startup boundary proof](../reports/verification/VOICESTUDIO_UI_STARTUP_BOUNDARY_2026-04-05.md) |
 
 ---
 

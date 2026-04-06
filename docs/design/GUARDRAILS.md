@@ -171,10 +171,28 @@ shared/
 - Maintains API contracts
 - Allows independent deployment
 
+### 9. Transcript / clip mutation outcomes (GAP-045 / GAP-047)
+
+Operations that mutate **transcript text**, **clip audio**, or **cross-consumer subtitle state** MUST be classifiable into one of these **three** buckets. A **fourth** bucket is **forbidden**.
+
+| Bucket | Definition | Examples |
+|--------|------------|----------|
+| **Atomic success** | All steps that define “committed” for the operation complete; downstream consumers may observe success events or quiet refetch. | Coordinator: clip apply + persist + local clip/linkage + success events + undo. Transcribe VM: `err == null` path. Timeline: `coherentReloadAfterSegmentApply` with guards passing → quiet refetch. |
+| **Explicit compensated rollback** | A forward mutation is **undone** by a defined compensating action; no success-path consumer events for partial commit. | Coordinator: transcript persist fails → `UpdateClipAsync` restores prior audio; no linkage removal, no success events, no undo registration. |
+| **Operator-visible degraded** | No silent partial commit: operator sees an explicit error or degraded signal; consumers do not apply optimistic success semantics. | Coordinator: validation/job timeout/clip apply throws; persist fails and clip rollback also fails (combined message). Transcribe VM: `err != null`. Timeline: guard mismatch → no refetch (fail-closed). |
+
+**Forbidden fourth bucket:** *“Mostly worked; let downstream consumers sort it out.”*  
+If a change cannot be assigned to one of the three buckets above, the seam is **not ready** for closure.
+
+**Local-only draft** (e.g. filler preview / draft text) is **not** a backend mutation bucket; it MUST NOT pretend to be persisted truth.
+
+**References:** [TranscriptSegmentRegenerationCoordinator.cs](../../src/VoiceStudio.App/Services/TranscriptSegmentRegenerationCoordinator.cs); [EXECUTION_ROW_DISCIPLINE.md](../governance/EXECUTION_ROW_DISCIPLINE.md).
+
 ## Implementation Checklist
 
 When implementing or modifying code, verify:
 
+- [ ] Transcript/clip/coherence changes map to **§9** outcome buckets (no forbidden fourth bucket)
 - [ ] All 6 panels exist with separate View/ViewModel files
 - [ ] MainWindow uses 3×2 grid layout
 - [ ] All panels use PanelHost control

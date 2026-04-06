@@ -1241,15 +1241,32 @@ class EngineRouter:
         return defaults.get(task_type)
 
     def _get_fallback_chain(self, task_type: str) -> list[str]:
-        """Get fallback chain for a task type from config."""
+        """Get fallback chain for a task type (GAP-053: user settings → YAML → defaults)."""
+        try:
+            from backend.api.routes.settings import load_settings
+
+            loaded = load_settings()
+            if (
+                loaded
+                and loaded.engine
+                and loaded.engine.engine_priority_order
+                and task_type == "tts"
+            ):
+                return list(loaded.engine.engine_priority_order)
+        except Exception as e:
+            logger.debug("User engine priority unavailable in router: %s", e)
+
+        chain: list[str] = []
         if HAS_UNIFIED_CONFIG:
             try:
                 config = get_config()
-                return config.get_fallback_chain(task_type)
+                chain = list(config.get_fallback_chain(task_type) or [])
             except Exception as e:
                 logger.debug("Config lookup for fallback chain failed, using fallback: %s", e)
 
-        # Fallback defaults
+        if chain:
+            return chain
+
         defaults = {
             "tts": ["xtts_v2", "openvoice", "piper", "espeak"],
             "stt": ["whisper_cpp", "faster_whisper", "vosk"],

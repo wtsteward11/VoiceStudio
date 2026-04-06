@@ -45,6 +45,13 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockSettingsClient
         .Setup(x => x.CheckDependenciesAsync(It.IsAny<CancellationToken>()))
         .ReturnsAsync(new Dictionary<string, object>());
+      _mockSettingsClient
+        .Setup(x => x.GetEffectiveEnginePriorityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new EffectiveEnginePriorityResponse
+        {
+          Source = "default",
+          Order = new List<string> { "xtts_v2", "openvoice", "piper", "espeak" }
+        });
     }
 
     [TestCleanup]

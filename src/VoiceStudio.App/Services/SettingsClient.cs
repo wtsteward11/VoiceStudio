@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Services
@@ -25,5 +26,18 @@ namespace VoiceStudio.App.Services
           null,
           HttpMethod.Get,
           cancellationToken);
+
+    /// <inheritdoc />
+    public Task<EffectiveEnginePriorityResponse?> GetEffectiveEnginePriorityAsync(
+        string taskType = "tts",
+        CancellationToken cancellationToken = default)
+    {
+      var q = string.IsNullOrWhiteSpace(taskType) ? "" : $"?task_type={System.Uri.EscapeDataString(taskType)}";
+      return _backend.SendRequestAsync<object, EffectiveEnginePriorityResponse>(
+          $"/api/settings/engine-priority/effective{q}",
+          null,
+          HttpMethod.Get,
+          cancellationToken);
+    }
   }
 }

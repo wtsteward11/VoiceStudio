@@ -26,7 +26,9 @@ namespace VoiceStudio.App.Views.Panels
           settingsService,
           settingsClient,
           pluginManager,
-          AppServices.GetService<ITelemetryService>());
+          AppServices.GetService<ITelemetryService>(),
+          eventAggregator: null,
+          enginesClient: AppServices.GetService<IEnginesClient>());
       this.DataContext = ViewModel;
 
       // Initialize services

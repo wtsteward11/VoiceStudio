@@ -12,12 +12,13 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import re
 import time
 from pathlib import Path
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from ..auth import require_auth_if_enabled
 
@@ -71,11 +72,24 @@ class GeneralSettings(BaseModel):
     auto_save_interval: int = 300
 
 
+_ENGINE_PRIORITY_ID_RE = re.compile(r"^[a-z0-9_-]+$")
+
+
 class EngineSettings(BaseModel):
     default_audio_engine: str = "xtts"
     default_image_engine: str = "sdxl"
     default_video_engine: str = "svd"
     quality_level: int = 5
+    engine_priority_order: list[str] = Field(default_factory=list)
+
+    @field_validator("engine_priority_order", mode="after")
+    @classmethod
+    def _validate_engine_priority_order(cls, v: list[str]) -> list[str]:
+        for item in v:
+            if not isinstance(item, str) or not _ENGINE_PRIORITY_ID_RE.fullmatch(item):
+                msg = f"Invalid engine_priority_order entry: {item!r} (allowed: [a-z0-9_-]+)"
+                raise ValueError(msg)
+        return v
 
 
 class AudioSettings(BaseModel):
@@ -244,6 +258,11 @@ def _load_from_unified_config(unified) -> SettingsData:
                 vs.engine.get("default_video_engine", "svd") if hasattr(vs, "engine") else "svd"
             ),
             quality_level=vs.engine.get("quality_level", 5) if hasattr(vs, "engine") else 5,
+            engine_priority_order=(
+                list(vs.engine.get("engine_priority_order", []) or [])
+                if hasattr(vs, "engine")
+                else []
+            ),
         ),
         audio=AudioSettings(
             output_device=(
@@ -467,6 +486,24 @@ async def get_settings():
             status_code=500,
             detail="Unable to load application settings. Please try again or reset to defaults.",
         )
+
+
+@router.get("/engine-priority/effective")
+@cache_response(ttl=30)
+async def get_effective_engine_priority(task_type: str = "tts"):
+    """GAP-053: Resolved TTS engine priority for diagnostics (user → YAML → default)."""
+    try:
+        from backend.services.engine_priority import build_effective_engine_priority_payload
+
+        return build_effective_engine_priority_payload(task_type)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to resolve engine priority: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to resolve effective engine priority.",
+        ) from e
 
 
 @router.get("/{category}")

@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -31,6 +33,7 @@ namespace VoiceStudio.App.ViewModels
     public PanelRegion Region => PanelRegion.Floating;
     private readonly ISettingsService _settingsService;
     private readonly ISettingsClient _settingsClient;
+    private readonly IEnginesClient? _enginesClient;
     private readonly PluginManager? _pluginManager;
     private readonly ITelemetryService? _telemetryService;
     private readonly IEventAggregator? _eventAggregator;
@@ -73,6 +76,18 @@ namespace VoiceStudio.App.ViewModels
 
     [ObservableProperty]
     private int qualityLevel = 5; // 1-10
+
+    /// <summary>GAP-053: TTS fallback order for Settings UI; persistence follows <see cref="_enginePriorityIsCustom"/>.</summary>
+    public ObservableCollection<string> EnginePriorityOrder { get; } = new();
+
+    [ObservableProperty]
+    private string? selectedEnginePriorityItem;
+
+    [ObservableProperty]
+    private string enginePrioritySourceLabel = "Default";
+
+    private bool _syncingEnginePriority;
+    private bool _enginePriorityIsCustom;
 
     // Audio Settings
     [ObservableProperty]
@@ -250,14 +265,18 @@ namespace VoiceStudio.App.ViewModels
         ISettingsClient settingsClient,
         PluginManager? pluginManager = null,
         ITelemetryService? telemetryService = null,
-        IEventAggregator? eventAggregator = null)
+        IEventAggregator? eventAggregator = null,
+        IEnginesClient? enginesClient = null)
         : base(context)
     {
       _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
       _settingsClient = settingsClient ?? throw new ArgumentNullException(nameof(settingsClient));
+      _enginesClient = enginesClient;
       _pluginManager = pluginManager;
       _telemetryService = telemetryService;
       _eventAggregator = eventAggregator ?? AppServices.TryGetEventAggregator();
+
+      EnginePriorityOrder.CollectionChanged += OnEnginePriorityOrderCollectionChanged;
 
       // Initialize commands in primary constructor so all construction paths have them
       LoadSettingsCommand = new EnhancedAsyncRelayCommand(async (ct) =>
@@ -373,7 +392,8 @@ namespace VoiceStudio.App.ViewModels
               settingsClient ?? AppServices.GetRequiredService<ISettingsClient>(),
               pluginManager ?? AppServices.GetService<PluginManager>(),
               AppServices.GetService<ITelemetryService>(),
-              eventAggregator: null)
+              eventAggregator: null,
+              enginesClient: null)
     {
       // Commands are initialized in the primary constructor
     }
@@ -396,6 +416,7 @@ namespace VoiceStudio.App.ViewModels
         var settings = await _settingsService.LoadSettingsAsync(cancellationToken);
 
         ApplySettings(settings);
+        await HydrateEnginePriorityDisplayAsync(settings, cancellationToken).ConfigureAwait(true);
         HasUnsavedChanges = false;
         StatusMessage = ResourceHelper.GetString("Settings.SettingsLoaded", "Settings loaded successfully");
       }
@@ -423,6 +444,11 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
+        if (!await EnsureEnginePriorityValidAsync(cancellationToken).ConfigureAwait(true))
+        {
+          return;
+        }
+
         var settings = GetSettingsData();
 
         // Save via service (backend and local storage)
@@ -610,7 +636,10 @@ namespace VoiceStudio.App.ViewModels
           DefaultAudioEngine = DefaultAudioEngine,
           DefaultImageEngine = DefaultImageEngine,
           DefaultVideoEngine = DefaultVideoEngine,
-          QualityLevel = QualityLevel
+          QualityLevel = QualityLevel,
+          EnginePriorityOrder = _enginePriorityIsCustom
+              ? new List<string>(EnginePriorityOrder)
+              : new List<string>()
         },
         Audio = new VoiceStudio.Core.Models.AudioSettings
         {
@@ -660,6 +689,147 @@ namespace VoiceStudio.App.ViewModels
       };
     }
 
+    private static readonly Regex s_enginePriorityTokenRegex = new(@"^[a-z0-9_-]+$", RegexOptions.Compiled);
+
+    private void OnEnginePriorityOrderCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+      if (_syncingEnginePriority)
+      {
+        return;
+      }
+
+      _enginePriorityIsCustom = true;
+      HasUnsavedChanges = true;
+    }
+
+    private void ClearEnginePriorityDisplayForDefaults()
+    {
+      _syncingEnginePriority = true;
+      try
+      {
+        EnginePriorityOrder.Clear();
+        _enginePriorityIsCustom = false;
+        EnginePrioritySourceLabel = "Default";
+      }
+      finally
+      {
+        _syncingEnginePriority = false;
+      }
+    }
+
+    private void ApplyEnginePrioritySourceLabel(string? source)
+    {
+      EnginePrioritySourceLabel = source switch
+      {
+        "user" => "Custom",
+        "yaml" => "Config file",
+        _ => "Default"
+      };
+    }
+
+    private async Task HydrateEnginePriorityDisplayAsync(CoreSettingsData settings, CancellationToken cancellationToken)
+    {
+      _syncingEnginePriority = true;
+      try
+      {
+        EnginePriorityOrder.Clear();
+        var fromDisk = settings.Engine?.EnginePriorityOrder;
+        if (fromDisk != null && fromDisk.Count > 0)
+        {
+          _enginePriorityIsCustom = true;
+          foreach (var id in fromDisk)
+          {
+            EnginePriorityOrder.Add(id);
+          }
+
+          ApplyEnginePrioritySourceLabel("user");
+          return;
+        }
+
+        _enginePriorityIsCustom = false;
+        try
+        {
+          var eff = await _settingsClient.GetEffectiveEnginePriorityAsync("tts", cancellationToken).ConfigureAwait(true);
+          if (eff?.Order != null && eff.Order.Count > 0)
+          {
+            foreach (var id in eff.Order)
+            {
+              EnginePriorityOrder.Add(id);
+            }
+
+            ApplyEnginePrioritySourceLabel(eff.Source);
+            return;
+          }
+        }
+        catch (Exception ex)
+        {
+          ErrorLoggingService?.LogWarning(
+              $"Effective engine priority unavailable: {ex.Message}",
+              "HydrateEnginePriority");
+        }
+
+        foreach (var id in new[] { "xtts_v2", "openvoice", "piper", "espeak" })
+        {
+          EnginePriorityOrder.Add(id);
+        }
+
+        EnginePrioritySourceLabel = "Default";
+      }
+      finally
+      {
+        _syncingEnginePriority = false;
+      }
+    }
+
+    private async Task<bool> EnsureEnginePriorityValidAsync(CancellationToken cancellationToken)
+    {
+      if (!_enginePriorityIsCustom)
+      {
+        return true;
+      }
+
+      foreach (var id in EnginePriorityOrder)
+      {
+        if (string.IsNullOrWhiteSpace(id) || !s_enginePriorityTokenRegex.IsMatch(id))
+        {
+          ErrorMessage =
+              $"Invalid engine id in priority list: '{id}' (use letters, digits, hyphen, underscore).";
+          StatusMessage = null;
+          return false;
+        }
+      }
+
+      if (_enginesClient != null)
+      {
+        try
+        {
+          var registered = await _enginesClient.GetEnginesAsync(cancellationToken).ConfigureAwait(true);
+          if (registered != null && registered.Count > 0)
+          {
+            var reg = new HashSet<string>(registered, StringComparer.Ordinal);
+            foreach (var id in EnginePriorityOrder)
+            {
+              if (!reg.Contains(id))
+              {
+                ErrorMessage =
+                    $"Unknown engine id in priority list: '{id}'. Save anyway after engines are installed, or remove the entry.";
+                StatusMessage = null;
+                return false;
+              }
+            }
+          }
+        }
+        catch (Exception ex)
+        {
+          ErrorLoggingService?.LogWarning(
+              $"Engine registry check failed (priority validation skipped): {ex.Message}",
+              "EnsureEnginePriorityValid");
+        }
+      }
+
+      return true;
+    }
+
     private void ResetToDefaults()
     {
       Theme = "Dark";
@@ -671,6 +841,7 @@ namespace VoiceStudio.App.ViewModels
       DefaultImageEngine = "sdxl";
       DefaultVideoEngine = "svd";
       QualityLevel = 5;
+      ClearEnginePriorityDisplayForDefaults();
       AudioOutputDevice = "Default";
       AudioInputDevice = "Default";
       SampleRate = 44100;
@@ -1064,6 +1235,55 @@ namespace VoiceStudio.App.ViewModels
       }
     }
 
+    [RelayCommand]
+    private void MoveEnginePriorityUp()
+    {
+      if (string.IsNullOrEmpty(SelectedEnginePriorityItem))
+      {
+        return;
+      }
+
+      var i = EnginePriorityOrder.IndexOf(SelectedEnginePriorityItem);
+      if (i <= 0)
+      {
+        return;
+      }
+
+      var item = SelectedEnginePriorityItem;
+      EnginePriorityOrder.RemoveAt(i);
+      EnginePriorityOrder.Insert(i - 1, item!);
+      SelectedEnginePriorityItem = item;
+    }
+
+    [RelayCommand]
+    private void MoveEnginePriorityDown()
+    {
+      if (string.IsNullOrEmpty(SelectedEnginePriorityItem))
+      {
+        return;
+      }
+
+      var i = EnginePriorityOrder.IndexOf(SelectedEnginePriorityItem);
+      if (i < 0 || i >= EnginePriorityOrder.Count - 1)
+      {
+        return;
+      }
+
+      var item = SelectedEnginePriorityItem;
+      EnginePriorityOrder.RemoveAt(i);
+      EnginePriorityOrder.Insert(i + 1, item!);
+      SelectedEnginePriorityItem = item;
+    }
+
+    [RelayCommand]
+    private async Task ResetEnginePriorityOrderAsync(CancellationToken cancellationToken)
+    {
+      await HydrateEnginePriorityDisplayAsync(
+          new CoreSettingsData { Engine = new VoiceStudio.Core.Models.EngineSettings() },
+          cancellationToken).ConfigureAwait(true);
+      HasUnsavedChanges = true;
+    }
+
     /// <summary>
     /// Data structure for dependency cache file.
     /// </summary>
@@ -1105,6 +1325,7 @@ namespace VoiceStudio.App.ViewModels
     public string DefaultImageEngine { get; set; } = "sdxl";
     public string DefaultVideoEngine { get; set; } = "svd";
     public int QualityLevel { get; set; } = 5;
+    public List<string> EnginePriorityOrder { get; set; } = new();
   }
 
   public class AudioSettings

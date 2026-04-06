@@ -7,6 +7,9 @@ using VoiceStudio.App.Services;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
+using VoiceStudio.Core.Models;
+using System.Collections.Generic;
+using System.Threading;
 
 namespace VoiceStudio.App.Tests.ViewModels
 {
@@ -27,6 +30,13 @@ namespace VoiceStudio.App.Tests.ViewModels
             _context = new ViewModelContext(NullLogger.Instance, dispatcher);
             _mockSettingsService = new Mock<ISettingsService>();
             _mockSettingsClient = new Mock<ISettingsClient>();
+            _mockSettingsClient
+                .Setup(x => x.GetEffectiveEnginePriorityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new EffectiveEnginePriorityResponse
+                {
+                    Source = "default",
+                    Order = new List<string> { "xtts_v2", "openvoice", "piper", "espeak" }
+                });
             _viewModel = new SettingsViewModel(
                 _context,
                 _mockSettingsService.Object,

@@ -24,6 +24,8 @@ namespace VoiceStudio.Core.Models
     public string DefaultImageEngine { get; set; } = "sdxl";
     public string DefaultVideoEngine { get; set; } = "svd";
     public int QualityLevel { get; set; } = 5; // 1-10
+    /// <summary>GAP-053: User TTS fallback order; empty defers to backend YAML/defaults.</summary>
+    public List<string> EnginePriorityOrder { get; set; } = new();
   }
 
   /// <summary>

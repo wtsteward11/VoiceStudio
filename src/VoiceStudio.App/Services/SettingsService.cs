@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.Core.Models;
@@ -294,6 +295,19 @@ namespace VoiceStudio.App.Services
           errorMessage = "Quality level must be between 1 and 10";
           return false;
         }
+
+        if (settings.Engine.EnginePriorityOrder != null)
+        {
+          var re = new Regex("^[a-z0-9_-]+$", RegexOptions.Compiled);
+          foreach (var id in settings.Engine.EnginePriorityOrder)
+          {
+            if (string.IsNullOrWhiteSpace(id) || !re.IsMatch(id))
+            {
+              errorMessage = $"Invalid engine_priority_order entry: '{id}'";
+              return false;
+            }
+          }
+        }
       }
 
       // Validate audio settings
@@ -389,7 +403,8 @@ namespace VoiceStudio.App.Services
           DefaultAudioEngine = "xtts",
           DefaultImageEngine = "sdxl",
           DefaultVideoEngine = "svd",
-          QualityLevel = 5
+          QualityLevel = 5,
+          EnginePriorityOrder = new System.Collections.Generic.List<string>()
         },
         Audio = new AudioSettings
         {

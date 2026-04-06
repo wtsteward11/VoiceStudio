@@ -307,7 +307,6 @@ class SynthesisService:
         from backend.api.models_additional import VoiceSynthesizeRequest, VoiceSynthesizeResponse
         from backend.api.utils.instrumentation import EventType, instrument_flow
         from backend.core.circuit_breaker import get_engine_breaker
-        from backend.platform.config.unified_config import get_config
         from backend.services.engine_shared import (
             ENGINE_AVAILABLE,
             _ensure_engine_router,
@@ -416,14 +415,9 @@ class SynthesisService:
                         valid_engines = []
 
                 if valid_engines and engine_id not in valid_engines:
-                    try:
-                        fallback_chain = get_config().get_fallback_chain("tts")
-                    except Exception as cfg_err:
-                        logger.warning("Failed to load fallback chain: %s", cfg_err)
-                        fallback_chain = []
+                    from backend.services.engine_priority import resolve_engine_priority
 
-                    if not fallback_chain:
-                        fallback_chain = ["xtts_v2", "xtts", "piper", "espeak_ng"]
+                    fallback_chain, _fb_source = resolve_engine_priority("tts")
 
                     original_engine_id = engine_id
                     for fallback_engine in fallback_chain:

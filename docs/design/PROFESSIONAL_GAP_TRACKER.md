@@ -72,7 +72,7 @@
 | GAP-050 | 5 | AI | Emotional voice control + preview | Emotion domain | 48 | Engine Engineer | — | Open |
 | GAP-051 | 5 | AI | Speech-to-speech conversion path (scoped) | `backend/voice/` | 64 | Engine Engineer | — | Open |
 | GAP-052 | 5 | UX | Engine benchmarking UI (MOS / side-by-side) | Benchmarks panel | 32 | UI Engineer | — | Open |
-| GAP-053 | 5 | Missing | User-configurable engine priority (no static fallback chain) | Settings + router | 24 | System Architect | — | Open |
+| GAP-053 | 5 | Missing | User-configurable engine priority (no static fallback chain) | Settings + router | 24 | System Architect | — | **Closed** 2026-04-06 — [GOV_VOICESTUDIO_GAP053_CONFIGURABLE_ENGINE_PRIORITY_01_EXECUTION_ROW.md](GOV_VOICESTUDIO_GAP053_CONFIGURABLE_ENGINE_PRIORITY_01_EXECUTION_ROW.md); [closure](../reports/verification/VOICESTUDIO_GAP053_CONFIGURABLE_ENGINE_PRIORITY_LANE_CLOSURE_2026-04-06.md) |
 | GAP-054 | 5 | Wiring | SSML: capability detect + strip/warn per engine | Synthesis request path | 16 | Core Platform | GAP-053 | Open |
 | GAP-055 | 6 | Security | Voice consent capture + storage + audit | Legal UX + DB | 40 | System Architect | GAP-016 | Open |
 | GAP-056 | 6 | Security | Audio watermarking / provenance (policy-aligned) | Export pipeline | 48 | Engine Engineer | [PROVENANCE_POLICY.md](../governance/PROVENANCE_POLICY.md) | Open |

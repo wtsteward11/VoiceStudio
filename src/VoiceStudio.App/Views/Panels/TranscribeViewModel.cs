@@ -662,7 +662,8 @@ namespace VoiceStudio.App.Views.Panels
         string? replacementText = null,
         CancellationToken cancellationToken = default,
         int? rangeEndInclusiveIndex = null,
-        TranscriptEditOperationKind historyOperationKind = TranscriptEditOperationKind.RegenerateSegment)
+        TranscriptEditOperationKind historyOperationKind = TranscriptEditOperationKind.RegenerateSegment,
+        bool requestTimelineSubtitleCoherence = false)
     {
       if (segment == null || SelectedTranscription == null)
         return "Select a transcription and segment first.";
@@ -755,6 +756,8 @@ namespace VoiceStudio.App.Views.Panels
             rangeEndInclusiveIndex,
             err,
             historyClipId);
+        if (err == null && requestTimelineSubtitleCoherence)
+          PublishTimelineCoherenceAfterSegmentApplySuccess();
         return err;
       }
       finally
@@ -921,7 +924,8 @@ namespace VoiceStudio.App.Views.Panels
               entry.ReplacementTextSnapshot,
               cancellationToken,
               entry.RangeEndInclusiveIndex,
-              entry.OperationKind)
+              entry.OperationKind,
+              requestTimelineSubtitleCoherence: true)
           .ConfigureAwait(true);
     }
 
@@ -1387,7 +1391,13 @@ namespace VoiceStudio.App.Views.Panels
       var historyKind = IsMultiSegmentRangeEdit
           ? TranscriptEditOperationKind.MultiSegmentRangeApply
           : TranscriptEditOperationKind.SingleSegmentApply;
-      var err = await RegenerateSegmentAudioAsync(segment, draft, cancellationToken, rangeEndInclusiveIndex, historyKind).ConfigureAwait(true);
+      var err = await RegenerateSegmentAudioAsync(
+          segment,
+          draft,
+          cancellationToken,
+          rangeEndInclusiveIndex,
+          historyKind,
+          requestTimelineSubtitleCoherence: true).ConfigureAwait(true);
       if (err == null)
         CancelSegmentEdit();
       return err;
@@ -2338,6 +2348,34 @@ namespace VoiceStudio.App.Views.Panels
                 { "action", "coherentReloadAfterRehydrate" },
                 { "previousTranscriptionId", previousTranscriptionId ?? string.Empty },
                 { "transcriptionId", SelectedTranscription?.Id ?? string.Empty },
+              }));
+    }
+
+    /// <summary>
+    /// GAP-047 post-apply cross-consumer: after successful apply/regen that persists transcript, ask Timeline to quiet-refetch
+    /// subtitle segments when the overlay still matches this transcription + project (fail-closed otherwise).
+    /// </summary>
+    private void PublishTimelineCoherenceAfterSegmentApplySuccess()
+    {
+      if (SelectedTranscription == null)
+        return;
+      var projectId = SelectedProjectId;
+      if (string.IsNullOrWhiteSpace(projectId))
+        return;
+
+      var eventAggregator = AppServices.TryGetEventAggregator();
+      if (eventAggregator == null)
+        return;
+
+      eventAggregator.Publish(
+          new NavigateToEvent(
+              PanelId,
+              "timeline",
+              new Dictionary<string, object>
+              {
+                { "action", "coherentReloadAfterSegmentApply" },
+                { "transcriptionId", SelectedTranscription.Id },
+                { "projectId", projectId },
               }));
     }
 

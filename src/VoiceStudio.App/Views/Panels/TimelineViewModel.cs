@@ -54,6 +54,19 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IClipTranscriptLinkageService? _linkageService;
     private readonly ITimelineSelectedProjectGate? _timelineProjectGate;
     private readonly ITimelineUseCase? _timelineUseCase;
+    private readonly IProjectRepository? _projectRepository;
+
+    /// <summary>
+    /// GAP-045 cross-consumer: backend transcription id currently driving the subtitle overlay (null if cleared / never loaded).
+    /// </summary>
+    private string? _loadedSubtitleTranscriptionId;
+
+    /// <summary>
+    /// GAP-045 reopen parity: project id for which the subtitle overlay was last loaded from backend authority (null if cleared).
+    /// </summary>
+    private string? _subtitleOverlayOwnerProjectId;
+
+    public string? LoadedSubtitleTranscriptionId => _loadedSubtitleTranscriptionId;
 
     public string PanelId => PanelIds.Timeline;
     public string DisplayName => ResourceHelper.GetString("Panel.Timeline.DisplayName", "Timeline");
@@ -314,11 +327,41 @@ namespace VoiceStudio.App.Views.Panels
     [RelayCommand]
     private void ClearTranscript()
     {
+      // Explicit user clear should also clear persisted restore id for the active project.
+      ClearTranscriptInternal(clearPersistedLastSubtitle: true);
+    }
+
+    private void ClearTranscriptInternal(bool clearPersistedLastSubtitle)
+    {
+      var projectIdForPersist = clearPersistedLastSubtitle
+          ? (SelectedProject?.Id ?? _subtitleOverlayOwnerProjectId)
+          : null;
+
       TranscriptSegments.Clear();
+      _loadedSubtitleTranscriptionId = null;
+      _subtitleOverlayOwnerProjectId = null;
       ShowTranscriptTrack = false;
       OnPropertyChanged(nameof(HasTranscriptSegments));
       OnPropertyChanged(nameof(TranscriptSegmentCount));
       OnPropertyChanged(nameof(TranscriptTrackVisibility));
+
+      if (!string.IsNullOrEmpty(projectIdForPersist) && _projectRepository != null)
+      {
+        _ = ClearPersistedLastSubtitleAsync(projectIdForPersist);
+      }
+    }
+
+    private async Task ClearPersistedLastSubtitleAsync(string projectId)
+    {
+      try
+      {
+        await _projectRepository!.SaveLastSubtitleTranscriptionIdAsync(projectId, null, CancellationToken.None)
+            .ConfigureAwait(false);
+      }
+      catch (Exception ex)
+      {
+        _logService?.LogWarning($"Failed to clear persisted subtitle restore id: {ex.Message}", "ClearPersistedLastSubtitleAsync");
+      }
     }
 
     partial void OnShowTranscriptTrackChanged(bool value)
@@ -333,7 +376,8 @@ namespace VoiceStudio.App.Views.Panels
     /// </summary>
     public async Task LoadTranscriptSegmentsAsync(
         string transcriptionId,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool quietNotifications = false)
     {
       try
       {
@@ -372,19 +416,51 @@ namespace VoiceStudio.App.Views.Panels
             _sessionDirty?.MarkProjectDirty("clip_transcript_links");
           }
 
+          _loadedSubtitleTranscriptionId = string.IsNullOrWhiteSpace(response.Id) ? transcriptionId : response.Id;
+          _subtitleOverlayOwnerProjectId = SelectedProject?.Id;
           ShowTranscriptTrack = true;
           OnPropertyChanged(nameof(TranscriptTrackVisibility));
           OnPropertyChanged(nameof(HasTranscriptSegments));
           OnPropertyChanged(nameof(TranscriptSegmentCount));
-          _toastNotificationService?.ShowSuccess(
-              "Transcript Loaded",
-              $"Loaded {TranscriptSegments.Count} segments to timeline");
+          if (!quietNotifications)
+          {
+            _toastNotificationService?.ShowSuccess(
+                "Transcript Loaded",
+                $"Loaded {TranscriptSegments.Count} segments to timeline");
+          }
+
+          if (_projectRepository != null && SelectedProject?.Id is { } persistPid &&
+              !string.IsNullOrEmpty(_loadedSubtitleTranscriptionId))
+          {
+            _ = PersistLastSubtitleTranscriptionIdAsync(persistPid, _loadedSubtitleTranscriptionId, ct);
+          }
         }
       }
       catch (Exception ex)
       {
         _logService?.LogError(ex, "LoadTranscriptSegments");
-        _toastNotificationService?.ShowError("Load Failed", $"Failed to load transcript: {ex.Message}");
+        if (!quietNotifications)
+        {
+          _toastNotificationService?.ShowError("Load Failed", $"Failed to load transcript: {ex.Message}");
+        }
+      }
+    }
+
+    private async Task PersistLastSubtitleTranscriptionIdAsync(string projectId, string transcriptionId, CancellationToken ct)
+    {
+      if (_projectRepository == null)
+        return;
+      try
+      {
+        await _projectRepository.SaveLastSubtitleTranscriptionIdAsync(projectId, transcriptionId, ct).ConfigureAwait(false);
+      }
+      catch (OperationCanceledException)
+      {
+        _logService?.LogInfo("Persist last subtitle restore id canceled.", "PersistLastSubtitleTranscriptionIdAsync");
+      }
+      catch (Exception ex)
+      {
+        _logService?.LogWarning($"Failed to persist last subtitle restore id: {ex.Message}", "PersistLastSubtitleTranscriptionIdAsync");
       }
     }
 
@@ -422,6 +498,7 @@ namespace VoiceStudio.App.Views.Panels
       RecentProjectsService? recentProjectsService = null,
       IProjectSessionDirtyState? sessionDirty = null,
       IClipTranscriptLinkageService? clipTranscriptLinkageService = null,
+      IProjectRepository? projectRepository = null,
       ITimelineUseCase? timelineUseCase = null)
         : base(AppServices.GetViewModelContext())
     {
@@ -453,6 +530,7 @@ namespace VoiceStudio.App.Views.Panels
       _linkageService = clipTranscriptLinkageService ?? AppServices.TryGetClipTranscriptLinkageService();
       _timelineProjectGate = AppServices.TryGetTimelineSelectedProjectGate();
       _timelineUseCase = timelineUseCase;
+      _projectRepository = projectRepository ?? AppServices.TryGetProjectRepository();
 
       Tracks.CollectionChanged += (_, _) =>
       {
@@ -664,7 +742,9 @@ namespace VoiceStudio.App.Views.Panels
 
     /// <summary>
     /// Handles NavigateToEvent when the target is this timeline panel.
-    /// Supports actions: "addClip" (from Synthesis), "loadTranscript" (from Transcribe).
+    /// Supports actions: "addClip" (from Synthesis), "loadTranscript" (from Transcribe),
+    /// "coherentReloadAfterRehydrate" (GAP-045: Transcribe list rehydrate → timeline subtitle refresh when tied),
+    /// "coherentReloadAfterSegmentApply" (GAP-047: successful Apply → quiet refetch when overlay id + project match).
     /// </summary>
     private void OnNavigateToTimeline(NavigateToEvent e)
     {
@@ -685,6 +765,68 @@ namespace VoiceStudio.App.Views.Panels
               _ = LoadTranscriptSegmentsAsync(tid);
             }
             break;
+
+          case "coherentReloadAfterRehydrate":
+            {
+              var prevRaw = parameters.TryGetValue("previousTranscriptionId", out var pObj) ? pObj?.ToString() : null;
+              var curRaw = parameters.TryGetValue("transcriptionId", out var cObj) ? cObj?.ToString() : null;
+              var prev = string.IsNullOrWhiteSpace(prevRaw) ? null : prevRaw;
+              var cur = string.IsNullOrWhiteSpace(curRaw) ? null : curRaw;
+
+              // GAP-045 last-subtitle restore: cold session has no in-memory overlay; still load when Transcribe selected a row after rehydrate.
+              if (string.IsNullOrEmpty(_loadedSubtitleTranscriptionId))
+              {
+                if (!string.IsNullOrEmpty(cur))
+                {
+                  _ = LoadTranscriptSegmentsAsync(cur!, default, quietNotifications: true);
+                }
+                break;
+              }
+
+              if (!string.IsNullOrEmpty(prev) &&
+                  !string.Equals(_loadedSubtitleTranscriptionId, prev, StringComparison.Ordinal))
+              {
+                break;
+              }
+
+              if (cur == null)
+              {
+                if (!string.IsNullOrEmpty(prev))
+                {
+                  ClearTranscriptInternal(clearPersistedLastSubtitle: false);
+                }
+              }
+              else
+              {
+                _ = LoadTranscriptSegmentsAsync(cur, default, quietNotifications: true);
+              }
+
+              break;
+            }
+
+          case "coherentReloadAfterSegmentApply":
+            {
+              var applyTidRaw = parameters.TryGetValue("transcriptionId", out var atObj) ? atObj?.ToString() : null;
+              var applyPidRaw = parameters.TryGetValue("projectId", out var apObj) ? apObj?.ToString() : null;
+              var applyTid = string.IsNullOrWhiteSpace(applyTidRaw) ? null : applyTidRaw;
+              var applyPid = string.IsNullOrWhiteSpace(applyPidRaw) ? null : applyPidRaw;
+
+              if (applyTid == null || applyPid == null)
+                break;
+
+              if (string.IsNullOrEmpty(_loadedSubtitleTranscriptionId))
+                break;
+
+              if (!string.Equals(_loadedSubtitleTranscriptionId, applyTid, StringComparison.Ordinal))
+                break;
+
+              if (SelectedProject == null
+                  || !string.Equals(SelectedProject.Id, applyPid, StringComparison.Ordinal))
+                break;
+
+              _ = LoadTranscriptSegmentsAsync(applyTid, default, quietNotifications: true);
+              break;
+            }
 
           case "seekPlayhead":
             if (parameters.TryGetValue("clipId", out var clipFocusObj) && clipFocusObj is string focusClipId &&
@@ -802,6 +944,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       // Clear existing segments
       TranscriptSegments.Clear();
+      _loadedSubtitleTranscriptionId = null;
 
       if (e.Segments.Count == 0)
       {
@@ -836,13 +979,14 @@ namespace VoiceStudio.App.Views.Panels
       }
 
       // Show the transcript overlay
+      _loadedSubtitleTranscriptionId = string.IsNullOrWhiteSpace(e.TranscriptionId) ? null : e.TranscriptionId;
       ShowTranscriptTrack = true;
       OnPropertyChanged(nameof(TranscriptSegments));
       OnPropertyChanged(nameof(TranscriptTrackVisibility));
 
       _toastNotificationService?.ShowSuccess(
-        "Subtitles Loaded",
-        $"{e.Segments.Count} segments added to timeline");
+          "Subtitles Loaded",
+          $"{e.Segments.Count} segments added to timeline");
     }
 
     /// <inheritdoc />
@@ -2017,6 +2161,13 @@ namespace VoiceStudio.App.Views.Panels
 
       if (value != null)
       {
+        // GAP-045 reopen parity: do not show another project's transcript on the subtitle overlay.
+        if (!string.IsNullOrEmpty(_subtitleOverlayOwnerProjectId) &&
+            !string.Equals(_subtitleOverlayOwnerProjectId, value.Id, StringComparison.Ordinal))
+        {
+          ClearTranscriptInternal(clearPersistedLastSubtitle: false);
+        }
+
         // Add to recent projects (IDEA 16)
         try
         {
@@ -2043,6 +2194,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       else
       {
+        ClearTranscriptInternal(clearPersistedLastSubtitle: false);
         Tracks.Clear();
         SelectedTrack = null;
         ProjectAudioFiles.Clear();

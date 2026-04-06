@@ -51,6 +51,9 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockProjectAudioClient
           .Setup(x => x.SaveAudioToProjectAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
           .ReturnsAsync(new ProjectAudioFile { Filename = "stub.wav" });
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse>());
     }
 
     private TranscribeViewModel CreateSut() =>
@@ -377,6 +380,154 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsFalse(string.IsNullOrWhiteSpace(vm.PersistenceScopeFootnote));
       StringAssert.Contains(vm.PersistenceScopeFootnote, "drag", StringComparison.OrdinalIgnoreCase);
       StringAssert.Contains(vm.PersistenceScopeFootnote, "project", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>GAP-045 reload lane: project+audio scope schedules backend list; export uses same DTO as persistence lane.</summary>
+    [TestMethod]
+    public async Task Rehydrate_WhenProjectAndAudioSet_LoadsFromListTranscriptions_ExportMatchesPlainText()
+    {
+      var tr = new TranscriptionResponse
+      {
+        Id = "tr-rehydrate-1",
+        Text = string.Empty,
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>
+        {
+          new() { Id = "seg-1", Start = 0, End = 1, Text = "hello" },
+        },
+      };
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync("aud-rehydrate", "proj-rehydrate", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse> { tr });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedProjectId = "proj-rehydrate";
+      vm.SelectedAudioId = "aud-rehydrate";
+      for (var i = 0; i < 40; i++)
+      {
+        await Task.Delay(25).ConfigureAwait(false);
+        await PumpDispatcherQueueAsync().ConfigureAwait(false);
+        if (vm.SelectedTranscription != null && vm.SelectedTranscription.Segments.Count > 0)
+          break;
+      }
+
+      Assert.IsNotNull(vm.SelectedTranscription);
+      Assert.AreEqual(string.Empty, vm.SelectedTranscription.Text ?? string.Empty);
+      Assert.AreEqual(1, vm.SelectedTranscription.Segments.Count);
+      var exported = TranscriptionExportFormatter.BuildPlainText(vm.SelectedTranscription);
+      StringAssert.Contains(exported, "hello", StringComparison.Ordinal);
+      _mockTranscriptionClient.Verify(
+          x => x.ListTranscriptionsAsync("aud-rehydrate", "proj-rehydrate", It.IsAny<CancellationToken>()),
+          Times.AtLeastOnce);
+    }
+
+    /// <summary>GAP-045 reload lane: explicit load surfaces diagnostic when prior selection id is absent from backend list.</summary>
+    [TestMethod]
+    public async Task LoadTranscriptions_WhenPriorSelectionNotReturned_SetsOperatorDiagnostic()
+    {
+      var trA = new TranscriptionResponse
+      {
+        Id = "id-a",
+        Text = "first",
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>(),
+      };
+      var trB = new TranscriptionResponse
+      {
+        Id = "id-b",
+        Text = "only-b",
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>(),
+      };
+
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync("ax", "px", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse> { trA });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedProjectId = "px";
+      vm.SelectedAudioId = "ax";
+      for (var i = 0; i < 40; i++)
+      {
+        await Task.Delay(25).ConfigureAwait(false);
+        await PumpDispatcherQueueAsync().ConfigureAwait(false);
+        if (vm.SelectedTranscription != null)
+          break;
+      }
+
+      Assert.IsNotNull(vm.SelectedTranscription);
+      Assert.AreEqual("id-a", vm.SelectedTranscription.Id);
+
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync("ax", "px", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse> { trB });
+
+      await vm.LoadTranscriptionsCommand.ExecuteAsync(null);
+
+      Assert.IsFalse(string.IsNullOrWhiteSpace(vm.TranscriptOperatorMessage));
+      StringAssert.Contains(vm.TranscriptOperatorMessage, "not in the backend list", StringComparison.OrdinalIgnoreCase);
+      Assert.AreEqual("id-b", vm.SelectedTranscription?.Id);
+    }
+
+    /// <summary>
+    /// GAP-047 seam: list reload must replace the selected row with backend truth, not retain stale local-only segment text
+    /// (models post-apply authoritative transcript after filler cleanup Apply).
+    /// </summary>
+    [TestMethod]
+    public async Task RehydrateAfterAppliedCleanup_UsesAuthoritativeText_NotDraftState()
+    {
+      const string tid = "tr-clean-1";
+      var staleLocal = new TranscriptionResponse
+      {
+        Id = tid,
+        Text = string.Empty,
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>
+        {
+          new() { Id = "seg-1", Start = 0, End = 1, Text = "stale draft-only view" },
+        },
+      };
+      var authoritative = new TranscriptionResponse
+      {
+        Id = tid,
+        Text = string.Empty,
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>
+        {
+          new() { Id = "seg-1", Start = 0, End = 1, Text = "authoritative after apply cleanup" },
+        },
+      };
+
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync("aud-c", "proj-c", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse> { authoritative });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedProjectId = "proj-c";
+      vm.SelectedAudioId = "aud-c";
+      vm.Transcriptions.Clear();
+      vm.Transcriptions.Add(staleLocal);
+      vm.SelectedTranscription = staleLocal;
+
+      await vm.LoadTranscriptionsCommand.ExecuteAsync(null);
+
+      for (var i = 0; i < 40; i++)
+      {
+        await Task.Delay(25).ConfigureAwait(false);
+        await PumpDispatcherQueueAsync().ConfigureAwait(false);
+        if (vm.SelectedTranscription?.Segments is { Count: > 0 } segs
+            && string.Equals(segs[0].Text, "authoritative after apply cleanup", StringComparison.Ordinal))
+        {
+          break;
+        }
+      }
+
+      Assert.IsNotNull(vm.SelectedTranscription);
+      Assert.AreEqual(1, vm.SelectedTranscription.Segments.Count);
+      Assert.AreEqual("authoritative after apply cleanup", vm.SelectedTranscription.Segments[0].Text);
     }
   }
 }

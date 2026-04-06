@@ -1131,6 +1131,98 @@ public sealed class TranscribeViewModelInlineEditTests
     Assert.AreEqual("original", vm.SelectedTranscription.Segments[0].Text);
   }
 
+  /// <summary>GAP-047 post-apply coherence: one cross-consumer reconcile signal after successful filler cleanup Apply.</summary>
+  [TestMethod]
+  public async Task ApplyFillerCleanup_Success_UpdatesCanonicalConsumerStateExactlyOnce()
+  {
+    InstallHarness(jobFails: false);
+    var bus = AppServices.TryGetEventAggregator();
+    Assert.IsNotNull(bus);
+    var segmentApplyCoherenceCount = 0;
+    using var _ = bus!.Subscribe<NavigateToEvent>(ev =>
+    {
+      if (ev.Parameters != null
+          && ev.Parameters.TryGetValue("action", out var a)
+          && string.Equals(a?.ToString(), "coherentReloadAfterSegmentApply", StringComparison.Ordinal))
+      {
+        segmentApplyCoherenceCount++;
+      }
+    });
+
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "new um words";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+
+    var err = await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false);
+
+    Assert.IsNull(err);
+    Assert.AreEqual(1, segmentApplyCoherenceCount);
+  }
+
+  /// <summary>GAP-047 post-apply coherence: failed Apply must not publish cross-consumer reload.</summary>
+  [TestMethod]
+  public async Task ApplyFillerCleanup_Failure_LeavesCrossConsumersUnchanged()
+  {
+    InstallHarness(jobFails: true);
+    var bus = AppServices.TryGetEventAggregator();
+    Assert.IsNotNull(bus);
+    var segmentApplyCoherenceCount = 0;
+    using var _ = bus!.Subscribe<NavigateToEvent>(ev =>
+    {
+      if (ev.Parameters != null
+          && ev.Parameters.TryGetValue("action", out var a)
+          && string.Equals(a?.ToString(), "coherentReloadAfterSegmentApply", StringComparison.Ordinal))
+      {
+        segmentApplyCoherenceCount++;
+      }
+    });
+
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "new um words";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+
+    var err = await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false);
+
+    Assert.IsNotNull(err);
+    Assert.AreEqual(0, segmentApplyCoherenceCount);
+  }
+
+  /// <summary>GAP-047 post-apply coherence: draft-only cleanup + cancel never publishes cross-consumer reload.</summary>
+  [TestMethod]
+  public async Task CancelAfterDraftCleanup_LeavesCrossConsumersUnchanged()
+  {
+    InstallHarness(jobFails: false);
+    var bus = AppServices.TryGetEventAggregator();
+    Assert.IsNotNull(bus);
+    var segmentApplyCoherenceCount = 0;
+    using var _ = bus!.Subscribe<NavigateToEvent>(ev =>
+    {
+      if (ev.Parameters != null
+          && ev.Parameters.TryGetValue("action", out var a)
+          && string.Equals(a?.ToString(), "coherentReloadAfterSegmentApply", StringComparison.Ordinal))
+      {
+        segmentApplyCoherenceCount++;
+      }
+    });
+
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "speech um here";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+    vm.CancelSegmentEdit();
+    await PumpDispatcherOnceAsync().ConfigureAwait(false);
+
+    Assert.AreEqual(0, segmentApplyCoherenceCount);
+  }
+
   [TestMethod]
   public void RemoveFillersFromDraft_AllTogglesOff_ReturnsError()
   {

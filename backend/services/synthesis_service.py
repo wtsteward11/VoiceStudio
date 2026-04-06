@@ -304,13 +304,21 @@ class SynthesisService:
             InvalidEngineException,
             ProfileNotFoundException,
         )
-        from backend.api.models_additional import VoiceSynthesizeRequest, VoiceSynthesizeResponse
+        from backend.api.models_additional import (
+            SsmlHandlingDiagnostics,
+            VoiceSynthesizeRequest,
+            VoiceSynthesizeResponse,
+        )
         from backend.api.utils.instrumentation import EventType, instrument_flow
         from backend.core.circuit_breaker import get_engine_breaker
         from backend.services.engine_shared import (
             ENGINE_AVAILABLE,
             _ensure_engine_router,
             engine_router,
+        )
+        from backend.services.ssml_capability_resolver import (
+            SsmlPolicyRejected,
+            apply_ssml_synthesis_policy,
         )
 
         _ensure_engine_router()
@@ -399,6 +407,7 @@ class SynthesisService:
                         duration=duration,
                         quality_score=0.0,
                         quality_metrics=None,
+                        ssml_handling=None,
                     )
 
                 ensure_tts_assets(engine_id)
@@ -475,28 +484,50 @@ class SynthesisService:
                             req.profile_id, profile, profile_dir
                         )
 
-                        text_to_synthesize = req.text
                         try:
-                            from backend.nlp.text_processing import get_text_preprocessor
+                            ssml_policy = apply_ssml_synthesis_policy(
+                                engine_id, req.text or ""
+                            )
+                        except SsmlPolicyRejected as rej:
+                            raise ServiceError(422, rej.message) from rej
 
-                            preprocessor = get_text_preprocessor()
-                            preprocessed = preprocessor.preprocess_for_tts(
-                                req.text,
-                                language=req.language or "en",
-                                normalize=True,
-                                segment_sentences=True,
+                        ssml_handling: SsmlHandlingDiagnostics | None = None
+                        if ssml_policy.diagnostics is not None:
+                            ssml_handling = SsmlHandlingDiagnostics(
+                                **ssml_policy.diagnostics
                             )
-                            text_to_synthesize = preprocessed["normalized"]
-                            logger.debug(
-                                "Text preprocessed: %s sentences, %s words",
-                                len(preprocessed["sentences"]),
-                                preprocessed["word_count"],
+
+                        text_to_synthesize = ssml_policy.effective_text
+                        if not ssml_policy.skip_text_preprocessor:
+                            try:
+                                from backend.nlp.text_processing import get_text_preprocessor
+
+                                preprocessor = get_text_preprocessor()
+                                preprocessed = preprocessor.preprocess_for_tts(
+                                    text_to_synthesize,
+                                    language=req.language or "en",
+                                    normalize=True,
+                                    segment_sentences=True,
+                                )
+                                text_to_synthesize = preprocessed["normalized"]
+                                logger.debug(
+                                    "Text preprocessed: %s sentences, %s words",
+                                    len(preprocessed["sentences"]),
+                                    preprocessed["word_count"],
+                                )
+                            # ALLOWED: bare except - optional dependency, import failure acceptable
+                            except ImportError:
+                                pass
+                            except Exception as e:
+                                logger.warning(
+                                    "NLP preprocessing failed, using raw text: %s", e
+                                )
+
+                        if not (text_to_synthesize or "").strip():
+                            raise ServiceError(
+                                400,
+                                "No speakable text remains after SSML processing.",
                             )
-                        # ALLOWED: bare except - optional dependency, import failure acceptable
-                        except ImportError:
-                            pass
-                        except Exception as e:
-                            logger.warning("NLP preprocessing failed, using raw text: %s", e)
 
                         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
                             output_path = tmp.name
@@ -556,6 +587,8 @@ class SynthesisService:
                                 synthesis_kwargs["emotion"] = req.emotion
                             if quality_preset:
                                 synthesis_kwargs["quality_preset"] = quality_preset
+                            if ssml_policy.pass_ssml_to_engine:
+                                synthesis_kwargs["ssml"] = True
 
                             result = None
                             synthesis_error: Exception | None = None
@@ -646,6 +679,7 @@ class SynthesisService:
                                         duration=result.get("duration", 0.0),
                                         quality_score=0.0,
                                         quality_metrics=None,
+                                        ssml_handling=ssml_handling,
                                     )
 
                             if isinstance(result, dict) and "audio_id" in result:
@@ -655,6 +689,7 @@ class SynthesisService:
                                     duration=result.get("duration", 0.0),
                                     quality_score=0.0,
                                     quality_metrics=None,
+                                    ssml_handling=ssml_handling,
                                 )
 
                             file_written_early = output_path and os.path.exists(output_path)
@@ -721,6 +756,7 @@ class SynthesisService:
                                     duration=duration,
                                     quality_score=quality_score,
                                     quality_metrics=detailed_metrics,
+                                    ssml_handling=ssml_handling,
                                 )
                             raise ServiceError(
                                 500,

@@ -14,11 +14,16 @@ from fastapi.responses import FileResponse
 
 from backend.api.dependencies import require_synthesis_clearance
 from backend.services.audio_artifacts.use_cases import create_audio_artifact_from_file
+from backend.services.ssml_capability_resolver import (
+    SsmlPolicyRejected,
+    apply_ssml_synthesis_policy,
+)
 
 from ...models_additional import (
     MultiPassSynthesisRequest,
     MultiPassSynthesisResponse,
     QualityMetrics,
+    SsmlHandlingDiagnostics,
     VoiceSynthesizeRequest,
     VoiceSynthesizeResponse,
 )
@@ -212,29 +217,52 @@ async def synthesize(
                         req.profile_id, profile
                     )
 
-                    # Preprocess text using NLP if available
-                    text_to_synthesize = req.text
                     try:
-                        from backend.nlp.text_processing import get_text_preprocessor
+                        ssml_policy = apply_ssml_synthesis_policy(
+                            engine_id, req.text or ""
+                        )
+                    except SsmlPolicyRejected as rej:
+                        raise HTTPException(
+                            status_code=422,
+                            detail=rej.message,
+                        ) from rej
 
-                        preprocessor = get_text_preprocessor()
-                        preprocessed = preprocessor.preprocess_for_tts(
-                            req.text,
-                            language=req.language or "en",
-                            normalize=True,
-                            segment_sentences=True,
+                    ssml_handling: SsmlHandlingDiagnostics | None = None
+                    if ssml_policy.diagnostics is not None:
+                        ssml_handling = SsmlHandlingDiagnostics(
+                            **ssml_policy.diagnostics
                         )
-                        # Use normalized text for synthesis
-                        text_to_synthesize = preprocessed["normalized"]
-                        logger.debug(
-                            f"Text preprocessed: {len(preprocessed['sentences'])} sentences, "
-                            f"{preprocessed['word_count']} words"
+
+                    text_to_synthesize = ssml_policy.effective_text
+                    if not ssml_policy.skip_text_preprocessor:
+                        try:
+                            from backend.nlp.text_processing import get_text_preprocessor
+
+                            preprocessor = get_text_preprocessor()
+                            preprocessed = preprocessor.preprocess_for_tts(
+                                text_to_synthesize,
+                                language=req.language or "en",
+                                normalize=True,
+                                segment_sentences=True,
+                            )
+                            text_to_synthesize = preprocessed["normalized"]
+                            logger.debug(
+                                "Text preprocessed: %s sentences, %s words",
+                                len(preprocessed["sentences"]),
+                                preprocessed["word_count"],
+                            )
+                        except ImportError:
+                            ...
+                        except Exception as e:
+                            logger.warning(
+                                "NLP preprocessing failed, using raw text: %s", e
+                            )
+
+                    if not (text_to_synthesize or "").strip():
+                        raise HTTPException(
+                            status_code=400,
+                            detail="No speakable text remains after SSML processing.",
                         )
-                    except ImportError:
-                        # NLP not available, use raw text
-                        ...
-                    except Exception as e:
-                        logger.warning(f"NLP preprocessing failed, using raw text: {e}")
 
                     # Perform synthesis with quality calculation
                     # Use preprocessed text if available
@@ -317,6 +345,8 @@ async def synthesize(
                             synthesis_kwargs["clarity"] = req.clarity
                         if req.temperature is not None:
                             synthesis_kwargs["temperature"] = req.temperature
+                        if ssml_policy.pass_ssml_to_engine:
+                            synthesis_kwargs["ssml"] = True
 
                         # Attempt synthesis with circuit breaker + error recovery
                         result = None
@@ -410,6 +440,7 @@ async def synthesize(
                                 duration=fallback_result["duration"],
                                 quality_score=0.0,
                                 quality_metrics=None,
+                                ssml_handling=ssml_handling,
                             )
 
                     # Handle synthesis result or error
@@ -487,6 +518,7 @@ async def synthesize(
                             duration=duration,
                             quality_score=quality_score,
                             quality_metrics=detailed_metrics,
+                            ssml_handling=ssml_handling,
                         )
                     else:
                         raise HTTPException(
@@ -545,6 +577,7 @@ async def synthesize(
                     duration=dur_s,
                     quality_score=0.0,
                     quality_metrics=None,
+                    ssml_handling=None,
                 )
 
             # No engines available - return proper error

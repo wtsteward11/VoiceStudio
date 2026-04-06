@@ -86,6 +86,8 @@ class SSMLPreviewResponse(BaseModel):
     audio_id: str
     duration: float
     message: str
+    # GAP-054: aligned with synthesis ssml_handling when SSML was processed
+    ssml_handling: dict[str, object] | None = None
 
 
 @router.get("", response_model=list[SSMLDocument])
@@ -335,129 +337,58 @@ async def validate_ssml(request: SSMLCreateRequest):
 
 @router.post("/preview", response_model=SSMLPreviewResponse)
 async def preview_ssml(request: SSMLPreviewRequest, http_request: Request):
-    """Preview SSML by synthesizing it."""
-    import xml.etree.ElementTree as ET
+    """Preview SSML by synthesizing via the canonical synthesis path (GAP-054)."""
+    from backend.services.ssml_capability_resolver import preview_policy_summary
+    from backend.services.voice_helpers import normalize_engine_id
+    from backend.voice.services.synthesis_service import SynthesisService
+
+    from ..models_additional import VoiceSynthesizeRequest
 
     try:
-        # Parse SSML to extract text content and apply SSML features
-        ssml_text = request.content.strip()
+        content = request.content.strip()
+        if not content:
+            raise HTTPException(status_code=400, detail="SSML content is empty")
 
-        # Ensure wrapped in <speak> tag
-        if not ssml_text.startswith("<speak"):
-            ssml_text = f"<speak>{ssml_text}</speak>"
+        engine_raw = request.engine or "xtts_v2"
+        engine_id = normalize_engine_id(engine_raw)
 
-        # Parse SSML XML
-        try:
-            root = ET.fromstring(ssml_text)
-        except ET.ParseError as e:
+        summary = preview_policy_summary(engine_id, content)
+        if not summary.get("ok"):
             raise HTTPException(
-                status_code=400,
-                detail=f"Invalid SSML XML structure: {e!s}",
+                status_code=422,
+                detail=str(summary.get("error", "SSML policy rejected input")),
             )
 
-        # Extract text content and process SSML tags
-        def extract_text_with_ssml(elem):
-            """Extract text from SSML element, processing SSML tags."""
-            text_parts = []
-
-            # Get direct text content
-            if elem.text:
-                text_parts.append(elem.text.strip())
-
-            # Process child elements
-            for child in elem:
-                if child.tag == "break":
-                    # Add pause based on break tag
-                    if "time" in child.attrib:
-                        # Convert time to pause (e.g., "500ms" -> pause)
-                        # Note: Break timing would be applied in synthesis
-                        text_parts.append(" ")  # Space for pause
-                    elif "strength" in child.attrib:
-                        # Map strength to pause duration
-                        # Note: Break strength would be applied in synthesis
-                        text_parts.append(" ")  # Space for pause
-                elif child.tag == "prosody":
-                    # Extract prosody-controlled text
-                    prosody_text = extract_text_with_ssml(child)
-                    # Note: Prosody parameters would be applied in synthesis
-                    text_parts.append(prosody_text)
-                elif child.tag == "emphasis":
-                    # Extract emphasized text
-                    emphasis_text = extract_text_with_ssml(child)
-                    # Note: Emphasis level would be applied in synthesis
-                    text_parts.append(emphasis_text)
-                elif child.tag == "say-as":
-                    # Extract say-as text
-                    say_as_text = extract_text_with_ssml(child)
-                    # Note: say-as interpretation would be applied in synthesis
-                    text_parts.append(say_as_text)
-                elif child.tag in ("p", "s"):
-                    # Paragraph or sentence - extract text
-                    para_text = extract_text_with_ssml(child)
-                    text_parts.append(para_text)
-                else:
-                    # Other tags - extract text content
-                    child_text = extract_text_with_ssml(child)
-                    text_parts.append(child_text)
-
-                # Add tail text
-                if child.tail:
-                    text_parts.append(child.tail.strip())
-
-            return " ".join(filter(None, text_parts))
-
-        text_content = extract_text_with_ssml(root).strip()
-
-        # Use NLP preprocessing for SSML if available
-        if HAS_NLP:
-            try:
-                preprocessor = get_text_preprocessor()
-                # Preprocess text for SSML (normalize, segment sentences)
-                preprocessed = preprocessor.preprocess_for_ssml(
-                    text_content,
-                    language="en",  # Could extract from SSML lang attribute
-                    add_prosody_hints=True,
-                )
-                text_content = preprocessed
-            except Exception as e:
-                logger.warning(f"NLP preprocessing failed, using raw text: {e}")
-
-        if not text_content:
-            raise HTTPException(
-                status_code=400,
-                detail="SSML content contains no text to synthesize",
-            )
-
-        # Determine engine (default to xtts if not specified)
-        engine = request.engine or "xtts"
-
-        # Use voice synthesis endpoint to synthesize the extracted text
-        from backend.voice.services.synthesis_service import SynthesisService
-
-        from ..models_additional import VoiceSynthesizeRequest
-
-        # Create synthesis request
         synth_request = VoiceSynthesizeRequest(
             profile_id=request.profile_id or "",
-            text=text_content,
-            engine=engine,
-            language="en",  # Could be extracted from SSML lang attribute
+            text=content,
+            engine=engine_raw,
+            language="en",
         )
 
-        # Synthesize using voice endpoint
-        synth_response = await SynthesisService.synthesize(synth_request, http_request, config_service=None)
+        synth_response = await SynthesisService.synthesize(
+            synth_request, http_request, config_service=None
+        )
 
-        # Return audio ID and duration from synthesis response
+        msg = "SSML preview synthesized successfully"
+        diag = synth_response.ssml_handling
+        diag_dict: dict[str, object] | None = None
+        if diag is not None:
+            diag_dict = diag.model_dump()
+            if diag.warnings:
+                msg = f"{msg} (warnings: {'; '.join(diag.warnings[:3])})"
+
         return SSMLPreviewResponse(
             audio_id=synth_response.audio_id,
             duration=synth_response.duration,
-            message="SSML preview synthesized successfully",
+            message=msg,
+            ssml_handling=diag_dict,
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to preview SSML: {e}", exc_info=True)
+        logger.error("Failed to preview SSML: %s", e, exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to synthesize SSML preview: {e!s}",

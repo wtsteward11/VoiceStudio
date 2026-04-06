@@ -323,6 +323,16 @@ class QualityMetrics(VoiceStudioBaseModel):
     voice_profile_match: dict[str, Any] | None = None  # Voice profile matching results
 
 
+class SsmlHandlingDiagnostics(VoiceStudioBaseModel):
+    """Structured SSML handling outcome for synthesis responses (GAP-054)."""
+
+    ssml_detected: bool
+    capability_class: str
+    action: str
+    warnings: list[str] = Field(default_factory=list)
+    engine_id: str = ""
+
+
 class VoiceSynthesizeResponse(VoiceStudioBaseModel):
     """Voice synthesis response (GAP-I16)."""
 
@@ -333,6 +343,8 @@ class VoiceSynthesizeResponse(VoiceStudioBaseModel):
     quality_score: float
     # Detailed quality metrics
     quality_metrics: QualityMetrics | None = None
+    # Present when SSML markup was detected or transformed (GAP-054).
+    ssml_handling: SsmlHandlingDiagnostics | None = None
 
 
 class ABTestRequest(VoiceStudioBaseModel):

@@ -24,6 +24,8 @@ namespace VoiceStudio.Core.Models
     public double Duration { get; set; }
     public double QualityScore { get; set; }
     public QualityMetrics? QualityMetrics { get; set; } // Detailed quality metrics
+    /// <summary>GAP-054: Present when SSML was detected or transformed.</summary>
+    public SsmlHandlingDiagnostics? SsmlHandling { get; set; }
   }
 
   public class VoiceAnalysisResponse

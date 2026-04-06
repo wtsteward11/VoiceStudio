@@ -9,6 +9,7 @@
 
 ## Changelog
 
+- **2026-04-06:** Follow-on **apply authority** bounded lane **closed** — explicit Apply-only regen/persist contract; [GOV_VOICESTUDIO_GAP047_FILLER_CLEANUP_APPLY_AUTHORITY_01_EXECUTION_ROW.md](GOV_VOICESTUDIO_GAP047_FILLER_CLEANUP_APPLY_AUTHORITY_01_EXECUTION_ROW.md).
 - **2026-04-01:** Lane **closed** — preview + toggles + enabled-key removal; proof in closure report.
 - **2026-04-02:** Lane opened — operator preview + per-term toggles; session-local flyout state; `like` default **off**; no backend routes.
 

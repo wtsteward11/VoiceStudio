@@ -29,25 +29,36 @@ namespace VoiceStudio.App.Tests.ViewModels;
 [DoNotParallelize]
 public sealed class TranscribeViewModelInlineEditTests
 {
+  /// <summary>Serializes harness + AppServices mutations for this class vs parallel suites that also touch <see cref="AppServices"/>.</summary>
+  private static readonly SemaphoreSlim AppServicesHarnessGate = new(1, 1);
+
   private DispatcherQueueController? _dispatcherController;
   private Mock<ITranscriptRegenerationClient>? _regenMock;
 
   [TestInitialize]
-  public void TestInitialize()
+  public async Task TestInitializeAsync()
   {
+    await AppServicesHarnessGate.WaitAsync().ConfigureAwait(false);
     InstallHarness(jobFails: false);
   }
 
   [TestCleanup]
   public void TestCleanup()
   {
-    if (_dispatcherController != null)
+    try
     {
-      _dispatcherController.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
-      _dispatcherController = null;
-    }
+      if (_dispatcherController != null)
+      {
+        _dispatcherController.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
+        _dispatcherController = null;
+      }
 
-    TestAppServicesHelper.RebuildDefaultProvider();
+      TestAppServicesHelper.RebuildDefaultProvider();
+    }
+    finally
+    {
+      AppServicesHarnessGate.Release();
+    }
   }
 
   private void InstallHarness(bool jobFails, Project? linkedProject = null)
@@ -1047,6 +1058,77 @@ public sealed class TranscribeViewModelInlineEditTests
     Assert.IsFalse(likeToggle.IsRemoveEnabled);
     Assert.IsTrue(umToggle.IsRemoveEnabled);
     Assert.AreEqual("I like", vm.FillerRemovalPreviewText?.Trim());
+  }
+
+  /// <summary>GAP-047: draft-only filler cleanup must not start regen or authoritative apply path.</summary>
+  [TestMethod]
+  public void RemoveFillersFromDraft_DoesNotStartRegeneration()
+  {
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "hello um world";
+
+    var err = vm.TryRemoveFillersFromEditingDraft();
+
+    Assert.IsNull(err);
+    _regenMock!.Verify(
+        x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()),
+        Times.Never);
+  }
+
+  /// <summary>GAP-047: preview/toggle review alone must not trigger regen.</summary>
+  [TestMethod]
+  public void FillerToggleChange_DoesNotStartRegeneration()
+  {
+    var vm = CreateSut();
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "hello um world";
+    var umToggle = vm.FillerRemovalToggles.First(t =>
+        string.Equals(t.Key, "um", StringComparison.OrdinalIgnoreCase));
+    umToggle.IsRemoveEnabled = false;
+    umToggle.IsRemoveEnabled = true;
+
+    _regenMock!.Verify(
+        x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()),
+        Times.Never);
+  }
+
+  /// <summary>GAP-047: committed segment text is unchanged until explicit Apply.</summary>
+  [TestMethod]
+  public void RemoveFillersFromDraft_LeavesCommittedSegmentTextUnchangedUntilApply()
+  {
+    var vm = CreateSut();
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "original um";
+
+    var err = vm.TryRemoveFillersFromEditingDraft();
+
+    Assert.IsNull(err);
+    Assert.AreEqual("original", vm.SelectedTranscription!.Segments![0].Text);
+    Assert.AreEqual("original", vm.EditingSegmentDraftText?.Trim());
+  }
+
+  /// <summary>GAP-047: cancel discards draft + filler state; canonical segment text never reflected draft-only edits.</summary>
+  [TestMethod]
+  public void CancelEdit_AfterRemoveFillers_LeavesCanonicalSegmentTextUnchanged()
+  {
+    var vm = CreateSut();
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "speech um here";
+
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+    Assert.AreEqual("speech here", vm.EditingSegmentDraftText?.Trim());
+    Assert.AreEqual("original", vm.SelectedTranscription!.Segments![0].Text);
+
+    vm.CancelSegmentEdit();
+
+    Assert.IsFalse(vm.IsEditingSegment);
+    Assert.AreEqual("original", vm.SelectedTranscription.Segments[0].Text);
   }
 
   [TestMethod]

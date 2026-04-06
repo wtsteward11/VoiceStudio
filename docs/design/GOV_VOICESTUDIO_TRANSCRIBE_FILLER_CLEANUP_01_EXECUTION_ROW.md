@@ -9,6 +9,7 @@
 
 ## Changelog
 
+- **2026-04-06:** Follow-on **apply authority** bounded lane **closed** — draft vs Apply seam frozen in [GOV_VOICESTUDIO_GAP047_FILLER_CLEANUP_APPLY_AUTHORITY_01_EXECUTION_ROW.md](GOV_VOICESTUDIO_GAP047_FILLER_CLEANUP_APPLY_AUTHORITY_01_EXECUTION_ROW.md) (no catalog change).
 - **2026-04-01:** Lane closed — `TranscriptFillerCleanupHelper` + Transcribe flyout **Remove fillers**; VM `TryRemoveFillersFromEditingDraft`; tests; verification matrix PASS.
 - **2026-04-01:** Lane opened — frozen contract below; implementation: WinUI draft-only cleanup + `TranscriptFillerCleanupHelper`; no backend routes.
 

@@ -1321,7 +1321,11 @@ namespace VoiceStudio.App.Views.Panels
       return keys;
     }
 
-    /// <summary>GAP-045 inline edit/apply: record ReplaceRange + run regen with draft text; clears edit state on success only.</summary>
+    /// <summary>
+    /// GAP-045 inline edit/apply: record ReplaceRange + run regen with draft text; clears edit state on success only.
+    /// GAP-047 apply authority: this is the sole entry that may start segment regen / authoritative transcript update for inline edit
+    /// (draft-only filler cleanup must never call into the coordinator; use <see cref="TryRemoveFillersFromEditingDraft"/> for draft text only).
+    /// </summary>
     public async Task<string?> ApplyEditedSegmentAsync(CancellationToken cancellationToken = default)
     {
       if (!IsEditingSegment || SelectedTranscription == null || string.IsNullOrWhiteSpace(EditingSegmentId))
@@ -1699,7 +1703,10 @@ namespace VoiceStudio.App.Views.Panels
           err);
     }
 
-    /// <summary>GAP-047: deterministic filler cleanup on current edit draft; returns operator error or null on success.</summary>
+    /// <summary>
+    /// GAP-047: deterministic filler cleanup on current <see cref="EditingSegmentDraftText"/> only (no Apply, no regen, no transcript PUT).
+    /// Canonical segment text changes only after operator <see cref="ApplyEditedSegmentAsync"/>.
+    /// </summary>
     public string? TryRemoveFillersFromEditingDraft()
     {
       if (!IsEditingSegment)

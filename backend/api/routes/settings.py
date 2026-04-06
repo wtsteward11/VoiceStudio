@@ -506,6 +506,24 @@ async def get_effective_engine_priority(task_type: str = "tts"):
         ) from e
 
 
+@router.get("/torch-venv/effective")
+@cache_response(ttl=60)
+async def get_effective_torch_venv_status():
+    """GAP-062: Per-family torch venv presence + import probe (subprocess; no torch in API worker)."""
+    try:
+        from backend.services.torch_venv_resolver import build_effective_torch_status_payload
+
+        return build_effective_torch_status_payload()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to resolve torch venv status: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to resolve torch virtual environment status.",
+        ) from e
+
+
 @router.get("/{category}")
 @cache_response(ttl=60)  # Cache for 60 seconds (settings change infrequently)
 async def get_settings_category(category: str):

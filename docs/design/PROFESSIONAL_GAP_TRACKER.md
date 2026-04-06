@@ -81,7 +81,7 @@
 | GAP-059 | 6 | Security | Audit trail: who / what / when / which model | Logging + persistence | 40 | Core Platform | GAP-016 | Open |
 | GAP-060 | 6 | Security | Model version provenance on outputs | Metadata in exports | 24 | Core Platform | GAP-059 | Open |
 | GAP-061 | 6 | Security | RBAC groundwork for multi-user | Middleware + roles | 48 | System Architect | GAP-057 | Open |
-| GAP-062 | 6 | Ops | Chatterbox vs pinned torch — dual venv or upgrade | `engines/`, env docs | 24 | Engine Engineer | TD-001 class | Open |
+| GAP-062 | 6 | Ops | Chatterbox vs pinned torch — dual venv or upgrade | `engines/`, env docs | 24 | Engine Engineer | TD-001 class | **Closed** 2026-04-06 — [GOV_VOICESTUDIO_GAP062_TORCH_VENV_RESOLUTION_AUTHORITY_01_EXECUTION_ROW.md](GOV_VOICESTUDIO_GAP062_TORCH_VENV_RESOLUTION_AUTHORITY_01_EXECUTION_ROW.md), [VOICESTUDIO_GAP062_TORCH_VENV_RESOLUTION_AUTHORITY_LANE_CLOSURE_2026-04-06.md](../reports/verification/VOICESTUDIO_GAP062_TORCH_VENV_RESOLUTION_AUTHORITY_LANE_CLOSURE_2026-04-06.md) (diagnostics authority slice) |
 | GAP-063 | 7 | UX | First-run wizard (models, GPU, keys) | Onboarding flow | 32 | UI Engineer | GAP-043 | Open |
 | GAP-064 | 7 | UX | Skeleton loading + actionable errors (no raw HTTP codes) | Global error + panels | 24 | UI Engineer | — | Open |
 | GAP-065 | 7 | UX | Shortcut registry + conflicts + customization | Input service | 32 | UI Engineer | — | Open |

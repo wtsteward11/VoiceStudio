@@ -52,6 +52,9 @@ namespace VoiceStudio.App.Tests.ViewModels
           Source = "default",
           Order = new List<string> { "xtts_v2", "openvoice", "piper", "espeak" }
         });
+      _mockSettingsClient
+        .Setup(x => x.GetTorchVenvStatusAsync(It.IsAny<CancellationToken>()))
+        .ReturnsAsync((TorchVenvStatusResponse?)null);
     }
 
     [TestCleanup]

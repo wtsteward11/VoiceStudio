@@ -16,5 +16,9 @@ namespace VoiceStudio.Core.Services
     Task<EffectiveEnginePriorityResponse?> GetEffectiveEnginePriorityAsync(
         string taskType = "tts",
         CancellationToken cancellationToken = default);
+
+    /// <summary>GAP-062: Torch-family venv diagnostics (not on <see cref="IBackendClient"/>).</summary>
+    Task<TorchVenvStatusResponse?> GetTorchVenvStatusAsync(
+        CancellationToken cancellationToken = default);
   }
 }

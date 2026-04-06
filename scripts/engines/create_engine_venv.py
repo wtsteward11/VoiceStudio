@@ -21,6 +21,18 @@ Venv Families:
 - translation: SeamlessM4T, MarianMT
 """
 
+# -----------------------------------------------------------------------------
+# Naming note (GAP-062): parallel venv naming schemes
+# -----------------------------------------------------------------------------
+# This script uses **provisioning family keys** such as ``torch24`` and ``torch26``
+# under ``runtime/venvs/<family>/`` (see ``VENV_FAMILIES`` below).
+# At **runtime**, ``app/core/runtime/venv_family_manager.py`` uses a different
+# enum namespace: ``venv_core_tts``, ``venv_advanced_tts``, ``venv_stt``, etc.
+# Those are **not** renamed here; operators should treat the two as different
+# lifecycle surfaces (CLI provisioning vs in-app ``VenvFamilyManager``).
+# Do not assume ``torch24`` string equals ``venv_core_tts`` without reading both files.
+# -----------------------------------------------------------------------------
+
 from __future__ import annotations
 
 import argparse

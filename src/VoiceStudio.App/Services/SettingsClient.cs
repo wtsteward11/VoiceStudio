@@ -39,5 +39,16 @@ namespace VoiceStudio.App.Services
           HttpMethod.Get,
           cancellationToken);
     }
+
+    /// <inheritdoc />
+    public Task<TorchVenvStatusResponse?> GetTorchVenvStatusAsync(
+        CancellationToken cancellationToken = default)
+    {
+      return _backend.SendRequestAsync<object, TorchVenvStatusResponse>(
+          "/api/settings/torch-venv/effective",
+          null,
+          HttpMethod.Get,
+          cancellationToken);
+    }
   }
 }

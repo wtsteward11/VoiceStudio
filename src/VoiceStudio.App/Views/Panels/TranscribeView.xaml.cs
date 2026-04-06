@@ -41,7 +41,8 @@ namespace VoiceStudio.App.Views.Panels
       ViewModel = new TranscribeViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
           AppServices.GetRequiredService<VoiceStudio.Core.Services.ITranscriptionClient>(),
-          AppServices.GetRequiredService<VoiceStudio.Core.Services.IProjectAudioClient>());
+          AppServices.GetRequiredService<VoiceStudio.Core.Services.IProjectAudioClient>(),
+          AppServices.GetProjectRepository());
       this.DataContext = ViewModel;
 
       // Initialize services

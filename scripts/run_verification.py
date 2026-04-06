@@ -6,8 +6,9 @@ Automated verification script that validates gate status and ledger.
 Includes import validation as a defensive pre-check.
 
 For full product verification including startup orchestration (icon launch,
-backend auto-start, overlay), use scripts/verify.ps1 Stage 7/8.5 or
-scripts/gatec-publish-launch.ps1 -UiSmoke. See
+backend auto-start, overlay), use scripts/verify.ps1 stages **UI Self-Test**,
+**Icon-Launch Smoke**, **Failure-Path Smoke**, **Runtime-Missing Failure Smoke**
+(see verify.ps1 header stage list) or scripts/gatec-publish-launch.ps1 -UiSmoke. See
 docs/design/STARTUP_ORCHESTRATION_HARDENING_PLAN.md.
 
 Exit codes:

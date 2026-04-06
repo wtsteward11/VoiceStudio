@@ -67,6 +67,7 @@ namespace VoiceStudio.App.Views.Panels
           AppServices.GetService<ISettingsService>(),
           AppServices.TryGetRecentProjectsService(),
           AppServices.GetProjectSessionDirtyState(),
+          projectRepository: AppServices.GetProjectRepository(),
           timelineUseCase: AppServices.GetTimelineUseCase()
       );
       this.DataContext = ViewModel;

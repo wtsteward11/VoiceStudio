@@ -16,7 +16,11 @@ namespace VoiceStudio.App.Services;
 /// </summary>
 public sealed class BackendProcessManager : IDisposable
 {
-    private const int StartupReadinessTimeoutSeconds = 45;
+    /// <summary>
+    /// Cold Python/uvicorn startup has been observed near ~40s; keep ≥15s margin for disk/AV variance.
+    /// See <c>docs/reports/verification/VOICESTUDIO_UI_STARTUP_BOUNDARY_2026-04-05.md</c>.
+    /// </summary>
+    private const int StartupReadinessTimeoutSeconds = 60;
     private readonly string _backendUrl;
     private readonly HttpClient _httpClient;
     private readonly IStartupDiagnosticsWriter? _diagnostics;
@@ -330,7 +334,7 @@ public sealed class BackendProcessManager : IDisposable
             _diagnostics?.Log("milestone_process_started_ms", sessionStart.ElapsedMilliseconds.ToString());
             _diagnostics?.Log("process_started", $"PID={_backendProcess.Id}");
 
-            // Wait for backend to become healthy (45s for first launch to allow cold Python/uvicorn startup)
+            // Wait for backend to become healthy (see StartupReadinessTimeoutSeconds for cold-start budget)
             var healthTimeout = TimeSpan.FromSeconds(StartupReadinessTimeoutSeconds);
             var (healthy, attempts, elapsed) = await WaitForHealthWithMetricsAsync(healthTimeout, cancellationToken, sessionStart, port);
             _diagnostics?.Log("health_probe_attempts", attempts.ToString());

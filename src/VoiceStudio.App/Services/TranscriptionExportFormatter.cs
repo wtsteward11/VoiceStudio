@@ -7,6 +7,8 @@ namespace VoiceStudio.App.Services;
 
 /// <summary>
 /// Formats transcription payloads for operator exports (TXT / SRT).
+/// Callers must pass a <see cref="TranscriptionResponse"/> that matches backend authority for the active selection
+/// (e.g. list rehydrate + selected row, or an explicit per-id read). The formatter does not fetch missing segments.
 /// </summary>
 public static class TranscriptionExportFormatter
 {

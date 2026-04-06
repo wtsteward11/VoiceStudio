@@ -450,4 +450,116 @@ public sealed class TimelineViewModelGap045CrossConsumerTests
         x => x.GetTranscriptionAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
         Times.Never);
   }
+
+  /// <summary>GAP-047 range parity: one post-apply signal → one quiet refetch; overlay shows merged authoritative segments.</summary>
+  [TestMethod]
+  public async Task RangeApply_Success_QuietRefetchesTimelineOnce_WhenOwnershipMatches()
+  {
+    const string tid = "tx-range-parity-1";
+    const string pid = "proj-range-parity-1";
+    var proj = new Project { Id = pid, Name = "RangeParity" };
+    _sut.Projects.Add(proj);
+    _mockTrackService
+        .Setup(x => x.GetTracksAsync(pid, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<AudioTrack> { new() { Id = "trk", Name = "T", ProjectId = pid, Clips = new List<AudioClip>() } });
+    _sut.SelectedProject = proj;
+
+    var first = new TranscriptionResponse
+    {
+      Id = tid,
+      AudioId = "a1",
+      Segments = new List<TranscriptionSegment>
+      {
+        new() { Id = "s1", Text = "aa", Start = 0, End = 1 },
+        new() { Id = "s2", Text = "bb", Start = 1, End = 2 },
+        new() { Id = "s3", Text = "cc", Start = 2, End = 3 },
+      },
+    };
+    var second = new TranscriptionResponse
+    {
+      Id = tid,
+      AudioId = "a1",
+      Segments = new List<TranscriptionSegment>
+      {
+        new() { Id = "s1", Text = "merged range", Start = 0, End = 1 },
+        new() { Id = "s2", Text = string.Empty, Start = 1, End = 2 },
+        new() { Id = "s3", Text = string.Empty, Start = 2, End = 3 },
+      },
+    };
+    var call = 0;
+    _mockTranscriptionService
+        .Setup(x => x.GetTranscriptionAsync(tid, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(() => call++ == 0 ? first : second);
+
+    await _sut.LoadTranscriptSegmentsAsync(tid).ConfigureAwait(false);
+    Assert.AreEqual(3, _sut.TranscriptSegments.Count);
+    Assert.AreEqual("aa", _sut.TranscriptSegments[0].Text);
+
+    var agg = AppServices.TryGetEventAggregator();
+    Assert.IsNotNull(agg);
+    agg!.Publish(
+        new NavigateToEvent(
+            PanelIds.Transcribe,
+            "timeline",
+            new Dictionary<string, object>
+            {
+                { "action", "coherentReloadAfterSegmentApply" },
+                { "transcriptionId", tid },
+                { "projectId", pid },
+            }));
+
+    await PumpNavigateAsync().ConfigureAwait(false);
+
+    Assert.AreEqual("merged range", _sut.TranscriptSegments[0].Text);
+    Assert.AreEqual(string.Empty, _sut.TranscriptSegments[1].Text);
+    _mockTranscriptionService.Verify(x => x.GetTranscriptionAsync(tid, It.IsAny<CancellationToken>()), Times.Exactly(2));
+  }
+
+  /// <summary>GAP-047 range parity: mismatching apply transcription id must not refetch (same fail-closed as single-segment).</summary>
+  [TestMethod]
+  public async Task RangeApply_Success_NoOpOnTimeline_WhenOwnershipMismatches()
+  {
+    const string loadedTid = "tx-range-loaded";
+    const string otherTid = "tx-range-other";
+    const string pid = "proj-range-mismatch";
+    var proj = new Project { Id = pid, Name = "RangeMis" };
+    _sut.Projects.Add(proj);
+    _mockTrackService
+        .Setup(x => x.GetTracksAsync(pid, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<AudioTrack> { new() { Id = "trk", Name = "T", ProjectId = pid, Clips = new List<AudioClip>() } });
+    _sut.SelectedProject = proj;
+
+    _mockTranscriptionService
+        .Setup(x => x.GetTranscriptionAsync(loadedTid, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(
+            new TranscriptionResponse
+            {
+              Id = loadedTid,
+              AudioId = "a1",
+              Segments = new List<TranscriptionSegment>
+              {
+                new() { Id = "s1", Text = "keep", Start = 0, End = 1 },
+                new() { Id = "s2", Text = "overlay", Start = 1, End = 2 },
+              },
+            });
+
+    await _sut.LoadTranscriptSegmentsAsync(loadedTid).ConfigureAwait(false);
+
+    var agg = AppServices.TryGetEventAggregator();
+    agg!.Publish(
+        new NavigateToEvent(
+            PanelIds.Transcribe,
+            "timeline",
+            new Dictionary<string, object>
+            {
+                { "action", "coherentReloadAfterSegmentApply" },
+                { "transcriptionId", otherTid },
+                { "projectId", pid },
+            }));
+
+    await PumpNavigateAsync().ConfigureAwait(false);
+
+    Assert.AreEqual("keep", _sut.TranscriptSegments[0].Text);
+    _mockTranscriptionService.Verify(x => x.GetTranscriptionAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+  }
 }

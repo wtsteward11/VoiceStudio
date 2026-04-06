@@ -1223,6 +1223,135 @@ public sealed class TranscribeViewModelInlineEditTests
     Assert.AreEqual(0, segmentApplyCoherenceCount);
   }
 
+  /// <summary>GAP-047 range parity: one coherence event after successful range filler cleanup Apply.</summary>
+  [TestMethod]
+  public async Task RangeApply_AfterFillerCleanup_PublishesSingleCoherenceEvent()
+  {
+    InstallHarness(jobFails: false, BuildLinkedProjectThreeSegmentsOneClip());
+    var bus = AppServices.TryGetEventAggregator();
+    Assert.IsNotNull(bus);
+    var segmentApplyCoherenceCount = 0;
+    using var _ = bus!.Subscribe<NavigateToEvent>(ev =>
+    {
+      if (ev.Parameters != null
+          && ev.Parameters.TryGetValue("action", out var a)
+          && string.Equals(a?.ToString(), "coherentReloadAfterSegmentApply", StringComparison.Ordinal))
+      {
+        segmentApplyCoherenceCount++;
+      }
+    });
+
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    var tr = BuildTranscriptionThreeSegments();
+    vm.SelectedTranscription = tr;
+    vm.BeginEditRange(tr.Segments![0], tr.Segments![2]);
+    vm.EditingSegmentDraftText = "aa uh bb cc";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+
+    var err = await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false);
+    Assert.IsNull(err);
+    await PumpUntilApplyJobRowSucceededAsync(vm).ConfigureAwait(false);
+
+    Assert.AreEqual(1, segmentApplyCoherenceCount);
+  }
+
+  /// <summary>GAP-047 range parity: failed range Apply must not publish cross-consumer reload.</summary>
+  [TestMethod]
+  public async Task RangeApply_Failure_DoesNotPublishCoherenceEvent()
+  {
+    InstallHarness(jobFails: true, BuildLinkedProjectThreeSegmentsOneClip());
+    var bus = AppServices.TryGetEventAggregator();
+    Assert.IsNotNull(bus);
+    var segmentApplyCoherenceCount = 0;
+    using var _ = bus!.Subscribe<NavigateToEvent>(ev =>
+    {
+      if (ev.Parameters != null
+          && ev.Parameters.TryGetValue("action", out var a)
+          && string.Equals(a?.ToString(), "coherentReloadAfterSegmentApply", StringComparison.Ordinal))
+      {
+        segmentApplyCoherenceCount++;
+      }
+    });
+
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    var tr = BuildTranscriptionThreeSegments();
+    vm.SelectedTranscription = tr;
+    vm.BeginEditRange(tr.Segments![0], tr.Segments![2]);
+    vm.EditingSegmentDraftText = "merged um words";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+
+    var err = await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false);
+    Assert.IsNotNull(err);
+    await PumpUntilApplyJobRowFailedAsync(vm).ConfigureAwait(false);
+
+    Assert.AreEqual(0, segmentApplyCoherenceCount);
+  }
+
+  /// <summary>GAP-047 range parity: cancel after range draft cleanup publishes no coherence event.</summary>
+  [TestMethod]
+  public async Task CancelAfterRangeDraftCleanup_DoesNotPublishCoherenceEvent()
+  {
+    InstallHarness(jobFails: false, BuildLinkedProjectThreeSegmentsOneClip());
+    var bus = AppServices.TryGetEventAggregator();
+    Assert.IsNotNull(bus);
+    var segmentApplyCoherenceCount = 0;
+    using var _ = bus!.Subscribe<NavigateToEvent>(ev =>
+    {
+      if (ev.Parameters != null
+          && ev.Parameters.TryGetValue("action", out var a)
+          && string.Equals(a?.ToString(), "coherentReloadAfterSegmentApply", StringComparison.Ordinal))
+      {
+        segmentApplyCoherenceCount++;
+      }
+    });
+
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    var tr = BuildTranscriptionThreeSegments();
+    vm.SelectedTranscription = tr;
+    vm.BeginEditRange(tr.Segments![0], tr.Segments![2]);
+    vm.EditingSegmentDraftText = "aa um bb cc";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+    vm.CancelSegmentEdit();
+    await PumpDispatcherOnceAsync().ConfigureAwait(false);
+
+    Assert.AreEqual(0, segmentApplyCoherenceCount);
+  }
+
+  /// <summary>GAP-047 range parity: draft-only range filler cleanup does not publish coherence or mutate committed segments.</summary>
+  [TestMethod]
+  public void RangeApply_DoesNotLeakDraftOnlyStateAcrossConsumers()
+  {
+    InstallHarness(jobFails: false, BuildLinkedProjectThreeSegmentsOneClip());
+    var bus = AppServices.TryGetEventAggregator();
+    Assert.IsNotNull(bus);
+    var segmentApplyCoherenceCount = 0;
+    using var _ = bus!.Subscribe<NavigateToEvent>(ev =>
+    {
+      if (ev.Parameters != null
+          && ev.Parameters.TryGetValue("action", out var a)
+          && string.Equals(a?.ToString(), "coherentReloadAfterSegmentApply", StringComparison.Ordinal))
+      {
+        segmentApplyCoherenceCount++;
+      }
+    });
+
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    var tr = BuildTranscriptionThreeSegments();
+    vm.SelectedTranscription = tr;
+    vm.BeginEditRange(tr.Segments![0], tr.Segments![2]);
+    vm.EditingSegmentDraftText = "aa uh bb cc";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+
+    Assert.AreEqual("aa", tr.Segments![0].Text);
+    Assert.AreEqual("bb", tr.Segments![1].Text);
+    Assert.AreEqual("cc", tr.Segments![2].Text);
+    Assert.AreEqual(0, segmentApplyCoherenceCount);
+  }
+
   [TestMethod]
   public void RemoveFillersFromDraft_AllTogglesOff_ReturnsError()
   {

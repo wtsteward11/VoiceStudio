@@ -529,5 +529,69 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.AreEqual(1, vm.SelectedTranscription.Segments.Count);
       Assert.AreEqual("authoritative after apply cleanup", vm.SelectedTranscription.Segments[0].Text);
     }
+
+    /// <summary>
+    /// GAP-047 range parity: list reload replaces stale multi-segment local row with backend authoritative merged shape.
+    /// </summary>
+    [TestMethod]
+    public async Task RangeApply_Rehydrate_UsesAuthoritativeBackendTruth()
+    {
+      const string tid = "tr-range-rehydrate-1";
+      var staleLocal = new TranscriptionResponse
+      {
+        Id = tid,
+        Text = string.Empty,
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>
+        {
+          new() { Id = "r1", Start = 0, End = 1, Text = "stale range a" },
+          new() { Id = "r2", Start = 1, End = 2, Text = "stale range b" },
+          new() { Id = "r3", Start = 2, End = 3, Text = "stale range c" },
+        },
+      };
+      var authoritative = new TranscriptionResponse
+      {
+        Id = tid,
+        Text = string.Empty,
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>
+        {
+          new() { Id = "r1", Start = 0, End = 1, Text = "authoritative merged range" },
+          new() { Id = "r2", Start = 1, End = 2, Text = string.Empty },
+          new() { Id = "r3", Start = 2, End = 3, Text = string.Empty },
+        },
+      };
+
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync("aud-r", "proj-r", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse> { authoritative });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedProjectId = "proj-r";
+      vm.SelectedAudioId = "aud-r";
+      vm.Transcriptions.Clear();
+      vm.Transcriptions.Add(staleLocal);
+      vm.SelectedTranscription = staleLocal;
+
+      await vm.LoadTranscriptionsCommand.ExecuteAsync(null);
+
+      for (var i = 0; i < 40; i++)
+      {
+        await Task.Delay(25).ConfigureAwait(false);
+        await PumpDispatcherQueueAsync().ConfigureAwait(false);
+        if (vm.SelectedTranscription?.Segments is { Count: >= 3 } segs
+            && string.Equals(segs[0].Text, "authoritative merged range", StringComparison.Ordinal))
+        {
+          break;
+        }
+      }
+
+      Assert.IsNotNull(vm.SelectedTranscription);
+      Assert.AreEqual(3, vm.SelectedTranscription.Segments.Count);
+      Assert.AreEqual("authoritative merged range", vm.SelectedTranscription.Segments[0].Text);
+      Assert.AreEqual(string.Empty, vm.SelectedTranscription.Segments[1].Text);
+      Assert.AreEqual(string.Empty, vm.SelectedTranscription.Segments[2].Text);
+    }
   }
 }

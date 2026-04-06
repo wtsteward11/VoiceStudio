@@ -64,7 +64,7 @@ public sealed class TranscribeViewModelInlineEditTests
     }
   }
 
-  private void InstallHarness(bool jobFails, Project? linkedProject = null)
+  private void InstallHarness(bool jobFails, Project? linkedProject = null, bool transcriptPersistFails = false)
   {
     if (_dispatcherController != null)
     {
@@ -142,20 +142,33 @@ public sealed class TranscribeViewModelInlineEditTests
         .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-old" });
 
     var coordinationTxMock = new Mock<ITranscriptionClient>();
-    coordinationTxMock
-        .Setup(t => t.UpdateTranscriptionTextAsync(
-            It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<List<TranscriptionSegment>>(),
-            It.IsAny<CancellationToken>()))
-        .ReturnsAsync(
-            (string id, string text, List<TranscriptionSegment> segs, CancellationToken _) =>
-                new TranscriptionResponse
-                {
-                  Id = id,
-                  Text = text,
-                  Segments = TranscriptTextUndoPayload.CloneSegmentList(segs),
-                });
+    if (transcriptPersistFails)
+    {
+      coordinationTxMock
+          .Setup(t => t.UpdateTranscriptionTextAsync(
+              It.IsAny<string>(),
+              It.IsAny<string>(),
+              It.IsAny<List<TranscriptionSegment>>(),
+              It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new InvalidOperationException("persist unavailable"));
+    }
+    else
+    {
+      coordinationTxMock
+          .Setup(t => t.UpdateTranscriptionTextAsync(
+              It.IsAny<string>(),
+              It.IsAny<string>(),
+              It.IsAny<List<TranscriptionSegment>>(),
+              It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              (string id, string text, List<TranscriptionSegment> segs, CancellationToken _) =>
+                  new TranscriptionResponse
+                  {
+                    Id = id,
+                    Text = text,
+                    Segments = TranscriptTextUndoPayload.CloneSegmentList(segs),
+                  });
+    }
 
     var undoRedo = new UndoRedoService();
 
@@ -1262,6 +1275,59 @@ public sealed class TranscribeViewModelInlineEditTests
     var err = await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false);
 
     Assert.IsNotNull(err);
+    Assert.AreEqual(0, segmentApplyCoherenceCount);
+  }
+
+  /// <summary>GAP-047 persist recovery: coordinator compensates clip; no undo registration on persist failure.</summary>
+  [TestMethod]
+  public async Task Apply_WithTranscriptPersistFailure_DoesNotCorruptUndoStack()
+  {
+    InstallHarness(jobFails: false, transcriptPersistFails: true);
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "new um words";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+
+    var err = await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false);
+
+    Assert.IsNotNull(err);
+    StringAssert.Contains(err, "transcript persistence failed", StringComparison.OrdinalIgnoreCase);
+    await PumpUntilApplyJobRowFailedAsync(vm).ConfigureAwait(false);
+    Assert.AreEqual(0, AppServices.GetUndoRedoService().UndoCount);
+  }
+
+  /// <summary>GAP-047 persist recovery: failed apply must not publish timeline coherence reload.</summary>
+  [TestMethod]
+  public async Task Apply_WithTranscriptPersistFailure_DoesNotLeaveTimelineOverlayStale()
+  {
+    InstallHarness(jobFails: false, transcriptPersistFails: true);
+    var bus = AppServices.TryGetEventAggregator();
+    Assert.IsNotNull(bus);
+    var segmentApplyCoherenceCount = 0;
+    using var _ = bus!.Subscribe<NavigateToEvent>(ev =>
+    {
+      if (ev.Parameters != null
+          && ev.Parameters.TryGetValue("action", out var a)
+          && string.Equals(a?.ToString(), "coherentReloadAfterSegmentApply", StringComparison.Ordinal))
+      {
+        segmentApplyCoherenceCount++;
+      }
+    });
+
+    var vm = CreateSut();
+    vm.SelectedProjectId = "p1";
+    vm.SelectedTranscription = BuildTranscription();
+    vm.BeginEditSegment(vm.SelectedTranscription.Segments![0]);
+    vm.EditingSegmentDraftText = "new um words";
+    Assert.IsNull(vm.TryRemoveFillersFromEditingDraft());
+
+    var err = await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false);
+
+    Assert.IsNotNull(err);
+    await PumpUntilApplyJobRowFailedAsync(vm).ConfigureAwait(false);
+
     Assert.AreEqual(0, segmentApplyCoherenceCount);
   }
 

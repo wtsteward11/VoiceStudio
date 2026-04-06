@@ -202,6 +202,39 @@ public sealed class TranscriptSegmentRegenerationCoordinator
             cancellationToken)
         .ConfigureAwait(false);
 
+    if (persistenceMessage != null)
+    {
+      var errMsg = persistenceMessage;
+      try
+      {
+        await _backend
+            .UpdateClipAsync(
+                project.Id,
+                r.TrackId,
+                r.ClipId,
+                audioId: string.IsNullOrWhiteSpace(prevAudioId) ? null : prevAudioId,
+                audioUrl: string.IsNullOrWhiteSpace(prevUrl) ? null : prevUrl,
+                durationSeconds: prevDur,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+      }
+      catch (Exception compensateEx)
+      {
+        _log?.LogError(compensateEx, "TranscriptRegenCompensateClip");
+        errMsg = $"{errMsg} Clip audio rollback also failed: {compensateEx.Message}";
+      }
+
+      ReportJobProgress(
+          operationCorrelationId,
+          jobProgress,
+          accepted.JobId,
+          "apply_failed",
+          0,
+          null,
+          errMsg);
+      return errMsg;
+    }
+
     TranscriptTextUndoPayload? preForUndo = null;
     TranscriptTextUndoPayload? postForUndo = null;
     if (preApplyTranscriptCapture != null && persistenceMessage == null)

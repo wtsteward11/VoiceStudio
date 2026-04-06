@@ -413,7 +413,7 @@ public sealed class TranscriptSegmentRegenerationCoordinatorTests
   }
 
   [TestMethod]
-  public async Task TryExecuteAsync_PersistFailure_ReturnsWarningAfterClipApply()
+  public async Task Apply_WithTranscriptPersistFailure_RestoresPreApplyClipState()
   {
     var project = BuildProject("p1", "t1", "c1");
     var gate = new Mock<ITimelineSelectedProjectGate>();
@@ -446,6 +446,9 @@ public sealed class TranscriptSegmentRegenerationCoordinatorTests
     backend
         .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-new", "/new.wav", 4.2, null, null, null, null, It.IsAny<CancellationToken>()))
         .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-new" });
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-old", "/old", 2, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-old" });
 
     var linkage = new Mock<IClipTranscriptLinkageService>();
     linkage.Setup(l => l.GetLinksForClip(project, "c1")).Returns(Array.Empty<ClipTranscriptLink>());
@@ -491,7 +494,381 @@ public sealed class TranscriptSegmentRegenerationCoordinatorTests
     backend.Verify(
         b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-new", "/new.wav", 4.2, null, null, null, null, It.IsAny<CancellationToken>()),
         Times.Once);
-    linkage.Verify(l => l.RemoveLinksByClipId(project, "c1"), Times.Once);
+    backend.Verify(
+        b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-old", "/old", 2, null, null, null, null, It.IsAny<CancellationToken>()),
+        Times.Once);
+    linkage.Verify(l => l.RemoveLinksByClipId(project, "c1"), Times.Never);
+    Assert.AreEqual("audio-old", project.Tracks[0].Clips[0].AudioId);
+    Assert.AreEqual("/old", project.Tracks[0].Clips[0].AudioUrl);
+    Assert.AreEqual(2, project.Tracks[0].Clips[0].Duration.TotalSeconds, 0.001);
+  }
+
+  [TestMethod]
+  public async Task Apply_WithTranscriptPersistFailure_DoesNotRegisterUndoAction()
+  {
+    var project = BuildProject("p1", "t1", "c1");
+    var gate = new Mock<ITimelineSelectedProjectGate>();
+    gate.SetupGet(g => g.SelectedProject).Returns(project);
+    var resolver = new Mock<ITranscriptSegmentTargetResolver>();
+    resolver
+        .Setup(r => r.Resolve("tr1", "seg1", It.IsAny<double>(), It.IsAny<double>()))
+        .Returns(TranscriptSegmentTargetResolution.Resolved("t1", "c1", "tr1", 0, 1, 0));
+    var regen = new Mock<ITranscriptRegenerationClient>();
+    regen
+        .Setup(x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new RegenerateSegmentJobStartResponse { JobId = "job-undo", Status = "pending" });
+    var jobs = new Mock<IJobProgressApiClient>();
+    jobs.Setup(j => j.GetJobAsync("job-undo", It.IsAny<CancellationToken>())).ReturnsAsync(new JobDto
+    {
+      Id = "job-undo",
+      Status = "completed",
+      ResultId = "audio-new",
+      Metadata = new Dictionary<string, object> { ["audio_url"] = "/new.wav", ["duration_seconds"] = 4.2 },
+    });
+    var backend = new Mock<IBackendClient>();
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-new", "/new.wav", 4.2, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-new" });
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-old", "/old", 2, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-old" });
+    var linkage = new Mock<IClipTranscriptLinkageService>();
+    linkage.Setup(l => l.GetLinksForClip(project, "c1")).Returns(Array.Empty<ClipTranscriptLink>());
+    var txClient = new Mock<ITranscriptionClient>();
+    txClient
+        .Setup(t => t.UpdateTranscriptionTextAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<List<TranscriptionSegment>>(),
+            It.IsAny<CancellationToken>()))
+        .ThrowsAsync(new InvalidOperationException("persist unavailable"));
+    var undo = new UndoRedoService();
+    var sut = new TranscriptSegmentRegenerationCoordinator(
+        regen.Object,
+        jobs.Object,
+        backend.Object,
+        linkage.Object,
+        gate.Object,
+        resolver.Object,
+        null,
+        undo,
+        null,
+        null,
+        txClient.Object);
+
+    _ = await sut.TryExecuteAsync(
+        new TranscriptionResponse
+        {
+          Id = "tr1",
+          Text = "original",
+          Segments = new List<TranscriptionSegment> { new() { Id = "seg1", Start = 0, End = 1, Text = "original" } },
+        },
+        new TranscriptionSegment { Id = "seg1", Start = 0, End = 1, Text = "original" },
+        PanelIds.Transcribe,
+        "new words",
+        CancellationToken.None);
+
+    Assert.AreEqual(0, undo.UndoCount);
+  }
+
+  [TestMethod]
+  public async Task Apply_WithTranscriptPersistFailure_DoesNotPublishSuccessEvents()
+  {
+    var project = BuildProject("p1", "t1", "c1");
+    var gate = new Mock<ITimelineSelectedProjectGate>();
+    gate.SetupGet(g => g.SelectedProject).Returns(project);
+    var resolver = new Mock<ITranscriptSegmentTargetResolver>();
+    resolver
+        .Setup(r => r.Resolve("tr1", "seg1", It.IsAny<double>(), It.IsAny<double>()))
+        .Returns(TranscriptSegmentTargetResolution.Resolved("t1", "c1", "tr1", 0, 1, 0));
+    var regen = new Mock<ITranscriptRegenerationClient>();
+    regen
+        .Setup(x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new RegenerateSegmentJobStartResponse { JobId = "job-ev", Status = "pending" });
+    var jobs = new Mock<IJobProgressApiClient>();
+    jobs.Setup(j => j.GetJobAsync("job-ev", It.IsAny<CancellationToken>())).ReturnsAsync(new JobDto
+    {
+      Id = "job-ev",
+      Status = "completed",
+      ResultId = "audio-new",
+      Metadata = new Dictionary<string, object> { ["audio_url"] = "/new.wav", ["duration_seconds"] = 4.2 },
+    });
+    var backend = new Mock<IBackendClient>();
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-new", "/new.wav", 4.2, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-new" });
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-old", "/old", 2, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-old" });
+    var linkage = new Mock<IClipTranscriptLinkageService>();
+    linkage.Setup(l => l.GetLinksForClip(project, "c1")).Returns(Array.Empty<ClipTranscriptLink>());
+    var txClient = new Mock<ITranscriptionClient>();
+    txClient
+        .Setup(t => t.UpdateTranscriptionTextAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<List<TranscriptionSegment>>(),
+            It.IsAny<CancellationToken>()))
+        .ThrowsAsync(new InvalidOperationException("persist unavailable"));
+    var events = new Mock<IEventAggregator>();
+    var sut = new TranscriptSegmentRegenerationCoordinator(
+        regen.Object,
+        jobs.Object,
+        backend.Object,
+        linkage.Object,
+        gate.Object,
+        resolver.Object,
+        null,
+        null,
+        events.Object,
+        null,
+        txClient.Object);
+
+    _ = await sut.TryExecuteAsync(
+        new TranscriptionResponse
+        {
+          Id = "tr1",
+          Text = "a",
+          Segments = new List<TranscriptionSegment> { new() { Id = "seg1", Start = 0, End = 1, Text = "a" } },
+        },
+        new TranscriptionSegment { Id = "seg1", Start = 0, End = 1, Text = "a" },
+        PanelIds.Transcribe,
+        "b",
+        CancellationToken.None);
+
+    events.Verify(e => e.Publish(It.IsAny<ClipAudioArtifactReplacedEvent>()), Times.Never);
+    events.Verify(e => e.Publish(It.IsAny<TranscriptTruthStateChangedEvent>()), Times.Never);
+  }
+
+  [TestMethod]
+  public async Task Apply_WithPersistenceMessage_FollowsAtomicFailureContract()
+  {
+    var project = BuildProject("p1", "t1", "c1");
+    var gate = new Mock<ITimelineSelectedProjectGate>();
+    gate.SetupGet(g => g.SelectedProject).Returns(project);
+    var resolver = new Mock<ITranscriptSegmentTargetResolver>();
+    resolver
+        .Setup(r => r.Resolve("tr1", "seg1", It.IsAny<double>(), It.IsAny<double>()))
+        .Returns(TranscriptSegmentTargetResolution.Resolved("t1", "c1", "tr1", 0, 1, 0));
+    var regen = new Mock<ITranscriptRegenerationClient>();
+    regen
+        .Setup(x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new RegenerateSegmentJobStartResponse { JobId = "job-at", Status = "pending" });
+    var jobs = new Mock<IJobProgressApiClient>();
+    jobs.Setup(j => j.GetJobAsync("job-at", It.IsAny<CancellationToken>())).ReturnsAsync(new JobDto
+    {
+      Id = "job-at",
+      Status = "completed",
+      ResultId = "audio-new",
+      Metadata = new Dictionary<string, object> { ["audio_url"] = "/new.wav", ["duration_seconds"] = 4.2 },
+    });
+    var backend = new Mock<IBackendClient>();
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-new", "/new.wav", 4.2, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-new" });
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-old", "/old", 2, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-old" });
+    var linkage = new Mock<IClipTranscriptLinkageService>();
+    linkage.Setup(l => l.GetLinksForClip(project, "c1")).Returns(Array.Empty<ClipTranscriptLink>());
+    var txClient = new Mock<ITranscriptionClient>();
+    txClient
+        .Setup(t => t.UpdateTranscriptionTextAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<List<TranscriptionSegment>>(),
+            It.IsAny<CancellationToken>()))
+        .ThrowsAsync(new InvalidOperationException("persist unavailable"));
+    var undo = new UndoRedoService();
+    var events = new Mock<IEventAggregator>();
+    var sut = new TranscriptSegmentRegenerationCoordinator(
+        regen.Object,
+        jobs.Object,
+        backend.Object,
+        linkage.Object,
+        gate.Object,
+        resolver.Object,
+        null,
+        undo,
+        events.Object,
+        null,
+        txClient.Object);
+
+    var msg = await sut.TryExecuteAsync(
+        new TranscriptionResponse
+        {
+          Id = "tr1",
+          Text = "original",
+          Segments = new List<TranscriptionSegment> { new() { Id = "seg1", Start = 0, End = 1, Text = "original" } },
+        },
+        new TranscriptionSegment { Id = "seg1", Start = 0, End = 1, Text = "original" },
+        PanelIds.Transcribe,
+        "new words",
+        CancellationToken.None);
+
+    StringAssert.Contains(msg ?? string.Empty, "transcript persistence failed");
+    Assert.AreEqual(0, undo.UndoCount);
+    linkage.Verify(l => l.RemoveLinksByClipId(project, "c1"), Times.Never);
+    events.Verify(e => e.Publish(It.IsAny<ClipAudioArtifactReplacedEvent>()), Times.Never);
+    backend.Verify(
+        b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-new", "/new.wav", 4.2, null, null, null, null, It.IsAny<CancellationToken>()),
+        Times.Once);
+    backend.Verify(
+        b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-old", "/old", 2, null, null, null, null, It.IsAny<CancellationToken>()),
+        Times.Once);
+  }
+
+  [TestMethod]
+  public async Task RangeApply_WithTranscriptPersistFailure_RestoresPreApplyState()
+  {
+    var project = BuildProject("p1", "t1", "c1");
+    var gate = new Mock<ITimelineSelectedProjectGate>();
+    gate.SetupGet(g => g.SelectedProject).Returns(project);
+    var resolver = new Mock<ITranscriptSegmentTargetResolver>();
+    resolver
+        .Setup(r => r.Resolve("tr1", "seg1", It.IsAny<double>(), It.IsAny<double>()))
+        .Returns(TranscriptSegmentTargetResolution.Resolved("t1", "c1", "tr1", 0, 1, 0));
+    var regen = new Mock<ITranscriptRegenerationClient>();
+    regen
+        .Setup(x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new RegenerateSegmentJobStartResponse { JobId = "job-rng", Status = "pending" });
+    var jobs = new Mock<IJobProgressApiClient>();
+    jobs.Setup(j => j.GetJobAsync("job-rng", It.IsAny<CancellationToken>())).ReturnsAsync(new JobDto
+    {
+      Id = "job-rng",
+      Status = "completed",
+      ResultId = "audio-new",
+      Metadata = new Dictionary<string, object> { ["audio_url"] = "/new.wav", ["duration_seconds"] = 4.2 },
+    });
+    var backend = new Mock<IBackendClient>();
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-new", "/new.wav", 4.2, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-new" });
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-old", "/old", 2, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-old" });
+    var linkage = new Mock<IClipTranscriptLinkageService>();
+    linkage.Setup(l => l.GetLinksForClip(project, "c1")).Returns(Array.Empty<ClipTranscriptLink>());
+    var txClient = new Mock<ITranscriptionClient>();
+    txClient
+        .Setup(t => t.UpdateTranscriptionTextAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<List<TranscriptionSegment>>(),
+            It.IsAny<CancellationToken>()))
+        .ThrowsAsync(new InvalidOperationException("persist unavailable"));
+    var sut = new TranscriptSegmentRegenerationCoordinator(
+        regen.Object,
+        jobs.Object,
+        backend.Object,
+        linkage.Object,
+        gate.Object,
+        resolver.Object,
+        null,
+        null,
+        null,
+        null,
+        txClient.Object);
+
+    var transcription = new TranscriptionResponse
+    {
+      Id = "tr1",
+      Text = string.Empty,
+      Segments = new List<TranscriptionSegment>
+      {
+        new() { Id = "seg1", Start = 0, End = 1, Text = "aa" },
+        new() { Id = "seg2", Start = 1, End = 2, Text = "bb" },
+      },
+    };
+
+    var msg = await sut.TryExecuteAsync(
+        transcription,
+        transcription.Segments[0],
+        PanelIds.Transcribe,
+        "merged",
+        CancellationToken.None,
+        jobProgress: null,
+        operationCorrelationId: null,
+        rangeEndInclusiveIndex: 1);
+
+    StringAssert.Contains(msg ?? string.Empty, "transcript persistence failed");
+    backend.Verify(
+        b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-new", "/new.wav", 4.2, null, null, null, null, It.IsAny<CancellationToken>()),
+        Times.Once);
+    backend.Verify(
+        b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-old", "/old", 2, null, null, null, null, It.IsAny<CancellationToken>()),
+        Times.Once);
+    linkage.Verify(l => l.RemoveLinksByClipId(project, "c1"), Times.Never);
+    Assert.AreEqual("audio-old", project.Tracks[0].Clips[0].AudioId);
+  }
+
+  [TestMethod]
+  public async Task TryExecuteAsync_PersistFailure_CompensateClipThrows_AppendsRollbackMessage()
+  {
+    var project = BuildProject("p1", "t1", "c1");
+    var gate = new Mock<ITimelineSelectedProjectGate>();
+    gate.SetupGet(g => g.SelectedProject).Returns(project);
+    var resolver = new Mock<ITranscriptSegmentTargetResolver>();
+    resolver
+        .Setup(r => r.Resolve("tr1", "seg1", It.IsAny<double>(), It.IsAny<double>()))
+        .Returns(TranscriptSegmentTargetResolution.Resolved("t1", "c1", "tr1", 0, 1, 0));
+    var regen = new Mock<ITranscriptRegenerationClient>();
+    regen
+        .Setup(x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new RegenerateSegmentJobStartResponse { JobId = "job-dbl", Status = "pending" });
+    var jobs = new Mock<IJobProgressApiClient>();
+    jobs.Setup(j => j.GetJobAsync("job-dbl", It.IsAny<CancellationToken>())).ReturnsAsync(new JobDto
+    {
+      Id = "job-dbl",
+      Status = "completed",
+      ResultId = "audio-new",
+      Metadata = new Dictionary<string, object> { ["audio_url"] = "/new.wav", ["duration_seconds"] = 4.2 },
+    });
+    var backend = new Mock<IBackendClient>();
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-new", "/new.wav", 4.2, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AudioClip { Id = "c1", AudioId = "audio-new" });
+    backend
+        .Setup(b => b.UpdateClipAsync("p1", "t1", "c1", null, null, "audio-old", "/old", 2, null, null, null, null, It.IsAny<CancellationToken>()))
+        .ThrowsAsync(new InvalidOperationException("rollback failed"));
+    var linkage = new Mock<IClipTranscriptLinkageService>();
+    linkage.Setup(l => l.GetLinksForClip(project, "c1")).Returns(Array.Empty<ClipTranscriptLink>());
+    var txClient = new Mock<ITranscriptionClient>();
+    txClient
+        .Setup(t => t.UpdateTranscriptionTextAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<List<TranscriptionSegment>>(),
+            It.IsAny<CancellationToken>()))
+        .ThrowsAsync(new InvalidOperationException("persist unavailable"));
+    var sut = new TranscriptSegmentRegenerationCoordinator(
+        regen.Object,
+        jobs.Object,
+        backend.Object,
+        linkage.Object,
+        gate.Object,
+        resolver.Object,
+        null,
+        null,
+        null,
+        null,
+        txClient.Object);
+
+    var msg = await sut.TryExecuteAsync(
+        new TranscriptionResponse
+        {
+          Id = "tr1",
+          Text = "x",
+          Segments = new List<TranscriptionSegment> { new() { Id = "seg1", Start = 0, End = 1, Text = "x" } },
+        },
+        new TranscriptionSegment { Id = "seg1", Start = 0, End = 1, Text = "x" },
+        PanelIds.Transcribe,
+        "y",
+        CancellationToken.None);
+
+    StringAssert.Contains(msg ?? string.Empty, "transcript persistence failed");
+    StringAssert.Contains(msg ?? string.Empty, "Clip audio rollback also failed");
+    StringAssert.Contains(msg ?? string.Empty, "rollback failed");
   }
 
   [TestMethod]

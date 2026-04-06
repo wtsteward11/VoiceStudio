@@ -652,5 +652,64 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.AreEqual(1, vm.SelectedTranscription.Segments.Count);
       Assert.AreEqual("post-undo backend truth", vm.SelectedTranscription.Segments[0].Text);
     }
+
+    /// <summary>
+    /// GAP-047 persist recovery: list reload replaces local row with backend truth when apply did not persist
+    /// (authoritative transcript unchanged on server).
+    /// </summary>
+    [TestMethod]
+    public async Task FailedApply_Rehydrate_UsesAuthoritativeBackendTruth()
+    {
+      const string tid = "tr-fail-persist-rehyd";
+      var staleLocal = new TranscriptionResponse
+      {
+        Id = tid,
+        Text = string.Empty,
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>
+        {
+          new() { Id = "seg-f1", Start = 0, End = 1, Text = "local drift after failed persist" },
+        },
+      };
+      var authoritative = new TranscriptionResponse
+      {
+        Id = tid,
+        Text = string.Empty,
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>
+        {
+          new() { Id = "seg-f1", Start = 0, End = 1, Text = "backend never received edit" },
+        },
+      };
+
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync("aud-fp", "proj-fp", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse> { authoritative });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedProjectId = "proj-fp";
+      vm.SelectedAudioId = "aud-fp";
+      vm.Transcriptions.Clear();
+      vm.Transcriptions.Add(staleLocal);
+      vm.SelectedTranscription = staleLocal;
+
+      await vm.LoadTranscriptionsCommand.ExecuteAsync(null);
+
+      for (var i = 0; i < 40; i++)
+      {
+        await Task.Delay(25).ConfigureAwait(false);
+        await PumpDispatcherQueueAsync().ConfigureAwait(false);
+        if (vm.SelectedTranscription?.Segments is { Count: > 0 } segs
+            && string.Equals(segs[0].Text, "backend never received edit", StringComparison.Ordinal))
+        {
+          break;
+        }
+      }
+
+      Assert.IsNotNull(vm.SelectedTranscription);
+      Assert.AreEqual(1, vm.SelectedTranscription.Segments.Count);
+      Assert.AreEqual("backend never received edit", vm.SelectedTranscription.Segments[0].Text);
+    }
   }
 }

@@ -370,6 +370,42 @@ public sealed class TimelineViewModelGap045CrossConsumerTests
     _mockTranscriptionService.Verify(x => x.GetTranscriptionAsync(tid, It.IsAny<CancellationToken>()), Times.Exactly(2));
   }
 
+  /// <summary>GAP-047 persist recovery: without coherence NavigateToEvent (failed apply path), overlay is not quietly refetched.</summary>
+  [TestMethod]
+  public async Task FailedApply_DoesNotTriggerTimelineCoherenceReload()
+  {
+    const string tid = "tx-failed-apply-coherence";
+    const string pid = "proj-failed-apply-1";
+    var proj = new Project { Id = pid, Name = "FailApply" };
+    _sut.Projects.Add(proj);
+    _mockTrackService
+        .Setup(x => x.GetTracksAsync(pid, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<AudioTrack> { new() { Id = "trk", Name = "T", ProjectId = pid, Clips = new List<AudioClip>() } });
+    _sut.SelectedProject = proj;
+
+    _mockTranscriptionService
+        .Setup(x => x.GetTranscriptionAsync(tid, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(
+            new TranscriptionResponse
+            {
+              Id = tid,
+              AudioId = "a1",
+              Segments = new List<TranscriptionSegment>
+              {
+                new() { Id = "s1", Text = "stable", Start = 0, End = 1 },
+              },
+            });
+
+    await _sut.LoadTranscriptSegmentsAsync(tid).ConfigureAwait(false);
+    Assert.AreEqual("stable", _sut.TranscriptSegments[0].Text);
+    _mockTranscriptionService.Verify(x => x.GetTranscriptionAsync(tid, It.IsAny<CancellationToken>()), Times.Once);
+
+    await PumpNavigateAsync().ConfigureAwait(false);
+
+    _mockTranscriptionService.Verify(x => x.GetTranscriptionAsync(tid, It.IsAny<CancellationToken>()), Times.Once);
+    Assert.AreEqual("stable", _sut.TranscriptSegments[0].Text);
+  }
+
   /// <summary>GAP-047: mismatching transcription id must not overwrite overlay (fail-closed).</summary>
   [TestMethod]
   public async Task PostApply_WhenLoadedSubtitleMismatches_DoesNotOverwriteOverlay()

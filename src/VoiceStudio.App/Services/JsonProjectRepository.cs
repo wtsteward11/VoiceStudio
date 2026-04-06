@@ -194,6 +194,49 @@ namespace VoiceStudio.App.Services
     public Task<Project?> OpenAsync(string projectId, CancellationToken cancellationToken = default)
         => GetByIdAsync(projectId, cancellationToken);
 
+    /// <inheritdoc />
+    public async Task SaveLastSubtitleTranscriptionIdAsync(string projectId, string? transcriptionId, CancellationToken cancellationToken = default)
+    {
+      if (string.IsNullOrEmpty(projectId))
+        return;
+
+      await _lock.WaitAsync(cancellationToken);
+      try
+      {
+        var path = GetProjectPath(projectId);
+        if (!File.Exists(path))
+          return;
+
+        var json = await File.ReadAllTextAsync(path, cancellationToken);
+        var project = JsonSerializer.Deserialize<Project>(json, _jsonOptions);
+        if (project == null)
+          return;
+        EnsureReadableSchemaVersion(project);
+
+        project.LastSubtitleTranscriptionId = string.IsNullOrWhiteSpace(transcriptionId) ? null : transcriptionId;
+        project.UpdatedAt = DateTime.UtcNow.ToString("o");
+        project.PersistedProjectSchemaVersion = CurrentPersistedProjectSchemaVersion;
+
+        var outJson = JsonSerializer.Serialize(project, _jsonOptions);
+        await File.WriteAllTextAsync(path, outJson, cancellationToken);
+      }
+      finally
+      {
+        _lock.Release();
+      }
+    }
+
+    /// <inheritdoc />
+    public async Task<string?> GetLastSubtitleTranscriptionIdAsync(string projectId, CancellationToken cancellationToken = default)
+    {
+      if (string.IsNullOrEmpty(projectId))
+        return null;
+
+      var project = await GetByIdAsync(projectId, cancellationToken).ConfigureAwait(false);
+      var id = project?.LastSubtitleTranscriptionId;
+      return string.IsNullOrWhiteSpace(id) ? null : id;
+    }
+
     private static ProjectMetadata MapToMetadata(Project project, string filePath)
     {
       DateTime.TryParse(project.CreatedAt, out var created);

@@ -76,6 +76,16 @@ namespace VoiceStudio.App.Tests.Commands
             Assert.AreEqual("My New Project", _handler.CurrentProject.Name);
         }
 
+        /// <summary>GAP-045 lifecycle: new project identity must not carry subtitle restore metadata.</summary>
+        [TestMethod]
+        public async Task NewProject_LastSubtitleTranscriptionId_IsNull()
+        {
+            SetupInputDialog("Lifecycle New");
+            await Registry.ExecuteAsync("file.new");
+            Assert.IsNotNull(_handler.CurrentProject);
+            Assert.IsNull(_handler.CurrentProject.LastSubtitleTranscriptionId);
+        }
+
         [TestMethod]
         public async Task NewProject_UserCancels_DoesNotCreateProject()
         {
@@ -184,6 +194,41 @@ namespace VoiceStudio.App.Tests.Commands
 
             // Assert
             Assert.AreEqual("Renamed Project", _handler.CurrentProject?.Name);
+        }
+
+        /// <summary>GAP-045 lifecycle: Save As must not copy LastSubtitleTranscriptionId onto the new project id.</summary>
+        [TestMethod]
+        public async Task SaveAs_AfterOpenWithStoredSubtitle_DoesNotInheritLastSubtitleTranscriptionId()
+        {
+            var createdAt = DateTime.UtcNow.ToString("o");
+            var source = new Project
+            {
+                Id = "src-proj-id",
+                Name = "Source",
+                CreatedAt = createdAt,
+                UpdatedAt = createdAt,
+                LastSubtitleTranscriptionId = "tr-should-not-copy",
+                Tracks = new List<AudioTrack>(),
+                VoiceProfileIds = new List<string>(),
+            };
+            MockProjectRepository.Setup(r => r.OpenAsync("path-open", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(source);
+            SetupFileDialog("path-open");
+            await Registry.ExecuteAsync("file.open");
+            Assert.AreEqual("tr-should-not-copy", _handler.CurrentProject?.LastSubtitleTranscriptionId);
+
+            Project? saved = null;
+            MockProjectRepository.Setup(r => r.SaveAsync(It.IsAny<Project>(), It.IsAny<CancellationToken>()))
+                .Callback<Project, CancellationToken>((p, _) => saved = p)
+                .ReturnsAsync((Project p, CancellationToken _) => p);
+
+            SetupInputDialog("Forked Name");
+            await Registry.ExecuteAsync("file.saveAs");
+
+            Assert.IsNotNull(saved);
+            Assert.IsNull(saved.LastSubtitleTranscriptionId);
+            Assert.AreEqual("Forked Name", saved.Name);
+            Assert.AreNotEqual("src-proj-id", saved.Id);
         }
 
         #endregion

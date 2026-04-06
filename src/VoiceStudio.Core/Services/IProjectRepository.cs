@@ -51,5 +51,15 @@ namespace VoiceStudio.Core.Services
     /// Open a project by ID (alias for GetByIdAsync for compatibility).
     /// </summary>
     Task<Project?> OpenAsync(string projectId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// GAP-045: persist last Timeline subtitle overlay transcription id for a project (local JSON).
+    /// </summary>
+    Task SaveLastSubtitleTranscriptionIdAsync(string projectId, string? transcriptionId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// GAP-045: read persisted last subtitle transcription id for a project.
+    /// </summary>
+    Task<string?> GetLastSubtitleTranscriptionIdAsync(string projectId, CancellationToken cancellationToken = default);
   }
 }

@@ -23,6 +23,7 @@ namespace VoiceStudio.App.Views.Panels
   {
     private readonly ITranscriptionClient _transcriptionClient;
     private readonly IProjectAudioClient _projectAudioClient;
+    private readonly IProjectRepository? _projectRepository;
     private readonly IErrorLoggingService? _logService;
     private readonly ToastNotificationService? _toastNotificationService;
     private bool _isInitialized;
@@ -32,6 +33,11 @@ namespace VoiceStudio.App.Views.Panels
     private ISubscriptionToken? _transcriptTruthStateToken;
     private string? _truthRefreshTrackId;
     private string? _truthRefreshClipId;
+
+    /// <summary>GAP-045 reload/rehydrate: cancels in-flight list fetch when project/audio scope changes.</summary>
+    private readonly object _rehydrateLock = new();
+
+    private CancellationTokenSource? _rehydrateCts;
 
     /// <summary>GAP-045 feedback: segment ids regenerated this session (cleared on transcription/project context change or truth refresh).</summary>
     private readonly HashSet<string> _sessionRegeneratedSegmentIds = new(StringComparer.Ordinal);
@@ -196,11 +202,13 @@ namespace VoiceStudio.App.Views.Panels
     public TranscribeViewModel(
         IViewModelContext context,
         ITranscriptionClient transcriptionClient,
-        IProjectAudioClient projectAudioClient)
+        IProjectAudioClient projectAudioClient,
+        IProjectRepository? projectRepository = null)
         : base(context)
     {
       _transcriptionClient = transcriptionClient ?? throw new ArgumentNullException(nameof(transcriptionClient));
       _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
+      _projectRepository = projectRepository ?? AppServices.TryGetProjectRepository();
       _logService = ServiceProvider.TryGetErrorLoggingService();
 
       // Get multi-select service
@@ -314,6 +322,7 @@ namespace VoiceStudio.App.Views.Panels
       EnsureClipTranscriptSelectionSubscription();
       EnsureTranscriptTruthStateSubscription();
       RefreshTranscriptTruthHints();
+      ScheduleBackendTranscriptRehydrate("initialize");
     }
 
     /// <inheritdoc />
@@ -327,6 +336,7 @@ namespace VoiceStudio.App.Views.Panels
       EnsureClipTranscriptSelectionSubscription();
       EnsureTranscriptTruthStateSubscription();
       RefreshTranscriptTruthHints();
+      ScheduleBackendTranscriptRehydrate("activated");
     }
 
     /// <inheritdoc />
@@ -341,6 +351,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       SyncSelectedProjectFromContext();
       RefreshTranscriptTruthHints();
+      ScheduleBackendTranscriptRehydrate("refresh");
       return Task.CompletedTask;
     }
 
@@ -1634,7 +1645,17 @@ namespace VoiceStudio.App.Views.Panels
     protected override void Dispose(bool disposing)
     {
       if (disposing)
+      {
+        lock (_rehydrateLock)
+        {
+          _rehydrateCts?.Cancel();
+          _rehydrateCts?.Dispose();
+          _rehydrateCts = null;
+        }
+
         ReleasePanelEventSubscriptions();
+      }
+
       base.Dispose(disposing);
     }
 
@@ -1728,14 +1749,22 @@ namespace VoiceStudio.App.Views.Panels
       TranscribeCommand.NotifyCanExecuteChanged();
       RefreshTranscriptTruthHints();
       RefreshTranscriptTruthCommand.NotifyCanExecuteChanged();
+      ScheduleBackendTranscriptRehydrate("audio_id");
     }
 
     partial void OnSelectedProjectIdChanged(string? value)
     {
       ClearSessionRegeneratedSegmentTracking();
       TranscriptSegmentLayoutRevision++;
+      // GAP-045 lifecycle: never treat the previous project's SelectedTranscription as authoritative
+      // for the new SelectedProjectId — rehydrate may use per-project LastSubtitleTranscriptionId or list default.
+      Transcriptions.Clear();
+      SelectedTranscription = null;
+      TranscriptionText = string.Empty;
+      TranscriptOperatorMessage = null;
       RefreshTranscriptTruthHints();
       RefreshTranscriptTruthCommand.NotifyCanExecuteChanged();
+      ScheduleBackendTranscriptRehydrate("project_id");
     }
 
     partial void OnEditingSegmentIdChanged(string? value)
@@ -2030,6 +2059,135 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    /// <summary>
+    /// GAP-045 reload lane: when project + audio scope are known, replace in-memory list from
+    /// <see cref="ITranscriptionClient.ListTranscriptionsAsync"/> (backend authority). Coalesces rapid scope changes via cancellation.
+    /// </summary>
+    private void ScheduleBackendTranscriptRehydrate(string triggerReason)
+    {
+      if (string.IsNullOrWhiteSpace(SelectedAudioId) || string.IsNullOrWhiteSpace(SelectedProjectId))
+        return;
+
+      CancellationToken token;
+      lock (_rehydrateLock)
+      {
+        _rehydrateCts?.Cancel();
+        _rehydrateCts?.Dispose();
+        _rehydrateCts = new CancellationTokenSource();
+        token = _rehydrateCts.Token;
+      }
+
+      _ = RunBackendTranscriptRehydrateAsync(triggerReason, token);
+    }
+
+    private async Task RunBackendTranscriptRehydrateAsync(string triggerReason, CancellationToken cancellationToken)
+    {
+      var audioId = SelectedAudioId;
+      var projectId = SelectedProjectId;
+      if (string.IsNullOrWhiteSpace(audioId) || string.IsNullOrWhiteSpace(projectId))
+        return;
+
+      var inMemoryPreviousId = SelectedTranscription?.Id;
+      string? previousSelectionId = inMemoryPreviousId;
+      var previousFromProjectRestore = false;
+
+      if (string.IsNullOrEmpty(previousSelectionId) && _projectRepository != null)
+      {
+        previousSelectionId = await _projectRepository
+            .GetLastSubtitleTranscriptionIdAsync(projectId, cancellationToken)
+            .ConfigureAwait(true);
+        previousFromProjectRestore = !string.IsNullOrEmpty(previousSelectionId);
+      }
+
+      if (!string.Equals(SelectedAudioId, audioId, StringComparison.Ordinal)
+          || !string.Equals(SelectedProjectId, projectId, StringComparison.Ordinal))
+      {
+        return;
+      }
+
+      try
+      {
+        var transcriptions = await _transcriptionClient.ListTranscriptionsAsync(audioId, projectId, cancellationToken).ConfigureAwait(true);
+        if (!string.Equals(SelectedAudioId, audioId, StringComparison.Ordinal)
+            || !string.Equals(SelectedProjectId, projectId, StringComparison.Ordinal))
+        {
+          return;
+        }
+
+        ApplyTranscriptionListFromBackend(
+            transcriptions,
+            showSuccessToast: false,
+            triggerReason: triggerReason,
+            previousSelectionId: previousSelectionId,
+            previousSelectionFromProjectRestore: previousFromProjectRestore);
+
+        PublishTimelineCoherenceAfterRehydrate(inMemoryPreviousId);
+      }
+      catch (OperationCanceledException)
+      {
+        return;
+      }
+      catch (Exception ex)
+      {
+        if (cancellationToken.IsCancellationRequested)
+          return;
+        ErrorMessage = $"Transcript rehydrate failed ({triggerReason}): {ex.Message}";
+        _logService?.LogError(ex, "TranscribeViewModel.Rehydrate");
+        await HandleErrorAsync(ex, "RehydrateTranscripts").ConfigureAwait(true);
+      }
+    }
+
+    /// <summary>
+    /// Applies backend list to <see cref="Transcriptions"/>; restores selection by id when possible.
+    /// </summary>
+    private void ApplyTranscriptionListFromBackend(
+        IReadOnlyList<TranscriptionResponse> transcriptions,
+        bool showSuccessToast,
+        string? triggerReason,
+        string? previousSelectionId,
+        bool previousSelectionFromProjectRestore = false)
+    {
+      Transcriptions.Clear();
+      foreach (var transcription in transcriptions.OrderByDescending(t => t.Created))
+      {
+        Transcriptions.Add(transcription);
+      }
+
+      if (!string.IsNullOrEmpty(previousSelectionId))
+      {
+        var match = Transcriptions.FirstOrDefault(t => string.Equals(t.Id, previousSelectionId, StringComparison.Ordinal));
+        if (match != null)
+        {
+          SelectedTranscription = match;
+        }
+        else
+        {
+          SelectedTranscription = Transcriptions.FirstOrDefault();
+          if (previousSelectionFromProjectRestore)
+          {
+            TranscriptOperatorMessage =
+                "[Restore] Last subtitle transcription no longer exists for this project — cleared";
+          }
+          else
+          {
+            var ctx = string.IsNullOrWhiteSpace(triggerReason) ? "load" : triggerReason;
+            TranscriptOperatorMessage =
+                $"Rehydrate ({ctx}): previously selected transcript is not in the backend list for this audio/project. "
+                + "Showing the newest available row.";
+          }
+        }
+      }
+      else if (Transcriptions.Count > 0)
+      {
+        SelectedTranscription ??= Transcriptions[0];
+      }
+
+      if (showSuccessToast && Transcriptions.Count > 0)
+      {
+        _toastNotificationService?.ShowSuccess("Transcriptions Loaded", $"Loaded {Transcriptions.Count} transcription(s)");
+      }
+    }
+
     private async Task LoadTranscriptionsAsync(CancellationToken cancellationToken)
     {
       if (string.IsNullOrWhiteSpace(SelectedAudioId))
@@ -2047,18 +2205,14 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var transcriptions = await _transcriptionClient.ListTranscriptionsAsync(SelectedAudioId, SelectedProjectId, cancellationToken);
-
-        Transcriptions.Clear();
-        foreach (var transcription in transcriptions.OrderByDescending(t => t.Created))
-        {
-          Transcriptions.Add(transcription);
-        }
-
-        if (Transcriptions.Count > 0)
-        {
-          _toastNotificationService?.ShowSuccess("Transcriptions Loaded", $"Loaded {Transcriptions.Count} transcription(s)");
-        }
+        var previousSelectionId = SelectedTranscription?.Id;
+        var transcriptions = await _transcriptionClient.ListTranscriptionsAsync(SelectedAudioId, SelectedProjectId, cancellationToken).ConfigureAwait(true);
+        ApplyTranscriptionListFromBackend(
+            transcriptions,
+            showSuccessToast: true,
+            triggerReason: null,
+            previousSelectionId: previousSelectionId,
+            previousSelectionFromProjectRestore: false);
       }
       catch (OperationCanceledException)
       {
@@ -2067,7 +2221,7 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         ErrorMessage = $"Failed to load transcriptions: {ex.Message}";
-        await HandleErrorAsync(ex, "LoadTranscriptions");
+        await HandleErrorAsync(ex, "LoadTranscriptions").ConfigureAwait(true);
       }
       finally
       {
@@ -2154,6 +2308,30 @@ namespace VoiceStudio.App.Views.Panels
 
       SendToTimelineCommand.NotifyCanExecuteChanged();
       TranscriptSegmentLayoutRevision++;
+    }
+
+    /// <summary>
+    /// GAP-045 cross-consumer: after backend list rehydrate, ask Timeline to refetch subtitle segments when
+    /// the timeline overlay was tied to the pre-rehydrate selection (avoids stale in-memory segment text).
+    /// </summary>
+    private void PublishTimelineCoherenceAfterRehydrate(string? previousTranscriptionId)
+    {
+      var eventAggregator = AppServices.TryGetEventAggregator();
+      if (eventAggregator == null)
+      {
+        return;
+      }
+
+      eventAggregator.Publish(
+          new NavigateToEvent(
+              PanelId,
+              "timeline",
+              new Dictionary<string, object>
+              {
+                { "action", "coherentReloadAfterRehydrate" },
+                { "previousTranscriptionId", previousTranscriptionId ?? string.Empty },
+                { "transcriptionId", SelectedTranscription?.Id ?? string.Empty },
+              }));
     }
 
     /// <summary>

@@ -76,6 +76,22 @@ namespace VoiceStudio.App.Commands
             return AllowedExportLufsPresetIds.Contains(t) ? t : "podcast_stereo";
         }
 
+        /// <summary>
+        /// GAP-045 subtitle-restore lifecycle: a new project identity must not inherit
+        /// <see cref="Project.LastSubtitleTranscriptionId"/> from another project (local JSON restore field).
+        /// </summary>
+        private static Project CreateShellProjectForNewIdentity(string name)
+        {
+            return new Project
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = name,
+                CreatedAt = DateTime.UtcNow.ToString("o"),
+                UpdatedAt = DateTime.UtcNow.ToString("o"),
+                LastSubtitleTranscriptionId = null,
+            };
+        }
+
         /// <summary>GAP-034: per-export correlation id → one terminal OS notification per attempt.</summary>
         private static void TryNotifyExportCompletion(string operationId, bool success, string bodyFragment)
         {
@@ -227,13 +243,7 @@ namespace VoiceStudio.App.Commands
                 return; // User cancelled
             }
 
-            _currentProject = new Project
-            {
-                Id = Guid.NewGuid().ToString(),
-                Name = name,
-                CreatedAt = DateTime.UtcNow.ToString("o"),
-                UpdatedAt = DateTime.UtcNow.ToString("o")
-            };
+            _currentProject = CreateShellProjectForNewIdentity(name);
             _currentProjectPath = null;
             HasUnsavedChanges = true;
 
@@ -275,6 +285,7 @@ namespace VoiceStudio.App.Commands
             try
             {
                 // Try to load from repository (if it's a project ID)
+                // Open replaces current project with file/ID authority — no merge of prior in-memory Project fields.
                 var project = await _projectRepository.OpenAsync(selectedPath, ct);
                 if (project != null)
                 {
@@ -349,15 +360,9 @@ namespace VoiceStudio.App.Commands
                 return; // User cancelled
             }
 
-            // Create a copy with new ID and name
-            var newProject = new Project
-            {
-                Id = Guid.NewGuid().ToString(),
-                Name = name,
-                CreatedAt = DateTime.UtcNow.ToString("o"),
-                UpdatedAt = DateTime.UtcNow.ToString("o"),
-                // Copy other properties as needed
-            };
+            // New identity: do not copy LastSubtitleTranscriptionId or other fields from the source project
+            // (bounded GAP-045 lifecycle hygiene — avoids cross-project subtitle restore carryover).
+            var newProject = CreateShellProjectForNewIdentity(name);
 
             try
             {

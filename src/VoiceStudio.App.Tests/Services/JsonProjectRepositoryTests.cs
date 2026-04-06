@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -103,6 +105,42 @@ public sealed class JsonProjectRepositoryTests
             var loaded = await repo.GetByIdAsync("legacy-proj");
             Assert.IsNotNull(loaded);
             Assert.AreEqual(0, loaded!.PersistedProjectSchemaVersion);
+        }
+        finally
+        {
+            TryDeleteDir(dir);
+        }
+    }
+
+    /// <summary>GAP-045 lifecycle: last-subtitle id patch persists and clears via repository API.</summary>
+    [TestMethod]
+    public async Task SaveLastSubtitleTranscriptionIdAsync_roundTrip_then_clear()
+    {
+        var dir = NewTempRepoDir();
+        try
+        {
+            var repo = new JsonProjectRepository(dir);
+            var p = new Project
+            {
+                Id = "proj-sub",
+                Name = "Sub",
+                CreatedAt = DateTime.UtcNow.ToString("o"),
+                UpdatedAt = DateTime.UtcNow.ToString("o"),
+                Tracks = new List<AudioTrack>(),
+            };
+            await repo.SaveAsync(p);
+
+            await repo.SaveLastSubtitleTranscriptionIdAsync("proj-sub", "tid-42", CancellationToken.None);
+            var got = await repo.GetLastSubtitleTranscriptionIdAsync("proj-sub");
+            Assert.AreEqual("tid-42", got);
+
+            await repo.SaveLastSubtitleTranscriptionIdAsync("proj-sub", null, CancellationToken.None);
+            var cleared = await repo.GetLastSubtitleTranscriptionIdAsync("proj-sub");
+            Assert.IsNull(cleared);
+
+            var loaded = await repo.GetByIdAsync("proj-sub");
+            Assert.IsNotNull(loaded);
+            Assert.IsNull(loaded!.LastSubtitleTranscriptionId);
         }
         finally
         {

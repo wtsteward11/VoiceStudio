@@ -77,12 +77,13 @@ namespace VoiceStudio.App.Services
     {
       if (ex is System.OperationCanceledException)
         return ex;
+      // GAP-064: Preserve typed backend exceptions for ActionableErrorTranslator.
       if (ex is BackendNotFoundException)
-        return new System.InvalidOperationException("Profile or engine not found. Please check your selection.", ex);
+        return ex;
       if (ex is System.Net.Http.HttpRequestException httpEx)
-        return new System.InvalidOperationException(
-          "Backend is unavailable. Please ensure the VoiceStudio backend is running." +
-          (httpEx.Message != null ? $" ({httpEx.Message})" : ""), ex);
+        return new BackendUnavailableException(
+            "Cannot reach the VoiceStudio backend. Ensure the backend is running and reachable.",
+            httpEx);
       return ex;
     }
 

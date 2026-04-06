@@ -722,6 +722,15 @@ namespace VoiceStudio.App.Views.Panels
             ResourceHelper.FormatString("VoiceSynthesis.SynthesisCompleteDetail", response.Duration, qualityPercent),
             ResourceHelper.GetString("VoiceSynthesis.SynthesisComplete", "Synthesis Complete")
         );
+
+        var ssmlNotice = ActionableErrorTranslator.BuildSsmlHandlingUserNotice(response.SsmlHandling);
+        if (ssmlNotice != null)
+        {
+          var body = string.IsNullOrWhiteSpace(ssmlNotice.SecondaryDetail)
+              ? ssmlNotice.PrimaryMessage
+              : $"{ssmlNotice.PrimaryMessage}{Environment.NewLine}{ssmlNotice.SecondaryDetail}";
+          _toastNotificationService?.ShowWarning(body, ssmlNotice.Title);
+        }
       }
       catch (OperationCanceledException)
       {
@@ -737,15 +746,19 @@ namespace VoiceStudio.App.Views.Panels
                     { "ProfileId", SelectedProfile?.Id ?? "unknown" },
                     { "TextLength", Text?.Length ?? 0 }
                 });
-        var errorMsg = ErrorHandler.GetUserFriendlyMessage(ex);
-        ErrorMessage = $"Synthesis failed: {errorMsg}";
+        var actionable = ActionableErrorTranslator.Translate(ex, ActionableOperationContext.VoiceSynthesize);
+        var errorMsg = actionable.PrimaryMessage;
+        ErrorMessage = errorMsg;
         HasError = true;
         WorkflowState = SynthesisWorkflowState.Error;
         StatusMessage = string.Empty;
 
         _errorService?.ShowError(ex, ResourceHelper.GetString("Timeline.SynthesisFailed", "Failed to synthesize voice"));
+        var toastDetail = string.IsNullOrWhiteSpace(actionable.SecondaryDetail)
+            ? errorMsg
+            : $"{errorMsg}{Environment.NewLine}{actionable.SecondaryDetail}";
         _toastNotificationService?.ShowError(
-            ResourceHelper.FormatString("VoiceSynthesis.SynthesisFailedDetail", errorMsg),
+            ResourceHelper.FormatString("VoiceSynthesis.SynthesisFailedDetail", toastDetail),
             ResourceHelper.GetString("VoiceSynthesis.SynthesisFailed", "Synthesis Failed"));
         await (_errorDialogService?.ShowErrorAsync(ex, ResourceHelper.GetString("Panel.VoiceSynthesis.DisplayName", "Voice Synthesis")) ?? Task.CompletedTask);
       }

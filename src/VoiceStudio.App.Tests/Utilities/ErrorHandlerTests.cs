@@ -41,5 +41,15 @@ namespace VoiceStudio.App.Tests.Utilities
       Assert.IsFalse(ErrorHandler.IsRateLimitException(new BackendException("Not found", 404, null, false)));
       Assert.IsFalse(ErrorHandler.IsRateLimitException(null));
     }
+
+    [TestMethod]
+    public void GetUserFriendlyMessage_HttpRequestException_UnknownStatus_OmitsRawCodeAndInnerDetail()
+    {
+      var ex = new HttpRequestException("low-level TCP detail");
+      ex.Data["StatusCode"] = "418";
+      var msg = ErrorHandler.GetUserFriendlyMessage(ex);
+      Assert.IsFalse(msg.Contains("418", StringComparison.Ordinal));
+      Assert.IsFalse(msg.Contains("TCP", StringComparison.OrdinalIgnoreCase));
+    }
   }
 }

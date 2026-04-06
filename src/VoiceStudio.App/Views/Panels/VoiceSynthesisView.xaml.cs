@@ -63,18 +63,7 @@ namespace VoiceStudio.App.Views.Panels
         // Close any open dialogs or overlays
       });
 
-      // Subscribe to ViewModel events for toast notifications
-      ViewModel.PropertyChanged += (s, e) =>
-      {
-        if (e.PropertyName == nameof(VoiceSynthesisViewModel.ErrorMessage) && !string.IsNullOrEmpty(ViewModel.ErrorMessage))
-        {
-          _toastService?.ShowToast(ToastType.Error, "Synthesis Error", ViewModel.ErrorMessage);
-        }
-        else if (e.PropertyName == nameof(VoiceSynthesisViewModel.LastSynthesizedAudioUrl) && !string.IsNullOrEmpty(ViewModel.LastSynthesizedAudioUrl))
-        {
-          _toastService?.ShowToast(ToastType.Success, "Synthesis Complete", "Audio synthesized successfully");
-        }
-      };
+      // GAP-064: Error/success toasts are owned by VoiceSynthesisViewModel (single narrative, no duplicate view toasts).
     }
 
     private void TextInput_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)

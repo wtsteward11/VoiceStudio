@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Threading;
 using VoiceStudio.App.Logging;
 using VoiceStudio.App.Utilities;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Services
@@ -298,18 +299,7 @@ namespace VoiceStudio.App.Services
 
     private static string GetErrorTitle(Exception exception)
     {
-      return exception switch
-      {
-        VoiceStudio.Core.Exceptions.BackendUnavailableException => "Connection Error",
-        VoiceStudio.Core.Exceptions.BackendTimeoutException => "Timeout Error",
-        VoiceStudio.Core.Exceptions.BackendAuthenticationException => "Authentication Error",
-        VoiceStudio.Core.Exceptions.BackendNotFoundException => "Not Found",
-        VoiceStudio.Core.Exceptions.BackendValidationException => "Validation Error",
-        System.Net.Http.HttpRequestException => "Network Error",
-        System.TimeoutException => "Timeout Error",
-        OutOfMemoryException => "Memory Error",
-        _ => "Error"
-      };
+      return ActionableErrorTranslator.Translate(exception, ActionableOperationContext.General).Title;
     }
   }
 }

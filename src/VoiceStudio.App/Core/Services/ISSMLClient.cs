@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
+using VoiceStudio.Core.Models;
 using SSMLDocument = VoiceStudio.App.ViewModels.SSMLDocument;
 
 namespace VoiceStudio.Core.Services
@@ -46,5 +47,8 @@ namespace VoiceStudio.Core.Services
     public string AudioId { get; set; } = string.Empty;
     public double Duration { get; set; }
     public string Message { get; set; } = string.Empty;
+    /// <summary>GAP-054/064: Present when SSML was detected or transformed on the preview path.</summary>
+    [System.Text.Json.Serialization.JsonPropertyName("ssml_handling")]
+    public SsmlHandlingDiagnostics? SsmlHandling { get; set; }
   }
 }

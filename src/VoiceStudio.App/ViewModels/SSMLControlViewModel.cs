@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Helpers;
@@ -365,8 +366,9 @@ namespace VoiceStudio.App.ViewModels
       catch (Exception ex)
       {
         await HandleErrorAsync(ex, "UpdateDocument");
+        var u = ActionableErrorTranslator.Translate(ex, ActionableOperationContext.General);
         _toastNotificationService?.ShowError(
-            ResourceHelper.FormatString("SSMLControl.UpdateDocumentFailed", ex.Message),
+            ResourceHelper.FormatString("SSMLControl.UpdateDocumentFailed", u.PrimaryMessage),
             ResourceHelper.GetString("Toast.Title.UpdateFailed", "Update Failed"));
       }
       finally
@@ -445,8 +447,9 @@ namespace VoiceStudio.App.ViewModels
       catch (Exception ex)
       {
         await HandleErrorAsync(ex, "DeleteDocument");
+        var d = ActionableErrorTranslator.Translate(ex, ActionableOperationContext.General);
         _toastNotificationService?.ShowError(
-            ResourceHelper.FormatString("SSMLControl.DeleteDocumentFailed", ex.Message),
+            ResourceHelper.FormatString("SSMLControl.DeleteDocumentFailed", d.PrimaryMessage),
             ResourceHelper.GetString("Toast.Title.DeleteFailed", "Delete Failed"));
       }
       finally
@@ -519,8 +522,9 @@ namespace VoiceStudio.App.ViewModels
       catch (Exception ex)
       {
         await HandleErrorAsync(ex, "ValidateSSML");
+        var v = ActionableErrorTranslator.Translate(ex, ActionableOperationContext.SSMLValidate);
         _toastNotificationService?.ShowError(
-            ResourceHelper.FormatString("SSMLControl.ValidateFailed", ex.Message),
+            ResourceHelper.FormatString("SSMLControl.ValidateFailed", v.PrimaryMessage),
             ResourceHelper.GetString("Toast.Title.ValidationFailed", "Validation Failed"));
       }
       finally
@@ -549,6 +553,15 @@ namespace VoiceStudio.App.ViewModels
             ResourceHelper.GetString("SSMLControl.PreviewSynthesized", "Preview synthesized"),
             ResourceHelper.GetString("Toast.Title.PreviewReady", "Preview Ready"));
 
+        var ssmlNotice = ActionableErrorTranslator.BuildSsmlHandlingUserNotice(response?.SsmlHandling);
+        if (ssmlNotice != null)
+        {
+          var body = string.IsNullOrWhiteSpace(ssmlNotice.SecondaryDetail)
+              ? ssmlNotice.PrimaryMessage
+              : $"{ssmlNotice.PrimaryMessage}{Environment.NewLine}{ssmlNotice.SecondaryDetail}";
+          _toastNotificationService?.ShowWarning(body, ssmlNotice.Title);
+        }
+
         if (response != null && !string.IsNullOrEmpty(response.AudioId))
         {
           PreviewAudioId = response.AudioId;
@@ -561,9 +574,13 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (Exception ex)
       {
-        ErrorMessage = ResourceHelper.FormatString("SSMLControl.PreviewFailed", ex.Message);
+        var p = ActionableErrorTranslator.Translate(ex, ActionableOperationContext.SSMLPreview);
+        ErrorMessage = ResourceHelper.FormatString("SSMLControl.PreviewFailed", p.PrimaryMessage);
+        var previewDetail = string.IsNullOrWhiteSpace(p.SecondaryDetail)
+            ? p.PrimaryMessage
+            : $"{p.PrimaryMessage}{Environment.NewLine}{p.SecondaryDetail}";
         _toastNotificationService?.ShowError(
-            ResourceHelper.FormatString("SSMLControl.PreviewFailed", ex.Message),
+            ResourceHelper.FormatString("SSMLControl.PreviewFailed", previewDetail),
             ResourceHelper.GetString("Toast.Title.PreviewFailed", "Preview Failed"));
       }
       finally
@@ -586,7 +603,8 @@ namespace VoiceStudio.App.ViewModels
       }
       catch (Exception ex)
       {
-        ErrorMessage = ResourceHelper.FormatString("SSMLControl.PreviewFailed", ex.Message);
+        var p = ActionableErrorTranslator.Translate(ex, ActionableOperationContext.SSMLPreview);
+        ErrorMessage = ResourceHelper.FormatString("SSMLControl.PreviewFailed", p.PrimaryMessage);
       }
     }
 

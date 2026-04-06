@@ -62,35 +62,34 @@ namespace VoiceStudio.App.Tests.Services
     }
 
     [TestMethod]
-    public async Task SynthesizeVoiceAsync_BackendNotFoundException_MapsToInvalidOperationException()
+    public async Task SynthesizeVoiceAsync_BackendNotFoundException_PropagatesTyped()
     {
       _mockBackend
         .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
         .ThrowsAsync(new BackendNotFoundException("Profile not found"));
 
-      var ex = await Assert.ThrowsExceptionAsync<InvalidOperationException>(async () =>
+      var ex = await Assert.ThrowsExceptionAsync<BackendNotFoundException>(async () =>
         await _sut.SynthesizeVoiceAsync(
           new VoiceSynthesisRequest { Engine = "xtts", ProfileId = "p1", Text = "Hi" },
           CancellationToken.None));
 
-      Assert.IsTrue(ex.Message.Contains("Profile or engine not found", StringComparison.OrdinalIgnoreCase));
-      Assert.IsNotNull(ex.InnerException);
-      Assert.IsInstanceOfType(ex.InnerException, typeof(BackendNotFoundException));
+      StringAssert.Contains(ex.Message, "Profile");
     }
 
     [TestMethod]
-    public async Task SynthesizeVoiceAsync_HttpRequestException_MapsToInvalidOperationException()
+    public async Task SynthesizeVoiceAsync_HttpRequestException_MapsToBackendUnavailableWithoutRawSocketText()
     {
       _mockBackend
         .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
         .ThrowsAsync(new HttpRequestException("Connection refused"));
 
-      var ex = await Assert.ThrowsExceptionAsync<InvalidOperationException>(async () =>
+      var ex = await Assert.ThrowsExceptionAsync<BackendUnavailableException>(async () =>
         await _sut.SynthesizeVoiceAsync(
           new VoiceSynthesisRequest { Engine = "xtts", ProfileId = "p1", Text = "Hi" },
           CancellationToken.None));
 
-      Assert.IsTrue(ex.Message.Contains("Backend is unavailable", StringComparison.OrdinalIgnoreCase));
+      Assert.IsTrue(ex.Message.Contains("backend", StringComparison.OrdinalIgnoreCase));
+      Assert.IsFalse(ex.Message.Contains("Connection refused", StringComparison.Ordinal));
     }
 
     [TestMethod]

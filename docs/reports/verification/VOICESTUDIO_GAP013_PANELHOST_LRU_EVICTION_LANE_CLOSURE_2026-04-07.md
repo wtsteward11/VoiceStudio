@@ -24,7 +24,8 @@
 ## 3. Proof pointers
 
 - Quick verify folder: `artifacts/verify/20260406_220332/`
-- Verification JSON: `.buildlogs/verification/last_run.json` (`timestamp_short`: **20260406-220821**)
+- Verification JSON (closure matrix): `.buildlogs/verification/last_run.json` (`timestamp_short`: **20260406-220821**)
+- Post-commit guard refresh: `run_verification.py` → **20260406-221038** (see `.cursor/STATE.md` **Latest verify artifact**)
 
 ## 4. Rollback
 

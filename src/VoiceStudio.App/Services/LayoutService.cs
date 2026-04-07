@@ -1,5 +1,8 @@
 // VoiceStudio - Panel Architecture Phase 3: Workspace System
 // LayoutService implements low-level panel layout operations
+//
+// GAP-014: Not registered in AppServices DI. Legacy helper for WorkspaceService when constructed manually;
+// live shell uses PanelStateService + MainWindow restore.
 
 using System;
 using System.Collections.Generic;

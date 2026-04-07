@@ -1,6 +1,6 @@
 // Phase 5.0: Service Unification
 // Task 5.0.1: Unified Workspace Service Interface
-// This interface unifies WorkspaceManager and PanelStateService
+// This interface unifies legacy workspace concepts into PanelStateService (GAP-014: deprecated WorkspaceManager type removed).
 
 using System;
 using System.Collections.Generic;

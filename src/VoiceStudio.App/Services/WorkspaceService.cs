@@ -1,5 +1,8 @@
 // VoiceStudio - Panel Architecture Phase 3: Workspace System
 // WorkspaceService implements workspace management with JSON persistence
+//
+// GAP-014: Not registered in AppServices DI. Type retained for DefaultPresets and tests
+// (e.g. PanelIdConsistencyTests). Runtime workspace authority is PanelStateService (IUnifiedWorkspaceService).
 
 using System;
 using System.Collections.Generic;

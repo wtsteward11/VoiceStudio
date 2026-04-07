@@ -387,7 +387,7 @@ namespace VoiceStudio.App.Services
     }
 
     /// <summary>
-    /// Registers panel-specific services: PanelRegistry, LayoutService, WorkspaceService, ContextManager, etc.
+    /// Registers panel-specific services: PanelRegistry, PanelStateService, ContextManager, etc.
     /// Must run after RegisterBackendFacades.
     /// </summary>
     private static void RegisterPanelServices(IServiceCollection services)
@@ -414,12 +414,8 @@ namespace VoiceStudio.App.Services
           sp.GetRequiredService<IEventAggregator>(),
           sp.GetService<AppStateStore>()));
 
-      // Layout and Workspace services (Panel Architecture Phase 3)
-      services.AddSingleton<ILayoutService, LayoutService>();
-      services.AddSingleton<IWorkspaceService>(sp => new WorkspaceService(
-          sp.GetService<ILayoutService>(),
-          sp.GetService<IEventAggregator>(),
-          sp.GetService<Microsoft.Extensions.Logging.ILogger<WorkspaceService>>()));
+      // GAP-014: Legacy ILayoutService/IWorkspaceService (LayoutService/WorkspaceService) removed from DI.
+      // Runtime workspace authority is PanelStateService (IUnifiedWorkspaceService) + MainWindow orchestration.
 
       // Selection navigation stack for back/forward navigation (Panel Architecture Phase 5)
       services.AddSingleton<ISelectionStack, SelectionStack>();
@@ -887,10 +883,6 @@ namespace VoiceStudio.App.Services
     public static IRecordingSessionCoordinator? TryGetRecordingSessionCoordinator() => GetService<IRecordingSessionCoordinator>();
 
     public static IRecordingCaptureFanoutService? TryGetRecordingCaptureFanoutService() => GetService<IRecordingCaptureFanoutService>();
-    public static ILayoutService GetLayoutService() => GetRequiredService<ILayoutService>();
-    public static ILayoutService? TryGetLayoutService() => GetService<ILayoutService>();
-    public static IWorkspaceService GetWorkspaceService() => GetRequiredService<IWorkspaceService>();
-    public static IWorkspaceService? TryGetWorkspaceService() => GetService<IWorkspaceService>();
     public static IDragDropService GetDragDropService() => GetRequiredService<IDragDropService>();
     public static IDragDropService? TryGetDragDropService() => GetService<IDragDropService>();
     public static IWorkflowCoordinatorService GetWorkflowCoordinatorService() => GetRequiredService<IWorkflowCoordinatorService>();

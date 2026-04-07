@@ -7,7 +7,7 @@
 // L2: EventAggregator._lock
 // L3: SettingsService._semaphore
 // L4: AudioPlayerService._playbackLock
-// L5: WorkspaceService._rwLock
+// L5: WorkspaceService._rwLock (legacy type; not DI-registered after GAP-014 — lock still applies if type is used)
 // L6: PanelStateService._panelLocks[id]
 // L7: CommandMutexService._lockSync
 //

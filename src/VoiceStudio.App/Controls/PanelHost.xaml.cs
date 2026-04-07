@@ -29,6 +29,8 @@ namespace VoiceStudio.App.Controls
     private readonly ConcurrentDictionary<string, UserControl> _loadedPanels = new();
     private readonly List<string> _lruOrder = new();
     private readonly SemaphoreSlim _loadLock = new(1, 1);
+    /// <summary>GAP-013: serialize HostedPanel lifecycle (deactivate/save/restore/activate) across overlapping DP changes.</summary>
+    private readonly SemaphoreSlim _hostedPanelTransitionLock = new(1, 1);
     private volatile bool _isUnloaded;
     private string? _previousPanelId;
     private PanelRegion _region = PanelRegion.Center;
@@ -216,6 +218,11 @@ namespace VoiceStudio.App.Controls
         _isUnloaded = true;
         _loadingCts?.Cancel();
         _loadingCts?.Dispose();
+        if (_subscribedToReachability)
+        {
+          ErrorPresentationService.BackendReachabilityChanged -= OnBackendReachabilityChanged;
+          _subscribedToReachability = false;
+        }
         _ = CleanupCacheAsync();
       };
     }
@@ -235,17 +242,17 @@ namespace VoiceStudio.App.Controls
     /// </summary>
     private async Task CleanupCacheAsync()
     {
-      List<IDisposable>? toDispose = null;
+      List<object?>? toTeardown = null;
       try
       {
         await _loadLock.WaitAsync().ConfigureAwait(false);
         try
         {
-          toDispose = new List<IDisposable>();
+          toTeardown = new List<object?>();
           foreach (var cached in _loadedPanels.Values)
           {
-            if (cached is UserControl uc && uc.DataContext is IDisposable d)
-              toDispose.Add(d);
+            if (cached is UserControl uc && uc.DataContext != null)
+              toTeardown.Add(uc.DataContext);
           }
           _loadedPanels.Clear();
           _lruOrder.Clear();
@@ -262,37 +269,53 @@ namespace VoiceStudio.App.Controls
         return;
       }
 
-      if (toDispose == null || toDispose.Count == 0)
+      if (toTeardown == null || toTeardown.Count == 0)
         return;
 
       var dq = DispatcherQueue;
       if (dq != null && !dq.HasThreadAccess)
       {
-        dq.TryEnqueue(() =>
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        dq.TryEnqueue(() => { _ = CompleteCacheTeardownOnUiAsync(tcs, toTeardown!); });
+        try
         {
-          foreach (var d in toDispose)
-          {
-            // ALLOWED: empty catch - panel teardown must not propagate exceptions to caller
-            try { d.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PanelHost.CleanupCacheAsync"); }
-          }
-        });
+          await tcs.Task.ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+          ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PanelHost.CleanupCacheAsync");
+        }
       }
       else if (dq == null)
       {
-        System.Diagnostics.Debug.WriteLine("[PanelHost] CleanupCacheAsync: DispatcherQueue null, disposing on current thread (may cause UI-thread affinity issues)");
-        foreach (var d in toDispose)
+        System.Diagnostics.Debug.WriteLine("[PanelHost] CleanupCacheAsync: DispatcherQueue null, deactivating/disposing on current thread (may cause UI-thread affinity issues)");
+        foreach (var vm in toTeardown)
         {
-          // ALLOWED: empty catch - panel teardown must not propagate exceptions to caller
-          try { d.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PanelHost.CleanupCacheAsync"); }
+          await DeactivateViewModelThenDisposeAsync(vm, CancellationToken.None).ConfigureAwait(false);
         }
       }
       else
       {
-        foreach (var d in toDispose)
+        foreach (var vm in toTeardown)
         {
-          // ALLOWED: empty catch - panel teardown must not propagate exceptions to caller
-          try { d.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PanelHost.CleanupCacheAsync"); }
+          await DeactivateViewModelThenDisposeAsync(vm, CancellationToken.None).ConfigureAwait(true);
         }
+      }
+    }
+
+    private async Task CompleteCacheTeardownOnUiAsync(TaskCompletionSource tcs, List<object?> vms)
+    {
+      try
+      {
+        foreach (var vm in vms)
+        {
+          await DeactivateViewModelThenDisposeAsync(vm, CancellationToken.None).ConfigureAwait(true);
+        }
+        tcs.TrySetResult();
+      }
+      catch (Exception ex)
+      {
+        tcs.TrySetException(ex);
       }
     }
 
@@ -301,23 +324,27 @@ namespace VoiceStudio.App.Controls
     /// </summary>
     private async Task HandleContentChangeAsync(UIElement? oldContent, UIElement? newContent)
     {
-      var ct = _loadingCts?.Token ?? CancellationToken.None;
+      if (ReferenceEquals(oldContent, newContent))
+        return;
 
+      await _hostedPanelTransitionLock.WaitAsync().ConfigureAwait(true);
       try
       {
+        var ct = _loadingCts?.Token ?? CancellationToken.None;
+
         // 1. Deactivate old content's ViewModel
-        await DeactivateViewModelAsync(oldContent, ct);
+        await DeactivateViewModelAsync(oldContent, ct).ConfigureAwait(true);
 
         // 2. Panels in cache must NOT be disposed on deactivation (removed DisposePreviousViewModel)
 
-        // 3. Save previous panel state before changing content
-        SaveCurrentPanelState();
+        // 3. Save outgoing panel state (use old content — HostedPanel already reflects new value in callback)
+        SaveOutgoingPanelState(oldContent);
 
-        // 4. Restore new panel state
-        RestorePanelState(newContent);
+        // 4. Restore new panel state (await before activate)
+        await RestorePanelStateAsync(newContent).ConfigureAwait(true);
 
         // 5. Activate new content's ViewModel
-        await ActivateViewModelAsync(newContent, ct);
+        await ActivateViewModelAsync(newContent, ct).ConfigureAwait(true);
 
         // 6. Update context-sensitive action bar (IDEA 2)
         UpdateActionBar(newContent);
@@ -330,7 +357,15 @@ namespace VoiceStudio.App.Controls
       {
         System.Diagnostics.Debug.WriteLine($"[PanelHost] Error during content change: {ex.Message}");
       }
+      finally
+      {
+        _hostedPanelTransitionLock.Release();
+      }
     }
+
+    /// <summary>GAP-013: seam for behavioral tests — runs the same path as <see cref="HostedPanelProperty"/> change.</summary>
+    internal Task RunHostedPanelLifecycleTransitionForTestsAsync(UIElement? oldContent, UIElement? newContent) =>
+      HandleContentChangeAsync(oldContent, newContent);
 
     /// <summary>
     /// Activates the ViewModel if it implements IPanelLifecycle.
@@ -387,6 +422,43 @@ namespace VoiceStudio.App.Controls
       {
         // Fall back to reflection-based deactivation
         await PanelLifecycleHelper.InvokeDeactivateAsync(viewModel, ct);
+      }
+    }
+
+    /// <summary>
+    /// GAP-013: deactivate lifecycle hooks before <see cref="IDisposable.Dispose"/> on eviction/unload/cache clear.
+    /// </summary>
+    internal static async Task DeactivateViewModelThenDisposeAsync(object? viewModel, CancellationToken cancellationToken)
+    {
+      if (viewModel == null)
+        return;
+
+      try
+      {
+        if (viewModel is IPanelLifecycle lifecycle)
+        {
+          await lifecycle.OnDeactivatedAsync(cancellationToken).ConfigureAwait(true);
+        }
+        else
+        {
+          await PanelLifecycleHelper.InvokeDeactivateAsync(viewModel, cancellationToken).ConfigureAwait(true);
+        }
+      }
+      catch (Exception ex)
+      {
+        System.Diagnostics.Debug.WriteLine($"[PanelHost] Deactivate before dispose failed: {ex.Message}");
+      }
+
+      if (viewModel is IDisposable d)
+      {
+        try
+        {
+          d.Dispose();
+        }
+        catch (Exception ex)
+        {
+          ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PanelHost.DeactivateViewModelThenDisposeAsync");
+        }
       }
     }
 
@@ -547,29 +619,24 @@ namespace VoiceStudio.App.Controls
     }
 
     /// <summary>
-    /// Saves the current panel state before switching panels.
-    /// Backend-Frontend Integration Plan - Phase 2: Enhanced state persistence.
+    /// Saves outgoing panel state when <see cref="HostedPanel"/> changes (use explicit outgoing element, not ambient <see cref="HostedPanel"/>).
     /// </summary>
-    private void SaveCurrentPanelState()
+    private void SaveOutgoingPanelState(UIElement? outgoingContent)
     {
-      if (_panelStateService == null || HostedPanel == null || string.IsNullOrEmpty(_previousPanelId))
+      if (_panelStateService == null || outgoingContent == null)
         return;
 
       try
       {
-        // Try to get ViewModel from content to save panel-specific state
-        string? panelId = null;
+        if (!GetPanelIdFromContent(outgoingContent, out string? panelId) || string.IsNullOrEmpty(panelId))
+          return;
 
-        // Get panel ID from ViewModel if it implements IPanelView
-        if (GetPanelIdFromContent(HostedPanel, out panelId) && !string.IsNullOrEmpty(panelId))
+        var panelState = new VoiceStudio.Core.Models.PanelState
         {
-          var panelState = new VoiceStudio.Core.Models.PanelState
-          {
-            PanelId = panelId
-          };
+          PanelId = panelId
+        };
 
-          // Check if ViewModel implements IPanelStatePersistable for custom state
-          if (HostedPanel is UserControl userControl && userControl.DataContext is IPanelStatePersistable persistable)
+        if (outgoingContent is UserControl userControl && userControl.DataContext is IPanelStatePersistable persistable)
           {
             var customState = persistable.GetCurrentState();
             if (customState != null)
@@ -607,50 +674,42 @@ namespace VoiceStudio.App.Controls
             }
           }
 
-          _panelStateService.SavePanelState(_region, panelId, panelState);
-        }
+        _panelStateService.SavePanelState(_region, panelId, panelState);
       }
       catch (Exception ex)
       {
-        // Don't break panel switching if state saving fails
         System.Diagnostics.Debug.WriteLine($"Failed to save panel state: {ex.Message}");
       }
     }
 
     /// <summary>
-    /// Restores panel state when a panel is loaded.
-    /// Backend-Frontend Integration Plan - Phase 2: Enhanced state restoration.
+    /// Restores panel state when a panel is shown; awaited before <see cref="IPanelLifecycle.OnActivatedAsync"/>.
     /// </summary>
-    private void RestorePanelState(UIElement? newContent)
+    private async Task RestorePanelStateAsync(UIElement? newContent)
     {
       if (_panelStateService == null || newContent == null)
         return;
 
       try
       {
-        // Get panel ID from content
         if (!GetPanelIdFromContent(newContent, out string? panelId) || string.IsNullOrEmpty(panelId))
           return;
 
         _previousPanelId = panelId;
 
-        // Get saved state for this panel
         var savedState = _panelStateService.GetPanelState(_region, panelId);
         if (savedState == null)
           return;
 
-        // Check if ViewModel implements IPanelStatePersistable for custom state restoration
         if (newContent is UserControl userControl && userControl.DataContext is IPanelStatePersistable persistable)
         {
-          // Convert PanelState to PanelStateData
           var stateData = new PanelStateData
           {
             PanelId = savedState.PanelId,
             ScrollPosition = savedState.ScrollPosition,
             SelectedItemId = savedState.SelectedItemId
           };
-          
-          // Extract custom state fields
+
           if (savedState.CustomState != null)
           {
             if (savedState.CustomState.TryGetValue("SearchText", out var searchText))
@@ -669,11 +728,10 @@ namespace VoiceStudio.App.Controls
               stateData.SelectedItemIds = idsArray;
             if (savedState.CustomState.TryGetValue("ExpandedSections", out var expanded) && expanded is Dictionary<string, bool> expandedDict)
               stateData.ExpandedSections = expandedDict;
-            
-            // Gather remaining custom data
-            var knownKeys = new HashSet<string> { 
-              "SearchText", "SortColumn", "SortDescending", "ActiveTabIndex", 
-              "ZoomLevel", "HorizontalScrollPosition", "SelectedItemIds", "ExpandedSections" 
+
+            var knownKeys = new HashSet<string> {
+              "SearchText", "SortColumn", "SortDescending", "ActiveTabIndex",
+              "ZoomLevel", "HorizontalScrollPosition", "SelectedItemIds", "ExpandedSections"
             };
             stateData.CustomData = new Dictionary<string, object>();
             foreach (var kvp in savedState.CustomState)
@@ -682,9 +740,16 @@ namespace VoiceStudio.App.Controls
                 stateData.CustomData[kvp.Key] = kvp.Value;
             }
           }
-          
-          // Restore state asynchronously (fire and forget, but log errors)
-          _ = RestorePanelStateAsync(persistable, stateData, panelId);
+
+          try
+          {
+            await persistable.RestoreStateAsync(stateData).ConfigureAwait(true);
+            System.Diagnostics.Debug.WriteLine($"Successfully restored custom state for panel: {panelId}");
+          }
+          catch (Exception ex)
+          {
+            System.Diagnostics.Debug.WriteLine($"Failed to restore custom state for panel {panelId}: {ex.Message}");
+          }
         }
         else
         {
@@ -693,24 +758,7 @@ namespace VoiceStudio.App.Controls
       }
       catch (Exception ex)
       {
-        // Don't break panel loading if state restoration fails
         System.Diagnostics.Debug.WriteLine($"Failed to restore panel state: {ex.Message}");
-      }
-    }
-    
-    /// <summary>
-    /// Async helper to restore panel state without blocking the UI thread.
-    /// </summary>
-    private async Task RestorePanelStateAsync(IPanelStatePersistable persistable, PanelStateData stateData, string panelId)
-    {
-      try
-      {
-        await persistable.RestoreStateAsync(stateData);
-        System.Diagnostics.Debug.WriteLine($"Successfully restored custom state for panel: {panelId}");
-      }
-      catch (Exception ex)
-      {
-        System.Diagnostics.Debug.WriteLine($"Failed to restore custom state for panel {panelId}: {ex.Message}");
       }
     }
 
@@ -746,7 +794,7 @@ namespace VoiceStudio.App.Controls
       _lruOrder.Add(panelId);
     }
 
-    private void EvictIfOverCapacity(string currentPanelId)
+    private async Task EvictIfOverCapacityAsync(string currentPanelId, CancellationToken cancellationToken)
     {
       if (_loadedPanels.Count <= MaxCachedPanels) return;
       string? toEvict = null;
@@ -761,10 +809,20 @@ namespace VoiceStudio.App.Controls
       }
       if (toEvict != null && _loadedPanels.TryRemove(toEvict, out var evicted))
       {
-        if (evicted is UserControl uc && uc.DataContext is IDisposable d)
+        if (evicted is UserControl uc)
         {
-          // ALLOWED: empty catch - cache eviction must not break the UI eviction loop
-          try { d.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PanelHost.EvictIfOverCapacity"); }
+          await DeactivateViewModelThenDisposeAsync(uc.DataContext, cancellationToken).ConfigureAwait(true);
+        }
+        else if (evicted is IDisposable ed)
+        {
+          try
+          {
+            ed.Dispose();
+          }
+          catch (Exception ex)
+          {
+            ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PanelHost.EvictIfOverCapacityAsync");
+          }
         }
         System.Diagnostics.Debug.WriteLine($"[PanelHost] LRU evicted: {toEvict}");
       }
@@ -930,10 +988,9 @@ namespace VoiceStudio.App.Controls
         {
           if (_isUnloaded)
           {
-            if (panel is UserControl uc && uc.DataContext is IDisposable d)
+            if (panel is UserControl ucUnloaded)
             {
-              try { d.Dispose(); }
-              catch (Exception disposeEx) { System.Diagnostics.Debug.WriteLine($"[PanelHost] Dispose teardown failed (non-fatal): {disposeEx.Message}"); }
+              await DeactivateViewModelThenDisposeAsync(ucUnloaded.DataContext, CancellationToken.None).ConfigureAwait(true);
             }
             return null;
           }
@@ -942,10 +999,9 @@ namespace VoiceStudio.App.Controls
           if (_loadedPanels.TryGetValue(panelId, out var existing))
           {
             System.Diagnostics.Debug.WriteLine($"[PanelHost] Duplicate load race for {panelId} — discarding newly created instance");
-            if (panel is UserControl uc2 && uc2.DataContext is IDisposable d2)
+            if (panel is UserControl uc2)
             {
-              try { d2.Dispose(); }
-              catch (Exception disposeEx) { System.Diagnostics.Debug.WriteLine($"[PanelHost] Duplicate race teardown Dispose failed (non-fatal): {disposeEx.Message}"); }
+              await DeactivateViewModelThenDisposeAsync(uc2.DataContext, _loadingCts.Token).ConfigureAwait(true);
             }
             TouchLru(panelId);
             LoadErrorMessage = string.Empty;
@@ -955,7 +1011,7 @@ namespace VoiceStudio.App.Controls
 
           _loadedPanels[panelId] = panel;
           _lruOrder.Add(panelId);
-          EvictIfOverCapacity(panelId);
+          await EvictIfOverCapacityAsync(panelId, _loadingCts.Token).ConfigureAwait(true);
           LoadErrorMessage = string.Empty;
           HostedPanel = panel;
           var loadTime = DateTime.UtcNow - startTime;
@@ -1116,27 +1172,82 @@ namespace VoiceStudio.App.Controls
     /// </summary>
     public async Task UnloadPanelAsync(string panelId)
     {
+      UserControl? userControl = null;
+      UIElement? removed = null;
       await _loadLock.WaitAsync().ConfigureAwait(false);
       try
       {
         if (_loadedPanels.TryRemove(panelId, out var panel))
         {
           _lruOrder.Remove(panelId);
-          if (panel is UserControl uc && uc.DataContext is IDisposable vmDisposable)
-          {
-            // ALLOWED: empty catch - teardown disposal is best-effort
-            try { vmDisposable.Dispose(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[PanelHost] VM dispose failed for {panelId}: {ex.Message}"); }
-          }
-          if (panel is IDisposable disposable)
-          {
-            disposable.Dispose();
-          }
-          System.Diagnostics.Debug.WriteLine($"[PanelHost] Unloaded panel: {panelId}");
+          userControl = panel as UserControl;
+          removed = panel;
         }
       }
       finally
       {
         _loadLock.Release();
+      }
+
+      if (removed == null)
+        return;
+
+      if (userControl != null)
+      {
+        await TeardownPanelUserControlOnDispatcherAsync(userControl, CancellationToken.None).ConfigureAwait(false);
+      }
+      else
+      {
+        var vm = GetViewModelFromContent(removed);
+        await DeactivateViewModelThenDisposeAsync(vm, CancellationToken.None).ConfigureAwait(true);
+      }
+
+      if (removed is IDisposable disposable)
+      {
+        try
+        {
+          disposable.Dispose();
+        }
+        catch (Exception ex)
+        {
+          System.Diagnostics.Debug.WriteLine($"[PanelHost] Panel dispose failed for {panelId}: {ex.Message}");
+        }
+      }
+
+      System.Diagnostics.Debug.WriteLine($"[PanelHost] Unloaded panel: {panelId}");
+    }
+
+    private async Task TeardownPanelUserControlOnDispatcherAsync(UserControl uc, CancellationToken ct)
+    {
+      var dq = DispatcherQueue;
+      if (dq == null || dq.HasThreadAccess)
+      {
+        await DeactivateViewModelThenDisposeAsync(uc.DataContext, ct).ConfigureAwait(true);
+        return;
+      }
+
+      var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+      dq.TryEnqueue(() => { _ = CompleteUnloadTeardownOnUiAsync(tcs, uc, ct); });
+      try
+      {
+        await tcs.Task.WaitAsync(ct).ConfigureAwait(false);
+      }
+      catch (Exception ex)
+      {
+        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "PanelHost.TeardownPanelUserControlOnDispatcherAsync");
+      }
+    }
+
+    private async Task CompleteUnloadTeardownOnUiAsync(TaskCompletionSource tcs, UserControl uc, CancellationToken ct)
+    {
+      try
+      {
+        await DeactivateViewModelThenDisposeAsync(uc.DataContext, ct).ConfigureAwait(true);
+        tcs.TrySetResult();
+      }
+      catch (Exception ex)
+      {
+        tcs.TrySetException(ex);
       }
     }
 

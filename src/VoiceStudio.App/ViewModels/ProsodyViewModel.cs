@@ -345,7 +345,13 @@ namespace VoiceStudio.App.ViewModels
 
         if (response != null)
         {
-          StatusMessage = ResourceHelper.FormatString("Prosody.ProsodyApplied", response.AudioId);
+          var suffix = response.ProsodyApplied
+              ? ResourceHelper.GetString("Prosody.DspAppliedSuffix", "DSP applied")
+              : ResourceHelper.GetString("Prosody.DspIdentitySuffix", "no DSP (identity)");
+          var appliedFmt = ResourceHelper.GetString(
+              "Prosody.ProsodyApplied",
+              "Prosody applied: {0}");
+          StatusMessage = $"{string.Format(appliedFmt, response.AudioId)} — {suffix}";
         }
       }
       catch (Exception ex)
@@ -386,11 +392,31 @@ namespace VoiceStudio.App.ViewModels
       public int[] WordBoundaries { get; set; } = Array.Empty<int>();
     }
 
+    /// <summary>
+    /// Mirrors POST /api/prosody/apply JSON (snake_case via backend client options).
+    /// </summary>
+    public class ProsodyHandlingDiagnostics
+    {
+      public string Action { get; set; } = string.Empty;
+      public List<string> AppliedOperations { get; set; } = new();
+      public List<Dictionary<string, string>> SkippedOperations { get; set; } = new();
+      public List<string> Warnings { get; set; } = new();
+      public List<string> Errors { get; set; } = new();
+      public double PitchFactor { get; set; } = 1.0;
+      public double RateFactor { get; set; } = 1.0;
+      public double VolumeFactor { get; set; } = 1.0;
+      public string Context { get; set; } = string.Empty;
+    }
+
     public class ProsodyApplyResponse
     {
       public string AudioId { get; set; } = string.Empty;
-      public string ConfigApplied { get; set; } = string.Empty;
-      public string Message { get; set; } = string.Empty;
+      public string OriginalAudioId { get; set; } = string.Empty;
+      public string AudioUrl { get; set; } = string.Empty;
+      public double Duration { get; set; }
+      public bool ProsodyApplied { get; set; }
+      public Dictionary<string, object>? ConfigApplied { get; set; }
+      public ProsodyHandlingDiagnostics? ProsodyHandling { get; set; }
     }
   }
 

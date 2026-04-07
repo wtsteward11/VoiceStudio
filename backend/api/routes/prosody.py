@@ -11,24 +11,12 @@ import asyncio
 import logging
 import uuid
 
-import numpy as np
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from ..optimization import cache_response
 
 logger = logging.getLogger(__name__)
-
-# Try importing audio processing utilities
-try:
-    from backend.audio.audio_utils import pitch_shift_audio, time_stretch_audio
-
-    HAS_AUDIO_UTILS = True
-except ImportError:
-    HAS_AUDIO_UTILS = False
-    logger.debug(
-        "Audio utilities not available. Prosody modifications will use basic implementations."
-    )
 
 # Try importing Phonemizer for better phoneme analysis
 try:
@@ -301,92 +289,56 @@ async def apply_prosody(request: ProsodyApplyRequest, http_request: Request):
 
         audio, sample_rate = load_audio(audio_path)
 
-        # Apply pitch modification if needed (use pyrubberband for higher quality)
-        if config.pitch != 1.0:
-            try:
-                # config.pitch: 0.5 to 2.0 (1.0 = no change)
-                # Convert to semitones: log2(pitch) * 12
-                semitones = 12 * (config.pitch - 1.0)
+        from backend.services.prosody_authority_service import (
+            ProsodyAuthorityError,
+            apply_transform,
+        )
 
-                if HAS_AUDIO_UTILS:
-                    # Use audio_utils which has pyrubberband support
-                    audio = pitch_shift_audio(audio, sample_rate, semitones)
-                    logger.info(f"Applied pitch shift using audio_utils: {semitones:.2f} semitones")
-                else:
-                    # Fallback to librosa
-                    import librosa
+        from ..models_additional import ProsodyApplyResponseModel, ProsodyHandlingDiagnostics
 
-                    audio = librosa.effects.pitch_shift(
-                        audio,
-                        sr=sample_rate,
-                        n_steps=semitones,
-                    )
-                    logger.info(f"Applied pitch shift using librosa: {semitones:.2f} semitones")
-            except ImportError:
-                logger.warning(
-                    "Audio processing libraries not available, skipping pitch modification"
-                )
-            except Exception as e:
-                logger.warning(f"Pitch shift failed: {e}, continuing without it")
+        try:
+            transform_result = apply_transform(
+                audio,
+                sample_rate,
+                pitch=config.pitch,
+                rate=config.rate,
+                volume=config.volume,
+                context="prosody_apply",
+            )
+        except ProsodyAuthorityError as e:
+            raise HTTPException(status_code=e.status_code, detail=e.message) from e
 
-        # Apply rate modification if needed (use pyrubberband for higher quality)
-        if config.rate != 1.0:
-            try:
-                if HAS_AUDIO_UTILS:
-                    # Use audio_utils which has pyrubberband support for time-stretching
-                    audio = time_stretch_audio(
-                        audio, sample_rate, rate=config.rate, preserve_pitch=True
-                    )
-                    logger.info(f"Applied rate modification using audio_utils: {config.rate:.2f}x")
-                else:
-                    # Fallback to librosa
-                    import librosa
-
-                    audio = librosa.effects.time_stretch(audio, rate=config.rate)
-                    logger.info(f"Applied rate modification using librosa: {config.rate:.2f}x")
-            except ImportError:
-                logger.warning(
-                    "Audio processing libraries not available, skipping rate modification"
-                )
-            except Exception as e:
-                logger.warning(f"Rate modification failed: {e}, continuing without it")
-
-        # Apply volume modification if needed
-        if config.volume != 1.0:
-            # Volume/gain adjustment: multiply by volume factor
-            audio = audio * config.volume
-            # Prevent clipping
-            max_val = np.max(np.abs(audio))
-            if max_val > 1.0:
-                audio = audio / max_val
-            logger.info(f"Applied volume adjustment: {config.volume:.2f}")
+        audio_out = transform_result.audio
+        diag_raw = transform_result.diagnostics
 
         # Save and register modified audio via artifact spine
         from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
 
         modified_audio_id, _, _ = create_audio_artifact_from_wav_array(
-            audio,
+            audio_out,
             sample_rate,
             created_by="prosody",
             audio_id=f"prosody_{uuid.uuid4().hex[:8]}",
         )
 
-        # Calculate duration
-        duration = len(audio) / sample_rate
+        duration = float(len(audio_out) / sample_rate)
+        prosody_handling = ProsodyHandlingDiagnostics.model_validate(diag_raw)
 
-        return {
-            "audio_id": modified_audio_id,
-            "original_audio_id": synth_response.audio_id,
-            "audio_url": f"/api/audio/{modified_audio_id}",
-            "duration": duration,
-            "prosody_applied": True,
-            "config_applied": {
+        response = ProsodyApplyResponseModel(
+            audio_id=modified_audio_id,
+            original_audio_id=synth_response.audio_id,
+            audio_url=f"/api/voice/audio/{modified_audio_id}",
+            duration=duration,
+            prosody_applied=diag_raw["action"] == "applied",
+            config_applied={
                 "pitch": config.pitch,
                 "rate": config.rate,
                 "volume": config.volume,
                 "intonation": config.intonation,
             },
-        }
+            prosody_handling=prosody_handling,
+        )
+        return response.model_dump()
     except Exception as e:
         logger.error(f"Prosody application failed: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to apply prosody: {e!s}")

@@ -2,6 +2,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -52,6 +53,38 @@ namespace VoiceStudio.App.Tests.ViewModels
     public void Constructor_WithNullClient_Throws()
     {
       _ = new ProsodyViewModel(MockContext!, null!);
+    }
+
+    [TestMethod]
+    public async Task ApplyProsodyAsync_StatusMessage_ReflectsProsodyAppliedFlag()
+    {
+      _mockClient
+          .Setup(x => x.ApplyProsodyAsync("c1", "hi", "v1", "xtts", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new ProsodyViewModel.ProsodyApplyResponse
+          {
+            AudioId = "out1",
+            ProsodyApplied = true,
+          });
+
+      var vm = new ProsodyViewModel(MockContext!, _mockClient.Object)
+      {
+        SelectedConfig = new ProsodyConfigItem(new ProsodyViewModel.ProsodyConfig
+        {
+          ConfigId = "c1",
+          Name = "n",
+          Pitch = 1,
+          Rate = 1,
+          Volume = 1,
+        }),
+        InputText = "hi",
+        SelectedVoiceProfileId = "v1",
+        SelectedEngine = "xtts",
+      };
+
+      await vm.ApplyProsodyCommand.ExecuteAsync(null);
+
+      Assert.IsTrue(string.IsNullOrEmpty(vm.ErrorMessage), vm.ErrorMessage);
+      StringAssert.Contains(vm.StatusMessage, "out1");
     }
   }
 }

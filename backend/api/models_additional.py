@@ -333,6 +333,35 @@ class SsmlHandlingDiagnostics(VoiceStudioBaseModel):
     engine_id: str = ""
 
 
+class ProsodyHandlingDiagnostics(VoiceStudioBaseModel):
+    """Structured prosody transform outcome for apply/control responses (GAP-023)."""
+
+    action: str = Field(
+        ...,
+        description='Outcome: "applied" | "none"',
+    )
+    applied_operations: list[str] = Field(default_factory=list)
+    skipped_operations: list[dict[str, str]] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    pitch_factor: float = 1.0
+    rate_factor: float = 1.0
+    volume_factor: float = 1.0
+    context: str = ""
+
+
+class ProsodyApplyResponseModel(VoiceStudioBaseModel):
+    """Response body for POST /api/prosody/apply (GAP-023)."""
+
+    audio_id: str
+    original_audio_id: str
+    audio_url: str
+    duration: float
+    prosody_applied: bool
+    config_applied: dict[str, object]
+    prosody_handling: ProsodyHandlingDiagnostics
+
+
 class VoiceSynthesizeResponse(VoiceStudioBaseModel):
     """Voice synthesis response (GAP-I16)."""
 

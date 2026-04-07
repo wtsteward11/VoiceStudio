@@ -280,47 +280,108 @@ async def prosody_control(req: ProsodyControlRequest) -> ProsodyControlResponse:
     """
     Advanced prosody and intonation control (IDEA 65).
 
-    Fine-tune prosody patterns, pitch contours, rhythm, and stress
-    for natural speech synthesis.
+    Bounded implementation (GAP-023): applies pitch/rate from ``pitch_contour`` (mean
+    multiplier) and ``rhythm_adjustments`` (``rate`` or ``tempo``). Metadata-only
+    requests return 422.
     """
-    import numpy as np
-
     try:
-        # Get audio file path
+        from backend.audio.audio_utils import load_audio
         from backend.services.audio_path_resolver import resolve_audio_path
+        from backend.services.prosody_authority_service import (
+            ProsodyAuthorityError,
+            apply_transform,
+            prosody_control_request_factors,
+        )
 
         audio_path = resolve_audio_path(req.audio_id)
         if not audio_path or not os.path.exists(audio_path):
             raise HTTPException(status_code=404, detail=f"Audio file not found: {req.audio_id}")
 
-        # Try to load audio processing libraries
         try:
-            import librosa
-            import soundfile as sf
-
-            HAS_AUDIO_LIBS = True
-        except ImportError:
-            HAS_AUDIO_LIBS = False
-
-        if not HAS_AUDIO_LIBS:
+            audio, sample_rate = load_audio(audio_path)
+        except ImportError as e:
             raise HTTPException(
                 status_code=503,
-                detail="Audio processing libraries not available. Install librosa and soundfile.",
-            )
-
-        # Load audio (validates file is readable); DSP path is not implemented below.
-        audio_probe, _sr = sf.read(audio_path)
-        if audio_probe.size == 0:
+                detail=(
+                    "Audio processing libraries not available. Install librosa and soundfile. "
+                    f"ImportError: {e!s}"
+                ),
+            ) from e
+        if audio.size == 0:
             raise HTTPException(status_code=400, detail="Audio file is empty")
 
-        # Real pitch/time-stress DSP is not implemented — do not return an identical waveform
-        # as if prosody were applied.
-        raise HTTPException(
-            status_code=501,
-            detail=(
-                "Prosody control is not yet implemented. "
-                "No audio was modified."
-            ),
+        pitch_f, rate_f = prosody_control_request_factors(
+            req.pitch_contour,
+            req.rhythm_adjustments,
+        )
+
+        has_meta_only = bool(req.stress_markers or req.prosody_template or req.intonation_pattern)
+        if pitch_f == 1.0 and rate_f == 1.0:
+            if has_meta_only:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        "Prosody control requires pitch_contour and/or rhythm_adjustments "
+                        "(rate/tempo). stress_markers, prosody_template, and intonation_pattern "
+                        "are not implemented without numeric transforms."
+                    ),
+                )
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Provide pitch_contour and/or rhythm_adjustments (rate/tempo) "
+                    "to apply prosody control."
+                ),
+            )
+
+        ignored_meta: list[str] = []
+        if req.stress_markers:
+            ignored_meta.append("stress_markers")
+        if req.prosody_template:
+            ignored_meta.append("prosody_template")
+        if req.intonation_pattern:
+            ignored_meta.append("intonation_pattern")
+
+        try:
+            transform_result = apply_transform(
+                audio,
+                sample_rate,
+                pitch=pitch_f,
+                rate=rate_f,
+                volume=1.0,
+                context="prosody_control",
+            )
+        except ProsodyAuthorityError as e:
+            raise HTTPException(status_code=e.status_code, detail=e.message) from e
+
+        diag = transform_result.diagnostics
+        warnings = list(diag.get("warnings", []))
+        if ignored_meta:
+            warnings.append(
+                "Ignored unimplemented metadata fields: " + ", ".join(ignored_meta)
+            )
+
+        processed_audio_id, _, _ = create_audio_artifact_from_wav_array(
+            transform_result.audio,
+            sample_rate,
+            created_by="prosody_control",
+            audio_id=f"prosodyctl_{uuid.uuid4().hex[:10]}",
+        )
+
+        prosody_applied: dict[str, Any] = {
+            "pitch_factor": pitch_f,
+            "rate_factor": rate_f,
+            "applied_operations": diag.get("applied_operations", []),
+            "action": diag.get("action"),
+            "warnings": warnings,
+        }
+
+        return ProsodyControlResponse(
+            audio_id=req.audio_id,
+            processed_audio_id=processed_audio_id,
+            processed_audio_url=f"/api/voice/audio/{processed_audio_id}",
+            prosody_applied=prosody_applied,
+            quality_improvement=0.0,
         )
 
     except HTTPException:

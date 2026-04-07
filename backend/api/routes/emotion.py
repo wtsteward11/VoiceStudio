@@ -18,7 +18,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..models import ApiOk
-from ..models_additional import EmotionApplyRequest
+from ..models_additional import EmotionApplyExtendedResponseModel, EmotionApplyRequest
 from ..optimization import cache_response
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,8 @@ AVAILABLE_EMOTIONS = [
     "surprised",
     "disgusted",
     "neutral",
+    "warm",
+    "energetic",
 ]
 
 
@@ -116,13 +118,6 @@ class EmotionApplyExtendedRequest(BaseModel):
     secondary_emotion: str | None = None
     secondary_intensity: float = 0.0  # 0-100
     timeline_curve: list[float] | None = None  # Automation curve
-
-
-class EmotionApplyExtendedResponse(BaseModel):
-    """Response after applying emotion (new file, new audio_id)."""
-
-    audio_id: str
-    audio_url: str
 
 
 @router.get("/list", response_model=list[str])
@@ -379,8 +374,8 @@ async def apply(req: EmotionApplyRequest) -> ApiOk:
     return ApiOk()
 
 
-@router.post("/apply-extended", response_model=EmotionApplyExtendedResponse)
-async def apply_extended(req: EmotionApplyExtendedRequest) -> EmotionApplyExtendedResponse:
+@router.post("/apply-extended", response_model=EmotionApplyExtendedResponseModel)
+async def apply_extended(req: EmotionApplyExtendedRequest) -> EmotionApplyExtendedResponseModel:
     """
     Apply emotion with blending and timeline automation.
 
@@ -418,13 +413,12 @@ async def apply_extended(req: EmotionApplyExtendedRequest) -> EmotionApplyExtend
         f"secondary: {req.secondary_emotion} ({req.secondary_intensity}%)"
     )
 
-    # Apply emotion to audio using prosody modifications
     try:
-        import numpy as np
+        from backend.services.audio_artifacts import AudioRegistry, create_audio_artifact_from_wav_array
+        from backend.services.emotion_preset_prosody_mapper import resolve_emotion_prosody
+        from backend.services.prosody_authority_service import ProsodyAuthorityError, apply_transform
+        from ..models_additional import ProsodyHandlingDiagnostics
 
-        from backend.services.audio_artifacts import AudioRegistry
-
-        # Get audio file path
         audio_path = AudioRegistry.get_path(req.audio_id)
         if not audio_path:
             raise HTTPException(status_code=404, detail=f"Audio file '{req.audio_id}' not found")
@@ -433,112 +427,81 @@ async def apply_extended(req: EmotionApplyExtendedRequest) -> EmotionApplyExtend
                 status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
             )
 
-        # Load audio
         try:
             import soundfile as sf
 
             audio, sample_rate = sf.read(audio_path)
             if len(audio.shape) > 1:
-                audio = np.mean(audio, axis=1)  # Convert to mono
+                audio = np.mean(audio, axis=1)
         except ImportError:
             logger.warning("soundfile not available, emotion application skipped")
             raise HTTPException(
                 status_code=503,
                 detail="soundfile required for emotion application",
-            )
+            ) from None
 
-        # Apply emotion-based prosody modifications
-        # Emotion affects pitch, tempo, and formant characteristics
-        emotion_params = {
-            "happy": {"pitch_shift": 0.3, "tempo": 1.1, "formant_shift": 0.1},
-            "sad": {"pitch_shift": -0.4, "tempo": 0.9, "formant_shift": -0.1},
-            "angry": {"pitch_shift": 0.2, "tempo": 1.15, "formant_shift": 0.15},
-            "excited": {"pitch_shift": 0.5, "tempo": 1.2, "formant_shift": 0.2},
-            "calm": {"pitch_shift": -0.2, "tempo": 0.95, "formant_shift": -0.05},
-            "fearful": {"pitch_shift": 0.4, "tempo": 1.1, "formant_shift": 0.1},
-            "surprised": {"pitch_shift": 0.6, "tempo": 1.05, "formant_shift": 0.15},
-            "disgusted": {"pitch_shift": -0.3, "tempo": 0.9, "formant_shift": -0.1},
-            "neutral": {"pitch_shift": 0, "tempo": 1.0, "formant_shift": 0},
-        }
+        mapped = resolve_emotion_prosody(
+            primary_emotion=req.primary_emotion,
+            primary_intensity=req.primary_intensity,
+            secondary_emotion=req.secondary_emotion,
+            secondary_intensity=req.secondary_intensity,
+        )
 
-        # Get primary emotion parameters
-        primary_params = emotion_params.get(req.primary_emotion, emotion_params["neutral"])
-        primary_weight = req.primary_intensity / 100.0
+        if req.timeline_curve:
+            mapped.warnings.append("timeline_curve_not_applied_in_bounded_slice")
 
-        # Blend with secondary emotion if provided
-        if req.secondary_emotion and req.secondary_intensity > 0:
-            secondary_params = emotion_params.get(req.secondary_emotion, emotion_params["neutral"])
-            secondary_weight = req.secondary_intensity / 100.0
-            total_weight = primary_weight + secondary_weight
+        logger.info(
+            "Emotion apply-extended mapped preset/emotion to prosody "
+            "pitch=%.4f rate=%.4f volume=%.4f source=%s",
+            mapped.pitch,
+            mapped.rate,
+            mapped.volume,
+            mapped.mapping_source,
+        )
 
-            if total_weight > 0:
-                pitch_shift = (
-                    primary_params["pitch_shift"] * primary_weight
-                    + secondary_params["pitch_shift"] * secondary_weight
-                ) / total_weight
-                tempo = (
-                    primary_params["tempo"] * primary_weight
-                    + secondary_params["tempo"] * secondary_weight
-                ) / total_weight
-                formant_shift = (
-                    primary_params["formant_shift"] * primary_weight
-                    + secondary_params["formant_shift"] * secondary_weight
-                ) / total_weight
-            else:
-                pitch_shift = 0
-                tempo = 1.0
-                formant_shift = 0
-        else:
-            pitch_shift = primary_params["pitch_shift"] * primary_weight
-            tempo = 1.0 + (primary_params["tempo"] - 1.0) * primary_weight
-            formant_shift = primary_params["formant_shift"] * primary_weight
-
-        # Apply prosody modifications using librosa if available
         try:
-            import librosa
-
-            # Apply pitch shift
-            if pitch_shift != 0:
-                audio = librosa.effects.pitch_shift(audio, sr=sample_rate, n_steps=pitch_shift * 12)
-
-            # Apply tempo change
-            if tempo != 1.0:
-                audio = librosa.effects.time_stretch(audio, rate=tempo)
-
-            # Apply formant shift (simplified)
-            if formant_shift != 0:
-                stft = librosa.stft(audio)
-                stft_shifted = librosa.phase_vocoder(stft, rate=1.0 + formant_shift)
-                audio = librosa.istft(stft_shifted)
-
-            # Write to artifact spine (do not overwrite original)
-            from backend.services.audio_artifacts import create_audio_artifact_from_wav_array
-
-            output_audio_id, _, _ = create_audio_artifact_from_wav_array(
-                audio,
-                sample_rate,
-                created_by="emotion",
-                audio_id=f"emotion_{uuid.uuid4().hex[:8]}",
+            transform_result = apply_transform(
+                np.asarray(audio, dtype=np.float64),
+                int(sample_rate),
+                pitch=mapped.pitch,
+                rate=mapped.rate,
+                volume=mapped.volume,
+                context="emotion_apply_extended",
             )
-            logger.info(
-                f"Applied emotion modifications to audio '{req.audio_id}' -> {output_audio_id}"
-            )
-            return EmotionApplyExtendedResponse(
-                audio_id=output_audio_id,
-                audio_url=f"/api/voice/audio/{output_audio_id}",
-            )
-        except ImportError:
-            logger.warning("librosa not available, emotion prosody modifications skipped")
-            raise HTTPException(
-                status_code=503,
-                detail="librosa required for emotion prosody modifications",
-            )
+        except ProsodyAuthorityError as e:
+            raise HTTPException(status_code=e.status_code, detail=e.message) from e
+
+        diag_raw = dict(transform_result.diagnostics)
+        diag_raw["warnings"] = list(diag_raw.get("warnings", [])) + mapped.warnings
+        diag_raw["skipped_operations"] = list(diag_raw.get("skipped_operations", [])) + list(
+            mapped.skipped_operations
+        )
+        prosody_handling = ProsodyHandlingDiagnostics.model_validate(diag_raw)
+
+        output_audio_id, _, _ = create_audio_artifact_from_wav_array(
+            transform_result.audio,
+            int(sample_rate),
+            created_by="emotion",
+            audio_id=f"emotion_{uuid.uuid4().hex[:8]}",
+        )
+        logger.info(
+            "Applied emotion (authority) to audio '%s' -> %s action=%s",
+            req.audio_id,
+            output_audio_id,
+            prosody_handling.action,
+        )
+        return EmotionApplyExtendedResponseModel(
+            audio_id=output_audio_id,
+            audio_url=f"/api/voice/audio/{output_audio_id}",
+            prosody_handling=prosody_handling,
+            emotion_mapping_source=mapped.mapping_source,
+        )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to apply emotion to audio: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to apply emotion to audio: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Failed to apply emotion to audio: {e!s}") from e
 
 
 @router.post("/preset/save", response_model=EmotionPresetResponse, status_code=201)

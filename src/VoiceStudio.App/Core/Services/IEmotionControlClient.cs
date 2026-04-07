@@ -11,7 +11,7 @@ namespace VoiceStudio.Core.Services
   public interface IEmotionControlClient
   {
     Task<string[]> GetAvailableEmotionsAsync(CancellationToken ct = default);
-    Task ApplyEmotionAsync(EmotionApplyExtendedRequest request, CancellationToken ct = default);
+    Task<EmotionApplyExtendedResponse?> ApplyEmotionAsync(EmotionApplyExtendedRequest request, CancellationToken ct = default);
     Task<EmotionPreviewResponse?> PreviewEmotionAsync(EmotionApplyExtendedRequest request, CancellationToken ct = default);
     Task<EmotionPreset[]> GetPresetsAsync(CancellationToken ct = default);
     Task<EmotionPreset> CreatePresetAsync(EmotionPresetCreateRequest request, CancellationToken ct = default);
@@ -19,3 +19,4 @@ namespace VoiceStudio.Core.Services
     Task DeletePresetAsync(string presetId, CancellationToken ct = default);
   }
 }
+

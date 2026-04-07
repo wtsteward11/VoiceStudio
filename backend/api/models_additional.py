@@ -350,6 +350,21 @@ class ProsodyHandlingDiagnostics(VoiceStudioBaseModel):
     context: str = ""
 
 
+class EmotionApplyExtendedResponseModel(VoiceStudioBaseModel):
+    """Response for POST /api/emotion/apply-extended (GAP-050)."""
+
+    audio_id: str
+    audio_url: str
+    prosody_handling: ProsodyHandlingDiagnostics
+    emotion_mapping_source: str = Field(
+        default="",
+        description=(
+            "Mapping lane: canonical_preset, legacy_emotion, blended, "
+            "canonical_blended, legacy_blended, canonical_legacy_blended, none"
+        ),
+    )
+
+
 class ProsodyApplyResponseModel(VoiceStudioBaseModel):
     """Response body for POST /api/prosody/apply (GAP-023)."""
 

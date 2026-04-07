@@ -45,8 +45,7 @@ namespace VoiceStudio.App.Services
     }
 
     /// <inheritdoc />
-    public Task ApplyEmotionAsync(EmotionApplyExtendedRequest request, CancellationToken ct = default)
-      => _backend.SendRequestAsync<EmotionApplyExtendedRequest, object>(
+    public Task<EmotionApplyExtendedResponse?> ApplyEmotionAsync(EmotionApplyExtendedRequest request, CancellationToken ct = default) => _backend.SendRequestAsync<EmotionApplyExtendedRequest, EmotionApplyExtendedResponse>(
         "/api/emotion/apply-extended",
         request,
         HttpMethod.Post,
@@ -110,3 +109,4 @@ namespace VoiceStudio.App.Services
     }
   }
 }
+

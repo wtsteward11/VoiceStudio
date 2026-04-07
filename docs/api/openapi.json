@@ -2463,7 +2463,11 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Test Pronunciation Api Voice Test Pronunciation Post"
+                }
               }
             }
           }
@@ -2617,7 +2621,7 @@
           "voice"
         ],
         "summary": "Prosody Control",
-        "description": "Advanced prosody and intonation control (IDEA 65).\n\nFine-tune prosody patterns, pitch contours, rhythm, and stress\nfor natural speech synthesis.",
+        "description": "Advanced prosody and intonation control (IDEA 65).\n\nBounded implementation (GAP-023): applies pitch/rate from ``pitch_contour`` (mean\nmultiplier) and ``rhythm_adjustments`` (``rate`` or ``tempo``). Metadata-only\nrequests return 422.",
         "operationId": "prosody_control_api_voice_prosody_control_post",
         "requestBody": {
           "content": {
@@ -5708,7 +5712,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__models_additional__VoiceProfile"
+                  "$ref": "#/components/schemas/VoiceProfile"
                 },
                 "examples": {
                   "default": {
@@ -5769,7 +5773,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__models_additional__VoiceProfile"
+                  "$ref": "#/components/schemas/VoiceProfile"
                 }
               }
             }
@@ -5820,7 +5824,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__models_additional__VoiceProfile"
+                  "$ref": "#/components/schemas/VoiceProfile"
                 }
               }
             }
@@ -6933,7 +6937,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__audio__WaveformData"
+                  "$ref": "#/components/schemas/WaveformData"
                 }
               }
             }
@@ -9311,6 +9315,48 @@
         }
       }
     },
+    "/api/models/download": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Start Model Download",
+        "description": "Create a canonical download job and begin staging the remote artifact.",
+        "operationId": "start_model_download_api_models_download_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelDownloadStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDownloadStartResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/effects/chains": {
       "get": {
         "tags": [
@@ -9613,6 +9659,30 @@
               "title": "Project Id"
             },
             "description": "Project ID"
+          },
+          {
+            "name": "bypass_chain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "GAP-039: When true, skip DSP and return the input audio id (dry signal).",
+              "default": false,
+              "title": "Bypass Chain"
+            },
+            "description": "GAP-039: When true, skip DSP and return the input audio id (dry signal)."
+          },
+          {
+            "name": "preview",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "GAP-039: Same processing; message tagged for UI/diagnostics.",
+              "default": false,
+              "title": "Preview"
+            },
+            "description": "GAP-039: Same processing; message tagged for UI/diagnostics."
           }
         ],
         "requestBody": {
@@ -9685,7 +9755,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/EffectPreset"
+                    "$ref": "#/components/schemas/backend__api__routes__effects__EffectPreset"
                   },
                   "title": "Response List Effect Presets Api Effects Presets Get"
                 }
@@ -9727,7 +9797,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EffectPreset"
+                  "$ref": "#/components/schemas/backend__api__routes__effects__EffectPreset"
                 }
               }
             }
@@ -10835,6 +10905,48 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiOk"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transcribe/regenerate-segment": {
+      "post": {
+        "tags": [
+          "transcribe"
+        ],
+        "summary": "Start Regenerate Segment",
+        "description": "GAP-046: queue single-segment regeneration (canonical job + synthesis pipeline).",
+        "operationId": "start_regenerate_segment_api_transcribe_regenerate_segment_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegenerateSegmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegenerateSegmentAcceptedResponse"
                 }
               }
             }
@@ -14317,7 +14429,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExportResponse"
+                  "$ref": "#/components/schemas/backend__api__routes__tracing__ExportResponse"
                 }
               }
             }
@@ -14889,196 +15001,6 @@
         }
       }
     },
-    "/api/drift/status": {
-      "get": {
-        "tags": [
-          "drift"
-        ],
-        "summary": "Get Drift Status",
-        "description": "Get current drift status per engine.\n\nQuery param engine_id: optional filter by engine.",
-        "operationId": "get_drift_status_api_drift_status_get",
-        "parameters": [
-          {
-            "name": "engine_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Engine Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DriftStatusListResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/drift/history": {
-      "get": {
-        "tags": [
-          "drift"
-        ],
-        "summary": "Get Drift History",
-        "description": "Get drift metrics history.\n\nQuery params: engine_id, metric_name (optional filters), limit.",
-        "operationId": "get_drift_history_api_drift_history_get",
-        "parameters": [
-          {
-            "name": "engine_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Engine Id"
-            }
-          },
-          {
-            "name": "metric_name",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Metric Name"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 100,
-              "title": "Limit"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "additionalProperties": true
-                    }
-                  },
-                  "title": "Response Get Drift History Api Drift History Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/drift/baseline": {
-      "post": {
-        "tags": [
-          "drift"
-        ],
-        "summary": "Set Baseline",
-        "description": "Set baseline distribution from current model version.\n\nRequires engine_id, metric_name, and list of values.",
-        "operationId": "set_baseline_api_drift_baseline_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetBaselineRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "integer"
-                      },
-                      {
-                        "type": "boolean"
-                      }
-                    ]
-                  },
-                  "type": "object",
-                  "title": "Response Set Baseline Api Drift Baseline Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/errors/summary": {
       "get": {
         "tags": [
@@ -15372,7 +15294,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__errors__ExportResponse"
+                  "$ref": "#/components/schemas/ExportResponse"
                 }
               }
             }
@@ -17375,7 +17297,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EmotionApplyExtendedResponse"
+                  "$ref": "#/components/schemas/EmotionApplyExtendedResponseModel"
                 }
               }
             }
@@ -21032,6 +20954,68 @@
         }
       }
     },
+    "/api/settings/engine-priority/effective": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Effective Engine Priority",
+        "description": "GAP-053: Resolved TTS engine priority for diagnostics (user → YAML → default).",
+        "operationId": "get_effective_engine_priority_api_settings_engine_priority_effective_get",
+        "parameters": [
+          {
+            "name": "task_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "tts",
+              "title": "Task Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/torch-venv/effective": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Effective Torch Venv Status",
+        "description": "GAP-062: Per-family torch venv presence + import probe (subprocess; no torch in API worker).",
+        "operationId": "get_effective_torch_venv_status_api_settings_torch_venv_effective_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/{category}": {
       "get": {
         "tags": [
@@ -22688,7 +22672,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/backend__api__routes__help__KeyboardShortcut"
+                "$ref": "#/components/schemas/KeyboardShortcut"
               }
             }
           }
@@ -22699,7 +22683,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__help__KeyboardShortcut"
+                  "$ref": "#/components/schemas/KeyboardShortcut"
                 }
               }
             }
@@ -22765,7 +22749,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/backend__api__routes__help__KeyboardShortcut"
+                    "$ref": "#/components/schemas/KeyboardShortcut"
                   },
                   "title": "Response Get Keyboard Shortcuts Api Help Shortcuts Get"
                 }
@@ -22809,7 +22793,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/backend__api__routes__help__KeyboardShortcut"
+                "$ref": "#/components/schemas/KeyboardShortcut"
               }
             }
           }
@@ -22820,7 +22804,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__help__KeyboardShortcut"
+                  "$ref": "#/components/schemas/KeyboardShortcut"
                 }
               }
             }
@@ -23087,7 +23071,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/KeyboardShortcut"
+                    "$ref": "#/components/schemas/backend__api__routes__shortcuts__KeyboardShortcut"
                   },
                   "title": "Response Get Shortcuts Api Shortcuts Get"
                 }
@@ -23118,7 +23102,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/KeyboardShortcut"
+                "$ref": "#/components/schemas/backend__api__routes__shortcuts__KeyboardShortcut"
               }
             }
           }
@@ -23129,7 +23113,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KeyboardShortcut"
+                  "$ref": "#/components/schemas/backend__api__routes__shortcuts__KeyboardShortcut"
                 }
               }
             }
@@ -23261,7 +23245,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KeyboardShortcut"
+                  "$ref": "#/components/schemas/backend__api__routes__shortcuts__KeyboardShortcut"
                 }
               }
             }
@@ -23312,7 +23296,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KeyboardShortcut"
+                  "$ref": "#/components/schemas/backend__api__routes__shortcuts__KeyboardShortcut"
                 }
               }
             }
@@ -26947,7 +26931,7 @@
           "ssml"
         ],
         "summary": "Preview Ssml",
-        "description": "Preview SSML by synthesizing it.",
+        "description": "Preview SSML by synthesizing via the canonical synthesis path (GAP-054).",
         "operationId": "preview_ssml_api_ssml_preview_post",
         "requestBody": {
           "content": {
@@ -30239,84 +30223,6 @@
         }
       }
     },
-    "/api/search": {
-      "get": {
-        "tags": [
-          "search"
-        ],
-        "summary": "Search",
-        "description": "Global search across all panels and content types.\n\nImplements IDEA 5: Global Search with Panel Context.\n\nSearches across:\n- Voice profiles (name, description, tags)\n- Projects (name, description)\n- Audio files (filename)\n- Timeline markers (name, description)\n- Scripts (name, text content)\n\nArgs:\n    q: Search query (minimum 2 characters)\n    types: Optional filter by content types\n    limit: Maximum results per type\n\nReturns:\n    Search results grouped by type with preview snippets",
-        "operationId": "search_api_search_get",
-        "parameters": [
-          {
-            "name": "q",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 2,
-              "description": "Search query",
-              "title": "Q"
-            },
-            "description": "Search query"
-          },
-          {
-            "name": "types",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Comma-separated list of types to search (profile,project,audio,marker,script)",
-              "title": "Types"
-            },
-            "description": "Comma-separated list of types to search (profile,project,audio,marker,script)"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "description": "Maximum number of results per type",
-              "default": 50,
-              "title": "Limit"
-            },
-            "description": "Maximum number of results per type"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SearchResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/voice-morph/configs": {
       "get": {
         "tags": [
@@ -30893,7 +30799,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WaveformData"
+                  "$ref": "#/components/schemas/backend__api__routes__waveform__WaveformData"
                 }
               }
             }
@@ -30998,392 +30904,6 @@
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/spectrogram/config/{audio_id}": {
-      "get": {
-        "tags": [
-          "spectrogram"
-        ],
-        "summary": "Get Spectrogram Config",
-        "description": "Get spectrogram configuration for an audio file.",
-        "operationId": "get_spectrogram_config_api_spectrogram_config__audio_id__get",
-        "parameters": [
-          {
-            "name": "audio_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Audio Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "spectrogram"
-        ],
-        "summary": "Update Spectrogram Config",
-        "description": "Update spectrogram configuration.",
-        "operationId": "update_spectrogram_config_api_spectrogram_config__audio_id__put",
-        "parameters": [
-          {
-            "name": "audio_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Audio Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SpectrogramConfig"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/spectrogram/data/{audio_id}": {
-      "get": {
-        "tags": [
-          "spectrogram"
-        ],
-        "summary": "Get Spectrogram Data",
-        "description": "Get spectrogram data for an audio file.",
-        "operationId": "get_spectrogram_data_api_spectrogram_data__audio_id__get",
-        "parameters": [
-          {
-            "name": "audio_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Audio Id"
-            }
-          },
-          {
-            "name": "window_size",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 8192,
-              "minimum": 256,
-              "default": 2048,
-              "title": "Window Size"
-            }
-          },
-          {
-            "name": "hop_length",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 2048,
-              "minimum": 128,
-              "default": 512,
-              "title": "Hop Length"
-            }
-          },
-          {
-            "name": "n_fft",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 8192,
-              "minimum": 256,
-              "default": 2048,
-              "title": "N Fft"
-            }
-          },
-          {
-            "name": "frequency_min",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "number",
-                  "minimum": 0.0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Frequency Min"
-            }
-          },
-          {
-            "name": "frequency_max",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "number",
-                  "minimum": 0.0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Frequency Max"
-            }
-          },
-          {
-            "name": "time_start",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "number",
-                  "minimum": 0.0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Time Start"
-            }
-          },
-          {
-            "name": "time_end",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "number",
-                  "minimum": 0.0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Time End"
-            }
-          },
-          {
-            "name": "log_scale",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": true,
-              "title": "Log Scale"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__spectrogram__SpectrogramData"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/spectrogram/compare": {
-      "get": {
-        "tags": [
-          "spectrogram"
-        ],
-        "summary": "Compare Spectrograms",
-        "description": "Compare multiple spectrograms side by side.",
-        "operationId": "compare_spectrograms_api_spectrogram_compare_get",
-        "parameters": [
-          {
-            "name": "audio_ids",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Comma-separated audio IDs",
-              "title": "Audio Ids"
-            },
-            "description": "Comma-separated audio IDs"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/spectrogram/export/{audio_id}": {
-      "get": {
-        "tags": [
-          "spectrogram"
-        ],
-        "summary": "Export Spectrogram",
-        "description": "Export spectrogram as an image.",
-        "operationId": "export_spectrogram_api_spectrogram_export__audio_id__get",
-        "parameters": [
-          {
-            "name": "audio_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Audio Id"
-            }
-          },
-          {
-            "name": "format",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "pattern": "^(png|jpg|svg)$",
-              "default": "png",
-              "title": "Format"
-            }
-          },
-          {
-            "name": "width",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 4096,
-              "minimum": 100,
-              "default": 1920,
-              "title": "Width"
-            }
-          },
-          {
-            "name": "height",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 4096,
-              "minimum": 100,
-              "default": 1080,
-              "title": "Height"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/spectrogram/color-schemes": {
-      "get": {
-        "tags": [
-          "spectrogram"
-        ],
-        "summary": "Get Color Schemes",
-        "description": "Get available color schemes.",
-        "operationId": "get_color_schemes_api_spectrogram_color_schemes_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
               }
             }
           }
@@ -31898,7 +31418,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TranslationResponse"
+                  "$ref": "#/components/schemas/backend__api__routes__multilingual__TranslationResponse"
                 }
               }
             }
@@ -33491,7 +33011,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/backend__api__routes__voice_effects__EffectPreset"
+                    "$ref": "#/components/schemas/EffectPreset"
                   },
                   "type": "array",
                   "title": "Response List Effect Presets Api Voice Effects Presets Get"
@@ -33527,7 +33047,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__voice_effects__EffectPreset"
+                  "$ref": "#/components/schemas/EffectPreset"
                 }
               }
             }
@@ -34019,7 +33539,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__translation__TranslationResponse"
+                  "$ref": "#/components/schemas/TranslationResponse"
                 }
               }
             }
@@ -34750,7 +34270,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__ai_enhancement__EnhanceResponse"
+                  "$ref": "#/components/schemas/EnhanceResponse"
                 }
               }
             }
@@ -35484,88 +35004,6 @@
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/pipeline/process": {
-      "post": {
-        "tags": [
-          "pipeline"
-        ],
-        "summary": "Process Pipeline",
-        "description": "Process text through the Voice AI pipeline.\n\nSupports batch mode (complete response) and returns\nthe LLM response with optional TTS audio.",
-        "operationId": "process_pipeline_api_pipeline_process_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PipelineRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PipelineResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/pipeline/providers": {
-      "get": {
-        "tags": [
-          "pipeline"
-        ],
-        "summary": "List Pipeline Providers",
-        "description": "List available providers for each pipeline stage.",
-        "operationId": "list_pipeline_providers_api_pipeline_providers_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/pipeline/metrics": {
-      "get": {
-        "tags": [
-          "pipeline"
-        ],
-        "summary": "Get Pipeline Metrics",
-        "description": "Get pipeline performance metrics.",
-        "operationId": "get_pipeline_metrics_api_pipeline_metrics_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
               }
             }
           }
@@ -36552,6 +35990,30 @@
               "title": "Output Filename"
             },
             "description": "Output filename"
+          },
+          {
+            "name": "bypass_chain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "GAP-039: When true, skip DSP and return the input audio id (dry signal).",
+              "default": false,
+              "title": "Bypass Chain"
+            },
+            "description": "GAP-039: When true, skip DSP and return the input audio id (dry signal)."
+          },
+          {
+            "name": "preview",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "GAP-039: Same processing; message tagged for UI/diagnostics.",
+              "default": false,
+              "title": "Preview"
+            },
+            "description": "GAP-039: Same processing; message tagged for UI/diagnostics."
           }
         ],
         "responses": {
@@ -38452,7 +37914,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnhanceResponse"
+                  "$ref": "#/components/schemas/backend__api__routes__video_enhance__EnhanceResponse"
                 }
               }
             }
@@ -39988,6 +39450,101 @@
         }
       }
     },
+    "/api/timeline/tracks/{track_id}": {
+      "put": {
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Update Timeline Track",
+        "description": "Update mix/rendering fields on an in-memory timeline track (GAP-031).",
+        "operationId": "update_timeline_track_api_timeline_tracks__track_id__put",
+        "parameters": [
+          {
+            "name": "track_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Track Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTimelineTrackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Track"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/timeline/import-from-project": {
+      "post": {
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Import Timeline From Project",
+        "description": "Load persisted project tracks into the timeline mix graph used by export (GAP-031).",
+        "operationId": "import_timeline_from_project_api_timeline_import_from_project_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/timeline/tracks/delete": {
       "post": {
         "tags": [
@@ -40273,6 +39830,59 @@
         }
       }
     },
+    "/api/timeline/clips/{clip_id}/fade": {
+      "put": {
+        "tags": [
+          "timeline"
+        ],
+        "summary": "Set Clip Fade",
+        "description": "Set linear fade-in/out in seconds (applied at mixdown).",
+        "operationId": "set_clip_fade_api_timeline_clips__clip_id__fade_put",
+        "parameters": [
+          {
+            "name": "clip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clip Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetClipFadeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Clip"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/timeline/playhead": {
       "post": {
         "tags": [
@@ -40454,513 +40064,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UndoRedoState"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/voice/voices": {
-      "get": {
-        "tags": [
-          "voice-aliases"
-        ],
-        "summary": "Get Available Voices",
-        "description": "Alias for /api/voice-browser/voices.\n\nReturns available voices, optionally filtered by engine.\nThis endpoint exists for VoiceGateway compatibility.",
-        "operationId": "get_available_voices_api_voice_voices_get",
-        "parameters": [
-          {
-            "name": "engine_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Filter by engine ID",
-              "title": "Engine Id"
-            },
-            "description": "Filter by engine ID"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/VoiceInfoAlias"
-                  },
-                  "title": "Response Get Available Voices Api Voice Voices Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/projects/{project_id}/timeline": {
-      "get": {
-        "tags": [
-          "timeline-aliases"
-        ],
-        "summary": "Get Timeline",
-        "description": "Get complete timeline for a project.\n\nReturns the timeline with all tracks and markers (GAP-CRIT-003).\nThis is the composite endpoint that TimelineGateway expects.",
-        "operationId": "get_timeline_api_projects__project_id__timeline_get",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TimelineDetailAlias"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/projects/{project_id}/timeline/tracks": {
-      "post": {
-        "tags": [
-          "timeline-aliases"
-        ],
-        "summary": "Add Track",
-        "description": "Add a track to the project timeline.\n\nAlias for POST /api/projects/{project_id}/tracks",
-        "operationId": "add_track_api_projects__project_id__timeline_tracks_post",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TrackCreateRequestAlias"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TrackInfoAlias"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/projects/{project_id}/timeline/tracks/{track_id}": {
-      "delete": {
-        "tags": [
-          "timeline-aliases"
-        ],
-        "summary": "Remove Track",
-        "description": "Remove a track from the project timeline.\n\nAlias for DELETE /api/projects/{project_id}/tracks/{track_id}",
-        "operationId": "remove_track_api_projects__project_id__timeline_tracks__track_id__delete",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Id"
-            }
-          },
-          {
-            "name": "track_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Track Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Remove Track Api Projects  Project Id  Timeline Tracks  Track Id  Delete"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/projects/{project_id}/timeline/tracks/{track_id}/clips": {
-      "post": {
-        "tags": [
-          "timeline-aliases"
-        ],
-        "summary": "Add Clip",
-        "description": "Add a clip to a track.\n\nAlias for POST /api/projects/{project_id}/tracks/{track_id}/clips",
-        "operationId": "add_clip_api_projects__project_id__timeline_tracks__track_id__clips_post",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Id"
-            }
-          },
-          {
-            "name": "track_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Track Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ClipCreateRequestAlias"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClipInfoAlias"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/projects/{project_id}/timeline/tracks/{track_id}/clips/{clip_id}": {
-      "put": {
-        "tags": [
-          "timeline-aliases"
-        ],
-        "summary": "Update Clip",
-        "description": "Update a clip in a track.\n\nAlias for PUT /api/projects/{project_id}/tracks/{track_id}/clips/{clip_id}",
-        "operationId": "update_clip_api_projects__project_id__timeline_tracks__track_id__clips__clip_id__put",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Id"
-            }
-          },
-          {
-            "name": "track_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Track Id"
-            }
-          },
-          {
-            "name": "clip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Clip Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ClipUpdateRequestAlias"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClipInfoAlias"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "timeline-aliases"
-        ],
-        "summary": "Remove Clip",
-        "description": "Remove a clip from a track.\n\nAlias for DELETE /api/projects/{project_id}/tracks/{track_id}/clips/{clip_id}",
-        "operationId": "remove_clip_api_projects__project_id__timeline_tracks__track_id__clips__clip_id__delete",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Id"
-            }
-          },
-          {
-            "name": "track_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Track Id"
-            }
-          },
-          {
-            "name": "clip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Clip Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Remove Clip Api Projects  Project Id  Timeline Tracks  Track Id  Clips  Clip Id  Delete"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/projects/{project_id}/timeline/markers": {
-      "post": {
-        "tags": [
-          "timeline-aliases"
-        ],
-        "summary": "Add Marker",
-        "description": "Add a marker to the project timeline.",
-        "operationId": "add_marker_api_projects__project_id__timeline_markers_post",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MarkerCreateRequestAlias"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MarkerInfoAlias"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/projects/{project_id}/timeline/markers/{marker_id}": {
-      "delete": {
-        "tags": [
-          "timeline-aliases"
-        ],
-        "summary": "Remove Marker",
-        "description": "Remove a marker from the project timeline.",
-        "operationId": "remove_marker_api_projects__project_id__timeline_markers__marker_id__delete",
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Id"
-            }
-          },
-          {
-            "name": "marker_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Marker Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Remove Marker Api Projects  Project Id  Timeline Markers  Marker Id  Delete"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -43432,6 +42535,21 @@
             "type": "number",
             "title": "Start Time"
           },
+          "source_start_seconds": {
+            "type": "number",
+            "title": "Source Start Seconds",
+            "default": 0.0
+          },
+          "fade_in_seconds": {
+            "type": "number",
+            "title": "Fade In Seconds",
+            "default": 0.0
+          },
+          "fade_out_seconds": {
+            "type": "number",
+            "title": "Fade Out Seconds",
+            "default": 0.0
+          },
           "engine": {
             "anyOf": [
               {
@@ -43453,6 +42571,17 @@
               }
             ],
             "title": "Quality Score"
+          },
+          "derived_from_clip_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived From Clip Id"
           }
         },
         "type": "object",
@@ -43674,6 +42803,16 @@
               }
             ],
             "title": "Engine"
+          },
+          "is_muted": {
+            "type": "boolean",
+            "title": "Is Muted",
+            "default": false
+          },
+          "is_solo": {
+            "type": "boolean",
+            "title": "Is Solo",
+            "default": false
           }
         },
         "type": "object",
@@ -45828,6 +44967,16 @@
             "title": "Source Start",
             "default": 0.0
           },
+          "fade_in_seconds": {
+            "type": "number",
+            "title": "Fade In Seconds",
+            "default": 0.0
+          },
+          "fade_out_seconds": {
+            "type": "number",
+            "title": "Fade Out Seconds",
+            "default": 0.0
+          },
           "name": {
             "type": "string",
             "title": "Name",
@@ -45895,6 +45044,32 @@
             "type": "number",
             "title": "Start Time"
           },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "source_start_seconds": {
+            "type": "number",
+            "title": "Source Start Seconds",
+            "default": 0.0
+          },
+          "fade_in_seconds": {
+            "type": "number",
+            "title": "Fade In Seconds",
+            "default": 0.0
+          },
+          "fade_out_seconds": {
+            "type": "number",
+            "title": "Fade Out Seconds",
+            "default": 0.0
+          },
           "engine": {
             "anyOf": [
               {
@@ -45916,6 +45091,17 @@
               }
             ],
             "title": "Quality Score"
+          },
+          "derived_from_clip_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived From Clip Id"
           }
         },
         "type": "object",
@@ -45928,133 +45114,6 @@
           "start_time"
         ],
         "title": "ClipCreateRequest"
-      },
-      "ClipCreateRequestAlias": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "profile_id": {
-            "type": "string",
-            "title": "Profile Id"
-          },
-          "audio_id": {
-            "type": "string",
-            "title": "Audio Id"
-          },
-          "audio_url": {
-            "type": "string",
-            "title": "Audio Url"
-          },
-          "duration_seconds": {
-            "type": "number",
-            "title": "Duration Seconds"
-          },
-          "start_time": {
-            "type": "number",
-            "title": "Start Time"
-          },
-          "engine": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engine"
-          },
-          "quality_score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Quality Score"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "profile_id",
-          "audio_id",
-          "audio_url",
-          "duration_seconds",
-          "start_time"
-        ],
-        "title": "ClipCreateRequestAlias",
-        "description": "Request to create a clip."
-      },
-      "ClipInfoAlias": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "profile_id": {
-            "type": "string",
-            "title": "Profile Id"
-          },
-          "audio_id": {
-            "type": "string",
-            "title": "Audio Id"
-          },
-          "audio_url": {
-            "type": "string",
-            "title": "Audio Url"
-          },
-          "duration_seconds": {
-            "type": "number",
-            "title": "Duration Seconds"
-          },
-          "start_time": {
-            "type": "number",
-            "title": "Start Time"
-          },
-          "engine": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engine"
-          },
-          "quality_score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Quality Score"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "profile_id",
-          "audio_id",
-          "audio_url",
-          "duration_seconds",
-          "start_time"
-        ],
-        "title": "ClipInfoAlias",
-        "description": "Clip info matching TimelineGateway.ClipInfo expectations."
       },
       "ClipUpdateRequest": {
         "properties": {
@@ -46079,14 +45138,8 @@
               }
             ],
             "title": "Start Time"
-          }
-        },
-        "type": "object",
-        "title": "ClipUpdateRequest"
-      },
-      "ClipUpdateRequestAlias": {
-        "properties": {
-          "name": {
+          },
+          "audio_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -46095,9 +45148,20 @@
                 "type": "null"
               }
             ],
-            "title": "Name"
+            "title": "Audio Id"
           },
-          "start_time": {
+          "audio_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Url"
+          },
+          "duration_seconds": {
             "anyOf": [
               {
                 "type": "number"
@@ -46106,12 +45170,55 @@
                 "type": "null"
               }
             ],
-            "title": "Start Time"
+            "title": "Duration Seconds"
+          },
+          "source_start_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Start Seconds"
+          },
+          "fade_in_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fade In Seconds"
+          },
+          "fade_out_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fade Out Seconds"
+          },
+          "derived_from_clip_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived From Clip Id"
           }
         },
         "type": "object",
-        "title": "ClipUpdateRequestAlias",
-        "description": "Request to update a clip."
+        "title": "ClipUpdateRequest"
       },
       "Conversation": {
         "properties": {
@@ -47518,109 +46625,6 @@
         "title": "DiarizationResponse",
         "description": "Response for speaker diarization."
       },
-      "DriftMetricResponse": {
-        "properties": {
-          "engine_id": {
-            "type": "string",
-            "title": "Engine Id"
-          },
-          "metric_name": {
-            "type": "string",
-            "title": "Metric Name"
-          },
-          "psi": {
-            "type": "number",
-            "title": "Psi"
-          },
-          "baseline_sample_count": {
-            "type": "integer",
-            "title": "Baseline Sample Count"
-          },
-          "current_sample_count": {
-            "type": "integer",
-            "title": "Current Sample Count"
-          },
-          "last_updated": {
-            "type": "string",
-            "title": "Last Updated"
-          },
-          "is_drifted": {
-            "type": "boolean",
-            "title": "Is Drifted"
-          }
-        },
-        "type": "object",
-        "required": [
-          "engine_id",
-          "metric_name",
-          "psi",
-          "baseline_sample_count",
-          "current_sample_count",
-          "last_updated",
-          "is_drifted"
-        ],
-        "title": "DriftMetricResponse",
-        "description": "Response model for a drift metric."
-      },
-      "DriftStatusListResponse": {
-        "properties": {
-          "statuses": {
-            "items": {
-              "$ref": "#/components/schemas/DriftStatusResponse"
-            },
-            "type": "array",
-            "title": "Statuses"
-          },
-          "psi_threshold": {
-            "type": "number",
-            "title": "Psi Threshold",
-            "default": 0.2
-          }
-        },
-        "type": "object",
-        "required": [
-          "statuses"
-        ],
-        "title": "DriftStatusListResponse",
-        "description": "Response model for drift status list."
-      },
-      "DriftStatusResponse": {
-        "properties": {
-          "engine_id": {
-            "type": "string",
-            "title": "Engine Id"
-          },
-          "has_baseline": {
-            "type": "boolean",
-            "title": "Has Baseline"
-          },
-          "metrics": {
-            "items": {
-              "$ref": "#/components/schemas/DriftMetricResponse"
-            },
-            "type": "array",
-            "title": "Metrics"
-          },
-          "any_drifted": {
-            "type": "boolean",
-            "title": "Any Drifted"
-          },
-          "last_checked": {
-            "type": "string",
-            "title": "Last Checked"
-          }
-        },
-        "type": "object",
-        "required": [
-          "engine_id",
-          "has_baseline",
-          "metrics",
-          "any_drifted",
-          "last_checked"
-        ],
-        "title": "DriftStatusResponse",
-        "description": "Response model for drift status per engine."
-      },
       "DubSyncRequest": {
         "properties": {
           "audio_id": {
@@ -48082,51 +47086,34 @@
             "type": "string",
             "title": "Id"
           },
-          "effect_type": {
-            "type": "string",
-            "title": "Effect Type"
-          },
           "name": {
             "type": "string",
             "title": "Name"
           },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
           "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Description"
           },
           "parameters": {
-            "items": {
-              "$ref": "#/components/schemas/EffectParameter"
-            },
-            "type": "array",
-            "title": "Parameters",
-            "default": []
-          },
-          "created": {
-            "type": "string",
-            "title": "Created"
-          },
-          "modified": {
-            "type": "string",
-            "title": "Modified"
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameters"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "effect_type",
           "name",
-          "created",
-          "modified"
+          "category",
+          "description",
+          "parameters"
         ],
-        "title": "EffectPreset"
+        "title": "EffectPreset",
+        "description": "Voice effect preset."
       },
       "EffectPresetCreateRequest": {
         "properties": {
@@ -48535,7 +47522,7 @@
         "title": "EmotionApplyExtendedRequest",
         "description": "Extended emotion apply request with blending support."
       },
-      "EmotionApplyExtendedResponse": {
+      "EmotionApplyExtendedResponseModel": {
         "properties": {
           "audio_id": {
             "type": "string",
@@ -48544,15 +47531,25 @@
           "audio_url": {
             "type": "string",
             "title": "Audio Url"
+          },
+          "prosody_handling": {
+            "$ref": "#/components/schemas/ProsodyHandlingDiagnostics"
+          },
+          "emotion_mapping_source": {
+            "type": "string",
+            "title": "Emotion Mapping Source",
+            "description": "Mapping lane: canonical_preset, legacy_emotion, blended, canonical_blended, legacy_blended, canonical_legacy_blended, none",
+            "default": ""
           }
         },
         "type": "object",
         "required": [
           "audio_id",
-          "audio_url"
+          "audio_url",
+          "prosody_handling"
         ],
-        "title": "EmotionApplyExtendedResponse",
-        "description": "Response after applying emotion (new file, new audio_id)."
+        "title": "EmotionApplyExtendedResponseModel",
+        "description": "Response for POST /api/emotion/apply-extended (GAP-050)."
       },
       "EmotionApplyRequest": {
         "properties": {
@@ -49561,6 +48558,13 @@
             "type": "integer",
             "title": "Quality Level",
             "default": 5
+          },
+          "engine_priority_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Engine Priority Order"
           }
         },
         "type": "object",
@@ -49823,27 +48827,35 @@
       },
       "EnhanceResponse": {
         "properties": {
-          "job_id": {
+          "output_audio_id": {
             "type": "string",
-            "title": "Job Id"
+            "title": "Output Audio Id"
           },
-          "status": {
+          "mode": {
             "type": "string",
-            "title": "Status"
+            "title": "Mode"
           },
-          "message": {
-            "type": "string",
-            "title": "Message"
+          "strength": {
+            "type": "number",
+            "title": "Strength"
+          },
+          "improvements": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Improvements"
           }
         },
         "type": "object",
         "required": [
-          "job_id",
-          "status",
-          "message"
+          "output_audio_id",
+          "mode",
+          "strength",
+          "improvements"
         ],
         "title": "EnhanceResponse",
-        "description": "Face enhancement response."
+        "description": "Response for audio enhancement."
       },
       "EnhancementStageResult": {
         "properties": {
@@ -50203,6 +49215,31 @@
             ],
             "title": "Details",
             "description": "Additional error context"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorSeverity"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Severity",
+            "description": "Error severity (info, warning, error, critical)",
+            "default": "error"
+          },
+          "recovery_suggestion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery Suggestion",
+            "description": "Suggested action to resolve the error"
           }
         },
         "type": "object",
@@ -50211,7 +49248,18 @@
           "message"
         ],
         "title": "ErrorDetail",
-        "description": "Detailed error information for API responses."
+        "description": "Unified error envelope for API responses.\n\nCanonical format: code, message, details, severity.\nAligns with shared/schemas/error-envelope.schema.json and ERROR_HANDLING_GUIDE."
+      },
+      "ErrorSeverity": {
+        "type": "string",
+        "enum": [
+          "info",
+          "warning",
+          "error",
+          "critical"
+        ],
+        "title": "ErrorSeverity",
+        "description": "Severity levels for error responses. Aligns with shared/schemas/error-envelope.schema.json."
       },
       "ErrorSummaryResponse": {
         "properties": {
@@ -50569,6 +49617,49 @@
               }
             ],
             "title": "Sample Rate"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "apply_effects": {
+            "type": "boolean",
+            "title": "Apply Effects",
+            "default": false
+          },
+          "effect_chain_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effect Chain Id"
+          },
+          "fallback_project_audio_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Project Audio Id"
+          },
+          "lufs_preset": {
+            "type": "string",
+            "title": "Lufs Preset",
+            "default": "podcast_stereo"
           }
         },
         "type": "object",
@@ -50588,14 +49679,6 @@
             "type": "string",
             "title": "Filepath"
           },
-          "trace_count": {
-            "type": "integer",
-            "title": "Trace Count"
-          },
-          "span_count": {
-            "type": "integer",
-            "title": "Span Count"
-          },
           "message": {
             "type": "string",
             "title": "Message"
@@ -50605,12 +49688,10 @@
         "required": [
           "success",
           "filepath",
-          "trace_count",
-          "span_count",
           "message"
         ],
         "title": "ExportResponse",
-        "description": "Response for trace export."
+        "description": "Response model for export operation."
       },
       "F0Method": {
         "type": "string",
@@ -52377,6 +51458,21 @@
         ],
         "title": "ImgSamplerRequest"
       },
+      "ImportProjectRequest": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Project Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id"
+        ],
+        "title": "ImportProjectRequest",
+        "description": "Rebuild in-memory timeline mix graph from persisted project tracks (GAP-031)."
+      },
       "InsertTextRequest": {
         "properties": {
           "session_id": {
@@ -52931,25 +52027,9 @@
       },
       "KeyboardShortcut": {
         "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
           "key": {
             "type": "string",
             "title": "Key"
-          },
-          "key_code": {
-            "type": "string",
-            "title": "Key Code"
-          },
-          "modifiers": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Modifiers",
-            "default": []
           },
           "description": {
             "type": "string",
@@ -52969,34 +52049,16 @@
               }
             ],
             "title": "Panel Id"
-          },
-          "action_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Action Id"
-          },
-          "is_custom": {
-            "type": "boolean",
-            "title": "Is Custom",
-            "default": false
           }
         },
         "type": "object",
         "required": [
-          "id",
           "key",
-          "key_code",
           "description",
           "category"
         ],
         "title": "KeyboardShortcut",
-        "description": "A keyboard shortcut definition."
+        "description": "A keyboard shortcut."
       },
       "LanguageConfig": {
         "properties": {
@@ -53376,6 +52438,17 @@
               }
             ],
             "title": "Thumbnail Url"
+          },
+          "audio_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Id"
           }
         },
         "type": "object",
@@ -54399,93 +53472,6 @@
         "title": "MarkerCreateRequest",
         "description": "Request to create a marker."
       },
-      "MarkerCreateRequestAlias": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "time_seconds": {
-            "type": "number",
-            "title": "Time Seconds"
-          },
-          "color": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Color"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "time_seconds"
-        ],
-        "title": "MarkerCreateRequestAlias",
-        "description": "Request to create a marker."
-      },
-      "MarkerInfoAlias": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "time_seconds": {
-            "type": "number",
-            "title": "Time Seconds"
-          },
-          "color": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Color"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "time_seconds"
-        ],
-        "title": "MarkerInfoAlias",
-        "description": "Marker info matching TimelineGateway.MarkerInfo expectations."
-      },
       "MarkerUpdateRequest": {
         "properties": {
           "name": {
@@ -55490,6 +54476,60 @@
           "bus_number"
         ],
         "title": "MixerSubGroup"
+      },
+      "ModelDownloadStartRequest": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "default": "1.0"
+          },
+          "expected_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "engine",
+          "model_name"
+        ],
+        "title": "ModelDownloadStartRequest",
+        "description": "Start a URL-based model download tracked as job_type=download."
+      },
+      "ModelDownloadStartResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "title": "ModelDownloadStartResponse",
+        "description": "Response with canonical job id for progress via /api/jobs."
       },
       "ModelExportRequest": {
         "properties": {
@@ -57461,50 +56501,6 @@
         "title": "ParameterMutationStrategy",
         "description": "How synthesis parameters are adjusted on retry."
       },
-      "ParsedQuery": {
-        "properties": {
-          "original_query": {
-            "type": "string",
-            "title": "Original Query",
-            "description": "Original query"
-          },
-          "search_terms": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Search Terms",
-            "description": "Search terms"
-          },
-          "filters": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Filters",
-            "description": "Extracted filters"
-          },
-          "types": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Types",
-            "description": "Content types to search"
-          }
-        },
-        "type": "object",
-        "required": [
-          "original_query"
-        ],
-        "title": "ParsedQuery",
-        "description": "Parsed natural language query with extracted filters."
-      },
       "PassResult": {
         "properties": {
           "pass_number": {
@@ -58008,119 +57004,6 @@
         ],
         "title": "PipelinePreviewResponse",
         "description": "Response from pipeline preview (IDEA 58)."
-      },
-      "PipelineRequest": {
-        "properties": {
-          "text": {
-            "type": "string",
-            "title": "Text"
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode",
-            "default": "batch"
-          },
-          "stt_engine": {
-            "type": "string",
-            "title": "Stt Engine",
-            "default": "whisper"
-          },
-          "llm_provider": {
-            "type": "string",
-            "title": "Llm Provider",
-            "default": "ollama"
-          },
-          "tts_engine": {
-            "type": "string",
-            "title": "Tts Engine",
-            "default": "xtts_v2"
-          },
-          "language": {
-            "type": "string",
-            "title": "Language",
-            "default": "en"
-          },
-          "llm_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Llm Model"
-          },
-          "tts_voice": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tts Voice"
-          },
-          "synthesize": {
-            "type": "boolean",
-            "title": "Synthesize",
-            "default": true
-          }
-        },
-        "type": "object",
-        "required": [
-          "text"
-        ],
-        "title": "PipelineRequest",
-        "description": "Request for pipeline processing."
-      },
-      "PipelineResponse": {
-        "properties": {
-          "session_id": {
-            "type": "string",
-            "title": "Session Id"
-          },
-          "response_text": {
-            "type": "string",
-            "title": "Response Text"
-          },
-          "audio_available": {
-            "type": "boolean",
-            "title": "Audio Available",
-            "default": false
-          },
-          "audio_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Audio Id"
-          },
-          "metrics": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metrics"
-          }
-        },
-        "type": "object",
-        "required": [
-          "session_id",
-          "response_text"
-        ],
-        "title": "PipelineResponse",
-        "description": "Response from pipeline processing."
       },
       "PipelineStep": {
         "properties": {
@@ -60229,6 +59112,72 @@
         ],
         "title": "ProsodyCreateRequest",
         "description": "Request to create a prosody configuration."
+      },
+      "ProsodyHandlingDiagnostics": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action",
+            "description": "Outcome: \"applied\" | \"none\""
+          },
+          "applied_operations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Applied Operations"
+          },
+          "skipped_operations": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Skipped Operations"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "pitch_factor": {
+            "type": "number",
+            "title": "Pitch Factor",
+            "default": 1.0
+          },
+          "rate_factor": {
+            "type": "number",
+            "title": "Rate Factor",
+            "default": 1.0
+          },
+          "volume_factor": {
+            "type": "number",
+            "title": "Volume Factor",
+            "default": 1.0
+          },
+          "context": {
+            "type": "string",
+            "title": "Context",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "ProsodyHandlingDiagnostics",
+        "description": "Structured prosody transform outcome for apply/control responses (GAP-023)."
       },
       "PublisherRegisterRequest": {
         "properties": {
@@ -62356,6 +61305,99 @@
         "title": "ReferenceAudioPreprocessResponse",
         "description": "Response model for reference audio pre-processing."
       },
+      "RegenerateSegmentAcceptedResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "pending"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "title": "RegenerateSegmentAcceptedResponse"
+      },
+      "RegenerateSegmentRequest": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Project Id"
+          },
+          "track_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Track Id"
+          },
+          "clip_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Clip Id"
+          },
+          "transcription_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Transcription Id"
+          },
+          "segment_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Segment Id"
+          },
+          "replacement_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Text",
+            "description": "If set, synthesize this text; otherwise use current segment text from storage."
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id",
+            "description": "Override clip profile; defaults to clip.profile_id from track store."
+          },
+          "engine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine",
+            "description": "TTS engine id override."
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "track_id",
+          "clip_id",
+          "transcription_id",
+          "segment_id"
+        ],
+        "title": "RegenerateSegmentRequest",
+        "description": "GAP-046: start async regeneration for one linked segment (canonical job + synthesis)."
+      },
       "RemoveFillerWordsRequest": {
         "properties": {
           "session_id": {
@@ -63293,6 +62335,18 @@
           "message": {
             "type": "string",
             "title": "Message"
+          },
+          "ssml_handling": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ssml Handling"
           }
         },
         "type": "object",
@@ -63828,117 +62882,6 @@
         ],
         "title": "ScoreResult"
       },
-      "SearchResponse": {
-        "properties": {
-          "query": {
-            "type": "string",
-            "title": "Query",
-            "description": "Search query"
-          },
-          "results": {
-            "items": {
-              "$ref": "#/components/schemas/SearchResultItem"
-            },
-            "type": "array",
-            "title": "Results",
-            "description": "Search results"
-          },
-          "total_results": {
-            "type": "integer",
-            "title": "Total Results",
-            "description": "Total number of results"
-          },
-          "results_by_type": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object",
-            "title": "Results By Type",
-            "description": "Result count by type"
-          },
-          "parsed_query": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ParsedQuery"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Parsed natural language query (if applicable)"
-          }
-        },
-        "type": "object",
-        "required": [
-          "query",
-          "total_results"
-        ],
-        "title": "SearchResponse",
-        "description": "Response from global search."
-      },
-      "SearchResultItem": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id",
-            "description": "Item identifier"
-          },
-          "type": {
-            "type": "string",
-            "title": "Type",
-            "description": "Item type (profile, project, audio, marker, script)"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title",
-            "description": "Item title/name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description",
-            "description": "Item description"
-          },
-          "panel_id": {
-            "type": "string",
-            "title": "Panel Id",
-            "description": "Panel ID to navigate to"
-          },
-          "preview": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Preview",
-            "description": "Preview text snippet"
-          },
-          "metadata": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Metadata",
-            "description": "Additional metadata"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "type",
-          "title",
-          "panel_id"
-        ],
-        "title": "SearchResultItem",
-        "description": "Individual search result item."
-      },
       "SessionCreateRequest": {
         "properties": {
           "audio_id": {
@@ -64009,32 +62952,22 @@
         "title": "SessionUpdateRequest",
         "description": "Request to update an edit session."
       },
-      "SetBaselineRequest": {
+      "SetClipFadeRequest": {
         "properties": {
-          "engine_id": {
-            "type": "string",
-            "title": "Engine Id"
+          "fade_in_seconds": {
+            "type": "number",
+            "title": "Fade In Seconds",
+            "default": 0.0
           },
-          "metric_name": {
-            "type": "string",
-            "title": "Metric Name"
-          },
-          "values": {
-            "items": {
-              "type": "number"
-            },
-            "type": "array",
-            "title": "Values"
+          "fade_out_seconds": {
+            "type": "number",
+            "title": "Fade Out Seconds",
+            "default": 0.0
           }
         },
         "type": "object",
-        "required": [
-          "engine_id",
-          "metric_name",
-          "values"
-        ],
-        "title": "SetBaselineRequest",
-        "description": "Request body for setting baseline."
+        "title": "SetClipFadeRequest",
+        "description": "Request to set linear fade-in/out on a clip (export/mixdown)."
       },
       "SettingsData": {
         "properties": {
@@ -64977,102 +63910,11 @@
         "title": "SpectrogramComparison",
         "description": "Comparison between multiple spectrograms."
       },
-      "SpectrogramConfig": {
-        "properties": {
-          "audio_id": {
-            "type": "string",
-            "title": "Audio Id"
-          },
-          "window_size": {
-            "type": "integer",
-            "title": "Window Size",
-            "default": 2048
-          },
-          "hop_length": {
-            "type": "integer",
-            "title": "Hop Length",
-            "default": 512
-          },
-          "n_fft": {
-            "type": "integer",
-            "title": "N Fft",
-            "default": 2048
-          },
-          "frequency_range": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "type": "number"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Frequency Range"
-          },
-          "time_range": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "type": "number"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Time Range"
-          },
-          "color_scheme": {
-            "type": "string",
-            "title": "Color Scheme",
-            "default": "viridis"
-          },
-          "colormap_range": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "type": "number"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Colormap Range"
-          },
-          "show_phase": {
-            "type": "boolean",
-            "title": "Show Phase",
-            "default": false
-          },
-          "show_magnitude": {
-            "type": "boolean",
-            "title": "Show Magnitude",
-            "default": true
-          },
-          "log_scale": {
-            "type": "boolean",
-            "title": "Log Scale",
-            "default": true
-          }
-        },
-        "type": "object",
-        "required": [
-          "audio_id"
-        ],
-        "title": "SpectrogramConfig",
-        "description": "Spectrogram configuration."
-      },
       "SpectrogramData": {
         "properties": {
           "frames": {
             "items": {
-              "$ref": "#/components/schemas/backend__api__routes__audio__SpectrogramFrame"
+              "$ref": "#/components/schemas/SpectrogramFrame"
             },
             "type": "array",
             "title": "Frames"
@@ -65122,37 +63964,15 @@
             },
             "type": "array",
             "title": "Frequencies"
-          },
-          "magnitudes": {
-            "items": {
-              "type": "number"
-            },
-            "type": "array",
-            "title": "Magnitudes"
-          },
-          "phases": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "number"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phases"
           }
         },
         "type": "object",
         "required": [
           "time",
-          "frequencies",
-          "magnitudes"
+          "frequencies"
         ],
         "title": "SpectrogramFrame",
-        "description": "A single spectrogram frame."
+        "description": "Single frame of spectrogram data."
       },
       "SpectrogramView": {
         "properties": {
@@ -65314,6 +64134,42 @@
         ],
         "title": "SplitClipResponse",
         "description": "Response after splitting a clip."
+      },
+      "SsmlHandlingDiagnostics": {
+        "properties": {
+          "ssml_detected": {
+            "type": "boolean",
+            "title": "Ssml Detected"
+          },
+          "capability_class": {
+            "type": "string",
+            "title": "Capability Class"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "engine_id": {
+            "type": "string",
+            "title": "Engine Id",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "ssml_detected",
+          "capability_class",
+          "action"
+        ],
+        "title": "SsmlHandlingDiagnostics",
+        "description": "Structured SSML handling outcome for synthesis responses (GAP-054)."
       },
       "StandardResponse_BatchSynthesisResponse_": {
         "properties": {
@@ -66414,7 +65270,7 @@
           "data": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/VoiceProfile"
+                "$ref": "#/components/schemas/backend__api__v3__voices__VoiceProfile"
               },
               {
                 "type": "null"
@@ -66717,7 +65573,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/VoiceProfile"
+                  "$ref": "#/components/schemas/backend__api__v3__voices__VoiceProfile"
                 },
                 "type": "array"
               },
@@ -68690,43 +67546,6 @@
         "title": "TextAnalysisResponse",
         "description": "Response from text analysis."
       },
-      "TimelineDetailAlias": {
-        "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
-          "duration_seconds": {
-            "type": "number",
-            "title": "Duration Seconds",
-            "default": 0.0
-          },
-          "tracks": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Tracks",
-            "default": []
-          },
-          "markers": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Markers",
-            "default": []
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_id"
-        ],
-        "title": "TimelineDetailAlias",
-        "description": "Complete timeline detail matching TimelineGateway expectations."
-      },
       "TimelineSettings": {
         "properties": {
           "time_format": {
@@ -69054,31 +67873,6 @@
         ],
         "title": "TrackCreateRequest"
       },
-      "TrackCreateRequestAlias": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "engine": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engine"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "title": "TrackCreateRequestAlias",
-        "description": "Request to create a track."
-      },
       "TrackInfo": {
         "properties": {
           "id": {
@@ -69123,55 +67917,6 @@
         "title": "TrackInfo",
         "description": "Track information."
       },
-      "TrackInfoAlias": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
-          "track_number": {
-            "type": "integer",
-            "title": "Track Number"
-          },
-          "clips": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Clips",
-            "default": []
-          },
-          "engine": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engine"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "project_id",
-          "track_number"
-        ],
-        "title": "TrackInfoAlias",
-        "description": "Track info matching TimelineGateway.TrackInfo expectations."
-      },
       "TrackUpdateRequest": {
         "properties": {
           "name": {
@@ -69195,6 +67940,28 @@
               }
             ],
             "title": "Engine"
+          },
+          "is_muted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Muted"
+          },
+          "is_solo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Solo"
           }
         },
         "type": "object",
@@ -70041,6 +68808,10 @@
       },
       "TranscriptionSegment": {
         "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
           "text": {
             "type": "string",
             "title": "Text"
@@ -70201,9 +68972,9 @@
       },
       "TranslationResponse": {
         "properties": {
-          "translated_text": {
+          "project_id": {
             "type": "string",
-            "title": "Translated Text"
+            "title": "Project Id"
           },
           "source_language": {
             "type": "string",
@@ -70213,20 +68984,23 @@
             "type": "string",
             "title": "Target Language"
           },
-          "confidence": {
-            "type": "number",
-            "title": "Confidence"
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/TranslatedSegment"
+            },
+            "type": "array",
+            "title": "Segments"
           }
         },
         "type": "object",
         "required": [
-          "translated_text",
+          "project_id",
           "source_language",
           "target_language",
-          "confidence"
+          "segments"
         ],
         "title": "TranslationResponse",
-        "description": "Response from translation."
+        "description": "Response for translation."
       },
       "TrimClipRequest": {
         "properties": {
@@ -70536,6 +69310,68 @@
         "type": "object",
         "title": "UpdateProjectRequest",
         "description": "Request to update a project."
+      },
+      "UpdateTimelineTrackRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "muted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Muted"
+          },
+          "solo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solo"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          },
+          "pan": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pan"
+          }
+        },
+        "type": "object",
+        "title": "UpdateTimelineTrackRequest",
+        "description": "Partial update for an in-memory timeline track (mix controls)."
       },
       "UpscalingEngine": {
         "properties": {
@@ -72436,88 +71272,6 @@
         "title": "VoiceEmbeddingResponse",
         "description": "Voice embedding response."
       },
-      "VoiceInfoAlias": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "engine_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engine Id"
-          },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
-          },
-          "gender": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Gender"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "preview_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Preview Url"
-          },
-          "tags": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Tags",
-            "default": []
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "VoiceInfoAlias",
-        "description": "Voice info model matching VoiceGateway expectations."
-      },
       "VoiceIsolationRequest": {
         "properties": {
           "audio_id": {
@@ -72731,23 +71485,12 @@
             "type": "string",
             "title": "Name"
           },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
           "language": {
             "type": "string",
             "title": "Language",
             "default": "en"
           },
-          "gender": {
+          "emotion": {
             "anyOf": [
               {
                 "type": "string"
@@ -72756,9 +71499,22 @@
                 "type": "null"
               }
             ],
-            "title": "Gender"
+            "title": "Emotion"
           },
-          "age_group": {
+          "quality_score": {
+            "type": "number",
+            "title": "Quality Score",
+            "default": 0.0
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "reference_audio_url": {
             "anyOf": [
               {
                 "type": "string"
@@ -72767,36 +71523,14 @@
                 "type": "null"
               }
             ],
-            "title": "Age Group"
+            "title": "Reference Audio Url"
           },
-          "style": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Style"
-          },
-          "sample_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sample Url"
-          },
-          "is_custom": {
+          "reference_audio_bound": {
             "type": "boolean",
-            "title": "Is Custom",
+            "title": "Reference Audio Bound",
             "default": false
           },
-          "engine_id": {
+          "avatar_url": {
             "anyOf": [
               {
                 "type": "string"
@@ -72805,18 +71539,7 @@
                 "type": "null"
               }
             ],
-            "title": "Engine Id"
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created At"
+            "title": "Avatar Url"
           }
         },
         "type": "object",
@@ -72825,7 +71548,7 @@
           "name"
         ],
         "title": "VoiceProfile",
-        "description": "Voice profile information.",
+        "description": "Voice profile model with avatar support.",
         "example": {
           "id": "profile_123",
           "name": "John Doe Voice",
@@ -73044,6 +71767,76 @@
             ],
             "title": "Consent Id",
             "description": "Consent record ID required when synthesizing with a third-party voice profile"
+          },
+          "speed": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": 0.5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed",
+            "description": "Speech speed (0.5-2.0, default 1.0)"
+          },
+          "pitch": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 12.0,
+                "minimum": -12.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pitch",
+            "description": "Pitch shift in semitones (-12 to 12)"
+          },
+          "stability": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stability",
+            "description": "Voice stability (0-1)"
+          },
+          "clarity": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarity",
+            "description": "Voice clarity (0-1)"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature",
+            "description": "Sampling temperature (0-1)"
           }
         },
         "type": "object",
@@ -73084,6 +71877,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/QualityMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ssml_handling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SsmlHandlingDiagnostics"
               },
               {
                 "type": "null"
@@ -73356,93 +72159,45 @@
       },
       "WaveformData": {
         "properties": {
-          "audio_id": {
-            "type": "string",
-            "title": "Audio Id"
+          "samples": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Samples"
           },
           "sample_rate": {
             "type": "integer",
             "title": "Sample Rate"
           },
-          "channels": {
-            "type": "integer",
-            "title": "Channels"
-          },
           "duration": {
             "type": "number",
             "title": "Duration"
           },
-          "samples": {
-            "items": {
-              "items": {
-                "type": "number"
-              },
-              "type": "array"
-            },
-            "type": "array",
-            "title": "Samples"
+          "channels": {
+            "type": "integer",
+            "title": "Channels"
           },
-          "rms_values": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "number"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rms Values"
+          "width": {
+            "type": "integer",
+            "title": "Width"
           },
-          "peak_values": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "number"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Peak Values"
-          },
-          "zero_crossings": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Zero Crossings"
-          },
-          "time_points": {
-            "items": {
-              "type": "number"
-            },
-            "type": "array",
-            "title": "Time Points"
+          "mode": {
+            "type": "string",
+            "title": "Mode"
           }
         },
         "type": "object",
         "required": [
-          "audio_id",
-          "sample_rate",
-          "channels",
-          "duration",
           "samples",
-          "time_points"
+          "sample_rate",
+          "duration",
+          "channels",
+          "width",
+          "mode"
         ],
         "title": "WaveformData",
-        "description": "Waveform data for visualization."
+        "description": "Waveform data for rendering."
       },
       "WizardFinalizeRequest": {
         "properties": {
@@ -74223,76 +72978,6 @@
         "title": "ZeroShotCloneResponse",
         "description": "Response for zero-shot voice cloning."
       },
-      "backend__api__models_additional__VoiceProfile": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "language": {
-            "type": "string",
-            "title": "Language",
-            "default": "en"
-          },
-          "emotion": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Emotion"
-          },
-          "quality_score": {
-            "type": "number",
-            "title": "Quality Score",
-            "default": 0.0
-          },
-          "tags": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Tags",
-            "default": []
-          },
-          "reference_audio_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reference Audio Url"
-          },
-          "avatar_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Avatar Url"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "VoiceProfile",
-        "description": "Voice profile model with avatar support."
-      },
       "backend__api__routes__ai_enhancement__EnhanceRequest": {
         "properties": {
           "audio_id": {
@@ -74333,102 +73018,6 @@
         ],
         "title": "EnhanceRequest",
         "description": "Request for audio enhancement."
-      },
-      "backend__api__routes__ai_enhancement__EnhanceResponse": {
-        "properties": {
-          "output_audio_id": {
-            "type": "string",
-            "title": "Output Audio Id"
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode"
-          },
-          "strength": {
-            "type": "number",
-            "title": "Strength"
-          },
-          "improvements": {
-            "additionalProperties": {
-              "type": "number"
-            },
-            "type": "object",
-            "title": "Improvements"
-          }
-        },
-        "type": "object",
-        "required": [
-          "output_audio_id",
-          "mode",
-          "strength",
-          "improvements"
-        ],
-        "title": "EnhanceResponse",
-        "description": "Response for audio enhancement."
-      },
-      "backend__api__routes__audio__SpectrogramFrame": {
-        "properties": {
-          "time": {
-            "type": "number",
-            "title": "Time"
-          },
-          "frequencies": {
-            "items": {
-              "type": "number"
-            },
-            "type": "array",
-            "title": "Frequencies"
-          }
-        },
-        "type": "object",
-        "required": [
-          "time",
-          "frequencies"
-        ],
-        "title": "SpectrogramFrame",
-        "description": "Single frame of spectrogram data."
-      },
-      "backend__api__routes__audio__WaveformData": {
-        "properties": {
-          "samples": {
-            "items": {
-              "type": "number"
-            },
-            "type": "array",
-            "title": "Samples"
-          },
-          "sample_rate": {
-            "type": "integer",
-            "title": "Sample Rate"
-          },
-          "duration": {
-            "type": "number",
-            "title": "Duration"
-          },
-          "channels": {
-            "type": "integer",
-            "title": "Channels"
-          },
-          "width": {
-            "type": "integer",
-            "title": "Width"
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode"
-          }
-        },
-        "type": "object",
-        "required": [
-          "samples",
-          "sample_rate",
-          "duration",
-          "channels",
-          "width",
-          "mode"
-        ],
-        "title": "WaveformData",
-        "description": "Waveform data for rendering."
       },
       "backend__api__routes__audio_analysis__TemporalAnalysis": {
         "properties": {
@@ -74565,45 +73154,21 @@
         "title": "AutomationCurveUpdateRequest",
         "description": "Request to update an automation curve."
       },
-      "backend__api__routes__errors__ExportResponse": {
+      "backend__api__routes__effects__EffectPreset": {
         "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
+          "id": {
+            "type": "string",
+            "title": "Id"
           },
-          "filepath": {
+          "effect_type": {
             "type": "string",
-            "title": "Filepath"
+            "title": "Effect Type"
           },
-          "message": {
+          "name": {
             "type": "string",
-            "title": "Message"
-          }
-        },
-        "type": "object",
-        "required": [
-          "success",
-          "filepath",
-          "message"
-        ],
-        "title": "ExportResponse",
-        "description": "Response model for export operation."
-      },
-      "backend__api__routes__help__KeyboardShortcut": {
-        "properties": {
-          "key": {
-            "type": "string",
-            "title": "Key"
+            "title": "Name"
           },
           "description": {
-            "type": "string",
-            "title": "Description"
-          },
-          "category": {
-            "type": "string",
-            "title": "Category"
-          },
-          "panel_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -74612,17 +73177,34 @@
                 "type": "null"
               }
             ],
-            "title": "Panel Id"
+            "title": "Description"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/EffectParameter"
+            },
+            "type": "array",
+            "title": "Parameters",
+            "default": []
+          },
+          "created": {
+            "type": "string",
+            "title": "Created"
+          },
+          "modified": {
+            "type": "string",
+            "title": "Modified"
           }
         },
         "type": "object",
         "required": [
-          "key",
-          "description",
-          "category"
+          "id",
+          "effect_type",
+          "name",
+          "created",
+          "modified"
         ],
-        "title": "KeyboardShortcut",
-        "description": "A keyboard shortcut."
+        "title": "EffectPreset"
       },
       "backend__api__routes__macros__AutomationCurve": {
         "properties": {
@@ -74727,6 +73309,35 @@
         ],
         "title": "AutomationPoint"
       },
+      "backend__api__routes__multilingual__TranslationResponse": {
+        "properties": {
+          "translated_text": {
+            "type": "string",
+            "title": "Translated Text"
+          },
+          "source_language": {
+            "type": "string",
+            "title": "Source Language"
+          },
+          "target_language": {
+            "type": "string",
+            "title": "Target Language"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "translated_text",
+          "source_language",
+          "target_language",
+          "confidence"
+        ],
+        "title": "TranslationResponse",
+        "description": "Response from translation."
+      },
       "backend__api__routes__settings__PerformanceSettings": {
         "properties": {
           "caching_enabled": {
@@ -74753,6 +73364,75 @@
         "type": "object",
         "title": "PerformanceSettings"
       },
+      "backend__api__routes__shortcuts__KeyboardShortcut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "key_code": {
+            "type": "string",
+            "title": "Key Code"
+          },
+          "modifiers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Modifiers",
+            "default": []
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "panel_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panel Id"
+          },
+          "action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Id"
+          },
+          "is_custom": {
+            "type": "boolean",
+            "title": "Is Custom",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "key_code",
+          "description",
+          "category"
+        ],
+        "title": "KeyboardShortcut",
+        "description": "A keyboard shortcut definition."
+      },
       "backend__api__routes__slo__ExportResponse": {
         "properties": {
           "success": {
@@ -74776,52 +73456,6 @@
         ],
         "title": "ExportResponse",
         "description": "Response model for export operation."
-      },
-      "backend__api__routes__spectrogram__SpectrogramData": {
-        "properties": {
-          "audio_id": {
-            "type": "string",
-            "title": "Audio Id"
-          },
-          "sample_rate": {
-            "type": "integer",
-            "title": "Sample Rate"
-          },
-          "duration": {
-            "type": "number",
-            "title": "Duration"
-          },
-          "frames": {
-            "items": {
-              "$ref": "#/components/schemas/SpectrogramFrame"
-            },
-            "type": "array",
-            "title": "Frames"
-          },
-          "frequency_resolution": {
-            "type": "number",
-            "title": "Frequency Resolution"
-          },
-          "time_resolution": {
-            "type": "number",
-            "title": "Time Resolution"
-          },
-          "config": {
-            "$ref": "#/components/schemas/SpectrogramConfig"
-          }
-        },
-        "type": "object",
-        "required": [
-          "audio_id",
-          "sample_rate",
-          "duration",
-          "frames",
-          "frequency_resolution",
-          "time_resolution",
-          "config"
-        ],
-        "title": "SpectrogramData",
-        "description": "Complete spectrogram data."
       },
       "backend__api__routes__style_transfer__StylePreset": {
         "properties": {
@@ -74898,6 +73532,40 @@
         ],
         "title": "ExportResponse",
         "description": "Response after export."
+      },
+      "backend__api__routes__tracing__ExportResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "filepath": {
+            "type": "string",
+            "title": "Filepath"
+          },
+          "trace_count": {
+            "type": "integer",
+            "title": "Trace Count"
+          },
+          "span_count": {
+            "type": "integer",
+            "title": "Span Count"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "filepath",
+          "trace_count",
+          "span_count",
+          "message"
+        ],
+        "title": "ExportResponse",
+        "description": "Response for trace export."
       },
       "backend__api__routes__transcribe__TranscriptionResponse": {
         "properties": {
@@ -75101,72 +73769,119 @@
         "title": "TranscriptionSegment",
         "description": "A transcription segment."
       },
-      "backend__api__routes__translation__TranslationResponse": {
+      "backend__api__routes__video_enhance__EnhanceResponse": {
         "properties": {
-          "project_id": {
+          "job_id": {
             "type": "string",
-            "title": "Project Id"
+            "title": "Job Id"
           },
-          "source_language": {
+          "status": {
             "type": "string",
-            "title": "Source Language"
+            "title": "Status"
           },
-          "target_language": {
+          "message": {
             "type": "string",
-            "title": "Target Language"
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "status",
+          "message"
+        ],
+        "title": "EnhanceResponse",
+        "description": "Face enhancement response."
+      },
+      "backend__api__routes__waveform__WaveformData": {
+        "properties": {
+          "audio_id": {
+            "type": "string",
+            "title": "Audio Id"
           },
-          "segments": {
+          "sample_rate": {
+            "type": "integer",
+            "title": "Sample Rate"
+          },
+          "channels": {
+            "type": "integer",
+            "title": "Channels"
+          },
+          "duration": {
+            "type": "number",
+            "title": "Duration"
+          },
+          "samples": {
             "items": {
-              "$ref": "#/components/schemas/TranslatedSegment"
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
             },
             "type": "array",
-            "title": "Segments"
+            "title": "Samples"
+          },
+          "rms_values": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rms Values"
+          },
+          "peak_values": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Values"
+          },
+          "zero_crossings": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zero Crossings"
+          },
+          "time_points": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Time Points"
           }
         },
         "type": "object",
         "required": [
-          "project_id",
-          "source_language",
-          "target_language",
-          "segments"
+          "audio_id",
+          "sample_rate",
+          "channels",
+          "duration",
+          "samples",
+          "time_points"
         ],
-        "title": "TranslationResponse",
-        "description": "Response for translation."
-      },
-      "backend__api__routes__voice_effects__EffectPreset": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "category": {
-            "type": "string",
-            "title": "Category"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description"
-          },
-          "parameters": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Parameters"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "category",
-          "description",
-          "parameters"
-        ],
-        "title": "EffectPreset",
-        "description": "Voice effect preset."
+        "title": "WaveformData",
+        "description": "Waveform data for visualization."
       },
       "backend__api__v3__engines__EngineInfo": {
         "properties": {
@@ -75313,6 +74028,122 @@
           "sample_rate": 44100,
           "track_count": 3,
           "updated_at": "2026-02-09T15:30:00Z"
+        }
+      },
+      "backend__api__v3__voices__VoiceProfile": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gender"
+          },
+          "age_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Group"
+          },
+          "style": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style"
+          },
+          "sample_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Url"
+          },
+          "is_custom": {
+            "type": "boolean",
+            "title": "Is Custom",
+            "default": false
+          },
+          "engine_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Id"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "VoiceProfile",
+        "description": "Voice profile information.",
+        "example": {
+          "age_group": "adult",
+          "description": "Clear, professional male voice",
+          "gender": "male",
+          "id": "voice_abc123",
+          "is_custom": false,
+          "language": "en",
+          "name": "Professional Male",
+          "style": "professional"
         }
       }
     },

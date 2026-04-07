@@ -257,9 +257,26 @@ namespace VoiceStudio.App.ViewModels
           SecondaryIntensity = EnableBlending ? (float)SecondaryIntensity : 0.0f
         };
 
-        await _emotionControlClient.ApplyEmotionAsync(request, cancellationToken).ConfigureAwait(false);
+        var response = await _emotionControlClient
+          .ApplyEmotionAsync(request, cancellationToken)
+          .ConfigureAwait(false);
 
-        StatusMessage = ResourceHelper.GetString("EmotionControl.EmotionApplied", "Emotion applied successfully");
+        var baseApplied = ResourceHelper.GetString(
+          "EmotionControl.EmotionApplied",
+          "Emotion applied successfully");
+        if (response?.ProsodyHandling != null)
+        {
+          var ph = response.ProsodyHandling;
+          StatusMessage = $"{baseApplied} ({ph.Action})";
+          if (ph.Warnings is { Count: > 0 })
+          {
+            StatusMessage += " — " + string.Join("; ", ph.Warnings);
+          }
+        }
+        else
+        {
+          StatusMessage = baseApplied;
+        }
       }
       catch (OperationCanceledException)
       {

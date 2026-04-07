@@ -42,8 +42,8 @@ namespace VoiceStudio.App.Controls
     private bool _subscribedToReachability;
     private Grid? _offlineOverlay;
 
-    public static new readonly DependencyProperty ContentProperty =
-        DependencyProperty.Register(nameof(Content), typeof(UIElement), typeof(PanelHost),
+    public static readonly DependencyProperty HostedPanelProperty =
+        DependencyProperty.Register(nameof(HostedPanel), typeof(UIElement), typeof(PanelHost),
             new PropertyMetadata(null, OnContentChanged));
 
     public static readonly DependencyProperty PanelRegionProperty =
@@ -116,10 +116,10 @@ namespace VoiceStudio.App.Controls
             typeof(PanelHost),
             new PropertyMetadata("Failed to load panel"));
 
-    public new UIElement? Content
+    public UIElement? HostedPanel
     {
-      get => (UIElement?)GetValue(ContentProperty);
-      set => SetValue(ContentProperty, value);
+      get => (UIElement?)GetValue(HostedPanelProperty);
+      set => SetValue(HostedPanelProperty, value);
     }
 
     public bool IsLoading
@@ -462,7 +462,7 @@ namespace VoiceStudio.App.Controls
       if (OptionsFlyout.Items.Count < 2)
         return;
 
-      var viewModel = Content != null ? GetViewModelFromContent(Content) : null;
+      var viewModel = HostedPanel != null ? GetViewModelFromContent(HostedPanel) : null;
       var showRefresh = viewModel is IPanelLifecycle;
 
       if (OptionsFlyout.Items[0] is MenuFlyoutItem refreshItem)
@@ -523,10 +523,10 @@ namespace VoiceStudio.App.Controls
 
     private async void OptionsRefresh_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
-      if (Content == null)
+      if (HostedPanel == null)
         return;
 
-      var viewModel = GetViewModelFromContent(Content);
+      var viewModel = GetViewModelFromContent(HostedPanel);
       if (viewModel is not IPanelLifecycle lifecycle)
         return;
 
@@ -552,7 +552,7 @@ namespace VoiceStudio.App.Controls
     /// </summary>
     private void SaveCurrentPanelState()
     {
-      if (_panelStateService == null || Content == null || string.IsNullOrEmpty(_previousPanelId))
+      if (_panelStateService == null || HostedPanel == null || string.IsNullOrEmpty(_previousPanelId))
         return;
 
       try
@@ -561,7 +561,7 @@ namespace VoiceStudio.App.Controls
         string? panelId = null;
 
         // Get panel ID from ViewModel if it implements IPanelView
-        if (GetPanelIdFromContent(Content, out panelId) && !string.IsNullOrEmpty(panelId))
+        if (GetPanelIdFromContent(HostedPanel, out panelId) && !string.IsNullOrEmpty(panelId))
         {
           var panelState = new VoiceStudio.Core.Models.PanelState
           {
@@ -569,7 +569,7 @@ namespace VoiceStudio.App.Controls
           };
 
           // Check if ViewModel implements IPanelStatePersistable for custom state
-          if (Content is UserControl userControl && userControl.DataContext is IPanelStatePersistable persistable)
+          if (HostedPanel is UserControl userControl && userControl.DataContext is IPanelStatePersistable persistable)
           {
             var customState = persistable.GetCurrentState();
             if (customState != null)
@@ -825,7 +825,7 @@ namespace VoiceStudio.App.Controls
         var openedPanels = new List<string>();
 
         // Get active panel ID
-        if (Content != null && GetPanelIdFromContent(Content, out string? panelId))
+        if (HostedPanel != null && GetPanelIdFromContent(HostedPanel, out string? panelId))
         {
           activePanelId = panelId ?? string.Empty;
           openedPanels.Add(activePanelId);
@@ -872,7 +872,7 @@ namespace VoiceStudio.App.Controls
         if (_loadedPanels.TryGetValue(panelId, out var cached))
         {
           TouchLru(panelId);
-          Content = cached;
+          HostedPanel = cached;
           return cached;
         }
       }
@@ -949,7 +949,7 @@ namespace VoiceStudio.App.Controls
             }
             TouchLru(panelId);
             LoadErrorMessage = string.Empty;
-            Content = existing;
+            HostedPanel = existing;
             return existing;
           }
 
@@ -957,7 +957,7 @@ namespace VoiceStudio.App.Controls
           _lruOrder.Add(panelId);
           EvictIfOverCapacity(panelId);
           LoadErrorMessage = string.Empty;
-          Content = panel;
+          HostedPanel = panel;
           var loadTime = DateTime.UtcNow - startTime;
           System.Diagnostics.Debug.WriteLine($"[PanelHost] Loaded panel {panelId} in {loadTime.TotalMilliseconds:F1}ms");
           return panel;
@@ -1001,7 +1001,7 @@ namespace VoiceStudio.App.Controls
     {
       LoadErrorMessage = message;
       LoadErrorTitle = "Failed to load panel";
-      Content = null;
+      HostedPanel = null;
     }
 
     private async void ErrorOverlay_RetryRequested(object? sender, EventArgs e)
@@ -1019,7 +1019,7 @@ namespace VoiceStudio.App.Controls
       if (_offlineOverlay != null)
       {
         LoadErrorMessage = string.Empty;
-        Content = _offlineOverlay;
+        HostedPanel = _offlineOverlay;
         return;
       }
 
@@ -1078,7 +1078,7 @@ namespace VoiceStudio.App.Controls
       _offlineOverlay = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
       _offlineOverlay.Children.Add(stack);
       LoadErrorMessage = string.Empty;
-      Content = _offlineOverlay;
+      HostedPanel = _offlineOverlay;
     }
 
     private void EnsureReachabilitySubscription()
@@ -1094,7 +1094,7 @@ namespace VoiceStudio.App.Controls
       if (!reachable || _lastRequestedPanelId == null)
         return;
 
-      if (Content != _offlineOverlay)
+      if (HostedPanel != _offlineOverlay)
         return;
 
       DispatcherQueue?.TryEnqueue(() =>
@@ -1264,7 +1264,7 @@ namespace VoiceStudio.App.Controls
       args.Data.Properties.Add("PanelHost", this);
       args.Data.Properties.Add("PanelRegion", _region);
       string panelId = string.Empty;
-      if (Content is UIElement content && GetPanelIdFromContent(content, out var id))
+      if (HostedPanel is UIElement content && GetPanelIdFromContent(content, out var id))
       {
         panelId = id ?? string.Empty;
       }

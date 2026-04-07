@@ -91,7 +91,7 @@
             <Grid>
                 <!-- Panel Content -->
                 <ContentPresenter x:Name="PanelContent"
-                    Content="{x:Bind Content, Mode=OneWay}"
+                    Content="{x:Bind HostedPanel, Mode=OneWay}"
                     Opacity="1">
                     <ContentPresenter.ContentTransitions>
                         <TransitionCollection>

@@ -199,8 +199,8 @@ namespace VoiceStudio.App
         /// </summary>
         private IProjectWorkflowCoordinator CreateProjectWorkflowCoordinator(IShellNavigationCoordinator shellNav, WorkflowDependencies deps)
         {
-            var getTimeline = () => (FindNameOnContent("CenterPanelHost") as Controls.PanelHost)?.Content is TimelineView tv ? tv.ViewModel : null;
-            var getMixer = () => (FindNameOnContent("RightPanelHost") as Controls.PanelHost)?.Content is EffectsMixerView em ? em.ViewModel : null;
+            var getTimeline = () => (FindNameOnContent("CenterPanelHost") as Controls.PanelHost)?.HostedPanel is TimelineView tv ? tv.ViewModel : null;
+            var getMixer = () => (FindNameOnContent("RightPanelHost") as Controls.PanelHost)?.HostedPanel is EffectsMixerView em ? em.ViewModel : null;
             return ProjectWorkflowBootstrap.Create(
                 shellNav,
                 getTimeline,
@@ -475,7 +475,7 @@ namespace VoiceStudio.App
             bootstrap?.SetGetTimelineController(() =>
             {
                 var host = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-                if (host?.Content is TimelineView tv && tv.ViewModel is ITimelineTransportController ctrl)
+                if (host?.HostedPanel is TimelineView tv && tv.ViewModel is ITimelineTransportController ctrl)
                     return ctrl;
                 return null;
             });
@@ -786,8 +786,8 @@ namespace VoiceStudio.App
                 return;
 
             // Swap panel contents
-            var sourceContent = e.SourcePanelHost.Content;
-            var targetContent = targetHost.Content;
+            var sourceContent = e.SourcePanelHost.HostedPanel;
+            var targetContent = targetHost.HostedPanel;
 
             // Animate the swap
             AnimatePanelDock(e.SourcePanelHost, targetHost, sourceContent, targetContent);
@@ -1335,7 +1335,7 @@ namespace VoiceStudio.App
                 return;
 
             // Switch panel content
-            targetHost.Content = panelFactory();
+            targetHost.HostedPanel = panelFactory();
 
             if (IsGateCSmokeMode())
             {
@@ -1486,7 +1486,7 @@ namespace VoiceStudio.App
             _currentPanelIndex = Array.IndexOf(_panelCycleOrder, region);
 
             // Focus the panel host
-            if (targetHost.Content is FrameworkElement content)
+            if (targetHost.HostedPanel is FrameworkElement content)
             {
                 // Try to focus the content first (more useful for interaction)
                 content.Focus(FocusState.Keyboard);
@@ -2115,11 +2115,11 @@ namespace VoiceStudio.App
                     return;
                 }
 
-                var recordingView = rightPanelHost.Content as RecordingView;
+                var recordingView = rightPanelHost.HostedPanel as RecordingView;
                 if (recordingView == null)
                 {
                     await OpenPanelByIdAsync("Recording", PanelRegion.Right);
-                    recordingView = rightPanelHost.Content as RecordingView;
+                    recordingView = rightPanelHost.HostedPanel as RecordingView;
                 }
 
                 if (recordingView == null)
@@ -2153,7 +2153,7 @@ namespace VoiceStudio.App
         private void ZoomIn()
         {
             var centerPanelHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-            if (centerPanelHost?.Content is TimelineView timelineView && timelineView.ViewModel != null)
+            if (centerPanelHost?.HostedPanel is TimelineView timelineView && timelineView.ViewModel != null)
             {
                 var viewModel = timelineView.ViewModel;
                 if (viewModel.ZoomInCommand.CanExecute(null))
@@ -2166,7 +2166,7 @@ namespace VoiceStudio.App
         private void ZoomOut()
         {
             var centerPanelHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-            if (centerPanelHost?.Content is TimelineView timelineView && timelineView.ViewModel != null)
+            if (centerPanelHost?.HostedPanel is TimelineView timelineView && timelineView.ViewModel != null)
             {
                 var viewModel = timelineView.ViewModel;
                 if (viewModel.ZoomOutCommand.CanExecute(null))
@@ -2179,7 +2179,7 @@ namespace VoiceStudio.App
         private void ResetZoom()
         {
             var centerPanelHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-            if (centerPanelHost?.Content is TimelineView timelineView && timelineView.ViewModel != null)
+            if (centerPanelHost?.HostedPanel is TimelineView timelineView && timelineView.ViewModel != null)
             {
                 var viewModel = timelineView.ViewModel;
                 viewModel.TimelineZoom = 1.0;

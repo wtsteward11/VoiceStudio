@@ -133,7 +133,7 @@ public sealed class SearchOverlayCoordinator : ISearchOverlayCoordinator
                 return;
             }
 
-            panelFe = targetHost.Content as FrameworkElement;
+            panelFe = targetHost.HostedPanel as FrameworkElement;
             navigable = panelFe as INavigatablePanel;
 
             if (panelFe == null)

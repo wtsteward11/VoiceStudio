@@ -344,7 +344,7 @@ namespace VoiceStudio.App
                             var actualContentType = await GetFromUiThreadAsync<string>($"GetCenterType_{wsStep.Name}", () =>
                             {
                                 var centerPanelHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-                                return centerPanelHost?.Content?.GetType().Name ?? "(null)";
+                                return centerPanelHost?.HostedPanel?.GetType().Name ?? "(null)";
                             }).ConfigureAwait(false);
                             if (string.Equals(actualContentType, wsStep.ExpectedCenterViewType, StringComparison.Ordinal))
                                 break;
@@ -355,7 +355,7 @@ namespace VoiceStudio.App
                         var assertTask = RunOnUiThreadAsync($"Assert_{wsStep.Name}", () =>
                         {
                             var centerPanelHost = FindNameOnContent("CenterPanelHost") as Controls.PanelHost;
-                            var actualContentType = centerPanelHost?.Content?.GetType().Name ?? "(null)";
+                            var actualContentType = centerPanelHost?.HostedPanel?.GetType().Name ?? "(null)";
                             AppendStepLog($"WORKSPACE_ASSERT\t{wsStep.Name}\texpected={wsStep.ExpectedCenterViewType}\tactual={actualContentType}");
 
                             if (!string.Equals(actualContentType, wsStep.ExpectedCenterViewType, StringComparison.Ordinal))

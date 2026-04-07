@@ -131,10 +131,10 @@ namespace VoiceStudio.App
             }
             SetActiveNavButton("NavStudio");
 
-            var leftHasContent = leftPanelHost?.Content != null;
-            var centerHasContent = centerPanelHost?.Content != null;
-            var rightHasContent = rightPanelHost?.Content != null;
-            var bottomHasContent = bottomPanelHost?.Content != null;
+            var leftHasContent = leftPanelHost?.HostedPanel != null;
+            var centerHasContent = centerPanelHost?.HostedPanel != null;
+            var rightHasContent = rightPanelHost?.HostedPanel != null;
+            var bottomHasContent = bottomPanelHost?.HostedPanel != null;
             var loadedCount = (leftHasContent ? 1 : 0) + (centerHasContent ? 1 : 0) + (rightHasContent ? 1 : 0) + (bottomHasContent ? 1 : 0);
 
 #if DEBUG
@@ -373,7 +373,7 @@ namespace VoiceStudio.App
             string activePanelId = string.Empty;
             var openedPanels = new List<string>();
 
-            if (host.Content != null)
+            if (host.HostedPanel != null)
             {
                 var panelId = GetPanelIdFromHost(host);
                 if (!string.IsNullOrEmpty(panelId))
@@ -402,14 +402,14 @@ namespace VoiceStudio.App
 
         private static string? GetPanelIdFromHost(Controls.PanelHost host)
         {
-            if (host.Content == null) return null;
+            if (host.HostedPanel == null) return null;
 
-            if (host.Content is UserControl uc
+            if (host.HostedPanel is UserControl uc
                 && uc.DataContext is IPanelView pv
                 && !string.IsNullOrEmpty(pv.PanelId))
                 return pv.PanelId;
 
-            if (host.Content is FrameworkElement fe)
+            if (host.HostedPanel is FrameworkElement fe)
             {
                 var typeName = fe.GetType().Name;
                 if (typeName.EndsWith("View", StringComparison.Ordinal))

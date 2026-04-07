@@ -1,7 +1,11 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
+using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests.ViewModels;
+using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.UI
 {
@@ -75,7 +79,11 @@ namespace VoiceStudio.App.Tests.UI
     {
       // Arrange
       var profilesClient = new VoiceStudio.App.Services.ProfilesClient(_mockBackendClient!, new VoiceStudio.App.Services.RequestCoordinator());
-      var voiceSynthesisService = new VoiceStudio.App.Services.VoiceSynthesisService(_mockBackendClient!);
+      var mockEmotion = new Mock<IEmotionControlClient>();
+      mockEmotion
+          .Setup(x => x.ApplyEmotionAsync(It.IsAny<EmotionApplyExtendedRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync((EmotionApplyExtendedResponse?)null);
+      var voiceSynthesisService = new VoiceStudio.App.Services.VoiceSynthesisService(_mockBackendClient!, mockEmotion.Object);
       var enginesClient = new VoiceStudio.App.Services.EnginesClient(_mockBackendClient!);
       var qualityPipelineService = new VoiceStudio.App.Services.QualityPipelineService(_mockBackendClient!);
       var ensembleService = new VoiceStudio.App.Services.EnsembleService(_mockBackendClient!);

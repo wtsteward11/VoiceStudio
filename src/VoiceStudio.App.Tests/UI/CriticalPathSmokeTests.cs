@@ -61,7 +61,11 @@ namespace VoiceStudio.App.Tests.UI
           logService: null,
           dialogService: null,
           previewService: null);
-      var voiceSynthesisService = new VoiceStudio.App.Services.VoiceSynthesisService(_mockBackendClient!);
+      var mockEmotion = new Mock<IEmotionControlClient>();
+      mockEmotion
+          .Setup(x => x.ApplyEmotionAsync(It.IsAny<EmotionApplyExtendedRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync((EmotionApplyExtendedResponse?)null);
+      var voiceSynthesisService = new VoiceStudio.App.Services.VoiceSynthesisService(_mockBackendClient!, mockEmotion.Object);
       var enginesClient = new VoiceStudio.App.Services.EnginesClient(_mockBackendClient!);
       var qualityPipelineService = new VoiceStudio.App.Services.QualityPipelineService(_mockBackendClient!);
       var ensembleService = new VoiceStudio.App.Services.EnsembleService(_mockBackendClient!);
@@ -147,7 +151,11 @@ namespace VoiceStudio.App.Tests.UI
           logService: null,
           dialogService: null,
           previewService: null);
-      var voiceSynthesisService = new VoiceStudio.App.Services.VoiceSynthesisService(_mockBackendClient!);
+      var mockEmotion2 = new Mock<IEmotionControlClient>();
+      mockEmotion2
+          .Setup(x => x.ApplyEmotionAsync(It.IsAny<EmotionApplyExtendedRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync((EmotionApplyExtendedResponse?)null);
+      var voiceSynthesisService = new VoiceStudio.App.Services.VoiceSynthesisService(_mockBackendClient!, mockEmotion2.Object);
       var enginesClient = new VoiceStudio.App.Services.EnginesClient(_mockBackendClient!);
       var qualityPipelineService = new VoiceStudio.App.Services.QualityPipelineService(_mockBackendClient!);
       var ensembleService = new VoiceStudio.App.Services.EnsembleService(_mockBackendClient!);

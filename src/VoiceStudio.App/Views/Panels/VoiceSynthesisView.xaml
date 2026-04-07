@@ -99,18 +99,13 @@
       </StackPanel>
       
       <StackPanel Spacing="4" MinWidth="120">
-        <TextBlock Text="Emotion" FontSize="12" Opacity="0.7"/>
+        <TextBlock Text="Emotion preset" FontSize="12" Opacity="0.7"/>
         <ComboBox x:Name="EmotionComboBox"
                   AutomationProperties.AutomationId="VoiceSynthesisView_EmotionComboBox"
+                  ItemsSource="{x:Bind ViewModel.CanonicalEmotionPresets, Mode=OneWay}"
                   SelectedItem="{x:Bind ViewModel.Emotion, Mode=TwoWay}"
-                  PlaceholderText="Select emotion"
+                  PlaceholderText="Optional preset"
                   HorizontalAlignment="Stretch">
-          <ComboBoxItem Content="neutral" IsSelected="True"/>
-          <ComboBoxItem Content="happy"/>
-          <ComboBoxItem Content="sad"/>
-          <ComboBoxItem Content="angry"/>
-          <ComboBoxItem Content="excited"/>
-          <ComboBoxItem Content="calm"/>
         </ComboBox>
       </StackPanel>
     </StackPanel>

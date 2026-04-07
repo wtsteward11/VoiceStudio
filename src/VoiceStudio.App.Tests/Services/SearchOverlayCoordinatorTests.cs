@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -347,6 +348,21 @@ namespace VoiceStudio.App.Tests.Services
             public void ShowInfo(string message, string? title = null)
             {
                 ShowToast(ToastType.Info, message, title);
+            }
+
+            public void ShowSuccess(string message, string? title = null)
+            {
+                ShowToast(ToastType.Success, message, title);
+            }
+
+            public void ShowWarning(string message, string? title = null)
+            {
+                ShowToast(ToastType.Warning, message, title);
+            }
+
+            public void ShowError(string message, string? title = null, Action? viewDetailsAction = null)
+            {
+                ShowToast(ToastType.Error, message, title);
             }
         }
     }

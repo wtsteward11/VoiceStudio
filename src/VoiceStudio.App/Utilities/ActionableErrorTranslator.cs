@@ -44,6 +44,97 @@ namespace VoiceStudio.App.Utilities
     }
 
     /// <summary>
+    /// GAP-050: When synthesis succeeded and emotion preset prosody authority reported skips or warnings, returns a warning notice; otherwise null.
+    /// </summary>
+    public static ActionableErrorInfo? BuildProsodyHandlingUserNotice(ProsodyHandlingDiagnosticsDto? handling)
+    {
+      if (handling == null)
+        return null;
+
+      var warnings = handling.Warnings ?? new List<string>();
+      var skipped = handling.SkippedOperations ?? new List<Dictionary<string, string>>();
+      var hasWarnings = warnings.Count > 0;
+      var hasSkipped = skipped.Count > 0;
+      if (!hasWarnings && !hasSkipped)
+        return null;
+
+      var secondaryParts = new List<string>();
+      if (hasWarnings)
+        secondaryParts.AddRange(warnings.Where(static w => !string.IsNullOrWhiteSpace(w)));
+      if (hasSkipped)
+      {
+        foreach (var row in skipped)
+        {
+          if (row.TryGetValue("operation", out var op) && row.TryGetValue("reason", out var reason))
+            secondaryParts.Add($"{op}: {reason}");
+        }
+      }
+
+      var secondary = secondaryParts.Count > 0
+          ? string.Join(Environment.NewLine, secondaryParts)
+          : null;
+
+      return new ActionableErrorInfo
+      {
+        Title = "Prosody / preset",
+        PrimaryMessage =
+            "The emotion preset was applied with some limits or adjustments. Playback uses the returned audio.",
+        SecondaryDetail = secondary,
+        RecommendedAction =
+            "Review warnings above; try a different preset or engine if the result is not acceptable.",
+        Severity = ActionableErrorSeverity.Warning,
+        Class = ActionableErrorClass.CapabilityUnsupported,
+        IsRetryable = false,
+        Warnings = hasWarnings ? warnings : null
+      };
+    }
+
+    /// <summary>
+    /// GAP-050: Single combined warning body for SSML + prosody + preset-apply failure (one toast).
+    /// </summary>
+    public static ActionableErrorInfo? BuildSynthesisCapabilityCombinedNotice(
+        SsmlHandlingDiagnostics? ssml,
+        ProsodyHandlingDiagnosticsDto? prosody,
+        string? emotionPresetApplyFailureMessage)
+    {
+      var ssmlNotice = BuildSsmlHandlingUserNotice(ssml);
+      var prosodyNotice = BuildProsodyHandlingUserNotice(prosody);
+      var hasFailure = !string.IsNullOrWhiteSpace(emotionPresetApplyFailureMessage);
+
+      if (ssmlNotice == null && prosodyNotice == null && !hasFailure)
+        return null;
+
+      var blocks = new List<string>();
+      if (ssmlNotice != null)
+      {
+        blocks.Add(string.IsNullOrWhiteSpace(ssmlNotice.SecondaryDetail)
+            ? ssmlNotice.PrimaryMessage
+            : $"{ssmlNotice.PrimaryMessage}{Environment.NewLine}{ssmlNotice.SecondaryDetail}");
+      }
+
+      if (prosodyNotice != null)
+      {
+        blocks.Add(string.IsNullOrWhiteSpace(prosodyNotice.SecondaryDetail)
+            ? prosodyNotice.PrimaryMessage
+            : $"{prosodyNotice.PrimaryMessage}{Environment.NewLine}{prosodyNotice.SecondaryDetail}");
+      }
+
+      if (hasFailure)
+        blocks.Add(emotionPresetApplyFailureMessage!.Trim());
+
+      return new ActionableErrorInfo
+      {
+        Title = "Synthesis note",
+        PrimaryMessage = string.Join($"{Environment.NewLine}{Environment.NewLine}", blocks),
+        SecondaryDetail = null,
+        RecommendedAction = "Review the notes above and retry or adjust settings if needed.",
+        Severity = ActionableErrorSeverity.Warning,
+        Class = ActionableErrorClass.CapabilityUnsupported,
+        IsRetryable = false
+      };
+    }
+
+    /// <summary>
     /// Maps an exception to actionable presentation metadata for the given operation.
     /// </summary>
     public static ActionableErrorInfo Translate(

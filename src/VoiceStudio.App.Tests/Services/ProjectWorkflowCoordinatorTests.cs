@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -393,6 +394,19 @@ namespace VoiceStudio.App.Tests.Services
         public void ShowInfo(string message, string? title = null)
         {
             LastInfoCall = (message, title);
+        }
+
+        public void ShowSuccess(string message, string? title = null)
+        {
+        }
+
+        public void ShowWarning(string message, string? title = null)
+        {
+        }
+
+        public void ShowError(string message, string? title = null, Action? viewDetailsAction = null)
+        {
+            LastErrorCall = (ToastType.Error, message, title);
         }
     }
 }

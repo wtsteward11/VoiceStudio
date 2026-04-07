@@ -50,7 +50,7 @@ namespace VoiceStudio.App.Views.Panels
     private readonly RealTimeQualityService? _qualityService;
     private readonly IErrorLoggingService? _errorLoggingService;
     private readonly IErrorDialogService? _errorDialogService;
-    private readonly ToastNotificationService? _toastNotificationService;
+    private readonly IToastNotificationService? _toastNotificationService;
     private readonly IErrorPresentationService? _errorService;
     private readonly string _backendBaseUrl;
     private StreamingAudioPlayer? _streamingPlayer;
@@ -225,7 +225,8 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private double temperature = 0.35;
 
-    public VoiceSynthesisViewModel(IVoiceSynthesisService voiceSynthesisService, IEnginesClient enginesClient, IQualityPipelineService qualityPipelineService, IEnsembleService ensembleService, ITextAnalysisService textAnalysisService, IQualityHistoryService qualityHistoryService, IProfilesClient profilesClient, IAudioPlayerService audioPlayer)
+    /// <summary>Optional <paramref name="toastNotificationService"/> enables unit tests to capture toasts without WinUI.</summary>
+    public VoiceSynthesisViewModel(IVoiceSynthesisService voiceSynthesisService, IEnginesClient enginesClient, IQualityPipelineService qualityPipelineService, IEnsembleService ensembleService, ITextAnalysisService textAnalysisService, IQualityHistoryService qualityHistoryService, IProfilesClient profilesClient, IAudioPlayerService audioPlayer, IToastNotificationService? toastNotificationService = null)
         : base(AppServices.GetViewModelContext())
     {
       _voiceSynthesisService = voiceSynthesisService ?? throw new ArgumentNullException(nameof(voiceSynthesisService));
@@ -267,15 +268,21 @@ namespace VoiceStudio.App.Views.Panels
         ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "VoiceSynthesisViewModel.Unknown");
       }
 
-      // Get toast notification service (may be null if not initialized)
-      try
+      // Toast surface (inject for tests, else app singleton when available)
+      if (toastNotificationService != null)
       {
-        _toastNotificationService = AppServices.TryGetToastNotificationService();
+        _toastNotificationService = toastNotificationService;
       }
-      catch
+      else
       {
-        // Service may not be initialized yet - that's okay
-        _toastNotificationService = null;
+        try
+        {
+          _toastNotificationService = AppServices.TryGetToastNotificationService();
+        }
+        catch
+        {
+          _toastNotificationService = null;
+        }
       }
 
       // EventAggregator for ProfileSelectedEvent (subscription in OnActivatedAsync per lifecycle rule)
@@ -441,8 +448,12 @@ namespace VoiceStudio.App.Views.Panels
         !string.IsNullOrWhiteSpace(Text) &&
         !IsLoading;
 
-    public bool IsEmotionSupported =>
-        SelectedEngine == "chatterbox" || SelectedEngine == "xtts";
+    /// <summary>GAP-050: Preset prosody is applied post-synthesis for any engine once a profile is selected.</summary>
+    public bool IsEmotionSupported => SelectedProfile != null;
+
+    /// <summary>GAP-050 canonical emotion presets (matches backend mapper / VoiceSynthesisService).</summary>
+    public IReadOnlyList<string> CanonicalEmotionPresets { get; } =
+        new[] { "neutral", "warm", "energetic", "calm" };
 
     // Quality metrics display properties
     public string MosScore =>
@@ -723,13 +734,13 @@ namespace VoiceStudio.App.Views.Panels
             ResourceHelper.GetString("VoiceSynthesis.SynthesisComplete", "Synthesis Complete")
         );
 
-        var ssmlNotice = ActionableErrorTranslator.BuildSsmlHandlingUserNotice(response.SsmlHandling);
-        if (ssmlNotice != null)
+        var combined = ActionableErrorTranslator.BuildSynthesisCapabilityCombinedNotice(
+            response.SsmlHandling,
+            response.ProsodyHandling,
+            response.EmotionPresetApplyFailureMessage);
+        if (combined != null)
         {
-          var body = string.IsNullOrWhiteSpace(ssmlNotice.SecondaryDetail)
-              ? ssmlNotice.PrimaryMessage
-              : $"{ssmlNotice.PrimaryMessage}{Environment.NewLine}{ssmlNotice.SecondaryDetail}";
-          _toastNotificationService?.ShowWarning(body, ssmlNotice.Title);
+          _toastNotificationService?.ShowWarning(combined.PrimaryMessage, combined.Title);
         }
       }
       catch (OperationCanceledException)
@@ -888,6 +899,9 @@ namespace VoiceStudio.App.Views.Panels
 
     partial void OnSelectedProfileChanged(VoiceProfile? value)
     {
+      OnPropertyChanged(nameof(IsEmotionSupported));
+      if (value == null)
+        Emotion = null;
       SynthesizeCommand.NotifyCanExecuteChanged();
       if (!IsLoading && WorkflowState != SynthesisWorkflowState.Synthesizing)
         UpdateWorkflowStateFromInputs();

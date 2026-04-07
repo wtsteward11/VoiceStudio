@@ -2,8 +2,10 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.Input;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Models;
@@ -27,6 +29,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     private Mock<IQualityHistoryService> _mockQualityHistoryService = null!;
     private Mock<IProfilesClient> _mockProfilesClient = null!;
     private Mock<IAudioPlayerService> _mockAudioPlayer = null!;
+    private Mock<IToastNotificationService> _mockToast = null!;
     private VoiceSynthesisViewModel _sut = null!;
 
     [TestInitialize]
@@ -41,6 +44,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockQualityHistoryService = new Mock<IQualityHistoryService>();
       _mockProfilesClient = new Mock<IProfilesClient>();
       _mockAudioPlayer = new Mock<IAudioPlayerService>();
+      _mockToast = new Mock<IToastNotificationService>();
 
       // Setup default mock behavior
       _mockProfilesClient
@@ -61,7 +65,8 @@ namespace VoiceStudio.App.Tests.ViewModels
           _mockTextAnalysisService.Object,
           _mockQualityHistoryService.Object,
           _mockProfilesClient.Object,
-          _mockAudioPlayer.Object
+          _mockAudioPlayer.Object,
+          _mockToast.Object
       );
     }
 
@@ -89,7 +94,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public void Constructor_WithNullProfilesClient_ThrowsArgumentNullException()
     {
       // Act
-      _ = new VoiceSynthesisViewModel(_mockVoiceSynthesisService.Object, _mockEnginesClient.Object, _mockQualityPipelineService.Object, _mockEnsembleService.Object, _mockTextAnalysisService.Object, _mockQualityHistoryService.Object, null!, _mockAudioPlayer.Object);
+      _ = new VoiceSynthesisViewModel(_mockVoiceSynthesisService.Object, _mockEnginesClient.Object, _mockQualityPipelineService.Object, _mockEnsembleService.Object, _mockTextAnalysisService.Object, _mockQualityHistoryService.Object, null!, _mockAudioPlayer.Object, _mockToast.Object);
     }
 
     [TestMethod]
@@ -97,7 +102,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public void Constructor_WithNullAudioPlayer_ThrowsArgumentNullException()
     {
       // Act
-      _ = new VoiceSynthesisViewModel(_mockVoiceSynthesisService.Object, _mockEnginesClient.Object, _mockQualityPipelineService.Object, _mockEnsembleService.Object, _mockTextAnalysisService.Object, _mockQualityHistoryService.Object, _mockProfilesClient.Object, null!);
+      _ = new VoiceSynthesisViewModel(_mockVoiceSynthesisService.Object, _mockEnginesClient.Object, _mockQualityPipelineService.Object, _mockEnsembleService.Object, _mockTextAnalysisService.Object, _mockQualityHistoryService.Object, _mockProfilesClient.Object, null!, _mockToast.Object);
     }
 
     #endregion
@@ -182,24 +187,27 @@ namespace VoiceStudio.App.Tests.ViewModels
     #region IsEmotionSupported Tests
 
     [TestMethod]
-    public void IsEmotionSupported_WithChatterbox_ReturnsTrue()
+    public void IsEmotionSupported_WithProfile_ReturnsTrue_AnyEngine()
     {
-      _sut.SelectedEngine = "chatterbox";
-      Assert.IsTrue(_sut.IsEmotionSupported);
-    }
-
-    [TestMethod]
-    public void IsEmotionSupported_WithXtts_ReturnsTrue()
-    {
-      _sut.SelectedEngine = "xtts";
-      Assert.IsTrue(_sut.IsEmotionSupported);
-    }
-
-    [TestMethod]
-    public void IsEmotionSupported_WithOtherEngine_ReturnsFalse()
-    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
       _sut.SelectedEngine = "piper";
+      Assert.IsTrue(_sut.IsEmotionSupported);
+    }
+
+    [TestMethod]
+    public void IsEmotionSupported_WithoutProfile_ReturnsFalse()
+    {
+      _sut.SelectedProfile = null;
+      _sut.SelectedEngine = "xtts";
       Assert.IsFalse(_sut.IsEmotionSupported);
+    }
+
+    [TestMethod]
+    public void CanonicalEmotionPresets_MatchesGap050Set()
+    {
+      CollectionAssert.AreEquivalent(
+        new[] { "neutral", "warm", "energetic", "calm" },
+        _sut.CanonicalEmotionPresets.ToList());
     }
 
     #endregion
@@ -259,17 +267,60 @@ namespace VoiceStudio.App.Tests.ViewModels
     }
 
     [TestMethod]
-    public void SelectedEngineChanged_ClearsEmotion_WhenNotSupported()
+    public void SelectedEngineChanged_DoesNotClearEmotion_WhenProfileSelected()
     {
-      // Arrange
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
       _sut.SelectedEngine = "chatterbox";
-      _sut.Emotion = "happy";
+      _sut.Emotion = "warm";
 
-      // Act
       _sut.SelectedEngine = "piper";
 
-      // Assert
+      Assert.AreEqual("warm", _sut.Emotion);
+    }
+
+    [TestMethod]
+    public void SelectedProfileCleared_ClearsEmotion()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Emotion = "calm";
+
+      _sut.SelectedProfile = null;
+
       Assert.IsNull(_sut.Emotion);
+    }
+
+    [TestMethod]
+    public async Task SynthesizeCommand_Success_UsesSingleCombinedCapabilityWarningToast()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _sut.Emotion = "warm";
+
+      _mockVoiceSynthesisService
+        .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new VoiceSynthesisResponse
+        {
+          AudioId = "a1",
+          AudioUrl = "/api/audio/a1",
+          Duration = 1.2,
+          QualityScore = 0.91,
+          SsmlHandling = new SsmlHandlingDiagnostics
+          {
+            Action = "stripped_warned",
+            Warnings = new List<string> { "SSML note" },
+          },
+          ProsodyHandling = new ProsodyHandlingDiagnosticsDto
+          {
+            Warnings = new List<string> { "Prosody note" },
+          },
+          EmotionPresetApplyFailureMessage = "Preset stage skipped.",
+        });
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      _mockToast.Verify(x => x.ShowWarning(It.IsAny<string>(), It.IsAny<string?>()), Times.Once);
+      _mockToast.Verify(x => x.ShowSuccess(It.IsAny<string>(), It.IsAny<string?>()), Times.Once);
     }
 
     #endregion

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
@@ -72,6 +73,12 @@ namespace VoiceStudio.App.Services
     private WorkspaceLayout? _currentLayout;
     private string _currentWorkspaceProfile = "studio";
     private bool _disposed;
+
+    /// <summary>
+    /// GAP-070: serialize load-merge-save for <see cref="SaveCurrentWorkspaceAsync"/> so concurrent workspace writes
+    /// cannot interleave and drop fields from <see cref="SettingsData"/>.
+    /// </summary>
+    private readonly SemaphoreSlim _workspaceSettingsSaveGate = new(1, 1);
 
     /// <summary>Maps workspace profile ID (e.g. studio, batch_lab) to embedded resource file name (e.g. Studio.json, BatchLab.json).</summary>
     private static readonly Dictionary<string, string> ProfileIdToResourceName = new(StringComparer.OrdinalIgnoreCase)
@@ -253,6 +260,11 @@ namespace VoiceStudio.App.Services
           ActivePanelId = panelId
         };
         layout.Regions.Add(regionState);
+      }
+      else
+      {
+        // GAP-070: PanelHost persist path must not leave ActivePanelId stale when the region already exists.
+        regionState.ActivePanelId = panelId;
       }
 
       state.PanelId = panelId;
@@ -800,16 +812,21 @@ namespace VoiceStudio.App.Services
     /// </summary>
     private async Task SaveCurrentWorkspaceAsync()
     {
+      await _workspaceSettingsSaveGate.WaitAsync().ConfigureAwait(false);
       try
       {
         var layout = GetCurrentLayout();
-        var settingsData = await _settingsService.LoadSettingsAsync();
+        var settingsData = await _settingsService.LoadSettingsAsync().ConfigureAwait(false);
         settingsData.WorkspaceLayout = layout;
-        await _settingsService.SaveSettingsAsync(settingsData);
+        await _settingsService.SaveSettingsAsync(settingsData).ConfigureAwait(false);
       }
       catch (Exception ex)
       {
         System.Diagnostics.Debug.WriteLine($"Failed to save workspace to settings: {ex.Message}");
+      }
+      finally
+      {
+        _workspaceSettingsSaveGate.Release();
       }
     }
 

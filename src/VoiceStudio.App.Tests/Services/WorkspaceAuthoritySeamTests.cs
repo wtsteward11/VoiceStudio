@@ -9,8 +9,9 @@ using VoiceStudio.App.Services;
 namespace VoiceStudio.App.Tests.Services;
 
 /// <summary>
-/// GAP-014: proves the legacy parallel workspace DI stack and deprecated WorkspaceManager type
+/// GAP-014 + GAP-070: proves the legacy parallel workspace DI stack and deprecated WorkspaceManager type
 /// are not part of the live shell authority surface (PanelStateService + MainWindow orchestration).
+/// GAP-070: treat as permanent anti-relapse contract — duplicate DI reintroduction must fail CI.
 /// </summary>
 [TestClass]
 public sealed class WorkspaceAuthoritySeamTests

@@ -202,13 +202,7 @@ namespace VoiceStudio.App
             }
         }
 
-        /// <summary>
-        /// Restores panels from saved workspace layout.
-        /// Only the active panel per region is restored. OpenedPanels is persisted for future tab support;
-        /// PanelHost currently supports a single panel per region.
-        /// Returns (restored, hadRegions, failedItems): hadRegions true when layout had regions to restore;
-        /// restored true when at least one succeeded; failedItems lists (region, panelId) for panels that failed.
-        /// </summary>
+        /// <summary>Restore saved layout (one active panel/region). Returns (restored, hadRegions, failedItems).</summary>
         private async Task<(bool restored, bool hadRegions, List<(PanelRegion region, string panelId)> failedItems)> RestorePanelsFromLayoutAsync()
         {
             var failedItems = new List<(PanelRegion region, string panelId)>();
@@ -229,7 +223,19 @@ namespace VoiceStudio.App
                 int expectedCount = 0;
                 int restoredCount = 0;
 
-                foreach (var regionState in layout.Regions)
+                // GAP-070-order-1: L→C→R→B→F (not JSON order).
+                var orderedRegions = layout.Regions
+                    .OrderBy(rs => rs.Region switch
+                    {
+                        PanelRegion.Left => 0,
+                        PanelRegion.Center => 1,
+                        PanelRegion.Right => 2,
+                        PanelRegion.Bottom => 3,
+                        PanelRegion.Floating => 4,
+                        _ => 99
+                    });
+
+                foreach (var regionState in orderedRegions)
                 {
                     try
                     {
@@ -285,6 +291,7 @@ namespace VoiceStudio.App
                     restoredAny = false;
                 }
 
+                // GAP-070-order-2: splitters after panels.
                 RestoreSplitterRatios(layout);
 
                 return (restoredAny, true, failedItems);

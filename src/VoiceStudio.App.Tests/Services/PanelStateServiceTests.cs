@@ -41,6 +41,31 @@ namespace VoiceStudio.App.Tests.Services
         /// Proves workspace persistence round-trips correctly: save state, switch workspace,
         /// switch back, assert original state is restored.
         /// </summary>
+        /// <summary>
+        /// GAP-070: SavePanelState (PanelHost path) must update ActivePanelId when the region already exists.
+        /// </summary>
+        [TestMethod]
+        public async Task SavePanelState_UpdatesActivePanelId_WhenRegionExists()
+        {
+            var mockSettings = new MockSettingsService();
+            mockSettings.Settings = mockSettings.GetDefaultSettings();
+            mockSettings.Settings.WorkspaceLayout = null;
+
+            var service = new PanelStateService(mockSettings, _tempWorkspaceRoot!);
+            await Task.Delay(150);
+
+            service.SaveRegionState(PanelRegion.Left, "OldPanel", new List<string> { "OldPanel" });
+            var rs = service.GetRegionState(PanelRegion.Left);
+            Assert.IsNotNull(rs);
+            Assert.AreEqual("OldPanel", rs.ActivePanelId);
+
+            service.SavePanelState(PanelRegion.Left, "NewPanel", new PanelState());
+            rs = service.GetRegionState(PanelRegion.Left);
+            Assert.IsNotNull(rs);
+            Assert.AreEqual("NewPanel", rs.ActivePanelId);
+            Assert.IsTrue(rs.PanelStates.ContainsKey("NewPanel"));
+        }
+
         [TestMethod]
         public async Task WorkspacePersistence_RoundTrip_RestoresOriginalState()
         {

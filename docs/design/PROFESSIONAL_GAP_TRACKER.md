@@ -17,7 +17,7 @@
 
 ## Master index
 
-**Count:** **69** deduplicated gaps (within the plan’s ~65–70 target). Phase 0–6 and execution slices for Phases 4–5 use **GAP-001–062**; Phase 7 shell/UX is **GAP-063–067**; post–hero and CI tracks are **GAP-068–069**. *Backend `deps.py` / `dependencies.py` split is folded into GAP-069.*
+**Count:** **70** deduplicated gaps (within the plan’s ~65–70 target). Phase 0–6 and execution slices for Phases 4–5 use **GAP-001–062**; Phase 7 shell/UX is **GAP-063–067**; post–hero and CI tracks are **GAP-068–069**; **GAP-070** shell persistence authority (after GAP-014). *Backend `deps.py` / `dependencies.py` split is folded into GAP-069.*
 
 | ID | Phase | Category | Title | Primary file(s) | Effort (h) | Role | Deps | Status |
 |----|-------|----------|-------|-----------------|------------|------|------|--------|
@@ -90,6 +90,7 @@
 | GAP-067 | 7 | UX | Notification center + jump lists + `.vstudio` assoc. + taskbar progress + progressive disclosure + WCAG 2.1 AA + cold-start (<10s stretch) | Shell, installer, all panels, startup | 192 | UI Engineer / Release / Core | GAP-034, GAP-018, GAP-015 | Open |
 | GAP-068 | 8+ | Ecosystem | **Post–hero:** VST3/CLAP feasibility; public API + SDK; marketplace (consent-gated); captions; dubbing; video workflow; spectral editing; collaboration; mobile companion | Multiple future surfaces | 1040 | System Architect | Phases 0–7 exit | Open |
 | GAP-069 | Cont | Ops | **Continuous:** C# skip debt; full `verify.ps1` in GHA; golden path / E2E heroes / perf SLO tests; mypy burn-down; workflow consolidation; `.gitignore` + doc truth; pip-audit / dotnet vuln; plugin SDK hardening; backend `deps.py`/`dependencies.py` consolidation | `.github/`, `tests/`, root docs, `backend/api/` | 408 | Build Tooling / Overseer / Architect | GAP-015 | Open |
+| GAP-070 | 7 | Ops | Shell / user-preference persistence boundary (merge-save serialization, `ActivePanelId` on `SavePanelState`, deterministic region restore order, GAP-014 relapse guard) | `PanelStateService.cs`, `MainWindow.Workspaces.cs` | 12 | UI Engineer | GAP-014 | **Closed** — [GOV_VOICESTUDIO_GAP070_USER_PREFERENCES_PERSISTENCE_BOUNDARY_01_EXECUTION_ROW.md](GOV_VOICESTUDIO_GAP070_USER_PREFERENCES_PERSISTENCE_BOUNDARY_01_EXECUTION_ROW.md); [closure](../reports/verification/VOICESTUDIO_GAP070_USER_PREFERENCES_PERSISTENCE_BOUNDARY_LANE_CLOSURE_2026-04-07.md) |
 
 ---
 

@@ -46,5 +46,5 @@
 
 ## 5. Changelog
 
-- **2026-04-08:** Row **Closed** — [VOICESTUDIO_GAP050_PRODUCT_EXIT_CHECKLIST_CLOSURE_2026-04-08.md](../reports/verification/VOICESTUDIO_GAP050_PRODUCT_EXIT_CHECKLIST_CLOSURE_2026-04-08.md); `run_verification.py` **20260407-194132** (**completion_guard** PASS); commits `b49addbb` (governance) + `725b3fa7` (STATE + closure proof back-fill).
+- **2026-04-08:** Row **Closed** — [VOICESTUDIO_GAP050_PRODUCT_EXIT_CHECKLIST_CLOSURE_2026-04-08.md](../reports/verification/VOICESTUDIO_GAP050_PRODUCT_EXIT_CHECKLIST_CLOSURE_2026-04-08.md); `run_verification.py` **20260407-194132** (**completion_guard** PASS); commits `b49addbb` (governance) + `725b3fa7` (STATE + closure proof back-fill) + `85b0f99b` (changelog alignment).
 - **2026-04-08:** Row **Frozen** — product exit audit scope locked; spawned **GOV-VOICESTUDIO-GAP050-EMOTION-PREVIEW-AUTHORITY-01** **Frozen**.

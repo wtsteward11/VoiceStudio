@@ -19,7 +19,7 @@ namespace VoiceStudio.App.ViewModels
   /// </summary>
   public sealed partial class GlobalSearchViewModel : BaseViewModel
   {
-    private readonly ISearchClient _searchClient;
+    private readonly IGlobalSearchService _searchService;
     private readonly SemaphoreSlim _searchSemaphore = new(1, 1);
     private int _activeSearchCount;
     private CancellationTokenSource? _searchDebounceCts;
@@ -52,10 +52,34 @@ namespace VoiceStudio.App.ViewModels
     public Visibility ResultsListVisibility => IsLoading ? Visibility.Collapsed : Visibility.Visible;
     public Visibility ErrorVisibility => string.IsNullOrEmpty(ErrorMessage) ? Visibility.Collapsed : Visibility.Visible;
 
-    public GlobalSearchViewModel(ISearchClient searchClient)
+    public GlobalSearchViewModel(IGlobalSearchService searchService)
         : base(AppServices.GetViewModelContext())
     {
-      _searchClient = searchClient ?? throw new ArgumentNullException(nameof(searchClient));
+      _searchService = searchService ?? throw new ArgumentNullException(nameof(searchService));
+    }
+
+    /// <summary>
+    /// Backward-compatible constructor for existing tests/callers that still pass ISearchClient.
+    /// </summary>
+    public GlobalSearchViewModel(ISearchClient searchClient)
+        : this(new PassthroughGlobalSearchService(
+            searchClient ?? throw new ArgumentNullException(nameof(searchClient))))
+    {
+    }
+
+    private sealed class PassthroughGlobalSearchService : IGlobalSearchService
+    {
+      private readonly ISearchClient _searchClient;
+
+      public PassthroughGlobalSearchService(ISearchClient searchClient)
+      {
+        _searchClient = searchClient;
+      }
+
+      public Task<SearchResponse> SearchAsync(string query, string? types = null, int limit = 50, CancellationToken cancellationToken = default)
+      {
+        return _searchClient.SearchAsync(query, types, limit, cancellationToken);
+      }
     }
 
     [RelayCommand]
@@ -79,7 +103,7 @@ namespace VoiceStudio.App.ViewModels
         await _searchSemaphore.WaitAsync();
         try
         {
-          var response = await _searchClient.SearchAsync(SearchQuery, null, 50);
+          var response = await _searchService.SearchAsync(SearchQuery, null, 50);
 
           Results.Clear();
           FilteredResults.Clear();

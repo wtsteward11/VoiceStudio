@@ -6,12 +6,14 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using VoiceStudio.App.Services;
+using VoiceStudio.App.ViewModels;
 
 namespace VoiceStudio.App.Controls
 {
   public sealed partial class CustomizableToolbar : UserControl
   {
     private ToolbarConfigurationService? _toolbarService;
+    private ToolbarViewModel? _toolbarViewModel;
     private readonly Dictionary<string, UIElement> _toolbarButtons = new Dictionary<string, UIElement>();
 
     /// <summary>Ordered list of (DisplayName, ProfileId) for workspace combo. Single source of truth.</summary>
@@ -47,6 +49,9 @@ namespace VoiceStudio.App.Controls
     {
       this.InitializeComponent();
       _toolbarService = ServiceProvider.TryGetToolbarConfigurationService();
+      _toolbarViewModel = ServiceProvider.TryGetToolbarViewModel();
+      if (_toolbarViewModel != null)
+        DataContext = _toolbarViewModel;
 
       if (_toolbarService != null)
       {
@@ -65,8 +70,6 @@ namespace VoiceStudio.App.Controls
       if (_toolbarService == null)
         return;
 
-      var config = _toolbarService.GetConfiguration();
-
       // Clear existing buttons
       TransportSection.Children.Clear();
       ProjectSection.Children.Clear();
@@ -74,10 +77,11 @@ namespace VoiceStudio.App.Controls
       PerformanceSection.Children.Clear();
 
       // Group items by section and order
-      var visibleItems = config.Items
-          .Where(i => i.IsVisible)
-          .OrderBy(i => i.Order)
-          .ToList();
+      var visibleItems = (_toolbarViewModel?.GetVisibleItems()
+          ?? _toolbarService.GetConfiguration().Items
+              .Where(i => i.IsVisible)
+              .OrderBy(i => i.Order)
+              .ToList());
 
       foreach (var item in visibleItems)
       {
@@ -306,24 +310,19 @@ namespace VoiceStudio.App.Controls
     {
       try
       {
-        var panelStateService = ServiceProvider.GetPanelStateService();
-        var toastService = ServiceProvider.TryGetToastNotificationService();
-
-        if (panelStateService != null)
+        if (_toolbarViewModel != null)
         {
-          // Switch workspace using PanelStateService
-          var success = await panelStateService.SwitchWorkspaceProfileAsync(workspaceId);
-          if (success)
-          {
-            toastService?.ShowSuccess("Workspace", $"Switched to: {GetDisplayNameFromProfileId(workspaceId)}");
-          }
-          else
-          {
-            toastService?.ShowWarning("Workspace", $"Workspace '{GetDisplayNameFromProfileId(workspaceId)}' created (default layout)");
-          }
+          await _toolbarViewModel.SwitchWorkspaceAsync(workspaceId);
         }
         else
         {
+          var panelStateService = ServiceProvider.GetPanelStateService();
+          var toastService = ServiceProvider.TryGetToastNotificationService();
+          var success = await panelStateService.SwitchWorkspaceProfileAsync(workspaceId);
+          if (success)
+            toastService?.ShowSuccess("Workspace", $"Switched to: {GetDisplayNameFromProfileId(workspaceId)}");
+          else
+            toastService?.ShowWarning("Workspace", $"Workspace '{GetDisplayNameFromProfileId(workspaceId)}' created (default layout)");
           toastService?.ShowInfo("Workspace", $"Selected: {GetDisplayNameFromProfileId(workspaceId)}");
         }
 
@@ -378,7 +377,7 @@ namespace VoiceStudio.App.Controls
     /// <summary>
     /// Handles toolbar button clicks by executing the appropriate command.
     /// </summary>
-    private void HandleToolbarButtonClick(string itemId)
+    private async void HandleToolbarButtonClick(string itemId)
     {
       // Log to file for debugging
       var logPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoiceStudio", "import_debug.log");
@@ -392,60 +391,39 @@ namespace VoiceStudio.App.Controls
       
       Log($"[Toolbar] HandleToolbarButtonClick called: {itemId}");
       
-      // Handle special cases directly first (before keyboard shortcuts)
-      switch (itemId)
+      try
       {
-        case "import_audio":
-          Log("[Toolbar] import_audio case matched");
-          // Call MainWindow's working ImportAudioFile method
-          if (App.MainWindowInstance is MainWindow mainWindow)
+        if (_toolbarViewModel != null)
+        {
+          await _toolbarViewModel.ExecuteToolbarActionAsync(itemId, () =>
           {
-            Log("[Toolbar] MainWindowInstance available, calling ImportAudioFile");
-            mainWindow.ImportAudioFile();
-          }
-          else
-          {
-            Log($"[Toolbar] MainWindowInstance NOT available: {App.MainWindowInstance?.GetType().Name ?? "null"}");
-            var toastService = ServiceProvider.TryGetToastNotificationService();
-            toastService?.ShowError("Import Error", "MainWindow not available");
-            System.Diagnostics.Debug.WriteLine($"Import failed: App.MainWindowInstance is {App.MainWindowInstance?.GetType().Name ?? "null"}");
-          }
+            if (App.MainWindowInstance is MainWindow mainWindow)
+              mainWindow.ImportAudioFile();
+          });
           return;
-        case "loop":
-          // Toggle loop on the canonical audio player service (Audit M-5)
-          try
-          {
-            var audioPlayer = ServiceProvider.GetAudioPlayerService();
-            audioPlayer.IsLooping = !audioPlayer.IsLooping;
-            var toastSvc = ServiceProvider.TryGetToastNotificationService();
-            toastSvc?.ShowInfo("Loop", audioPlayer.IsLooping ? "Loop playback enabled" : "Loop playback disabled");
-          }
-          catch (Exception ex)
-          {
-            System.Diagnostics.Debug.WriteLine($"[Toolbar] Loop toggle failed: {ex.Message}");
-          }
+        }
+
+        var keyboardService = ServiceProvider.TryGetKeyboardShortcutService();
+        if (keyboardService == null)
           return;
+
+        var commandId = itemId switch
+        {
+          "play" => "playback.play",
+          "pause" => "playback.play",
+          "stop" => "playback.stop",
+          "record" => "playback.record",
+          "undo" => "edit.undo",
+          "redo" => "edit.redo",
+          _ => null
+        };
+
+        if (commandId != null)
+          keyboardService.ExecuteShortcut(commandId);
       }
-
-      // Map toolbar item IDs to command IDs and execute via KeyboardShortcutService
-      var keyboardService = ServiceProvider.TryGetKeyboardShortcutService();
-
-      // Map toolbar item IDs to command IDs
-      var commandId = itemId switch
+      catch (Exception ex)
       {
-        "play" => "playback.play",
-        "pause" => "playback.play", // Toggle play/pause (same as play)
-        "stop" => "playback.stop",
-        "record" => "playback.record",
-        "undo" => "edit.undo",
-        "redo" => "edit.redo",
-        _ => null
-      };
-
-      if (commandId != null && keyboardService != null)
-      {
-        // Execute the command through the keyboard shortcut service
-        keyboardService.ExecuteShortcut(commandId);
+        Log($"[Toolbar] command dispatch failed: {ex.Message}");
       }
     }
 

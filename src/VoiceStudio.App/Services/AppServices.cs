@@ -395,6 +395,7 @@ namespace VoiceStudio.App.Services
       services.AddTransient<VoiceStudio.App.Views.Panels.ProfilesViewModel>();
       services.AddSingleton<IPanelRegistry, PanelRegistry>();
       services.AddSingleton<PanelStateService>();
+      services.AddSingleton<IUnifiedWorkspaceService>(sp => sp.GetRequiredService<PanelStateService>());
       services.AddSingleton<INavigationService, NavigationService>();
 
       // Event aggregator for cross-panel synchronization (Phase 4)
@@ -525,18 +526,30 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<UndoRedoService>();
       services.AddSingleton<RecentProjectsService>();
       services.AddSingleton<ToolbarConfigurationService>();
+      services.AddSingleton<INotificationCenterService, NotificationCenterService>();
+      services.AddSingleton<IAnimationService, AnimationService>();
       services.AddSingleton<StatusBarActivityService>();
       services.AddSingleton<StatusBarCoordinator>();
       services.AddSingleton<TransportShortcutCoordinator>(sp =>
           new TransportShortcutCoordinator(sp.GetService<IGlobalTransportOrchestrator>()));
       services.AddSingleton<StartupRetryCoordinator>();
       services.AddSingleton<KeyboardShortcutService>();
+      services.AddSingleton<ToolbarViewModel>(sp =>
+          new ToolbarViewModel(
+              sp.GetRequiredService<ToolbarConfigurationService>(),
+              sp.GetRequiredService<IUnifiedCommandRegistry>(),
+              sp.GetRequiredService<IUnifiedWorkspaceService>(),
+              sp.GetRequiredService<IAudioPlayerService>(),
+              _toastOverride));
       services.AddSingleton<IUnifiedCommandRegistry>(sp =>
         new UnifiedCommandRegistry(
           sp.GetRequiredService<KeyboardShortcutService>(),
           sp.GetRequiredService<IStartupStateService>()));
       services.AddSingleton<CommandRouter>(sp =>
         new CommandRouter(sp.GetRequiredService<IUnifiedCommandRegistry>()));
+      services.AddSingleton<ILocalSearchProvider, CommandSearchProvider>();
+      services.AddSingleton<ILocalSearchProvider, SettingsSearchProvider>();
+      services.AddSingleton<IGlobalSearchService, LocalSearchAggregator>();
       services.AddSingleton<CollaborationService>();
       services.AddSingleton<IStartupStateService, StartupStateService>();
       services.AddSingleton<IStartupDiagnosticsWriter, StartupDiagnosticsWriter>();
@@ -825,6 +838,12 @@ namespace VoiceStudio.App.Services
     public static RecentProjectsService? TryGetRecentProjectsService() => GetService<RecentProjectsService>();
     public static ToolbarConfigurationService GetToolbarConfigurationService() => GetRequiredService<ToolbarConfigurationService>();
     public static ToolbarConfigurationService? TryGetToolbarConfigurationService() => GetService<ToolbarConfigurationService>();
+    public static ToolbarViewModel GetToolbarViewModel() => GetRequiredService<ToolbarViewModel>();
+    public static ToolbarViewModel? TryGetToolbarViewModel() => GetService<ToolbarViewModel>();
+    public static INotificationCenterService GetNotificationCenterService() => GetRequiredService<INotificationCenterService>();
+    public static INotificationCenterService? TryGetNotificationCenterService() => GetService<INotificationCenterService>();
+    public static IAnimationService GetAnimationService() => GetRequiredService<IAnimationService>();
+    public static IAnimationService? TryGetAnimationService() => GetService<IAnimationService>();
     public static StatusBarActivityService GetStatusBarActivityService() => GetRequiredService<StatusBarActivityService>();
     public static StatusBarActivityService? TryGetStatusBarActivityService() => GetService<StatusBarActivityService>();
     public static KeyboardShortcutService GetKeyboardShortcutService() => GetRequiredService<KeyboardShortcutService>();

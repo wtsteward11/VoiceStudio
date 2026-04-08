@@ -136,6 +136,12 @@ namespace VoiceStudio.App.Services
       AppServices.GetToolbarConfigurationService();
     public static ToolbarConfigurationService? TryGetToolbarConfigurationService() =>
       AppServices.TryGetToolbarConfigurationService();
+    public static ToolbarViewModel GetToolbarViewModel() => AppServices.GetToolbarViewModel();
+    public static ToolbarViewModel? TryGetToolbarViewModel() => AppServices.TryGetToolbarViewModel();
+    public static INotificationCenterService GetNotificationCenterService() => AppServices.GetNotificationCenterService();
+    public static INotificationCenterService? TryGetNotificationCenterService() => AppServices.TryGetNotificationCenterService();
+    public static IAnimationService GetAnimationService() => AppServices.GetAnimationService();
+    public static IAnimationService? TryGetAnimationService() => AppServices.TryGetAnimationService();
     public static StatusBarActivityService GetStatusBarActivityService() => AppServices.GetStatusBarActivityService();
     public static StatusBarActivityService? TryGetStatusBarActivityService() =>
       AppServices.TryGetStatusBarActivityService();

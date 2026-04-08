@@ -78,7 +78,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [ExpectedException(typeof(ArgumentNullException))]
     public void Constructor_WithNullClient_Throws()
     {
-      _ = new GlobalSearchViewModel(null!);
+      _ = new GlobalSearchViewModel((ISearchClient)null!);
     }
 
     [TestMethod]

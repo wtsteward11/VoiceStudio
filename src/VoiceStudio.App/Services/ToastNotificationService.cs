@@ -151,6 +151,16 @@ namespace VoiceStudio.App.Services
         IsProgress = isProgress
       };
 
+      AppServices.TryGetNotificationCenterService()?.AddNotification(
+          type: MapNotificationType(type),
+          message: message,
+          title: title,
+          priority: MapPriority(type),
+          progress: isProgress ? 0d : null,
+          progressStatus: isProgress ? "In progress" : null,
+          actionLabel: action != null ? "View Details" : null,
+          action: action);
+
       // Create UI element
       var border = new Border
       {
@@ -296,6 +306,30 @@ namespace VoiceStudio.App.Services
         ToastType.Info => new Microsoft.UI.Xaml.Media.SolidColorBrush(Color.FromArgb(255, 0, 120, 212)),
         ToastType.Progress => new Microsoft.UI.Xaml.Media.SolidColorBrush(Color.FromArgb(255, 50, 50, 50)),
         _ => new Microsoft.UI.Xaml.Media.SolidColorBrush(Color.FromArgb(255, 50, 50, 50))
+      };
+    }
+
+    private static AppNotificationType MapNotificationType(ToastType type)
+    {
+      return type switch
+      {
+        ToastType.Success => AppNotificationType.Success,
+        ToastType.Warning => AppNotificationType.Warning,
+        ToastType.Error => AppNotificationType.Error,
+        ToastType.Progress => AppNotificationType.Progress,
+        _ => AppNotificationType.Info
+      };
+    }
+
+    private static AppNotificationPriority MapPriority(ToastType type)
+    {
+      return type switch
+      {
+        ToastType.Error => AppNotificationPriority.High,
+        ToastType.Warning => AppNotificationPriority.Normal,
+        ToastType.Success => AppNotificationPriority.Normal,
+        ToastType.Progress => AppNotificationPriority.Low,
+        _ => AppNotificationPriority.Low
       };
     }
   }

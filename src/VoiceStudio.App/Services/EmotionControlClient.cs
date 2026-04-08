@@ -52,8 +52,8 @@ namespace VoiceStudio.App.Services
         ct);
 
     /// <inheritdoc />
-    public Task<EmotionPreviewResponse?> PreviewEmotionAsync(EmotionApplyExtendedRequest request, CancellationToken ct = default)
-      => _backend.SendRequestAsync<EmotionApplyExtendedRequest, EmotionPreviewResponse>(
+    public Task<EmotionApplyExtendedResponse?> PreviewEmotionAsync(EmotionApplyExtendedRequest request, CancellationToken ct = default)
+      => _backend.SendRequestAsync<EmotionApplyExtendedRequest, EmotionApplyExtendedResponse>(
         "/api/emotion/preview",
         request,
         HttpMethod.Post,
@@ -86,7 +86,8 @@ namespace VoiceStudio.App.Services
         HttpMethod.Post,
         ct).ConfigureAwait(false);
       _coordinator.Invalidate(PresetsKey);
-      return preset;
+      return preset
+        ?? throw new InvalidOperationException("Emotion preset create returned an empty response.");
     }
 
     /// <inheritdoc />
@@ -94,7 +95,8 @@ namespace VoiceStudio.App.Services
     {
       var preset = await _backend.UpdateEmotionPresetAsync(presetId, request, ct).ConfigureAwait(false);
       _coordinator.Invalidate(PresetsKey);
-      return preset;
+      return preset
+        ?? throw new InvalidOperationException("Emotion preset update returned an empty response.");
     }
 
     /// <inheritdoc />
@@ -109,4 +111,3 @@ namespace VoiceStudio.App.Services
     }
   }
 }
-

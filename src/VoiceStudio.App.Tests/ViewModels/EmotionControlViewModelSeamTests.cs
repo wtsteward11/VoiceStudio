@@ -98,5 +98,35 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsNotNull(vm.StatusMessage);
       StringAssert.Contains(vm.StatusMessage, "(applied)");
     }
+
+    /// <summary>GAP-050 preview authority: preview returns apply-extended-shaped response.</summary>
+    [TestMethod]
+    public async Task PreviewEmotionCommand_WhenClientReturnsApplyExtendedShape_SetsPreviewFieldsAndStatus()
+    {
+      _mockEmotionControlClient
+        .Setup(x => x.PreviewEmotionAsync(It.IsAny<EmotionApplyExtendedRequest>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new EmotionApplyExtendedResponse
+        {
+          AudioId = "emotion_preview_abc",
+          AudioUrl = "/api/voice/audio/emotion_preview_abc",
+          EmotionMappingSource = "canonical_preset",
+          ProsodyHandling = new ProsodyHandlingDiagnosticsDto
+          {
+            Action = "none",
+            AppliedOperations = new List<string>(),
+            Warnings = new List<string> { "note" },
+          },
+        });
+
+      var vm = new EmotionControlViewModel(_context, _mockEmotionControlClient.Object, dialogService: null);
+      vm.TargetAudioId = "a1";
+      vm.SelectedPrimaryEmotion = "warm";
+      await vm.PreviewEmotionCommand.ExecuteAsync(CancellationToken.None);
+      Assert.AreEqual("emotion_preview_abc", vm.PreviewAudioId);
+      Assert.AreEqual("/api/voice/audio/emotion_preview_abc", vm.PreviewAudioUrl);
+      Assert.IsNotNull(vm.StatusMessage);
+      StringAssert.Contains(vm.StatusMessage, "(none)");
+      StringAssert.Contains(vm.StatusMessage, "note");
+    }
   }
 }

@@ -58,6 +58,7 @@ This file is a **living index** of VoiceStudio’s architecture, contracts, and 
 
 ## Key components and contracts
 
+- **Emotion preview authority (GAP-050, 2026-04-08)**: `POST /api/emotion/preview` in `backend/api/routes/emotion.py` uses the same pipeline as apply-extended (`resolve_emotion_prosody` → `apply_transform`) with `transform_context="emotion_preview"`; WinUI `IEmotionControlClient.PreviewEmotionAsync` returns `EmotionApplyExtendedResponse?` (shared shape with apply). Closure: `docs/reports/verification/VOICESTUDIO_GAP050_EMOTION_PREVIEW_AUTHORITY_LANE_CLOSURE_2026-04-08.md`.
 - **Engine interface contract (Gate E)**: `VoiceStudio.Core.Engines` interfaces (`IEngine`, `ITextToSpeechEngine`, `ITranscriptionEngine`) + `EngineCapabilities`.
 - **Schema validation (C#)**: `src/VoiceStudio.App/Utilities/SchemaValidationHelper.cs` validates settings and voice profiles against `shared/schemas/` using JsonSchema.Net; schemas are copied into app output under `shared/`.
 - **IPC boundary**: `src/VoiceStudio.App/Services/IPC/NamedPipeClient.cs` validates IPC messages against `shared/schemas/ipc-message.schema.json` and uses `IIPCSerializer` (JSON default) with length-prefixed named pipe transport; error payloads include `request_id` + `path` for envelope alignment.

@@ -58,7 +58,7 @@ namespace VoiceStudio.Core.Models
   }
 
   /// <summary>
-  /// Response from POST /api/emotion/apply-extended (GAP-050).
+  /// Response from POST /api/emotion/apply-extended and POST /api/emotion/preview (GAP-050 preview authority).
   /// </summary>
   public class EmotionApplyExtendedResponse
   {
@@ -73,17 +73,5 @@ namespace VoiceStudio.Core.Models
 
     [JsonPropertyName("emotion_mapping_source")]
     public string EmotionMappingSource { get; set; } = string.Empty;
-  }
-
-  /// <summary>
-  /// Response from emotion preview (/api/emotion/preview).
-  /// </summary>
-  public class EmotionPreviewResponse
-  {
-    [JsonPropertyName("audio_id")]
-    public string AudioId { get; set; } = string.Empty;
-
-    [JsonPropertyName("message")]
-    public string Message { get; set; } = string.Empty;
   }
 }

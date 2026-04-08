@@ -12,11 +12,10 @@ namespace VoiceStudio.Core.Services
   {
     Task<string[]> GetAvailableEmotionsAsync(CancellationToken ct = default);
     Task<EmotionApplyExtendedResponse?> ApplyEmotionAsync(EmotionApplyExtendedRequest request, CancellationToken ct = default);
-    Task<EmotionPreviewResponse?> PreviewEmotionAsync(EmotionApplyExtendedRequest request, CancellationToken ct = default);
+    Task<EmotionApplyExtendedResponse?> PreviewEmotionAsync(EmotionApplyExtendedRequest request, CancellationToken ct = default);
     Task<EmotionPreset[]> GetPresetsAsync(CancellationToken ct = default);
     Task<EmotionPreset> CreatePresetAsync(EmotionPresetCreateRequest request, CancellationToken ct = default);
     Task<EmotionPreset> UpdatePresetAsync(string presetId, EmotionPresetUpdateRequest request, CancellationToken ct = default);
     Task DeletePresetAsync(string presetId, CancellationToken ct = default);
   }
 }
-

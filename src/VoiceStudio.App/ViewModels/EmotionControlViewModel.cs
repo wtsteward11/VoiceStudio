@@ -318,8 +318,25 @@ namespace VoiceStudio.App.ViewModels
         if (response != null)
         {
           PreviewAudioId = response.AudioId;
-          PreviewAudioUrl = $"/api/audio/{response.AudioId}";
-          StatusMessage = ResourceHelper.GetString("EmotionControl.PreviewGenerated", "Preview generated successfully");
+          PreviewAudioUrl = !string.IsNullOrWhiteSpace(response.AudioUrl)
+            ? response.AudioUrl
+            : $"/api/audio/file/{response.AudioId}";
+          var basePreview = ResourceHelper.GetString(
+            "EmotionControl.PreviewGenerated",
+            "Preview generated successfully");
+          if (response.ProsodyHandling != null)
+          {
+            var ph = response.ProsodyHandling;
+            StatusMessage = $"{basePreview} ({ph.Action})";
+            if (ph.Warnings is { Count: > 0 })
+            {
+              StatusMessage += " — " + string.Join("; ", ph.Warnings);
+            }
+          }
+          else
+          {
+            StatusMessage = basePreview;
+          }
         }
       }
       catch (OperationCanceledException)

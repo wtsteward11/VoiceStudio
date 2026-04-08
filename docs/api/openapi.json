@@ -1757,7 +1757,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/backend__api__routes__style_transfer__StylePreset"
+                    "$ref": "#/components/schemas/StylePreset"
                   },
                   "title": "Response List Style Presets Api Style Transfer Presets Get"
                 }
@@ -1840,7 +1840,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__style_transfer__StylePreset"
+                  "$ref": "#/components/schemas/StylePreset"
                 }
               }
             }
@@ -5712,7 +5712,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/VoiceProfile"
+                  "$ref": "#/components/schemas/backend__api__models_additional__VoiceProfile"
                 },
                 "examples": {
                   "default": {
@@ -5773,7 +5773,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/VoiceProfile"
+                  "$ref": "#/components/schemas/backend__api__models_additional__VoiceProfile"
                 }
               }
             }
@@ -5824,7 +5824,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/VoiceProfile"
+                  "$ref": "#/components/schemas/backend__api__models_additional__VoiceProfile"
                 }
               }
             }
@@ -9755,7 +9755,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/backend__api__routes__effects__EffectPreset"
+                    "$ref": "#/components/schemas/EffectPreset"
                   },
                   "title": "Response List Effect Presets Api Effects Presets Get"
                 }
@@ -9797,7 +9797,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__effects__EffectPreset"
+                  "$ref": "#/components/schemas/EffectPreset"
                 }
               }
             }
@@ -10697,7 +10697,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__transcribe__TranscriptionResponse"
+                  "$ref": "#/components/schemas/TranscriptionResponse"
                 }
               }
             }
@@ -10767,7 +10767,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/backend__api__routes__transcribe__TranscriptionResponse"
+                    "$ref": "#/components/schemas/TranscriptionResponse"
                   },
                   "title": "Response List Transcriptions Api Transcribe  Get"
                 }
@@ -10812,7 +10812,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__transcribe__TranscriptionResponse"
+                  "$ref": "#/components/schemas/TranscriptionResponse"
                 }
               }
             }
@@ -10863,7 +10863,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__transcribe__TranscriptionResponse"
+                  "$ref": "#/components/schemas/TranscriptionResponse"
                 }
               }
             }
@@ -14687,7 +14687,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__slo__ExportResponse"
+                  "$ref": "#/components/schemas/ExportResponse"
                 }
               }
             }
@@ -15294,7 +15294,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExportResponse"
+                  "$ref": "#/components/schemas/backend__api__routes__errors__ExportResponse"
                 }
               }
             }
@@ -17522,13 +17522,13 @@
           "emotion"
         ],
         "summary": "Preview Emotion",
-        "description": "Preview emotion-adjusted audio before applying.",
+        "description": "Preview emotion-adjusted audio using the same canonical path as apply-extended.\n\nRequest body matches apply-extended (primary/secondary blend, intensities 0–100).",
         "operationId": "preview_emotion_api_emotion_preview_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EmotionPreviewRequest"
+                "$ref": "#/components/schemas/EmotionApplyExtendedRequest"
               }
             }
           },
@@ -17539,7 +17539,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/EmotionApplyExtendedResponseModel"
+                }
               }
             }
           },
@@ -31202,7 +31204,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/StylePreset"
+                    "$ref": "#/components/schemas/backend__api__routes__emotion_style__StylePreset"
                   },
                   "type": "array",
                   "title": "Response Get Style Presets Api Emotion Style Styles Get"
@@ -31418,7 +31420,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/backend__api__routes__multilingual__TranslationResponse"
+                  "$ref": "#/components/schemas/TranslationResponse"
                 }
               }
             }
@@ -33011,7 +33013,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/EffectPreset"
+                    "$ref": "#/components/schemas/backend__api__routes__voice_effects__EffectPreset"
                   },
                   "type": "array",
                   "title": "Response List Effect Presets Api Voice Effects Presets Get"
@@ -33047,7 +33049,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EffectPreset"
+                  "$ref": "#/components/schemas/backend__api__routes__voice_effects__EffectPreset"
                 }
               }
             }
@@ -33486,7 +33488,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TranscriptionResponse"
+                  "$ref": "#/components/schemas/backend__api__routes__translation__TranscriptionResponse"
                 }
               }
             }
@@ -33539,7 +33541,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TranslationResponse"
+                  "$ref": "#/components/schemas/backend__api__routes__translation__TranslationResponse"
                 }
               }
             }
@@ -34258,7 +34260,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/backend__api__routes__ai_enhancement__EnhanceRequest"
+                "$ref": "#/components/schemas/EnhanceRequest"
               }
             }
           },
@@ -37902,7 +37904,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EnhanceRequest"
+                "$ref": "#/components/schemas/backend__api__routes__video_enhance__EnhanceRequest"
               }
             }
           },
@@ -41342,7 +41344,7 @@
             }
           },
           "performance": {
-            "$ref": "#/components/schemas/PerformanceSettings",
+            "$ref": "#/components/schemas/backend__api__routes__advanced_settings__PerformanceSettings",
             "default": {
               "cache_enabled": true,
               "cache_size_mb": 512,
@@ -42481,7 +42483,7 @@
             "$ref": "#/components/schemas/SpectralAnalysis"
           },
           "temporal": {
-            "$ref": "#/components/schemas/backend__api__routes__audio_analysis__TemporalAnalysis"
+            "$ref": "#/components/schemas/TemporalAnalysis"
           },
           "perceptual": {
             "$ref": "#/components/schemas/PerceptualAnalysis"
@@ -47086,34 +47088,51 @@
             "type": "string",
             "title": "Id"
           },
+          "effect_type": {
+            "type": "string",
+            "title": "Effect Type"
+          },
           "name": {
             "type": "string",
             "title": "Name"
           },
-          "category": {
-            "type": "string",
-            "title": "Category"
-          },
           "description": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Description"
           },
           "parameters": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Parameters"
+            "items": {
+              "$ref": "#/components/schemas/EffectParameter"
+            },
+            "type": "array",
+            "title": "Parameters",
+            "default": []
+          },
+          "created": {
+            "type": "string",
+            "title": "Created"
+          },
+          "modified": {
+            "type": "string",
+            "title": "Modified"
           }
         },
         "type": "object",
         "required": [
           "id",
+          "effect_type",
           "name",
-          "category",
-          "description",
-          "parameters"
+          "created",
+          "modified"
         ],
-        "title": "EffectPreset",
-        "description": "Voice effect preset."
+        "title": "EffectPreset"
       },
       "EffectPresetCreateRequest": {
         "properties": {
@@ -47804,57 +47823,6 @@
         "title": "EmotionPresetUpdateRequest",
         "description": "Request to update an emotion preset."
       },
-      "EmotionPreviewRequest": {
-        "properties": {
-          "text": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Text"
-          },
-          "audio_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Audio Id"
-          },
-          "emotion": {
-            "type": "string",
-            "title": "Emotion",
-            "default": "neutral"
-          },
-          "intensity": {
-            "type": "number",
-            "title": "Intensity",
-            "default": 0.5
-          },
-          "blend": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Blend"
-          }
-        },
-        "type": "object",
-        "title": "EmotionPreviewRequest",
-        "description": "Request to preview emotion-adjusted audio."
-      },
       "EmotionStyleApplyRequest": {
         "properties": {
           "profile_id": {
@@ -48180,88 +48148,89 @@
         "properties": {
           "id": {
             "type": "string",
-            "title": "Id",
-            "description": "Engine identifier"
+            "title": "Id"
           },
           "name": {
             "type": "string",
-            "title": "Name",
-            "description": "Display name"
+            "title": "Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
           },
           "type": {
             "type": "string",
-            "title": "Type",
-            "description": "Engine type (e.g., tts, vc, stt)",
-            "default": "tts"
-          },
-          "version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Version",
-            "description": "Engine version"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description",
-            "description": "Engine description"
-          },
-          "available": {
-            "type": "boolean",
-            "title": "Available",
-            "description": "Whether engine is available",
-            "default": true
+            "title": "Type"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Status",
-            "description": "Current status"
+            "type": "string",
+            "title": "Status"
           },
-          "support_tier": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/EngineCapability"
+            },
+            "type": "array",
+            "title": "Capabilities",
+            "default": []
+          },
+          "memory_usage_mb": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "number"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Support Tier",
-            "description": "Support tier: tier1_supported (wedge), tier2_best_effort, experimental"
+            "title": "Memory Usage Mb"
+          },
+          "gpu_usage_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Usage Percent"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "name"
+          "name",
+          "version",
+          "type",
+          "status"
         ],
         "title": "EngineInfo",
-        "description": "Information about a single engine."
+        "description": "Engine information response.",
+        "example": {
+          "capabilities": [
+            {
+              "feature": "text_to_speech",
+              "supported": true
+            },
+            {
+              "feature": "voice_cloning",
+              "supported": true
+            }
+          ],
+          "id": "xtts_v2",
+          "memory_usage_mb": 2048.5,
+          "name": "XTTS v2",
+          "status": "ready",
+          "type": "synthesis",
+          "version": "2.0.0"
+        }
       },
       "EngineListResponse": {
         "properties": {
           "engines": {
             "items": {
-              "$ref": "#/components/schemas/EngineInfo"
+              "$ref": "#/components/schemas/backend__api__routes__engines__EngineInfo"
             },
             "type": "array",
             "title": "Engines",
@@ -48787,25 +48756,26 @@
       },
       "EnhanceRequest": {
         "properties": {
-          "input_path": {
+          "audio_id": {
             "type": "string",
-            "title": "Input Path"
-          },
-          "output_path": {
-            "type": "string",
-            "title": "Output Path"
+            "title": "Audio Id",
+            "description": "Audio ID to enhance"
           },
           "mode": {
             "type": "string",
             "title": "Mode",
-            "default": "lip_sync"
+            "description": "Enhancement mode: speech, music, balanced, podcast, broadcast",
+            "default": "balanced"
           },
-          "quality": {
-            "type": "string",
-            "title": "Quality",
-            "default": "standard"
+          "strength": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Strength",
+            "description": "Enhancement strength (0.0-1.0)",
+            "default": 0.5
           },
-          "audio_path": {
+          "preset": {
             "anyOf": [
               {
                 "type": "string"
@@ -48814,16 +48784,16 @@
                 "type": "null"
               }
             ],
-            "title": "Audio Path"
+            "title": "Preset",
+            "description": "Optional preset name"
           }
         },
         "type": "object",
         "required": [
-          "input_path",
-          "output_path"
+          "audio_id"
         ],
         "title": "EnhanceRequest",
-        "description": "Face enhancement request."
+        "description": "Request for audio enhancement."
       },
       "EnhanceResponse": {
         "properties": {
@@ -56592,14 +56562,14 @@
       },
       "PerformanceSettings": {
         "properties": {
-          "cache_enabled": {
+          "caching_enabled": {
             "type": "boolean",
-            "title": "Cache Enabled",
+            "title": "Caching Enabled",
             "default": true
           },
-          "cache_size_mb": {
+          "cache_size": {
             "type": "integer",
-            "title": "Cache Size Mb",
+            "title": "Cache Size",
             "default": 512
           },
           "max_threads": {
@@ -56607,47 +56577,14 @@
             "title": "Max Threads",
             "default": 4
           },
-          "gpu_enabled": {
-            "type": "boolean",
-            "title": "Gpu Enabled",
-            "default": true
-          },
-          "gpu_device": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Gpu Device"
-          },
-          "memory_limit_mb": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Memory Limit Mb"
-          },
-          "background_processing": {
-            "type": "boolean",
-            "title": "Background Processing",
-            "default": true
-          },
-          "preload_engines": {
-            "type": "boolean",
-            "title": "Preload Engines",
-            "default": false
+          "memory_limit": {
+            "type": "integer",
+            "title": "Memory Limit",
+            "default": 4096
           }
         },
         "type": "object",
-        "title": "PerformanceSettings",
-        "description": "Performance optimization settings."
+        "title": "PerformanceSettings"
       },
       "PhaseData": {
         "properties": {
@@ -63024,7 +62961,7 @@
           "performance": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/backend__api__routes__settings__PerformanceSettings"
+                "$ref": "#/components/schemas/PerformanceSettings"
               },
               {
                 "type": "null"
@@ -64780,7 +64717,7 @@
           "data": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/backend__api__v3__engines__EngineInfo"
+                "$ref": "#/components/schemas/EngineInfo"
               },
               {
                 "type": "null"
@@ -65270,7 +65207,7 @@
           "data": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/backend__api__v3__voices__VoiceProfile"
+                "$ref": "#/components/schemas/VoiceProfile"
               },
               {
                 "type": "null"
@@ -65369,7 +65306,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/backend__api__v3__engines__EngineInfo"
+                  "$ref": "#/components/schemas/EngineInfo"
                 },
                 "type": "array"
               },
@@ -65573,7 +65510,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/backend__api__v3__voices__VoiceProfile"
+                  "$ref": "#/components/schemas/VoiceProfile"
                 },
                 "type": "array"
               },
@@ -65874,25 +65811,40 @@
       },
       "StylePreset": {
         "properties": {
-          "id": {
+          "preset_id": {
             "type": "string",
-            "title": "Id"
+            "title": "Preset Id"
           },
           "name": {
             "type": "string",
             "title": "Name"
           },
-          "style": {
-            "type": "string",
-            "title": "Style"
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
           },
-          "parameters": {
-            "additionalProperties": {
-              "type": "number"
-            },
+          "voice_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voice Profile Id"
+          },
+          "style_characteristics": {
+            "additionalProperties": true,
             "type": "object",
-            "title": "Parameters",
-            "default": {}
+            "title": "Style Characteristics"
           },
           "created": {
             "type": "string",
@@ -65901,13 +65853,13 @@
         },
         "type": "object",
         "required": [
-          "id",
+          "preset_id",
           "name",
-          "style",
+          "style_characteristics",
           "created"
         ],
         "title": "StylePreset",
-        "description": "A style preset."
+        "description": "Voice style preset."
       },
       "StyleProfile": {
         "properties": {
@@ -67319,42 +67271,63 @@
       },
       "TemporalAnalysis": {
         "properties": {
-          "frame_stability": {
+          "rms": {
             "type": "number",
-            "title": "Frame Stability"
+            "title": "Rms"
           },
-          "motion_smoothness": {
+          "zero_crossing_rate": {
             "type": "number",
-            "title": "Motion Smoothness"
+            "title": "Zero Crossing Rate"
           },
-          "flicker_score": {
-            "type": "number",
-            "title": "Flicker Score"
+          "attack_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attack Time"
           },
-          "jitter_score": {
-            "type": "number",
-            "title": "Jitter Score"
+          "decay_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decay Time"
           },
-          "overall_consistency": {
-            "type": "number",
-            "title": "Overall Consistency"
+          "sustain_level": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sustain Level"
           },
-          "artifacts_detected": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Artifacts Detected",
-            "default": []
+          "release_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Time"
           }
         },
         "type": "object",
         "required": [
-          "frame_stability",
-          "motion_smoothness",
-          "flicker_score",
-          "jitter_score",
-          "overall_consistency"
+          "rms",
+          "zero_crossing_rate"
         ],
         "title": "TemporalAnalysis",
         "description": "Temporal analysis results."
@@ -67430,12 +67403,12 @@
             "title": "Processed Video Url"
           },
           "original_analysis": {
-            "$ref": "#/components/schemas/TemporalAnalysis"
+            "$ref": "#/components/schemas/backend__api__models_additional__TemporalAnalysis"
           },
           "processed_analysis": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/TemporalAnalysis"
+                "$ref": "#/components/schemas/backend__api__models_additional__TemporalAnalysis"
               },
               {
                 "type": "null"
@@ -68776,35 +68749,64 @@
       },
       "TranscriptionResponse": {
         "properties": {
-          "project_id": {
+          "id": {
             "type": "string",
-            "title": "Project Id"
+            "title": "Id"
+          },
+          "audio_id": {
+            "type": "string",
+            "title": "Audio Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "duration": {
+            "type": "number",
+            "title": "Duration"
           },
           "segments": {
             "items": {
-              "$ref": "#/components/schemas/backend__api__routes__translation__TranscriptionSegment"
+              "$ref": "#/components/schemas/TranscriptionSegment"
             },
             "type": "array",
             "title": "Segments"
           },
-          "detected_language": {
-            "type": "string",
-            "title": "Detected Language"
+          "word_timestamps": {
+            "items": {
+              "$ref": "#/components/schemas/WordTimestamp"
+            },
+            "type": "array",
+            "title": "Word Timestamps"
           },
-          "total_duration": {
-            "type": "number",
-            "title": "Total Duration"
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
           }
         },
         "type": "object",
         "required": [
-          "project_id",
+          "id",
+          "audio_id",
+          "text",
+          "language",
+          "duration",
           "segments",
-          "detected_language",
-          "total_duration"
+          "word_timestamps",
+          "created",
+          "engine"
         ],
         "title": "TranscriptionResponse",
-        "description": "Response for transcription."
+        "description": "Response from transcription."
       },
       "TranscriptionSegment": {
         "properties": {
@@ -68972,9 +68974,9 @@
       },
       "TranslationResponse": {
         "properties": {
-          "project_id": {
+          "translated_text": {
             "type": "string",
-            "title": "Project Id"
+            "title": "Translated Text"
           },
           "source_language": {
             "type": "string",
@@ -68984,23 +68986,20 @@
             "type": "string",
             "title": "Target Language"
           },
-          "segments": {
-            "items": {
-              "$ref": "#/components/schemas/TranslatedSegment"
-            },
-            "type": "array",
-            "title": "Segments"
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
           }
         },
         "type": "object",
         "required": [
-          "project_id",
+          "translated_text",
           "source_language",
           "target_language",
-          "segments"
+          "confidence"
         ],
         "title": "TranslationResponse",
-        "description": "Response for translation."
+        "description": "Response from translation."
       },
       "TrimClipRequest": {
         "properties": {
@@ -71485,12 +71484,23 @@
             "type": "string",
             "title": "Name"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "language": {
             "type": "string",
             "title": "Language",
             "default": "en"
           },
-          "emotion": {
+          "gender": {
             "anyOf": [
               {
                 "type": "string"
@@ -71499,22 +71509,9 @@
                 "type": "null"
               }
             ],
-            "title": "Emotion"
+            "title": "Gender"
           },
-          "quality_score": {
-            "type": "number",
-            "title": "Quality Score",
-            "default": 0.0
-          },
-          "tags": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Tags",
-            "default": []
-          },
-          "reference_audio_url": {
+          "age_group": {
             "anyOf": [
               {
                 "type": "string"
@@ -71523,14 +71520,36 @@
                 "type": "null"
               }
             ],
-            "title": "Reference Audio Url"
+            "title": "Age Group"
           },
-          "reference_audio_bound": {
+          "style": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style"
+          },
+          "sample_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Url"
+          },
+          "is_custom": {
             "type": "boolean",
-            "title": "Reference Audio Bound",
+            "title": "Is Custom",
             "default": false
           },
-          "avatar_url": {
+          "engine_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -71539,7 +71558,18 @@
                 "type": "null"
               }
             ],
-            "title": "Avatar Url"
+            "title": "Engine Id"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
           }
         },
         "type": "object",
@@ -71548,7 +71578,7 @@
           "name"
         ],
         "title": "VoiceProfile",
-        "description": "Voice profile model with avatar support.",
+        "description": "Voice profile information.",
         "example": {
           "id": "profile_123",
           "name": "John Doe Voice",
@@ -72978,28 +73008,64 @@
         "title": "ZeroShotCloneResponse",
         "description": "Response for zero-shot voice cloning."
       },
-      "backend__api__routes__ai_enhancement__EnhanceRequest": {
+      "backend__api__models_additional__TemporalAnalysis": {
         "properties": {
-          "audio_id": {
-            "type": "string",
-            "title": "Audio Id",
-            "description": "Audio ID to enhance"
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode",
-            "description": "Enhancement mode: speech, music, balanced, podcast, broadcast",
-            "default": "balanced"
-          },
-          "strength": {
+          "frame_stability": {
             "type": "number",
-            "maximum": 1.0,
-            "minimum": 0.0,
-            "title": "Strength",
-            "description": "Enhancement strength (0.0-1.0)",
-            "default": 0.5
+            "title": "Frame Stability"
           },
-          "preset": {
+          "motion_smoothness": {
+            "type": "number",
+            "title": "Motion Smoothness"
+          },
+          "flicker_score": {
+            "type": "number",
+            "title": "Flicker Score"
+          },
+          "jitter_score": {
+            "type": "number",
+            "title": "Jitter Score"
+          },
+          "overall_consistency": {
+            "type": "number",
+            "title": "Overall Consistency"
+          },
+          "artifacts_detected": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Artifacts Detected",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "frame_stability",
+          "motion_smoothness",
+          "flicker_score",
+          "jitter_score",
+          "overall_consistency"
+        ],
+        "title": "TemporalAnalysis",
+        "description": "Temporal analysis results."
+      },
+      "backend__api__models_additional__VoiceProfile": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en"
+          },
+          "emotion": {
             "anyOf": [
               {
                 "type": "string"
@@ -73008,79 +73074,115 @@
                 "type": "null"
               }
             ],
-            "title": "Preset",
-            "description": "Optional preset name"
+            "title": "Emotion"
+          },
+          "quality_score": {
+            "type": "number",
+            "title": "Quality Score",
+            "default": 0.0
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "reference_audio_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Audio Url"
+          },
+          "reference_audio_bound": {
+            "type": "boolean",
+            "title": "Reference Audio Bound",
+            "default": false
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
           }
         },
         "type": "object",
         "required": [
-          "audio_id"
+          "id",
+          "name"
         ],
-        "title": "EnhanceRequest",
-        "description": "Request for audio enhancement."
+        "title": "VoiceProfile",
+        "description": "Voice profile model with avatar support."
       },
-      "backend__api__routes__audio_analysis__TemporalAnalysis": {
+      "backend__api__routes__advanced_settings__PerformanceSettings": {
         "properties": {
-          "rms": {
-            "type": "number",
-            "title": "Rms"
+          "cache_enabled": {
+            "type": "boolean",
+            "title": "Cache Enabled",
+            "default": true
           },
-          "zero_crossing_rate": {
-            "type": "number",
-            "title": "Zero Crossing Rate"
+          "cache_size_mb": {
+            "type": "integer",
+            "title": "Cache Size Mb",
+            "default": 512
           },
-          "attack_time": {
+          "max_threads": {
+            "type": "integer",
+            "title": "Max Threads",
+            "default": 4
+          },
+          "gpu_enabled": {
+            "type": "boolean",
+            "title": "Gpu Enabled",
+            "default": true
+          },
+          "gpu_device": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Attack Time"
+            "title": "Gpu Device"
           },
-          "decay_time": {
+          "memory_limit_mb": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Decay Time"
+            "title": "Memory Limit Mb"
           },
-          "sustain_level": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sustain Level"
+          "background_processing": {
+            "type": "boolean",
+            "title": "Background Processing",
+            "default": true
           },
-          "release_time": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Release Time"
+          "preload_engines": {
+            "type": "boolean",
+            "title": "Preload Engines",
+            "default": false
           }
         },
         "type": "object",
-        "required": [
-          "rms",
-          "zero_crossing_rate"
-        ],
-        "title": "TemporalAnalysis",
-        "description": "Temporal analysis results."
+        "title": "PerformanceSettings",
+        "description": "Performance optimization settings."
       },
       "backend__api__routes__automation__AutomationCurveCreateRequest": {
         "properties": {
@@ -73154,19 +73256,72 @@
         "title": "AutomationCurveUpdateRequest",
         "description": "Request to update an automation curve."
       },
-      "backend__api__routes__effects__EffectPreset": {
+      "backend__api__routes__emotion_style__StylePreset": {
         "properties": {
           "id": {
             "type": "string",
             "title": "Id"
           },
-          "effect_type": {
-            "type": "string",
-            "title": "Effect Type"
-          },
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "style": {
+            "type": "string",
+            "title": "Style"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Parameters",
+            "default": {}
+          },
+          "created": {
+            "type": "string",
+            "title": "Created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "style",
+          "created"
+        ],
+        "title": "StylePreset",
+        "description": "A style preset."
+      },
+      "backend__api__routes__engines__EngineInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Engine identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Engine type (e.g., tts, vc, stt)",
+            "default": "tts"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Engine version"
           },
           "description": {
             "anyOf": [
@@ -73177,34 +73332,71 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Engine description"
           },
-          "parameters": {
-            "items": {
-              "$ref": "#/components/schemas/EffectParameter"
-            },
-            "type": "array",
-            "title": "Parameters",
-            "default": []
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "Whether engine is available",
+            "default": true
           },
-          "created": {
-            "type": "string",
-            "title": "Created"
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Current status"
           },
-          "modified": {
-            "type": "string",
-            "title": "Modified"
+          "support_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Support Tier",
+            "description": "Support tier: tier1_supported (wedge), tier2_best_effort, experimental"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "effect_type",
-          "name",
-          "created",
-          "modified"
+          "name"
         ],
-        "title": "EffectPreset"
+        "title": "EngineInfo",
+        "description": "Information about a single engine."
+      },
+      "backend__api__routes__errors__ExportResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "filepath": {
+            "type": "string",
+            "title": "Filepath"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "filepath",
+          "message"
+        ],
+        "title": "ExportResponse",
+        "description": "Response model for export operation."
       },
       "backend__api__routes__macros__AutomationCurve": {
         "properties": {
@@ -73309,61 +73501,6 @@
         ],
         "title": "AutomationPoint"
       },
-      "backend__api__routes__multilingual__TranslationResponse": {
-        "properties": {
-          "translated_text": {
-            "type": "string",
-            "title": "Translated Text"
-          },
-          "source_language": {
-            "type": "string",
-            "title": "Source Language"
-          },
-          "target_language": {
-            "type": "string",
-            "title": "Target Language"
-          },
-          "confidence": {
-            "type": "number",
-            "title": "Confidence"
-          }
-        },
-        "type": "object",
-        "required": [
-          "translated_text",
-          "source_language",
-          "target_language",
-          "confidence"
-        ],
-        "title": "TranslationResponse",
-        "description": "Response from translation."
-      },
-      "backend__api__routes__settings__PerformanceSettings": {
-        "properties": {
-          "caching_enabled": {
-            "type": "boolean",
-            "title": "Caching Enabled",
-            "default": true
-          },
-          "cache_size": {
-            "type": "integer",
-            "title": "Cache Size",
-            "default": 512
-          },
-          "max_threads": {
-            "type": "integer",
-            "title": "Max Threads",
-            "default": 4
-          },
-          "memory_limit": {
-            "type": "integer",
-            "title": "Memory Limit",
-            "default": 4096
-          }
-        },
-        "type": "object",
-        "title": "PerformanceSettings"
-      },
       "backend__api__routes__shortcuts__KeyboardShortcut": {
         "properties": {
           "id": {
@@ -73433,82 +73570,6 @@
         "title": "KeyboardShortcut",
         "description": "A keyboard shortcut definition."
       },
-      "backend__api__routes__slo__ExportResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "filepath": {
-            "type": "string",
-            "title": "Filepath"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          }
-        },
-        "type": "object",
-        "required": [
-          "success",
-          "filepath",
-          "message"
-        ],
-        "title": "ExportResponse",
-        "description": "Response model for export operation."
-      },
-      "backend__api__routes__style_transfer__StylePreset": {
-        "properties": {
-          "preset_id": {
-            "type": "string",
-            "title": "Preset Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "voice_profile_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Voice Profile Id"
-          },
-          "style_characteristics": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Style Characteristics"
-          },
-          "created": {
-            "type": "string",
-            "title": "Created"
-          }
-        },
-        "type": "object",
-        "required": [
-          "preset_id",
-          "name",
-          "style_characteristics",
-          "created"
-        ],
-        "title": "StylePreset",
-        "description": "Voice style preset."
-      },
       "backend__api__routes__timeline__ExportResponse": {
         "properties": {
           "success": {
@@ -73566,67 +73627,6 @@
         ],
         "title": "ExportResponse",
         "description": "Response for trace export."
-      },
-      "backend__api__routes__transcribe__TranscriptionResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "audio_id": {
-            "type": "string",
-            "title": "Audio Id"
-          },
-          "text": {
-            "type": "string",
-            "title": "Text"
-          },
-          "language": {
-            "type": "string",
-            "title": "Language"
-          },
-          "duration": {
-            "type": "number",
-            "title": "Duration"
-          },
-          "segments": {
-            "items": {
-              "$ref": "#/components/schemas/TranscriptionSegment"
-            },
-            "type": "array",
-            "title": "Segments"
-          },
-          "word_timestamps": {
-            "items": {
-              "$ref": "#/components/schemas/WordTimestamp"
-            },
-            "type": "array",
-            "title": "Word Timestamps"
-          },
-          "created": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created"
-          },
-          "engine": {
-            "type": "string",
-            "title": "Engine"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "audio_id",
-          "text",
-          "language",
-          "duration",
-          "segments",
-          "word_timestamps",
-          "created",
-          "engine"
-        ],
-        "title": "TranscriptionResponse",
-        "description": "Response from transcription."
       },
       "backend__api__routes__translation__ProjectCreateRequest": {
         "properties": {
@@ -73730,6 +73730,38 @@
         "title": "ProjectInfo",
         "description": "Translation project information."
       },
+      "backend__api__routes__translation__TranscriptionResponse": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/backend__api__routes__translation__TranscriptionSegment"
+            },
+            "type": "array",
+            "title": "Segments"
+          },
+          "detected_language": {
+            "type": "string",
+            "title": "Detected Language"
+          },
+          "total_duration": {
+            "type": "number",
+            "title": "Total Duration"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "segments",
+          "detected_language",
+          "total_duration"
+        ],
+        "title": "TranscriptionResponse",
+        "description": "Response for transcription."
+      },
       "backend__api__routes__translation__TranscriptionSegment": {
         "properties": {
           "segment_id": {
@@ -73769,6 +73801,78 @@
         "title": "TranscriptionSegment",
         "description": "A transcription segment."
       },
+      "backend__api__routes__translation__TranslationResponse": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "source_language": {
+            "type": "string",
+            "title": "Source Language"
+          },
+          "target_language": {
+            "type": "string",
+            "title": "Target Language"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/TranslatedSegment"
+            },
+            "type": "array",
+            "title": "Segments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "source_language",
+          "target_language",
+          "segments"
+        ],
+        "title": "TranslationResponse",
+        "description": "Response for translation."
+      },
+      "backend__api__routes__video_enhance__EnhanceRequest": {
+        "properties": {
+          "input_path": {
+            "type": "string",
+            "title": "Input Path"
+          },
+          "output_path": {
+            "type": "string",
+            "title": "Output Path"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": "lip_sync"
+          },
+          "quality": {
+            "type": "string",
+            "title": "Quality",
+            "default": "standard"
+          },
+          "audio_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_path",
+          "output_path"
+        ],
+        "title": "EnhanceRequest",
+        "description": "Face enhancement request."
+      },
       "backend__api__routes__video_enhance__EnhanceResponse": {
         "properties": {
           "job_id": {
@@ -73792,6 +73896,41 @@
         ],
         "title": "EnhanceResponse",
         "description": "Face enhancement response."
+      },
+      "backend__api__routes__voice_effects__EffectPreset": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "category",
+          "description",
+          "parameters"
+        ],
+        "title": "EffectPreset",
+        "description": "Voice effect preset."
       },
       "backend__api__routes__waveform__WaveformData": {
         "properties": {
@@ -73883,88 +74022,6 @@
         "title": "WaveformData",
         "description": "Waveform data for visualization."
       },
-      "backend__api__v3__engines__EngineInfo": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "version": {
-            "type": "string",
-            "title": "Version"
-          },
-          "type": {
-            "type": "string",
-            "title": "Type"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "capabilities": {
-            "items": {
-              "$ref": "#/components/schemas/EngineCapability"
-            },
-            "type": "array",
-            "title": "Capabilities",
-            "default": []
-          },
-          "memory_usage_mb": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Memory Usage Mb"
-          },
-          "gpu_usage_percent": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Gpu Usage Percent"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "version",
-          "type",
-          "status"
-        ],
-        "title": "EngineInfo",
-        "description": "Engine information response.",
-        "example": {
-          "capabilities": [
-            {
-              "feature": "text_to_speech",
-              "supported": true
-            },
-            {
-              "feature": "voice_cloning",
-              "supported": true
-            }
-          ],
-          "id": "xtts_v2",
-          "memory_usage_mb": 2048.5,
-          "name": "XTTS v2",
-          "status": "ready",
-          "type": "synthesis",
-          "version": "2.0.0"
-        }
-      },
       "backend__api__v3__projects__ProjectInfo": {
         "properties": {
           "id": {
@@ -74028,122 +74085,6 @@
           "sample_rate": 44100,
           "track_count": 3,
           "updated_at": "2026-02-09T15:30:00Z"
-        }
-      },
-      "backend__api__v3__voices__VoiceProfile": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "language": {
-            "type": "string",
-            "title": "Language",
-            "default": "en"
-          },
-          "gender": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Gender"
-          },
-          "age_group": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Age Group"
-          },
-          "style": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Style"
-          },
-          "sample_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sample Url"
-          },
-          "is_custom": {
-            "type": "boolean",
-            "title": "Is Custom",
-            "default": false
-          },
-          "engine_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engine Id"
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "VoiceProfile",
-        "description": "Voice profile information.",
-        "example": {
-          "age_group": "adult",
-          "description": "Clear, professional male voice",
-          "gender": "male",
-          "id": "voice_abc123",
-          "is_custom": false,
-          "language": "en",
-          "name": "Professional Male",
-          "style": "professional"
         }
       }
     },

@@ -53,6 +53,8 @@ Audit whether **GAP-050** (*Emotional voice control + preview*, roadmap F5-6) ca
 - **Close GAP-050 product umbrella:** **No** — preview seam is **product-critical** relative to F5-6 wording and Emotion Control UX.
 - **Spawn exactly one bounded lane:** **Yes** — [GOV_VOICESTUDIO_GAP050_EMOTION_PREVIEW_AUTHORITY_01_EXECUTION_ROW.md](../../design/GOV_VOICESTUDIO_GAP050_EMOTION_PREVIEW_AUTHORITY_01_EXECUTION_ROW.md) (**Frozen**, awaiting implementation).
 
+**Update 2026-04-08 (same calendar day):** Preview lane **implemented and Closed** — [VOICESTUDIO_GAP050_EMOTION_PREVIEW_AUTHORITY_LANE_CLOSURE_2026-04-08.md](VOICESTUDIO_GAP050_EMOTION_PREVIEW_AUTHORITY_LANE_CLOSURE_2026-04-08.md); tracker **GAP-050** umbrella **Closed** per that closure §5. The §4 verdict above records the **audit-time** state; product umbrella closure is **retroactive** to preview lane completion.
+
 ## 5. Known limitations (unchanged, not blocking audit closure)
 
 - **`timeline_curve`** on apply-extended: warning only; not applied per mapping lane Hard OUT.

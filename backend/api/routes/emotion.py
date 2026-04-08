@@ -18,7 +18,11 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..models import ApiOk
-from ..models_additional import EmotionApplyExtendedResponseModel, EmotionApplyRequest
+from ..models_additional import (
+    EmotionApplyExtendedResponseModel,
+    EmotionApplyRequest,
+    ProsodyHandlingDiagnostics,
+)
 from ..optimization import cache_response
 
 logger = logging.getLogger(__name__)
@@ -118,6 +122,135 @@ class EmotionApplyExtendedRequest(BaseModel):
     secondary_emotion: str | None = None
     secondary_intensity: float = 0.0  # 0-100
     timeline_curve: list[float] | None = None  # Automation curve
+
+
+def _validate_emotion_apply_extended_request(req: EmotionApplyExtendedRequest) -> None:
+    """Shared validation for apply-extended and preview (canonical prosody path)."""
+    if req.primary_emotion not in AVAILABLE_EMOTIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid primary emotion: {req.primary_emotion}",
+        )
+
+    if req.secondary_emotion and req.secondary_emotion not in AVAILABLE_EMOTIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid secondary emotion: {req.secondary_emotion}",
+        )
+
+    if not 0.0 <= req.primary_intensity <= 100.0:
+        raise HTTPException(
+            status_code=400,
+            detail="Primary intensity must be between 0 and 100",
+        )
+
+    if not 0.0 <= req.secondary_intensity <= 100.0:
+        raise HTTPException(
+            status_code=400,
+            detail="Secondary intensity must be between 0 and 100",
+        )
+
+
+def _run_emotion_apply_extended_pipeline(
+    req: EmotionApplyExtendedRequest,
+    *,
+    transform_context: str,
+    artifact_id_prefix: str,
+) -> EmotionApplyExtendedResponseModel:
+    """
+    Canonical preset→prosody→apply_transform path shared by apply-extended and preview.
+
+    No second DSP fork: uses resolve_emotion_prosody + apply_transform only.
+    """
+    from backend.services.audio_artifacts import (
+        AudioRegistry,
+        create_audio_artifact_from_wav_array,
+    )
+    from backend.services.emotion_preset_prosody_mapper import resolve_emotion_prosody
+    from backend.services.prosody_authority_service import (
+        ProsodyAuthorityError,
+        apply_transform,
+    )
+
+    audio_path = AudioRegistry.get_path(req.audio_id)
+    if not audio_path:
+        raise HTTPException(status_code=404, detail=f"Audio file '{req.audio_id}' not found")
+    if not os.path.exists(audio_path):
+        raise HTTPException(
+            status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
+        )
+
+    try:
+        import soundfile as sf
+
+        audio, sample_rate = sf.read(audio_path)
+        if len(audio.shape) > 1:
+            audio = np.mean(audio, axis=1)
+    except ImportError:
+        logger.warning("soundfile not available, emotion application skipped")
+        raise HTTPException(
+            status_code=503,
+            detail="soundfile required for emotion application",
+        ) from None
+
+    mapped = resolve_emotion_prosody(
+        primary_emotion=req.primary_emotion,
+        primary_intensity=req.primary_intensity,
+        secondary_emotion=req.secondary_emotion,
+        secondary_intensity=req.secondary_intensity,
+    )
+
+    if req.timeline_curve:
+        mapped.warnings.append("timeline_curve_not_applied_in_bounded_slice")
+
+    logger.info(
+        "Emotion %s mapped preset/emotion to prosody pitch=%.4f rate=%.4f volume=%.4f source=%s",
+        transform_context,
+        mapped.pitch,
+        mapped.rate,
+        mapped.volume,
+        mapped.mapping_source,
+    )
+
+    try:
+        transform_result = apply_transform(
+            np.asarray(audio, dtype=np.float64),
+            int(sample_rate),
+            pitch=mapped.pitch,
+            rate=mapped.rate,
+            volume=mapped.volume,
+            context=transform_context,
+        )
+    except ProsodyAuthorityError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message) from e
+
+    diag_raw = dict(transform_result.diagnostics)
+    diag_raw["warnings"] = list(diag_raw.get("warnings", [])) + mapped.warnings
+    diag_raw["skipped_operations"] = list(diag_raw.get("skipped_operations", [])) + list(
+        mapped.skipped_operations
+    )
+    prosody_handling = ProsodyHandlingDiagnostics.model_validate(diag_raw)
+
+    out_id = f"{artifact_id_prefix}{uuid.uuid4().hex[:8]}"
+    output_audio_id, _, _ = create_audio_artifact_from_wav_array(
+        transform_result.audio,
+        int(sample_rate),
+        created_by="emotion",
+        audio_id=out_id,
+    )
+    logger.info(
+        "Emotion %s applied to audio '%s' -> %s action=%s",
+        transform_context,
+        req.audio_id,
+        output_audio_id,
+        prosody_handling.action,
+    )
+    return EmotionApplyExtendedResponseModel(
+        audio_id=output_audio_id,
+        audio_url=f"/api/voice/audio/{output_audio_id}",
+        prosody_handling=prosody_handling,
+        emotion_mapping_source=mapped.mapping_source,
+    )
 
 
 @router.get("/list", response_model=list[str])
@@ -381,31 +514,7 @@ async def apply_extended(req: EmotionApplyExtendedRequest) -> EmotionApplyExtend
 
     Supports primary/secondary emotion blending and timeline curves.
     """
-    # Validate emotions
-    if req.primary_emotion not in AVAILABLE_EMOTIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid primary emotion: {req.primary_emotion}",
-        )
-
-    if req.secondary_emotion and req.secondary_emotion not in AVAILABLE_EMOTIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid secondary emotion: {req.secondary_emotion}",
-        )
-
-    # Validate intensity ranges
-    if not 0.0 <= req.primary_intensity <= 100.0:
-        raise HTTPException(
-            status_code=400,
-            detail="Primary intensity must be between 0 and 100",
-        )
-
-    if not 0.0 <= req.secondary_intensity <= 100.0:
-        raise HTTPException(
-            status_code=400,
-            detail="Secondary intensity must be between 0 and 100",
-        )
+    _validate_emotion_apply_extended_request(req)
 
     logger.info(
         f"Applying emotion to audio: {req.audio_id}, "
@@ -414,89 +523,11 @@ async def apply_extended(req: EmotionApplyExtendedRequest) -> EmotionApplyExtend
     )
 
     try:
-        from backend.services.audio_artifacts import AudioRegistry, create_audio_artifact_from_wav_array
-        from backend.services.emotion_preset_prosody_mapper import resolve_emotion_prosody
-        from backend.services.prosody_authority_service import ProsodyAuthorityError, apply_transform
-        from ..models_additional import ProsodyHandlingDiagnostics
-
-        audio_path = AudioRegistry.get_path(req.audio_id)
-        if not audio_path:
-            raise HTTPException(status_code=404, detail=f"Audio file '{req.audio_id}' not found")
-        if not os.path.exists(audio_path):
-            raise HTTPException(
-                status_code=404, detail=f"Audio file at '{audio_path}' does not exist"
-            )
-
-        try:
-            import soundfile as sf
-
-            audio, sample_rate = sf.read(audio_path)
-            if len(audio.shape) > 1:
-                audio = np.mean(audio, axis=1)
-        except ImportError:
-            logger.warning("soundfile not available, emotion application skipped")
-            raise HTTPException(
-                status_code=503,
-                detail="soundfile required for emotion application",
-            ) from None
-
-        mapped = resolve_emotion_prosody(
-            primary_emotion=req.primary_emotion,
-            primary_intensity=req.primary_intensity,
-            secondary_emotion=req.secondary_emotion,
-            secondary_intensity=req.secondary_intensity,
+        return _run_emotion_apply_extended_pipeline(
+            req,
+            transform_context="emotion_apply_extended",
+            artifact_id_prefix="emotion_",
         )
-
-        if req.timeline_curve:
-            mapped.warnings.append("timeline_curve_not_applied_in_bounded_slice")
-
-        logger.info(
-            "Emotion apply-extended mapped preset/emotion to prosody "
-            "pitch=%.4f rate=%.4f volume=%.4f source=%s",
-            mapped.pitch,
-            mapped.rate,
-            mapped.volume,
-            mapped.mapping_source,
-        )
-
-        try:
-            transform_result = apply_transform(
-                np.asarray(audio, dtype=np.float64),
-                int(sample_rate),
-                pitch=mapped.pitch,
-                rate=mapped.rate,
-                volume=mapped.volume,
-                context="emotion_apply_extended",
-            )
-        except ProsodyAuthorityError as e:
-            raise HTTPException(status_code=e.status_code, detail=e.message) from e
-
-        diag_raw = dict(transform_result.diagnostics)
-        diag_raw["warnings"] = list(diag_raw.get("warnings", [])) + mapped.warnings
-        diag_raw["skipped_operations"] = list(diag_raw.get("skipped_operations", [])) + list(
-            mapped.skipped_operations
-        )
-        prosody_handling = ProsodyHandlingDiagnostics.model_validate(diag_raw)
-
-        output_audio_id, _, _ = create_audio_artifact_from_wav_array(
-            transform_result.audio,
-            int(sample_rate),
-            created_by="emotion",
-            audio_id=f"emotion_{uuid.uuid4().hex[:8]}",
-        )
-        logger.info(
-            "Applied emotion (authority) to audio '%s' -> %s action=%s",
-            req.audio_id,
-            output_audio_id,
-            prosody_handling.action,
-        )
-        return EmotionApplyExtendedResponseModel(
-            audio_id=output_audio_id,
-            audio_url=f"/api/voice/audio/{output_audio_id}",
-            prosody_handling=prosody_handling,
-            emotion_mapping_source=mapped.mapping_source,
-        )
-
     except HTTPException:
         raise
     except Exception as e:
@@ -727,27 +758,35 @@ async def delete_preset(preset_id: str):
 # --- Emotion preview (called by EmotionControlViewModel) ---
 
 
-class EmotionPreviewRequest(BaseModel):
-    """Request to preview emotion-adjusted audio."""
+@router.post("/preview", response_model=EmotionApplyExtendedResponseModel)
+async def preview_emotion(req: EmotionApplyExtendedRequest) -> EmotionApplyExtendedResponseModel:
+    """
+    Preview emotion-adjusted audio using the same canonical path as apply-extended.
 
-    text: str | None = None
-    audio_id: str | None = None
-    emotion: str = "neutral"
-    intensity: float = 0.5
-    blend: dict | None = None
+    Request body matches apply-extended (primary/secondary blend, intensities 0–100).
+    """
+    _validate_emotion_apply_extended_request(req)
 
+    logger.info(
+        "Preview emotion for audio: %s, primary: %s (%.1f%%), secondary: %s (%.1f%%)",
+        req.audio_id,
+        req.primary_emotion,
+        req.primary_intensity,
+        req.secondary_emotion,
+        req.secondary_intensity,
+    )
 
-@router.post("/preview")
-async def preview_emotion(request: EmotionPreviewRequest):
-    """Preview emotion-adjusted audio before applying."""
-    return {
-        "status": "ok",
-        "emotion": request.emotion,
-        "intensity": request.intensity,
-        "audio_url": None,
-        "duration": 0.0,
-        "message": "Preview generated",
-    }
+    try:
+        return _run_emotion_apply_extended_pipeline(
+            req,
+            transform_context="emotion_preview",
+            artifact_id_prefix="emotion_preview_",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to preview emotion: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to preview emotion: {e!s}") from e
 
 
 from backend.services.emotion_service import register_emotion_analyze_handler

@@ -99,9 +99,13 @@ What becomes easier or more difficult to do because of this change?
 | [ADR-041](ADR-041-python-311-runtime.md) | Python 3.11 Runtime | Accepted | 2026-02 |
 | [ADR-042](ADR-042-plugin-installer-consolidation.md) | Plugin Installer Consolidation | Accepted | 2026-02 |
 | [ADR-043](ADR-043-model-lifecycle-strategy.md) | Model Lifecycle Strategy | Accepted | 2026-02-21 |
+| [ADR-044](ADR-044-supply-chain-integrity.md) | Supply-Chain Integrity | Accepted | 2026-02-21 |
+| [ADR-045](ADR-045-orchestrator-architecture.md) | Intelligent Engine Orchestrator Architecture | Accepted | 2026-02-25 |
 | [ADR-046](ADR-046-delete-mediator-cqrs-layer.md) | Delete Mediator/CQRS Layer (B-DELETE) | Accepted | 2026-03-03 |
 | [ADR-047](ADR-047-winui-xamlroot-deferral-pattern.md) | WinUI 3 XamlRoot Deferral Pattern | Accepted | 2026-03-10 |
 | [ADR-048](ADR-048-centralized-request-coordination.md) | Centralized Request Coordination | Accepted | 2026-03-11 |
+| [ADR-049](ADR-049-mcp-integration-strategy.md) | MCP Integration Strategy | Proposed | 2026-02-21 |
+| [ADR-050](ADR-050-sqlite-project-authority-migrations.md) | SQLite Project Authority and Schema Migrations (No Alembic) | Accepted | 2026-03-28 |
 
 ## Status Legend
 

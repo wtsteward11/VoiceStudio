@@ -1,7 +1,7 @@
 # Golden Path Governance Status (GP-01)
 
 > **Purpose:** Explicit governance closure for golden-path real-engine validation gap.  
-> **Related:** [ADR-050](../architecture/decisions/ADR-050-golden-path-ci-deferred-risk.md), [VoiceStudio Completion Plan](VOICESTUDIO_COMPLETION_ROADMAP_V2.md)
+> **Related:** [ADR-050 SQLite authority](../architecture/decisions/ADR-050-sqlite-project-authority-migrations.md), [VoiceStudio Completion Plan](VOICESTUDIO_COMPLETION_ROADMAP_V2.md)
 
 ---
 
@@ -9,7 +9,7 @@
 
 **GP-01 requirement:** Either scheduled real-engine CI validation exists, or an ADR/tracked decision makes the gap explicit and owned.
 
-**Resolution:** [ADR-050: Real-Engine Golden-Path CI Validation Deferred](../architecture/decisions/ADR-050-golden-path-ci-deferred-risk.md) documents the gap, dependencies, and target resolution trigger. Risk is explicitly accepted; no scheduled job.
+**Resolution:** The real-engine golden-path CI validation deferment is documented in this governance status file (no standalone ADR file was created for that deferred-risk decision). ADR-050 was later assigned to SQLite project authority; this document remains the canonical record for GP-01 deferral and revisit triggers.
 
 ---
 

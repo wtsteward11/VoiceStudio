@@ -54,5 +54,5 @@ Revert this lane’s commits; preserve closed GAP-050 mapping + consumer lanes a
 
 ## Changelog
 
-- **2026-04-07:** Row **Closed** — [VOICESTUDIO_GAP050_EMOTION_PRESET_STATE_HYGIENE_AND_PERSISTENCE_LANE_CLOSURE_2026-04-07.md](../reports/verification/VOICESTUDIO_GAP050_EMOTION_PRESET_STATE_HYGIENE_AND_PERSISTENCE_LANE_CLOSURE_2026-04-07.md); Quick `artifacts/verify/20260407_185825/`; rolling **20260407-190416**; full App.Tests **3193** passed / **274** skipped; `pytest tests/ci` **217**; commit `COMMIT_HASH_PLACEHOLDER`.
+- **2026-04-07:** Row **Closed** — [VOICESTUDIO_GAP050_EMOTION_PRESET_STATE_HYGIENE_AND_PERSISTENCE_LANE_CLOSURE_2026-04-07.md](../reports/verification/VOICESTUDIO_GAP050_EMOTION_PRESET_STATE_HYGIENE_AND_PERSISTENCE_LANE_CLOSURE_2026-04-07.md); Quick `artifacts/verify/20260407_185825/`; rolling **20260407-190416**; full App.Tests **3193** passed / **274** skipped; `pytest tests/ci` **217**; commit `e1e5554f`.
 - **2026-04-06:** Row **Frozen** — state hygiene + persistence + single-VM binding.

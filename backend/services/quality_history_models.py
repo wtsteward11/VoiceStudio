@@ -1,7 +1,7 @@
 """
 Pydantic models for quality history (shared by quality routes and batch pipeline).
 
-Separated from backend.api.routes.quality to satisfy route boundary checks.
+Kept in services so route modules do not cross-import each other for this model.
 """
 
 from __future__ import annotations

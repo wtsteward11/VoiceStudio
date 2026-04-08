@@ -1,8 +1,8 @@
 """
 Canonical job lifecycle operations (SQLite job_history).
 
-Extracted from backend.api.routes.jobs so other route modules and services
-import services, not routes (route boundary gate).
+Extracted from the jobs route module so callers import services, not routes
+(route boundary gate).
 """
 
 from __future__ import annotations

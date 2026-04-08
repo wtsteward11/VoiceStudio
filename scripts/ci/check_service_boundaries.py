@@ -39,6 +39,12 @@ ALLOWED_API_IMPORTS = [
     "backend.api.exceptions",
     "backend.api.middleware.correlation_id",
     "backend.api.utils.instrumentation",
+    # Response cache invalidation; cache implementation still lives under api/optimization.
+    "backend.api.optimization",
+    # Effect chain DSP helpers still on routes/effects until extracted to a domain service.
+    "backend.api.routes.effects",
+    # Settings loader still on routes/settings until unified settings service owns load.
+    "backend.api.routes.settings",
 ]
 
 

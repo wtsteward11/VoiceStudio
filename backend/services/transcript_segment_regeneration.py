@@ -44,7 +44,7 @@ async def run_transcript_segment_regeneration_job(
     track_store: Any,
 ) -> None:
     """Execute regeneration for one segment; updates job row on success/failure."""
-    from backend.api.routes.jobs import (
+    from backend.services.canonical_job_lifecycle import (
         complete_job,
         fail_job,
         mark_job_running,

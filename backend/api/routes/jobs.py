@@ -25,6 +25,15 @@ from backend.data.repositories.job_repository import (
 from backend.data.repositories.job_repository import JobStatus as RepoJobStatus
 from backend.data.repositories.job_repository import JobType as RepoJobType
 from backend.data.repository_base import QueryOptions
+from backend.services.canonical_job_lifecycle import (
+    cancel_canonical_job,
+    complete_job,
+    create_job,
+    fail_job,
+    mark_job_running,
+    soft_delete_canonical_job,
+    update_job_progress,
+)
 
 from ..middleware.auth_middleware import require_auth_if_enabled
 from ..optimization import cache_response, invalidate_api_response_cache
@@ -408,104 +417,3 @@ async def clear_completed_jobs(
     deleted_count = await repo.clear_completed()
     _invalidate_jobs_cache()
     return {"success": True, "deleted_count": deleted_count}
-
-
-# === Helper function to create jobs (used by other modules) ===
-
-
-async def create_job(
-    job_id: str,
-    job_type: str,
-    name: str,
-    metadata: dict | None = None,
-    user_id: str | None = None,
-) -> JobEntity:
-    """
-    Create a new job in the database.
-
-    Called by other services to register new jobs.
-    """
-    repo = get_job_repository()
-
-    entity = JobEntity(
-        id=job_id,
-        job_type=job_type,
-        name=name,
-        status=RepoJobStatus.PENDING.value,
-        progress=0.0,
-        metadata="{}" if metadata is None else __import__("json").dumps(metadata),
-        user_id=user_id,
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
-    )
-
-    created = cast(JobEntity, await repo.create(entity))
-    _invalidate_jobs_cache()
-    return created
-
-
-async def update_job_progress(
-    job_id: str,
-    progress: float,
-    current_step: str | None = None,
-    current_step_index: int | None = None,
-) -> JobEntity | None:
-    """Update job progress (does not invalidate full API cache — TTL covers polling)."""
-    repo = get_job_repository()
-    return cast(
-        Optional[JobEntity],
-        await repo.update_progress(job_id, progress, current_step, current_step_index),
-    )
-
-
-async def complete_job(
-    job_id: str,
-    result_path: str | None = None,
-    result_id: str | None = None,
-) -> JobEntity | None:
-    """Mark job as completed."""
-    repo = get_job_repository()
-    entity = cast(
-        Optional[JobEntity],
-        await repo.mark_completed(job_id, result_path, result_id),
-    )
-    _invalidate_jobs_cache()
-    return entity
-
-
-async def fail_job(
-    job_id: str,
-    error: str,
-) -> JobEntity | None:
-    """Mark job as failed."""
-    repo = get_job_repository()
-    entity = cast(Optional[JobEntity], await repo.mark_failed(job_id, error))
-    _invalidate_jobs_cache()
-    return entity
-
-
-async def mark_job_running(job_id: str) -> JobEntity | None:
-    """Mark a pending job as running (canonical store)."""
-    repo = get_job_repository()
-    entity = cast(Optional[JobEntity], await repo.mark_started(job_id))
-    _invalidate_jobs_cache()
-    return entity
-
-
-async def cancel_canonical_job(job_id: str) -> JobEntity | None:
-    """Mark a job cancelled in the canonical store (used by adapters e.g. batch)."""
-    repo = get_job_repository()
-    entity = cast(Optional[JobEntity], await repo.mark_cancelled(job_id))
-    _invalidate_jobs_cache()
-    return entity
-
-
-async def soft_delete_canonical_job(job_id: str) -> bool:
-    """Soft-delete a job row if present (e.g. when a domain-specific job is removed)."""
-    repo = get_job_repository()
-    existing = await repo.get_by_id(job_id)
-    if not existing:
-        return False
-    await repo.delete(job_id, soft=True)
-    _invalidate_jobs_cache()
-    return True

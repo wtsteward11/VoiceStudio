@@ -20,6 +20,7 @@ from backend.core.security.file_validation import (
     validate_audio_file,
 )
 from backend.ml.models.engine_service import get_engine_service
+from backend.services.quality_history_models import QualityHistoryEntry
 
 from ..optimization import cache_response
 
@@ -120,21 +121,7 @@ class BenchmarkResponse(BaseModel):
     benchmark_id: str | None = None  # For tracking historical benchmarks
 
 
-# Quality History Models
-class QualityHistoryEntry(BaseModel):
-    """Quality history entry for a voice profile."""
-
-    id: str
-    profile_id: str
-    project_id: str | None = None  # Project ID for filtering (B.1 enhancement)
-    timestamp: str  # ISO format datetime string
-    engine: str
-    metrics: dict[str, Any]
-    quality_score: float
-    synthesis_text: str | None = None
-    audio_url: str | None = None
-    enhanced_quality: bool = False
-    metadata: dict[str, Any] | None = None
+# Quality History Models (QualityHistoryEntry lives in backend.services.quality_history_models)
 
 
 class QualityHistoryRequest(BaseModel):

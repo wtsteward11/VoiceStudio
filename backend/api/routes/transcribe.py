@@ -300,7 +300,7 @@ async def start_regenerate_segment(
     track_store: TrackStoreDep,
 ):
     """GAP-046: queue single-segment regeneration (canonical job + synthesis pipeline)."""
-    from backend.api.routes.jobs import create_job
+    from backend.services.canonical_job_lifecycle import create_job
     from backend.services.transcript_segment_regeneration import (
         run_transcript_segment_regeneration_job,
     )

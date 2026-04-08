@@ -69,7 +69,7 @@ async def _canonical_register_batch_job(
     language: str,
 ) -> None:
     """Register batch job in canonical SQLite job_history via /api/jobs helpers."""
-    from backend.api.routes.jobs import create_job
+    from backend.services.canonical_job_lifecycle import create_job
     from backend.data.repositories.job_repository import JobType as CanonicalJobType
 
     metadata = {
@@ -93,7 +93,7 @@ async def _canonical_batch_progress(
     message: str | None,
 ) -> None:
     """Best-effort progress sync to job_history (no full API cache invalidation)."""
-    from backend.api.routes.jobs import update_job_progress
+    from backend.services.canonical_job_lifecycle import update_job_progress
 
     try:
         await update_job_progress(job_id, progress, message)
@@ -103,7 +103,7 @@ async def _canonical_batch_progress(
 
 async def _canonical_batch_fail(job_id: str, error: str) -> None:
     """Mark canonical job failed (invalidates jobs API cache)."""
-    from backend.api.routes.jobs import fail_job
+    from backend.services.canonical_job_lifecycle import fail_job
 
     try:
         await fail_job(job_id, error)
@@ -118,7 +118,7 @@ async def _canonical_batch_complete(
     result_id: str | None,
 ) -> None:
     """Mark canonical job completed."""
-    from backend.api.routes.jobs import complete_job
+    from backend.services.canonical_job_lifecycle import complete_job
 
     try:
         await complete_job(job_id, result_path=result_path, result_id=result_id)
@@ -449,7 +449,7 @@ async def delete_batch_job(job_id: str):
         if job_id in _processing_jobs:
             _processing_jobs.remove(job_id)
 
-        from backend.api.routes.jobs import soft_delete_canonical_job
+        from backend.services.canonical_job_lifecycle import soft_delete_canonical_job
 
         try:
             await soft_delete_canonical_job(job_id)
@@ -512,7 +512,7 @@ async def start_batch_job(
         if job_id in _job_queue:
             _job_queue.remove(job_id)
 
-        from backend.api.routes.jobs import mark_job_running
+        from backend.services.canonical_job_lifecycle import mark_job_running
 
         try:
             await mark_job_running(job_id)
@@ -581,7 +581,7 @@ async def cancel_batch_job(job_id: str):
         _batch_jobs[job_id] = job_data
         _persist_batch_job(job_id, job_data)
 
-        from backend.api.routes.jobs import cancel_canonical_job
+        from backend.services.canonical_job_lifecycle import cancel_canonical_job
 
         try:
             await cancel_canonical_job(job_id)
@@ -647,7 +647,7 @@ def _store_batch_quality_history(
     """GAP-030: store quality metrics from a completed batch job into the quality history service."""
     from datetime import timezone
 
-    from backend.api.routes.quality import QualityHistoryEntry
+    from backend.services.quality_history_models import QualityHistoryEntry
     from backend.services.quality_history_service import store_entry
 
     profile_id = job_data.get("voice_profile_id") or "unknown"

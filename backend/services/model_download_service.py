@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from backend.api.routes.jobs import (
+from backend.services.canonical_job_lifecycle import (
     complete_job,
     fail_job,
     mark_job_running,

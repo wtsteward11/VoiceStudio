@@ -10,7 +10,7 @@ from backend.api.models_additional import (
     VoiceSynthesizeRequest,
     VoiceSynthesizeResponse,
 )
-from backend.api.routes.voice._shared import router
+from ._shared import router
 from backend.core.exceptions import ServiceError
 from backend.services.synthesis_service import SynthesisService
 

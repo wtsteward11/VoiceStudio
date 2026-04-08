@@ -57,7 +57,7 @@ async def ab_test(request: ABTestRequest, http_request: Request) -> ABTestRespon
             engine_name: str, emotion: str | None, enhance_quality: bool, label: str
         ) -> ABTestResult:
             """Synthesize one sample for A/B test."""
-            from backend.services.voice_synthesis_service import synthesize
+            from backend.services.synthesis_service import SynthesisService
 
             # Create synthesis request
             synth_req = VoiceSynthesizeRequest(
@@ -69,8 +69,10 @@ async def ab_test(request: ABTestRequest, http_request: Request) -> ABTestRespon
                 enhance_quality=enhance_quality,
             )
 
-            # Synthesize using existing endpoint logic
-            result = await synthesize(synth_req, http_request, config_service=None)
+            # Synthesize using canonical service
+            result = await SynthesisService.synthesize(
+                synth_req, http_request, config_service=None
+            )
 
             return ABTestResult(
                 sample_label=label,

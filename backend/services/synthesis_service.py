@@ -8,10 +8,12 @@ Policy, provenance, and usage are enforced in the synthesis flow.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import tempfile
 import uuid
+import wave
 from pathlib import Path
 from typing import Any
 
@@ -589,6 +591,16 @@ class SynthesisService:
                                 synthesis_kwargs["quality_preset"] = quality_preset
                             if ssml_policy.pass_ssml_to_engine:
                                 synthesis_kwargs["ssml"] = True
+                            if req.speed is not None:
+                                synthesis_kwargs["speed"] = req.speed
+                            if req.pitch is not None:
+                                synthesis_kwargs["pitch"] = req.pitch
+                            if req.stability is not None:
+                                synthesis_kwargs["stability"] = req.stability
+                            if req.clarity is not None:
+                                synthesis_kwargs["clarity"] = req.clarity
+                            if req.temperature is not None:
+                                synthesis_kwargs["temperature"] = req.temperature
 
                             result = None
                             synthesis_error: Exception | None = None
@@ -795,3 +807,422 @@ class SynthesisService:
                     ),
                 )
                 raise ServiceError(500, f"Synthesis failed: {e!s}")
+
+    @staticmethod
+    async def synthesize_multipass(
+        req: Any,
+        request: Any,
+        config_service: Any = None,
+    ) -> Any:
+        """Multi-pass synthesis; each pass delegates to synthesize()."""
+        from backend.api.models_additional import (
+            MultiPassSynthesisResponse,
+            PassResult,
+            QualityMetrics,
+            VoiceSynthesizeRequest,
+        )
+        from backend.services.engine_shared import (
+            ENGINE_AVAILABLE,
+            _ensure_engine_router,
+            engine_router,
+        )
+
+        _ensure_engine_router()
+        if not ENGINE_AVAILABLE or not engine_router:
+            raise ServiceError(
+                503,
+                "Engine router not available for multi-pass synthesis",
+            )
+
+        valid_engines = engine_router.list_engines()
+        requested_engine = req.engine
+        engine_id = normalize_engine_id(requested_engine)
+        if engine_id not in valid_engines:
+            raise ServiceError(
+                400,
+                f"Invalid engine '{requested_engine}'. Available: {', '.join(valid_engines)}",
+            )
+
+        if engine_router.get_engine(engine_id) is None:
+            raise ServiceError(
+                503,
+                f"Engine '{requested_engine}' is not available or failed to initialize",
+            )
+
+        min_improvement = (
+            req.min_quality_improvement
+            if req.min_quality_improvement is not None
+            else 0.02
+        )
+        if req.pass_preset == "naturalness_focus":
+            min_improvement = 0.02
+        elif req.pass_preset == "similarity_focus":
+            min_improvement = 0.01
+        elif req.pass_preset == "artifact_focus":
+            min_improvement = 0.03
+
+        adaptive = True if req.adaptive is None else bool(req.adaptive)
+
+        passes: list[Any] = []
+        improvement_tracking: list[float] = []
+        best_pass = 0
+        best_quality = 0.0
+        previous_quality = 0.0
+        max_passes = req.max_passes or 3
+
+        for pass_num in range(1, max_passes + 1):
+            logger.info("Multi-pass synthesis: Pass %s/%s", pass_num, max_passes)
+            synth_req = VoiceSynthesizeRequest(
+                engine=engine_id,
+                profile_id=req.profile_id,
+                text=req.text,
+                language=req.language,
+                emotion=req.emotion,
+                enhance_quality=True,
+                consent_id=getattr(req, "consent_id", None),
+            )
+            synth_response = await SynthesisService.synthesize(
+                synth_req, request, config_service
+            )
+
+            if not synth_response.quality_metrics:
+                quality_score = synth_response.quality_score
+                quality_metrics = QualityMetrics(
+                    mos_score=quality_score * 5.0 if quality_score <= 1.0 else None,
+                    similarity=quality_score if quality_score <= 1.0 else None,
+                )
+            else:
+                quality_metrics = synth_response.quality_metrics
+                quality_score = synth_response.quality_score
+
+            improvement = 0.0
+            if pass_num > 1:
+                improvement = quality_score - previous_quality
+
+            pass_result = PassResult(
+                pass_number=pass_num,
+                audio_id=synth_response.audio_id,
+                audio_url=synth_response.audio_url,
+                quality_metrics=quality_metrics,
+                quality_score=quality_score,
+                improvement=improvement if pass_num > 1 else None,
+            )
+            passes.append(pass_result)
+            improvement_tracking.append(improvement if pass_num > 1 else 0.0)
+
+            if quality_score > best_quality:
+                best_quality = quality_score
+                best_pass = pass_num
+
+            if adaptive and pass_num > 1 and improvement < min_improvement:
+                logger.info(
+                    "Multi-pass synthesis: Stopping early at pass %s "
+                    "(improvement %.4f < %s)",
+                    pass_num,
+                    improvement,
+                    min_improvement,
+                )
+                break
+
+            previous_quality = quality_score
+
+        best_pass_result = passes[best_pass - 1]
+
+        from backend.services.audio_path_resolver import resolve_audio_path
+
+        best_audio_path = resolve_audio_path(best_pass_result.audio_id)
+        duration = 2.5
+        if best_audio_path and os.path.exists(best_audio_path):
+            try:
+                with wave.open(best_audio_path, "rb") as wav_file:
+                    frames = wav_file.getnframes()
+                    sample_rate = wav_file.getframerate()
+                    duration = frames / float(sample_rate)
+            except (wave.Error, OSError) as wav_err:
+                logger.debug(
+                    "Could not read duration from %s: %s", best_audio_path, wav_err
+                )
+
+        return MultiPassSynthesisResponse(
+            audio_id=best_pass_result.audio_id,
+            audio_url=best_pass_result.audio_url,
+            duration=duration,
+            quality_score=best_pass_result.quality_score,
+            quality_metrics=best_pass_result.quality_metrics,
+            passes_completed=len(passes),
+            passes=passes,
+            best_pass=best_pass,
+            improvement_tracking=improvement_tracking,
+        )
+
+    @staticmethod
+    async def synthesize_with_style(
+        *,
+        _request: Any,
+        text: str,
+        profile_id: str,
+        engine: str = "openvoice",
+        language: str = "en",
+        emotion: str | None = None,
+        accent: str | None = None,
+        rhythm: float | None = None,
+        pauses: str | None = None,
+        pitch_shift: float | None = None,
+        pitch_variance: float | None = None,
+        energy: float | None = None,
+        enhance_quality: bool = True,
+        calculate_quality: bool = True,
+    ) -> Any:
+        """OpenVoice style-controlled synthesis (canonical service path)."""
+        from backend.api.models_additional import QualityMetrics, VoiceSynthesizeResponse
+        from backend.services.engine_shared import (
+            ENGINE_AVAILABLE,
+            _ensure_engine_router,
+            engine_router,
+        )
+        from backend.services.profile_service import resolve_reference_audio_path
+
+        if os.environ.get("VOICESTUDIO_DEMO_MODE", "").strip().lower() in (
+            "true",
+            "1",
+            "yes",
+        ):
+            raise ServiceError(403, "Style synthesis disabled in demo mode.")
+
+        _ensure_engine_router()
+        if not ENGINE_AVAILABLE or not engine_router:
+            raise ServiceError(503, "Engine router not available")
+
+        if engine != "openvoice":
+            raise ServiceError(
+                400,
+                "Style control is currently only supported for OpenVoice engine",
+            )
+
+        engine_instance = engine_router.get_engine(engine)
+        if engine_instance is None:
+            raise ServiceError(503, f"Engine '{engine}' is not available")
+
+        if not hasattr(engine_instance, "synthesize_with_style"):
+            raise ServiceError(400, "Engine does not support style control")
+
+        pause_list = None
+        pause_positions = None
+        if pauses:
+            try:
+                pause_data = json.loads(pauses)
+                if isinstance(pause_data, list):
+                    pause_list = pause_data
+                elif isinstance(pause_data, dict):
+                    pause_list = pause_data.get("durations", [])
+                    pause_positions = pause_data.get("positions", [0.3, 0.7])
+            except json.JSONDecodeError:
+                logger.warning("Invalid pauses JSON: %s", pauses)
+
+        intonation: dict[str, float] = {}
+        if pitch_shift is not None:
+            intonation["pitch_shift"] = pitch_shift
+        if pitch_variance is not None:
+            intonation["pitch_variance"] = pitch_variance
+        if energy is not None:
+            intonation["energy"] = energy
+
+        profile_audio_path = resolve_reference_audio_path(profile_id)
+        if not profile_audio_path.exists():
+            raise ServiceError(404, f"Profile audio not found: {profile_id}")
+        profile_audio_str = str(profile_audio_path)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            output_path = tmp.name
+        try:
+            engine_instance.synthesize_with_style(
+                text=text,
+                speaker_wav=profile_audio_str,
+                language=language,
+                emotion=emotion,
+                accent=accent,
+                rhythm=rhythm,
+                pauses=pause_list,
+                intonation=intonation if intonation else None,
+                output_path=output_path,
+                pause_positions=pause_positions,
+            )
+
+            quality_metrics = None
+            if calculate_quality:
+                try:
+                    from backend.ml.models.engine_service import get_engine_service
+
+                    svc = get_engine_service()
+                    import soundfile as sf
+
+                    audio_array, sr = sf.read(output_path)
+                    metrics = svc.calculate_all_metrics(audio_array, sr)
+                    quality_metrics = QualityMetrics(
+                        mos_score=metrics.get("mos_score"),
+                        similarity=metrics.get("similarity"),
+                        naturalness=metrics.get("naturalness"),
+                        snr_db=metrics.get("snr_db"),
+                    )
+                except Exception as e:
+                    logger.warning("Quality calculation failed: %s", e)
+
+            try:
+                with wave.open(output_path, "rb") as wav_file:
+                    frames = wav_file.getnframes()
+                    sample_rate = wav_file.getframerate()
+                    duration = frames / float(sample_rate)
+            except (wave.Error, OSError) as wav_err:
+                logger.debug("Could not read duration from %s: %s", output_path, wav_err)
+                duration = 2.5
+
+            audio_id, _, _ = create_audio_artifact_from_file(
+                output_path,
+                created_by="style",
+                project_id=None,
+                source="style_transfer",
+            )
+
+            return VoiceSynthesizeResponse(
+                audio_id=audio_id,
+                audio_url=f"/api/voice/audio/{audio_id}",
+                duration=duration,
+                quality_score=0.85,
+                quality_metrics=quality_metrics,
+            )
+        finally:
+            if os.path.exists(output_path):
+                try:
+                    os.unlink(output_path)
+                except OSError as unlink_err:
+                    logger.debug(
+                        "Could not remove temp style output %s: %s",
+                        output_path,
+                        unlink_err,
+                    )
+
+    @staticmethod
+    async def synthesize_cross_lingual(
+        *,
+        _request: Any,
+        text: str,
+        profile_id: str,
+        source_language: str = "en",
+        target_language: str = "es",
+        engine: str = "openvoice",
+        enhance_quality: bool = True,
+        calculate_quality: bool = True,
+    ) -> Any:
+        """OpenVoice cross-lingual synthesis (canonical service path)."""
+        from backend.api.models_additional import QualityMetrics, VoiceSynthesizeResponse
+        from backend.services.engine_shared import (
+            ENGINE_AVAILABLE,
+            _ensure_engine_router,
+            engine_router,
+        )
+        from backend.services.profile_service import resolve_reference_audio_path
+
+        _ = enhance_quality  # reserved for future engine kwargs parity
+
+        if os.environ.get("VOICESTUDIO_DEMO_MODE", "").strip().lower() in (
+            "true",
+            "1",
+            "yes",
+        ):
+            raise ServiceError(
+                403,
+                "Cross-lingual synthesis disabled in demo mode.",
+            )
+
+        _ensure_engine_router()
+        if not ENGINE_AVAILABLE or not engine_router:
+            raise ServiceError(503, "Engine router not available")
+
+        if engine != "openvoice":
+            raise ServiceError(
+                400,
+                "Cross-lingual cloning is currently only supported for OpenVoice engine",
+            )
+
+        engine_instance = engine_router.get_engine(engine)
+        if engine_instance is None:
+            raise ServiceError(503, f"Engine '{engine}' is not available")
+
+        if not hasattr(engine_instance, "synthesize_cross_lingual"):
+            raise ServiceError(
+                400,
+                "Engine does not support cross-lingual cloning",
+            )
+
+        profile_audio_path = resolve_reference_audio_path(profile_id)
+        if not profile_audio_path.exists():
+            raise ServiceError(404, f"Profile audio not found: {profile_id}")
+        profile_audio_str = str(profile_audio_path)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            output_path = tmp.name
+        try:
+            audio = engine_instance.synthesize_cross_lingual(
+                text=text,
+                speaker_wav=profile_audio_str,
+                source_language=source_language,
+                target_language=target_language,
+                output_path=output_path,
+            )
+
+            if audio is None:
+                raise ServiceError(500, "Cross-lingual synthesis failed")
+
+            try:
+                with wave.open(output_path, "rb") as wav_file:
+                    frames = wav_file.getnframes()
+                    sample_rate = wav_file.getframerate()
+                    duration = frames / float(sample_rate)
+            except (wave.Error, OSError) as wav_err:
+                logger.debug(
+                    "Could not read duration from %s: %s", output_path, wav_err
+                )
+                duration = 2.5
+
+            quality_metrics_obj = None
+            if calculate_quality:
+                try:
+                    from backend.ml.models.engine_service import get_engine_service
+
+                    svc = get_engine_service()
+                    import soundfile as sf
+
+                    audio_array, sr = sf.read(output_path)
+                    metrics = svc.calculate_all_metrics(audio_array, sr)
+                    quality_metrics_obj = QualityMetrics(
+                        mos_score=metrics.get("mos_score"),
+                        similarity=metrics.get("similarity"),
+                        naturalness=metrics.get("naturalness"),
+                        snr_db=metrics.get("snr_db"),
+                    )
+                except Exception as e:
+                    logger.warning("Quality calculation failed: %s", e)
+
+            audio_id, _cached_path, _meta = create_audio_artifact_from_file(
+                output_path,
+                created_by="cross_lingual",
+                delete_source=True,
+            )
+
+            return VoiceSynthesizeResponse(
+                audio_id=audio_id,
+                audio_url=f"/api/voice/audio/{audio_id}",
+                duration=duration,
+                quality_score=0.85,
+                quality_metrics=quality_metrics_obj,
+            )
+        finally:
+            if os.path.exists(output_path):
+                try:
+                    os.unlink(output_path)
+                except OSError as unlink_err:
+                    logger.debug(
+                        "Could not remove temp cross-lingual output %s: %s",
+                        output_path,
+                        unlink_err,
+                    )

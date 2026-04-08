@@ -92,7 +92,7 @@
         <ListView.ItemTemplate>
           <DataTemplate x:DataType="core:TrainingStatus" xmlns:core="using:VoiceStudio.Core.Models">
             <StackPanel Padding="6">
-              <TextBlock Text="{x:Bind Status}" FontWeight="SemiBold" />
+              <TextBlock Text="{x:Bind StatusDisplay}" FontWeight="SemiBold" />
               <TextBlock
                 Text="{x:Bind Progress, Mode=OneWay, Converter={StaticResource PercentFormatConverter}}"
                 Opacity="0.7" FontSize="11" />

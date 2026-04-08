@@ -267,6 +267,58 @@ namespace VoiceStudio.App.Tests.ViewModels
       }
     }
 
+    /// <summary>GAP-024: simulation terminal state must not publish profile trained events (polling path).</summary>
+    [TestMethod]
+    public void Gap024_PollingSimulationComplete_DoesNotPublishProfileEvents()
+    {
+      var vm = new TrainingViewModel(_context, _mockTrainingClient.Object);
+      try
+      {
+        var eventCount = 0;
+        var agg = AppServices.TryGetEventAggregator();
+        Assert.IsNotNull(agg);
+        using var _ = agg.Subscribe<ProfileCreatedEvent>(_ => eventCount++);
+        using var __ = agg.Subscribe<ProfileUpdatedEvent>(_ => eventCount++);
+
+        var status = new TrainingStatus
+        {
+          Id = "job-sim",
+          Status = "simulation_complete",
+          ProfileId = "prof-sim",
+          Engine = "xtts",
+          SimulationMode = true,
+        };
+        vm.SeamTryPublishPollingTrainingCompletion(status);
+
+        Assert.AreEqual(0, eventCount);
+      }
+      finally
+      {
+        vm.Dispose();
+      }
+    }
+
+    /// <summary>GAP-024: helpers distinguish real completion from simulation.</summary>
+    [TestMethod]
+    public void Gap024_IsRealTrainingCompletion_ExcludesSimulation()
+    {
+      Assert.IsFalse(TrainingViewModel.IsRealTrainingCompletion(new TrainingStatus
+      {
+        Status = "simulation_complete",
+        SimulationMode = true,
+      }));
+      Assert.IsFalse(TrainingViewModel.IsRealTrainingCompletion(new TrainingStatus
+      {
+        Status = "completed",
+        SimulationMode = true,
+      }));
+      Assert.IsTrue(TrainingViewModel.IsRealTrainingCompletion(new TrainingStatus
+      {
+        Status = "completed",
+        SimulationMode = false,
+      }));
+    }
+
     /// <summary>GAP-028: seam helper emits both events (shared path with WebSocket completion).</summary>
     [TestMethod]
     public void Gap028_SeamPublishTrainingCompletedProfileEvents_EmitsCreatedAndUpdated()

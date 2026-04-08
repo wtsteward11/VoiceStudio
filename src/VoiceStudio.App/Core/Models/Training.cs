@@ -59,6 +59,18 @@ namespace VoiceStudio.Core.Models
     // Simulation mode (MED-1: backend returns when training runs in simulation)
     public bool SimulationMode { get; set; }
     public string? SimulationReason { get; set; }
+
+    /// <summary>GAP-024: Friendly label for job list — simulation runs are not real completions.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string StatusDisplay
+    {
+      get
+      {
+        if (SimulationMode || string.Equals(Status, "simulation_complete", StringComparison.OrdinalIgnoreCase))
+          return "Simulation complete (no trained model)";
+        return Status;
+      }
+    }
   }
 
   /// <summary>

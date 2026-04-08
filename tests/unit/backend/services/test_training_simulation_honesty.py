@@ -93,3 +93,15 @@ async def test_real_path_sets_completed_status(tmp_path, monkeypatch):
 
     assert ts._training_jobs_store[key]["status"] == "completed"
     assert ts._training_jobs_store[key].get("simulation_mode") is not True
+
+
+def test_export_trained_model_rejects_simulation_status():
+    tid = "sim-export-blocked"
+    key = f"training_{tid}"
+    ts._training_jobs_store[key] = {
+        "status": ts.SIMULATION_STATUS,
+        "output_path": "/tmp/fake",
+        "dataset_id": "d1",
+        "profile_id": "p1",
+    }
+    assert ts.export_trained_model(tid, profile_id="p1") is None

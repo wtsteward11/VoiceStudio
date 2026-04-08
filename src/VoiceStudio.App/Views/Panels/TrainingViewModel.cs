@@ -49,6 +49,28 @@ namespace VoiceStudio.App.Views.Panels
     /// <summary>GAP-028: avoid duplicate ProfileCreated/ProfileUpdated publishes when polling re-reads the same completed job.</summary>
     private string? _lastPublishedCompletedTrainingJobId;
 
+    /// <summary>GAP-024: True when the job is a real trained-model completion (not simulation terminal state).</summary>
+    public static bool IsRealTrainingCompletion(TrainingStatus? job)
+    {
+      if (job == null)
+        return false;
+      if (job.SimulationMode)
+        return false;
+      if (string.Equals(job.Status, "simulation_complete", StringComparison.OrdinalIgnoreCase))
+        return false;
+      return string.Equals(job.Status, "completed", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>GAP-024: Simulation finished — must not be treated as production training completion.</summary>
+    public static bool IsSimulationTerminal(TrainingStatus? job)
+    {
+      if (job == null)
+        return false;
+      if (job.SimulationMode)
+        return true;
+      return string.Equals(job.Status, "simulation_complete", StringComparison.OrdinalIgnoreCase);
+    }
+
     public string PanelId => PanelIds.Training;
     public string DisplayName => ResourceHelper.GetString("Panel.Training.DisplayName", "Training");
     public PanelRegion Region => PanelRegion.Bottom;
@@ -999,17 +1021,21 @@ namespace VoiceStudio.App.Views.Panels
 
       Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()?.TryEnqueue(async () =>
       {
-        var job = TrainingJobs.FirstOrDefault(j => j.Id == update.JobId);
-        if (job != null)
-        {
-          job.Status = "completed";
-          job.Progress = 1.0;
-          OnPropertyChanged(nameof(TrainingJobs));
-          
-          // Show success notification
-          _toastNotificationService?.ShowSuccess($"Training job completed successfully");
+        // GAP-024: Reload canonical job state first — WebSocket completion does not encode simulation vs real training.
+        await LoadTrainingJobsAsync(_disposalCts.Token);
+        await LoadLogsAsync(_disposalCts.Token);
 
-          // GAP-B05 / GAP-028: cross-panel profile list + metadata refresh (skip if polling path already published)
+        var job = TrainingJobs.FirstOrDefault(j => j.Id == update.JobId);
+        if (job == null)
+          return;
+
+        OnPropertyChanged(nameof(TrainingJobs));
+
+        if (IsRealTrainingCompletion(job))
+        {
+          _toastNotificationService?.ShowSuccess(
+            ResourceHelper.GetString("Training.JobCompletedSuccess", "Training job completed successfully"));
+
           if (!string.IsNullOrEmpty(job.ProfileId) && _eventAggregator != null
               && job.Id != _lastPublishedCompletedTrainingJobId)
           {
@@ -1018,22 +1044,26 @@ namespace VoiceStudio.App.Views.Panels
             System.Diagnostics.Debug.WriteLine(
               $"[TrainingViewModel] Published training completion profile events: {job.ProfileId}");
           }
+
+          var osCompletion = AppServices.TryGetCompletionOsNotificationService();
+          var trainingBody = CompletionOsNotificationMessages.Shorten($"{job.Engine} · {job.ProfileId}");
+          osCompletion?.TryNotifyTerminalCompletion(
+              CompletionOsNotificationCategory.Training,
+              update.JobId,
+              true,
+              CompletionOsNotificationMessages.TrainingCompleteTitle,
+              trainingBody);
+          return;
         }
 
-        var osCompletion = AppServices.TryGetCompletionOsNotificationService();
-        var trainingBody = job != null
-            ? CompletionOsNotificationMessages.Shorten($"{job.Engine} · {job.ProfileId}")
-            : CompletionOsNotificationMessages.Shorten("Training job completed");
-        osCompletion?.TryNotifyTerminalCompletion(
-            CompletionOsNotificationCategory.Training,
-            update.JobId,
-            true,
-            CompletionOsNotificationMessages.TrainingCompleteTitle,
-            trainingBody);
-
-        // GAP-I15: Refresh logs and jobs to get final state using disposal token
-        await LoadLogsAsync(_disposalCts.Token);
-        await LoadTrainingJobsAsync(_disposalCts.Token);
+        if (IsSimulationTerminal(job))
+        {
+          _toastNotificationService?.ShowInfo(
+            ResourceHelper.GetString(
+              "Training.SimulationFinishedToast",
+              "Training simulation finished. No trained model was produced."),
+            ResourceHelper.GetString("Training.SimulationFinishedTitle", "Simulation complete"));
+        }
       });
     }
 
@@ -1071,6 +1101,8 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (_eventAggregator == null || string.IsNullOrEmpty(job.ProfileId))
         return;
+      if (!IsRealTrainingCompletion(job))
+        return;
 
       var profileName = $"Trained Profile ({job.Engine})";
       _eventAggregator.Publish(new ProfileCreatedEvent(PanelId, job.ProfileId, profileName));
@@ -1089,7 +1121,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (_eventAggregator == null || string.IsNullOrEmpty(updatedStatus.ProfileId))
         return;
-      if (!string.Equals(updatedStatus.Status, "completed", StringComparison.OrdinalIgnoreCase))
+      if (!IsRealTrainingCompletion(updatedStatus))
         return;
       if (updatedStatus.Id == _lastPublishedCompletedTrainingJobId)
         return;

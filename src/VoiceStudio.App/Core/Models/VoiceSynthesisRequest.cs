@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace VoiceStudio.Core.Models
 {
@@ -26,6 +27,20 @@ namespace VoiceStudio.Core.Models
     public QualityMetrics? QualityMetrics { get; set; } // Detailed quality metrics
     /// <summary>GAP-054: Present when SSML was detected or transformed.</summary>
     public SsmlHandlingDiagnostics? SsmlHandling { get; set; }
+
+    /// <summary>GAP-050 consumer: prosody authority outcome after preset apply-extended.</summary>
+    [JsonPropertyName("prosody_handling")]
+    public ProsodyHandlingDiagnosticsDto? ProsodyHandling { get; set; }
+
+    /// <summary>GAP-050: mapping lane from emotion mapper (e.g. canonical_preset).</summary>
+    [JsonPropertyName("emotion_mapping_source")]
+    public string EmotionMappingSource { get; set; } = string.Empty;
+
+    /// <summary>
+    /// When base synthesis succeeded but apply-extended failed or returned null; base audio ids remain valid.
+    /// </summary>
+    [JsonPropertyName("emotion_preset_apply_failure_message")]
+    public string? EmotionPresetApplyFailureMessage { get; set; }
   }
 
   public class VoiceAnalysisResponse

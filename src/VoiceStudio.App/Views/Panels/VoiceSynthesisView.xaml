@@ -3,7 +3,7 @@
   
   AI GUIDELINES:
   - ViewModel is in VoiceStudio.App.Views.Panels (not ViewModels)
-  - Use {x:Bind ViewModel.Property, Mode=OneWay/TwoWay} for all bindings
+  - Use {x:Bind ViewModel.Property} with x:DataType local:VoiceSynthesisView; ViewModel mirrors DataContext (single VM)
   - Engine selection ComboBox drives available voice options
   - SynthesizeCommand is async with built-in cancellation support
   - DO NOT modify the output audio player controls without updating IMediaPlayerService
@@ -17,8 +17,8 @@
   xmlns:controls="using:VoiceStudio.App.Controls"
   xmlns:local="using:VoiceStudio.App.Views.Panels"
   mc:Ignorable="d"
-  d:DataContext="{d:DesignInstance Type=local:VoiceSynthesisViewModel, IsDesignTimeCreatable=False}"
-  x:DataType="local:VoiceSynthesisViewModel">
+  d:DataContext="{d:DesignInstance Type=local:VoiceSynthesisView, IsDesignTimeCreatable=False}"
+  x:DataType="local:VoiceSynthesisView">
   
   <Grid AutomationProperties.AutomationId="VoiceSynthesisView_Root" Padding="16"
         AllowDrop="True"
@@ -224,12 +224,8 @@
                     Visibility="{x:Bind ViewModel.IsStreaming, Mode=OneWay}" Margin="0,0,8,0"/>
           <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StreamingStatus, Mode=OneWay}" 
                      FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" VerticalAlignment="Center"/>
-          <TextBlock Grid.Column="2" FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" VerticalAlignment="Center">
-            <Run Text="Chunks: "/>
-            <Run Text="{x:Bind ViewModel.StreamingReceivedChunks, Mode=OneWay}"/>
-            <Run Text=" / Buffered: "/>
-            <Run Text="{x:Bind ViewModel.StreamingBufferedChunks, Mode=OneWay}"/>
-          </TextBlock>
+          <TextBlock Grid.Column="2" FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" VerticalAlignment="Center"
+                     Text="{x:Bind ViewModel.StreamingChunksSummary, Mode=OneWay}"/>
         </Grid>
       </StackPanel>
     </Border>

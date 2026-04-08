@@ -34,7 +34,7 @@ namespace VoiceStudio.App.Views.Panels
   }
 
   // GAP-005: Updated to inherit from BaseViewModel for standardized error handling
-  public partial class VoiceSynthesisViewModel : BaseViewModel, IPanelView, IPanelLifecycle
+  public partial class VoiceSynthesisViewModel : BaseViewModel, IPanelView, IPanelLifecycle, IPanelStatePersistable
   {
     public string PanelId => PanelIds.VoiceSynthesis;
     public string DisplayName => ResourceHelper.GetString("Panel.VoiceSynthesis.DisplayName", "Voice Synthesis");
@@ -65,6 +65,20 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IEventAggregator? _eventAggregator;
     private ISubscriptionToken? _profileSelectedToken;
 
+    /// <summary>GAP-050 hygiene: last bound profile id for detecting cross-profile switches.</summary>
+    private string? _lastNonNullProfileIdForEmotionHygiene;
+
+    /// <summary>While true, profile changes from panel restore do not clear emotion preset.</summary>
+    private bool _suppressEmotionClearForPanelRestore;
+
+    private string? _pendingRestoreProfileId;
+    private string? _pendingRestoreEngine;
+    private bool _pendingRestoreHasEmotionKey;
+    private string? _pendingRestoreEmotionRaw;
+
+    private const string CustomKeyEmotionPreset = "VoiceSynthesis_EmotionPreset";
+    private const string CustomKeySelectedEngine = "VoiceSynthesis_SelectedEngine";
+
     [ObservableProperty]
     private ObservableCollection<VoiceProfile> profiles = new();
 
@@ -93,10 +107,16 @@ namespace VoiceStudio.App.Views.Panels
     private bool isStreaming;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StreamingChunksSummary))]
     private int streamingBufferedChunks;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StreamingChunksSummary))]
     private int streamingReceivedChunks;
+
+    /// <summary>Single-line streaming chunk line for XAML (avoids x:Bind on Run inlines).</summary>
+    public string StreamingChunksSummary =>
+        $"Chunks: {StreamingReceivedChunks} / Buffered: {StreamingBufferedChunks}";
 
     [ObservableProperty]
     private string streamingStatus = string.Empty;
@@ -455,6 +475,35 @@ namespace VoiceStudio.App.Views.Panels
     public IReadOnlyList<string> CanonicalEmotionPresets { get; } =
         new[] { "neutral", "warm", "energetic", "calm" };
 
+    /// <summary>Normalize user/restored input to a canonical preset or null if unsupported.</summary>
+    public string? NormalizeCanonicalEmotionPreset(string? raw)
+    {
+      if (string.IsNullOrWhiteSpace(raw))
+        return null;
+      var t = raw.Trim();
+      foreach (var preset in CanonicalEmotionPresets)
+      {
+        if (string.Equals(preset, t, StringComparison.OrdinalIgnoreCase))
+          return preset;
+      }
+      return null;
+    }
+
+    partial void OnEmotionChanged(string? value)
+    {
+      var normalized = NormalizeCanonicalEmotionPreset(value);
+      if (!string.Equals(normalized, value, StringComparison.Ordinal))
+        Emotion = normalized;
+    }
+
+    /// <summary>Clears prior operation error/capability UI state before a new synthesis attempt.</summary>
+    private void BeginSynthesisOperationNarrativeHygiene()
+    {
+      ErrorMessage = null;
+      HasError = false;
+      HasQualityMetrics = false;
+    }
+
     // Quality metrics display properties
     public string MosScore =>
         QualityMetrics?.MosScore.HasValue == true
@@ -534,6 +583,7 @@ namespace VoiceStudio.App.Views.Panels
       finally
       {
         IsLoading = false;
+        TryCompletePendingPanelRestore();
         UpdateWorkflowStateFromInputs();
       }
     }
@@ -596,9 +646,7 @@ namespace VoiceStudio.App.Views.Panels
       }
 
       IsLoading = true;
-      ErrorMessage = null;
-      HasError = false;
-      HasQualityMetrics = false;
+      BeginSynthesisOperationNarrativeHygiene();
       WorkflowState = SynthesisWorkflowState.Synthesizing;
       StatusMessage = ResourceHelper.GetString("Status.Synthesizing", "Synthesizing voice...");
 
@@ -901,7 +949,20 @@ namespace VoiceStudio.App.Views.Panels
     {
       OnPropertyChanged(nameof(IsEmotionSupported));
       if (value == null)
+      {
         Emotion = null;
+        _lastNonNullProfileIdForEmotionHygiene = null;
+      }
+      else
+      {
+        if (!_suppressEmotionClearForPanelRestore &&
+            _lastNonNullProfileIdForEmotionHygiene != null &&
+            !string.Equals(_lastNonNullProfileIdForEmotionHygiene, value.Id, StringComparison.Ordinal))
+        {
+          Emotion = null;
+        }
+        _lastNonNullProfileIdForEmotionHygiene = value.Id;
+      }
       SynthesizeCommand.NotifyCanExecuteChanged();
       if (!IsLoading && WorkflowState != SynthesisWorkflowState.Synthesizing)
         UpdateWorkflowStateFromInputs();
@@ -1047,6 +1108,8 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (SelectedProfile == null || string.IsNullOrWhiteSpace(Text))
         return;
+
+      BeginSynthesisOperationNarrativeHygiene();
 
       try
       {
@@ -1509,8 +1572,7 @@ namespace VoiceStudio.App.Views.Panels
 
       IsEnsembleProcessing = true;
       IsLoading = true;
-      ErrorMessage = null;
-      HasError = false;
+      BeginSynthesisOperationNarrativeHygiene();
       CreateEnsembleCommand.NotifyCanExecuteChanged();
       CheckEnsembleStatusCommand.NotifyCanExecuteChanged();
 
@@ -1918,6 +1980,126 @@ namespace VoiceStudio.App.Views.Panels
       await System.IO.File.WriteAllBytesAsync(tempPath, audioData);
       return tempPath;
     }
+
+    #region IPanelStatePersistable (GAP-050 state hygiene)
+
+    /// <inheritdoc />
+    public PanelStateData? GetCurrentState()
+    {
+      try
+      {
+        var state = new PanelStateData
+        {
+          PanelId = PanelId,
+          SelectedItemId = SelectedProfile?.Id,
+          CapturedAt = DateTime.UtcNow,
+          CustomData = new Dictionary<string, object>()
+        };
+
+        if (!string.IsNullOrEmpty(SelectedEngine))
+          state.CustomData[CustomKeySelectedEngine] = SelectedEngine;
+        if (!string.IsNullOrEmpty(Emotion))
+          state.CustomData[CustomKeyEmotionPreset] = Emotion!;
+
+        return state;
+      }
+      catch (Exception ex)
+      {
+        System.Diagnostics.Debug.WriteLine($"VoiceSynthesisViewModel.GetCurrentState failed: {ex.Message}");
+        return null;
+      }
+    }
+
+    /// <inheritdoc />
+    public Task RestoreStateAsync(PanelStateData state, CancellationToken cancellationToken = default)
+    {
+      if (state == null)
+        return Task.CompletedTask;
+
+      try
+      {
+        _pendingRestoreProfileId = state.SelectedItemId;
+        _pendingRestoreEngine = null;
+        _pendingRestoreHasEmotionKey = false;
+        _pendingRestoreEmotionRaw = null;
+
+        if (state.CustomData != null)
+        {
+          if (state.CustomData.TryGetValue(CustomKeySelectedEngine, out var engObj))
+          {
+            var engStr = CoerceCustomStateString(engObj);
+            if (!string.IsNullOrWhiteSpace(engStr))
+              _pendingRestoreEngine = engStr.Trim();
+          }
+          if (state.CustomData.TryGetValue(CustomKeyEmotionPreset, out var emoObj))
+          {
+            _pendingRestoreHasEmotionKey = true;
+            _pendingRestoreEmotionRaw = CoerceCustomStateString(emoObj);
+          }
+        }
+
+        TryCompletePendingPanelRestore();
+      }
+      catch (Exception ex)
+      {
+        System.Diagnostics.Debug.WriteLine($"VoiceSynthesisViewModel.RestoreStateAsync failed: {ex.Message}");
+      }
+
+      return Task.CompletedTask;
+    }
+
+    private static string? CoerceCustomStateString(object? value)
+    {
+      if (value == null)
+        return null;
+      if (value is string s)
+        return s;
+      return Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Applies deferred workspace restore once profiles/engines are available.</summary>
+    private void TryCompletePendingPanelRestore()
+    {
+      var hasWork = !string.IsNullOrEmpty(_pendingRestoreProfileId) ||
+                    !string.IsNullOrEmpty(_pendingRestoreEngine) ||
+                    _pendingRestoreHasEmotionKey;
+      if (!hasWork)
+        return;
+
+      _suppressEmotionClearForPanelRestore = true;
+      try
+      {
+        if (!string.IsNullOrEmpty(_pendingRestoreEngine) && AvailableEngines.Count > 0)
+        {
+          var eng = _pendingRestoreEngine!;
+          SelectedEngine = AvailableEngines.Contains(eng) ? eng : AvailableEngines[0];
+          _pendingRestoreEngine = null;
+        }
+
+        if (!string.IsNullOrEmpty(_pendingRestoreProfileId) && Profiles.Count > 0)
+        {
+          var profile = Profiles.FirstOrDefault(p => p.Id == _pendingRestoreProfileId);
+          if (profile != null)
+          {
+            SelectedProfile = profile;
+            _pendingRestoreProfileId = null;
+          }
+        }
+
+        if (_pendingRestoreHasEmotionKey)
+        {
+          Emotion = NormalizeCanonicalEmotionPreset(_pendingRestoreEmotionRaw);
+          _pendingRestoreHasEmotionKey = false;
+          _pendingRestoreEmotionRaw = null;
+        }
+      }
+      finally
+      {
+        _suppressEmotionClearForPanelRestore = false;
+      }
+    }
+
+    #endregion
 
     protected override void Dispose(bool disposing)
     {

@@ -3,12 +3,14 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.ViewModels
@@ -20,7 +22,6 @@ namespace VoiceStudio.App.Tests.ViewModels
   [TestClass]
   public class VoiceSynthesisViewModelTests
   {
-    private Mock<IBackendClient> _mockBackendClient = null!;
     private Mock<IVoiceSynthesisService> _mockVoiceSynthesisService = null!;
     private Mock<IEnginesClient> _mockEnginesClient = null!;
     private Mock<IQualityPipelineService> _mockQualityPipelineService = null!;
@@ -35,7 +36,6 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestInitialize]
     public void Setup()
     {
-      _mockBackendClient = new Mock<IBackendClient>();
       _mockVoiceSynthesisService = new Mock<IVoiceSynthesisService>();
       _mockEnginesClient = new Mock<IEnginesClient>();
       _mockQualityPipelineService = new Mock<IQualityPipelineService>();
@@ -287,6 +287,157 @@ namespace VoiceStudio.App.Tests.ViewModels
       _sut.SelectedProfile = null;
 
       Assert.IsNull(_sut.Emotion);
+    }
+
+    [TestMethod]
+    public void SelectedProfile_SwitchToDifferentProfileId_ClearsEmotion_Gap050()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "A" };
+      _sut.Emotion = "warm";
+
+      _sut.SelectedProfile = new VoiceProfile { Id = "p2", Name = "B" };
+
+      Assert.IsNull(_sut.Emotion);
+    }
+
+    [TestMethod]
+    public void Emotion_SetToNonCanonical_NormalizesToNull_Gap050()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Emotion = "not-a-canonical-preset";
+
+      Assert.IsNull(_sut.Emotion);
+    }
+
+    [TestMethod]
+    public async Task RestoreStateAsync_InvalidEmotionKey_NormalizesToNull_AfterProfilesLoaded_Gap050()
+    {
+      _mockProfilesClient
+          .Setup(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<VoiceProfile> { new() { Id = "p1", Name = "P1" } });
+      _mockEnginesClient
+          .Setup(x => x.GetEnginesAsync(It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<string> { "xtts" });
+
+      var loadCmd = (IAsyncRelayCommand)_sut.LoadProfilesCommand;
+      await loadCmd.ExecuteAsync(default);
+
+      var state = new PanelStateData
+      {
+        PanelId = PanelIds.VoiceSynthesis,
+        SelectedItemId = "p1",
+        CustomData = new Dictionary<string, object>
+        {
+          ["VoiceSynthesis_EmotionPreset"] = "totally_invalid",
+          ["VoiceSynthesis_SelectedEngine"] = "xtts",
+        },
+      };
+
+      await _sut.RestoreStateAsync(state, default);
+
+      Assert.AreEqual("p1", _sut.SelectedProfile?.Id);
+      Assert.IsNull(_sut.Emotion);
+    }
+
+    [TestMethod]
+    public async Task RestoreStateAsync_ValidCanonicalEmotion_Restored_AfterProfilesLoaded_Gap050()
+    {
+      _mockProfilesClient
+          .Setup(x => x.GetProfilesAsync(It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<VoiceProfile> { new() { Id = "p1", Name = "P1" } });
+      _mockEnginesClient
+          .Setup(x => x.GetEnginesAsync(It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<string> { "xtts", "piper" });
+
+      var loadCmd = (IAsyncRelayCommand)_sut.LoadProfilesCommand;
+      await loadCmd.ExecuteAsync(default);
+
+      var state = new PanelStateData
+      {
+        PanelId = PanelIds.VoiceSynthesis,
+        SelectedItemId = "p1",
+        CustomData = new Dictionary<string, object>
+        {
+          ["VoiceSynthesis_EmotionPreset"] = "CALM",
+          ["VoiceSynthesis_SelectedEngine"] = "piper",
+        },
+      };
+
+      await _sut.RestoreStateAsync(state, default);
+
+      Assert.AreEqual("p1", _sut.SelectedProfile?.Id);
+      Assert.AreEqual("calm", _sut.Emotion);
+      Assert.AreEqual("piper", _sut.SelectedEngine);
+    }
+
+    [TestMethod]
+    public async Task SynthesizeCommand_SecondRun_AfterWarning_ShowsWarningAgain_NoStaleError_Gap050()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+
+      var response = new VoiceSynthesisResponse
+      {
+        AudioId = "a1",
+        AudioUrl = "/api/audio/a1",
+        Duration = 1.2,
+        QualityScore = 0.91,
+        SsmlHandling = new SsmlHandlingDiagnostics
+        {
+          Action = "stripped_warned",
+          Warnings = new List<string> { "SSML note" },
+        },
+      };
+
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(response);
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+      Assert.IsFalse(_sut.HasError);
+      await cmd.ExecuteAsync(default);
+      Assert.IsFalse(_sut.HasError);
+
+      _mockToast.Verify(x => x.ShowWarning(It.IsAny<string>(), It.IsAny<string?>()), Times.Exactly(2));
+    }
+
+    [TestMethod]
+    public async Task SynthesizeCommand_AfterFailureThenSuccess_ClearsErrorState_Gap050()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+
+      var success = new VoiceSynthesisResponse
+      {
+        AudioId = "a1",
+        AudioUrl = "/api/audio/a1",
+        Duration = 1.0,
+        QualityScore = 0.9,
+      };
+
+      var call = 0;
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .Returns(() =>
+          {
+            call++;
+            if (call == 1)
+            {
+              return Task.FromException<VoiceSynthesisResponse>(new HttpRequestException("network fail"));
+            }
+
+            return Task.FromResult(success);
+          });
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+      Assert.IsTrue(_sut.HasError);
+      Assert.IsFalse(string.IsNullOrEmpty(_sut.ErrorMessage));
+
+      await cmd.ExecuteAsync(default);
+      Assert.IsFalse(_sut.HasError);
+      Assert.IsNull(_sut.ErrorMessage);
     }
 
     [TestMethod]

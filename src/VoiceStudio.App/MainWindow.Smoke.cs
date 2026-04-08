@@ -491,7 +491,8 @@ namespace VoiceStudio.App
                 throw new InvalidOperationException("VoiceSynthesisView not in center panel");
             }
 
-            var vm = synthView.ViewModel;
+            var vm = synthView.DataContext as VoiceSynthesisViewModel
+                ?? throw new InvalidOperationException("VoiceSynthesisView DataContext is not VoiceSynthesisViewModel");
             appendStepLog("SYNTHESIS_BEGIN\tLoading profiles");
 
             if (vm.LoadProfilesCommand.CanExecute(null))
@@ -583,7 +584,8 @@ namespace VoiceStudio.App
                     appendStepLog("PLAYBACK_SKIP\tVoiceSynthesisView not in center panel");
                     throw new InvalidOperationException("VoiceSynthesisView not in center panel");
                 }
-                var vm = synthView.ViewModel;
+                var vm = synthView.DataContext as VoiceSynthesisViewModel
+                    ?? throw new InvalidOperationException("VoiceSynthesisView DataContext is not VoiceSynthesisViewModel");
                 if (!vm.PlayAudioCommand.CanExecute(null))
                 {
                     appendStepLog("PLAYBACK_SKIP\tPlayAudioCommand not executable");

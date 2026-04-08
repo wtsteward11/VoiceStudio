@@ -19,8 +19,8 @@ from fastapi.testclient import TestClient
 project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from backend.api.routes import emotion  # noqa: E402
-from backend.services.prosody_authority_service import ProsodyTransformResult  # noqa: E402
+from backend.api.routes import emotion
+from backend.services.prosody_authority_service import ProsodyTransformResult
 
 
 @pytest.fixture

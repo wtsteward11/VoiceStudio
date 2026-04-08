@@ -14,70 +14,79 @@ using VoiceStudio.Core.Events;
 
 namespace VoiceStudio.App.Views.Panels
 {
+  /// <summary>
+  /// GAP-050 state hygiene: panel VM is supplied only via <see cref="UserControl.DataContext"/> from
+  /// <see cref="PanelRegistry"/> — no duplicate <see cref="VoiceSynthesisViewModel"/> construction here.
+  /// </summary>
   public sealed partial class VoiceSynthesisView : UserControl
   {
-    public VoiceSynthesisViewModel ViewModel { get; }
     private PanelHost? _parentPanelHost;
     private ContextMenuService? _contextMenuService;
     private ToastNotificationService? _toastService;
     private IDragDropService? _panelDragDropService;
     private IEventAggregator? _eventAggregator;
+    private VoiceSynthesisViewModel? _subscribedVm;
+
+    /// <summary>Compiled x:Bind root; mirrors shell-assigned <see cref="UserControl.DataContext"/>.</summary>
+    public VoiceSynthesisViewModel? ViewModel => DataContext as VoiceSynthesisViewModel;
 
     public VoiceSynthesisView()
     {
       this.InitializeComponent();
-      ViewModel = new VoiceSynthesisViewModel(
-          AppServices.GetRequiredService<IVoiceSynthesisService>(),
-          AppServices.GetEnginesClient(),
-          AppServices.GetRequiredService<IQualityPipelineService>(),
-          AppServices.GetRequiredService<IEnsembleService>(),
-          AppServices.GetRequiredService<ITextAnalysisService>(),
-          AppServices.GetRequiredService<IQualityHistoryService>(),
-          ServiceProvider.GetProfilesClient(),
-          ServiceProvider.GetAudioPlayerService()
-      );
-      this.DataContext = ViewModel;
 
-      // Initialize services
+      RegisterPropertyChangedCallback(DataContextProperty, OnDataContextPropertyChanged);
+
       _contextMenuService = ServiceProvider.GetContextMenuService();
       _toastService = ServiceProvider.GetToastNotificationService();
       _panelDragDropService = AppServices.TryGetDragDropService();
       _eventAggregator = AppServices.TryGetEventAggregator();
 
-      // Subscribe to quality metrics updates
-      ViewModel.PropertyChanged += ViewModel_PropertyChanged;
-
-      // Find parent PanelHost after loaded
       this.Loaded += VoiceSynthesisView_Loaded;
       this.Unloaded += VoiceSynthesisView_Unloaded;
 
-      // Add Enter key handling for form submission
       if (this.FindName("TextInput") is Microsoft.UI.Xaml.Controls.TextBox textInput)
       {
         textInput.KeyDown += TextInput_KeyDown;
       }
 
-      // Setup Escape key to close help overlay
       KeyboardNavigationHelper.SetupEscapeKeyHandling(this, () =>
       {
-        // Close any open dialogs or overlays
       });
+    }
 
-      // GAP-064: Error/success toasts are owned by VoiceSynthesisViewModel (single narrative, no duplicate view toasts).
+    private static void OnDataContextPropertyChanged(DependencyObject d, DependencyProperty dp)
+    {
+      if (d is VoiceSynthesisView view)
+      {
+        view.SyncViewModelPropertyChangedSubscription();
+      }
+    }
+
+    private void SyncViewModelPropertyChangedSubscription()
+    {
+      if (_subscribedVm != null)
+      {
+        _subscribedVm.PropertyChanged -= ViewModel_PropertyChanged;
+        _subscribedVm = null;
+      }
+
+      if (DataContext is VoiceSynthesisViewModel vm)
+      {
+        _subscribedVm = vm;
+        _subscribedVm.PropertyChanged += ViewModel_PropertyChanged;
+      }
     }
 
     private void TextInput_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
     {
-      // For multi-line text boxes: Ctrl+Enter submits, Enter creates new line
       if (e.Key == Windows.System.VirtualKey.Enter && IsModifierDown(Windows.System.VirtualKey.Control))
       {
-        // Ctrl+Enter submits
-        if (ViewModel.SynthesizeCommand.CanExecute(null))
+        var vm = ViewModel;
+        if (vm?.SynthesizeCommand.CanExecute(null) == true)
         {
-          ViewModel.SynthesizeCommand.Execute(null);
+          vm.SynthesizeCommand.Execute(null);
           e.Handled = true;
         }
-        // Otherwise, Enter creates new line (default behavior for AcceptsReturn="True")
       }
     }
 
@@ -89,37 +98,35 @@ namespace VoiceStudio.App.Views.Panels
 
     private void VoiceSynthesisView_Loaded(object sender, RoutedEventArgs e)
     {
-      // Find parent PanelHost
+      SyncViewModelPropertyChangedSubscription();
+
       _parentPanelHost = FindParentPanelHost(this);
       if (_parentPanelHost != null)
       {
-        // Enable quality badge
         _parentPanelHost.ShowQualityBadge = true;
         _parentPanelHost.PanelTitle = "Voice Synthesis";
         _parentPanelHost.PanelIcon = "🎙️";
-
-        // Set initial quality metrics if available
         UpdatePanelHostQualityMetrics();
       }
 
-      // Setup Tab navigation order for this panel
       KeyboardNavigationHelper.SetupTabNavigation(this, 0);
 
-      // Register as drop target for Profile / voice-profile library assets (GAP-032)
-      _panelDragDropService?.RegisterDropTarget(
-          ViewModel.PanelId,
-          CanAcceptSynthesisDrop);
+      if (ViewModel != null)
+      {
+        _panelDragDropService?.RegisterDropTarget(
+            ViewModel.PanelId,
+            CanAcceptSynthesisDrop);
+      }
     }
 
     private void VoiceSynthesisView_Unloaded(object sender, RoutedEventArgs e)
     {
-      // Unregister from drop target (Panel Architecture Phase 4)
-      _panelDragDropService?.UnregisterDropTarget(ViewModel.PanelId);
+      if (ViewModel != null)
+      {
+        _panelDragDropService?.UnregisterDropTarget(ViewModel.PanelId);
+      }
     }
 
-    /// <summary>
-    /// GAP-032: Voice profile payloads and library voice-profile assets (via ProfileSelectedEvent path).
-    /// </summary>
     private static bool CanAcceptSynthesisDrop(DragPayload payload)
     {
       if (payload.PayloadType == DragPayloadType.Profile ||
@@ -142,10 +149,16 @@ namespace VoiceStudio.App.Views.Panels
     private async Task<DropResult> HandleSynthesisDropAsync(DragPayload payload, CancellationToken cancellationToken)
     {
       _ = cancellationToken;
+      var vm = ViewModel;
+      if (vm == null)
+      {
+        return new DropResult { Success = false, TargetPanelId = PanelIds.VoiceSynthesis, ErrorMessage = "ViewModel not ready" };
+      }
+
       if (_eventAggregator == null)
       {
         _toastService?.ShowToast(ToastType.Warning, "Drop Failed", "Cannot apply profile (events unavailable).");
-        return new DropResult { Success = false, TargetPanelId = ViewModel.PanelId, ErrorMessage = "Event aggregator unavailable" };
+        return new DropResult { Success = false, TargetPanelId = vm.PanelId, ErrorMessage = "Event aggregator unavailable" };
       }
 
       if (payload.PayloadType == DragPayloadType.Profile ||
@@ -155,7 +168,7 @@ namespace VoiceStudio.App.Views.Panels
         if (item == null || string.IsNullOrEmpty(item.Id))
         {
           _toastService?.ShowToast(ToastType.Warning, "Drop Failed", "Missing profile identifier on drag payload.");
-          return new DropResult { Success = false, TargetPanelId = ViewModel.PanelId, ErrorMessage = "Missing profile id" };
+          return new DropResult { Success = false, TargetPanelId = vm.PanelId, ErrorMessage = "Missing profile id" };
         }
         _eventAggregator.Publish(new ProfileSelectedEvent(
             payload.SourcePanelId,
@@ -164,7 +177,7 @@ namespace VoiceStudio.App.Views.Panels
             InteractionIntent.ImmediateUse));
         _toastService?.ShowToast(ToastType.Success, "Voice Selected", $"'{item.DisplayName}' selected for synthesis");
         await Task.CompletedTask.ConfigureAwait(true);
-        return new DropResult { Success = true, TargetPanelId = ViewModel.PanelId, Action = nameof(ProfileSelectedEvent) };
+        return new DropResult { Success = true, TargetPanelId = vm.PanelId, Action = nameof(ProfileSelectedEvent) };
       }
 
       if (payload.PayloadType == DragPayloadType.ReferenceAudio)
@@ -173,20 +186,23 @@ namespace VoiceStudio.App.Views.Panels
         if (!string.IsNullOrEmpty(audioPath))
           _toastService?.ShowToast(ToastType.Info, "Reference Audio", $"Reference audio path: {audioPath}");
         await Task.CompletedTask.ConfigureAwait(true);
-        return new DropResult { Success = true, TargetPanelId = ViewModel.PanelId, Action = "ReferenceAudio" };
+        return new DropResult { Success = true, TargetPanelId = vm.PanelId, Action = "ReferenceAudio" };
       }
 
       await Task.CompletedTask.ConfigureAwait(true);
-      return new DropResult { Success = false, TargetPanelId = ViewModel.PanelId, ErrorMessage = "Unsupported synthesis drop" };
+      return new DropResult { Success = false, TargetPanelId = vm.PanelId, ErrorMessage = "Unsupported synthesis drop" };
     }
 
     private void VoiceSynthesisPanel_DragOver(object sender, DragEventArgs e)
     {
       _ = sender;
-      if (_panelDragDropService is { IsDragging: true } && _panelDragDropService.CanDrop(ViewModel.PanelId))
+      var vm = ViewModel;
+      if (vm == null)
+        return;
+      if (_panelDragDropService is { IsDragging: true } && _panelDragDropService.CanDrop(vm.PanelId))
       {
         e.AcceptedOperation = DataPackageOperation.Copy;
-        _panelDragDropService.UpdateDragTarget(ViewModel.PanelId);
+        _panelDragDropService.UpdateDragTarget(vm.PanelId);
         e.Handled = true;
       }
     }
@@ -194,10 +210,13 @@ namespace VoiceStudio.App.Views.Panels
     private async void VoiceSynthesisPanel_Drop(object sender, DragEventArgs e)
     {
       _ = sender;
-      if (_panelDragDropService is { IsDragging: true } && _panelDragDropService.CanDrop(ViewModel.PanelId))
+      var vm = ViewModel;
+      if (vm == null)
+        return;
+      if (_panelDragDropService is { IsDragging: true } && _panelDragDropService.CanDrop(vm.PanelId))
       {
         _ = await _panelDragDropService.ExecuteDropAsync(
-            ViewModel.PanelId,
+            vm.PanelId,
             HandleSynthesisDropAsync,
             CancellationToken.None).ConfigureAwait(true);
         e.Handled = true;
@@ -220,8 +239,8 @@ namespace VoiceStudio.App.Views.Panels
 
     private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-      if (e.PropertyName == nameof(ViewModel.QualityMetrics) ||
-          e.PropertyName == nameof(ViewModel.HasQualityMetrics))
+      if (e.PropertyName == nameof(VoiceSynthesisViewModel.QualityMetrics) ||
+          e.PropertyName == nameof(VoiceSynthesisViewModel.HasQualityMetrics))
       {
         UpdatePanelHostQualityMetrics();
       }
@@ -229,7 +248,7 @@ namespace VoiceStudio.App.Views.Panels
 
     private void UpdatePanelHostQualityMetrics()
     {
-      if (_parentPanelHost != null)
+      if (_parentPanelHost != null && ViewModel != null)
       {
         _parentPanelHost.QualityMetrics = ViewModel.QualityMetrics;
       }
@@ -245,9 +264,10 @@ namespace VoiceStudio.App.Views.Panels
         var refreshItem = new MenuFlyoutItem { Text = "Refresh Profiles" };
         refreshItem.Click += async (_, _) =>
         {
-          if (ViewModel.LoadProfilesCommand.CanExecute(null))
+          var vm = ViewModel;
+          if (vm != null && vm.LoadProfilesCommand.CanExecute(null))
           {
-            await ViewModel.LoadProfilesCommand.ExecuteAsync(null);
+            await vm.LoadProfilesCommand.ExecuteAsync(null);
             _toastService?.ShowToast(ToastType.Success, "Refreshed", "Voice profiles refreshed");
           }
         };
@@ -318,15 +338,16 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (sender is CheckBox checkBox && checkBox.Tag is string engine)
       {
-        ViewModel.ToggleEngineSelection(engine);
+        ViewModel?.ToggleEngineSelection(engine);
       }
     }
 
     private void ErrorInfoBar_Closed(object sender, Microsoft.UI.Xaml.Controls.InfoBarClosedEventArgs e)
     {
-      if (ViewModel.ClearErrorCommand.CanExecute(null))
+      var vm = ViewModel;
+      if (vm != null && vm.ClearErrorCommand.CanExecute(null))
       {
-        ViewModel.ClearErrorCommand.Execute(null);
+        vm.ClearErrorCommand.Execute(null);
       }
     }
 

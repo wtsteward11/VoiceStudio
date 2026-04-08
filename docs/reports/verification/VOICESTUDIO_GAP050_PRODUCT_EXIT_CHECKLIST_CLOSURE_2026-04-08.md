@@ -63,7 +63,7 @@ Audit whether **GAP-050** (*Emotional voice control + preview*, roadmap F5-6) ca
 
 | Step | Command / artifact | Result |
 |------|-------------------|--------|
-| Rolling verifier | `python scripts/run_verification.py` | PASS (**completion_guard**); `last_run.json` **20260407-194132** (post-commit `b49addbb`) |
+| Rolling verifier | `python scripts/run_verification.py` | PASS (**completion_guard**); `last_run.json` **20260407-194132** (post-commit `b49addbb`; STATE back-fill `725b3fa7`) |
 | Doc consistency | Tracker GAP-050 **Open** + exit row + spawned row; registry; STATE | PASS |
 
 **Proof inheritance:** Runtime proof remains on last GAP-050 runtime lane — [VOICESTUDIO_GAP050_EMOTION_PRESET_STATE_HYGIENE_AND_PERSISTENCE_LANE_CLOSURE_2026-04-07.md](VOICESTUDIO_GAP050_EMOTION_PRESET_STATE_HYGIENE_AND_PERSISTENCE_LANE_CLOSURE_2026-04-07.md); App.Tests **3193** passed / **274** skipped; `pytest tests/ci` **217**; rolling **20260407-190416** (**completion_guard** PASS). This closure adds **governance + audit traceability** only.

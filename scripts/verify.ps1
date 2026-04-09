@@ -37,6 +37,7 @@
     VERIFICATION MODES:
     - Full (default): All stages. Typical duration 10+ minutes.
     - Quick (-Quick): Build, lint, Quick Critical Gates, Security Tests, Gate/Ledger. Skips C#/Python unit tests, contract, integration, UI. Typical duration 3-5 minutes depending on machine.
+    - Runtime proof (-RuntimeProof): Standalone only (GAP-015). Runs real-mode golden-loop synthesis + training export honesty CI tests; writes artifacts/verify/{timestamp}/runtime_proof.json. Prerequisites: python, pytest, engines/consent for real synthesis. Forbidden with -Quick.
     
     SIDE EFFECTS: Creates artifacts/verify/{timestamp}/, updates artifacts/verify/latest symlink, prunes runs older than KeepCount (10).
 .PARAMETER Quick
@@ -67,6 +68,8 @@
     Treat mypy type errors (exit code 1) as failures. Default: warnings only.
 .PARAMETER OnlyStage
     Run only the specified stage. Use after a successful build to debug a specific stage. Fails fast with clear message if build artifacts are missing.     Supports: Clean Build, Python Quality, Quick Critical Gates, C# Unit Tests (all shards), C# Unit Tests - ViewModels Seam A-D, C# Unit Tests - Services, etc., Python Unit Tests, Contract Tests, Security Tests, Backend Integration, UI Smoke Tests, UI Self-Test, Icon-Launch Smoke, Failure-Path Smoke, Runtime-Missing Failure Smoke, Gate/Ledger Validation.
+.PARAMETER RuntimeProof
+    Standalone mode: run only the GAP-015 runtime proof bundle (real-mode synthesis pytest + training export honesty). Writes runtime_proof.json under artifacts/verify/{timestamp}. Cannot be used with -Quick or -OnlyStage.
 .EXAMPLE
     .\scripts\verify.ps1
     .\scripts\verify.ps1 -Quick
@@ -74,6 +77,7 @@
     .\scripts\verify.ps1 -RealUI -Configuration Release
     .\scripts\verify.ps1 -OnlyStage "C# Unit Tests"
     .\scripts\verify.ps1 -OnlyStage "C# Unit Tests - ViewModels Seam A-D"
+    .\scripts\verify.ps1 -RuntimeProof
 #>
 [CmdletBinding()]
 param(
@@ -94,6 +98,7 @@ param(
     [switch]$RealUI,
     [switch]$StrictMypy,
     [switch]$ReleaseCandidate,
+    [switch]$RuntimeProof,
     [ValidateSet("", "Clean Build", "Python Quality", "Quick Critical Gates", "C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other", "Python Unit Tests", "Contract Tests", "Security Tests", "Backend Integration", "UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke", "Gate/Ledger Validation")]
     [string]$OnlyStage = ""
 )
@@ -139,6 +144,15 @@ if ($ReleaseCandidate) {
     Write-Host "  RELEASE CANDIDATE VERIFICATION MODE"
     Write-Host "  All stages enabled. No skips allowed."
     Write-Host "========================================" -ForegroundColor Yellow
+}
+
+if ($Quick -and $RuntimeProof) {
+    Write-Host "ERROR: -RuntimeProof cannot be combined with -Quick" -ForegroundColor Red
+    exit 1
+}
+if ($RuntimeProof -and $OnlyStage) {
+    Write-Host "ERROR: -RuntimeProof is standalone; do not combine with -OnlyStage" -ForegroundColor Red
+    exit 1
 }
 
 # ============================================================================
@@ -305,6 +319,9 @@ $proofLines = @(
 )
 if ($Quick) {
     $proofLines += "QuickCriticalGates: golden-loop, route-alignment, contract-drift"
+}
+if ($RuntimeProof) {
+    $proofLines += "RuntimeProof: standalone GAP-015 bundle (exits after runtime_proof.json)"
 }
 $proofLines += "StageTimeouts:"
 foreach ($key in $StageTimeouts.Keys) {
@@ -813,6 +830,75 @@ if ($Quick) {
 Write-Host ""
 
 Set-Location $RootDir
+
+# ============================================================================
+# STANDALONE: Runtime proof (GAP-015) — real synthesis + training export honesty
+# ============================================================================
+if ($RuntimeProof) {
+    Write-Host ""
+    Write-Host ("=" * 70) -ForegroundColor Cyan
+    Write-Host "  RUNTIME PROOF (-RuntimeProof)" -ForegroundColor Cyan
+    Write-Host "  Real-mode golden loop + training export API honesty" -ForegroundColor Cyan
+    Write-Host ("=" * 70) -ForegroundColor Cyan
+    Write-Host ""
+
+    $runtimeLog = Join-Path $StageLogsDir "runtime_proof.log"
+    $synthXml = Join-Path $TestResultsDir "runtime_proof_synthesis.xml"
+    $trainXml = Join-Path $TestResultsDir "runtime_proof_training.xml"
+
+    $synthArgs = @(
+        "-m", "pytest",
+        "tests/ci/test_golden_loop_smoke_real.py::test_golden_loop_real_health_synthesize_stream",
+        "-v",
+        "--override-ini", "addopts=-v --strict-markers --tb=short --color=yes -p no:capture --randomly-seed=12345",
+        "--junitxml=$synthXml"
+    )
+    Write-Host "[Runtime proof] Synthesis (real-mode golden loop)..." -ForegroundColor Cyan
+    & python @synthArgs 2>&1 | Tee-Object -FilePath $runtimeLog
+    $synthExit = $LASTEXITCODE
+
+    $trainArgs = @(
+        "-m", "pytest",
+        "tests/ci/test_runtime_proof_training_export.py",
+        "-v",
+        "--junitxml=$trainXml"
+    )
+    Write-Host "[Runtime proof] Training export honesty..." -ForegroundColor Cyan
+    & python @trainArgs 2>&1 | Tee-Object -Append -FilePath $runtimeLog
+    $trainExit = $LASTEXITCODE
+
+    $proofObj = [ordered]@{
+        schema_version = 1
+        timestamp      = (Get-Date -Format 'o')
+        synthesis_pytest_exit = $synthExit
+        training_pytest_exit  = $trainExit
+        synthesis_junit       = $synthXml
+        training_junit        = $trainXml
+        log                   = $runtimeLog
+        overall_pass          = ($synthExit -eq 0 -and $trainExit -eq 0)
+    }
+    $proofJson = Join-Path $ArtifactsDir "runtime_proof.json"
+    ($proofObj | ConvertTo-Json -Depth 5) | Out-File -FilePath $proofJson -Encoding utf8
+
+    if (Test-Path $LatestLink) {
+        Remove-Item $LatestLink -Force -Recurse -ErrorAction SilentlyContinue
+    }
+    try {
+        cmd /c mklink /J "$LatestLink" "$ArtifactsDir" 2>&1 | Out-Null
+    } catch {
+        Copy-Item $ArtifactsDir $LatestLink -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    if ($synthExit -ne 0 -or $trainExit -ne 0) {
+        Write-Host ""
+        Write-Host "RUNTIME PROOF FAILED (see $runtimeLog)" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host ""
+    Write-Host "RUNTIME PROOF PASSED" -ForegroundColor Green
+    Write-Host "  $proofJson" -ForegroundColor Cyan
+    exit 0
+}
 
 # -OnlyStage prerequisite check: fail fast when required artifacts are missing
 function Test-OnlyStagePrerequisites {

@@ -38,8 +38,40 @@ If runtime code existed before the row was frozen, the row MUST say:
 - what **pre-existed**,
 - what was **newly validated** or **changed** in this lane.
 
-## 6. References
+## 6. Runtime proof requirement (required at freeze)
+
+Every execution row MUST include a **Runtime proof requirement** subsection that checks exactly one of:
+
+| Checkbox | When to use |
+|----------|-------------|
+| **Fresh Grade R proof required** | The lane changes synthesis, training, startup, export, or health **product** paths (not only tests/docs). |
+| **Inherited Grade R proof required** | The lane changes product code but not the paths above; the closure must cite the most recent Grade R proof artifact within the policy window (default **72 hours** unless the row states otherwise). |
+| **No Grade R proof** | Proof-hardening rows, or governance/CI-only rows that do not change production behavior. |
+
+Proof grades **S / I / R** are defined in [TEST_CLASSIFICATION.md](TEST_CLASSIFICATION.md).
+
+### Closure gate (runtime-affecting lanes with Fresh or Inherited Grade R)
+
+The closure report MUST include a **Runtime Proof** section containing:
+
+- Commands executed (exact `verify.ps1` flags, pytest paths, or scripted smokes),
+- Artifact paths (`artifacts/verify/...`, `docs/reports/verification/PROOF_*.json`, `%LOCALAPPDATA%\VoiceStudio\crashes\*.json`, etc.),
+- Pass/fail and timestamp,
+- For **inherited** proof: citation of the prior artifact and confirmation it is within the policy window.
+
+Lanes with **No Grade R proof** must state that explicitly and must not claim full-stack operability from seam tests alone.
+
+### Callable Grade R bundle (optional)
+
+For engine-backed synthesis + training export honesty without running the full UI stack, use:
+
+`.\scripts\verify.ps1 -RuntimeProof`
+
+(`-Quick` is forbidden with `-RuntimeProof`; see `scripts/verify.ps1` header.)
+
+## 7. References
 
 - Gap tracker: [PROFESSIONAL_GAP_TRACKER.md](../design/PROFESSIONAL_GAP_TRACKER.md)
+- Proof grades: [TEST_CLASSIFICATION.md](TEST_CLASSIFICATION.md) (Grade S / I / R)
 - Panel / architecture guardrails: [GUARDRAILS.md](../design/GUARDRAILS.md) (includes transcript mutation outcome taxonomy)
 - Document governance: [DOCUMENT_GOVERNANCE.md](DOCUMENT_GOVERNANCE.md)

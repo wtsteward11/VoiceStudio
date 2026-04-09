@@ -24,6 +24,63 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+
+def _runtime_proof_staleness_result(project_root: Path) -> dict:
+    """
+    GAP-015: Report freshness of optional PROOF_GOLDEN_PATH_REAL_*.json artifacts.
+    Always passes (warning-only); does not fail the verification exit code.
+    """
+    start_time = datetime.now()
+    ver_dir = project_root / "docs" / "reports" / "verification"
+    try:
+        files = sorted(
+            ver_dir.glob("PROOF_GOLDEN_PATH_REAL_*.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+    except OSError as e:
+        duration = (datetime.now() - start_time).total_seconds()
+        return {
+            "name": "runtime_proof_staleness",
+            "command": "scan docs/reports/verification/PROOF_GOLDEN_PATH_REAL_*.json",
+            "exit_code": 0,
+            "passed": True,
+            "duration_seconds": round(duration, 2),
+            "output_sample": f"STATUS=ERROR listing proofs: {e}",
+        }
+
+    if not files:
+        duration = (datetime.now() - start_time).total_seconds()
+        return {
+            "name": "runtime_proof_staleness",
+            "command": "scan docs/reports/verification/PROOF_GOLDEN_PATH_REAL_*.json",
+            "exit_code": 0,
+            "passed": True,
+            "duration_seconds": round(duration, 2),
+            "output_sample": (
+                "STATUS=MISSING: no PROOF_GOLDEN_PATH_REAL_*.json under docs/reports/verification "
+                "(optional artifact; generate via scripts/ci/write_golden_path_real_proof.py). "
+                "This check is informational and does not fail the run."
+            ),
+        }
+
+    latest = files[0]
+    mtime = datetime.fromtimestamp(latest.stat().st_mtime, tz=timezone.utc)
+    age_hours = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600.0
+    status = "FRESH" if age_hours <= 72 else "STALE"
+    duration = (datetime.now() - start_time).total_seconds()
+    return {
+        "name": "runtime_proof_staleness",
+        "command": "scan docs/reports/verification/PROOF_GOLDEN_PATH_REAL_*.json",
+        "exit_code": 0,
+        "passed": True,
+        "duration_seconds": round(duration, 2),
+        "output_sample": (
+            f"STATUS={status}: latest_file={latest.name} age_hours={age_hours:.2f} "
+            f"(policy_window_hours=72; warning-only, does not fail exit code)"
+        ),
+    }
+
 # Ensure UTF-8 output on Windows console
 if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -272,6 +329,9 @@ def main():
             "timeout": 90
         })
 
+    # GAP-015: optional real golden-path proof staleness (warning-only; always passed=True)
+    skip_runtime_stale = "--skip-runtime-proof-staleness" in sys.argv
+
     # Run checks
     results = []
     print("=" * 60)
@@ -295,6 +355,14 @@ def main():
 
         status = "PASS" if result["passed"] else "FAIL"
         print(f"  [{status}] {result['name']} (exit {result['exit_code']}, {result['duration_seconds']}s)")
+
+    if not skip_runtime_stale:
+        stale_result = _runtime_proof_staleness_result(project_root)
+        results.append(stale_result)
+        print(
+            f"  [PASS] {stale_result['name']} "
+            f"(exit 0, {stale_result['duration_seconds']}s)"
+        )
 
     # Summary
     all_passed = all(r["passed"] for r in results)

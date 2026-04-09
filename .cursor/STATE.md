@@ -37,8 +37,8 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 - **Next 3 Steps:** (1) Pick next Open/Partial tracker item for bounded row. (2) Freeze execution row and allowlist. (3) Execute bounded slice with full verification proof set.
 - **Current Blocker:** None.
 - **Truth Sync Note:** **2026-04-08:** `GOV-VOICESTUDIO-GAP015-RUNTIME-PROOF-HARD-GATE-02` closed — `runtime_proof.json` schema v2, `scripts/ci/check_runtime_prerequisites.py`, `run_verification.py --enforce-runtime-proof`, `verify.ps1 -EnforceRuntimeProof`; proof in [VOICESTUDIO_GAP015_RUNTIME_PROOF_HARD_GATE_02_LANE_CLOSURE_2026-04-08.md](../docs/reports/verification/VOICESTUDIO_GAP015_RUNTIME_PROOF_HARD_GATE_02_LANE_CLOSURE_2026-04-08.md); tracker **GAP-015** remains **Partial** (percentile SLO slice 3).
-- **Last Verified Commands:** `python -m pytest tests/ci` **219** passed (**2** deselected); `.\scripts\verify.ps1 -Quick` → `artifacts/verify/20260408_190807/` PASS; `python scripts/run_verification.py` PASS (`.buildlogs/verification/last_run.json` **20260408-191402**, **completion_guard** PASS).
-- **Context Acknowledgment:** 2026-04-08 ACTIVE WINDOW acknowledged; closure protocol applied for GAP-015 bounded lane.
+- **Last Verified Commands:** `python -m pytest tests/unit/test_runtime_proof_staleness_enforcement.py` **2** PASS; `python scripts/run_verification.py --skip-guard` PASS (staleness **ADVISORY**); `python scripts/run_verification.py --skip-guard --enforce-runtime-proof` **FAIL** on STALE proof (expected); prior `pytest tests/ci` **219** (**2** deselected); Quick `20260408_190807` (pre-slice-2).
+- **Context Acknowledgment:** 2026-04-08 ACTIVE WINDOW acknowledged; closure protocol applied for GAP-015 slice 2 bounded lane.
 - **Latest verify artifact:** `artifacts/verify/20260408_190807/verification_report.md` + `.buildlogs/verification/last_run.json` (rolling PASS).
 
 ## HISTORY LEDGER

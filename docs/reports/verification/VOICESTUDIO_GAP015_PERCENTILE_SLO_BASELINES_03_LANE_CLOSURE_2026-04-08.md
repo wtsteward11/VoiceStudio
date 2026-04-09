@@ -41,7 +41,7 @@ Record **machine-readable percentile samples** (p50 / p95; p99 when n ≥ 100) f
 
 ## 4. Proof seal — actual results (2026-04-08)
 
-Workspace HEAD at runtime proof run: **`f4893d2a4b641ac5aa8033717dbd4128d61e85f0`** (pre-commit; re-resolve after ship).
+Ship commit (slice 3 harness + docs): **`202caac4`** (`feat(gap-015): percentile SLO baselines (slice 3)`). Runtime proof + Quick runs below used parent **`f4893d2a4b641ac5aa8033717dbd4128d61e85f0`** (artifacts carry that **commit_hash** in `slo_baselines.json` / `runtime_proof.json` from the proof run).
 
 | Surface | Command | Outcome | Artifact / evidence |
 |---------|---------|---------|---------------------|

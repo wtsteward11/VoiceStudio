@@ -11,9 +11,12 @@ Writes JSON diagnostics to stdout (single line or pretty-printed object).
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import sys
+import warnings
 from pathlib import Path
 
 # Reduce noisy imports when probing engine router (best-effort)
@@ -83,20 +86,25 @@ def _probe() -> dict:
         )
         return result
 
+    # Router import loads many optional engines; they log warnings to stderr. stdout must be JSON-only
+    # for verify.ps1 (which merges stderr when capturing). Capture stderr during this block only.
+    _router_stderr = io.StringIO()
     try:
-        from backend.services.engine_shared import _ensure_engine_router, engine_router
+        with contextlib.redirect_stderr(_router_stderr), warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            from backend.services.engine_shared import _ensure_engine_router, engine_router
 
-        _ensure_engine_router()
-        if engine_router is None:
-            result["engine_probe_error"] = "engine_router is None after _ensure_engine_router"
-        else:
-            engines = engine_router.list_engines()
-            ids = [e.lower() if isinstance(e, str) else str(e).lower() for e in engines]
-            result["engine_piper_available"] = any("piper" in x for x in ids)
-            if not result["engine_piper_available"]:
-                result["engine_probe_error"] = (
-                    f"piper not in engine list: {engines!r}"
-                )
+            _ensure_engine_router()
+            if engine_router is None:
+                result["engine_probe_error"] = "engine_router is None after _ensure_engine_router"
+            else:
+                engines = engine_router.list_engines()
+                ids = [e.lower() if isinstance(e, str) else str(e).lower() for e in engines]
+                result["engine_piper_available"] = any("piper" in x for x in ids)
+                if not result["engine_piper_available"]:
+                    result["engine_probe_error"] = (
+                        f"piper not in engine list: {engines!r}"
+                    )
     except Exception as exc:
         result["engine_probe_error"] = str(exc)[:500]
         result["engine_piper_available"] = False

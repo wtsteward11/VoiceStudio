@@ -14,6 +14,11 @@ docs/design/STARTUP_ORCHESTRATION_HARDENING_PLAN.md.
 Exit codes:
   0 - All checks passed
   1 - One or more checks failed
+
+Flags:
+  --enforce-runtime-proof — `runtime_proof_staleness` fails the run if
+    PROOF_GOLDEN_PATH_REAL_*.json is missing or older than 72 hours (GAP-015 slice 2).
+  --skip-runtime-proof-staleness — omit the staleness row entirely.
 """
 
 
@@ -25,10 +30,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-def _runtime_proof_staleness_result(project_root: Path) -> dict:
+def _runtime_proof_staleness_result(project_root: Path, *, enforce: bool = False) -> dict:
     """
     GAP-015: Report freshness of optional PROOF_GOLDEN_PATH_REAL_*.json artifacts.
-    Always passes (warning-only); does not fail the verification exit code.
+
+    When enforce=False (default): advisory only; passed=True; exit_code=0.
+    When enforce=True (GAP-015 slice 2): MISSING/STALE/ERROR fails the run (passed=False, exit_code=1).
     """
     start_time = datetime.now()
     ver_dir = project_root / "docs" / "reports" / "verification"
@@ -40,28 +47,36 @@ def _runtime_proof_staleness_result(project_root: Path) -> dict:
         )
     except OSError as e:
         duration = (datetime.now() - start_time).total_seconds()
+        passed = not enforce
         return {
             "name": "runtime_proof_staleness",
             "command": "scan docs/reports/verification/PROOF_GOLDEN_PATH_REAL_*.json",
-            "exit_code": 0,
-            "passed": True,
+            "exit_code": 0 if passed else 1,
+            "passed": passed,
             "duration_seconds": round(duration, 2),
             "output_sample": f"STATUS=ERROR listing proofs: {e}",
+            "enforce": enforce,
         }
 
     if not files:
         duration = (datetime.now() - start_time).total_seconds()
+        msg = (
+            "STATUS=MISSING: no PROOF_GOLDEN_PATH_REAL_*.json under docs/reports/verification "
+            "(optional artifact; generate via scripts/ci/write_golden_path_real_proof.py). "
+        )
+        if enforce:
+            msg += "Enforce mode: this is a hard failure."
+        else:
+            msg += "This check is informational and does not fail the run."
+        passed = not enforce
         return {
             "name": "runtime_proof_staleness",
             "command": "scan docs/reports/verification/PROOF_GOLDEN_PATH_REAL_*.json",
-            "exit_code": 0,
-            "passed": True,
+            "exit_code": 0 if passed else 1,
+            "passed": passed,
             "duration_seconds": round(duration, 2),
-            "output_sample": (
-                "STATUS=MISSING: no PROOF_GOLDEN_PATH_REAL_*.json under docs/reports/verification "
-                "(optional artifact; generate via scripts/ci/write_golden_path_real_proof.py). "
-                "This check is informational and does not fail the run."
-            ),
+            "output_sample": msg,
+            "enforce": enforce,
         }
 
     latest = files[0]
@@ -69,16 +84,23 @@ def _runtime_proof_staleness_result(project_root: Path) -> dict:
     age_hours = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600.0
     status = "FRESH" if age_hours <= 72 else "STALE"
     duration = (datetime.now() - start_time).total_seconds()
+    if enforce:
+        passed = status == "FRESH"
+        tail = "Enforce mode: STALE or MISSING fails exit code."
+    else:
+        passed = True
+        tail = "warning-only, does not fail exit code"
     return {
         "name": "runtime_proof_staleness",
         "command": "scan docs/reports/verification/PROOF_GOLDEN_PATH_REAL_*.json",
-        "exit_code": 0,
-        "passed": True,
+        "exit_code": 0 if passed else 1,
+        "passed": passed,
         "duration_seconds": round(duration, 2),
         "output_sample": (
             f"STATUS={status}: latest_file={latest.name} age_hours={age_hours:.2f} "
-            f"(policy_window_hours=72; warning-only, does not fail exit code)"
+            f"(policy_window_hours=72; {tail})"
         ),
+        "enforce": enforce,
     }
 
 # Ensure UTF-8 output on Windows console
@@ -329,8 +351,9 @@ def main():
             "timeout": 90
         })
 
-    # GAP-015: optional real golden-path proof staleness (warning-only; always passed=True)
+    # GAP-015: optional real golden-path proof staleness (warning-only unless --enforce-runtime-proof)
     skip_runtime_stale = "--skip-runtime-proof-staleness" in sys.argv
+    enforce_runtime_proof = "--enforce-runtime-proof" in sys.argv
 
     # Run checks
     results = []
@@ -357,12 +380,19 @@ def main():
         print(f"  [{status}] {result['name']} (exit {result['exit_code']}, {result['duration_seconds']}s)")
 
     if not skip_runtime_stale:
-        stale_result = _runtime_proof_staleness_result(project_root)
-        results.append(stale_result)
-        print(
-            f"  [PASS] {stale_result['name']} "
-            f"(exit 0, {stale_result['duration_seconds']}s)"
+        stale_result = _runtime_proof_staleness_result(
+            project_root, enforce=enforce_runtime_proof
         )
+        results.append(stale_result)
+        if stale_result["passed"]:
+            tag = "PASS" if enforce_runtime_proof else "ADVISORY"
+        else:
+            tag = "FAIL"
+        print(
+            f"  [{tag}] {stale_result['name']} "
+            f"(exit {stale_result['exit_code']}, {stale_result['duration_seconds']}s)"
+        )
+        print(f"       {stale_result['output_sample'][:300]}")
 
     # Summary
     all_passed = all(r["passed"] for r in results)
@@ -370,7 +400,7 @@ def main():
     print()
     print(f"  Overall: {'PASS' if all_passed else 'FAIL'}")
     if any_stale_cleaned:
-        print(f"  [AUDIT] stale_process_cleaned: true (testhost was killed before build)")
+        print("  [AUDIT] stale_process_cleaned: true (testhost was killed before build)")
     print()
 
     # Save JSON report

@@ -14,7 +14,7 @@ These grades classify **what class of truth** a test or harness proves. They com
 |-------|------|------------|----------|
 | **S** | Seam | Unit / isolated tests; mocks; no live process; no network. | MSTest ViewModel tests with mocked `ITrainingClient`; Python unit tests. |
 | **I** | Integration | In-process ASGI or `TestClient`; real app wiring; no separate uvicorn/desktop process. | `tests/ci/test_golden_loop_smoke.py` (stub mode); `tests/ci/test_runtime_proof_training_export.py`. |
-| **R** | Runtime | Live backend on a port and/or desktop subprocess; health and feature paths through real I/O. | `verify.ps1` UI stages (icon-launch, failure smokes); `tests/ci/test_golden_loop_smoke_real.py` (real engine + consent); optional `PROOF_GOLDEN_PATH_REAL_*.json`. |
+| **R** | Runtime | Live backend on a port and/or desktop subprocess; health and feature paths through real I/O. | `verify.ps1` UI stages (icon-launch, failure smokes); `tests/ci/test_golden_loop_smoke_real.py` (real engine + consent); optional `PROOF_GOLDEN_PATH_REAL_*.json`; `artifacts/verify/<ts>/runtime_proof.json` **schema v2** from `verify.ps1 -RuntimeProof` (`status`: PASS / FAIL / BLOCKED; `proof_grade`: R). |
 
 **Operational doctrine:** Green **Grade S** alone does not prove the product path works against a live backend. **Grade I** proves in-process authority. **Grade R** proves operability consistent with production startup and/or engine-backed paths.
 

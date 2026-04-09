@@ -37,7 +37,8 @@
     VERIFICATION MODES:
     - Full (default): All stages. Typical duration 10+ minutes.
     - Quick (-Quick): Build, lint, Quick Critical Gates, Security Tests, Gate/Ledger. Skips C#/Python unit tests, contract, integration, UI. Typical duration 3-5 minutes depending on machine.
-    - Runtime proof (-RuntimeProof): Standalone only (GAP-015). Runs real-mode golden-loop synthesis + training export honesty CI tests; writes artifacts/verify/{timestamp}/runtime_proof.json. Prerequisites: python, pytest, engines/consent for real synthesis. Forbidden with -Quick.
+    - Runtime proof (-RuntimeProof): Standalone only (GAP-015). Runs real-mode golden-loop synthesis + training export honesty CI tests; writes artifacts/verify/{timestamp}/runtime_proof.json (schema v2). Prerequisites: python, pytest, piper engine + consent routes. Forbidden with -Quick.
+    - Enforce runtime proof freshness (-EnforceRuntimeProof): Passes --enforce-runtime-proof to Gate/Ledger (run_verification.py) so stale/missing PROOF_GOLDEN_PATH_REAL_*.json fails. Forbidden with -Quick. Does not affect -RuntimeProof standalone.
     
     SIDE EFFECTS: Creates artifacts/verify/{timestamp}/, updates artifacts/verify/latest symlink, prunes runs older than KeepCount (10).
 .PARAMETER Quick
@@ -69,7 +70,9 @@
 .PARAMETER OnlyStage
     Run only the specified stage. Use after a successful build to debug a specific stage. Fails fast with clear message if build artifacts are missing.     Supports: Clean Build, Python Quality, Quick Critical Gates, C# Unit Tests (all shards), C# Unit Tests - ViewModels Seam A-D, C# Unit Tests - Services, etc., Python Unit Tests, Contract Tests, Security Tests, Backend Integration, UI Smoke Tests, UI Self-Test, Icon-Launch Smoke, Failure-Path Smoke, Runtime-Missing Failure Smoke, Gate/Ledger Validation.
 .PARAMETER RuntimeProof
-    Standalone mode: run only the GAP-015 runtime proof bundle (real-mode synthesis pytest + training export honesty). Writes runtime_proof.json under artifacts/verify/{timestamp}. Cannot be used with -Quick or -OnlyStage.
+    Standalone mode: run only the GAP-015 runtime proof bundle (real-mode synthesis pytest + training export honesty). Writes runtime_proof.json (schema v2) under artifacts/verify/{timestamp}. Cannot be used with -Quick or -OnlyStage.
+.PARAMETER EnforceRuntimeProof
+    When set, Gate/Ledger stage runs python scripts/run_verification.py with --enforce-runtime-proof (hard fail on missing/stale Grade-R golden-path proof artifacts). Cannot be used with -Quick.
 .EXAMPLE
     .\scripts\verify.ps1
     .\scripts\verify.ps1 -Quick
@@ -78,6 +81,7 @@
     .\scripts\verify.ps1 -OnlyStage "C# Unit Tests"
     .\scripts\verify.ps1 -OnlyStage "C# Unit Tests - ViewModels Seam A-D"
     .\scripts\verify.ps1 -RuntimeProof
+    .\scripts\verify.ps1 -EnforceRuntimeProof
 #>
 [CmdletBinding()]
 param(
@@ -99,6 +103,7 @@ param(
     [switch]$StrictMypy,
     [switch]$ReleaseCandidate,
     [switch]$RuntimeProof,
+    [switch]$EnforceRuntimeProof,
     [ValidateSet("", "Clean Build", "Python Quality", "Quick Critical Gates", "C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other", "Python Unit Tests", "Contract Tests", "Security Tests", "Backend Integration", "UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke", "Gate/Ledger Validation")]
     [string]$OnlyStage = ""
 )
@@ -152,6 +157,10 @@ if ($Quick -and $RuntimeProof) {
 }
 if ($RuntimeProof -and $OnlyStage) {
     Write-Host "ERROR: -RuntimeProof is standalone; do not combine with -OnlyStage" -ForegroundColor Red
+    exit 1
+}
+if ($Quick -and $EnforceRuntimeProof) {
+    Write-Host "ERROR: -EnforceRuntimeProof cannot be combined with -Quick" -ForegroundColor Red
     exit 1
 }
 
@@ -322,6 +331,9 @@ if ($Quick) {
 }
 if ($RuntimeProof) {
     $proofLines += "RuntimeProof: standalone GAP-015 bundle (exits after runtime_proof.json)"
+}
+if ($EnforceRuntimeProof) {
+    $proofLines += "EnforceRuntimeProof: Gate/Ledger uses --enforce-runtime-proof (stale/missing Grade-R proof fails)"
 }
 $proofLines += "StageTimeouts:"
 foreach ($key in $StageTimeouts.Keys) {
@@ -838,13 +850,97 @@ if ($RuntimeProof) {
     Write-Host ""
     Write-Host ("=" * 70) -ForegroundColor Cyan
     Write-Host "  RUNTIME PROOF (-RuntimeProof)" -ForegroundColor Cyan
-    Write-Host "  Real-mode golden loop + training export API honesty" -ForegroundColor Cyan
+    Write-Host "  Real-mode golden loop + training export API honesty (schema v2)" -ForegroundColor Cyan
     Write-Host ("=" * 70) -ForegroundColor Cyan
     Write-Host ""
 
+    $commitHash = git rev-parse HEAD 2>$null
+    if (-not $commitHash) { $commitHash = "unknown" }
     $runtimeLog = Join-Path $StageLogsDir "runtime_proof.log"
     $synthXml = Join-Path $TestResultsDir "runtime_proof_synthesis.xml"
     $trainXml = Join-Path $TestResultsDir "runtime_proof_training.xml"
+    $proofJson = Join-Path $ArtifactsDir "runtime_proof.json"
+    $probeScript = Join-Path $ScriptDir "ci\check_runtime_prerequisites.py"
+
+    Write-Host "[Runtime proof] Prerequisite probe (engines, consent, pytest)..." -ForegroundColor Cyan
+    $probeStdout = & python $probeScript 2>&1
+    $probeExit = $LASTEXITCODE
+    $probeText = ($probeStdout | Out-String).Trim()
+    $prereqObj = $null
+    try {
+        $prereqObj = $probeText | ConvertFrom-Json
+    } catch {
+        Write-Host "ERROR: Prerequisite probe returned non-JSON output:" -ForegroundColor Red
+        Write-Host $probeText -ForegroundColor Yellow
+        $failProof = [ordered]@{
+            schema_version  = 2
+            timestamp       = (Get-Date -Format 'o')
+            commit_hash     = $commitHash
+            status          = "FAIL"
+            blocked_reason  = $null
+            skip_reason     = $null
+            proof_grade     = "R"
+            command_executed = "verify.ps1 -RuntimeProof"
+            prerequisites   = @{ probe_parse_error = $true }
+            assertions      = @()
+            log             = $runtimeLog
+        }
+        ($failProof | ConvertTo-Json -Depth 8) | Out-File -FilePath $proofJson -Encoding utf8
+        exit 1
+    }
+
+    function Write-RuntimeProofJson {
+        param(
+            [string]$Status,
+            [string]$BlockedReason,
+            [string]$SkipReason,
+            [object]$Prereq,
+            [array]$Assertions,
+            [int]$ExitCode
+        )
+        $proofObj = [ordered]@{
+            schema_version   = 2
+            timestamp        = (Get-Date -Format 'o')
+            commit_hash      = $commitHash
+            status           = $Status
+            blocked_reason   = $BlockedReason
+            skip_reason      = $SkipReason
+            proof_grade      = "R"
+            command_executed = "verify.ps1 -RuntimeProof"
+            prerequisites    = $Prereq
+            assertions       = $Assertions
+            log              = $runtimeLog
+        }
+        ($proofObj | ConvertTo-Json -Depth 8) | Out-File -FilePath $proofJson -Encoding utf8
+        if (Test-Path $LatestLink) {
+            Remove-Item $LatestLink -Force -Recurse -ErrorAction SilentlyContinue
+        }
+        try {
+            cmd /c mklink /J "$LatestLink" "$ArtifactsDir" 2>&1 | Out-Null
+        } catch {
+            Copy-Item $ArtifactsDir $LatestLink -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        exit $ExitCode
+    }
+
+    if ($null -ne $prereqObj -and $prereqObj.blocked -eq $true) {
+        Write-Host ""
+        Write-Host "RUNTIME PROOF BLOCKED: $($prereqObj.blocked_reason)" -ForegroundColor Yellow
+        $prMap = @{}
+        if ($prereqObj) {
+            $prereqObj.PSObject.Properties | ForEach-Object { $prMap[$_.Name] = $_.Value }
+        }
+        $asr = @()
+        Write-RuntimeProofJson -Status "BLOCKED" -BlockedReason ([string]$prereqObj.blocked_reason) -SkipReason $null -Prereq $prMap -Assertions $asr -ExitCode 2
+    }
+    if (($probeExit -ne 0) -and (($null -eq $prereqObj) -or (-not $prereqObj.blocked))) {
+        Write-Host "ERROR: Prerequisite probe failed (exit $probeExit)" -ForegroundColor Red
+        $prMap = @{}
+        if ($prereqObj) {
+            $prereqObj.PSObject.Properties | ForEach-Object { $prMap[$_.Name] = $_.Value }
+        }
+        Write-RuntimeProofJson -Status "FAIL" -BlockedReason $null -SkipReason $null -Prereq $prMap -Assertions @() -ExitCode 1
+    }
 
     $synthArgs = @(
         "-m", "pytest",
@@ -867,18 +963,44 @@ if ($RuntimeProof) {
     & python @trainArgs 2>&1 | Tee-Object -Append -FilePath $runtimeLog
     $trainExit = $LASTEXITCODE
 
+    $synthStatus = if ($synthExit -eq 0) { "PASS" } else { "FAIL" }
+    $trainStatus = if ($trainExit -eq 0) { "PASS" } else { "FAIL" }
+    $overallStatus = if ($synthExit -eq 0 -and $trainExit -eq 0) { "PASS" } else { "FAIL" }
+    $prMap = @{}
+    $prereqObj.PSObject.Properties | ForEach-Object { $prMap[$_.Name] = $_.Value }
+
+    $assertions = @(
+        [ordered]@{
+            name        = "synthesis_golden_loop"
+            pytest_exit = $synthExit
+            junit_path  = $synthXml
+            status      = $synthStatus
+        },
+        [ordered]@{
+            name        = "training_export_honesty"
+            pytest_exit = $trainExit
+            junit_path  = $trainXml
+            status      = $trainStatus
+        }
+    )
+
+    $exitFinal = 0
+    if ($overallStatus -ne "PASS") { $exitFinal = 1 }
+
     $proofObj = [ordered]@{
-        schema_version = 1
-        timestamp      = (Get-Date -Format 'o')
-        synthesis_pytest_exit = $synthExit
-        training_pytest_exit  = $trainExit
-        synthesis_junit       = $synthXml
-        training_junit        = $trainXml
-        log                   = $runtimeLog
-        overall_pass          = ($synthExit -eq 0 -and $trainExit -eq 0)
+        schema_version   = 2
+        timestamp        = (Get-Date -Format 'o')
+        commit_hash      = $commitHash
+        status           = $overallStatus
+        blocked_reason   = $null
+        skip_reason      = $null
+        proof_grade      = "R"
+        command_executed = "verify.ps1 -RuntimeProof"
+        prerequisites    = $prMap
+        assertions       = $assertions
+        log              = $runtimeLog
     }
-    $proofJson = Join-Path $ArtifactsDir "runtime_proof.json"
-    ($proofObj | ConvertTo-Json -Depth 5) | Out-File -FilePath $proofJson -Encoding utf8
+    ($proofObj | ConvertTo-Json -Depth 8) | Out-File -FilePath $proofJson -Encoding utf8
 
     if (Test-Path $LatestLink) {
         Remove-Item $LatestLink -Force -Recurse -ErrorAction SilentlyContinue
@@ -889,7 +1011,7 @@ if ($RuntimeProof) {
         Copy-Item $ArtifactsDir $LatestLink -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    if ($synthExit -ne 0 -or $trainExit -ne 0) {
+    if ($exitFinal -ne 0) {
         Write-Host ""
         Write-Host "RUNTIME PROOF FAILED (see $runtimeLog)" -ForegroundColor Red
         exit 1
@@ -1624,7 +1746,14 @@ if (-not $SkipUI) { Invoke-PostStageCleanup }
 # ============================================================================
 
 $stage9Passed = Invoke-Stage -Name "Gate/Ledger Validation" -Description "Check gate status and validate quality ledger" -Skip:(($OnlyStage -and "Gate/Ledger Validation" -ne $OnlyStage) -or (-not $OnlyStage -and $SkipGates)) -Action {
-    & python scripts/run_verification.py --skip-guard
+    $rvArgs = @("scripts/run_verification.py", "--skip-guard")
+    if ($EnforceRuntimeProof) {
+        $rvArgs += "--enforce-runtime-proof"
+        Write-Host "  Gate/Ledger: runtime_proof_staleness enforce mode ON (GAP-015 slice 2)" -ForegroundColor Cyan
+    } else {
+        Write-Host "  Gate/Ledger: runtime_proof_staleness advisory (use -EnforceRuntimeProof for hard fail)" -ForegroundColor DarkGray
+    }
+    & python @rvArgs
     return $LASTEXITCODE
 }
 

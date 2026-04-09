@@ -4,7 +4,7 @@
 **Tracker:** **GAP-015** — **Partial** (umbrella “product SLO definitions + CI measurement hooks”; this slice delivers **governance + CI harness only**, not percentile SLO dashboards)  
 **Execution row:** [GOV_VOICESTUDIO_GAP015_PRODUCT_SLOS_AND_RUNTIME_PROOF_01_EXECUTION_ROW.md](../../design/GOV_VOICESTUDIO_GAP015_PRODUCT_SLOS_AND_RUNTIME_PROOF_01_EXECUTION_ROW.md) — **Closed**  
 **Closure date:** 2026-04-08  
-**Git:** `main` @ `d32124dbb8ffba63faffcb39ce5e907612a88e17` (GAP-015 slice 1 closure commit)
+**Git:** `main` @ `851b28d39c0a0025ca9cb94a26380ff93d37f15b` (GAP-015 slice 1 closure commit)
 
 ---
 

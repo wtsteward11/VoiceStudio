@@ -6,6 +6,7 @@ Complements Grade S unit tests in tests/unit/backend/services/test_training_simu
 """
 from __future__ import annotations
 
+import time
 import uuid
 
 import pytest
@@ -13,6 +14,7 @@ from httpx import ASGITransport, AsyncClient
 
 from backend.api.main import app
 from backend.services import training_service as ts
+from tests.ci.slo_timing_io import append_slo_timing_sample
 
 
 @pytest.mark.asyncio
@@ -31,6 +33,7 @@ async def test_export_rejects_simulation_complete_status() -> None:
     try:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
+            t0 = time.perf_counter()
             response = await client.post(
                 "/api/training/export",
                 json={
@@ -38,6 +41,11 @@ async def test_export_rejects_simulation_complete_status() -> None:
                     "profile_id": "p1",
                     "include_metadata": True,
                 },
+            )
+            append_slo_timing_sample(
+                "training_export_rejection",
+                "POST /api/training/export",
+                time.perf_counter() - t0,
             )
         assert response.status_code == 404, (
             f"Expected 404 for simulation job export, got {response.status_code}: {response.text[:300]}"
@@ -67,9 +75,15 @@ async def test_export_rejects_running_status() -> None:
     try:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
+            t0 = time.perf_counter()
             response = await client.post(
                 "/api/training/export",
                 json={"training_id": tid, "profile_id": "p1", "include_metadata": True},
+            )
+            append_slo_timing_sample(
+                "training_export_rejection",
+                "POST /api/training/export",
+                time.perf_counter() - t0,
             )
         assert response.status_code == 404
     finally:

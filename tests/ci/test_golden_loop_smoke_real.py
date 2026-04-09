@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import io
 import struct
+import time
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from backend.api.main import app
+from tests.ci.slo_timing_io import append_slo_timing_sample
 
 
 @pytest.fixture(autouse=True)
@@ -71,7 +73,13 @@ async def test_golden_loop_real_health_synthesize_stream(client: AsyncClient) ->
 
     Requires real piper engine and voice consent. Fails when missing.
     """
+    t0 = time.perf_counter()
     resp = await client.get("/api/health")
+    append_slo_timing_sample(
+        "backend_readiness",
+        "GET /api/health",
+        time.perf_counter() - t0,
+    )
     assert resp.status_code == 200, f"Health failed: {resp.status_code} - {resp.text}"
     data = resp.json()
     assert data.get("status") in ("healthy", "ok", "running")
@@ -119,6 +127,7 @@ async def test_golden_loop_real_health_synthesize_stream(client: AsyncClient) ->
         f"Consent not granted: status={grant_data.get('status')}"
     )
 
+    t1 = time.perf_counter()
     synth_resp = await client.post(
         "/api/voice/synthesize",
         json={
@@ -127,6 +136,11 @@ async def test_golden_loop_real_health_synthesize_stream(client: AsyncClient) ->
             "text": "Real-mode golden loop smoke.",
             "language": "en",
         },
+    )
+    append_slo_timing_sample(
+        "canonical_synthesis",
+        "POST /api/voice/synthesize",
+        time.perf_counter() - t1,
     )
     if synth_resp.status_code not in (200, 201, 202):
         pytest.fail(

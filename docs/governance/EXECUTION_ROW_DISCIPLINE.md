@@ -76,14 +76,14 @@ For engine-backed synthesis + training export honesty without running the full U
 | Quick verify | None (no staleness gate) | `.\scripts\verify.ps1 -Quick` |
 | Full verify (default) | **Advisory** — `runtime_proof_staleness` runs in `run_verification.py` and is visible in Stage 9 output; does **not** fail the harness | `.\scripts\verify.ps1` |
 | Full verify + hard gate | **Enforce** — missing or stale `PROOF_GOLDEN_PATH_REAL_*.json` (per 72h policy) **fails** Stage 9 | `.\scripts\verify.ps1 -EnforceRuntimeProof` |
-| Rolling verifier (default) | Advisory (`passed: True` for staleness row) | `python scripts/run_verification.py` |
+| Rolling verifier (default) | Advisory — `runtime_proof_staleness` **and** `slo_baseline_freshness` (GAP-015 slice 3; newest `slo_baselines.json` under `artifacts/verify/*/` or `docs/reports/verification/slo_baselines*.json`, 72h window); both rows `passed: True` unless `--enforce-runtime-proof` (staleness only) | `python scripts/run_verification.py` |
 | Rolling verifier + enforce | Hard fail on missing/stale proof | `python scripts/run_verification.py --enforce-runtime-proof` |
 | Release / closure (human process) | Runtime-affecting lanes that declare **Fresh** or **Inherited** Grade R must attach proof within the policy window; reviewers run enforce mode before approving | Same as enforce rows above |
-| Standalone runtime proof | `runtime_proof.json` **schema v2** — `PASS` / `FAIL` / `BLOCKED` (exit **0** / **1** / **2**); prerequisite probe: `scripts/ci/check_runtime_prerequisites.py` | `.\scripts\verify.ps1 -RuntimeProof` |
+| Standalone runtime proof | `runtime_proof.json` **schema v2** — `PASS` / `FAIL` / `BLOCKED` (exit **0** / **1** / **2**); prerequisite probe: `scripts/ci/check_runtime_prerequisites.py`; sibling **`slo_baselines.json` schema v1** from `scripts/ci/write_slo_baseline_proof.py` (advisory baselines; no threshold enforcement) | `.\scripts\verify.ps1 -RuntimeProof` |
 
 **Definitions:** **FRESH** = newest `docs/reports/verification/PROOF_GOLDEN_PATH_REAL_*.json` is ≤ **72 hours** old; **STALE** = older than 72h; **MISSING** = no such files. **BLOCKED** = cannot honestly run real-mode pytest (missing pytest, consent import failure, or no Piper manifest under `engines/`).
 
-**Deferred (GAP-015 slice 3):** percentile latency SLOs, measurement baselines, trend thresholds, telemetry warehouses — not part of slice 2.
+**GAP-015 slice 3 (closed):** Percentile **sample** baselines for three ASGI workflows live in `slo_baselines.json`; `slo_baseline_freshness` in `run_verification.py` mirrors the 72h advisory pattern and does **not** enforce thresholds. **Hard OUT** remains: no telemetry warehouse, dashboards, or CI gating on SLOs.
 
 ## 7. References
 

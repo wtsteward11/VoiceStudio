@@ -19,6 +19,10 @@ Flags:
   --enforce-runtime-proof — `runtime_proof_staleness` fails the run if
     PROOF_GOLDEN_PATH_REAL_*.json is missing or older than 72 hours (GAP-015 slice 2).
   --skip-runtime-proof-staleness — omit the staleness row entirely.
+
+Always-on advisory (GAP-015 slice 3): `slo_baseline_freshness` scans for
+`slo_baselines.json` under `artifacts/verify/*/` and `docs/reports/verification/`;
+never fails the run.
 """
 
 
@@ -102,6 +106,70 @@ def _runtime_proof_staleness_result(project_root: Path, *, enforce: bool = False
         ),
         "enforce": enforce,
     }
+
+
+def _slo_baseline_freshness_result(project_root: Path) -> dict:
+    """
+    GAP-015 slice 3: Report freshness of optional slo_baselines.json artifacts.
+
+    Advisory only — never fails the run (baseline_policy is not enforced via this check).
+    Scans artifacts/verify/*/slo_baselines.json and docs/reports/verification/slo_baselines*.json.
+    """
+    start_time = datetime.now()
+    candidates: list[Path] = []
+    try:
+        art = project_root / "artifacts" / "verify"
+        if art.is_dir():
+            candidates.extend(sorted(art.glob("*/slo_baselines.json")))
+        ver_dir = project_root / "docs" / "reports" / "verification"
+        if ver_dir.is_dir():
+            candidates.extend(sorted(ver_dir.glob("slo_baselines*.json")))
+    except OSError as e:
+        duration = (datetime.now() - start_time).total_seconds()
+        return {
+            "name": "slo_baseline_freshness",
+            "command": "scan slo_baselines.json (artifacts + docs/reports/verification)",
+            "exit_code": 0,
+            "passed": True,
+            "duration_seconds": round(duration, 2),
+            "output_sample": f"STATUS=ERROR listing baselines: {e}",
+            "enforce": False,
+        }
+
+    if not candidates:
+        duration = (datetime.now() - start_time).total_seconds()
+        return {
+            "name": "slo_baseline_freshness",
+            "command": "scan slo_baselines.json (artifacts + docs/reports/verification)",
+            "exit_code": 0,
+            "passed": True,
+            "duration_seconds": round(duration, 2),
+            "output_sample": (
+                "STATUS=MISSING: no slo_baselines.json found under artifacts/verify/*/ or "
+                "docs/reports/verification/slo_baselines*.json (optional; generate via verify.ps1 -RuntimeProof). "
+                "Advisory only."
+            ),
+            "enforce": False,
+        }
+
+    latest = max(candidates, key=lambda p: p.stat().st_mtime)
+    mtime = datetime.fromtimestamp(latest.stat().st_mtime, tz=timezone.utc)
+    age_hours = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600.0
+    status = "FRESH" if age_hours <= 72 else "STALE"
+    duration = (datetime.now() - start_time).total_seconds()
+    return {
+        "name": "slo_baseline_freshness",
+        "command": "scan slo_baselines.json (artifacts + docs/reports/verification)",
+        "exit_code": 0,
+        "passed": True,
+        "duration_seconds": round(duration, 2),
+        "output_sample": (
+            f"STATUS={status}: latest_file={latest.relative_to(project_root)} "
+            f"age_hours={age_hours:.2f} (policy_window_hours=72; advisory only, does not fail exit code)"
+        ),
+        "enforce": False,
+    }
+
 
 # Ensure UTF-8 output on Windows console
 if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
@@ -393,6 +461,14 @@ def main():
             f"(exit {stale_result['exit_code']}, {stale_result['duration_seconds']}s)"
         )
         print(f"       {stale_result['output_sample'][:300]}")
+
+    slo_fresh_result = _slo_baseline_freshness_result(project_root)
+    results.append(slo_fresh_result)
+    print(
+        f"  [ADVISORY] {slo_fresh_result['name']} "
+        f"(exit {slo_fresh_result['exit_code']}, {slo_fresh_result['duration_seconds']}s)"
+    )
+    print(f"       {slo_fresh_result['output_sample'][:300]}")
 
     # Summary
     all_passed = all(r["passed"] for r in results)

@@ -37,7 +37,7 @@
     VERIFICATION MODES:
     - Full (default): All stages. Typical duration 10+ minutes.
     - Quick (-Quick): Build, lint, Quick Critical Gates, Security Tests, Gate/Ledger. Skips C#/Python unit tests, contract, integration, UI. Typical duration 3-5 minutes depending on machine.
-    - Runtime proof (-RuntimeProof): Standalone only (GAP-015). Runs real-mode golden-loop synthesis + training export honesty CI tests; writes artifacts/verify/{timestamp}/runtime_proof.json (schema v2). Prerequisites: python, pytest, piper engine + consent routes. Forbidden with -Quick.
+    - Runtime proof (-RuntimeProof): Standalone only (GAP-015). Runs real-mode golden-loop synthesis + training export honesty CI tests; writes artifacts/verify/{timestamp}/runtime_proof.json (schema v2) and slo_baselines.json (schema v1, advisory SLO samples). Prerequisites: python, pytest, piper engine + consent routes. Forbidden with -Quick.
     - Enforce runtime proof freshness (-EnforceRuntimeProof): Passes --enforce-runtime-proof to Gate/Ledger (run_verification.py) so stale/missing PROOF_GOLDEN_PATH_REAL_*.json fails. Forbidden with -Quick. Does not affect -RuntimeProof standalone.
     
     SIDE EFFECTS: Creates artifacts/verify/{timestamp}/, updates artifacts/verify/latest symlink, prunes runs older than KeepCount (10).
@@ -850,7 +850,7 @@ if ($RuntimeProof) {
     Write-Host ""
     Write-Host ("=" * 70) -ForegroundColor Cyan
     Write-Host "  RUNTIME PROOF (-RuntimeProof)" -ForegroundColor Cyan
-    Write-Host "  Real-mode golden loop + training export API honesty (schema v2)" -ForegroundColor Cyan
+    Write-Host "  Real-mode golden loop + training export API honesty (schema v2 + SLO baselines v1)" -ForegroundColor Cyan
     Write-Host ("=" * 70) -ForegroundColor Cyan
     Write-Host ""
 
@@ -860,6 +860,9 @@ if ($RuntimeProof) {
     $synthXml = Join-Path $TestResultsDir "runtime_proof_synthesis.xml"
     $trainXml = Join-Path $TestResultsDir "runtime_proof_training.xml"
     $proofJson = Join-Path $ArtifactsDir "runtime_proof.json"
+    $sloTimingJson = Join-Path $ArtifactsDir "slo_timing_samples.json"
+    $sloBaselinesJson = Join-Path $ArtifactsDir "slo_baselines.json"
+    $sloWriterScript = Join-Path $ScriptDir "ci\write_slo_baseline_proof.py"
     $probeScript = Join-Path $ScriptDir "ci\check_runtime_prerequisites.py"
 
     Write-Host "[Runtime proof] Prerequisite probe (engines, consent, pytest)..." -ForegroundColor Cyan
@@ -942,6 +945,9 @@ if ($RuntimeProof) {
         Write-RuntimeProofJson -Status "FAIL" -BlockedReason $null -SkipReason $null -Prereq $prMap -Assertions @() -ExitCode 1
     }
 
+    if (Test-Path $sloTimingJson) { Remove-Item $sloTimingJson -Force -ErrorAction SilentlyContinue }
+    $env:VOICESTUDIO_SLO_TIMING_JSON = $sloTimingJson
+
     $synthArgs = @(
         "-m", "pytest",
         "tests/ci/test_golden_loop_smoke_real.py::test_golden_loop_real_health_synthesize_stream",
@@ -962,6 +968,12 @@ if ($RuntimeProof) {
     Write-Host "[Runtime proof] Training export honesty..." -ForegroundColor Cyan
     & python @trainArgs 2>&1 | Tee-Object -Append -FilePath $runtimeLog
     $trainExit = $LASTEXITCODE
+
+    Write-Host "[Runtime proof] Writing slo_baselines.json (GAP-015 slice 3)..." -ForegroundColor Cyan
+    & python $sloWriterScript --timing-json $sloTimingJson --output $sloBaselinesJson --commit-hash $commitHash --environment asgi_transport --proof-grade R 2>&1 | Tee-Object -Append -FilePath $runtimeLog
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARNING: write_slo_baseline_proof.py exited $LASTEXITCODE (artifact may be missing)" -ForegroundColor Yellow
+    }
 
     $synthStatus = if ($synthExit -eq 0) { "PASS" } else { "FAIL" }
     $trainStatus = if ($trainExit -eq 0) { "PASS" } else { "FAIL" }

@@ -37,3 +37,21 @@ def test_staleness_enforce_fails_when_missing_proof(tmp_path: Path, rv_mod) -> N
     assert res["passed"] is False
     assert res["exit_code"] == 1
     assert "MISSING" in res["output_sample"]
+
+
+def test_slo_baseline_freshness_advisory_when_missing(tmp_path: Path, rv_mod) -> None:
+    """GAP-015 slice 3: no slo_baselines.json is advisory-only (never fails)."""
+    res = rv_mod._slo_baseline_freshness_result(tmp_path)
+    assert res["passed"] is True
+    assert res["exit_code"] == 0
+    assert res["name"] == "slo_baseline_freshness"
+    assert "MISSING" in res["output_sample"]
+
+
+def test_slo_baseline_freshness_fresh_under_artifacts_verify(tmp_path: Path, rv_mod) -> None:
+    art = tmp_path / "artifacts" / "verify" / "fake_run"
+    art.mkdir(parents=True)
+    (art / "slo_baselines.json").write_text('{"schema_version": 1}\n', encoding="utf-8")
+    res = rv_mod._slo_baseline_freshness_result(tmp_path)
+    assert res["passed"] is True
+    assert "FRESH" in res["output_sample"]

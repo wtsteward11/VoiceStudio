@@ -638,8 +638,8 @@ async def start_model_download(
     _: None = Depends(require_auth_if_enabled),
 ):
     """Create a canonical download job and begin staging the remote artifact."""
-    from backend.services.canonical_job_lifecycle import create_job
     from backend.data.repositories.job_repository import JobType as RepoJobType
+    from backend.services.canonical_job_lifecycle import create_job
     from backend.services.model_download_service import (
         find_active_download_job,
         schedule_model_download,

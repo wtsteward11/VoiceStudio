@@ -69,8 +69,8 @@ async def _canonical_register_batch_job(
     language: str,
 ) -> None:
     """Register batch job in canonical SQLite job_history via /api/jobs helpers."""
-    from backend.services.canonical_job_lifecycle import create_job
     from backend.data.repositories.job_repository import JobType as CanonicalJobType
+    from backend.services.canonical_job_lifecycle import create_job
 
     metadata = {
         "domain": "batch",

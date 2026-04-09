@@ -19,17 +19,17 @@ from urllib.parse import urlparse
 
 import httpx
 
-from backend.services.canonical_job_lifecycle import (
-    complete_job,
-    fail_job,
-    mark_job_running,
-    update_job_progress,
-)
 from backend.core.security.file_validation import FileValidationError, validate_archive_file
 from backend.data.repositories.job_repository import (
     JobStatus,
     JobType,
     get_job_repository,
+)
+from backend.services.canonical_job_lifecycle import (
+    complete_job,
+    fail_job,
+    mark_job_running,
+    update_job_progress,
 )
 from backend.services.model_facade import ModelStorage
 

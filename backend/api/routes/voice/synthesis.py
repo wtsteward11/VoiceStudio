@@ -10,9 +10,10 @@ from backend.api.models_additional import (
     VoiceSynthesizeRequest,
     VoiceSynthesizeResponse,
 )
-from ._shared import router
 from backend.core.exceptions import ServiceError
 from backend.services.synthesis_service import SynthesisService
+
+from ._shared import router
 
 
 def _raise_synthesis_service_error(exc: ServiceError) -> None:

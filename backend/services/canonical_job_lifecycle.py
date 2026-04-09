@@ -11,10 +11,9 @@ import logging
 from datetime import datetime
 from typing import Optional, cast
 
+from backend.api.optimization import invalidate_api_response_cache
 from backend.data.repositories.job_repository import JobEntity, get_job_repository
 from backend.data.repositories.job_repository import JobStatus as RepoJobStatus
-
-from backend.api.optimization import invalidate_api_response_cache
 
 logger = logging.getLogger(__name__)
 

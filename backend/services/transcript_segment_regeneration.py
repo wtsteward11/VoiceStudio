@@ -44,13 +44,13 @@ async def run_transcript_segment_regeneration_job(
     track_store: Any,
 ) -> None:
     """Execute regeneration for one segment; updates job row on success/failure."""
+    from backend.core.exceptions import ServiceError
     from backend.services.canonical_job_lifecycle import (
         complete_job,
         fail_job,
         mark_job_running,
         update_job_progress,
     )
-    from backend.core.exceptions import ServiceError
 
     t_repo = get_transcription_repository()
 

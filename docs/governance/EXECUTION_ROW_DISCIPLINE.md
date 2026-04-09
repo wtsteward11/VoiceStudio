@@ -85,7 +85,17 @@ For engine-backed synthesis + training export honesty without running the full U
 
 **GAP-015 slice 3 (closed):** Percentile **sample** baselines for three ASGI workflows live in `slo_baselines.json`; `slo_baseline_freshness` in `run_verification.py` mirrors the 72h advisory pattern and does **not** enforce thresholds. **Hard OUT** remains: no telemetry warehouse, dashboards, or CI gating on SLOs.
 
-## 7. References
+## 7. Closure report doctrine (runtime-affecting lanes)
+
+Every **runtime-affecting** lane closure report MUST make the following explicit (in addition to §2 failure-path parity and §6 runtime proof when applicable):
+
+1. **Grade S / I / R** — What was proven at each grade per [TEST_CLASSIFICATION.md](TEST_CLASSIFICATION.md) (seam vs integration vs real stack).
+2. **Grade R: inherited vs fresh** — If the row declared **Inherited Grade R proof required**, cite the prior artifact path and timestamp and confirm it is within the policy window (default **72h**). If **Fresh Grade R proof required**, cite the new artifact from `.\scripts\verify.ps1 -RuntimeProof` (or the row’s stated substitute) and its outcome. If the row declared **No Grade R proof**, state that and do not imply full-stack operability from lower grades alone.
+3. **SLO posture** — State whether `slo_baselines.json` / `slo_baseline_freshness` was **informational / advisory only** for this closure (default after GAP-015 slice 3) or whether a future umbrella explicitly changed gating. Silent omission is not allowed for lanes that ran the rolling verifier or `-RuntimeProof` sibling SLO emission.
+
+**Proof-hardening** rows (§1) must state **No production code paths changed** and typically declare **No Grade R proof**; they still benefit from a one-line SLO posture note if rolling verify output is cited.
+
+## 8. References
 
 - Gap tracker: [PROFESSIONAL_GAP_TRACKER.md](../design/PROFESSIONAL_GAP_TRACKER.md)
 - Proof grades: [TEST_CLASSIFICATION.md](TEST_CLASSIFICATION.md) (Grade S / I / R)

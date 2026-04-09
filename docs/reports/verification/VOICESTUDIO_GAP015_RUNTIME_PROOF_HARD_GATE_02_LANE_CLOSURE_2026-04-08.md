@@ -3,7 +3,8 @@
 **Lane ID:** `GOV-VOICESTUDIO-GAP015-RUNTIME-PROOF-HARD-GATE-02`  
 **Tracker:** **GAP-015** — **Partial** (percentile SLO measurement = slice 3)  
 **Execution row:** [GOV_VOICESTUDIO_GAP015_RUNTIME_PROOF_HARD_GATE_02_EXECUTION_ROW.md](../../design/GOV_VOICESTUDIO_GAP015_RUNTIME_PROOF_HARD_GATE_02_EXECUTION_ROW.md) — **Closed**  
-**Closure date:** 2026-04-08
+**Closure date:** 2026-04-08  
+**Git:** `main` @ `cb804077c32fba7b30d1b57e94e708967d2ed678` (GAP-015 slice 2 harness commit)
 
 ---
 

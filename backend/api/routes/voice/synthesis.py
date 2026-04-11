@@ -5,6 +5,8 @@ from fastapi import Depends, HTTPException, Request
 from backend.api.dependencies import require_synthesis_clearance
 from backend.api.deps import EngineConfigServiceDep
 from backend.api.models_additional import (
+    LongFormSynthesisRequest,
+    LongFormSynthesisResponse,
     MultiPassSynthesisRequest,
     MultiPassSynthesisResponse,
     VoiceSynthesizeRequest,
@@ -55,6 +57,23 @@ async def synthesize_multipass(
             req,
             request,
             None,
+        )
+    except ServiceError as e:
+        _raise_synthesis_service_error(e)
+
+
+async def synthesize_long_form(
+    req: LongFormSynthesisRequest,
+    request: Request,
+    _policy: None = Depends(require_synthesis_clearance),
+    config_service: EngineConfigServiceDep | None = None,
+) -> LongFormSynthesisResponse:
+    """Long-form chunked synthesis; delegates to SynthesisService."""
+    try:
+        return await SynthesisService.synthesize_long_form(
+            req,
+            request,
+            config_service,
         )
     except ServiceError as e:
         _raise_synthesis_service_error(e)
@@ -137,6 +156,12 @@ router.add_api_route(
     synthesize_multipass,
     methods=["POST"],
     response_model=MultiPassSynthesisResponse,
+)
+router.add_api_route(
+    "/synthesize/long-form",
+    synthesize_long_form,
+    methods=["POST"],
+    response_model=LongFormSynthesisResponse,
 )
 router.add_api_route(
     "/synthesize/style",

@@ -15,7 +15,7 @@ namespace VoiceStudio.App.Helpers;
 /// </summary>
 public static class UnpackagedSettingsHelper
 {
-    private static readonly string _settingsFilePath;
+    private static string _settingsFilePath;
     private static readonly object _lock = new();
     private static Dictionary<string, object?>? _cachedSettings;
 
@@ -25,6 +25,38 @@ public static class UnpackagedSettingsHelper
         var voiceStudioDir = Path.Combine(appDataPath, "VoiceStudio");
         Directory.CreateDirectory(voiceStudioDir);
         _settingsFilePath = Path.Combine(voiceStudioDir, "appsettings.json");
+    }
+
+    /// <summary>
+    /// Redirects all reads and writes to a test file path. Test-only; never call from production code.
+    /// Public so MSTest can call it (assembly has <c>GenerateAssemblyInfo=false</c>, so <c>InternalsVisibleTo</c> is not emitted).
+    /// </summary>
+    public static void UseTestSettingsPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("Path must be non-empty.", nameof(path));
+        }
+
+        lock (_lock)
+        {
+            _settingsFilePath = path;
+            _cachedSettings = null;
+        }
+    }
+
+    /// <summary>
+    /// Restores the production settings path after a test run. Test-only companion to <see cref="UseTestSettingsPath"/>.
+    /// </summary>
+    public static void ResetSettingsPath()
+    {
+        lock (_lock)
+        {
+            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var voiceStudioDir = Path.Combine(appDataPath, "VoiceStudio");
+            _settingsFilePath = Path.Combine(voiceStudioDir, "appsettings.json");
+            _cachedSettings = null;
+        }
     }
 
     /// <summary>

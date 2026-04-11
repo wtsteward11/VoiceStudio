@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace VoiceStudio.Core.Services
@@ -38,6 +39,18 @@ namespace VoiceStudio.Core.Services
     /// Gets whether the WebSocket is connected.
     /// </summary>
     bool IsConnected { get; }
+
+    /// <summary>
+    /// Sets static request headers for the WebSocket upgrade handshake (e.g. X-API-Key).
+    /// Call before <see cref="ConnectAsync"/>. GAP-058.
+    /// </summary>
+    void SetAuthHeaders(IReadOnlyDictionary<string, string>? headers);
+
+    /// <summary>
+    /// Optional per-connect credential provider (e.g. from <c>IUnifiedAuthService</c>).
+    /// Merged with <see cref="SetAuthHeaders"/> and env <c>VOICESTUDIO_API_KEY</c>. GAP-058.
+    /// </summary>
+    void SetCredentialProvider(Func<IReadOnlyDictionary<string, string>?>? provider);
 
     /// <summary>
     /// Connects to the WebSocket server with specified topics.

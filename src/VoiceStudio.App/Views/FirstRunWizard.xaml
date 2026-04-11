@@ -1,9 +1,12 @@
 <Window x:Class="VoiceStudio.App.Views.FirstRunWizard"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:VoiceStudio.App.Controls"
         Title="VoiceStudio Setup Wizard">
 
-    <Grid Background="{StaticResource VSQ.Window.Background}">
+    <Grid x:Name="WizardRootGrid"
+          Background="{StaticResource VSQ.Window.Background}"
+          Loaded="WizardRootGrid_Loaded">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -20,7 +23,7 @@
                            FontWeight="Bold"
                            Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
                 <TextBlock x:Name="StepIndicatorText"
-                           Text="Step 1 of 4: Welcome"
+                           Text="Step 1 of 5: Welcome"
                            FontSize="14"
                            Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
             </StackPanel>
@@ -30,7 +33,9 @@
         <ScrollViewer Grid.Row="1" Padding="24">
             <Grid x:Name="ContentGrid">
                 <!-- Step 1: Welcome -->
-                <StackPanel x:Name="Step1Welcome" Spacing="16">
+                <StackPanel x:Name="Step1Welcome"
+                            AutomationProperties.AutomationId="FirstRunWizard_Step1Welcome"
+                            Spacing="16">
                     <TextBlock Text="Welcome to VoiceStudio Quantum+"
                                FontSize="28"
                                FontWeight="Bold"
@@ -50,9 +55,9 @@
                                        Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
                             <TextBlock Text="1. Verify your system meets the requirements"
                                        Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                            <TextBlock Text="2. Connect to the backend processing engine"
+                            <TextBlock Text="2. Confirm models and connect to the backend engine"
                                        Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                            <TextBlock Text="3. Get started with your first project"
+                            <TextBlock Text="3. Learn where to manage API keys and get started"
                                        Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
                         </StackPanel>
                     </Border>
@@ -66,6 +71,7 @@
 
                 <!-- Step 2: System Check -->
                 <StackPanel x:Name="Step2SystemCheck" 
+                            AutomationProperties.AutomationId="FirstRunWizard_Step2SystemCheck"
                             Spacing="16"
                             Visibility="Collapsed">
                     <TextBlock Text="System Requirements Check"
@@ -100,6 +106,18 @@
                                        Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
                         </StackPanel>
 
+                        <Border x:Name="GpuFallbackPanel"
+                                AutomationProperties.AutomationId="FirstRunWizard_GpuFallbackPanel"
+                                Visibility="Collapsed"
+                                Background="{StaticResource VSQ.Panel.Background.SecondaryBrush}"
+                                BorderBrush="{StaticResource VSQ.Warn.Brush}"
+                                BorderThickness="1"
+                                CornerRadius="8" Padding="12" Margin="0,8,0,0">
+                            <TextBlock TextWrapping="Wrap"
+                                       Text="CPU mode: synthesis will be significantly slower than on a CUDA GPU. 8 GB RAM minimum recommended for typical workloads; larger models need more memory."
+                                       Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                        </Border>
+
                         <StackPanel Orientation="Horizontal" Spacing="12">
                             <FontIcon x:Name="DiskIcon" Glyph="&#xE73E;" Foreground="Green"/>
                             <TextBlock Text="Disk Space" VerticalAlignment="Center"
@@ -125,8 +143,57 @@
                                   Margin="0,16,0,0"/>
                 </StackPanel>
 
-                <!-- Step 3: Backend Health -->
-                <StackPanel x:Name="Step3BackendHealth" 
+                <!-- Step 3: Model readiness -->
+                <StackPanel x:Name="Step3ModelReadiness"
+                            AutomationProperties.AutomationId="FirstRunWizard_Step3ModelReadiness"
+                            Spacing="16"
+                            Visibility="Collapsed">
+                    <TextBlock Text="Model Readiness"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                    <TextBlock Text="Checking registered models for synthesis engines..."
+                               Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+
+                    <Border Background="{StaticResource VSQ.Panel.Background}"
+                            CornerRadius="8"
+                            Padding="16"
+                            Margin="0,16,0,0">
+                        <StackPanel Spacing="12">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <FontIcon x:Name="ModelIcon" Glyph="&#xE73E;" Foreground="Green"/>
+                                <TextBlock Text="Registered models" VerticalAlignment="Center"
+                                           Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                                <TextBlock x:Name="ModelStatus" Text="Checking..."
+                                           Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel x:Name="ModelDownloadCtaPanel"
+                                Visibility="Collapsed"
+                                Margin="0,8,0,0">
+                        <TextBlock TextWrapping="Wrap"
+                                   Text="No models are registered yet. After you finish setup, open the Model Manager panel (Train area) to download and register models. You can continue setup now."
+                                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+                        <Button x:Name="OpenModelManagerInfoButton"
+                                AutomationProperties.AutomationId="FirstRunWizard_ModelDownloadCta"
+                                Content="Where is Model Manager?"
+                                Margin="0,12,0,0"
+                                Click="OpenModelManagerInfoButton_Click"/>
+                    </StackPanel>
+
+                    <ProgressRing x:Name="ModelCheckProgress" 
+                                  IsActive="True" 
+                                  Width="32" 
+                                  Height="32"
+                                  HorizontalAlignment="Center"
+                                  Margin="0,16,0,0"/>
+                </StackPanel>
+
+                <!-- Step 4: Backend Health -->
+                <StackPanel x:Name="Step4BackendHealth" 
+                            AutomationProperties.AutomationId="FirstRunWizard_Step4BackendHealth"
                             Spacing="16"
                             Visibility="Collapsed">
                     <TextBlock Text="Backend Connection"
@@ -188,28 +255,31 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Step 4: Complete -->
-                <StackPanel x:Name="Step4Complete" 
+                <!-- Step 5: API keys + Complete -->
+                <StackPanel x:Name="Step5ApiComplete" 
+                            AutomationProperties.AutomationId="FirstRunWizard_Step5ApiComplete"
                             Spacing="16"
                             Visibility="Collapsed">
-                    <TextBlock Text="Setup Complete!"
+                    <TextBlock Text="API Keys &amp; Finish"
                                FontSize="24"
                                FontWeight="Bold"
                                HorizontalAlignment="Center"
                                Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
-                    <TextBlock Text="VoiceStudio is ready to use."
-                               FontSize="16"
-                               HorizontalAlignment="Center"
+                    <TextBlock TextWrapping="Wrap" HorizontalAlignment="Center"
+                               Text="Optional: add provider API keys in Settings → API Key Manager when you use cloud-backed engines. You can skip and configure later."
+                               FontSize="14"
                                Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
-                    
+
                     <Border Background="{StaticResource VSQ.Panel.Background}"
                             CornerRadius="8"
                             Padding="16"
-                            Margin="0,24,0,0">
+                            Margin="0,16,0,0">
                         <StackPanel Spacing="12">
                             <TextBlock Text="What's Next?" 
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
+                            <TextBlock Text="- Open API Key Manager from Settings when you need external providers"
+                                       Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
                             <TextBlock Text="- Create your first voice profile in the Profiles panel"
                                        Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
                             <TextBlock Text="- Import audio samples for voice cloning"
@@ -222,6 +292,7 @@
                     </Border>
 
                     <CheckBox x:Name="DontShowAgainCheckBox"
+                              AutomationProperties.AutomationId="FirstRunWizard_DontShowAgainCheckBox"
                               Content="Don't show this wizard on startup"
                               Margin="0,16,0,0"
                               Foreground="{StaticResource VSQ.Text.PrimaryBrush}"/>
@@ -238,25 +309,46 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <Button x:Name="SkipButton"
+                        AutomationProperties.AutomationId="FirstRunWizard_SkipButton"
                         Content="Skip Setup"
                         Click="SkipButton_Click"/>
 
-                <Button x:Name="BackButton"
+                <Button x:Name="HelpButton"
+                        AutomationProperties.AutomationId="FirstRunWizard_HelpButton"
                         Grid.Column="1"
+                        Content="?"
+                        Margin="8,0,8,0"
+                        ToolTipService.ToolTip="Step help"
+                        Visibility="Collapsed"
+                        Click="HelpButton_Click"/>
+
+                <Button x:Name="BackButton"
+                        Grid.Column="2"
                         Content="Back"
                         Margin="0,0,8,0"
                         Click="BackButton_Click"
                         Visibility="Collapsed"/>
 
                 <Button x:Name="NextButton"
-                        Grid.Column="2"
+                        AutomationProperties.AutomationId="FirstRunWizard_NextButton"
+                        Grid.Column="3"
                         Content="Get Started"
                         Style="{StaticResource VSQ.Button.Primary}"
                         Click="NextButton_Click"/>
             </Grid>
         </Border>
+
+        <controls:HelpOverlay x:Name="HelpOverlay"
+                              AutomationProperties.AutomationId="FirstRunWizard_HelpOverlay"
+                              Grid.Row="0"
+                              Grid.RowSpan="3"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch"
+                              IsVisible="False"
+                              Visibility="Collapsed"/>
     </Grid>
 </Window>

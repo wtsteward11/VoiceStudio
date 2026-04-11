@@ -612,6 +612,11 @@ def write_provenance_sidecar(
     model_used: str,
     source_reference_hash: str | None = None,
     version: str | None = None,
+    is_transformed: bool = False,
+    transformation_type: str | None = None,
+    source_reference_id: str | None = None,
+    watermark_applied: bool = False,
+    watermark_method: str | None = None,
 ) -> None:
     """
     Write provenance metadata as JSON sidecar (Item 24).
@@ -623,7 +628,6 @@ def write_provenance_sidecar(
     from pathlib import Path
 
     base = Path(output_base_path)
-    # If path has extension, sidecar is same name with .json; else append .json
     if base.suffix:
         sidecar_path = base.with_suffix(base.suffix + ".provenance.json")
     else:
@@ -634,6 +638,13 @@ def write_provenance_sidecar(
         "source_reference_hash": source_reference_hash,
         "voicestudio_version": version or "1.1.0",
     }
+    if is_transformed:
+        payload["is_transformed"] = True
+        payload["transformation_type"] = transformation_type
+        payload["source_reference_id"] = source_reference_id
+    if watermark_applied:
+        payload["watermark_applied"] = True
+        payload["watermark_method"] = watermark_method
     try:
         sidecar_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     except OSError as e:

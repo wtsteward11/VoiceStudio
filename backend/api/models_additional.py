@@ -676,6 +676,189 @@ class MultiPassSynthesisResponse(VoiceStudioBaseModel):
     improvement_tracking: list[float]  # Quality improvement per pass
 
 
+class LongFormChunkResult(VoiceStudioBaseModel):
+    """One failed chunk in long-form synthesis (GAP-049)."""
+
+    chunk_index: int
+    error: str
+
+
+class LongFormSynthesisRequest(VoiceStudioBaseModel):
+    """Long-form TTS: chunked synthesis with merged output (GAP-049)."""
+
+    model_config = ConfigDict(
+        validate_assignment=False,
+        use_enum_values=True,
+        str_strip_whitespace=True,
+        validate_default=False,
+    )
+
+    engine: str | None = Field(
+        default=None,
+        description="Engine id; defaults via config when omitted.",
+        min_length=1,
+        max_length=50,
+    )
+    profile_id: str = Field(
+        ...,
+        description="Voice profile ID",
+        min_length=1,
+        max_length=100,
+    )
+    text: str = Field(
+        ...,
+        description="Full text to synthesize (chunked server-side)",
+        min_length=1,
+        max_length=100_000,
+    )
+    language: str | None = Field(default="en", description="Language code", max_length=10)
+    emotion: str | None = Field(default=None, description="Emotion", max_length=50)
+    enhance_quality: bool | None = Field(
+        default=False,
+        description="Enable quality enhancement pipeline",
+    )
+    consent_id: str | None = Field(default=None, max_length=100)
+    speed: float | None = Field(default=None, ge=0.5, le=2.0)
+    pitch: float | None = Field(default=None, ge=-12.0, le=12.0)
+    stability: float | None = Field(default=None, ge=0.0, le=1.0)
+    clarity: float | None = Field(default=None, ge=0.0, le=1.0)
+    temperature: float | None = Field(default=None, ge=0.0, le=1.0)
+    chunk_size_chars: int = Field(
+        default=1800,
+        description="Target max characters per chunk (sentence-bounded)",
+        ge=200,
+        le=9000,
+    )
+
+    @field_validator("engine", mode="before")
+    @classmethod
+    def validate_engine_long_form(cls, v):
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            raise ValueError("Engine must be a string")
+        if not re.match(r"^[a-z0-9_-]+$", v.lower()):
+            raise ValueError(
+                "Engine name must contain only lowercase letters, numbers, "
+                "hyphens, and underscores"
+            )
+        return v.lower()
+
+    @field_validator("profile_id", mode="before")
+    @classmethod
+    def validate_profile_id_long_form(cls, v):
+        if not re.match(r"^[a-zA-Z0-9_\-:./]{1,100}$", v):
+            raise ValueError(
+                "Profile ID must contain only alphanumeric, hyphens, underscores, "
+                "and optionally colons/slashes/dots for third-party IDs"
+            )
+        return v
+
+
+class LongFormSynthesisResponse(VoiceStudioBaseModel):
+    """Merged long-form synthesis result (GAP-049)."""
+
+    audio_id: str
+    audio_url: str
+    duration: float
+    quality_score: float
+    chunks_total: int
+    chunks_succeeded: int
+    partial_failure: bool
+    failed_chunks: list[LongFormChunkResult] = Field(default_factory=list)
+
+
+class SpeechToSpeechRequest(VoiceStudioBaseModel):
+    """Batch speech-to-speech conversion (GAP-051)."""
+
+    model_config = ConfigDict(
+        validate_assignment=False,
+        use_enum_values=True,
+        str_strip_whitespace=True,
+        validate_default=False,
+    )
+
+    source_audio_id: str = Field(
+        ...,
+        description="Registered audio artifact id for source speech",
+        min_length=1,
+        max_length=200,
+    )
+    target_voice_profile_id: str = Field(
+        ...,
+        description="Voice profile id whose RVC checkpoint (optional .pth) defines target timbre",
+        min_length=1,
+        max_length=100,
+    )
+    engine_id: str | None = Field(
+        default=None,
+        description="Optional engine hint (reserved; RVC path uses RVCEngine)",
+        max_length=50,
+    )
+    pitch_shift: float = Field(
+        default=0.0,
+        ge=-12.0,
+        le=12.0,
+        description="Pitch shift in semitones (applied as integer to RVC)",
+    )
+    index_rate: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="RVC index retrieval blend",
+    )
+    protect: float = Field(
+        default=0.33,
+        ge=0.0,
+        le=0.5,
+        description="Protect voiceless consonants (RVC protect)",
+    )
+    consent_acknowledged: bool = Field(
+        default=False,
+        description=(
+            "User asserts they have permission to transform this voice. "
+            "Required True before conversion proceeds."
+        ),
+    )
+    consent_id: str | None = Field(
+        default=None,
+        description=(
+            "Optional reference to a formal VoiceConsentRecord. "
+            "When provided, validated as GRANTED and unexpired."
+        ),
+        max_length=100,
+    )
+
+
+class SpeechToSpeechResponse(VoiceStudioBaseModel):
+    """Speech-to-speech conversion result (GAP-051 + GAP-056 disclosure + watermark)."""
+
+    audio_id: str
+    audio_url: str
+    duration: float
+    quality_score: float | None = None
+    engine_used: str = "rvc"
+    is_transformed: bool = True
+    transformation_type: str = "speech_to_speech"
+    source_audio_id: str | None = None
+    disclosure_text: str | None = None
+    watermark_applied: bool = False
+    watermark_method: str | None = None
+
+
+class StsMarkingStatus(VoiceStudioBaseModel):
+    """Transformed-audio durable marking status (GAP-056 slices 2–3)."""
+
+    audio_id: str
+    is_transformed: bool
+    transformation_type: str | None = None
+    source_reference_id: str | None = None
+    marked_at: str | None = None
+    watermark_applied: bool = False
+    watermark_verified: bool | None = None
+    watermark_method: str | None = None
+
+
 class ReferenceAudioPreprocessRequest(BaseModel):
     """Request model for reference audio pre-processing."""
 

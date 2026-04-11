@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -45,6 +46,8 @@ namespace VoiceStudio.App.Tests.Services
       public Task UnsubscribeAsync(string topic) => Task.CompletedTask;
       public Task PingAsync() => Task.CompletedTask;
       public Task SendMessageAsync(object message) => Task.CompletedTask;
+      public void SetAuthHeaders(IReadOnlyDictionary<string, string>? headers) { }
+      public void SetCredentialProvider(Func<IReadOnlyDictionary<string, string>?>? provider) { }
       public void Dispose() { }
     }
 

@@ -26,16 +26,23 @@ import uuid
 from pathlib import Path
 
 import numpy as np
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel
 
+from backend.api.auth import User
 from backend.config.path_config import get_path
 
+from ..middleware.auth_middleware import get_current_user, require_auth_if_enabled
+from ..models_additional import StsMarkingStatus
 from ..optimization import cache_response
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/audio", tags=["audio"])
+router = APIRouter(
+    prefix="/api/audio",
+    tags=["audio"],
+    dependencies=[Depends(require_auth_if_enabled)],
+)
 
 # Import audio utilities
 try:
@@ -149,14 +156,99 @@ def _get_audio_path(audio_id: str) -> str | None:
     return resolve_audio_path(audio_id)
 
 
+def _verify_watermark_on_artifact(artifact_path: str) -> bool:
+    """Run watermark detection on the stored artifact.  Returns False on any failure."""
+    try:
+        import soundfile as sf  # type: ignore[import-untyped]
+
+        from backend.services.security_service import get_security_service
+
+        if not os.path.isfile(artifact_path):
+            return False
+        samples, sr = sf.read(artifact_path, dtype="float64")
+        detected = get_security_service().watermarking.detect_watermark(samples, sr)
+        return detected is not None and len(detected) > 0
+    except Exception:
+        return False
+
+
+@router.get("/{audio_id}/marking", response_model=StsMarkingStatus)
+async def get_audio_marking(
+    audio_id: str,
+    request: Request,
+    user: User | None = Depends(get_current_user),
+) -> StsMarkingStatus:
+    """Return durable transformation + watermark marking status (GAP-056 slices 2–3)."""
+    from backend.services.audio_artifacts.errors import ArtifactNotFoundError
+    from backend.services.audio_registry_service import get_registry
+    from backend.services.trust_audit_service import get_trust_audit_service
+
+    try:
+        artifact = get_registry().get(audio_id)
+    except ArtifactNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Audio artifact not found: {audio_id}") from None
+
+    meta = artifact.metadata or {}
+    wm_applied = bool(meta.get("watermark_applied", False))
+    wm_verified: bool | None = None
+
+    if wm_applied:
+        wm_verified = _verify_watermark_on_artifact(artifact.path)
+
+    status = StsMarkingStatus(
+        audio_id=audio_id,
+        is_transformed=bool(meta.get("is_transformed", False)),
+        transformation_type=meta.get("transformation_type"),
+        source_reference_id=meta.get("source"),
+        marked_at=None,
+        watermark_applied=wm_applied,
+        watermark_verified=wm_verified,
+        watermark_method=meta.get("watermark_method"),
+    )
+    await get_trust_audit_service().record_marking_read(
+        audio_id=audio_id,
+        marking=status,
+        auth_subject=user.user_id if user else None,
+        correlation_id=getattr(request.state, "correlation_id", None),
+    )
+    return status
+
+
 @router.get("/file/{audio_id}")
-async def get_audio_file(audio_id: str):
+async def get_audio_file(
+    audio_id: str,
+    request: Request,
+    user: User | None = Depends(get_current_user),
+):
     """Stream an audio file by ID (uploaded, synthesized, or project audio)."""
     from starlette.responses import FileResponse
 
     file_path = _get_audio_path(audio_id)
     if not file_path or not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail=f"Audio not found: {audio_id}")
+
+    try:
+        from backend.services.audio_artifacts.errors import ArtifactNotFoundError
+        from backend.services.audio_registry_service import get_registry
+        from backend.services.trust_audit_service import get_trust_audit_service
+
+        artifact = get_registry().get(audio_id)
+        meta = artifact.metadata or {}
+        if meta.get("is_transformed"):
+            await get_trust_audit_service().record_audio_download(
+                audio_id=audio_id,
+                artifact_meta=meta,
+                result="success",
+                reason_code=None,
+                auth_subject=user.user_id if user else None,
+                correlation_id=getattr(request.state, "correlation_id", None),
+            )
+    except ArtifactNotFoundError:
+        # ALLOWED: bare except - optional registry row; file may exist without registry entry
+        pass
+    except Exception as ex:
+        logger.debug("Trust audit download skipped: %s", ex)
+
     ext = os.path.splitext(file_path)[1].lower()
     media_type = {
         ".wav": "audio/wav",
@@ -1082,7 +1174,11 @@ EXPORT_FORMAT_MIME_TYPES = {
 
 
 @router.post("/export")
-async def export_audio(request: AudioExportRequest):
+async def export_audio(
+    export_req: AudioExportRequest,
+    http_request: Request,
+    user: User | None = Depends(get_current_user),
+):
     """
     Export an audio file to a different format.
 
@@ -1112,19 +1208,19 @@ async def export_audio(request: AudioExportRequest):
 
     from fastapi.responses import StreamingResponse
 
-    target_format = request.format.lower().lstrip(".")
+    target_format = export_req.format.lower().lstrip(".")
 
     if target_format not in EXPORT_FORMAT_MIME_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported export format: {request.format}. "
+            detail=f"Unsupported export format: {export_req.format}. "
             f"Supported formats: {', '.join(EXPORT_FORMAT_MIME_TYPES.keys())}",
         )
 
     # Find source audio file
-    audio_path = _get_audio_path(request.source)
+    audio_path = _get_audio_path(export_req.source)
     if not audio_path or not os.path.exists(audio_path):
-        raise HTTPException(status_code=404, detail=f"Audio file not found: {request.source}")
+        raise HTTPException(status_code=404, detail=f"Audio file not found: {export_req.source}")
 
     # Import conversion service
     try:
@@ -1162,10 +1258,10 @@ async def export_audio(request: AudioExportRequest):
             input_path=Path(audio_path),
             output_path=output_path,
             target_format=audio_format,
-            bitrate_kbps=request.bitrate_kbps,
-            sample_rate=request.sample_rate,
-            channels=request.channels,
-            normalize=request.normalize,
+            bitrate_kbps=export_req.bitrate_kbps,
+            sample_rate=export_req.sample_rate,
+            channels=export_req.channels,
+            normalize=export_req.normalize,
         )
 
         if not result.success:
@@ -1187,13 +1283,43 @@ async def export_audio(request: AudioExportRequest):
             except Exception:
                 pass
 
+        response_headers: dict[str, str] = {
+            "Content-Disposition": f'attachment; filename="{output_filename}"',
+            "Content-Length": str(result.file_size_bytes),
+        }
+        try:
+            from backend.services.audio_artifacts.errors import ArtifactNotFoundError
+            from backend.services.audio_registry_service import get_registry
+            from backend.services.trust_audit_service import get_trust_audit_service
+
+            reg = get_registry()
+            artifact = reg.get(export_req.source)
+            exp_meta = artifact.metadata or {}
+            if exp_meta.get("is_transformed"):
+                response_headers["X-VoiceStudio-IsTransformed"] = "true"
+                response_headers["X-VoiceStudio-TransformationType"] = str(
+                    exp_meta.get("transformation_type") or "unknown"
+                )
+                await get_trust_audit_service().record_audio_export(
+                    source_audio_id=export_req.source,
+                    artifact_meta=exp_meta,
+                    result="success",
+                    reason_code=None,
+                    auth_subject=user.user_id if user else None,
+                    correlation_id=getattr(http_request.state, "correlation_id", None),
+                )
+        except ArtifactNotFoundError:
+            logger.debug(
+                "Export transformation headers skipped (not a registered audio id): %s",
+                export_req.source,
+            )
+        except Exception as ex:
+            logger.debug("Export transformation header lookup skipped: %s", ex)
+
         return StreamingResponse(
             iterfile(),
             media_type=EXPORT_FORMAT_MIME_TYPES[target_format],
-            headers={
-                "Content-Disposition": f'attachment; filename="{output_filename}"',
-                "Content-Length": str(result.file_size_bytes),
-            },
+            headers=response_headers,
         )
 
     except HTTPException:

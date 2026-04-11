@@ -383,13 +383,28 @@ namespace VoiceStudio.App.ViewModels
         IsLoading = true;
         ErrorMessage = null;
 
+        var beforeRequest = new ScriptUpdateRequest
+        {
+          Name = script.Name,
+          Description = script.Description,
+          Segments = script.Segments.Select(ScriptUndoSnapshots.CloneSegment).ToList(),
+          Metadata = script.Metadata != null
+              ? new Dictionary<string, object>(script.Metadata)
+              : new Dictionary<string, object>()
+        };
+
         var request = new ScriptUpdateRequest
         {
           Name = NewScriptName ?? script.Name,
           Description = NewScriptDescription ?? script.Description,
-          Segments = script.Segments.ToList(),
-          Metadata = script.Metadata
+          Segments = script.Segments.Select(ScriptUndoSnapshots.CloneSegment).ToList(),
+          Metadata = script.Metadata != null
+              ? new Dictionary<string, object>(script.Metadata)
+              : new Dictionary<string, object>()
         };
+
+        var anchorScriptId = script.Id;
+        var anchorSegmentId = SelectedSegment?.Id;
 
         var updated = await _scriptEditorClient.UpdateScriptAsync(script.Id, request, cancellationToken);
 
@@ -407,9 +422,26 @@ namespace VoiceStudio.App.ViewModels
         SelectedScript = Scripts.FirstOrDefault(s => s.Id == selectedScriptId);
         SelectedSegment = SelectedScript?.Segments.FirstOrDefault(s => s.Id == selectedSegmentId);
 
+        if (_undoRedoService != null)
+        {
+          var afterRequest = ScriptUndoSnapshots.CloneRequest(request);
+          var log = ServiceProvider.TryGetErrorLoggingService();
+          var reload = new Action(() => ReloadAfterScriptUndoRedo(anchorScriptId, anchorSegmentId));
+          var undoAction = new UpdateScriptUndoAction(
+              _scriptEditorClient,
+              anchorScriptId,
+              beforeRequest,
+              afterRequest,
+              reload,
+              actionName: $"Update script '{script.Name ?? "Script"}'",
+              sessionDirty: AppServices.GetProjectSessionDirtyState(),
+              log: log);
+          _undoRedoService.RegisterAction(undoAction);
+        }
+
         StatusMessage = ResourceHelper.GetString("ScriptEditor.ScriptUpdated", "Script updated");
         _toastNotificationService?.ShowSuccess(
-            ResourceHelper.FormatString("ScriptEditor.ScriptUpdatedDetail", NewScriptName ?? script.Name),
+            ResourceHelper.FormatString("ScriptEditor.ScriptUpdatedDetail", NewScriptName ?? script.Name ?? string.Empty),
             ResourceHelper.GetString("Toast.Title.ScriptUpdated", "Script Updated"));
       }
       catch (Exception ex)
@@ -423,6 +455,16 @@ namespace VoiceStudio.App.ViewModels
       {
         IsLoading = false;
       }
+    }
+
+    /// <summary>Reloads scripts after undo/redo of <see cref="UpdateScriptUndoAction"/> (sync wrapper).</summary>
+    private void ReloadAfterScriptUndoRedo(string scriptId, string? segmentId)
+    {
+      LoadScriptsAsync(CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+      SelectedScript = Scripts.FirstOrDefault(s => s.Id == scriptId);
+      SelectedSegment = !string.IsNullOrEmpty(segmentId)
+          ? SelectedScript?.Segments.FirstOrDefault(s => s.Id == segmentId)
+          : null;
     }
 
     private async Task DeleteScriptAsync(ScriptItem? script, CancellationToken cancellationToken)
@@ -839,7 +881,7 @@ namespace VoiceStudio.App.ViewModels
       // Show confirmation dialog (Panel Hardening: IDialogService per PANEL_HARDENING_PATTERN)
       var confirmed = await _dialogService.ShowConfirmationAsync(
           "Delete scripts?",
-          $"Are you sure you want to delete '{selectedIds.Count} script(s)'? This action cannot be undone.",
+          $"Are you sure you want to delete '{selectedIds.Count} script(s)'? You can undo this from the Edit menu.",
           "Delete",
           "Cancel");
 
@@ -851,7 +893,7 @@ namespace VoiceStudio.App.ViewModels
 
       try
       {
-        var scriptsToDelete = new System.Collections.Generic.List<ScriptItem>();
+        var undoParts = new System.Collections.Generic.List<IUndoableAction>();
         int deletedCount = 0;
 
         foreach (var scriptId in selectedIds)
@@ -863,14 +905,33 @@ namespace VoiceStudio.App.ViewModels
             var script = Scripts.FirstOrDefault(s => s.Id == scriptId);
             if (script != null)
             {
+              var originalIndex = Scripts.IndexOf(script);
               await _scriptEditorClient.DeleteScriptAsync(scriptId, cancellationToken);
-              scriptsToDelete.Add(script);
+              var scriptToDelete = script;
               Scripts.Remove(script);
               if (SelectedScript?.Id == scriptId)
               {
                 SelectedScript = null;
               }
               deletedCount++;
+
+              if (_undoRedoService != null)
+              {
+                var part = new DeleteScriptAction(
+                    Scripts,
+                    _scriptEditorClient,
+                    scriptToDelete,
+                    originalIndex,
+                    onUndo: (s) => SelectedScript = s,
+                    onRedo: (s) =>
+                    {
+                      if (SelectedScript?.Id == s.Id)
+                      {
+                        SelectedScript = null;
+                      }
+                    });
+                undoParts.Add(part);
+              }
             }
           }
           catch (OperationCanceledException)
@@ -878,9 +939,21 @@ namespace VoiceStudio.App.ViewModels
             throw; // Re-throw cancellation to abort batch deletion
           }
           catch (Exception ex)
-      {
-        ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "ScriptEditorViewModel.DeleteSelectedScriptsAsync");
-      }
+          {
+            ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "ScriptEditorViewModel.DeleteSelectedScriptsAsync");
+          }
+        }
+
+        if (_undoRedoService != null && undoParts.Count > 0)
+        {
+          var log = ServiceProvider.TryGetErrorLoggingService();
+          var composite = undoParts.Count == 1
+              ? undoParts[0]
+              : new CompositeUndoAction(
+                  $"Delete {undoParts.Count} scripts",
+                  undoParts,
+                  log);
+          _undoRedoService.RegisterAction(composite);
         }
 
         // Clear selection after deletion

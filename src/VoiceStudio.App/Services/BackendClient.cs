@@ -225,6 +225,7 @@ namespace VoiceStudio.App.Services
     private readonly BackendClientHttpPipeline _pipeline;
 
     private readonly IRequestCoordinator _requestCoordinator;
+    private readonly IUnifiedAuthService? _unifiedAuthService;
 
     private IWebSocketService? _webSocketService;
     public IWebSocketService? WebSocketService => _webSocketService;
@@ -246,30 +247,29 @@ namespace VoiceStudio.App.Services
     /// <param name="requestCoordinator">Shared request coordinator for profiles/engines (required when created via DI).</param>
     /// <param name="gracefulDegradation">Optional service to clear degraded mode on successful responses.</param>
     /// <param name="innerHandler">Optional inner HTTP handler for testing; when null, uses HttpClientHandler.</param>
-    public BackendClient(BackendClientConfig config, ICorrelationIdProvider? correlationProvider, IRequestMetricsService? requestMetrics = null, IRequestCoordinator? requestCoordinator = null, GracefulDegradationService? gracefulDegradation = null, HttpMessageHandler? innerHandler = null)
+    /// <param name="unifiedAuthService">Optional auth service for WebSocket handshake headers (GAP-058).</param>
+    public BackendClient(
+        BackendClientConfig config,
+        ICorrelationIdProvider? correlationProvider,
+        IRequestMetricsService? requestMetrics = null,
+        IRequestCoordinator? requestCoordinator = null,
+        GracefulDegradationService? gracefulDegradation = null,
+        HttpMessageHandler? innerHandler = null,
+        IUnifiedAuthService? unifiedAuthService = null)
     {
       _config = config ?? throw new ArgumentNullException(nameof(config));
       _requestCoordinator = requestCoordinator ?? new RequestCoordinator();
+      _unifiedAuthService = unifiedAuthService;
 
-      // Handler chain: DegradedModeClearHandler (outer) -> RequestMetricsHandler -> CorrelationIdHandler -> innerHandler (inner)
-      var httpHandler = innerHandler ?? new HttpClientHandler();
-      var correlationHandler = correlationProvider != null
-        ? new CorrelationIdHandler(httpHandler, correlationProvider)
-        : new CorrelationIdHandler(httpHandler);
-      var metricsOrCorrelation = requestMetrics != null
-        ? new RequestMetricsHandler(requestMetrics, correlationHandler)
-        : (HttpMessageHandler)correlationHandler;
-      var rootHandler = new DegradedModeClearHandler(gracefulDegradation, metricsOrCorrelation);
-      _httpClient = new HttpClient(rootHandler)
-      {
-        BaseAddress = new Uri(config.BaseUrl),
-        Timeout = config.RequestTimeout
-      };
-
-      // Use centralized JSON options for consistent snake_case serialization
+      // Handler chain: DegradedModeClearHandler -> Polly resilience -> RequestMetricsHandler -> CorrelationIdHandler -> inner (ADR-051)
       _jsonOptions = JsonSerializerOptionsFactory.BackendApi;
-
-      _pipeline = new BackendClientHttpPipeline(_httpClient, _jsonOptions);
+      (_httpClient, _pipeline) = BackendHttpTransportFactory.Create(
+        config,
+        _jsonOptions,
+        correlationProvider,
+        requestMetrics,
+        gracefulDegradation,
+        innerHandler);
 
       InitializeWebSocket(config);
     }
@@ -278,10 +278,16 @@ namespace VoiceStudio.App.Services
     /// PR-3: Constructor that uses shared <see cref="BackendHttpContext"/> for HTTP transport.
     /// Used when PluginHealthClient and BackendClient share the same pipeline.
     /// </summary>
-    internal BackendClient(BackendHttpContext httpContext, BackendClientConfig config, IRequestCoordinator? requestCoordinator = null)
+    /// <param name="unifiedAuthService">Optional auth service for WebSocket handshake headers (GAP-058).</param>
+    internal BackendClient(
+        BackendHttpContext httpContext,
+        BackendClientConfig config,
+        IRequestCoordinator? requestCoordinator = null,
+        IUnifiedAuthService? unifiedAuthService = null)
     {
       _config = config ?? throw new ArgumentNullException(nameof(config));
       _requestCoordinator = requestCoordinator ?? new RequestCoordinator();
+      _unifiedAuthService = unifiedAuthService;
       _httpClient = httpContext.HttpClient;
       _jsonOptions = JsonSerializerOptionsFactory.BackendApi;
       _pipeline = httpContext.Pipeline;
@@ -304,6 +310,25 @@ namespace VoiceStudio.App.Services
         wsUrl = wsUrl.TrimEnd('/') + "/realtime";
 
       _webSocketService = new WebSocketService(wsUrl);
+      if (_unifiedAuthService != null)
+      {
+        _webSocketService.SetCredentialProvider(() =>
+        {
+          var key = _unifiedAuthService.GetCurrentApiKey();
+          if (!string.IsNullOrEmpty(key))
+          {
+            return new Dictionary<string, string> { ["X-API-Key"] = key };
+          }
+
+          var token = _unifiedAuthService.GetCurrentToken();
+          if (!string.IsNullOrEmpty(token))
+          {
+            return new Dictionary<string, string> { ["Authorization"] = $"Bearer {token}" };
+          }
+
+          return null;
+        });
+      }
     }
 
     /// <summary>
@@ -395,6 +420,102 @@ namespace VoiceStudio.App.Services
           throw new BackendDeserializationException(
                     "The backend returned an invalid response format for voice synthesis.",
                     ex);
+        }
+      });
+    }
+
+    public async Task<LongFormSynthesisResponse> SynthesizeLongFormAsync(
+        LongFormSynthesisRequest request,
+        CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.PostAsJsonAsync(
+                  "/api/voice/synthesize/long-form",
+                  request,
+                  _jsonOptions,
+                  cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        try
+        {
+          return await response.Content.ReadFromJsonAsync<LongFormSynthesisResponse>(_jsonOptions, cancellationToken)
+                    ?? throw new BackendDeserializationException("Failed to deserialize long-form synthesis response.");
+        }
+        catch (JsonException ex)
+        {
+          throw new BackendDeserializationException(
+                    "The backend returned an invalid response format for long-form synthesis.",
+                    ex);
+        }
+      });
+    }
+
+    public async Task<SpeechToSpeechResponse> SynthesizeSpeechToSpeechAsync(
+        SpeechToSpeechRequest request,
+        CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.PostAsJsonAsync(
+                  "/api/voice/sts/convert",
+                  request,
+                  _jsonOptions,
+                  cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        try
+        {
+          return await response.Content.ReadFromJsonAsync<SpeechToSpeechResponse>(_jsonOptions, cancellationToken)
+                    ?? throw new BackendDeserializationException("Failed to deserialize speech-to-speech response.");
+        }
+        catch (JsonException ex)
+        {
+          throw new BackendDeserializationException(
+                    "The backend returned an invalid response format for speech-to-speech conversion.",
+                    ex);
+        }
+      });
+    }
+
+    /// <inheritdoc />
+    public async Task<StsMarkingStatus?> GetStsMarkingAsync(
+        string audioId,
+        CancellationToken cancellationToken = default)
+    {
+      return await ExecuteWithRetryAsync(async () =>
+      {
+        var response = await _httpClient.GetAsync(
+            $"/api/audio/{Uri.EscapeDataString(audioId)}/marking",
+            cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+          return null;
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+          throw await _pipeline.CreateExceptionFromResponseAsync(response);
+        }
+
+        try
+        {
+          return await response.Content.ReadFromJsonAsync<StsMarkingStatus>(_jsonOptions, cancellationToken);
+        }
+        catch (JsonException ex)
+        {
+          throw new BackendDeserializationException(
+              "The backend returned an invalid response format for STS marking status.",
+              ex);
         }
       });
     }

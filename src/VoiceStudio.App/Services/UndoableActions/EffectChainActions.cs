@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Collections.Generic;
+using System.Threading;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 
@@ -327,6 +328,202 @@ namespace VoiceStudio.App.Services.UndoableActions
           otherEffect.Order = _oldOrder;
           chain.Effects.Sort((a, b) => a.Order.CompareTo(b.Order));
         }
+      }
+    }
+  }
+
+  /// <summary>Deep clone for effect-chain undo snapshots (GAP-012 remainder).</summary>
+  public static class EffectChainUndoSnapshots
+  {
+    public static EffectChain CloneEffectChain(EffectChain? chain)
+    {
+      if (chain == null)
+        throw new ArgumentNullException(nameof(chain));
+      return new EffectChain
+      {
+        Id = chain.Id,
+        Name = chain.Name,
+        Description = chain.Description,
+        ProjectId = chain.ProjectId,
+        Created = chain.Created,
+        Modified = chain.Modified,
+        Effects = chain.Effects?.Select(CloneEffect).ToList() ?? new List<Effect>()
+      };
+    }
+
+    public static Effect CloneEffect(Effect e)
+    {
+      ArgumentNullException.ThrowIfNull(e);
+      return new Effect
+      {
+        Id = e.Id,
+        Type = e.Type,
+        Name = e.Name,
+        Enabled = e.Enabled,
+        Order = e.Order,
+        Parameters = e.Parameters?.Select(p => new EffectParameter
+        {
+          Name = p.Name,
+          Value = p.Value,
+          MinValue = p.MinValue,
+          MaxValue = p.MaxValue,
+          Unit = p.Unit
+        }).ToList() ?? new List<EffectParameter>()
+      };
+    }
+  }
+
+  /// <summary>GAP-012: session-only bypass flag (not persisted on <see cref="EffectChain"/>).</summary>
+  public sealed class ToggleBypassUndoAction : IUndoableAction
+  {
+    private readonly Action<bool> _apply;
+    private readonly bool _undoValue;
+    private readonly bool _redoValue;
+
+    public ToggleBypassUndoAction(bool undoValue, bool redoValue, Action<bool> apply)
+    {
+      _undoValue = undoValue;
+      _redoValue = redoValue;
+      _apply = apply ?? throw new ArgumentNullException(nameof(apply));
+    }
+
+    public string ActionName => "Toggle effect chain bypass";
+
+    public void Undo() => _apply(_undoValue);
+
+    public void Redo() => _apply(_redoValue);
+  }
+
+  /// <summary>GAP-012: undo effect enable/disable with backend persistence.</summary>
+  public sealed class ToggleEffectEnabledUndoAction : IUndoableAction
+  {
+    private readonly ObservableCollection<EffectChain> _chains;
+    private readonly IEffectChainClient _client;
+    private readonly string _projectId;
+    private readonly string _chainId;
+    private readonly string _effectId;
+    private readonly bool _undoEnabled;
+    private readonly bool _redoEnabled;
+    private readonly IErrorLoggingService? _log;
+    private readonly Action<EffectChain>? _afterApply;
+
+    public ToggleEffectEnabledUndoAction(
+        ObservableCollection<EffectChain> chains,
+        IEffectChainClient client,
+        string projectId,
+        string chainId,
+        string effectId,
+        bool undoEnabled,
+        bool redoEnabled,
+        IErrorLoggingService? log = null,
+        Action<EffectChain>? afterApply = null)
+    {
+      _chains = chains ?? throw new ArgumentNullException(nameof(chains));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
+      _projectId = projectId ?? throw new ArgumentNullException(nameof(projectId));
+      _chainId = chainId ?? throw new ArgumentNullException(nameof(chainId));
+      _effectId = effectId ?? throw new ArgumentNullException(nameof(effectId));
+      _undoEnabled = undoEnabled;
+      _redoEnabled = redoEnabled;
+      _log = log;
+      _afterApply = afterApply;
+    }
+
+    public string ActionName => "Toggle effect enabled";
+
+    public void Undo() => Apply(_undoEnabled);
+
+    public void Redo() => Apply(_redoEnabled);
+
+    private void Apply(bool enabled)
+    {
+      var chain = _chains.FirstOrDefault(c => c.Id == _chainId);
+      var effect = chain?.Effects?.FirstOrDefault(e => e.Id == _effectId);
+      if (chain == null || effect == null)
+        return;
+      effect.Enabled = enabled;
+      chain.Modified = DateTime.UtcNow;
+      try
+      {
+        var updated = _client
+            .UpdateEffectChainAsync(_projectId, _chainId, chain, CancellationToken.None)
+            .ConfigureAwait(false)
+            .GetAwaiter()
+            .GetResult();
+        var idx = _chains.IndexOf(chain);
+        if (idx >= 0 && updated != null)
+        {
+          _chains[idx] = updated;
+          _afterApply?.Invoke(updated);
+        }
+      }
+      catch (Exception ex)
+      {
+        _log?.LogError(ex, "ToggleEffectEnabledUndoAction.Apply");
+        throw;
+      }
+    }
+  }
+
+  /// <summary>GAP-012: full effect chain snapshot on save (parameters + effects).</summary>
+  public sealed class UpdateEffectChainSnapshotUndoAction : IUndoableAction
+  {
+    private readonly ObservableCollection<EffectChain> _chains;
+    private readonly IEffectChainClient _client;
+    private readonly string _projectId;
+    private readonly string _chainId;
+    private readonly EffectChain _before;
+    private readonly EffectChain _after;
+    private readonly IErrorLoggingService? _log;
+    private readonly Action<EffectChain>? _afterApply;
+
+    public UpdateEffectChainSnapshotUndoAction(
+        ObservableCollection<EffectChain> chains,
+        IEffectChainClient client,
+        string projectId,
+        string chainId,
+        EffectChain beforeSnapshot,
+        EffectChain afterSnapshot,
+        IErrorLoggingService? log = null,
+        Action<EffectChain>? afterApply = null)
+    {
+      _chains = chains ?? throw new ArgumentNullException(nameof(chains));
+      _client = client ?? throw new ArgumentNullException(nameof(client));
+      _projectId = projectId ?? throw new ArgumentNullException(nameof(projectId));
+      _chainId = chainId ?? throw new ArgumentNullException(nameof(chainId));
+      _before = EffectChainUndoSnapshots.CloneEffectChain(beforeSnapshot ?? throw new ArgumentNullException(nameof(beforeSnapshot)));
+      _after = EffectChainUndoSnapshots.CloneEffectChain(afterSnapshot ?? throw new ArgumentNullException(nameof(afterSnapshot)));
+      _log = log;
+      _afterApply = afterApply;
+    }
+
+    public string ActionName => "Update effect chain";
+
+    public void Undo() => Apply(_before);
+
+    public void Redo() => Apply(_after);
+
+    private void Apply(EffectChain target)
+    {
+      try
+      {
+        var updated = _client
+            .UpdateEffectChainAsync(_projectId, _chainId, EffectChainUndoSnapshots.CloneEffectChain(target), CancellationToken.None)
+            .ConfigureAwait(false)
+            .GetAwaiter()
+            .GetResult();
+        var existing = _chains.FirstOrDefault(c => c.Id == _chainId);
+        var idx = existing != null ? _chains.IndexOf(existing) : -1;
+        if (idx >= 0 && updated != null)
+        {
+          _chains[idx] = updated;
+          _afterApply?.Invoke(updated);
+        }
+      }
+      catch (Exception ex)
+      {
+        _log?.LogError(ex, "UpdateEffectChainSnapshotUndoAction.Apply");
+        throw;
       }
     }
   }

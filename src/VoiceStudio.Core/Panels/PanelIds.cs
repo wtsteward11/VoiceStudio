@@ -10,6 +10,7 @@ namespace VoiceStudio.Core.Panels
   {
     // Core synthesis
     public const string VoiceSynthesis = "VoiceSynthesis";
+    public const string SpeechToSpeech = "SpeechToSpeech";
     public const string EnsembleSynthesis = "EnsembleSynthesis";
     public const string BatchProcessing = "BatchProcessing";
 
@@ -112,7 +113,7 @@ namespace VoiceStudio.Core.Panels
     /// </summary>
     public static IReadOnlyList<string> All => new[]
     {
-      VoiceSynthesis, EnsembleSynthesis, BatchProcessing,
+      VoiceSynthesis, SpeechToSpeech, EnsembleSynthesis, BatchProcessing,
       TrainingDatasetEditor, ModelManager, Training,
       Transcribe, Recording, AudioAnalysis, QualityControl,
       Timeline, Profiles, Library, EffectsMixer, Analyzer,

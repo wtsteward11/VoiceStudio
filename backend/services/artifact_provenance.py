@@ -37,6 +37,7 @@ def record_artifact_provenance_and_usage(
     output_path: str,
     model_used: str,
     duration_seconds: float | None = None,
+    transformation_meta: dict | None = None,
 ) -> None:
     """
     Write provenance sidecar and record usage for an audio artifact.
@@ -46,17 +47,30 @@ def record_artifact_provenance_and_usage(
 
     Policy: If POLICY is STRICT, failures re-raise. If BEST_EFFORT, log and continue.
     """
-    _do_provenance(output_path, model_used)
+    _do_provenance(output_path, model_used, transformation_meta)
     _do_usage(output_path, model_used, duration_seconds)
 
 
-def _do_provenance(output_path: str, model_used: str) -> None:
+def _do_provenance(
+    output_path: str,
+    model_used: str,
+    transformation_meta: dict | None = None,
+) -> None:
     """Write provenance sidecar. Respects POLICY for failure handling."""
     try:
         from backend.services.security_service import write_provenance_sidecar
 
         if output_path and os.path.exists(output_path):
-            write_provenance_sidecar(output_base_path=output_path, model_used=model_used)
+            tm = transformation_meta or {}
+            write_provenance_sidecar(
+                output_base_path=output_path,
+                model_used=model_used,
+                is_transformed=bool(tm.get("is_transformed", False)),
+                transformation_type=tm.get("transformation_type"),
+                source_reference_id=tm.get("source_reference_id"),
+                watermark_applied=bool(tm.get("watermark_applied", False)),
+                watermark_method=tm.get("watermark_method"),
+            )
     except Exception as e:
         if POLICY == ProvenancePolicy.STRICT:
             raise

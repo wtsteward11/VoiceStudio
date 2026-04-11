@@ -35,6 +35,18 @@ namespace VoiceStudio.App.Services
 
       RegisterIfNotExists(registry, new PanelDescriptor
       {
+        PanelId = PanelIds.SpeechToSpeech,
+        DisplayName = "Speech to Speech",
+        Region = PanelRegion.Center,
+        ViewType = typeof(SpeechToSpeechView),
+        ViewModelType = typeof(SpeechToSpeechViewModel),
+        MenuCategory = "Voice",
+        Maturity = PanelMaturity.Beta,
+        Keywords = new[] { "speech", "STS", "RVC", "voice conversion", "speech-to-speech" }
+      });
+
+      RegisterIfNotExists(registry, new PanelDescriptor
+      {
         PanelId = PanelIds.EnsembleSynthesis,
         DisplayName = "Ensemble Synthesis",
         Region = PanelRegion.Center,

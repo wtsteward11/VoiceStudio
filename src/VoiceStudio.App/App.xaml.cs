@@ -12,6 +12,7 @@ using VoiceStudio.App.Utilities;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Core.ErrorHandling;
 using VoiceStudio.App.Logging;
+using VoiceStudio.App.Helpers;
 using VoiceStudio.App.Views;
 
 namespace VoiceStudio.App
@@ -320,13 +321,16 @@ namespace VoiceStudio.App
         }
       }
 
-      // GAP-X02: Check if first-run wizard should be shown (skip for smoke modes)
+      // GAP-X02 / GAP-063: Check if first-run wizard should be shown (skip for smoke modes)
       if (!isSmokeMode && !IsIconLaunchSmokeRequested() && !IsSmokeFailurePortRequested() && await FirstRunWizard.ShouldShowWizardAsync())
       {
         _startupProfiler?.Checkpoint("FirstRunWizard Check - Should Show");
 
+        var firstRunCompleteBeforeWizard = UnpackagedSettingsHelper.GetValue<bool>("FirstRunComplete", false);
+        var isFirstRun = !firstRunCompleteBeforeWizard;
+
         // Show wizard as modal before main window
-        var wizard = new FirstRunWizard();
+        var wizard = new FirstRunWizard(isFirstRun: isFirstRun);
         wizard.Activate();
 
         // Wait for wizard completion
@@ -336,9 +340,9 @@ namespace VoiceStudio.App
 
         _startupProfiler?.Checkpoint($"FirstRunWizard Closed (Completed: {wizard.WasCompleted})");
 
-        if (!wizard.WasCompleted)
+        // GAP-063: Exit only on true first-run cancel (not when re-shown via ShowWizardOnStartup)
+        if (!wizard.WasCompleted && isFirstRun)
         {
-          // User cancelled - exit gracefully
           ErrorLogger.LogInfo("First-run wizard cancelled by user, exiting application.");
           Application.Current.Exit();
           return;

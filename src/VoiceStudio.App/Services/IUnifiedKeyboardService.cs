@@ -89,9 +89,13 @@ public interface IUnifiedKeyboardService
     void ResetAllShortcuts();
 
     /// <summary>
-    /// Checks for conflicts with a proposed binding.
+    /// Checks for conflicts with a proposed binding (same chord and same <see cref="ShortcutContext"/> only).
     /// </summary>
-    ShortcutConflict? CheckForConflict(string commandId, VirtualKey key, VirtualKeyModifiers modifiers);
+    ShortcutConflict? CheckForConflict(
+        string commandId,
+        VirtualKey key,
+        VirtualKeyModifiers modifiers,
+        ShortcutContext context = ShortcutContext.Global);
 
     /// <summary>
     /// Gets shortcuts that have been customized.

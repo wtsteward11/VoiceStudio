@@ -7,7 +7,7 @@ Provides endpoints for audio module auditing and enhancement tracking.
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from backend.audio.audit import (
     AudioModuleAuditor,
@@ -19,9 +19,15 @@ from backend.audio.audit import (
     VoiceMixer,
 )
 
+from ..middleware.auth_middleware import require_auth_if_enabled
+
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/audio/audit", tags=["audio"])
+router = APIRouter(
+    prefix="/api/audio/audit",
+    tags=["audio"],
+    dependencies=[Depends(require_auth_if_enabled)],
+)
 
 # Module registry
 AUDIO_MODULES = {

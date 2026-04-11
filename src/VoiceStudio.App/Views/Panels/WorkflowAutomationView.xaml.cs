@@ -61,37 +61,53 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (_keyboardShortcutService == null) return;
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "workflow_new",
+          _keyboardShortcutService.TryRegisterShortcut(
           "workflow_new",
           VirtualKey.N,
           VirtualKeyModifiers.Control,
           () => ViewModel.CreateWorkflowCommand.Execute(null),
-          "Create new workflow"
-      );
+          "Create new workflow",
+          ShortcutContext.Panel));
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "workflow_save",
+          _keyboardShortcutService.TryRegisterShortcut(
           "workflow_save",
           VirtualKey.S,
           VirtualKeyModifiers.Control,
           async () => await ViewModel.SaveWorkflowCommand.ExecuteAsync(null),
-          "Save workflow"
-      );
+          "Save workflow",
+          ShortcutContext.Panel));
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "workflow_test",
+          _keyboardShortcutService.TryRegisterShortcut(
           "workflow_test",
           VirtualKey.T,
           VirtualKeyModifiers.Control,
           async () => await ViewModel.TestWorkflowCommand.ExecuteAsync(null),
-          "Test workflow"
-      );
+          "Test workflow",
+          ShortcutContext.Panel));
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "workflow_run",
+          _keyboardShortcutService.TryRegisterShortcut(
           "workflow_run",
           VirtualKey.R,
           VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift,
           async () => await ViewModel.RunWorkflowCommand.ExecuteAsync(null),
-          "Run workflow"
-      );
+          "Run workflow",
+          ShortcutContext.Panel));
+    }
+
+    private static void LogPanelShortcut(string commandId, bool registered)
+    {
+      if (!registered)
+      {
+        System.Diagnostics.Debug.WriteLine($"[Shortcuts] Panel registration blocked: {commandId}");
+      }
     }
 
     private void WorkflowAutomationView_KeyDown(object sender, KeyRoutedEventArgs e)

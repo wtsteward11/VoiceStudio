@@ -4,7 +4,7 @@
     xmlns:local="using:VoiceStudio.App.Controls"
     x:DataType="local:HelpOverlay">
     <!-- Phase 0: keep XAML minimal to avoid XamlCompiler.exe crashes. -->
-    <Border Background="#CC000000" Padding="16">
+    <Border Background="{StaticResource VSQ.HelpOverlay.BackgroundBrush}" Padding="16">
         <StackPanel Spacing="12">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="{x:Bind Title, Mode=OneWay}" FontWeight="SemiBold" />

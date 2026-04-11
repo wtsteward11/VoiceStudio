@@ -3,8 +3,10 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using VoiceStudio.App.Core.Models;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.Views.Panels;
@@ -250,5 +252,166 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsNull(vm.SelectedEffectChain);
       Assert.IsNull(vm.MixerState);
     }
+
+    /// <summary>GAP-048: Studio Sound creates a transient chain and processes selected audio.</summary>
+    [TestMethod]
+    public async Task StudioSound_CreatesChainAndProcesses_WhenAudioSelected()
+    {
+      _mockEffectChainClient
+          .Setup(x => x.GetEffectChainsAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<EffectChain>());
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerStateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync((MixerState?)null);
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerPresetsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<MixerPreset>());
+
+      _mockEffectChainClient
+          .Setup(x => x.CreateEffectChainAsync("proj-1", It.IsAny<EffectChain>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync((string _, EffectChain c, CancellationToken _) => new EffectChain
+          {
+            Id = "ss-chain",
+            Name = c.Name,
+            ProjectId = "proj-1",
+            Effects = c.Effects
+          });
+
+      _mockEffectChainClient
+          .Setup(x => x.ProcessAudioWithChainAsync("proj-1", "ss-chain", "audio-1", null, false, false, It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new EffectProcessResponse { Success = true, OutputAudioId = "out-ss" })
+          .Verifiable();
+
+      _mockEffectChainClient
+          .Setup(x => x.DeleteEffectChainAsync("proj-1", "ss-chain", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(true)
+          .Verifiable();
+
+      var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
+      vm.SelectedProjectId = "proj-1";
+      await Task.Delay(200);
+      vm.SelectedAudioId = "audio-1";
+
+      vm.RunStudioSoundCommand.Execute(null);
+      await Task.Delay(500);
+
+      _mockEffectChainClient.Verify(
+          x => x.ProcessAudioWithChainAsync("proj-1", "ss-chain", "audio-1", null, false, false, It.IsAny<CancellationToken>()),
+          Times.Once);
+      _mockEffectChainClient.Verify(
+          x => x.DeleteEffectChainAsync("proj-1", "ss-chain", It.IsAny<CancellationToken>()),
+          Times.Once);
+      Assert.AreEqual("out-ss", vm.StudioSoundOutputAudioId);
+    }
+
+    /// <summary>GAP-048: Processing failure leaves output id null and does not crash.</summary>
+    [TestMethod]
+    public async Task StudioSound_FailsHonestly_WhenProcessThrows()
+    {
+      _mockEffectChainClient
+          .Setup(x => x.GetEffectChainsAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<EffectChain>());
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerStateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync((MixerState?)null);
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerPresetsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<MixerPreset>());
+
+      _mockEffectChainClient
+          .Setup(x => x.CreateEffectChainAsync("proj-1", It.IsAny<EffectChain>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync((string _, EffectChain c, CancellationToken _) => new EffectChain
+          {
+            Id = "ss-chain",
+            Name = c.Name,
+            ProjectId = "proj-1",
+            Effects = c.Effects
+          });
+
+      _mockEffectChainClient
+          .Setup(x => x.ProcessAudioWithChainAsync("proj-1", "ss-chain", "audio-1", null, false, false, It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new InvalidOperationException("process failed"));
+
+      _mockEffectChainClient
+          .Setup(x => x.DeleteEffectChainAsync("proj-1", "ss-chain", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(true);
+
+      var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
+      vm.SelectedProjectId = "proj-1";
+      await Task.Delay(200);
+      vm.SelectedAudioId = "audio-1";
+
+      vm.RunStudioSoundCommand.Execute(null);
+      await Task.Delay(500);
+
+      Assert.IsNull(vm.StudioSoundOutputAudioId);
+    }
+
+    /// <summary>GAP-048: Transient chain contains denoise → compressor → normalize.</summary>
+    [TestMethod]
+    public async Task StudioSound_ChainHasThreeEffects_DenoiseCompressorNormalize()
+    {
+      EffectChain? captured = null;
+      _mockEffectChainClient
+          .Setup(x => x.GetEffectChainsAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<EffectChain>());
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerStateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync((MixerState?)null);
+      _mockMixerStateClient
+          .Setup(x => x.GetMixerPresetsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<MixerPreset>());
+
+      _mockEffectChainClient
+          .Setup(x => x.CreateEffectChainAsync("proj-1", It.IsAny<EffectChain>(), It.IsAny<CancellationToken>()))
+          .Callback<string, EffectChain, CancellationToken>((_, chain, _) => captured = chain)
+          .ReturnsAsync((string _, EffectChain c, CancellationToken _) => new EffectChain
+          {
+            Id = "ss-chain",
+            Name = c.Name,
+            ProjectId = "proj-1",
+            Effects = c.Effects
+          });
+
+      _mockEffectChainClient
+          .Setup(x => x.ProcessAudioWithChainAsync("proj-1", "ss-chain", "audio-1", null, false, false, It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new EffectProcessResponse { Success = true, OutputAudioId = "out-ss" });
+
+      _mockEffectChainClient
+          .Setup(x => x.DeleteEffectChainAsync("proj-1", "ss-chain", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(true);
+
+      var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
+      vm.SelectedProjectId = "proj-1";
+      await Task.Delay(200);
+      vm.SelectedAudioId = "audio-1";
+
+      vm.RunStudioSoundCommand.Execute(null);
+      await Task.Delay(500);
+
+      Assert.IsNotNull(captured);
+      Assert.AreEqual(3, captured!.Effects.Count);
+      var types = captured.Effects.OrderBy(e => e.Order).Select(e => e.Type).ToList();
+      CollectionAssert.AreEqual(new[] { "denoise", "compressor", "normalize" }, types);
+    }
+
+    [TestMethod]
+    public void StudioSound_CannotRun_WhenNoAudioSelected()
+    {
+      var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
+      vm.SelectedProjectId = "proj-1";
+      Assert.IsFalse(vm.CanRunStudioSound);
+    }
+
+    [TestMethod]
+    public void StudioSound_CannotRun_WhenAlreadyRunning()
+    {
+      var vm = new EffectsMixerViewModel(_mockEffectsMeterClient.Object, _mockEffectChainClient.Object, _mockMixerStateClient.Object);
+      vm.SelectedProjectId = "proj-1";
+      vm.SelectedAudioId = "audio-1";
+      vm.IsStudioSoundRunning = true;
+      Assert.IsFalse(vm.CanRunStudioSound);
+    }
   }
 }
+

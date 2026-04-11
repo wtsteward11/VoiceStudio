@@ -14,6 +14,14 @@ namespace VoiceStudio.App.Helpers;
 /// Phase 11.1: Fluent Design 2 Materials
 /// Implements Mica, Acrylic, and other backdrop effects.
 /// </summary>
+/// <remarks>
+/// <para><b>Fallback matrix (shell)</b>:</para>
+/// <list type="bullet">
+/// <item><description>Windows 11 22H2+ — <see cref="MicaController"/> when supported; else Desktop Acrylic when supported.</description></item>
+/// <item><description>Windows 10 21H1+ — Desktop Acrylic when supported (Mica typically unavailable).</description></item>
+/// <item><description>Older / unsupported — <see cref="MaterialType.None"/>; host keeps merged <c>VSQ.Window.Background</c> gradient; custom title bar still applies.</description></item>
+/// </list>
+/// </remarks>
 public static class MaterialsHelper
 {
     /// <summary>
@@ -116,6 +124,16 @@ public static class MaterialsHelper
     /// Check if Desktop Acrylic is supported on the current system.
     /// </summary>
     public static bool IsDesktopAcrylicSupported() => DesktopAcrylicController.IsSupported();
+
+    /// <summary>
+    /// Re-applies <see cref="SystemBackdropConfiguration"/> theme from the current window content.
+    /// Call after merged <see cref="ResourceDictionary"/> theme swaps when <see cref="FrameworkElement.ActualThemeChanged"/>
+    /// may not fire.
+    /// </summary>
+    public static void RefreshSystemBackdropTheme()
+    {
+        UpdateTheme();
+    }
 
     /// <summary>
     /// Create an in-app acrylic brush for panels.

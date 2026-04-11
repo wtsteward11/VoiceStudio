@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -11,6 +10,7 @@ using VoiceStudio.App.Helpers;
 using VoiceStudio.App.Logging;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Utilities;
+using VoiceStudio.App.Views.Dialogs;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Views;
@@ -18,15 +18,20 @@ namespace VoiceStudio.App.Views;
 /// <summary>
 /// First-run wizard that guides users through initial setup including:
 /// - System requirements check
+/// - Model registration check
 /// - Backend health verification
-/// - Quick start guidance
+/// - API key orientation and quick start guidance
 /// </summary>
 public sealed partial class FirstRunWizard : Window
 {
+  /// <summary>Unpackaged settings key for wizard step resume (GAP-063).</summary>
+  public const string WizardCurrentStepKey = "WizardCurrentStep";
+
   private int _currentStep = 1;
-  private const int TotalSteps = 4;
+  private const int TotalSteps = 5;
   private readonly CancellationTokenSource _cts = new();
-  private bool _backendRunning;
+  private readonly bool _isFirstRun;
+  private readonly OnboardingWizardService? _onboardingService;
 
   /// <summary>
   /// GAP-X02: Tracks whether the wizard was completed successfully.
@@ -36,15 +41,51 @@ public sealed partial class FirstRunWizard : Window
 
   public bool DontShowAgain => DontShowAgainCheckBox?.IsChecked ?? false;
 
-  public FirstRunWizard()
+  /// <param name="isFirstRun">False when the wizard is shown again via "show on startup" after a completed first run; controls app exit on cancel.</param>
+  public FirstRunWizard(bool isFirstRun = true)
   {
     this.InitializeComponent();
+    _isFirstRun = isFirstRun;
+    _onboardingService = AppServices.GetOnboardingWizardService();
+
+    var savedStep = UnpackagedSettingsHelper.GetValue<int>(WizardCurrentStepKey, 1);
+    _currentStep = Math.Clamp(savedStep, 1, TotalSteps);
+    SyncOnboardingProgress();
 
     // Set version text
     var version = typeof(FirstRunWizard).Assembly.GetName().Version;
     VersionText.Text = $"Version {version?.ToString(3) ?? "1.0.0"}";
 
+    this.Closed += FirstRunWizard_Closed;
+
     UpdateStepUI();
+  }
+
+  private void FirstRunWizard_Closed(object sender, WindowEventArgs e)
+  {
+    _cts.Cancel();
+  }
+
+  private void SyncOnboardingProgress()
+  {
+    var progress = _onboardingService?.GetProgress();
+    if (progress != null)
+    {
+      progress.CurrentStepId = $"first_run_step_{_currentStep}";
+    }
+  }
+
+  private void SaveStepProgress()
+  {
+    try
+    {
+      UnpackagedSettingsHelper.SetValue(WizardCurrentStepKey, _currentStep);
+    }
+    catch (Exception ex)
+    {
+      ErrorLogger.LogWarning($"Failed to save wizard step: {ex.Message}");
+    }
+    SyncOnboardingProgress();
   }
 
   private void UpdateStepUI()
@@ -52,18 +93,20 @@ public sealed partial class FirstRunWizard : Window
     // Update step indicator
     StepIndicatorText.Text = _currentStep switch
     {
-      1 => "Step 1 of 4: Welcome",
-      2 => "Step 2 of 4: System Check",
-      3 => "Step 3 of 4: Backend Connection",
-      4 => "Step 4 of 4: Complete",
+      1 => "Step 1 of 5: Welcome",
+      2 => "Step 2 of 5: System Check",
+      3 => "Step 3 of 5: Model Readiness",
+      4 => "Step 4 of 5: Backend Connection",
+      5 => "Step 5 of 5: API Keys & Finish",
       _ => "Setup"
     };
 
     // Show/hide panels
     Step1Welcome.Visibility = _currentStep == 1 ? Visibility.Visible : Visibility.Collapsed;
     Step2SystemCheck.Visibility = _currentStep == 2 ? Visibility.Visible : Visibility.Collapsed;
-    Step3BackendHealth.Visibility = _currentStep == 3 ? Visibility.Visible : Visibility.Collapsed;
-    Step4Complete.Visibility = _currentStep == 4 ? Visibility.Visible : Visibility.Collapsed;
+    Step3ModelReadiness.Visibility = _currentStep == 3 ? Visibility.Visible : Visibility.Collapsed;
+    Step4BackendHealth.Visibility = _currentStep == 4 ? Visibility.Visible : Visibility.Collapsed;
+    Step5ApiComplete.Visibility = _currentStep == 5 ? Visibility.Visible : Visibility.Collapsed;
 
     // Update button visibility
     BackButton.Visibility = _currentStep > 1 ? Visibility.Visible : Visibility.Collapsed;
@@ -72,9 +115,26 @@ public sealed partial class FirstRunWizard : Window
     NextButton.Content = _currentStep switch
     {
       1 => "Get Started",
-      4 => "Finish",
+      5 => "Finish",
       _ => "Next"
     };
+
+    HelpButton.Visibility = _currentStep is 3 or 4 ? Visibility.Visible : Visibility.Collapsed;
+    if (_currentStep == 3)
+    {
+      HelpOverlay.Title = "Model Readiness";
+      HelpOverlay.HelpText =
+          "VoiceStudio requires at least one voice model to synthesize speech. " +
+          "Open the Model Manager via Settings to download or import models.";
+    }
+    else if (_currentStep == 4)
+    {
+      HelpOverlay.Title = "Backend Health";
+      HelpOverlay.HelpText =
+          "VoiceStudio's Python backend must be running before synthesis. " +
+          "Click 'Start Backend' to launch it. If it fails, ensure Python 3.11 is installed " +
+          "and the engines folder is intact.";
+    }
 
     // Trigger step-specific actions
     if (_currentStep == 2)
@@ -83,7 +143,77 @@ public sealed partial class FirstRunWizard : Window
     }
     else if (_currentStep == 3)
     {
+      _ = CheckModelReadinessAsync();
+    }
+    else if (_currentStep == 4)
+    {
       _ = CheckBackendHealthAsync();
+    }
+  }
+
+  private async void WizardRootGrid_Loaded(object sender, RoutedEventArgs e)
+  {
+    await TryShowTelemetryConsentOnFirstStepAsync();
+  }
+
+  private async Task TryShowTelemetryConsentOnFirstStepAsync()
+  {
+    if (_currentStep != 1)
+    {
+      return;
+    }
+
+    if (UnpackagedSettingsHelper.GetValue<bool>("TelemetryConsentShown", false))
+    {
+      return;
+    }
+
+    if (WizardRootGrid.XamlRoot == null)
+    {
+      return;
+    }
+
+    try
+    {
+      var consent = new TelemetryConsentDialog
+      {
+        XamlRoot = WizardRootGrid.XamlRoot,
+      };
+      await consent.ShowAsync();
+      UnpackagedSettingsHelper.SetValue("TelemetryConsentShown", true);
+    }
+    catch (Exception ex)
+    {
+      ErrorLogger.LogWarning($"Telemetry consent dialog failed: {ex.Message}");
+    }
+  }
+
+  private void HelpButton_Click(object sender, RoutedEventArgs e)
+  {
+    HelpOverlay.Show();
+  }
+
+  private async void OpenModelManagerInfoButton_Click(object sender, RoutedEventArgs e)
+  {
+    if (WizardRootGrid.XamlRoot == null)
+    {
+      return;
+    }
+
+    try
+    {
+      var dialog = new ContentDialog
+      {
+        Title = "Model Manager",
+        Content = "After you complete this wizard, use the navigation rail → Train → Model Manager to download and register voice models.",
+        CloseButtonText = "OK",
+        XamlRoot = WizardRootGrid.XamlRoot,
+      };
+      await dialog.ShowAsync();
+    }
+    catch (Exception ex)
+    {
+      ErrorLogger.LogWarning($"Model Manager info dialog failed: {ex.Message}");
     }
   }
 
@@ -92,6 +222,7 @@ public sealed partial class FirstRunWizard : Window
     if (_currentStep < TotalSteps)
     {
       _currentStep++;
+      SaveStepProgress();
       UpdateStepUI();
     }
     else
@@ -108,6 +239,7 @@ public sealed partial class FirstRunWizard : Window
     if (_currentStep > 1)
     {
       _currentStep--;
+      SaveStepProgress();
       UpdateStepUI();
     }
   }
@@ -127,6 +259,7 @@ public sealed partial class FirstRunWizard : Window
       // Use UnpackagedSettingsHelper for file-based settings (works for both packaged and unpackaged apps)
       UnpackagedSettingsHelper.SetValue("FirstRunComplete", true);
       UnpackagedSettingsHelper.SetValue("ShowWizardOnStartup", !DontShowAgain);
+      UnpackagedSettingsHelper.SetValue(WizardCurrentStepKey, 1);
 
       await Task.CompletedTask;
     }
@@ -139,6 +272,7 @@ public sealed partial class FirstRunWizard : Window
   private async Task RunSystemCheckAsync()
   {
     SystemCheckProgress.IsActive = true;
+    GpuFallbackPanel.Visibility = Visibility.Collapsed;
 
     try
     {
@@ -157,6 +291,10 @@ public sealed partial class FirstRunWizard : Window
       var (gpuFound, gpuName) = await CheckGpuAsync();
       SetCheckStatus(GpuIcon, GpuStatus, gpuFound,
           gpuFound ? gpuName : "Not detected (CPU mode)");
+      if (!gpuFound)
+      {
+        GpuFallbackPanel.Visibility = Visibility.Visible;
+      }
 
       // Check Disk Space
       await Task.Delay(300);
@@ -185,6 +323,13 @@ public sealed partial class FirstRunWizard : Window
     status.Text = message;
   }
 
+  private void SetModelStatus(bool success, string message)
+  {
+    ModelIcon.Glyph = success ? "\uE73E" : "\uE7BA";
+    ModelIcon.Foreground = new SolidColorBrush(success ? Microsoft.UI.Colors.Green : Microsoft.UI.Colors.Orange);
+    ModelStatus.Text = message;
+  }
+
   private async Task<bool> CheckPythonInstalledAsync()
   {
     try
@@ -206,9 +351,9 @@ public sealed partial class FirstRunWizard : Window
       }
     }
     catch (Exception ex)
-      {
+    {
         ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "FirstRunWizard.Task");
-      }
+    }
     return false;
   }
 
@@ -239,9 +384,9 @@ public sealed partial class FirstRunWizard : Window
       }
     }
     catch (Exception ex)
-      {
+    {
         ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "FirstRunWizard.Task");
-      }
+    }
     return (false, "Not detected");
   }
 
@@ -274,6 +419,40 @@ public sealed partial class FirstRunWizard : Window
     }
   }
 
+  private async Task CheckModelReadinessAsync()
+  {
+    ModelCheckProgress.IsActive = true;
+    ModelDownloadCtaPanel.Visibility = Visibility.Collapsed;
+
+    try
+    {
+      var client = AppServices.GetService<IModelManagerClient>();
+      if (client == null)
+      {
+        SetModelStatus(false, "Model manager unavailable");
+        ModelDownloadCtaPanel.Visibility = Visibility.Visible;
+        return;
+      }
+
+      var models = await client.GetModelsAsync(engine: null, cancellationToken: _cts.Token).ConfigureAwait(true);
+      var hasModels = models != null && models.Count > 0;
+      SetModelStatus(hasModels, hasModels
+          ? $"{models!.Count} model(s) registered"
+          : "No models registered yet");
+      ModelDownloadCtaPanel.Visibility = hasModels ? Visibility.Collapsed : Visibility.Visible;
+    }
+    catch (Exception ex)
+    {
+      ErrorLogger.LogWarning($"Model readiness check error: {ex.Message}");
+      SetModelStatus(false, "Could not reach backend for models");
+      ModelDownloadCtaPanel.Visibility = Visibility.Visible;
+    }
+    finally
+    {
+      ModelCheckProgress.IsActive = false;
+    }
+  }
+
   private async Task CheckBackendHealthAsync()
   {
     BackendProgress.IsActive = true;
@@ -281,62 +460,65 @@ public sealed partial class FirstRunWizard : Window
 
     try
     {
-      var httpClient = AppServices.GetService<HttpClient>();
-      if (httpClient == null)
+      var diagnostics = AppServices.GetService<IDiagnosticsClient>();
+      var enginesClient = AppServices.GetService<IEnginesClient>();
+
+      if (diagnostics == null)
       {
-        SetCheckStatus(BackendIcon, BackendStatus, false, "HttpClient not available");
+        SetCheckStatus(BackendIcon, BackendStatus, false, "Diagnostics unavailable");
+        SetCheckStatus(EnginesIcon, EnginesStatus, false, "Unavailable");
+        BackendWarningPanel.Visibility = Visibility.Visible;
         return;
       }
 
-      // Try to connect to backend
       SetCheckStatus(BackendIcon, BackendStatus, false, "Connecting...");
 
+      bool healthy;
       try
       {
-        var backendBase = AppServices.GetService<BackendClientConfig>()?.BaseUrl?.TrimEnd('/')
-            ?? BackendClientConfig.DefaultHttpBaseUrl;
-        var response = await httpClient.GetAsync($"{backendBase}/health", _cts.Token);
-        _backendRunning = response.IsSuccessStatusCode;
-
-        SetCheckStatus(BackendIcon, BackendStatus, _backendRunning,
-            _backendRunning ? "Connected" : "Not responding");
-
-        if (_backendRunning)
-        {
-          // Check engines
-          SetCheckStatus(EnginesIcon, EnginesStatus, false, "Checking...");
-          await Task.Delay(500);
-
-          try
-          {
-            var enginesResponse = await httpClient.GetAsync($"{backendBase}/api/engines", _cts.Token);
-            var enginesOk = enginesResponse.IsSuccessStatusCode;
-            SetCheckStatus(EnginesIcon, EnginesStatus, enginesOk,
-                enginesOk ? "Available" : "Error loading");
-          }
-          catch
-          {
-            SetCheckStatus(EnginesIcon, EnginesStatus, false, "Not available");
-          }
-        }
-        else
-        {
-          SetCheckStatus(EnginesIcon, EnginesStatus, false, "Backend required");
-          BackendWarningPanel.Visibility = Visibility.Visible;
-        }
+        healthy = await diagnostics.CheckHealthAsync(_cts.Token).ConfigureAwait(true);
       }
-      catch (HttpRequestException)
+      catch (Exception ex)
       {
-        _backendRunning = false;
-        SetCheckStatus(BackendIcon, BackendStatus, false, "Not running");
+        ErrorLogger.LogWarning($"Backend health check failed: {ex.Message}");
+        healthy = false;
+      }
+
+      SetCheckStatus(BackendIcon, BackendStatus, healthy,
+          healthy ? "Connected" : "Not responding");
+
+      if (!healthy)
+      {
         SetCheckStatus(EnginesIcon, EnginesStatus, false, "Backend required");
         BackendWarningPanel.Visibility = Visibility.Visible;
+      }
+      else if (enginesClient != null)
+      {
+        SetCheckStatus(EnginesIcon, EnginesStatus, false, "Checking...");
+        await Task.Delay(300);
+        try
+        {
+          var engines = await enginesClient.GetEnginesAsync(_cts.Token).ConfigureAwait(true);
+          var enginesOk = engines != null && engines.Count > 0;
+          SetCheckStatus(EnginesIcon, EnginesStatus, enginesOk,
+              enginesOk ? "Available" : "None listed");
+        }
+        catch (Exception ex)
+        {
+          ErrorLogger.LogWarning($"Engines list check failed: {ex.Message}");
+          SetCheckStatus(EnginesIcon, EnginesStatus, false, "Not available");
+        }
+      }
+      else
+      {
+        SetCheckStatus(EnginesIcon, EnginesStatus, false, "Engines client unavailable");
       }
     }
     catch (Exception ex)
     {
       ErrorLogger.LogWarning($"Backend health check error: {ex.Message}");
       SetCheckStatus(BackendIcon, BackendStatus, false, "Error");
+      SetCheckStatus(EnginesIcon, EnginesStatus, false, "Unavailable");
       BackendWarningPanel.Visibility = Visibility.Visible;
     }
     finally
@@ -349,21 +531,17 @@ public sealed partial class FirstRunWizard : Window
   {
     try
     {
-      // Try to start the backend
-      var psi = new ProcessStartInfo
+      var mgr = AppServices.GetService<BackendProcessManager>();
+      if (mgr == null)
       {
-        FileName = "python",
-        Arguments = "-m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000",
-        UseShellExecute = true,
-        CreateNoWindow = false
-      };
+        BackendStatus.Text = "Backend manager unavailable";
+        return;
+      }
 
-      Process.Start(psi);
-
-      // Wait a bit and re-check
       BackendStatus.Text = "Starting...";
-      await Task.Delay(5000);
-      await CheckBackendHealthAsync();
+      await mgr.EnsureBackendRunningAsync(_cts.Token).ConfigureAwait(true);
+      await Task.Delay(2000);
+      await CheckBackendHealthAsync().ConfigureAwait(true);
     }
     catch (Exception ex)
     {

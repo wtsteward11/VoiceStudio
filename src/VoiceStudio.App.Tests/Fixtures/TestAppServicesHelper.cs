@@ -17,7 +17,13 @@ namespace VoiceStudio.App.Tests.Fixtures
     public static class TestAppServicesHelper
     {
         private static DispatcherQueueController? _dispatcherController;
-        private static readonly object _lock = new();
+
+        /// <summary>
+        /// Serializes <see cref="AppServices.Initialize"/> across parallel MSTest workers.
+        /// Harness tests that call <see cref="RebuildDefaultProvider"/> then replace the provider must hold this
+        /// for the full sequence (reentrant with methods that lock the same object).
+        /// </summary>
+        internal static readonly object AppServicesInitializeSyncRoot = new();
 
         /// <summary>
         /// Ensures AppServices is initialized with test-appropriate services.
@@ -28,7 +34,7 @@ namespace VoiceStudio.App.Tests.Fixtures
         /// </summary>
         public static void EnsureInitialized()
         {
-            lock (_lock)
+            lock (AppServicesInitializeSyncRoot)
             {
                 // Always check for required services first. DegradedModeIntegrationTests replaces
                 // AppServices with a minimal provider; we must re-initialize when EventAggregator
@@ -84,7 +90,7 @@ namespace VoiceStudio.App.Tests.Fixtures
         /// </summary>
         public static void RebuildDefaultProvider()
         {
-            lock (_lock)
+            lock (AppServicesInitializeSyncRoot)
             {
                 if (_dispatcherController != null)
                 {
@@ -130,7 +136,7 @@ namespace VoiceStudio.App.Tests.Fixtures
             if (contextManager == null)
                 throw new ArgumentNullException(nameof(contextManager));
 
-            lock (_lock)
+            lock (AppServicesInitializeSyncRoot)
             {
                 if (_dispatcherController != null)
                 {

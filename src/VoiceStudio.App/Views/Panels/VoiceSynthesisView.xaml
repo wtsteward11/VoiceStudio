@@ -15,6 +15,7 @@
   xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
   xmlns:controls="using:VoiceStudio.App.Controls"
+  xmlns:converters="using:VoiceStudio.App.Converters"
   xmlns:local="using:VoiceStudio.App.Views.Panels"
   mc:Ignorable="d"
   d:DataContext="{d:DesignInstance Type=local:VoiceSynthesisView, IsDesignTimeCreatable=False}"
@@ -24,6 +25,9 @@
         AllowDrop="True"
         DragOver="VoiceSynthesisPanel_DragOver"
         Drop="VoiceSynthesisPanel_Drop">
+    <Grid.Resources>
+      <converters:BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    </Grid.Resources>
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
@@ -211,7 +215,20 @@
                     AutomationProperties.AutomationId="VoiceSynthesisView_StreamingModeCheckBox"
                     IsChecked="{x:Bind ViewModel.StreamingMode, Mode=TwoWay}"
                     ToolTipService.ToolTip="Enable real-time streaming playback" FontSize="11" />
+          <CheckBox Content="Long-form mode"
+                    AutomationProperties.AutomationId="VoiceSynthesisView_LongFormToggle"
+                    IsChecked="{x:Bind ViewModel.UseLongForm, Mode=TwoWay}"
+                    ToolTipService.ToolTip="Split long text into chunks on the server and merge into one file"
+                    FontSize="11" />
         </StackPanel>
+
+        <TextBlock Margin="0,4,0,0"
+                   FontSize="12"
+                   Opacity="0.85"
+                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                   Text="{x:Bind ViewModel.LongFormProgressText, Mode=OneWay}"
+                   AutomationProperties.AutomationId="VoiceSynthesisView_LongFormProgressText"
+                   Visibility="{x:Bind ViewModel.IsLongFormRunning, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
         
         <!-- Streaming status (visible when streaming is enabled) -->
         <Grid Visibility="{x:Bind ViewModel.StreamingMode, Mode=OneWay}" Margin="0,8,0,0">

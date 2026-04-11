@@ -344,6 +344,20 @@ namespace VoiceStudio.App
                         System.Diagnostics.Debug.WriteLine($"[Theme] Failed to initialize: {ex.Message}");
                     }
 
+                    // GAP-065: rehydrate user shortcut customizations (Loaded-only; ADR-047).
+                    try
+                    {
+                        await _keyboardShortcutService.InitializeAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[Shortcuts] Failed to load customizations: {ex.Message}");
+                    }
+
+                    // GAP-010: Mica/Desktop Acrylic + custom title bar (Loaded-only; ADR-047).
+                    ApplyMicaBackdrop();
+                    InitializeCustomTitleBar();
+
 #if DEBUG
                     // Log visual tree info after loaded (DEBUG only - avoid production file I/O)
                     var diagPath = System.IO.Path.Combine(
@@ -1605,12 +1619,13 @@ namespace VoiceStudio.App
         {
             try
             {
-                // Show keyboard shortcuts cheat sheet (IDEA 29)
+                // Show keyboard shortcuts cheat sheet (IDEA 29) + GAP-065 customize entry
                 var shortcutsView = new Views.KeyboardShortcutsView();
                 var dialog = new ContentDialog
                 {
                     Title = "Keyboard Shortcuts",
                     Content = shortcutsView,
+                    PrimaryButtonText = "Customize…",
                     CloseButtonText = "Close",
                     DefaultButton = ContentDialogButton.Close,
                     XamlRoot = this.Content.XamlRoot,
@@ -1618,7 +1633,34 @@ namespace VoiceStudio.App
                     Height = 600
                 };
 
-                await dialog.ShowAsync();
+                var result = await dialog.ShowAsync();
+                if (result == ContentDialogResult.Primary)
+                {
+                    KeyboardCustomizationViewModel? customizeVm = null;
+                    try
+                    {
+                        customizeVm = AppServices.GetRequiredService<KeyboardCustomizationViewModel>();
+                        customizeVm.RefreshShortcuts();
+                        var customizeView = new Views.Panels.KeyboardCustomizationView
+                        {
+                            DataContext = customizeVm
+                        };
+                        var customizeDialog = new ContentDialog
+                        {
+                            Title = "Customize keyboard shortcuts",
+                            Content = customizeView,
+                            CloseButtonText = "Close",
+                            DefaultButton = ContentDialogButton.Close,
+                            XamlRoot = this.Content.XamlRoot,
+                            MaxWidth = 640
+                        };
+                        await customizeDialog.ShowAsync();
+                    }
+                    finally
+                    {
+                        customizeVm?.Dispose();
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -2264,6 +2306,8 @@ namespace VoiceStudio.App
                 _globalTransport.StopRequested -= OnStopRequested;
                 _globalTransport = null;
             }
+
+            UnsubscribeShellChromeEvents();
 
             _disposed = true;
         }

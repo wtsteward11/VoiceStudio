@@ -407,7 +407,10 @@ def register_all_routes(app: FastAPI) -> None:
 
     @app.websocket("/ws/events")
     async def ws_events(ws: WebSocket):
-        """Legacy WebSocket endpoint (heartbeat only)."""
+        """Legacy WebSocket endpoint (heartbeat only).
+
+        Intentionally public: increments a demo counter only; no user data (GAP-058).
+        """
         from .ws import events
 
         await events.stream(ws)
@@ -420,7 +423,12 @@ def register_all_routes(app: FastAPI) -> None:
         Query parameters:
         - topics: Comma-separated list of topics (meters, training, batch, general)
         """
+        from .middleware.auth_middleware import AUTH_REQUIRED, require_ws_auth_if_enabled
         from .ws import realtime
+
+        user = await require_ws_auth_if_enabled(ws)
+        if user is None and AUTH_REQUIRED:
+            return
 
         topic_list = topics.split(",") if topics else None
         await realtime.connect(ws, topic_list)
@@ -442,7 +450,12 @@ def register_all_routes(app: FastAPI) -> None:
           - {"type": "plugin_sync", "action": "..."}: State updates
           - {"type": "plugin_command_response", ...}: Command results
         """
+        from .middleware.auth_middleware import AUTH_REQUIRED, require_ws_auth_if_enabled
         from .ws import plugins
+
+        user = await require_ws_auth_if_enabled(ws)
+        if user is None and AUTH_REQUIRED:
+            return
 
         await plugins.plugin_websocket_handler(ws)
 

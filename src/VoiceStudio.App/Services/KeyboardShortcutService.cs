@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
@@ -402,7 +403,7 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
         ShortcutContext context = ShortcutContext.Global,
         bool allowOverwrite = false)
     {
-        var conflict = CheckForConflict(commandId, key, modifiers);
+        var conflict = CheckForConflict(commandId, key, modifiers, context);
         if (conflict != null)
         {
             if (!allowOverwrite)
@@ -412,7 +413,7 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
                 ConflictDetected?.Invoke(this, new ShortcutConflictEventArgs(commandId, conflict));
                 return false;
             }
-            
+
             // Remove conflicting shortcut when overwrite allowed
             UnregisterShortcut(conflict.ConflictingCommandId);
             System.Diagnostics.Debug.WriteLine(
@@ -421,6 +422,29 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
 
         // Proceed with registration
         RegisterShortcut(commandId, key, modifiers, description, context);
+        return true;
+    }
+
+    /// <summary>
+    /// GAP-B23/B24: Register a shortcut with conflict detection and a sync handler.
+    /// </summary>
+    /// <returns>True if registration succeeded, false if conflict blocked it.</returns>
+    public bool TryRegisterShortcut(
+        string commandId,
+        VirtualKey key,
+        VirtualKeyModifiers modifiers,
+        Action handler,
+        string description,
+        ShortcutContext context = ShortcutContext.Global,
+        bool allowOverwrite = false)
+    {
+        if (!TryRegisterShortcut(commandId, key, modifiers, description, context, allowOverwrite))
+        {
+            System.Diagnostics.Debug.WriteLine($"[Shortcuts] TryRegisterShortcut (handler) failed: {commandId}");
+            return false;
+        }
+
+        RegisterHandler(commandId, handler);
         return true;
     }
 
@@ -436,13 +460,19 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
         VirtualKey key,
         VirtualKeyModifiers modifiers)
     {
+        var context = ShortcutContext.Global;
+        if (_shortcuts.TryGetValue(commandId, out var existingBinding))
+        {
+            context = existingBinding.Context;
+        }
+
         // Check for conflicts, allowing overwrite for user customizations
-        var conflict = CheckForConflict(commandId, key, modifiers);
+        var conflict = CheckForConflict(commandId, key, modifiers, context);
         if (conflict != null)
         {
-            // For user customizations, we allow overwrite but log the conflict
             System.Diagnostics.Debug.WriteLine(
                 $"[Shortcuts] User customization overwrites {conflict.ConflictingCommandId}");
+            ConflictDetected?.Invoke(this, new ShortcutConflictEventArgs(commandId, conflict));
             UnregisterShortcut(conflict.ConflictingCommandId);
         }
 
@@ -511,12 +541,17 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
     /// <summary>
     /// Check if a shortcut conflicts with another.
     /// </summary>
-    public bool HasConflict(VirtualKey key, VirtualKeyModifiers modifiers, string excludeCommandId)
+    public bool HasConflict(
+        VirtualKey key,
+        VirtualKeyModifiers modifiers,
+        string excludeCommandId,
+        ShortcutContext context = ShortcutContext.Global)
     {
         return _shortcuts.Values.Any(s =>
             s.Key == key &&
             s.Modifiers == modifiers &&
-            s.CommandId != excludeCommandId);
+            s.CommandId != excludeCommandId &&
+            s.Context == context);
     }
 
     /// <summary>
@@ -558,7 +593,10 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
 
     private class ShortcutImport
     {
+        [JsonPropertyName("key")]
         public int Key { get; set; }
+
+        [JsonPropertyName("modifiers")]
         public int Modifiers { get; set; }
     }
 
@@ -614,12 +652,17 @@ public class KeyboardShortcutService : IUnifiedKeyboardService
     /// <summary>
     /// Checks for conflicts with a proposed binding.
     /// </summary>
-    public ShortcutConflict? CheckForConflict(string commandId, VirtualKey key, VirtualKeyModifiers modifiers)
+    public ShortcutConflict? CheckForConflict(
+        string commandId,
+        VirtualKey key,
+        VirtualKeyModifiers modifiers,
+        ShortcutContext context = ShortcutContext.Global)
     {
         var conflicting = _shortcuts.Values.FirstOrDefault(s =>
             s.Key == key &&
             s.Modifiers == modifiers &&
-            s.CommandId != commandId);
+            s.CommandId != commandId &&
+            s.Context == context);
 
         if (conflicting != null)
         {

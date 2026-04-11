@@ -70,29 +70,43 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (_keyboardShortcutService == null) return;
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "assistant_send",
+          _keyboardShortcutService.TryRegisterShortcut(
           "assistant_send",
           VirtualKey.Enter,
           VirtualKeyModifiers.Control,
           () => { if (ViewModel.SendMessageCommand.CanExecute(null)) ViewModel.SendMessageCommand.Execute(null); },
-          "Send message to assistant"
-      );
+          "Send message to assistant",
+          ShortcutContext.Panel));
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "assistant_delete_conversation",
+          _keyboardShortcutService.TryRegisterShortcut(
           "assistant_delete_conversation",
           VirtualKey.Delete,
           VirtualKeyModifiers.None,
           () => { if (ViewModel.DeleteConversationCommand.CanExecute(null)) ViewModel.DeleteConversationCommand.Execute(null); },
-          "Delete selected conversation"
-      );
+          "Delete selected conversation",
+          ShortcutContext.Panel));
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "assistant_suggest_tasks",
+          _keyboardShortcutService.TryRegisterShortcut(
           "assistant_suggest_tasks",
           VirtualKey.T,
           VirtualKeyModifiers.Control,
           () => { if (ViewModel.SuggestTasksCommand.CanExecute(null)) ViewModel.SuggestTasksCommand.Execute(null); },
-          "Suggest tasks for selected project"
-      );
+          "Suggest tasks for selected project",
+          ShortcutContext.Panel));
+    }
+
+    private static void LogPanelShortcut(string commandId, bool registered)
+    {
+      if (!registered)
+      {
+        System.Diagnostics.Debug.WriteLine($"[Shortcuts] Panel registration blocked: {commandId}");
+      }
     }
 
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)

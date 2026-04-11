@@ -99,6 +99,9 @@ namespace VoiceStudio.App.Services
         client.DefaultRequestHeaders.Add("User-Agent", "VoiceStudio-Quantum-Plus/1.0");
         return client;
       });
+
+      // GAP-058: optional unified auth for WebSocket handshake headers (API key / Bearer).
+      services.AddSingleton<IUnifiedAuthService>(sp => new AuthService(sp.GetService<HttpClient>()));
     }
 
     /// <summary>
@@ -117,7 +120,8 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IBackendClient>(sp => new BackendClient(
         sp.GetRequiredService<BackendHttpContext>(),
         sp.GetRequiredService<BackendClientConfig>(),
-        sp.GetRequiredService<IRequestCoordinator>()));
+        sp.GetRequiredService<IRequestCoordinator>(),
+        sp.GetService<IUnifiedAuthService>()));
 
       // Profiles domain facade (Block 4.3)
       services.AddSingleton<IProfilesClient, ProfilesClient>();
@@ -142,6 +146,7 @@ namespace VoiceStudio.App.Services
 
       // Voice synthesis panel facade (Phase 4 Post-Timeline 4A.2 Phase A)
       services.AddSingleton<IVoiceSynthesisService, VoiceSynthesisService>();
+      services.AddSingleton<ISpeechToSpeechService, SpeechToSpeechService>();
 
       // Engines facade (Phase 5 Post-Timeline 5A)
       services.AddSingleton<IEnginesClient, EnginesClient>();
@@ -516,7 +521,8 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<PluginManager>();
       // Plugin Bridge Service for frontend-backend plugin state synchronization (Phase 1)
       services.AddSingleton<IPluginBridgeService, PluginBridgeService>(sp => new PluginBridgeService(
-          sp.GetRequiredService<ILogger<PluginBridgeService>>()));
+          sp.GetRequiredService<ILogger<PluginBridgeService>>(),
+          sp.GetService<IUnifiedAuthService>()));
       services.AddSingleton<RealTimeQualityService>();
       // NOTE: ToastNotificationService requires a StackPanel container and cannot be auto-resolved.
       // It must be registered manually via RegisterToastNotificationService() after UI is created.
@@ -534,6 +540,8 @@ namespace VoiceStudio.App.Services
           new TransportShortcutCoordinator(sp.GetService<IGlobalTransportOrchestrator>()));
       services.AddSingleton<StartupRetryCoordinator>();
       services.AddSingleton<KeyboardShortcutService>();
+      services.AddSingleton<IUnifiedKeyboardService>(sp => sp.GetRequiredService<KeyboardShortcutService>());
+      services.AddTransient<KeyboardCustomizationViewModel>();
       services.AddSingleton<ToolbarViewModel>(sp =>
           new ToolbarViewModel(
               sp.GetRequiredService<ToolbarConfigurationService>(),
@@ -561,6 +569,7 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IErrorPresentationService, ErrorPresentationService>();
       services.AddSingleton<IAnalyticsService, AnalyticsService>();
       services.AddSingleton<EngineManager>();
+      services.AddSingleton<OnboardingWizardService>();
 
       // Theme service: unified theme management with persistence
       services.AddSingleton<IUnifiedThemeService, ThemeManager>();
@@ -701,6 +710,9 @@ namespace VoiceStudio.App.Services
     public static IProjectsClient GetProjectsClient() => GetRequiredService<IProjectsClient>();
     public static IProfilesClient GetProfilesClient() => GetRequiredService<IProfilesClient>();
     public static IEnginesClient GetEnginesClient() => GetRequiredService<IEnginesClient>();
+
+    /// <summary>Canonical voice synthesis facade for panels (GAP-052 comparison, Voice Synthesis, etc.).</summary>
+    public static IVoiceSynthesisService GetVoiceSynthesisService() => GetRequiredService<IVoiceSynthesisService>();
     public static ISearchClient GetSearchClient() => GetRequiredService<ISearchClient>();
     public static IHealthVersionClient GetHealthVersionClient() => GetRequiredService<IHealthVersionClient>();
     public static ITelemetryClient GetTelemetryClient() => GetRequiredService<ITelemetryClient>();
@@ -887,6 +899,9 @@ namespace VoiceStudio.App.Services
     public static IExportLufsPresetUi? TryGetExportLufsPresetUi() => GetService<IExportLufsPresetUi>();
     public static BackendProcessManager GetBackendProcessManager() => GetRequiredService<BackendProcessManager>();
     public static BackendProcessManager? TryGetBackendProcessManager() => GetService<BackendProcessManager>();
+
+    /// <summary>GAP-063: First-run wizard onboarding state (singleton; no tooltip flow from <see cref="OnboardingWizardService.StartWizardAsync"/> in wizard).</summary>
+    public static OnboardingWizardService? GetOnboardingWizardService() => GetService<OnboardingWizardService>();
     public static IStartupStateService GetStartupStateService() => GetRequiredService<IStartupStateService>();
     public static IUnifiedThemeService GetThemeService() => GetRequiredService<IUnifiedThemeService>();
     public static IUnifiedThemeService? TryGetThemeService() => GetService<IUnifiedThemeService>();

@@ -2,7 +2,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:VoiceStudio.App.Controls"
-    x:DataType="controls:PanelHost">
+    x:DataType="controls:PanelHost"
+    MinWidth="{StaticResource VSQ.PanelHost.MinWidth}">
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="32" />

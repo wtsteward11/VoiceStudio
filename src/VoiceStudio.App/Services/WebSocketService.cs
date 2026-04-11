@@ -19,6 +19,9 @@ namespace VoiceStudio.App.Services
   /// </summary>
   public class WebSocketService : IWebSocketService
   {
+    /// <summary>Matches backend <c>WS_CLOSE_AUTH_REQUIRED</c> (GAP-058).</summary>
+    public const int AuthenticationRequiredCloseCode = 4001;
+
     private ClientWebSocket? _webSocket;
     private CancellationTokenSource? _cancellationTokenSource;
     private Task? _receiveTask;
@@ -26,6 +29,8 @@ namespace VoiceStudio.App.Services
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly HashSet<string> _subscribedTopics;
     private CoreWebSocketState _state = CoreWebSocketState.Disconnected;
+    private IReadOnlyDictionary<string, string>? _staticAuthHeaders;
+    private Func<IReadOnlyDictionary<string, string>?>? _credentialProvider;
 
     public event EventHandler? Connected;
     public event EventHandler<string>? Disconnected;
@@ -43,6 +48,63 @@ namespace VoiceStudio.App.Services
       _jsonOptions = JsonSerializerOptionsFactory.BackendApi;
     }
 
+    /// <inheritdoc />
+    public void SetAuthHeaders(IReadOnlyDictionary<string, string>? headers)
+    {
+      _staticAuthHeaders = headers;
+    }
+
+    /// <inheritdoc />
+    public void SetCredentialProvider(Func<IReadOnlyDictionary<string, string>?>? provider)
+    {
+      _credentialProvider = provider;
+    }
+
+    /// <summary>Test seam: resolved headers for the next handshake (GAP-058).</summary>
+    internal IReadOnlyDictionary<string, string>? ResolveHandshakeHeadersForTests() => ResolveHandshakeHeaders();
+
+    private IReadOnlyDictionary<string, string>? ResolveHandshakeHeaders()
+    {
+      var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+      if (_staticAuthHeaders != null)
+      {
+        foreach (var kv in _staticAuthHeaders)
+        {
+          headers[kv.Key] = kv.Value;
+        }
+      }
+
+      var dynamicHeaders = _credentialProvider?.Invoke();
+      if (dynamicHeaders != null)
+      {
+        foreach (var kv in dynamicHeaders)
+        {
+          headers[kv.Key] = kv.Value;
+        }
+      }
+
+      var envKey = Environment.GetEnvironmentVariable("VOICESTUDIO_API_KEY");
+      if (!string.IsNullOrWhiteSpace(envKey) && !headers.ContainsKey("X-API-Key"))
+      {
+        headers["X-API-Key"] = envKey.Trim();
+      }
+
+      return headers.Count > 0 ? headers : null;
+    }
+
+    private static void ApplyHandshakeHeaders(ClientWebSocket socket, IReadOnlyDictionary<string, string>? headers)
+    {
+      if (headers == null)
+      {
+        return;
+      }
+
+      foreach (var kv in headers)
+      {
+        socket.Options.SetRequestHeader(kv.Key, kv.Value);
+      }
+    }
+
     public async Task ConnectAsync(string[]? topics = null, CancellationToken cancellationToken = default)
     {
       if (_state == CoreWebSocketState.Connected || _state == CoreWebSocketState.Connecting)
@@ -54,6 +116,7 @@ namespace VoiceStudio.App.Services
       {
         _state = CoreWebSocketState.Connecting;
         _webSocket = new ClientWebSocket();
+        ApplyHandshakeHeaders(_webSocket, ResolveHandshakeHeaders());
         _cancellationTokenSource = new CancellationTokenSource();
 
         // Build WebSocket URL with topics query parameter
@@ -82,9 +145,31 @@ namespace VoiceStudio.App.Services
       catch (Exception ex)
       {
         _state = CoreWebSocketState.Error;
-        Error?.Invoke(this, ex);
+        if (IsLikelyWebSocketAuthenticationFailure(ex))
+        {
+          Error?.Invoke(this, new InvalidOperationException(
+              "WebSocket authentication required or handshake rejected (GAP-058).", ex));
+        }
+        else
+        {
+          Error?.Invoke(this, ex);
+        }
+
         throw;
       }
+    }
+
+    private static bool IsLikelyWebSocketAuthenticationFailure(Exception ex)
+    {
+      for (var e = ex; e != null; e = e.InnerException)
+      {
+        if (e.Message.IndexOf("4001", StringComparison.Ordinal) >= 0)
+        {
+          return true;
+        }
+      }
+
+      return false;
     }
 
     public async Task DisconnectAsync()
@@ -202,6 +287,21 @@ namespace VoiceStudio.App.Services
           CancellationToken.None);
     }
 
+    /// <summary>
+    /// GAP-058: shared with <see cref="ReceiveMessagesAsync"/>; exposed for seam tests.
+    /// </summary>
+    internal void NotifyAuthenticationRequiredCloseIfNeeded(WebSocketCloseStatus? closeStatus)
+    {
+      if (closeStatus == (WebSocketCloseStatus)AuthenticationRequiredCloseCode)
+      {
+        _state = CoreWebSocketState.Error;
+        Error?.Invoke(
+            this,
+            new InvalidOperationException(
+                $"WebSocket closed with authentication required (close code {AuthenticationRequiredCloseCode})."));
+      }
+    }
+
     private async Task ReceiveMessagesAsync(CancellationToken cancellationToken)
     {
       if (_webSocket == null)
@@ -221,10 +321,7 @@ namespace VoiceStudio.App.Services
 
           if (result.MessageType == WebSocketMessageType.Close)
           {
-            await _webSocket.CloseAsync(
-                WebSocketCloseStatus.NormalClosure,
-                "Server closed connection",
-                cancellationToken);
+            NotifyAuthenticationRequiredCloseIfNeeded(result.CloseStatus);
             break;
           }
 

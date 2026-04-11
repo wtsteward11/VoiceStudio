@@ -10,6 +10,7 @@ from backend.api.routes.voice import (
     audio,
     cloning,
     processing,
+    speech_to_speech,
     streaming,
     synthesis,
     testing,

@@ -153,6 +153,7 @@
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="$(VoiceStudioGraphicsWin2DVersion)" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="$(MicrosoftWindowsAppSDKVersion)" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="$(VoiceStudioWindowsSdkBuildToolsPackageVersion)" />
+    <PackageReference Include="Polly.Core" Version="8.5.0" />
     <!-- Required for in-proc XAML compiler task dependency -->
     <PackageReference Include="System.Security.Permissions" Version="6.0.0" />
     <PackageReference Include="CommunityToolkit.WinUI.UI.Controls" Version="$(VoiceStudioCommunityToolkitWinUIVersion)">

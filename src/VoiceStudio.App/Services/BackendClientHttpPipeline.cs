@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Polly.CircuitBreaker;
 using VoiceStudio.App.Logging;
 using VoiceStudio.App.Utilities;
 using VoiceStudio.Core.Exceptions;
@@ -15,32 +16,30 @@ using VoiceStudio.Core.Exceptions;
 namespace VoiceStudio.App.Services
 {
   /// <summary>
-  /// HTTP policy core for <see cref="BackendClient"/>: retry, circuit breaker, connection bookkeeping,
-  /// error mapping, and generic JSON request helpers. Extracted PR-1 — throw-based contract preserved.
+  /// HTTP helpers for <see cref="BackendClient"/>: connection bookkeeping, error mapping, JSON sends.
+  /// Retry and circuit breaker are implemented in Polly on the <see cref="HttpClient"/> handler chain (ADR-051).
   /// </summary>
   internal sealed class BackendClientHttpPipeline
   {
-    private const int MaxRetries = 3;
-    private const int RetryDelayMs = 1000;
     private const int ConnectionCheckIntervalSeconds = 5;
 
     private readonly HttpClient _httpClient;
     private readonly JsonSerializerOptions _jsonOptions;
-    private readonly CircuitBreaker _circuitBreaker;
+    private readonly CircuitBreakerStateProvider? _circuitStateProvider;
 
     private bool _isConnected = true;
     private DateTime _lastConnectionCheck = DateTime.MinValue;
 
-    public BackendClientHttpPipeline(HttpClient httpClient, JsonSerializerOptions jsonOptions)
+    public BackendClientHttpPipeline(HttpClient httpClient, JsonSerializerOptions jsonOptions, CircuitBreakerStateProvider? circuitStateProvider = null)
     {
       _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
       _jsonOptions = jsonOptions ?? throw new ArgumentNullException(nameof(jsonOptions));
-      _circuitBreaker = new CircuitBreaker(failureThreshold: 5, timeout: TimeSpan.FromSeconds(30));
+      _circuitStateProvider = circuitStateProvider;
     }
 
     public bool IsConnected => _isConnected;
 
-    public CircuitState CircuitState => _circuitBreaker.State;
+    public Utilities.CircuitState CircuitState => MapPollyCircuitState(_circuitStateProvider);
 
     public async Task<bool> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
@@ -59,20 +58,18 @@ namespace VoiceStudio.App.Services
       }
     }
 
-    public async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, int maxRetries = MaxRetries)
+    /// <summary>
+    /// Runs an operation after an optional connection check. Retries are owned by Polly on <see cref="HttpClient"/> (ADR-051).
+    /// </summary>
+    /// <param name="maxRetries">Ignored; retained for binary compatibility with call sites.</param>
+    public async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, int maxRetries = 3)
     {
+      _ = maxRetries;
       await UpdateConnectionStatusAsync();
 
       try
       {
-        return await _circuitBreaker.ExecuteAsync(async () =>
-            await RetryHelper.ExecuteWithExponentialBackoffAsync<T>(
-                operation,
-                maxRetries: maxRetries,
-                initialDelayMs: RetryDelayMs,
-                maxDelayMs: 10000
-            )
-        );
+        return await operation().ConfigureAwait(false);
       }
       catch (Exception ex)
       {
@@ -101,6 +98,24 @@ namespace VoiceStudio.App.Services
 
         throw;
       }
+    }
+
+    private static Utilities.CircuitState MapPollyCircuitState(CircuitBreakerStateProvider? provider)
+    {
+      if (provider is null)
+      {
+        return Utilities.CircuitState.Closed;
+      }
+
+      // SAFETY: StateProvider is always constructed with the circuit strategy in ADR-051 stack.
+      return provider.CircuitState switch
+      {
+        Polly.CircuitBreaker.CircuitState.Closed => Utilities.CircuitState.Closed,
+        Polly.CircuitBreaker.CircuitState.Open => Utilities.CircuitState.Open,
+        Polly.CircuitBreaker.CircuitState.HalfOpen => Utilities.CircuitState.HalfOpen,
+        Polly.CircuitBreaker.CircuitState.Isolated => Utilities.CircuitState.Open,
+        _ => Utilities.CircuitState.Closed,
+      };
     }
 
     private async Task UpdateConnectionStatusAsync()

@@ -4,8 +4,12 @@
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:controls="using:VoiceStudio.App.Controls"
   xmlns:views="using:VoiceStudio.App.Views">
-  <Grid Background="{StaticResource VSQ.Window.Background}" x:Name="RootGrid">
+  <Grid Background="{StaticResource VSQ.Window.Background}" x:Name="RootGrid"
+        MinWidth="{StaticResource VSQ.Shell.MinWidth}"
+        MinHeight="{StaticResource VSQ.Shell.MinHeight}">
     <Grid.RowDefinitions>
+      <RowDefinition Height="32" />
+      <!-- Custom title bar (drag region + chrome; system caption replaced when ExtendsContentIntoTitleBar) -->
       <RowDefinition Height="Auto" />
       <!-- Menu bar -->
       <RowDefinition Height="48" />
@@ -19,19 +23,36 @@
       <RowDefinition Height="26" />
       <!-- Status bar -->
     </Grid.RowDefinitions>
+    <!-- Custom title bar: icon + title + drag surface (SetTitleBar target) -->
+    <Grid Grid.Row="0" x:Name="TitleBarChromeGrid" Height="32" Padding="12,0,8,0" VerticalAlignment="Stretch"
+      Background="Transparent">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <FontIcon Grid.Column="0" Glyph="&#xE700;" FontSize="16" FontFamily="Segoe Fluent Icons"
+        VerticalAlignment="Center"
+        AutomationProperties.AutomationId="MainWindow_TitleBarIcon" />
+      <TextBlock Grid.Column="1" Text="VoiceStudio Quantum+" VerticalAlignment="Center" Margin="8,0,12,0"
+        Style="{StaticResource VSQ.Text.Body}"
+        AutomationProperties.AutomationId="MainWindow_TitleBarText" />
+      <Border x:Name="AppTitleBar" Grid.Column="2" Background="Transparent" VerticalAlignment="Stretch"
+        AutomationProperties.AutomationId="MainWindow_AppTitleBarDragRegion" />
+    </Grid>
     <!-- Menu bar host (populated by InitializeMenuBar) -->
-    <ContentControl x:Name="MenuBarHost" Grid.Row="0" HorizontalAlignment="Stretch" Margin="8,2,8,0" />
+    <ContentControl x:Name="MenuBarHost" Grid.Row="1" HorizontalAlignment="Stretch" Margin="8,2,8,0" />
     <!-- Top command toolbar -->
-    <controls:CustomizableToolbar Grid.Row="1" Margin="8,0,8,4" x:Name="CommandToolbar" />
+    <controls:CustomizableToolbar Grid.Row="2" Margin="8,0,8,4" x:Name="CommandToolbar" />
     <!-- Global transport strip: current media, source, status -->
-    <Border Grid.Row="2" Height="28" Margin="8,0,8,2" Padding="8,0"
+    <Border Grid.Row="3" Height="28" Margin="8,0,8,2" Padding="8,0"
       Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
       BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="0,0,0,1"
       CornerRadius="4,4,0,0">
       <controls:GlobalTransportControl x:Name="GlobalTransportControl" />
     </Border>
     <!-- Main workspace -->
-    <Grid Grid.Row="3" Margin="8,0,8,4" x:Name="WorkspaceGrid"
+    <Grid Grid.Row="4" Margin="8,0,8,4" x:Name="WorkspaceGrid"
       AutomationProperties.AutomationId="MainWindow_WorkspaceGrid">
       <Grid.RowDefinitions>
         <RowDefinition x:Name="TopRow" Height="4*" />
@@ -148,11 +169,11 @@
       <controls:PanelHost Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="5" x:Name="BottomPanelHost" />
     </Grid>
     <!-- Degraded mode banner (429/backend stress) -->
-    <InfoBar x:Name="DegradedModeBanner" Grid.Row="4" IsOpen="False" IsClosable="True"
+    <InfoBar x:Name="DegradedModeBanner" Grid.Row="5" IsOpen="False" IsClosable="True"
       Severity="Warning" Margin="8,4,8,0"
       AutomationProperties.AutomationId="MainWindow_DegradedModeBanner" />
     <!-- Status bar -->
-    <Border Grid.Row="5" Height="26" Background="{StaticResource VSQ.StatusBar.BackgroundBrush}"
+    <Border Grid.Row="6" Height="26" Background="{StaticResource VSQ.StatusBar.BackgroundBrush}"
       BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="1,1,1,0">
       <Grid Margin="8,0,8,0">
         <Grid.ColumnDefinitions>
@@ -214,24 +235,24 @@
       </Grid>
     </Border>
     <!-- Toast Notification Container (IDEA 11) -->
-    <StackPanel x:Name="ToastContainer" Grid.Row="3" HorizontalAlignment="Right"
+    <StackPanel x:Name="ToastContainer" Grid.Row="4" HorizontalAlignment="Right"
       VerticalAlignment="Bottom" Margin="0,0,16,80" Spacing="0" MaxWidth="400" />
     <!-- Global Search Overlay (IDEA 5) -->
-    <Grid x:Name="GlobalSearchOverlay" Grid.Row="3"
+    <Grid x:Name="GlobalSearchOverlay" Grid.Row="4"
       Background="{StaticResource VSQ.Overlay.BackgroundBrush}" Visibility="Collapsed"
       Tapped="GlobalSearchOverlay_Tapped">
       <views:GlobalSearchView x:Name="GlobalSearchView" HorizontalAlignment="Center"
         VerticalAlignment="Top" Margin="0,100,0,0" />
     </Grid>
     <!-- Collaboration Indicators (IDEA 25) -->
-    <Border x:Name="CollaborationPanel" Grid.Row="3" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0"
+    <Border x:Name="CollaborationPanel" Grid.Row="4" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0"
       Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
       BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="1" CornerRadius="8"
       Padding="8" Width="280" MaxHeight="400" Visibility="Collapsed">
       <controls:CollaborationIndicator x:Name="CollaborationIndicator" CloseRequested="CollaborationIndicator_CloseRequested" />
     </Border>
     <!-- Startup overlay: visible by default until backend ready (Task 3: show before content) -->
-    <Border x:Name="StartupOverlay" Grid.Row="0" Grid.RowSpan="6"
+    <Border x:Name="StartupOverlay" Grid.Row="0" Grid.RowSpan="7"
       Background="{StaticResource VSQ.Overlay.BackgroundBrush}"
       Visibility="Visible"
       AutomationProperties.AutomationId="MainWindow_StartupOverlay">

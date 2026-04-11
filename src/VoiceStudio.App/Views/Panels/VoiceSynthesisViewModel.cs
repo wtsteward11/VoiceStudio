@@ -124,6 +124,18 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private bool isLoading;
 
+    /// <summary>GAP-049: Use server-side chunked long-form synthesis and merge.</summary>
+    [ObservableProperty]
+    private bool useLongForm;
+
+    /// <summary>GAP-049: Long-form synthesis in progress (distinct from generic loading for progress text).</summary>
+    [ObservableProperty]
+    private bool isLongFormRunning;
+
+    /// <summary>GAP-049: Status line while long-form synthesis runs.</summary>
+    [ObservableProperty]
+    private string longFormProgressText = string.Empty;
+
     [ObservableProperty]
     private string statusMessage = string.Empty;
 
@@ -466,7 +478,8 @@ namespace VoiceStudio.App.Views.Panels
     public bool CanSynthesize =>
         SelectedProfile != null &&
         !string.IsNullOrWhiteSpace(Text) &&
-        !IsLoading;
+        !IsLoading &&
+        !IsLongFormRunning;
 
     /// <summary>GAP-050: Preset prosody is applied post-synthesis for any engine once a profile is selected.</summary>
     public bool IsEmotionSupported => SelectedProfile != null;
@@ -704,7 +717,60 @@ namespace VoiceStudio.App.Views.Panels
         }
 
         SynthesizeCommand.ReportProgress(25);
-        var response = await _voiceSynthesisService.SynthesizeVoiceAsync(request, cancellationToken);
+
+        VoiceSynthesisResponse response;
+        if (UseLongForm)
+        {
+          IsLongFormRunning = true;
+          LongFormProgressText = ResourceHelper.GetString(
+              "VoiceSynthesis.LongFormProgress",
+              "Processing long-form audio...");
+          try
+          {
+            var lfRequest = new LongFormSynthesisRequest
+            {
+              Engine = SelectedEngine,
+              ProfileId = SelectedProfile.Id,
+              Text = Text!,
+              Language = Language,
+              Emotion = Emotion,
+              EnhanceQuality = EnhanceQuality,
+              Speed = (float)Speed,
+              Pitch = (float)Pitch,
+              Stability = (float)Stability,
+              Clarity = (float)Clarity,
+              Temperature = (float)Temperature,
+              ChunkSizeChars = 1800,
+            };
+            var lf = await _voiceSynthesisService.SynthesizeLongFormAsync(lfRequest, cancellationToken);
+            response = new VoiceSynthesisResponse
+            {
+              AudioId = lf.AudioId,
+              AudioUrl = lf.AudioUrl,
+              Duration = lf.Duration,
+              QualityScore = lf.QualityScore,
+              QualityMetrics = null,
+            };
+            if (lf.PartialFailure && lf.FailedChunks is { Count: > 0 })
+            {
+              var failedIdx = string.Join(", ", lf.FailedChunks.ConvertAll(c => c.ChunkIndex.ToString()));
+              _toastNotificationService?.ShowWarning(
+                  $"Some chunks failed (indices: {failedIdx}). Output merges successful chunks only.",
+                  ResourceHelper.GetString(
+                      "VoiceSynthesis.LongFormPartialTitle",
+                      "Long-form synthesis"));
+            }
+          }
+          finally
+          {
+            LongFormProgressText = string.Empty;
+            IsLongFormRunning = false;
+          }
+        }
+        else
+        {
+          response = await _voiceSynthesisService.SynthesizeVoiceAsync(request, cancellationToken);
+        }
 
         SynthesizeCommand.ReportProgress(50);
 
@@ -1043,6 +1109,11 @@ namespace VoiceStudio.App.Views.Panels
       AddToTimelineCommand.NotifyCanExecuteChanged(); // GAP-B04
       OnPropertyChanged(nameof(CanPlayAudio));
       PlayAudioCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsLongFormRunningChanged(bool value)
+    {
+      SynthesizeCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnWorkflowStateChanged(SynthesisWorkflowState value)

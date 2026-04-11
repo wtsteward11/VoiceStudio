@@ -69,6 +69,10 @@ def create_audio_artifact_from_file(
     delete_source: bool = False,
     project_id: str | None = None,
     source: str | None = None,
+    is_transformed: bool = False,
+    transformation_type: str | None = None,
+    watermark_applied: bool = False,
+    watermark_method: str | None = None,
 ) -> tuple[str, str, dict]:
     """
     Create an audio artifact from an existing file.
@@ -88,6 +92,10 @@ def create_audio_artifact_from_file(
         source=source,
         model_used=created_by,
         write_provenance=True,
+        is_transformed=is_transformed,
+        transformation_type=transformation_type,
+        watermark_applied=watermark_applied,
+        watermark_method=watermark_method,
     )
     if delete_source and src.exists():
         try:

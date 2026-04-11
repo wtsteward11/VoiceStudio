@@ -300,6 +300,38 @@ class AudioRegistryDB:
         finally:
             conn.close()
 
+    def update_metadata(self, audio_id: str, extra: dict[str, Any]) -> None:
+        """Merge *extra* keys into existing metadata_json. No-op if row missing."""
+        if not extra:
+            return
+        conn = _connect(self._db_path)
+        try:
+            _ensure_schema(conn)
+            cur = conn.execute(
+                "SELECT metadata_json FROM audio_artifacts WHERE audio_id = ?",
+                (audio_id,),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return
+            current: dict[str, Any] = {}
+            if row["metadata_json"]:
+                try:
+                    loaded = json.loads(row["metadata_json"])
+                    if isinstance(loaded, dict):
+                        current = loaded
+                except (json.JSONDecodeError, TypeError):
+                    current = {}
+            for key, value in extra.items():
+                current[key] = value
+            conn.execute(
+                "UPDATE audio_artifacts SET metadata_json = ? WHERE audio_id = ?",
+                (json.dumps(current), audio_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
     def exists(self, audio_id: str) -> bool:
         """Check if audio_id is registered."""
         conn = _connect(self._db_path)

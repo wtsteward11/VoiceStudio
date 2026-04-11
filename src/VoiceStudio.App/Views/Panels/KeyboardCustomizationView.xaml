@@ -1,0 +1,96 @@
+<UserControl
+    x:Class="VoiceStudio.App.Views.Panels.KeyboardCustomizationView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:VoiceStudio.App.Controls"
+    xmlns:converters="using:VoiceStudio.App.Converters"
+    MaxWidth="600">
+    <UserControl.Resources>
+        <converters:BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    </UserControl.Resources>
+    <Grid>
+    <Grid Padding="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <AutoSuggestBox
+            x:Name="SearchBox"
+            Grid.Row="0"
+            Margin="0,0,0,8"
+            PlaceholderText="Search shortcuts..."
+            Text="{Binding SearchQuery, Mode=TwoWay}"
+            AutomationProperties.AutomationId="KeyboardCustomization_SearchBox"/>
+        <ListView
+            Grid.Row="1"
+            Margin="0,0,0,8"
+            ItemsSource="{Binding FilteredItems}"
+            SelectionMode="None"
+            AutomationProperties.AutomationId="KeyboardCustomization_ShortcutList">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Padding="4,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="{Binding Description}" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding CommandId}" Opacity="0.7" FontSize="12"/>
+                            <TextBlock
+                                Foreground="OrangeRed"
+                                Text="{Binding ConflictDescription}"
+                                Visibility="{Binding HasConflict, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        </StackPanel>
+                        <TextBlock
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Text="{Binding DisplayChord}"/>
+                        <Button
+                            Grid.Column="2"
+                            Margin="4,0,4,0"
+                            VerticalAlignment="Center"
+                            Content="Edit"
+                            Click="EditButton_Click"
+                            Tag="{Binding CommandId}"/>
+                        <Button
+                            Grid.Column="3"
+                            VerticalAlignment="Center"
+                            Content="Reset"
+                            Click="ResetButton_Click"
+                            Tag="{Binding CommandId}"/>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
+            <TextBox
+                x:Name="ChordCaptureBox"
+                Width="280"
+                PlaceholderText="Select a row, then press new keys..."
+                IsReadOnly="True"
+                IsEnabled="{Binding IsChordCaptureActive}"
+                PreviewKeyDown="ChordCaptureBox_PreviewKeyDown"/>
+            <Button Content="Cancel edit" Click="CancelEdit_Click"/>
+            <Button
+                Content="Reset all to defaults"
+                Click="ResetAll_Click"
+                AutomationProperties.AutomationId="KeyboardCustomization_ResetAllButton"/>
+            <Button
+                x:Name="HelpButton"
+                AutomationProperties.AutomationId="KeyboardCustomization_HelpButton"
+                Content="?"
+                ToolTipService.ToolTip="Keyboard shortcut help"
+                Click="HelpButton_Click"/>
+        </StackPanel>
+    </Grid>
+        <controls:HelpOverlay x:Name="HelpOverlay"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch"
+                              IsVisible="False"
+                              Visibility="Collapsed"/>
+    </Grid>
+</UserControl>

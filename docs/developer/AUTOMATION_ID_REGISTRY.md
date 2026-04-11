@@ -1,7 +1,7 @@
 # AutomationId Registry
 
 > **Version**: 1.0.0  
-> **Last Updated**: 2026-04-04  
+> **Last Updated**: 2026-04-10  
 > **Status**: ACTIVE  
 > **Owner**: UI Engineer (Role 3)
 
@@ -75,6 +75,9 @@ Every panel MUST have a root AutomationId on its outermost container:
 
 | AutomationId | Control Type | Purpose | Stable Since |
 |--------------|--------------|---------|--------------|
+| `MainWindow_TitleBarIcon` | FontIcon | Custom title bar app icon (GAP-010) | v1.2.0 |
+| `MainWindow_TitleBarText` | TextBlock | Custom title bar caption text | v1.2.0 |
+| `MainWindow_AppTitleBarDragRegion` | Border | Custom title bar drag region (`SetTitleBar`) | v1.2.0 |
 | `MainWindow_StartupOverlay` | Border | Startup overlay (visible until backend ready) | v1.2.0 |
 | `MainWindow_DegradedModeBanner` | InfoBar | Degraded mode (429/backend stress) banner | v1.0.0 |
 | `MainWindow_WorkspaceGrid` | Grid | Primary workspace layout (panel hosts) | v1.2.0 |
@@ -86,6 +89,35 @@ Every panel MUST have a root AutomationId on its outermost container:
 | `StatusBar_JobStatusText` | TextBlock | Job status | v1.0.0 |
 | `StatusBar_JobProgressBar` | ProgressBar | Job progress | v1.0.0 |
 | `StatusBar_CurrentMedia` | TextBlock | Current media info | v1.0.0 |
+| `KeyboardCustomization_SearchBox` | AutoSuggestBox | Shortcut customization search (GAP-065) | v1.2.0 |
+| `KeyboardCustomization_ShortcutList` | ListView | Shortcut list for rebinding (GAP-065) | v1.2.0 |
+| `KeyboardCustomization_ResetAllButton` | Button | Reset all shortcuts to defaults (GAP-065) | v1.2.0 |
+
+---
+
+## FirstRunWizard (GAP-063)
+
+| AutomationId | Control Type | Purpose | Stable Since |
+|--------------|--------------|---------|--------------|
+| `FirstRunWizard_Step1Welcome` | StackPanel | Step 1 — Welcome | v1.2.0 |
+| `FirstRunWizard_Step2SystemCheck` | StackPanel | Step 2 — System check | v1.2.0 |
+| `FirstRunWizard_Step3ModelReadiness` | StackPanel | Step 3 — Model readiness | v1.2.0 |
+| `FirstRunWizard_Step4BackendHealth` | StackPanel | Step 4 — Backend connection | v1.2.0 |
+| `FirstRunWizard_Step5ApiComplete` | StackPanel | Step 5 — API keys + finish | v1.2.0 |
+| `FirstRunWizard_GpuFallbackPanel` | Border | CPU-mode advisory (no NVIDIA GPU) | v1.2.0 |
+| `FirstRunWizard_ModelDownloadCta` | Button | Model Manager location CTA | v1.2.0 |
+| `FirstRunWizard_NextButton` | Button | Primary navigation | v1.2.0 |
+| `FirstRunWizard_SkipButton` | Button | Skip setup | v1.2.0 |
+| `FirstRunWizard_DontShowAgainCheckBox` | CheckBox | Repeat-show on startup toggle | v1.2.0 |
+
+---
+
+## GAP-066 Help affordances
+
+| AutomationId | Control Type | Purpose | Stable Since |
+|--------------|--------------|---------|--------------|
+| `FirstRunWizard_HelpButton` | Button | Contextual help (steps 3–4: model readiness, backend) | v1.2.0 |
+| `KeyboardCustomization_HelpButton` | Button | Shortcut customization help | v1.2.0 |
 
 ---
 
@@ -114,6 +146,23 @@ Primary voice synthesis interface.
 | `VoiceSynthesisView_MultiEngineCheckBox` | CheckBox | Multi-engine mode toggle | v1.0.0 |
 | `VoiceSynthesisView_AutoApplyCheckBox` | CheckBox | Auto-apply toggle | v1.0.0 |
 | `VoiceSynthesisView_ErrorInfoBar` | InfoBar | Error display | v1.0.0 |
+| `VoiceSynthesisView_LongFormToggle` | CheckBox | Long-form (chunked) synthesis mode | v1.2.0 |
+| `VoiceSynthesisView_LongFormProgressText` | TextBlock | Long-form processing status | v1.2.0 |
+
+#### SpeechToSpeechView
+Batch speech-to-speech conversion (RVC) — GAP-051.
+
+| AutomationId | Control Type | Purpose | Stable Since |
+|--------------|--------------|---------|--------------|
+| `SpeechToSpeechView_Root` | StackPanel | Panel root container | v1.2.0 |
+| `SpeechToSpeechView_SourceAudioSelector` | TextBox | Source artifact audio id | v1.2.0 |
+| `SpeechToSpeechView_TargetVoiceSelector` | ComboBox | Target voice profile | v1.2.0 |
+| `SpeechToSpeechView_ConvertButton` | Button | Run conversion | v1.2.0 |
+| `SpeechToSpeechView_ConsentCheckBox` | CheckBox | User consent acknowledgement gate | GAP-055 |
+| `SpeechToSpeechView_StatusText` | TextBlock | Status / progress text | v1.2.0 |
+| `SpeechToSpeechView_OutputAudioLink` | TextBlock | Output audio URL line | v1.2.0 |
+| `SpeechToSpeechView_DisclosureText` | TextBlock | Transformed-output disclosure label | GAP-056 |
+| `SpeechToSpeechView_MarkingBadge` | TextBlock | Durable-marking verified indicator | GAP-056 slice 2 |
 
 #### ProfilesView
 Voice profile management.
@@ -167,6 +216,7 @@ Audio effects and mixing.
 | `EffectsMixerView_NewChainNameTextBox` | TextBox | New chain name input | v1.0.0 |
 | `EffectsMixerView_CreateChainButton` | Button | Create chain | v1.0.0 |
 | `EffectsMixerView_EffectChainsListView` | ListView | Effect chains list | v1.0.0 |
+| `EffectsMixerView_StudioSoundButton` | Button | One-click Studio Sound (denoise → compressor → normalize) | v1.0.0 |
 | `EffectsMixerView_AddEffectComboBox` | ComboBox | Add effect selector | v1.0.0 |
 | `EffectsMixerView_EffectsListView` | ListView | Effects list | v1.0.0 |
 | `EffectsMixerView_MasterVolumeSlider` | Slider | Master volume | v1.0.0 |
@@ -276,6 +326,8 @@ Every panel has a `_Root` AutomationId for test navigation:
 | QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_ResultsSummary` |
 | QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_NextStepHint` |
 | QualityBenchmarkView (W8-C1) | `QualityBenchmarkView_ResultsListView` |
+| QualityBenchmarkView (GAP-052 side-by-side comparison) | `QualityBenchmarkView_RunComparisonButton` |
+| QualityBenchmarkView (GAP-052 comparison result cards) | `QualityBenchmarkView_ComparisonSlots` |
 | ProfileComparisonView (Pass 08 W8-C3) | `ProfileComparisonView_Root` |
 | ProfileComparisonView (W8-C3) | `ProfileComparisonView_HelpButton` |
 | ProfileComparisonView (W8-C3) | `ProfileComparisonView_ErrorInfoBar` |

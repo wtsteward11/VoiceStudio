@@ -1,6 +1,6 @@
 # GOV-VOICESTUDIO-GAP022-HTTPCLIENT-POLLY-RESILIENCE-01
 
-**Status:** Frozen (execution row only — **no implementation in this commit**)  
+**Status:** **Closed** — Implementation complete 2026-04-09. Closure: [VOICESTUDIO_GAP022_HTTPCLIENT_POLLY_RESILIENCE_LANE_CLOSURE_2026-04-09.md](../reports/verification/VOICESTUDIO_GAP022_HTTPCLIENT_POLLY_RESILIENCE_LANE_CLOSURE_2026-04-09.md)  
 **GAP:** [GAP-022](PROFESSIONAL_GAP_TRACKER.md) — Replace hand-rolled resilience with Polly v8 / `HttpClient` resilience  
 **Phase:** 2 (Missing)  
 **Row type:** **runtime-affecting**  
@@ -21,7 +21,9 @@ The desktop client uses `HttpClient` (via `BackendClient` / HTTP pipeline) to re
 
 ## Runtime proof requirement
 
-- [ ] **Inherited Grade R proof required** — This lane changes **client transport** only, not server synthesis, training, export, or health **product** routes. At closure, cite the most recent **Grade R** artifact (e.g. `artifacts/verify/<ts>/runtime_proof.json` or policy-approved substitute) and confirm it is within the **72h** policy window, **or** rerun `.\scripts\verify.ps1 -RuntimeProof` if inherited proof is stale/missing.
+- [x] **Inherited Grade R proof required** — This lane changes **client transport** only, not server synthesis, training, export, or health **product** routes. At closure, cite the most recent **Grade R** artifact (e.g. `artifacts/verify/<ts>/runtime_proof.json` or policy-approved substitute) and confirm it is within the **72h** policy window, **or** rerun `.\scripts\verify.ps1 -RuntimeProof` if inherited proof is stale/missing.
+
+**Cited at closure:** `artifacts/verify/20260408_205616/runtime_proof.json` (2026-04-08; within 72h of closure 2026-04-09). See closure report §4b.
 
 ## SLO baseline posture
 
@@ -30,6 +32,8 @@ The desktop client uses `HttpClient` (via `BackendClient` / HTTP pipeline) to re
 ## Closure report doctrine (this lane)
 
 At closure, the report MUST explicitly state: **Grade S / I** evidence (tests), **Grade R** inherited vs fresh (see above), and that **SLO** artifacts were **advisory only** for this closure.
+
+**Closure report:** [VOICESTUDIO_GAP022_HTTPCLIENT_POLLY_RESILIENCE_LANE_CLOSURE_2026-04-09.md](../reports/verification/VOICESTUDIO_GAP022_HTTPCLIENT_POLLY_RESILIENCE_LANE_CLOSURE_2026-04-09.md).
 
 ## Allowlist (initial — refine during implementation)
 
@@ -51,14 +55,14 @@ At closure, the report MUST explicitly state: **Grade S / I** evidence (tests), 
 
 ## Acceptance contract (implementation phase)
 
-- [ ] Polly v8 policies applied to the **`HttpClient`** instance(s) used for backend API calls (document which handler/pipeline owns them).
-- [ ] Retry/timeout/circuit parameters are **configurable or documented constants** with rationale (no magic sleep-only hacks per project standards).
-- [ ] New or updated **MSTest** coverage for resilience behavior (mock handler / test `HttpMessageHandler`).
-- [ ] **ADR** accepted if a **new production NuGet** dependency is added ([architecture.mdc](../../.cursor/rules/core/architecture.mdc)).
-- [ ] `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` clean; targeted `dotnet test` for changed tests **PASS**.
-- [ ] `.\scripts\verify.ps1 -Quick` **PASS** at closure.
-- [ ] **Inherited or Fresh Grade R** cited in closure (see Runtime proof requirement).
-- [ ] Tracker **GAP-022** row updated to **Closed** only when the bounded slice is fully delivered (may defer follow-on polish to a new row if honest).
+- [x] Polly v8 policies applied to the **`HttpClient`** instance(s) used for backend API calls — owned by **`ResiliencePipelineDelegatingHandler`** via **`BackendHttpTransportFactory`** (see ADR-051).
+- [x] Retry/timeout/circuit parameters are **configurable or documented constants** with rationale (no magic sleep-only hacks per project standards) — `BackendHttpResiliencePolicies.cs`.
+- [x] New or updated **MSTest** coverage for resilience behavior (mock handler / test `HttpMessageHandler`) — `BackendClientTransportPolicyTests.cs`.
+- [x] **ADR** accepted for **new production NuGet** — [ADR-051](../../architecture/decisions/ADR-051-polly-v8-httpclient-resilience.md).
+- [x] `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` clean; full `dotnet test` for `VoiceStudio.App.Tests` **PASS** at closure seal.
+- [x] `.\scripts\verify.ps1 -Quick` **PASS** at closure — `artifacts/verify/20260408_205814/`.
+- [x] **Inherited or Fresh Grade R** cited in closure — `artifacts/verify/20260408_205616/runtime_proof.json` (see Runtime proof requirement).
+- [x] Tracker **GAP-022** row updated to **Closed** when the bounded slice is fully delivered.
 
 ## Rollback
 
@@ -71,3 +75,9 @@ At closure, the report MUST explicitly state: **Grade S / I** evidence (tests), 
 | Policy hides real outages | Circuit breaker + bounded retries; preserve user-visible errors |
 | Test flakiness | Deterministic mock `HttpMessageHandler`; no real network in unit tests |
 | NuGet / supply chain | ADR + explicit version pin; `pip`-style hash discipline not applicable to NuGet — follow repo NuGet conventions |
+
+## Changelog
+
+| Date | Change |
+|------|--------|
+| 2026-04-09 | Lane **Closed**. Implementation + governance seal. Closure: [VOICESTUDIO_GAP022_HTTPCLIENT_POLLY_RESILIENCE_LANE_CLOSURE_2026-04-09.md](../reports/verification/VOICESTUDIO_GAP022_HTTPCLIENT_POLLY_RESILIENCE_LANE_CLOSURE_2026-04-09.md). |

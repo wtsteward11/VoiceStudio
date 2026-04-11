@@ -38,6 +38,12 @@ namespace VoiceStudio.App.Views.Panels
     private bool _isPolling;
     private bool _disposed;
 
+    /// <summary>GAP-012: last known bypass for undo pairing (session flag, not persisted on chain).</summary>
+    private bool _lastBypassValue;
+
+    /// <summary>GAP-012: suppress bypass undo when applying from undo/redo stack.</summary>
+    private bool _suppressBypassUndoRegistration;
+
     public string PanelId => PanelIds.EffectsMixer;
     public string DisplayName => ResourceHelper.GetString("Panel.EffectsMixer.DisplayName", "Effects & Mixer");
     public PanelRegion Region => PanelRegion.Right;
@@ -99,6 +105,14 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private bool isEffectChainBypassed;
 
+    /// <summary>GAP-048: Studio Sound one-click processing in progress (drives ProgressRing).</summary>
+    [ObservableProperty]
+    private bool isStudioSoundRunning;
+
+    /// <summary>GAP-048: Last Studio Sound output artifact id (session only).</summary>
+    [ObservableProperty]
+    private string? studioSoundOutputAudioId;
+
     [ObservableProperty]
     private MixerMaster master = new();
 
@@ -118,9 +132,24 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private bool hasMultipleChannelSelection;
 
+    /// <summary>GAP-048: Whether the one-click Studio Sound action can run.</summary>
+    public bool CanRunStudioSound =>
+        !string.IsNullOrWhiteSpace(SelectedProjectId)
+        && !string.IsNullOrWhiteSpace(SelectedAudioId)
+        && !IsLoading
+        && !IsStudioSoundRunning;
+
     public bool IsChannelSelected(string channelId) => _multiSelectState?.SelectedIds.Contains(channelId) ?? false;
 
     // Available effect types
+    /// <summary>GAP-048: Curated Studio Sound chain (denoise → compressor → normalize). Parameters are applied at run time.</summary>
+    private static readonly List<Effect> StudioSoundEffects = new()
+    {
+      new Effect { Id = "studio-denoise", Type = "denoise", Name = "Noise Reduction", Enabled = true, Order = 0 },
+      new Effect { Id = "studio-compressor", Type = "compressor", Name = "Voice Compressor", Enabled = true, Order = 1 },
+      new Effect { Id = "studio-normalize", Type = "normalize", Name = "Normalize", Enabled = true, Order = 2 },
+    };
+
     public List<string> AvailableEffectTypes { get; } = new()
         {
             "normalize",
@@ -149,6 +178,7 @@ namespace VoiceStudio.App.Views.Panels
       _mixerStateClient = mixerStateClient ?? throw new ArgumentNullException(nameof(mixerStateClient));
       _meterClient = meterClient;
       _disposalCts = new CancellationTokenSource();
+      _lastBypassValue = IsEffectChainBypassed;
 
       // Get multi-select service
       var multiSelectService = AppServices.TryGetMultiSelectService();
@@ -242,6 +272,12 @@ namespace VoiceStudio.App.Views.Panels
         using var profiler = PerformanceProfiler.StartCommand("PreviewEffectChain");
         await RunEffectChainProcessAsync(chainId, isPreview: true, ct);
       }, (string? _) => !IsLoading && !string.IsNullOrWhiteSpace(SelectedProjectId) && !string.IsNullOrWhiteSpace(SelectedAudioId));
+
+      RunStudioSoundCommand = new EnhancedAsyncRelayCommand(async (ct) =>
+      {
+        using var profiler = PerformanceProfiler.StartCommand("StudioSound");
+        await RunStudioSoundAsync(ct);
+      }, () => CanRunStudioSound);
 
       AddEffectCommand = new EnhancedAsyncRelayCommand<string>(async (string? effectType, CancellationToken ct) =>
       {
@@ -390,6 +426,7 @@ namespace VoiceStudio.App.Views.Panels
     public EnhancedAsyncRelayCommand<string> DeleteEffectChainCommand { get; }
     public EnhancedAsyncRelayCommand<string> ApplyEffectChainCommand { get; }
     public EnhancedAsyncRelayCommand<string> PreviewEffectChainCommand { get; }
+    public EnhancedAsyncRelayCommand RunStudioSoundCommand { get; }
     public EnhancedAsyncRelayCommand<string> AddEffectCommand { get; }
     public EnhancedAsyncRelayCommand<string> RemoveEffectCommand { get; }
     public EnhancedAsyncRelayCommand<string> MoveEffectUpCommand { get; }
@@ -431,6 +468,7 @@ namespace VoiceStudio.App.Views.Panels
       CreateEffectChainCommand.NotifyCanExecuteChanged();
       ApplyEffectChainCommand.NotifyCanExecuteChanged();
       PreviewEffectChainCommand.NotifyCanExecuteChanged();
+      RunStudioSoundCommand.NotifyCanExecuteChanged();
       LoadMixerStateCommand.NotifyCanExecuteChanged();
       SaveMixerStateCommand.NotifyCanExecuteChanged();
       ResetMixerStateCommand.NotifyCanExecuteChanged();
@@ -469,6 +507,116 @@ namespace VoiceStudio.App.Views.Panels
       _contextManager?.SetActiveEffectChain(value?.Id, SelectedProjectId);
     }
 
+    partial void OnIsEffectChainBypassedChanged(bool value)
+    {
+      if (_suppressBypassUndoRegistration)
+      {
+        _lastBypassValue = value;
+        return;
+      }
+
+      var previous = _lastBypassValue;
+      _lastBypassValue = value;
+      if (previous == value)
+        return;
+
+      RegisterBypassUndo(previous, value);
+    }
+
+    private void RegisterBypassUndo(bool before, bool after)
+    {
+      if (_undoRedoService == null)
+        return;
+      var action = new ToggleBypassUndoAction(
+          before,
+          after,
+          v =>
+          {
+            _suppressBypassUndoRegistration = true;
+            try
+            {
+              IsEffectChainBypassed = v;
+            }
+            finally
+            {
+              _suppressBypassUndoRegistration = false;
+            }
+          });
+      _undoRedoService.RegisterAction(action);
+    }
+
+    private void SyncSelectedEffectChainAfterUndo(EffectChain updated)
+    {
+      if (SelectedEffectChain?.Id != updated.Id)
+        return;
+      var effectId = SelectedEffect?.Id;
+      SelectedEffectChain = updated;
+      if (!string.IsNullOrEmpty(effectId))
+        SelectedEffect = updated.Effects?.FirstOrDefault(e => e.Id == effectId);
+    }
+
+    /// <summary>GAP-012: Called from view when effect enable checkbox toggles (after TwoWay binding applies).</summary>
+    public async Task PersistEffectEnabledToggleAsync(
+        Effect? effect,
+        bool previousEnabled,
+        bool newEnabled,
+        CancellationToken cancellationToken = default)
+    {
+      if (effect == null || SelectedEffectChain == null || string.IsNullOrWhiteSpace(SelectedProjectId))
+        return;
+      if (previousEnabled == newEnabled)
+        return;
+
+      IsLoading = true;
+      ErrorMessage = null;
+      try
+      {
+        SelectedEffectChain.Modified = DateTime.UtcNow;
+        var updated = await _effectChainClient.UpdateEffectChainAsync(
+            SelectedProjectId,
+            SelectedEffectChain.Id,
+            SelectedEffectChain,
+            cancellationToken);
+
+        var index = EffectChains.IndexOf(SelectedEffectChain);
+        if (index >= 0 && updated != null)
+        {
+          EffectChains[index] = updated;
+          SelectedEffectChain = updated;
+        }
+
+        if (_undoRedoService != null && SelectedEffectChain != null)
+        {
+          var log = ServiceProvider.TryGetErrorLoggingService();
+          var action = new ToggleEffectEnabledUndoAction(
+              EffectChains,
+              _effectChainClient,
+              SelectedProjectId,
+              SelectedEffectChain.Id,
+              effect.Id,
+              previousEnabled,
+              newEnabled,
+              log,
+              SyncSelectedEffectChainAfterUndo);
+          _undoRedoService.RegisterAction(action);
+        }
+      }
+      catch (OperationCanceledException)
+      {
+        return;
+      }
+      catch (Exception ex)
+      {
+        ErrorMessage = ErrorHandler.GetUserFriendlyMessage(ex);
+        _errorService?.ShowError(ex, ResourceHelper.GetString("EffectsMixer.EffectChainSaveFailed", "Failed to save effect chain"));
+        _logService?.LogError(ex, "PersistEffectEnabledToggle");
+      }
+      finally
+      {
+        IsLoading = false;
+      }
+    }
+
     partial void OnIsLoadingChanged(bool value)
     {
       LoadMixerStateCommand.NotifyCanExecuteChanged();
@@ -479,6 +627,12 @@ namespace VoiceStudio.App.Views.Panels
       ApplyMixerPresetCommand.NotifyCanExecuteChanged();
       ApplyEffectChainCommand.NotifyCanExecuteChanged();
       PreviewEffectChainCommand.NotifyCanExecuteChanged();
+      RunStudioSoundCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsStudioSoundRunningChanged(bool value)
+    {
+      RunStudioSoundCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnMixerStateChanged(MixerState? value)
@@ -492,6 +646,7 @@ namespace VoiceStudio.App.Views.Panels
       ToggleRealTimeUpdatesCommand.NotifyCanExecuteChanged();
       ApplyEffectChainCommand.NotifyCanExecuteChanged();
       PreviewEffectChainCommand.NotifyCanExecuteChanged();
+      RunStudioSoundCommand.NotifyCanExecuteChanged();
 
       // Stop polling if audio ID changes
       if (IsRealTimeUpdatesEnabled)
@@ -1153,6 +1308,109 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    /// <summary>GAP-048: One-click denoise → compressor → normalize via canonical effect-chain APIs; transient chain is deleted after processing.</summary>
+    private async Task RunStudioSoundAsync(CancellationToken cancellationToken)
+    {
+      var projectId = SelectedProjectId;
+      var audioId = SelectedAudioId;
+      if (string.IsNullOrWhiteSpace(projectId) || string.IsNullOrWhiteSpace(audioId))
+        return;
+
+      IsLoading = true;
+      IsStudioSoundRunning = true;
+      StudioSoundOutputAudioId = null;
+      ErrorMessage = null;
+      string? transientChainId = null;
+
+      try
+      {
+        var effects = new List<Effect>(StudioSoundEffects.Count);
+        foreach (var template in StudioSoundEffects)
+        {
+          var effectType = template.Type ?? string.Empty;
+          effects.Add(new Effect
+          {
+            Id = template.Id,
+            Type = effectType,
+            Name = template.Name,
+            Enabled = template.Enabled,
+            Order = template.Order,
+            Parameters = GetDefaultParametersForEffectType(effectType)
+          });
+        }
+
+        var chain = new EffectChain
+        {
+          Id = Guid.NewGuid().ToString(),
+          Name = "Studio Sound",
+          ProjectId = projectId,
+          Effects = effects,
+          Created = DateTime.UtcNow,
+          Modified = DateTime.UtcNow
+        };
+
+        var created = await _effectChainClient.CreateEffectChainAsync(projectId, chain, cancellationToken);
+        transientChainId = created.Id;
+
+        var response = await _effectChainClient.ProcessAudioWithChainAsync(
+            projectId,
+            created.Id,
+            audioId,
+            outputFilename: null,
+            bypassChain: false,
+            preview: false,
+            cancellationToken);
+
+        if (!response.Success)
+        {
+          StudioSoundOutputAudioId = null;
+          ErrorMessage = response.ErrorMessage ?? ResourceHelper.GetString("EffectsMixer.StudioSoundFailed", "Studio Sound processing failed");
+          _toastNotificationService?.ShowError(
+              ResourceHelper.GetString("EffectsMixer.StudioSoundFailed", "Studio Sound Failed"),
+              response.ErrorMessage ?? ErrorMessage ?? ResourceHelper.GetString("EffectsMixer.StudioSoundFailed", "Studio Sound processing failed"));
+        }
+        else
+        {
+          StudioSoundOutputAudioId = response.OutputAudioId;
+          _toastNotificationService?.ShowSuccess(
+              ResourceHelper.GetString("EffectsMixer.StudioSoundApplied", "Studio Sound Applied"),
+              ResourceHelper.GetString("EffectsMixer.StudioSoundAppliedDetail", "A new processed audio clip was created."));
+        }
+      }
+      catch (OperationCanceledException)
+      {
+        return;
+      }
+      catch (Exception ex)
+      {
+        ErrorMessage = ErrorHandler.GetUserFriendlyMessage(ex);
+        StudioSoundOutputAudioId = null;
+        _errorService?.ShowError(ex, ResourceHelper.GetString("EffectsMixer.StudioSoundFailed", "Studio Sound failed"));
+        _logService?.LogError(ex, "RunStudioSound");
+        _toastNotificationService?.ShowError(
+            ResourceHelper.GetString("EffectsMixer.StudioSoundFailed", "Studio Sound Failed"),
+            ErrorHandler.GetUserFriendlyMessage(ex));
+      }
+      finally
+      {
+        if (!string.IsNullOrWhiteSpace(transientChainId) && !string.IsNullOrWhiteSpace(projectId))
+        {
+          try
+          {
+            await _effectChainClient.DeleteEffectChainAsync(projectId, transientChainId, CancellationToken.None);
+          }
+          catch (Exception ex)
+          {
+            _logService?.LogError(ex, "StudioSoundDeleteTransientChain");
+          }
+        }
+
+        IsStudioSoundRunning = false;
+        IsLoading = false;
+        RunStudioSoundCommand.NotifyCanExecuteChanged();
+      }
+    }
+
     // Effect chain editing methods
     private Task AddEffectToChainAsync(string? effectType, CancellationToken cancellationToken)
     {
@@ -1412,8 +1670,12 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
+        var projectId = SelectedProjectId;
+        var chainId = SelectedEffectChain.Id;
+        var beforeSnapshot = EffectChainUndoSnapshots.CloneEffectChain(SelectedEffectChain);
+
         SelectedEffectChain.Modified = DateTime.UtcNow;
-        var updatedChain = await _effectChainClient.UpdateEffectChainAsync(SelectedProjectId, SelectedEffectChain.Id, SelectedEffectChain, cancellationToken);
+        var updatedChain = await _effectChainClient.UpdateEffectChainAsync(projectId, chainId, SelectedEffectChain, cancellationToken);
 
         // Update in collection
         var index = EffectChains.IndexOf(SelectedEffectChain);
@@ -1421,9 +1683,25 @@ namespace VoiceStudio.App.Views.Panels
         {
           EffectChains[index] = updatedChain;
           SelectedEffectChain = updatedChain;
+          if (_undoRedoService != null && updatedChain != null)
+          {
+            var log = ServiceProvider.TryGetErrorLoggingService();
+            var afterSnapshot = EffectChainUndoSnapshots.CloneEffectChain(updatedChain);
+            var undoAction = new UpdateEffectChainSnapshotUndoAction(
+                EffectChains,
+                _effectChainClient,
+                projectId,
+                chainId,
+                beforeSnapshot,
+                afterSnapshot,
+                log,
+                SyncSelectedEffectChainAfterUndo);
+            _undoRedoService.RegisterAction(undoAction);
+          }
+
           _toastNotificationService?.ShowSuccess(
               ResourceHelper.GetString("EffectsMixer.EffectChainSaved", "Effect Chain Saved"),
-              ResourceHelper.FormatString("EffectsMixer.EffectChainSavedDetail", updatedChain.Name));
+              ResourceHelper.FormatString("EffectsMixer.EffectChainSavedDetail", updatedChain?.Name ?? string.Empty));
         }
       }
       catch (OperationCanceledException)

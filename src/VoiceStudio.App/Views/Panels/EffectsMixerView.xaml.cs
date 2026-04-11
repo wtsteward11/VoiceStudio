@@ -135,6 +135,27 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    private async void EffectEnabledCheckBox_Checked(object sender, RoutedEventArgs e)
+    {
+      await EffectEnabledToggleCoreAsync(sender, isChecked: true).ConfigureAwait(true);
+    }
+
+    private async void EffectEnabledCheckBox_Unchecked(object sender, RoutedEventArgs e)
+    {
+      await EffectEnabledToggleCoreAsync(sender, isChecked: false).ConfigureAwait(true);
+    }
+
+    private async Task EffectEnabledToggleCoreAsync(object sender, bool isChecked)
+    {
+      if (ViewModel.IsLoading)
+        return;
+      if (sender is CheckBox { DataContext: Effect effect })
+      {
+        var previous = !isChecked;
+        await ViewModel.PersistEffectEnabledToggleAsync(effect, previous, isChecked).ConfigureAwait(true);
+      }
+    }
+
     private void UpdateChannelSelectionVisuals()
     {
       // Update visual indicators for all channel borders

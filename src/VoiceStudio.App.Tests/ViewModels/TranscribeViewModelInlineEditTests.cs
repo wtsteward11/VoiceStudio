@@ -66,6 +66,8 @@ public sealed class TranscribeViewModelInlineEditTests
 
   private void InstallHarness(bool jobFails, Project? linkedProject = null, bool transcriptPersistFails = false)
   {
+    lock (TestAppServicesHelper.AppServicesInitializeSyncRoot)
+    {
     if (_dispatcherController != null)
     {
       _dispatcherController.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
@@ -198,11 +200,14 @@ public sealed class TranscribeViewModelInlineEditTests
         coordinationTxMock.Object));
     services.AddSingleton<TranscriptEditHistoryService>();
     AppServices.Initialize(services.BuildServiceProvider());
+    }
   }
 
   /// <summary>First regen job fails; second succeeds — GOV-VOICESTUDIO-EDIT-APPLY-RETRY-RECOVERY-01.</summary>
   private void InstallRetryHarness(Project? linkedProject = null)
   {
+    lock (TestAppServicesHelper.AppServicesInitializeSyncRoot)
+    {
     if (_dispatcherController != null)
     {
       _dispatcherController.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
@@ -329,6 +334,7 @@ public sealed class TranscribeViewModelInlineEditTests
         coordinationTxMock.Object));
     services.AddSingleton<TranscriptEditHistoryService>();
     AppServices.Initialize(services.BuildServiceProvider());
+    }
   }
 
   private static Project BuildLinkedProject()

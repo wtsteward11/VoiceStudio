@@ -17,6 +17,11 @@ namespace VoiceStudio.App.Services
     Task<VoiceSynthesisResponse> SynthesizeVoiceAsync(VoiceSynthesisRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// GAP-049: Long-form chunked synthesis; server merges chunks into one artifact.
+    /// </summary>
+    Task<LongFormSynthesisResponse> SynthesizeLongFormAsync(LongFormSynthesisRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get audio stream by ID for playback.
     /// </summary>
     Task<Stream> GetAudioStreamAsync(string audioId, CancellationToken cancellationToken = default);

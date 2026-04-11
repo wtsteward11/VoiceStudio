@@ -1,4 +1,5 @@
 <UserControl x:Class="VoiceStudio.App.Views.Panels.QualityBenchmarkView"
+    x:Name="Self"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:VoiceStudio.App.Controls"
@@ -140,6 +141,102 @@
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
+
+                <TextBlock Text="Side-by-side comparison" FontWeight="SemiBold" FontSize="{StaticResource VSQ.FontSize.Subtitle}" />
+
+                <TextBlock Text="Select engines to compare (at least two). Uses the same test text and profile as above."
+                           TextWrapping="WrapWholeWords" Opacity="0.9" FontSize="12" />
+
+                <ItemsControl ItemsSource="{x:Bind ViewModel.ComparisonEngineOptions, Mode=OneWay}"
+                              AutomationProperties.AutomationId="QualityBenchmarkView_ComparisonEngineOptions">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="12" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:SelectableComparisonEngineRow">
+                            <CheckBox Content="{x:Bind EngineId, Mode=OneWay}"
+                                      IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
+                                      MinWidth="120" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <Button Content="Run comparison"
+                            Command="{x:Bind ViewModel.RunComparisonCommand}"
+                            AutomationProperties.AutomationId="QualityBenchmarkView_RunComparisonButton" />
+                    <ProgressRing IsActive="{x:Bind ViewModel.IsComparisonRunning, Mode=OneWay}"
+                                  Width="32" Height="32"
+                                  AutomationProperties.AutomationId="QualityBenchmarkView_ComparisonProgressRing" />
+                </StackPanel>
+
+                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Disabled"
+                              AutomationProperties.AutomationId="QualityBenchmarkView_ComparisonSlotsScroll">
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.ComparisonSlots, Mode=OneWay}"
+                                  AutomationProperties.AutomationId="QualityBenchmarkView_ComparisonSlots">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="16" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="local:ComparisonSlot">
+                                <Border Width="220" MinHeight="200" Padding="12" CornerRadius="8"
+                                        Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+                                        BorderBrush="{StaticResource VSQ.Panel.BorderBrush}" BorderThickness="1">
+                                    <Grid RowSpacing="8">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" FontWeight="SemiBold" Text="{x:Bind EngineId, Mode=OneWay}" />
+                                        <ProgressRing Grid.Row="1" Width="28" Height="28"
+                                                      IsActive="{x:Bind IsLoading, Mode=OneWay}"
+                                                      Visibility="{x:Bind IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                        <TextBlock Grid.Row="2" Text="{x:Bind Error, Mode=OneWay}" TextWrapping="Wrap"
+                                                   Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                                   Visibility="{x:Bind ShouldShowErrorText, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                        <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8"
+                                                    Visibility="{x:Bind IsSuccess, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="MOS:" FontSize="11" />
+                                            <TextBlock Text="{x:Bind MosScoreDisplay, Mode=OneWay}" FontSize="11" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8"
+                                                    Visibility="{x:Bind IsSuccess, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="Sim:" FontSize="11" />
+                                            <TextBlock Text="{x:Bind SimilarityDisplay, Mode=OneWay}" FontSize="11" />
+                                        </StackPanel>
+                                        <Button Grid.Row="5" Content="Play"
+                                                Command="{x:Bind PlaySlotCommand}"
+                                                Visibility="{x:Bind IsSuccess, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                        <StackPanel Grid.Row="6" Spacing="4"
+                                                    Visibility="{x:Bind IsSuccess, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="Subjective (1–5)" FontSize="11" />
+                                            <Slider Minimum="0" Maximum="5" StepFrequency="1"
+                                                    Value="{x:Bind SubjectiveScore, Mode=TwoWay}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="7" Orientation="Horizontal" Spacing="8">
+                                            <Button Content="Prefer"
+                                                    Command="{Binding ElementName=Self, Path=ViewModel.SetPreferredEngineCommand}"
+                                                    CommandParameter="{Binding}" />
+                                            <TextBlock Text="Preferred" FontSize="11" VerticalAlignment="Center"
+                                                       Visibility="{x:Bind IsPreferred, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
             </StackPanel>
         </ScrollViewer>
 

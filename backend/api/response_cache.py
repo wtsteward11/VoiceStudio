@@ -384,6 +384,25 @@ def set_response_cache(cache: ResponseCache) -> None:
     _response_cache = cache
 
 
+def _cache_key_auth_segment(request: Request) -> str:
+    """
+    Isolate cached GET responses by auth mode and credential presence.
+
+    Without this, a 200 from an anonymous request could be served from cache
+    when VOICESTUDIO_REQUIRE_AUTH=true should return 401 (GAP-057).
+    """
+    from backend.api.middleware import auth_middleware as am
+
+    ar = str(am.AUTH_REQUIRED)
+    if request.headers.get("X-API-Key"):
+        cred = "k"
+    elif request.headers.get("Authorization"):
+        cred = "b"
+    else:
+        cred = "0"
+    return f"{ar}|{cred}"
+
+
 async def response_cache_middleware(request: Request, call_next: Callable) -> Response:
     """
     Middleware for caching GET endpoint responses.
@@ -413,7 +432,10 @@ async def response_cache_middleware(request: Request, call_next: Callable) -> Re
         return resp2
 
     cache = get_response_cache()
-    cache_key = cache._generate_cache_key(request)
+    base_key = cache._generate_cache_key(request)
+    cache_key = hashlib.md5(
+        f"{base_key}|{_cache_key_auth_segment(request)}".encode(),
+    ).hexdigest()
 
     # Try to get cached response
     cached_response = cache.get(cache_key)

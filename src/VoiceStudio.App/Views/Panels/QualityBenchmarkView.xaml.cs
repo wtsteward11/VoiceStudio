@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VoiceStudio.App.Controls;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Services;
 using System.Threading;
 
 namespace VoiceStudio.App.Views.Panels
@@ -21,8 +22,11 @@ namespace VoiceStudio.App.Views.Panels
       ViewModel = new QualityBenchmarkViewModel(
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IViewModelContext>(),
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IQualityControlClient>(),
-          ServiceProvider.GetProfilesClient()
-      );
+          ServiceProvider.GetProfilesClient(),
+          AppServices.GetEnginesClient(),
+          AppServices.GetAudioPlayerService(),
+          AppServices.GetVoiceSynthesisService(),
+          AppServices.GetRequiredService<BackendClientConfig>());
       this.DataContext = ViewModel;
 
       _toastService = ServiceProvider.GetToastNotificationService();

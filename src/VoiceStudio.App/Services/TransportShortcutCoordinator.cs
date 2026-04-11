@@ -39,23 +39,25 @@ public sealed class TransportShortcutCoordinator
         _openRecordingPanel = openRecordingPanel;
 
         // Play: Space — delegate to orchestrator only
-        _shortcutService.RegisterShortcut(
+        _shortcutService.TryRegisterShortcut(
             "playback.play",
             VirtualKey.Space,
             VirtualKeyModifiers.None,
             () => _ = _orchestrator?.TogglePlaybackAsync(),
             "Play/Pause");
 
-        // Stop: S — delegate to orchestrator only
-        _shortcutService.RegisterShortcut(
+        // Stop: S — overrides default Escape binding for playback.stop (intentional; GAP-065)
+        _shortcutService.TryRegisterShortcut(
             "playback.stop",
             VirtualKey.S,
             VirtualKeyModifiers.None,
             () => _orchestrator?.StopPlayback(),
-            "Stop");
+            "Stop",
+            ShortcutContext.Global,
+            allowOverwrite: true);
 
         // Record: Ctrl+R — same navigation policy as timeline Record (no shell-only record toggle)
-        _shortcutService.RegisterShortcut(
+        _shortcutService.TryRegisterShortcut(
             "playback.record",
             VirtualKey.R,
             VirtualKeyModifiers.Control,

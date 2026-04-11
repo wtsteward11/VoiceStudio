@@ -176,6 +176,10 @@ class AudioArtifactStore:
         source: str | None = None,
         model_used: str = "artifact_store",
         write_provenance: bool = True,
+        is_transformed: bool = False,
+        transformation_type: str | None = None,
+        watermark_applied: bool = False,
+        watermark_method: str | None = None,
     ) -> tuple[str, str, dict]:
         """
         Store an existing audio file. Uses registry_db (artifacts_root layout).
@@ -189,7 +193,16 @@ class AudioArtifactStore:
         if not source_path.exists():
             raise FileNotFoundError(f"Audio file not found: {source_path}")
 
-        metadata_dict = {"source": source} if source else None
+        meta_parts: dict = {}
+        if source:
+            meta_parts["source"] = source
+        if is_transformed:
+            meta_parts["is_transformed"] = True
+            meta_parts["transformation_type"] = transformation_type
+        if watermark_applied:
+            meta_parts["watermark_applied"] = True
+            meta_parts["watermark_method"] = watermark_method
+        metadata_dict = meta_parts if meta_parts else None
         registry = get_registry()
         artifact = registry.create_from_path(
             source_path,
@@ -209,10 +222,22 @@ class AudioArtifactStore:
                 )
                 from backend.services.provenance_policy import POLICY, ProvenancePolicy
 
+                transformation_meta = None
+                if is_transformed:
+                    transformation_meta = {
+                        "is_transformed": True,
+                        "transformation_type": transformation_type,
+                        "source_reference_id": source,
+                    }
+                    if watermark_applied:
+                        transformation_meta["watermark_applied"] = True
+                        transformation_meta["watermark_method"] = watermark_method
+
                 record_artifact_provenance_and_usage(
                     artifact.path,
                     model_used=model_used,
                     duration_seconds=duration,
+                    transformation_meta=transformation_meta,
                 )
             except Exception as e:
                 if POLICY == ProvenancePolicy.STRICT:

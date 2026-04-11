@@ -281,6 +281,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <!-- Effect Chains Header -->
@@ -357,6 +358,22 @@
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
+
+                    <!-- GAP-048: One-click Studio Sound -->
+                    <StackPanel Grid.Row="2" Spacing="8" Margin="0,8,0,0">
+                        <TextBlock Text="One-click voice cleanup: noise reduction, compression, and normalization."
+                                   TextWrapping="WrapWholeWords"
+                                   Opacity="0.9"
+                                   FontSize="12" />
+                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <Button Content="Studio Sound"
+                                    Command="{x:Bind ViewModel.RunStudioSoundCommand}"
+                                    AutomationProperties.AutomationId="EffectsMixerView_StudioSoundButton" />
+                            <ProgressRing IsActive="{x:Bind ViewModel.IsStudioSoundRunning, Mode=OneWay}"
+                                          Width="28"
+                                          Height="28" />
+                        </StackPanel>
+                    </StackPanel>
                 </Grid>
 
                 <!-- Effects in Selected Chain -->
@@ -422,6 +439,8 @@
 
                                         <CheckBox Grid.Column="0"
                                                   IsChecked="{x:Bind Enabled, Mode=TwoWay}"
+                                                  Checked="EffectEnabledCheckBox_Checked"
+                                                  Unchecked="EffectEnabledCheckBox_Unchecked"
                                                   VerticalAlignment="Center"
                                                   MinWidth="0" />
 

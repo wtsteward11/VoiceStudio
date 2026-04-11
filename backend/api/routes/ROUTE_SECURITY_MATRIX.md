@@ -22,6 +22,23 @@ These routes are intentionally public:
 | `GET /api/engines` | engines.py | Engine discovery |
 | `GET /` | main.py | Root endpoint |
 | `GET /metrics` | metrics.py | Prometheus metrics |
+| `WS /ws/events` | route_registry.py → [ws/events.py](../ws/events.py) | Demo heartbeat counter only; **no user data** (GAP-058) |
+
+## WebSocket routes (GAP-058)
+
+| Route | Registration | Auth mechanism | Tier |
+|-------|--------------|----------------|------|
+| `WS /ws/events` | `route_registry.py` | None (intentionally public) | **Public** |
+| `WS /ws/realtime` | `route_registry.py` | `require_ws_auth_if_enabled` (handshake); close **4001** if missing credentials when auth required | **Protected** |
+| `WS /ws/plugins` | `route_registry.py` | `require_ws_auth_if_enabled` (handshake); close **4001** if missing credentials when auth required | **Protected** |
+| `WS /api/voice/synthesize/stream` | `routes/voice/streaming.py` (voice router) | `Depends(require_auth_if_enabled)` on [voice/_shared.py](voice/_shared.py) router | **Protected** |
+| `WS /api/rvc/convert/realtime` | `routes/rvc.py` | Router-level `require_auth_if_enabled` | **Protected** |
+| `WS /api/orchestrator/events/{job_id}` | `routes/orchestrator.py` | Router-level `require_auth_if_enabled` | **Protected** |
+| `WS /api/pipeline/stream` | `routes/pipeline.py` | Router-level `require_auth_if_enabled` | **Protected** |
+| `WS /api/realtime-converter/{session_id}/stream` | `routes/realtime_converter.py` | Router-level `require_auth_if_enabled` | **Protected** |
+| `WS /api/realtime-visualizer/{session_id}/stream` | `routes/realtime_visualizer.py` | Router-level `require_auth_if_enabled` | **Protected** |
+
+Handshake credentials: `X-API-Key` or `Authorization: Bearer` (same as HTTP). Environment: `VOICESTUDIO_REQUIRE_AUTH=true` enables enforcement for app-level `/ws/*` routes.
 
 ## Protected Routes (Auth When Enabled)
 
@@ -30,7 +47,7 @@ These routes require `Depends(require_auth_if_enabled)`:
 ### Voice Operations
 - `POST /api/voice/synthesize` - voice.py ✓
 - `POST /api/voice/clone` - voice.py ✓
-- `WS /api/voice/synthesize/stream` - voice.py ✓
+- `WS /api/voice/synthesize/stream` - voice/streaming.py (voice router) ✓ — see **WebSocket routes** table
 
 ### Profile Management
 - `POST /api/profiles` - profiles.py ✓
@@ -51,6 +68,25 @@ These routes require `Depends(require_auth_if_enabled)`:
 ### Jobs
 - `POST /api/jobs` - jobs.py ✓
 - `DELETE /api/jobs/{id}` - jobs.py
+
+### Audio — core router (GAP-057: 2026-04-10)
+
+Router-level `Depends(require_auth_if_enabled)` on [audio.py](audio.py) (`prefix=/api/audio`). When `VOICESTUDIO_REQUIRE_AUTH=true`, all listed endpoints require `X-API-Key` or `Authorization: Bearer`. **GET response cache** keys include auth mode + credential presence ([response_cache.py](../response_cache.py) `_cache_key_auth_segment`) so anonymous 200s are not served when auth is required.
+
+- `GET /api/audio/{audio_id}/marking` — STS / watermark trust metadata ✓
+- `GET /api/audio/file/{audio_id}` — artifact streaming ✓
+- `POST /api/audio/export` — format export ✓
+- `POST /api/audio/upload` — upload ✓
+- `GET /api/audio/formats` — format catalog (same router; protected when auth enabled) ✓
+- `GET /api/audio/waveform`, `/spectrogram`, `/loudness`, `/meters`, `/radar`, `/phase`, etc. — analysis ✓
+
+### Audio — module audit (GAP-057)
+
+- `GET /api/audio/audit/*` — [audio_audit.py](audio_audit.py) ✓
+
+### Audio context — follow-up (not GAP-057)
+
+Routers mounted via [contexts/audio.py](contexts/audio.py) under other prefixes (`/api/waveform`, `/api/audio-analysis`, `/api/effects`, `/api/recording`, …) do **not** yet use `require_auth_if_enabled` at router scope. Track as future security hardening if those deployments expose non-localhost listeners.
 
 ## Admin Routes (Always Protected)
 

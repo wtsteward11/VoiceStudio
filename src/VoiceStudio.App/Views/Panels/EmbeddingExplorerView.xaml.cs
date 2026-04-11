@@ -76,29 +76,43 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (_keyboardShortcutService == null) return;
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "embedding_extract",
+          _keyboardShortcutService.TryRegisterShortcut(
           "embedding_extract",
           VirtualKey.E,
           VirtualKeyModifiers.Control,
           () => { if (ViewModel.ExtractEmbeddingCommand.CanExecute(null)) ViewModel.ExtractEmbeddingCommand.Execute(null); },
-          "Extract speaker embedding"
-      );
+          "Extract speaker embedding",
+          ShortcutContext.Panel));
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "embedding_refresh",
+          _keyboardShortcutService.TryRegisterShortcut(
           "embedding_refresh",
           VirtualKey.F5,
           VirtualKeyModifiers.None,
           () => { if (ViewModel.RefreshCommand.CanExecute(null)) ViewModel.RefreshCommand.Execute(null); },
-          "Refresh embeddings list"
-      );
+          "Refresh embeddings list",
+          ShortcutContext.Panel));
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "embedding_delete",
+          _keyboardShortcutService.TryRegisterShortcut(
           "embedding_delete",
           VirtualKey.Delete,
           VirtualKeyModifiers.None,
           () => { if (ViewModel.DeleteSelectedEmbeddingsCommand.CanExecute(null)) ViewModel.DeleteSelectedEmbeddingsCommand.Execute(null); },
-          "Delete selected embeddings"
-      );
+          "Delete selected embeddings",
+          ShortcutContext.Panel));
+    }
+
+    private static void LogPanelShortcut(string commandId, bool registered)
+    {
+      if (!registered)
+      {
+        System.Diagnostics.Debug.WriteLine($"[Shortcuts] Panel registration blocked: {commandId}");
+      }
     }
 
     private void EmbeddingExplorerView_KeyDown(object sender, KeyRoutedEventArgs e)

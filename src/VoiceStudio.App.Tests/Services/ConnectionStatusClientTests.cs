@@ -58,9 +58,9 @@ public class ConnectionStatusClientTests
             ?? throw new InvalidOperationException("Failed to create BackendHttpContext");
         var backendCtor = typeof(BackendClient).GetConstructor(
             BindingFlags.NonPublic | BindingFlags.Instance,
-            new[] { contextType, typeof(BackendClientConfig), typeof(IRequestCoordinator) })
+            new[] { contextType, typeof(BackendClientConfig), typeof(IRequestCoordinator), typeof(IUnifiedAuthService) })
             ?? throw new InvalidOperationException("BackendClient constructor not found");
-        var backend = (BackendClient)backendCtor.Invoke(new object[] { context, config, new RequestCoordinator() })!;
+        var backend = (BackendClient)backendCtor.Invoke(new object?[] { context, config, new RequestCoordinator(), null })!;
         var connType = appAssembly.GetType("VoiceStudio.App.Services.ConnectionStatusClient")
             ?? throw new InvalidOperationException("ConnectionStatusClient type not found");
         var connCtor = connType.GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, new[] { contextType })

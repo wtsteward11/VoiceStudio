@@ -70,6 +70,70 @@ namespace VoiceStudio.App.Services
       }
     }
 
+    /// <inheritdoc />
+    public async Task<LongFormSynthesisResponse> SynthesizeLongFormAsync(
+        LongFormSynthesisRequest request,
+        CancellationToken cancellationToken = default)
+    {
+      if (request == null)
+        throw new System.ArgumentNullException(nameof(request));
+      if (string.IsNullOrWhiteSpace(request.Text))
+        throw new System.ArgumentException("Synthesis text cannot be empty.", nameof(request));
+
+      var engine = string.IsNullOrWhiteSpace(request.Engine) ? "xtts" : request.Engine;
+      var shaped = new LongFormSynthesisRequest
+      {
+        Engine = engine,
+        ProfileId = request.ProfileId,
+        Text = request.Text,
+        Language = request.Language,
+        Emotion = request.Emotion,
+        EnhanceQuality = request.EnhanceQuality,
+        Speed = request.Speed,
+        Pitch = request.Pitch,
+        Stability = request.Stability,
+        Clarity = request.Clarity,
+        Temperature = request.Temperature,
+        ChunkSizeChars = request.ChunkSizeChars <= 0 ? 1800 : request.ChunkSizeChars,
+      };
+
+      var canonicalPreset = CanonicalEmotionPresetKey.Normalize(request.Emotion);
+      if (canonicalPreset != null)
+      {
+        shaped.Emotion = null;
+      }
+
+      try
+      {
+        var response = await _backend.SynthesizeLongFormAsync(shaped, cancellationToken).ConfigureAwait(false);
+        if (response != null && string.IsNullOrEmpty(response.AudioUrl) && !string.IsNullOrEmpty(response.AudioId))
+        {
+          response.AudioUrl = $"/api/audio/{response.AudioId}";
+        }
+        response ??= new LongFormSynthesisResponse();
+
+        if (canonicalPreset != null && !string.IsNullOrEmpty(response.AudioId))
+        {
+          var bridge = new VoiceSynthesisResponse
+          {
+            AudioId = response.AudioId,
+            AudioUrl = response.AudioUrl,
+            Duration = response.Duration,
+            QualityScore = response.QualityScore,
+          };
+          await ApplyCanonicalPresetProsodyAsync(bridge, canonicalPreset, cancellationToken).ConfigureAwait(false);
+          response.AudioId = bridge.AudioId;
+          response.AudioUrl = bridge.AudioUrl;
+        }
+
+        return response;
+      }
+      catch (System.Exception ex)
+      {
+        throw MapToUserActionableException(ex);
+      }
+    }
+
     private async Task ApplyCanonicalPresetProsodyAsync(
         VoiceSynthesisResponse response,
         string canonicalPresetKey,

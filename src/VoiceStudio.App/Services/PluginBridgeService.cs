@@ -41,16 +41,107 @@ public sealed class PluginBridgeService : IPluginBridgeService
     private const int MaxDelayMs = 30000;
     private const int HeartbeatIntervalMs = 30000;
     private string? _lastBackendUrl;
+    private readonly IUnifiedAuthService? _unifiedAuthService;
+    private IReadOnlyDictionary<string, string>? _staticAuthHeaders;
+    private Func<IReadOnlyDictionary<string, string>?>? _credentialProvider;
 
-    public PluginBridgeService(ILogger<PluginBridgeService> logger)
+    public PluginBridgeService(ILogger<PluginBridgeService> logger, IUnifiedAuthService? unifiedAuthService = null)
     {
         _logger = logger;
+        _unifiedAuthService = unifiedAuthService;
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
             PropertyNameCaseInsensitive = true,
             Converters = { new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower) }
         };
+    }
+
+    /// <summary>Static handshake headers (e.g. X-API-Key). GAP-058.</summary>
+    public void SetAuthHeaders(IReadOnlyDictionary<string, string>? headers) => _staticAuthHeaders = headers;
+
+    /// <summary>Optional per-connect credential provider. GAP-058.</summary>
+    public void SetCredentialProvider(Func<IReadOnlyDictionary<string, string>?>? provider) =>
+        _credentialProvider = provider;
+
+    /// <summary>
+    /// GAP-058 seam tests only: when set, <see cref="ConnectAsync"/> awaits this instead of
+    /// <see cref="ClientWebSocket.ConnectAsync(System.Uri,System.Threading.CancellationToken)"/>.
+    /// </summary>
+    internal Func<Task>? ConnectHandshakeAsyncOverrideForSeamTests { get; set; }
+
+    /// <summary>Test seam: merged headers for next handshake (GAP-058).</summary>
+    internal IReadOnlyDictionary<string, string>? ResolvePluginHandshakeHeadersForTests() =>
+        ResolvePluginHandshakeHeaders();
+
+    private IReadOnlyDictionary<string, string>? ResolvePluginHandshakeHeaders()
+    {
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (_staticAuthHeaders != null)
+        {
+            foreach (var kv in _staticAuthHeaders)
+            {
+                headers[kv.Key] = kv.Value;
+            }
+        }
+
+        var dynamicHeaders = _credentialProvider?.Invoke();
+        if (dynamicHeaders != null)
+        {
+            foreach (var kv in dynamicHeaders)
+            {
+                headers[kv.Key] = kv.Value;
+            }
+        }
+
+        if (_unifiedAuthService != null)
+        {
+            var key = _unifiedAuthService.GetCurrentApiKey();
+            if (!string.IsNullOrEmpty(key) && !headers.ContainsKey("X-API-Key"))
+            {
+                headers["X-API-Key"] = key;
+            }
+
+            var token = _unifiedAuthService.GetCurrentToken();
+            if (!string.IsNullOrEmpty(token) && !headers.ContainsKey("Authorization"))
+            {
+                headers["Authorization"] = $"Bearer {token}";
+            }
+        }
+
+        var envKey = Environment.GetEnvironmentVariable("VOICESTUDIO_API_KEY");
+        if (!string.IsNullOrWhiteSpace(envKey) && !headers.ContainsKey("X-API-Key"))
+        {
+            headers["X-API-Key"] = envKey.Trim();
+        }
+
+        return headers.Count > 0 ? headers : null;
+    }
+
+    private static void ApplyPluginHandshakeHeaders(ClientWebSocket socket, IReadOnlyDictionary<string, string>? headers)
+    {
+        if (headers == null)
+        {
+            return;
+        }
+
+        foreach (var kv in headers)
+        {
+            socket.Options.SetRequestHeader(kv.Key, kv.Value);
+        }
+    }
+
+    internal static bool IsLikelyWebSocketAuthenticationFailure(Exception ex)
+    {
+        for (var e = ex; e != null; e = e.InnerException)
+        {
+            if (e.Message.IndexOf("4001", StringComparison.Ordinal) >= 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     #region IPluginBridgeService Implementation
@@ -85,12 +176,21 @@ public sealed class PluginBridgeService : IPluginBridgeService
             wsUrl = "wss://" + wsUrl[8..];
 
         _webSocket = new ClientWebSocket();
+        ApplyPluginHandshakeHeaders(_webSocket, ResolvePluginHandshakeHeaders());
         _receiveCts = new CancellationTokenSource();
         _heartbeatCts = new CancellationTokenSource();
 
         try
         {
-            await _webSocket.ConnectAsync(new Uri(wsUrl), cancellationToken).ConfigureAwait(false);
+            if (ConnectHandshakeAsyncOverrideForSeamTests != null)
+            {
+                await ConnectHandshakeAsyncOverrideForSeamTests().ConfigureAwait(false);
+            }
+            else
+            {
+                await _webSocket.ConnectAsync(new Uri(wsUrl), cancellationToken).ConfigureAwait(false);
+            }
+
             _logger.LogInformation("Connected to plugin bridge at {Url}", wsUrl);
 
             // Start receiving messages
@@ -103,7 +203,16 @@ public sealed class PluginBridgeService : IPluginBridgeService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to connect to plugin bridge at {Url}", wsUrl);
+            if (IsLikelyWebSocketAuthenticationFailure(ex))
+            {
+                _logger.LogError(ex, "Authentication failed for plugin bridge at {Url}", wsUrl);
+                _autoReconnect = false;
+            }
+            else
+            {
+                _logger.LogError(ex, "Failed to connect to plugin bridge at {Url}", wsUrl);
+            }
+
             await CleanupConnectionAsync(fireDisconnected: false).ConfigureAwait(false);
             throw;
         }
@@ -641,6 +750,13 @@ public sealed class PluginBridgeService : IPluginBridgeService
                     _logger.LogWarning(ex, "Failed to request full sync after reconnection");
                 }
 
+                return;
+            }
+            catch (Exception ex) when (IsLikelyWebSocketAuthenticationFailure(ex))
+            {
+                _logger.LogWarning(ex, "Plugin bridge WebSocket authentication failed; disabling auto-reconnect");
+                _autoReconnect = false;
+                Disconnected?.Invoke(this, ex);
                 return;
             }
             catch (Exception ex)

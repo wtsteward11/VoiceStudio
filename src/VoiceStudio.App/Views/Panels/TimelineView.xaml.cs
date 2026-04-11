@@ -342,7 +342,9 @@ namespace VoiceStudio.App.Views.Panels
     {
       if (_keyboardShortcutService == null) return;
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "timeline_play_pause",
+          _keyboardShortcutService.TryRegisterShortcut(
           "timeline_play_pause",
           VirtualKey.Space,
           VirtualKeyModifiers.None,
@@ -357,48 +359,66 @@ namespace VoiceStudio.App.Views.Panels
               if (ViewModel.PlayAudioCommand.CanExecute(null)) ViewModel.PlayAudioCommand.Execute(null);
             }
           },
-          "Play/Pause timeline"
-      );
+          "Play/Pause timeline",
+          ShortcutContext.Panel));
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "timeline_stop",
+          _keyboardShortcutService.TryRegisterShortcut(
           "timeline_stop",
           VirtualKey.S,
           VirtualKeyModifiers.None,
           () => { if (ViewModel.StopAudioCommand.CanExecute(null)) ViewModel.StopAudioCommand.Execute(null); },
-          "Stop timeline playback"
-      );
+          "Stop timeline playback",
+          ShortcutContext.Panel));
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "timeline_add_track",
+          _keyboardShortcutService.TryRegisterShortcut(
           "timeline_add_track",
           VirtualKey.T,
           VirtualKeyModifiers.Control,
           () => { if (ViewModel.AddTrackCommand.CanExecute(null)) ViewModel.AddTrackCommand.Execute(null); },
-          "Add new track"
-      );
+          "Add new track",
+          ShortcutContext.Panel));
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "timeline_delete_clips",
+          _keyboardShortcutService.TryRegisterShortcut(
           "timeline_delete_clips",
           VirtualKey.Delete,
           VirtualKeyModifiers.None,
           () => { if (ViewModel.DeleteSelectedClipsCommand.CanExecute(null)) ViewModel.DeleteSelectedClipsCommand.Execute(null); },
-          "Delete selected clips"
-      );
+          "Delete selected clips",
+          ShortcutContext.Panel));
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "timeline_zoom_in",
+          _keyboardShortcutService.TryRegisterShortcut(
           "timeline_zoom_in",
           VirtualKey.Add,
           VirtualKeyModifiers.Control,
           () => ViewModel.ZoomInCommand.Execute(null),
-          "Zoom in timeline"
-      );
+          "Zoom in timeline",
+          ShortcutContext.Panel));
 
-      _keyboardShortcutService.RegisterShortcut(
+      LogPanelShortcut(
+          "timeline_zoom_out",
+          _keyboardShortcutService.TryRegisterShortcut(
           "timeline_zoom_out",
           VirtualKey.Subtract,
           VirtualKeyModifiers.Control,
           () => ViewModel.ZoomOutCommand.Execute(null),
-          "Zoom out timeline"
-      );
+          "Zoom out timeline",
+          ShortcutContext.Panel));
+    }
+
+    private static void LogPanelShortcut(string commandId, bool registered)
+    {
+      if (!registered)
+      {
+        System.Diagnostics.Debug.WriteLine($"[Shortcuts] Panel registration blocked: {commandId}");
+      }
     }
 
     private void HelpButton_Click(object _, RoutedEventArgs __)

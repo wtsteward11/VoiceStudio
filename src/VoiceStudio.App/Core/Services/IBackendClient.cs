@@ -26,6 +26,15 @@ namespace VoiceStudio.Core.Services
 
     // Voice cloning endpoints
     Task<VoiceSynthesisResponse> SynthesizeVoiceAsync(VoiceSynthesisRequest request, CancellationToken cancellationToken = default);
+    Task<LongFormSynthesisResponse> SynthesizeLongFormAsync(LongFormSynthesisRequest request, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Batch speech-to-speech conversion (RVC); POST /api/voice/sts/convert (GAP-051).
+    /// </summary>
+    Task<SpeechToSpeechResponse> SynthesizeSpeechToSpeechAsync(SpeechToSpeechRequest request, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Durable STS marking metadata; GET /api/audio/{audio_id}/marking (GAP-056 slice 2).
+    /// </summary>
+    Task<StsMarkingStatus?> GetStsMarkingAsync(string audioId, CancellationToken cancellationToken = default);
     Task<VoiceAnalysisResponse> AnalyzeVoiceAsync(Stream audioFile, string? metrics = null, CancellationToken cancellationToken = default);
     Task<VoiceCloneResponse> CloneVoiceAsync(Stream referenceAudio, VoiceCloneRequest request, CancellationToken cancellationToken = default);
 

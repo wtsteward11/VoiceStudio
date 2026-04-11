@@ -164,6 +164,13 @@
   <!-- Card sizing -->
   <x:Double x:Key="VSQ.Card.MinWidth">200</x:Double>
   <x:Double x:Key="VSQ.Card.MinHeight">100</x:Double>
+  <!-- Shell responsive min-sizes (layout floor; GAP-066) -->
+  <x:Double x:Key="VSQ.Shell.MinWidth">900</x:Double>
+  <x:Double x:Key="VSQ.Shell.MinHeight">600</x:Double>
+  <!-- Panel host min-size floor -->
+  <x:Double x:Key="VSQ.PanelHost.MinWidth">200</x:Double>
+  <!-- Help overlay scrim -->
+  <SolidColorBrush x:Key="VSQ.HelpOverlay.BackgroundBrush" Color="#CC000000" />
   <!-- Animation durations (in milliseconds) -->
   <x:Double x:Key="VSQ.Animation.Duration.Fast">100</x:Double>
   <x:Double x:Key="VSQ.Animation.Duration.Normal">200</x:Double>

@@ -74,9 +74,9 @@ namespace VoiceStudio.App.Tests.Services
         ?? throw new InvalidOperationException("Failed to create BackendHttpContext");
       var backendCtor = typeof(BackendClient).GetConstructor(
         System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance,
-        new[] { contextType, typeof(BackendClientConfig), typeof(IRequestCoordinator) })
-        ?? throw new InvalidOperationException("BackendClient(context, config, coordinator) constructor not found");
-      var backend = (BackendClient)backendCtor.Invoke(new object[] { context, config, new RequestCoordinator() })!;
+        new[] { contextType, typeof(BackendClientConfig), typeof(IRequestCoordinator), typeof(IUnifiedAuthService) })
+        ?? throw new InvalidOperationException("BackendClient(httpContext, config, coordinator, unifiedAuth) constructor not found");
+      var backend = (BackendClient)backendCtor.Invoke(new object?[] { context, config, new RequestCoordinator(), null })!;
       var healthType = appAssembly.GetType("VoiceStudio.App.Services.HealthVersionClient")
         ?? throw new InvalidOperationException("HealthVersionClient type not found");
       var healthCtor = healthType.GetConstructor(
@@ -337,7 +337,8 @@ namespace VoiceStudio.App.Tests.Services
         if (path.Contains("/api/health", StringComparison.Ordinal))
         {
           var n = Interlocked.Increment(ref healthCalls);
-          return n == 1
+          // Polly retries 503 (1 initial + MaxRetryAttempts); all must fail before surfacing failure.
+          return n <= 4
             ? new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
             : HealthOk();
         }
@@ -356,6 +357,81 @@ namespace VoiceStudio.App.Tests.Services
         Assert.IsTrue(second, "Second health check should succeed.");
         Assert.IsTrue(connectionStatusClient.IsConnected, "IsConnected should be true after recovery.");
       }
+    }
+
+    [TestMethod]
+    public async Task GetAsync_PreCancelledToken_DoesNotInvokeMainPath()
+    {
+      var mainCalls = 0;
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        var path = req.RequestUri?.AbsolutePath ?? "";
+        if (path.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (path == "/api/transport-cancel")
+        {
+          Interlocked.Increment(ref mainCalls);
+          return JsonOk("{\"status\":\"ok\"}");
+        }
+
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      using var client = CreateClient(handler);
+      using var cts = new CancellationTokenSource();
+      cts.Cancel();
+      try
+      {
+        await client.GetAsync<RetryOkDto>("/api/transport-cancel", cts.Token).ConfigureAwait(false);
+        Assert.Fail("Expected OperationCanceledException");
+      }
+      catch (OperationCanceledException)
+      {
+        Assert.AreEqual(0, mainCalls, "Pre-cancelled token must not run the main API handler.");
+      }
+    }
+
+    [TestMethod]
+    public async Task GetAsync_Persistent503_OpensCircuit_ThenBackendUnavailable()
+    {
+      var handler = new TransportTestHandler((req, seq) =>
+      {
+        var path = req.RequestUri?.AbsolutePath ?? "";
+        if (path.Contains("/api/health", StringComparison.Ordinal))
+          return HealthOk();
+        if (path == "/api/transport-circuit-open")
+        {
+          return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+          {
+            Content = new StringContent("{\"message\":\"down\"}")
+          };
+        }
+
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+      });
+
+      using var client = CreateClient(handler);
+      var sawServerException = false;
+      for (var i = 0; i < 12; i++)
+      {
+        try
+        {
+          await client.GetAsync<RetryOkDto>("/api/transport-circuit-open", CancellationToken.None).ConfigureAwait(false);
+          Assert.Fail($"Expected exception on iteration {i}");
+        }
+        catch (BackendServerException)
+        {
+          sawServerException = true;
+        }
+        catch (BackendUnavailableException ex)
+        {
+          Assert.IsTrue(sawServerException, "Circuit open should occur only after at least one exhausted 503 path (BackendServerException).");
+          Assert.IsInstanceOfType(ex.InnerException, typeof(Polly.CircuitBreaker.BrokenCircuitException));
+          return;
+        }
+      }
+
+      Assert.Fail("Expected circuit to open (BackendUnavailableException) within iteration budget.");
     }
 
     private const string CanonicalErrorPayload =

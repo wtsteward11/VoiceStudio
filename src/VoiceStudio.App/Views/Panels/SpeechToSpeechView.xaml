@@ -1,0 +1,75 @@
+<UserControl x:Class="VoiceStudio.App.Views.Panels.SpeechToSpeechView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:VoiceStudio.App.Converters"
+    xmlns:local="using:VoiceStudio.App.Views.Panels"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    x:DataType="local:SpeechToSpeechView"
+    d:DataContext="{d:DesignInstance Type=local:SpeechToSpeechView, IsDesignTimeCreatable=False}">
+  <UserControl.Resources>
+    <converters:BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+  </UserControl.Resources>
+  <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+    <StackPanel Spacing="12" MaxWidth="720"
+                AutomationProperties.AutomationId="SpeechToSpeechView_Root">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <FontIcon Glyph="&#xE8D5;" FontSize="24"/>
+        <TextBlock Text="Speech to Speech" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
+      </StackPanel>
+
+      <TextBlock Text="Convert registered source speech to a target voice (RVC). Use an audio id from the artifact registry."
+                 TextWrapping="WrapWholeWords" Opacity="0.85"/>
+
+      <TextBlock Text="Source audio id" FontWeight="SemiBold"/>
+      <TextBox Text="{x:Bind ViewModel.SourceAudioId, Mode=TwoWay}"
+               AutomationProperties.AutomationId="SpeechToSpeechView_SourceAudioSelector"/>
+
+      <TextBlock Text="Target voice profile" FontWeight="SemiBold"/>
+      <ComboBox ItemsSource="{x:Bind ViewModel.Profiles, Mode=OneWay}"
+                SelectedItem="{x:Bind ViewModel.SelectedTargetProfile, Mode=TwoWay}"
+                DisplayMemberPath="Name"
+                AutomationProperties.AutomationId="SpeechToSpeechView_TargetVoiceSelector"/>
+
+      <TextBlock Text="Pitch shift (semitones)" FontWeight="SemiBold"/>
+      <Slider Minimum="-12" Maximum="12" StepFrequency="1"
+              Value="{x:Bind ViewModel.PitchShift, Mode=TwoWay}"/>
+
+      <TextBlock Text="Index rate" FontWeight="SemiBold"/>
+      <Slider Minimum="0" Maximum="1" StepFrequency="0.05"
+              Value="{x:Bind ViewModel.IndexRate, Mode=TwoWay}"/>
+
+      <TextBlock Text="Protect" FontWeight="SemiBold"/>
+      <Slider Minimum="0" Maximum="0.5" StepFrequency="0.01"
+              Value="{x:Bind ViewModel.Protect, Mode=TwoWay}"/>
+
+      <CheckBox Content="I confirm I have permission to transform this voice"
+                IsChecked="{x:Bind ViewModel.ConsentAcknowledged, Mode=TwoWay}"
+                AutomationProperties.AutomationId="SpeechToSpeechView_ConsentCheckBox"/>
+
+      <Button Content="Convert"
+              Command="{x:Bind ViewModel.ConvertCommand}"
+              AutomationProperties.AutomationId="SpeechToSpeechView_ConvertButton"/>
+
+      <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                 TextWrapping="WrapWholeWords"
+                 AutomationProperties.AutomationId="SpeechToSpeechView_StatusText"/>
+
+      <TextBlock Text="{x:Bind ViewModel.OutputAudioUrl, Mode=OneWay}"
+                 TextWrapping="WrapWholeWords"
+                 AutomationProperties.AutomationId="SpeechToSpeechView_OutputAudioLink"/>
+
+      <TextBlock Text="{x:Bind ViewModel.OutputDisclosureText, Mode=OneWay}"
+                 TextWrapping="WrapWholeWords"
+                 FontStyle="Italic"
+                 Opacity="0.85"
+                 AutomationProperties.AutomationId="SpeechToSpeechView_DisclosureText"/>
+
+      <TextBlock Text="Durably marked"
+                 Visibility="{x:Bind ViewModel.OutputMarkingVerified, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                 FontWeight="SemiBold"
+                 AutomationProperties.AutomationId="SpeechToSpeechView_MarkingBadge"/>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

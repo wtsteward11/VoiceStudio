@@ -1,4 +1,3 @@
-using System;
 using System.Net.Http;
 using VoiceStudio.Core.Services;
 
@@ -20,23 +19,14 @@ namespace VoiceStudio.App.Services
       GracefulDegradationService? gracefulDegradation,
       HttpMessageHandler? innerHandler = null)
     {
-      var httpHandler = innerHandler ?? new HttpClientHandler();
-      var correlationHandler = correlationProvider != null
-        ? new CorrelationIdHandler(httpHandler, correlationProvider)
-        : new CorrelationIdHandler(httpHandler);
-      var metricsOrCorrelation = requestMetrics != null
-        ? new RequestMetricsHandler(requestMetrics, correlationHandler)
-        : (HttpMessageHandler)correlationHandler;
-      var rootHandler = new DegradedModeClearHandler(gracefulDegradation, metricsOrCorrelation);
-
-      HttpClient = new HttpClient(rootHandler)
-      {
-        BaseAddress = new Uri(config.BaseUrl),
-        Timeout = config.RequestTimeout
-      };
-
       var jsonOptions = JsonSerializerOptionsFactory.BackendApi;
-      Pipeline = new BackendClientHttpPipeline(HttpClient, jsonOptions);
+      (HttpClient, Pipeline) = BackendHttpTransportFactory.Create(
+        config,
+        jsonOptions,
+        correlationProvider,
+        requestMetrics,
+        gracefulDegradation,
+        innerHandler);
     }
   }
 }

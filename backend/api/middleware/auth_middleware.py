@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, Request, WebSocket, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from ..auth import (
@@ -210,6 +210,55 @@ import os
 
 # Default to no auth required for local desktop usage
 AUTH_REQUIRED = os.getenv("VOICESTUDIO_REQUIRE_AUTH", "false").lower() == "true"
+
+# RFC 6455 private-use range: application-defined WebSocket close code for auth required
+WS_CLOSE_AUTH_REQUIRED = 4001
+
+
+def _get_user_from_websocket_headers(ws: WebSocket) -> User | None:
+    """Resolve User from WebSocket upgrade headers (same sources as HTTP)."""
+    api_key = ws.headers.get("x-api-key") or ws.headers.get("X-API-Key")
+    if api_key:
+        user = get_current_user_from_api_key(api_key)
+        if user:
+            return user
+
+    auth_header = ws.headers.get("authorization") or ws.headers.get("Authorization") or ""
+    if len(auth_header) >= 7 and auth_header[:7].lower() == "bearer ":
+        token = auth_header[7:].strip()
+        if token:
+            user = get_current_user_from_token(token)
+            if user:
+                return user
+
+    return None
+
+
+async def require_ws_auth_if_enabled(ws: WebSocket) -> User | None:
+    """
+    Handshake-time auth for WebSocket connections.
+
+    Reads X-API-Key and Authorization: Bearer from the upgrade request.
+    When AUTH_REQUIRED is False, credentials are optional (local desktop).
+    When AUTH_REQUIRED is True and no valid user: accept, close with WS_CLOSE_AUTH_REQUIRED, return None.
+    """
+    user = _get_user_from_websocket_headers(ws)
+
+    if not AUTH_REQUIRED:
+        return user
+
+    if user is None:
+        request_id = getattr(ws.state, "request_id", None)
+        logger.warning(
+            "WS auth required but not provided for %s",
+            ws.url.path,
+            extra={"path": ws.url.path, "request_id": request_id},
+        )
+        await ws.accept()
+        await ws.close(code=WS_CLOSE_AUTH_REQUIRED)
+        return None
+
+    return user
 
 
 async def require_auth_if_enabled(request: Request) -> User | None:

@@ -956,6 +956,255 @@ class SynthesisService:
         )
 
     @staticmethod
+    def _split_oversized_sentence(sentence: str, max_chunk_chars: int) -> list[str]:
+        """Word-bounded segments when a single sentence exceeds max_chunk_chars."""
+        words = sentence.split()
+        out: list[str] = []
+        cur: list[str] = []
+        cur_len = 0
+        for w in words:
+            add = len(w) + (1 if cur else 0)
+            if cur_len + add > max_chunk_chars and cur:
+                out.append(" ".join(cur))
+                cur = [w]
+                cur_len = len(w)
+            else:
+                cur.append(w)
+                cur_len += add
+        if cur:
+            out.append(" ".join(cur))
+        return [x for x in out if x.strip()]
+
+    @staticmethod
+    def _chunk_text_for_long_form(text: str, max_chunk_chars: int, language: str) -> list[str]:
+        """
+        Deterministic sentence-boundary chunking for long-form synthesis (GAP-049).
+        Uses TextPreprocessor.sentence_segmentation; falls back to one chunk on NLP failure.
+        """
+        stripped = text.strip()
+        if not stripped:
+            return []
+        try:
+            from backend.nlp.text_processing import get_text_preprocessor
+
+            preprocessor = get_text_preprocessor()
+            sentences = preprocessor.sentence_segmentation(
+                stripped, language=language or "en"
+            )
+        except Exception as e:
+            logger.warning("Long-form chunking: NLP unavailable, single chunk: %s", e)
+            return [stripped]
+
+        sentences = [s.strip() for s in sentences if s and str(s).strip()]
+        if not sentences:
+            return [stripped]
+
+        chunks: list[str] = []
+        current: list[str] = []
+        current_len = 0
+
+        for sent in sentences:
+            s = sent.strip()
+            if not s:
+                continue
+            if len(s) > max_chunk_chars:
+                if current:
+                    chunks.append(" ".join(current).strip())
+                    current = []
+                    current_len = 0
+                chunks.extend(
+                    SynthesisService._split_oversized_sentence(s, max_chunk_chars)
+                )
+                continue
+            added = len(s) + (1 if current else 0)
+            if current_len + added > max_chunk_chars and current:
+                chunks.append(" ".join(current).strip())
+                current = [s]
+                current_len = len(s)
+            else:
+                current.append(s)
+                current_len += added
+        if current:
+            chunks.append(" ".join(current).strip())
+        return [c for c in chunks if c]
+
+    @staticmethod
+    async def synthesize_long_form(
+        req: Any,
+        request: Any,
+        config_service: Any = None,
+    ) -> Any:
+        """
+        Long-form synthesis: chunk text at sentence boundaries, synthesize each chunk with
+        identical settings, concatenate audio, one merged artifact (GAP-049).
+        """
+        from backend.api.models_additional import (
+            LongFormChunkResult,
+            LongFormSynthesisResponse,
+            VoiceSynthesizeRequest,
+        )
+        from backend.audio.audio_utils import load_audio, resample_audio
+        from backend.services.audio_path_resolver import resolve_audio_path
+        from backend.services.engine_shared import (
+            ENGINE_AVAILABLE,
+            _ensure_engine_router,
+            engine_router,
+        )
+
+        _ensure_engine_router()
+        if not ENGINE_AVAILABLE or not engine_router:
+            raise ServiceError(
+                503,
+                "Engine router not available for long-form synthesis",
+            )
+
+        valid_engines = engine_router.list_engines()
+        requested_engine = getattr(req, "engine", None)
+        if not requested_engine or not str(requested_engine).strip():
+            try:
+                if config_service:
+                    default_engine = config_service.get_default_engine("tts")
+                    requested_engine = default_engine or "xtts_v2"
+                else:
+                    requested_engine = "xtts_v2"
+            except Exception:
+                requested_engine = "xtts_v2"
+        engine_id = normalize_engine_id(str(requested_engine).strip())
+
+        if valid_engines and engine_id not in valid_engines:
+            raise ServiceError(
+                400,
+                f"Invalid engine '{requested_engine}'. Available: {', '.join(valid_engines)}",
+            )
+        if engine_router.get_engine(engine_id) is None:
+            raise ServiceError(
+                503,
+                f"Engine '{requested_engine}' is not available or failed to initialize",
+            )
+
+        lang = req.language or "en"
+        max_chars = int(req.chunk_size_chars)
+        chunks = SynthesisService._chunk_text_for_long_form(req.text, max_chars, lang)
+        if not chunks:
+            raise ServiceError(400, "No synthesizable text after chunking.")
+
+        failed: list[LongFormChunkResult] = []
+        arrays: list[Any] = []
+        sample_rate: int | None = None
+        quality_num = 0.0
+        quality_den = 0.0
+
+        for idx, chunk_text in enumerate(chunks):
+            synth_req = VoiceSynthesizeRequest(
+                engine=engine_id,
+                profile_id=req.profile_id,
+                text=chunk_text,
+                language=lang,
+                emotion=req.emotion,
+                enhance_quality=bool(req.enhance_quality)
+                if req.enhance_quality is not None
+                else False,
+                consent_id=getattr(req, "consent_id", None),
+                speed=getattr(req, "speed", None),
+                pitch=getattr(req, "pitch", None),
+                stability=getattr(req, "stability", None),
+                clarity=getattr(req, "clarity", None),
+                temperature=getattr(req, "temperature", None),
+            )
+            try:
+                synth_response = await SynthesisService.synthesize(
+                    synth_req, request, config_service
+                )
+            except Exception as e:
+                logger.warning(
+                    "Long-form chunk %s failed: %s",
+                    idx,
+                    e,
+                    exc_info=True,
+                )
+                failed.append(LongFormChunkResult(chunk_index=idx, error=str(e)))
+                continue
+
+            aid = getattr(synth_response, "audio_id", None)
+            if not aid:
+                failed.append(
+                    LongFormChunkResult(chunk_index=idx, error="Missing audio_id")
+                )
+                continue
+            path = resolve_audio_path(aid)
+            if not path or not os.path.exists(path):
+                failed.append(
+                    LongFormChunkResult(
+                        chunk_index=idx,
+                        error="Could not resolve synthesized audio path",
+                    )
+                )
+                continue
+            try:
+                chunk_audio, sr = load_audio(path)
+            except Exception as e:
+                failed.append(
+                    LongFormChunkResult(chunk_index=idx, error=f"Load audio: {e!s}")
+                )
+                continue
+
+            chunk_audio = np.asarray(chunk_audio, dtype=np.float32)
+            if chunk_audio.ndim > 1:
+                chunk_audio = np.mean(chunk_audio, axis=1)
+
+            if chunk_audio is None or len(chunk_audio) == 0:
+                failed.append(
+                    LongFormChunkResult(chunk_index=idx, error="Empty audio chunk")
+                )
+                continue
+
+            q = float(getattr(synth_response, "quality_score", 0.0) or 0.0)
+            w = float(len(chunk_audio))
+            quality_num += q * w
+            quality_den += w
+
+            if sample_rate is None:
+                sample_rate = int(sr)
+                arrays.append(np.asarray(chunk_audio, dtype=np.float32))
+            else:
+                if int(sr) != int(sample_rate):
+                    chunk_audio = resample_audio(
+                        np.asarray(chunk_audio, dtype=np.float32),
+                        int(sr),
+                        int(sample_rate),
+                    )
+                arrays.append(np.asarray(chunk_audio, dtype=np.float32))
+
+        if not arrays or sample_rate is None:
+            raise ServiceError(
+                500,
+                "All long-form synthesis chunks failed; no audio to merge.",
+            )
+
+        merged = np.concatenate(arrays)
+        out_id = f"longform_{uuid.uuid4().hex[:12]}"
+        create_audio_artifact_from_wav_array(
+            merged,
+            int(sample_rate),
+            created_by="long_form_synthesis",
+            audio_id=out_id,
+            source="gap049_long_form",
+        )
+        duration = float(len(merged)) / float(sample_rate)
+        avg_quality = quality_num / quality_den if quality_den > 0 else 0.0
+
+        return LongFormSynthesisResponse(
+            audio_id=out_id,
+            audio_url=f"/api/voice/audio/{out_id}",
+            duration=duration,
+            quality_score=float(avg_quality),
+            chunks_total=len(chunks),
+            chunks_succeeded=len(arrays),
+            partial_failure=len(failed) > 0,
+            failed_chunks=failed,
+        )
+
+    @staticmethod
     async def synthesize_with_style(
         *,
         _request: Any,

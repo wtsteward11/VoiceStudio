@@ -28,6 +28,7 @@ never fails the run.
 
 import io
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -385,6 +386,29 @@ def main():
                 "name": "empty_catch_check",
                 "command": f"{sys.executable} {empty_catch_script}",
                 "timeout": 60  # Extended timeout for large codebase scan
+            })
+
+        # Startup artifact schema v2 guard (GAP-069 regression guard lane)
+        skip_startup_artifact = os.environ.get(
+            "VOICESTUDIO_SKIP_STARTUP_ARTIFACT_CHECK", ""
+        ).strip().lower() in ("1", "true", "yes")
+        startup_checker = project_root / "scripts" / "ci" / "check_startup_artifact.py"
+        if startup_checker.exists() and not skip_startup_artifact:
+            # Use argv list on Windows so paths are not broken by shlex.quote/split.
+            artifact_path = os.environ.get("VOICESTUDIO_STARTUP_ARTIFACT_PATH", "").strip()
+            if artifact_path:
+                startup_cmd: list[str] | str = [
+                    sys.executable,
+                    str(startup_checker),
+                    "--path",
+                    artifact_path,
+                ]
+            else:
+                startup_cmd = f"{sys.executable} {startup_checker}"
+            checks.append({
+                "name": "startup_artifact_check",
+                "command": startup_cmd,
+                "timeout": 10,
             })
 
         # XAML safety check (WS-4)

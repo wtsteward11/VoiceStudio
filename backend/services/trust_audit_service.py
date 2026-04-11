@@ -38,6 +38,7 @@ class TrustAuditEvent:
     consent_id: str | None
     watermark_applied: bool | None
     correlation_id: str | None
+    user_role: str | None = None
 
     def to_metadata_dict(self) -> dict[str, Any]:
         """Serialize for AuditEntry.metadata (JSONL-safe)."""
@@ -77,6 +78,7 @@ class TrustAuditService:
         auth_subject: str | None,
         correlation_id: str | None,
         watermark_applied: bool | None,
+        user_role: str | None = None,
     ) -> None:
         from datetime import datetime, timezone
 
@@ -97,6 +99,7 @@ class TrustAuditService:
             consent_id=request.consent_id.strip() if request.consent_id else None,
             watermark_applied=watermark_applied,
             correlation_id=correlation_id,
+            user_role=user_role,
         )
         await self._emit(event)
 
@@ -109,6 +112,7 @@ class TrustAuditService:
         reason_code: str | None,
         auth_subject: str | None,
         correlation_id: str | None,
+        user_role: str | None = None,
     ) -> None:
         from datetime import datetime, timezone
 
@@ -130,6 +134,7 @@ class TrustAuditService:
             consent_id=None,
             watermark_applied=artifact_meta.get("watermark_applied") if isinstance(artifact_meta, dict) else None,
             correlation_id=correlation_id,
+            user_role=user_role,
         )
         await self._emit(event)
 
@@ -163,6 +168,7 @@ class TrustAuditService:
             consent_id=None,
             watermark_applied=artifact_meta.get("watermark_applied") if isinstance(artifact_meta, dict) else None,
             correlation_id=correlation_id,
+            user_role=None,
         )
         await self._emit(event)
 
@@ -193,6 +199,7 @@ class TrustAuditService:
             consent_id=None,
             watermark_applied=marking.watermark_applied,
             correlation_id=correlation_id,
+            user_role=None,
         )
         await self._emit(event)
 

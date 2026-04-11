@@ -14,22 +14,9 @@ if str(_project_root) not in sys.path:
 
 
 @pytest.fixture
-def client(monkeypatch: pytest.MonkeyPatch):
-    """TestClient with enhanced rate limit bypass (TestClient host is not loopback)."""
+def client():
+    """TestClient — loopback-exempt via _LOOPBACK_HOSTS ("testclient")."""
     from fastapi.testclient import TestClient
-    from starlette.middleware.base import RequestResponseEndpoint
-    from starlette.requests import Request
-
-    from backend.api.rate_limiting_enhanced import RateLimitMiddleware
-
-    async def _passthrough(  # pylint: disable=unused-argument
-        self: RateLimitMiddleware,
-        request: Request,
-        call_next: RequestResponseEndpoint,
-    ):
-        return await call_next(request)
-
-    monkeypatch.setattr(RateLimitMiddleware, "dispatch", _passthrough)
 
     from backend.api.main import app
 

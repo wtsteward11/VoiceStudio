@@ -83,6 +83,7 @@ class SpeechToSpeechService:
         *,
         auth_subject: str | None = None,
         correlation_id: str | None = None,
+        user_role: str | None = None,
     ) -> SpeechToSpeechResponse:
         _trust = get_trust_audit_service()
 
@@ -101,6 +102,7 @@ class SpeechToSpeechService:
                 auth_subject=auth_subject,
                 correlation_id=correlation_id,
                 watermark_applied=watermark_applied,
+                user_role=user_role,
             )
 
         # Consent gate — must be explicit for any voice identity transformation

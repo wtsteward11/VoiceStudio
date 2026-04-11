@@ -486,7 +486,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.rate_limiter = _enhanced_rate_limiter
 
     # Loopback hosts (localhost desktop mode) - exempt for high-frequency paths
-    _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+    # "testclient": Starlette TestClient ASGI transport host; treated as localhost-equivalent.
+    _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "testclient"})
 
     async def dispatch(self, request: Request, call_next):
         """Process request with rate limiting."""

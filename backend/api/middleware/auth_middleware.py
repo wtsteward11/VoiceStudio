@@ -21,6 +21,14 @@ from ..auth import (
 
 logger = logging.getLogger(__name__)
 
+# Role hierarchy for authorization (admin > user > guest; service ~= user)
+ROLE_HIERARCHY_LEVEL: dict[UserRole, int] = {
+    UserRole.ADMIN: 3,
+    UserRole.USER: 2,
+    UserRole.GUEST: 1,
+    UserRole.SERVICE: 2,
+}
+
 # Security scheme for OpenAPI
 security = HTTPBearer(auto_error=False)
 
@@ -132,32 +140,14 @@ async def require_permission_middleware(
     return user
 
 
-async def require_role_middleware(
-    request: Request,
-    required_role: UserRole,
-) -> User:
-    """
-    Require authentication and specific role.
-
-    Raises HTTPException if not authenticated or lacks role.
-    """
-    user = await require_authentication(request)
-
-    # Check role hierarchy (admin > user > guest)
-    role_hierarchy = {
-        UserRole.ADMIN: 3,
-        UserRole.USER: 2,
-        UserRole.GUEST: 1,
-        UserRole.SERVICE: 2,
-    }
-
-    user_level = role_hierarchy.get(user.role, 0)
-    required_level = role_hierarchy.get(required_role, 0)
+def _ensure_user_meets_minimum_role(user: User, required_role: UserRole, request: Request) -> None:
+    """Raise 403 if *user* is below *required_role* in the hierarchy."""
+    user_level = ROLE_HIERARCHY_LEVEL.get(user.role, 0)
+    required_level = ROLE_HIERARCHY_LEVEL.get(required_role, 0)
 
     if user_level < required_level:
         request_id = getattr(request.state, "request_id", None)
 
-        # Log authorization failure
         logger.warning(
             f"Role denied for user {user.user_id}: required {required_role.value}, has {user.role.value}",
             extra={
@@ -176,6 +166,45 @@ async def require_role_middleware(
             detail=f"Role denied: requires {required_role.value}",
         )
 
+
+def _synthetic_local_trust_surface_user() -> User:
+    """Anonymous principal when auth is off (local desktop); full access for single-user workflows."""
+    return User(
+        user_id="local",
+        username="local_user",
+        role=UserRole.ADMIN,
+        permissions=set(Permission),
+    )
+
+
+async def require_user_role_for_trust_surfaces(request: Request) -> User:
+    """
+    GAP-061: Minimum UserRole.USER for STS convert and transformed audio export.
+
+    When ``VOICESTUDIO_REQUIRE_AUTH`` is false, unauthenticated requests use a synthetic
+    local principal (ADMIN) so desktop flows keep working; when credentials are present,
+    the real principal must meet USER or higher.
+    """
+    if not AUTH_REQUIRED:
+        user = await get_current_user(request)
+        if user is None:
+            return _synthetic_local_trust_surface_user()
+        _ensure_user_meets_minimum_role(user, UserRole.USER, request)
+        return user
+    return await require_role_middleware(request, UserRole.USER)
+
+
+async def require_role_middleware(
+    request: Request,
+    required_role: UserRole,
+) -> User:
+    """
+    Require authentication and specific role.
+
+    Raises HTTPException if not authenticated or lacks role.
+    """
+    user = await require_authentication(request)
+    _ensure_user_meets_minimum_role(user, required_role, request)
     return user
 
 

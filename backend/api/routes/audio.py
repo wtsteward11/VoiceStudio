@@ -32,7 +32,11 @@ from pydantic import BaseModel
 from backend.api.auth import User
 from backend.config.path_config import get_path
 
-from ..middleware.auth_middleware import get_current_user, require_auth_if_enabled
+from ..middleware.auth_middleware import (
+    get_current_user,
+    require_auth_if_enabled,
+    require_user_role_for_trust_surfaces,
+)
 from ..models_additional import StsMarkingStatus
 from ..optimization import cache_response
 
@@ -1177,7 +1181,7 @@ EXPORT_FORMAT_MIME_TYPES = {
 async def export_audio(
     export_req: AudioExportRequest,
     http_request: Request,
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user_role_for_trust_surfaces),
 ):
     """
     Export an audio file to a different format.
@@ -1305,8 +1309,9 @@ async def export_audio(
                     artifact_meta=exp_meta,
                     result="success",
                     reason_code=None,
-                    auth_subject=user.user_id if user else None,
+                    auth_subject=user.user_id,
                     correlation_id=getattr(http_request.state, "correlation_id", None),
+                    user_role=user.role.value,
                 )
         except ArtifactNotFoundError:
             logger.debug(

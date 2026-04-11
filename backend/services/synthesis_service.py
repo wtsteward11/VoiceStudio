@@ -240,7 +240,7 @@ def _extract_quality_metrics(
                 frames = wav_file.getnframes()
                 sample_rate = wav_file.getframerate()
                 duration = frames / float(sample_rate)
-        except (wave.Error, OSError) as wav_err:
+        except (wave.Error, OSError, EOFError) as wav_err:
             logger.debug("Could not read duration from %s: %s", output_path, wav_err)
             duration = 2.5
 

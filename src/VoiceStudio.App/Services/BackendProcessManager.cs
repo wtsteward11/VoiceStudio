@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -21,12 +22,23 @@ public sealed class BackendProcessManager : IDisposable
     /// See <c>docs/reports/verification/VOICESTUDIO_UI_STARTUP_BOUNDARY_2026-04-05.md</c>.
     /// </summary>
     private const int StartupReadinessTimeoutSeconds = 60;
+
+    private readonly record struct HealthWaitMetrics(
+        bool Success,
+        int Attempts,
+        TimeSpan Elapsed,
+        double SpawnToFirstHealthAttemptMs,
+        double HealthPhaseMs);
+
     private readonly string _backendUrl;
     private readonly HttpClient _httpClient;
     private readonly IStartupDiagnosticsWriter? _diagnostics;
     private Process? _backendProcess;
     private bool _isStarting;
     private bool _disposed;
+    private readonly object _stderrBufferLock = new();
+    private readonly List<string> _stderrTail = new();
+    private const int StderrTailMaxLines = 40;
 
     /// <summary>
     /// Event raised when backend starts successfully.
@@ -83,14 +95,21 @@ public sealed class BackendProcessManager : IDisposable
         if (await IsBackendHealthyAsync(cancellationToken))
         {
             Debug.WriteLine("[BackendProcessManager] Backend already running");
-            WriteStartupDecisionArtifact(
+            WriteStartupArtifact(
+                success: true,
                 decision: "reuse",
                 healthProbeResult: true,
                 portOccupied: true,
                 backendPid: null,
                 elapsedMs: decisionStart.Elapsed.TotalMilliseconds,
                 spawnAttempted: false,
-                reusedExistingBackend: true);
+                reusedExistingBackend: true,
+                conflictCategory: null,
+                spawnElapsedMs: null,
+                healthAttempts: null,
+                healthyElapsedMs: null,
+                lastStderrLines: null,
+                pythonPathResolved: null);
             LastFailure = null;
             BackendStarted?.Invoke(this, EventArgs.Empty);
             return true;
@@ -103,14 +122,21 @@ public sealed class BackendProcessManager : IDisposable
             // Give it more time
             if (await WaitForHealthAsync(TimeSpan.FromSeconds(10), cancellationToken))
             {
-                WriteStartupDecisionArtifact(
+                WriteStartupArtifact(
+                    success: true,
                     decision: "reuse",
                     healthProbeResult: false,
                     portOccupied: true,
                     backendPid: _backendProcess?.HasExited == false ? _backendProcess.Id : null,
                     elapsedMs: decisionStart.Elapsed.TotalMilliseconds,
                     spawnAttempted: false,
-                    reusedExistingBackend: true);
+                    reusedExistingBackend: true,
+                    conflictCategory: null,
+                    spawnElapsedMs: null,
+                    healthAttempts: null,
+                    healthyElapsedMs: null,
+                    lastStderrLines: null,
+                    pythonPathResolved: null);
                 BackendStarted?.Invoke(this, EventArgs.Empty);
                 return true;
             }
@@ -143,6 +169,7 @@ public sealed class BackendProcessManager : IDisposable
 
         _isStarting = true;
         _diagnostics?.BeginSession();
+        string? resolvedPythonPath = null;
         try
         {
             var port = GetBackendPort();
@@ -156,14 +183,21 @@ public sealed class BackendProcessManager : IDisposable
             if (await IsBackendHealthyAsync(cancellationToken))
             {
                 Debug.WriteLine($"[BackendProcessManager] Port {port} in use and backend healthy");
-                WriteStartupDecisionArtifact(
+                WriteStartupArtifact(
+                    success: true,
                     decision: "reuse",
                     healthProbeResult: true,
                     portOccupied: true,
                     backendPid: null,
                     elapsedMs: (decisionStart ?? Stopwatch.StartNew()).Elapsed.TotalMilliseconds,
                     spawnAttempted: false,
-                    reusedExistingBackend: true);
+                    reusedExistingBackend: true,
+                    conflictCategory: null,
+                    spawnElapsedMs: null,
+                    healthAttempts: null,
+                    healthyElapsedMs: null,
+                    lastStderrLines: null,
+                    pythonPathResolved: null);
                 LastFailure = null;
                 BackendStarted?.Invoke(this, EventArgs.Empty);
                 return true;
@@ -173,7 +207,8 @@ public sealed class BackendProcessManager : IDisposable
                 Debug.WriteLine($"[BackendProcessManager] {error}");
                 _diagnostics?.LogFailure("port_collision", error);
                 _diagnostics?.EndSession();
-                WriteStartupDecisionArtifact(
+                WriteStartupArtifact(
+                    success: false,
                     decision: "port_collision",
                     healthProbeResult: false,
                     portOccupied: true,
@@ -181,7 +216,12 @@ public sealed class BackendProcessManager : IDisposable
                     elapsedMs: (decisionStart ?? Stopwatch.StartNew()).Elapsed.TotalMilliseconds,
                     spawnAttempted: false,
                     reusedExistingBackend: false,
-                    conflictCategory: "port_collision");
+                    conflictCategory: "port_collision",
+                    spawnElapsedMs: null,
+                    healthAttempts: null,
+                    healthyElapsedMs: null,
+                    lastStderrLines: null,
+                    pythonPathResolved: null);
                 LastFailure = new BackendStartFailedEventArgs(BackendStartFailureCategory.PortCollision, error);
                 BackendStartFailed?.Invoke(this, LastFailure);
                 return false;
@@ -198,14 +238,21 @@ public sealed class BackendProcessManager : IDisposable
                 Debug.WriteLine($"[BackendProcessManager] {error}");
                 _diagnostics?.LogFailure("invalid_app_root", error);
                 _diagnostics?.EndSession();
-                WriteStartupDecisionArtifact(
+                WriteStartupArtifact(
+                    success: false,
                     decision: "app_root_invalid",
                     healthProbeResult: false,
                     portOccupied: false,
                     backendPid: null,
                     elapsedMs: (decisionStart ?? Stopwatch.StartNew()).Elapsed.TotalMilliseconds,
                     spawnAttempted: false,
-                    reusedExistingBackend: false);
+                    reusedExistingBackend: false,
+                    conflictCategory: null,
+                    spawnElapsedMs: null,
+                    healthAttempts: null,
+                    healthyElapsedMs: null,
+                    lastStderrLines: null,
+                    pythonPathResolved: null);
                 LastFailure = new BackendStartFailedEventArgs(BackendStartFailureCategory.InvalidAppRoot, error);
                 BackendStartFailed?.Invoke(this, LastFailure);
                 return false;
@@ -223,6 +270,7 @@ public sealed class BackendProcessManager : IDisposable
             };
 
             var venvPython = Array.Find(pythonCandidates, File.Exists);
+            resolvedPythonPath = venvPython;
             _diagnostics?.Log("python_candidates", string.Join(";", pythonCandidates));
             _diagnostics?.Log("python_chosen", venvPython ?? "(none)");
 
@@ -233,14 +281,21 @@ public sealed class BackendProcessManager : IDisposable
                 Debug.WriteLine($"[BackendProcessManager] {error}");
                 _diagnostics?.LogFailure("missing_python_runtime", error);
                 _diagnostics?.EndSession();
-                WriteStartupDecisionArtifact(
+                WriteStartupArtifact(
+                    success: false,
                     decision: "runtime_missing",
                     healthProbeResult: false,
                     portOccupied: false,
                     backendPid: null,
                     elapsedMs: (decisionStart ?? Stopwatch.StartNew()).Elapsed.TotalMilliseconds,
                     spawnAttempted: false,
-                    reusedExistingBackend: false);
+                    reusedExistingBackend: false,
+                    conflictCategory: null,
+                    spawnElapsedMs: null,
+                    healthAttempts: null,
+                    healthyElapsedMs: null,
+                    lastStderrLines: null,
+                    pythonPathResolved: null);
                 LastFailure = new BackendStartFailedEventArgs(BackendStartFailureCategory.RuntimeMissing, error);
                 BackendStartFailed?.Invoke(this, LastFailure);
                 return false;
@@ -312,6 +367,7 @@ public sealed class BackendProcessManager : IDisposable
             {
                 if (!string.IsNullOrEmpty(e.Data))
                 {
+                    AppendStderrLine(e.Data);
                     Debug.WriteLine($"[Backend ERR] {e.Data}");
                     if (Interlocked.Exchange(ref firstStderrLogged, 1) == 0)
                     {
@@ -326,6 +382,7 @@ public sealed class BackendProcessManager : IDisposable
                 BackendExited?.Invoke(this, EventArgs.Empty);
             };
 
+            ClearStderrBuffer();
             _backendProcess.Start();
             _backendProcess.BeginOutputReadLine();
             _backendProcess.BeginErrorReadLine();
@@ -336,23 +393,30 @@ public sealed class BackendProcessManager : IDisposable
 
             // Wait for backend to become healthy (see StartupReadinessTimeoutSeconds for cold-start budget)
             var healthTimeout = TimeSpan.FromSeconds(StartupReadinessTimeoutSeconds);
-            var (healthy, attempts, elapsed) = await WaitForHealthWithMetricsAsync(healthTimeout, cancellationToken, sessionStart, port);
-            _diagnostics?.Log("health_probe_attempts", attempts.ToString());
-            _diagnostics?.Log("health_probe_elapsed_ms", elapsed.TotalMilliseconds.ToString("F0"));
+            var metrics = await WaitForHealthWithMetricsAsync(healthTimeout, cancellationToken, sessionStart, port);
+            _diagnostics?.Log("health_probe_attempts", metrics.Attempts.ToString());
+            _diagnostics?.Log("health_probe_elapsed_ms", metrics.Elapsed.TotalMilliseconds.ToString("F0"));
 
-            if (healthy)
+            if (metrics.Success)
             {
                 Debug.WriteLine("[BackendProcessManager] Backend is healthy");
                 _diagnostics?.Log("result", "success");
                 _diagnostics?.EndSession();
-                WriteStartupDecisionArtifact(
+                WriteStartupArtifact(
+                    success: true,
                     decision: "spawn",
-                    healthProbeResult: false,
+                    healthProbeResult: true,
                     portOccupied: false,
                     backendPid: _backendProcess?.HasExited == false ? _backendProcess.Id : null,
                     elapsedMs: (decisionStart ?? sessionStart).Elapsed.TotalMilliseconds,
                     spawnAttempted: true,
-                    reusedExistingBackend: false);
+                    reusedExistingBackend: false,
+                    conflictCategory: null,
+                    spawnElapsedMs: metrics.SpawnToFirstHealthAttemptMs,
+                    healthAttempts: metrics.Attempts,
+                    healthyElapsedMs: metrics.HealthPhaseMs,
+                    lastStderrLines: GetStderrTailSnapshot(),
+                    pythonPathResolved: venvPython);
                 LastFailure = null;
                 BackendStarted?.Invoke(this, EventArgs.Empty);
                 return true;
@@ -363,14 +427,21 @@ public sealed class BackendProcessManager : IDisposable
                 Debug.WriteLine($"[BackendProcessManager] {error}");
                 _diagnostics?.LogFailure("health_timeout", error);
                 _diagnostics?.EndSession();
-                WriteStartupDecisionArtifact(
+                WriteStartupArtifact(
+                    success: false,
                     decision: "health_timeout",
                     healthProbeResult: false,
                     portOccupied: false,
                     backendPid: _backendProcess?.HasExited == false ? _backendProcess.Id : null,
                     elapsedMs: (decisionStart ?? sessionStart).Elapsed.TotalMilliseconds,
                     spawnAttempted: true,
-                    reusedExistingBackend: false);
+                    reusedExistingBackend: false,
+                    conflictCategory: null,
+                    spawnElapsedMs: metrics.SpawnToFirstHealthAttemptMs,
+                    healthAttempts: metrics.Attempts,
+                    healthyElapsedMs: metrics.HealthPhaseMs,
+                    lastStderrLines: GetStderrTailSnapshot(),
+                    pythonPathResolved: venvPython);
                 LastFailure = new BackendStartFailedEventArgs(BackendStartFailureCategory.HealthTimeout, error);
                 BackendStartFailed?.Invoke(this, LastFailure);
                 return false;
@@ -383,14 +454,21 @@ public sealed class BackendProcessManager : IDisposable
             _diagnostics?.LogFailure("spawn_failure", error);
             _diagnostics?.EndSession();
             ErrorLogger.LogError($"Failed to start backend: {ex.Message}", "BackendProcessManager.StartBackendProcessAsync");
-            WriteStartupDecisionArtifact(
+            WriteStartupArtifact(
+                success: false,
                 decision: "spawn_failure",
                 healthProbeResult: false,
                 portOccupied: false,
                 backendPid: _backendProcess?.HasExited == false ? _backendProcess.Id : null,
                 elapsedMs: (decisionStart ?? Stopwatch.StartNew()).Elapsed.TotalMilliseconds,
                 spawnAttempted: true,
-                reusedExistingBackend: false);
+                reusedExistingBackend: false,
+                conflictCategory: null,
+                spawnElapsedMs: null,
+                healthAttempts: null,
+                healthyElapsedMs: null,
+                lastStderrLines: GetStderrTailSnapshot(),
+                pythonPathResolved: resolvedPythonPath);
             LastFailure = new BackendStartFailedEventArgs(BackendStartFailureCategory.SpawnFailure, error);
             BackendStartFailed?.Invoke(this, LastFailure);
             return false;
@@ -406,15 +484,15 @@ public sealed class BackendProcessManager : IDisposable
     /// </summary>
     private async Task<bool> WaitForHealthAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
     {
-        var (healthy, _, _) = await WaitForHealthWithMetricsAsync(timeout, cancellationToken, null, 0);
-        return healthy;
+        var metrics = await WaitForHealthWithMetricsAsync(timeout, cancellationToken, null, 0);
+        return metrics.Success;
     }
 
     /// <summary>
-    /// Waits for the backend to become healthy, returning attempt count and elapsed time.
+    /// Waits for the backend to become healthy, returning attempt count, elapsed time, and probe timings.
     /// Logs milestone_first_tcp_ms and milestone_first_health_ms when diagnostics and port are provided.
     /// </summary>
-    private async Task<(bool Success, int Attempts, TimeSpan Elapsed)> WaitForHealthWithMetricsAsync(
+    private async Task<HealthWaitMetrics> WaitForHealthWithMetricsAsync(
         TimeSpan timeout,
         CancellationToken cancellationToken = default,
         Stopwatch? sessionStart = null,
@@ -423,9 +501,17 @@ public sealed class BackendProcessManager : IDisposable
         var sw = Stopwatch.StartNew();
         var attempts = 0;
         var firstTcpLogged = 0;
+        var firstHealthAttemptMs = 0.0;
+        var recordedFirstAttempt = false;
         while (sw.Elapsed < timeout && !cancellationToken.IsCancellationRequested)
         {
             attempts++;
+
+            if (!recordedFirstAttempt && sessionStart != null)
+            {
+                firstHealthAttemptMs = sessionStart.Elapsed.TotalMilliseconds;
+                recordedFirstAttempt = true;
+            }
 
             // Log first TCP reachability milestone (once, when TCP first becomes reachable)
             if (port > 0 && sessionStart != null && Volatile.Read(ref firstTcpLogged) == 0)
@@ -442,13 +528,16 @@ public sealed class BackendProcessManager : IDisposable
                 {
                     _diagnostics?.Log("milestone_first_health_ms", sessionStart.ElapsedMilliseconds.ToString());
                 }
-                return (true, attempts, sw.Elapsed);
+
+                var healthPhaseMs = sw.Elapsed.TotalMilliseconds;
+                return new HealthWaitMetrics(true, attempts, sw.Elapsed, firstHealthAttemptMs, healthPhaseMs);
             }
 
             await Task.Delay(500, cancellationToken);
         }
 
-        return (false, attempts, sw.Elapsed);
+        var failPhaseMs = sw.Elapsed.TotalMilliseconds;
+        return new HealthWaitMetrics(false, attempts, sw.Elapsed, firstHealthAttemptMs, failPhaseMs);
     }
 
     private static async Task<bool> IsTcpReachableAsync(int port, CancellationToken cancellationToken)
@@ -502,7 +591,45 @@ public sealed class BackendProcessManager : IDisposable
         }
     }
 
-    private void WriteStartupDecisionArtifact(
+    private void ClearStderrBuffer()
+    {
+        lock (_stderrBufferLock)
+        {
+            _stderrTail.Clear();
+        }
+    }
+
+    private void AppendStderrLine(string? line)
+    {
+        if (string.IsNullOrEmpty(line))
+        {
+            return;
+        }
+
+        lock (_stderrBufferLock)
+        {
+            _stderrTail.Add(line);
+            while (_stderrTail.Count > StderrTailMaxLines)
+            {
+                _stderrTail.RemoveAt(0);
+            }
+        }
+    }
+
+    private List<string> GetStderrTailSnapshot()
+    {
+        lock (_stderrBufferLock)
+        {
+            return new List<string>(_stderrTail);
+        }
+    }
+
+    /// <summary>
+    /// Writes startup diagnostics to %LocalAppData%\VoiceStudio\crashes\startup_decision.json.
+    /// Includes <c>status</c> success/failure and <c>schema_version</c> 2.
+    /// </summary>
+    private void WriteStartupArtifact(
+        bool success,
         string decision,
         bool healthProbeResult,
         bool portOccupied,
@@ -510,9 +637,14 @@ public sealed class BackendProcessManager : IDisposable
         double elapsedMs,
         bool spawnAttempted,
         bool reusedExistingBackend,
-        string? conflictCategory = null,
-        int schemaVersion = 1)
+        string? conflictCategory,
+        double? spawnElapsedMs,
+        int? healthAttempts,
+        double? healthyElapsedMs,
+        IReadOnlyList<string>? lastStderrLines,
+        string? pythonPathResolved)
     {
+        const int schemaVersion = 2;
         try
         {
             var crashDir = Path.Combine(
@@ -521,9 +653,14 @@ public sealed class BackendProcessManager : IDisposable
                 "crashes");
             Directory.CreateDirectory(crashDir);
 
+            var stderrSnapshot = lastStderrLines is { Count: > 0 }
+                ? new List<string>(lastStderrLines)
+                : new List<string>();
+
             var payload = new
             {
                 schema_version = schemaVersion,
+                status = success ? "success" : "failure",
                 timestamp_utc = DateTime.UtcNow.ToString("o"),
                 decision,
                 health_probe_result = healthProbeResult,
@@ -534,9 +671,15 @@ public sealed class BackendProcessManager : IDisposable
                 conflict_category = conflictCategory,
                 timeout_seconds = StartupReadinessTimeoutSeconds,
                 elapsed_ms = Math.Round(elapsedMs, 2),
+                spawn_elapsed_ms = spawnElapsedMs.HasValue ? Math.Round(spawnElapsedMs.Value, 2) : (double?)null,
+                health_attempts = healthAttempts,
+                healthy_elapsed_ms = healthyElapsedMs.HasValue ? Math.Round(healthyElapsedMs.Value, 2) : (double?)null,
+                last_stderr_lines = stderrSnapshot,
+                python_path_resolved = pythonPathResolved,
             };
 
-            var path = Path.Combine(crashDir, "startup_decision.json");
+            const string fileName = "startup_decision.json";
+            var path = Path.Combine(crashDir, fileName);
             var json = System.Text.Json.JsonSerializer.Serialize(
                 payload,
                 new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
@@ -544,7 +687,7 @@ public sealed class BackendProcessManager : IDisposable
         }
         catch (Exception ex)
         {
-            ErrorLogger.LogWarning($"Failed to write startup decision artifact: {ex.Message}", "BackendProcessManager");
+            ErrorLogger.LogWarning($"Failed to write startup artifact: {ex.Message}", "BackendProcessManager");
         }
     }
 
@@ -630,7 +773,12 @@ public sealed class BackendProcessManager : IDisposable
         }
 
         // 3. Parent of exe (e.g. exe in bin/ subdir)
-        var parentDir = Directory.GetParent(exeDir)?.FullName;
+        string? parentDir = null;
+        if (!string.IsNullOrEmpty(exeDir))
+        {
+            parentDir = Directory.GetParent(exeDir)?.FullName;
+        }
+
         if (!string.IsNullOrEmpty(parentDir) && HasBackendMarker(parentDir))
         {
             source = "exe_parent";

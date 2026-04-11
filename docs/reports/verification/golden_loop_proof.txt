@@ -1,0 +1,16 @@
+Backend Readiness Truth Lane — Phase 6 evidence
+GOV-VOICESTUDIO-BACKEND-READINESS-TRUTH-01
+
+Command:
+  $env:VOICESTUDIO_MODELS_PATH = "e:\VoiceStudio\models"
+  python -m pytest tests/ci/test_golden_loop_smoke_real.py -v -m nightly --tb=short
+
+Result: 2 passed in ~27s (2026-04-10 local)
+
+Tests:
+  tests/ci/test_golden_loop_smoke_real.py::test_golden_loop_real_upload_stream PASSED
+  tests/ci/test_golden_loop_smoke_real.py::test_golden_loop_real_health_synthesize_stream PASSED
+
+Notes:
+  - Piper OHF package (PiperVoice) path wired in app/core/engines/piper_engine.py (piper_voice_v1).
+  - Real-mode requires VOICESTUDIO_MODELS_PATH (or ProgramData VoiceStudio models) with piper ONNX + JSON.

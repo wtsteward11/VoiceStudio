@@ -506,18 +506,22 @@ def register_all_routes(app: FastAPI) -> None:
     @app.get("/health")
     def health():
         """Basic health check endpoint."""
+        from backend.api.startup_flags import get_engines_ready
         from backend.settings import config
 
         return {
             "status": "ok",
             "version": "1.0",
             "portable_mode": config.portable_mode,
+            "engines_ready": get_engines_ready(),
         }
 
     @app.get("/api/health")
     def api_health():
         """API health check endpoint with performance metrics."""
         import os
+
+        from backend.api.startup_flags import get_engines_ready
 
         from .middleware_setup import get_performance_middleware
 
@@ -536,6 +540,7 @@ def register_all_routes(app: FastAPI) -> None:
                 "version": version_info["version"],
                 "version_string": get_version_string(),
                 "version_info": version_info,
+                "engines_ready": get_engines_ready(),
                 "metrics": {
                     "memory_mb": memory_info.rss / (1024 * 1024),
                     "cpu_percent": cpu_percent,
@@ -550,6 +555,7 @@ def register_all_routes(app: FastAPI) -> None:
                 "status": "ok",
                 "version": version_info["version"],
                 "version_string": get_version_string(),
+                "engines_ready": get_engines_ready(),
                 "metrics": "unavailable",
             }
 

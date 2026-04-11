@@ -241,6 +241,42 @@ class PiperEngine(EngineProtocol):
 
         return None
 
+    def _resolve_executable_path(self) -> None:
+        """Bind lazy_load engines to a concrete backend (piper v1 PiperVoice, legacy, or CLI)."""
+        if self.executable_path is not None:
+            return
+        mp = self.model_path
+        if mp and os.path.isfile(mp):
+            try:
+                from piper import PiperVoice  # piper (OHF) >= 1.0; onnx + json beside model
+            except ImportError as exc:
+                logger.debug("Optional piper PiperVoice import failed: %s", exc)
+            else:
+                logger.debug(
+                    "Piper backend: %s (onnx) at %s",
+                    PiperVoice.__name__,
+                    mp,
+                )
+                self.executable_path = "piper_voice_v1"
+                return
+        try:
+            import piper_tts
+        except ImportError as exc:
+            logger.debug("Optional legacy piper_tts import failed: %s", exc)
+        else:
+            self.executable_path = "python_package"
+            logger.debug("Piper backend: legacy %s package", piper_tts.__name__)
+            return
+        exe = self._find_executable("piper", self.piper_path)
+        if not exe:
+            for exe_name in ("piper-tts", "piper.exe", "piper-tts.exe"):
+                exe = self._find_executable(exe_name, self.piper_path)
+                if exe:
+                    break
+        if exe:
+            self.executable_path = exe
+            logger.debug("Piper backend: CLI %s", exe)
+
     def _initialize_piper_instance(self):
         """Initialize and cache Piper instance (Python package only)."""
         if self._piper_instance is not None:
@@ -276,6 +312,26 @@ class PiperEngine(EngineProtocol):
         except Exception as e:
             logger.warning(f"Failed to create Piper instance: {e}")
             return None
+
+    def _get_piper_voice_v1(self):
+        """Load OHF ``piper`` package PiperVoice (cached on engine instance)."""
+        if self._piper_instance is not None:
+            return self._piper_instance
+        try:
+            from piper import PiperVoice
+        except ImportError:
+            return None
+        if not self.model_path or not os.path.isfile(self.model_path):
+            logger.warning("PiperVoice requires model_path to an existing .onnx file")
+            return None
+        download_dir = Path(self.model_path).parent
+        try:
+            voice = PiperVoice.load(self.model_path, download_dir=download_dir)
+        except Exception as e:
+            logger.warning("PiperVoice.load failed: %s", e)
+            return None
+        self._piper_instance = voice
+        return voice
 
     def initialize(self) -> bool:
         """
@@ -381,6 +437,14 @@ class PiperEngine(EngineProtocol):
         if not self._initialized and not self.initialize():
             return None
 
+        self._resolve_executable_path()
+        if self.executable_path is None:
+            logger.error(
+                "Piper could not resolve a backend (install piper or piper-tts, "
+                "place a .onnx model beside its .json, or install the piper CLI)"
+            )
+            return None
+
         try:
             # Get synthesis parameters
             speed = kwargs.get("speed", 1.0)
@@ -399,8 +463,23 @@ class PiperEngine(EngineProtocol):
                 output_file = Path(temp_dir) / f"{uuid.uuid4().hex}.wav"
 
             try:
-                # Use Python package if available
-                if self.executable_path == "python_package":
+                # OHF ``piper`` package (onnx PiperVoice)
+                if self.executable_path == "piper_voice_v1":
+                    pv = self._get_piper_voice_v1()
+                    if pv is None:
+                        logger.error("PiperVoice not available or model load failed")
+                        return None
+                    chunks = list(pv.synthesize(text))
+                    if not chunks:
+                        logger.error("PiperVoice synthesize produced no audio")
+                        return None
+                    arrays = [
+                        np.asarray(c.audio_float_array, dtype=np.float32) for c in chunks
+                    ]
+                    audio = np.concatenate(arrays) if len(arrays) > 1 else arrays[0]
+                    self.sample_rate = int(chunks[0].sample_rate)
+                # Legacy piper_tts Python package
+                elif self.executable_path == "python_package":
                     # Use cached instance if available
                     piper = self._initialize_piper_instance()
                     if piper is None:

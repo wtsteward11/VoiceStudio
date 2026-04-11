@@ -1,0 +1,22 @@
+{
+  "command": "python scripts/ci/write_backend_cold_start_proof.py",
+  "exit_code": 0,
+  "timestamp": "2026-04-11T03:50:31Z",
+  "git_commit": "8bd7f32afc6fa98211af5ff721ab011a898d1ce4",
+  "git_branch": "main",
+  "cold_start_ms": 27078.0,
+  "first_api_ms": 140.0,
+  "warm_api_ms": 134.4,
+  "budgets": {
+    "ColdStartMs": 45000,
+    "FirstApiMs": 10000,
+    "WarmApiMs": 2000
+  },
+  "within_budget": true,
+  "environment": {
+    "os": "Windows",
+    "runner": "local",
+    "mode": "runtime-gates"
+  },
+  "evidence_fingerprint": "2a9c2f1c65ea95afafa5246ae29475ca3fd29dd70a0b66caef9db36367a256aa"
+}

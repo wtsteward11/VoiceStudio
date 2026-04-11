@@ -168,8 +168,10 @@ async def on_startup_prepare(app: FastAPI) -> None:
         pass
 
     app.state.startup_t0 = time.time()
+    _prepare_t0 = time.perf_counter()
 
     # Initialize temp file manager and perform startup cleanup
+    _t_phase = time.perf_counter()
     try:
         from app.core.utils.temp_file_manager import get_temp_file_manager
 
@@ -178,8 +180,10 @@ async def on_startup_prepare(app: FastAPI) -> None:
         logger.info("Temp file manager initialized and startup cleanup performed")
     except Exception as e:
         logger.warning(f"Failed to initialize temp file manager: {e}")
+    logger.info("[STARTUP-TIMING] temp_init=%.3fs", time.perf_counter() - _t_phase)
 
     # Initialize database and run migrations (Phase 1 - Backend-Frontend Integration)
+    _t_phase = time.perf_counter()
     try:
         # Create database connection for migrations
         import aiosqlite
@@ -264,8 +268,10 @@ async def on_startup_prepare(app: FastAPI) -> None:
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}", exc_info=True)
         # Don't fail startup - fall back to in-memory if database unavailable
+    logger.info("[STARTUP-TIMING] db_migrate=%.3fs", time.perf_counter() - _t_phase)
 
     # Initialize security services (Gap Analysis Fix - Phase 2)
+    _t_phase = time.perf_counter()
     try:
         from backend.security.key_rotation import get_key_rotation_service
         from backend.security.rbac import get_rbac_service
@@ -285,9 +291,11 @@ async def on_startup_prepare(app: FastAPI) -> None:
         logger.info("Security services initialized successfully")
     except Exception as e:
         logger.warning(f"Failed to initialize security services: {e}")
+    logger.info("[STARTUP-TIMING] security_init=%.3fs", time.perf_counter() - _t_phase)
 
     try:
         # Initialize background task scheduler
+        _t_phase = time.perf_counter()
         try:
             from app.core.tasks.scheduler import TaskPriority, get_scheduler
 
@@ -314,8 +322,10 @@ async def on_startup_prepare(app: FastAPI) -> None:
             logger.info("Background task scheduler started")
         except Exception as e:
             logger.warning(f"Failed to initialize task scheduler: {e}")
+        logger.info("[STARTUP-TIMING] scheduler_start=%.3fs", time.perf_counter() - _t_phase)
 
-        # Register all routes (lazy)
+        # Register all routes (lazy) + training broadcaster
+        _t_phase = time.perf_counter()
         register_all_routes(app)
 
         # Wire training progress broadcaster (service layer must not import ws)
@@ -335,8 +345,11 @@ async def on_startup_prepare(app: FastAPI) -> None:
             logger.info("Training progress broadcaster registered (WebSocket)")
         except ImportError as e:
             logger.debug("WebSocket realtime not available, training progress will not broadcast: %s", e)
+        logger.info("[STARTUP-TIMING] route_registration=%.3fs", time.perf_counter() - _t_phase)
     except Exception as e:
         logger.error(f"Error during startup prepare: {e}", exc_info=True)
+
+    logger.info("[STARTUP-TIMING] total_prepare=%.3fs", time.perf_counter() - _prepare_t0)
 
 
 async def on_startup_heavy(app: FastAPI) -> None:
@@ -352,6 +365,7 @@ async def on_startup_heavy(app: FastAPI) -> None:
         # Load all engines from manifests
         try:
             from app.core.engines.router import router as engine_router
+            from backend.api.startup_flags import set_engines_ready
 
             engine_router.load_all_engines("engines")
             engine_count = len(engine_router.list_engines())
@@ -364,6 +378,23 @@ async def on_startup_heavy(app: FastAPI) -> None:
                 logger.warning(f"Engine status: {engine_count} loaded, {failed_count} failed")
                 for engine_id, error in failed_engines.items():
                     logger.warning(f"  - {engine_id}: {error}")
+
+            # Synthesis and other services use backend.services.engine_shared — keep it aligned
+            # with the same router instance loaded above (ML engine_service may return None).
+            try:
+                from backend.services import engine_shared as _engine_shared
+
+                _engine_shared.engine_router = engine_router
+                listed = engine_router.list_engines()
+                _engine_shared.ENGINE_AVAILABLE = len(listed) > 0
+                logger.info(
+                    "engine_shared synchronized with core router (%s engines listed)",
+                    len(listed),
+                )
+            except Exception as sync_err:
+                logger.warning("engine_shared sync skipped: %s", sync_err, exc_info=True)
+
+            set_engines_ready()
         except Exception as e:
             logger.warning(f"Failed to load engines from manifests: {e}")
 

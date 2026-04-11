@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-04-11T04:11:05.742215+00:00",
+  "commit_hash": "8bd7f32afc6fa98211af5ff721ab011a898d1ce4",
+  "proof_grade": "R",
+  "environment": "asgi_transport",
+  "workflows": [
+    {
+      "id": "backend_readiness",
+      "endpoint": "GET /api/health",
+      "sample_count": 1,
+      "p50_seconds": 0.108224,
+      "p95_seconds": 0.108224,
+      "p99_seconds": null,
+      "status": "RECORDED",
+      "notes": "ASGI transport; client perf_counter around health GET sample_count=1; with small n, p95 approaches tail of observations."
+    },
+    {
+      "id": "canonical_synthesis",
+      "endpoint": "POST /api/voice/synthesize",
+      "sample_count": 1,
+      "p50_seconds": 1.221342,
+      "p95_seconds": 1.221342,
+      "p99_seconds": null,
+      "status": "RECORDED",
+      "notes": "ASGI transport; client perf_counter around synthesize POST only (after setup) sample_count=1; with small n, p95 approaches tail of observations."
+    },
+    {
+      "id": "training_export_rejection",
+      "endpoint": "POST /api/training/export",
+      "sample_count": 2,
+      "p50_seconds": 0.007315,
+      "p95_seconds": 0.009763,
+      "p99_seconds": null,
+      "status": "RECORDED",
+      "notes": "ASGI transport; client perf_counter around export POST (expected 404) sample_count=2; with small n, p95 approaches tail of observations."
+    }
+  ],
+  "baseline_policy": "advisory",
+  "evidence_fingerprint": "7c981a55b4b9ed004b11c6620c8d25030209956500c138e82c7d90a90275e975"
+}

@@ -1,0 +1,40 @@
+{
+  "schema_version": 2,
+  "timestamp": "2026-04-10T23:11:05.7562523-05:00",
+  "commit_hash": "8bd7f32afc6fa98211af5ff721ab011a898d1ce4",
+  "status": "PASS",
+  "blocked_reason": null,
+  "skip_reason": null,
+  "proof_grade": "R",
+  "command_executed": "verify.ps1 -RuntimeProof",
+  "prerequisites": {
+    "blocked": false,
+    "pytest_version": "8.4.2",
+    "blocked_reason": null,
+    "engine_probe_warning": "engine_router is None after _ensure_engine_router",
+    "consent_routes_importable": true,
+    "pytest_available": true,
+    "engine_piper_available": false,
+    "backend_main_import_error": null,
+    "environment_mode": "real",
+    "python_version": "3.9.13",
+    "engine_probe_error": "engine_router is None after _ensure_engine_router",
+    "piper_manifest_present": true,
+    "backend_main_import_ok": true
+  },
+  "assertions": [
+    {
+      "name": "synthesis_golden_loop",
+      "pytest_exit": 0,
+      "junit_path": "E:\\VoiceStudio\\artifacts\\verify\\20260410_230939\\test-results\\runtime_proof_synthesis.xml",
+      "status": "PASS"
+    },
+    {
+      "name": "training_export_honesty",
+      "pytest_exit": 0,
+      "junit_path": "E:\\VoiceStudio\\artifacts\\verify\\20260410_230939\\test-results\\runtime_proof_training.xml",
+      "status": "PASS"
+    }
+  ],
+  "log": "E:\\VoiceStudio\\artifacts\\verify\\20260410_230939\\logs\\runtime_proof.log"
+}

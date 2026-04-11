@@ -17,7 +17,9 @@ import time
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from backend.api.lifecycle import on_startup_heavy
 from backend.api.main import app
+from backend.services.path_service import PathService
 from tests.ci.slo_timing_io import append_slo_timing_sample
 
 
@@ -60,6 +62,12 @@ def _make_wav_bytes(num_samples: int = 4000, sample_rate: int = 22050) -> bytes:
 
 @pytest.fixture
 async def client():
+    """
+    httpx ASGITransport does not run FastAPI lifespan, so deferred ``on_startup_heavy``
+    (engine manifest load) never runs unless we invoke it. Mirror production readiness
+    for real-mode synthesis tests.
+    """
+    await on_startup_heavy(app)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
@@ -96,6 +104,11 @@ async def test_golden_loop_real_health_synthesize_stream(client: AsyncClient) ->
     profile_data = profile_resp.json()
     profile_id = profile_data.get("id") or profile_data.get("profile_id")
     assert profile_id, f"No profile id in response: {profile_data}"
+
+    # Synthesis resolves reference_audio.wav under the profile dir (all engines on this path).
+    prof_dir = PathService.get_profiles_dir() / str(profile_id)
+    prof_dir.mkdir(parents=True, exist_ok=True)
+    (prof_dir / "reference_audio.wav").write_bytes(_make_wav_bytes())
 
     # Acquire voice consent (same flow UI would use) before synthesis
     req_resp = await client.post(

@@ -15,6 +15,7 @@ import contextlib
 import io
 import json
 import os
+import subprocess
 import sys
 import warnings
 from pathlib import Path
@@ -22,6 +23,38 @@ from pathlib import Path
 # Reduce noisy imports when probing engine router (best-effort)
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 os.environ.setdefault("GRPC_VERBOSITY", "ERROR")
+
+
+def _backend_main_import_smoke(project_root: Path) -> tuple[bool, str | None]:
+    """Verify ``import backend.api.main`` succeeds (env drift / broken venv detection)."""
+
+    root_str = str(project_root)
+    env = os.environ.copy()
+    existing = env.get("PYTHONPATH", "").strip()
+    if root_str:
+        if existing:
+            if root_str not in existing.split(os.pathsep):
+                env["PYTHONPATH"] = root_str + os.pathsep + existing
+        else:
+            env["PYTHONPATH"] = root_str
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-c", "import backend.api.main"],
+            cwd=root_str,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "import backend.api.main timed out after 120s"
+    except OSError as exc:
+        return False, str(exc)[:2000]
+    if proc.returncode == 0:
+        return True, None
+    err = (proc.stderr or proc.stdout or "").strip()
+    return False, (err[:2000] if err else "non-zero exit from import backend.api.main")
 
 
 def _piper_manifest_present(project_root: Path) -> bool:
@@ -52,6 +85,8 @@ def _probe() -> dict:
         "pytest_available": False,
         "environment_mode": os.environ.get("VOICESTUDIO_TEST_MODE", "").strip(),
         "consent_routes_importable": False,
+        "backend_main_import_ok": False,
+        "backend_main_import_error": None,
         "engine_piper_available": False,
         "engine_probe_error": None,
         "blocked": False,
@@ -84,6 +119,14 @@ def _probe() -> dict:
         result["blocked_reason"] = (
             "no Piper engine manifest under engines/ (expected engines/**/piper/engine.manifest.json)"
         )
+        return result
+
+    main_ok, main_err = _backend_main_import_smoke(project_root)
+    result["backend_main_import_ok"] = main_ok
+    result["backend_main_import_error"] = main_err
+    if not main_ok:
+        result["blocked"] = True
+        result["blocked_reason"] = f"backend.api.main import failed: {main_err}"
         return result
 
     # Router import loads many optional engines; they log warnings to stderr. stdout must be JSON-only

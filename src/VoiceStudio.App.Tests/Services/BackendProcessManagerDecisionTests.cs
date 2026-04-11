@@ -124,7 +124,7 @@ public class BackendProcessManagerDecisionTests
             Assert.AreEqual("reuse", root.GetProperty("decision").GetString());
             Assert.IsTrue(root.GetProperty("health_probe_result").GetBoolean());
             Assert.AreEqual(JsonValueKind.Null, root.GetProperty("backend_pid").ValueKind);
-            Assert.AreEqual(1, root.GetProperty("schema_version").GetInt32());
+            Assert.AreEqual(2, root.GetProperty("schema_version").GetInt32());
             Assert.IsFalse(root.GetProperty("spawn_attempted").GetBoolean());
             Assert.IsTrue(root.GetProperty("reused_existing_backend").GetBoolean());
             Assert.AreEqual(JsonValueKind.Null, root.GetProperty("conflict_category").ValueKind);
@@ -176,10 +176,10 @@ public class BackendProcessManagerDecisionTests
             using var doc = ReadDecisionArtifact();
             var root = doc.RootElement;
             Assert.AreEqual("spawn", root.GetProperty("decision").GetString());
-            Assert.IsFalse(root.GetProperty("health_probe_result").GetBoolean());
+            Assert.IsTrue(root.GetProperty("health_probe_result").GetBoolean());
             Assert.AreEqual(JsonValueKind.Number, root.GetProperty("backend_pid").ValueKind);
             Assert.IsTrue(root.GetProperty("backend_pid").GetInt32() > 0);
-            Assert.AreEqual(1, root.GetProperty("schema_version").GetInt32());
+            Assert.AreEqual(2, root.GetProperty("schema_version").GetInt32());
             Assert.IsTrue(root.GetProperty("spawn_attempted").GetBoolean());
             Assert.IsFalse(root.GetProperty("reused_existing_backend").GetBoolean());
             Assert.AreEqual(JsonValueKind.Null, root.GetProperty("conflict_category").ValueKind);
@@ -233,7 +233,7 @@ public class BackendProcessManagerDecisionTests
             Assert.IsFalse(root.GetProperty("spawn_attempted").GetBoolean());
             Assert.IsFalse(root.GetProperty("reused_existing_backend").GetBoolean());
             Assert.AreEqual("port_collision", root.GetProperty("conflict_category").GetString());
-            Assert.AreEqual(1, root.GetProperty("schema_version").GetInt32());
+            Assert.AreEqual(2, root.GetProperty("schema_version").GetInt32());
         }
         finally
         {

@@ -78,6 +78,10 @@ Every panel MUST have a root AutomationId on its outermost container:
 | `MainWindow_TitleBarIcon` | FontIcon | Custom title bar app icon (GAP-010) | v1.2.0 |
 | `MainWindow_TitleBarText` | TextBlock | Custom title bar caption text | v1.2.0 |
 | `MainWindow_AppTitleBarDragRegion` | Border | Custom title bar drag region (`SetTitleBar`) | v1.2.0 |
+| `MainWindow_NotificationCenterButton` | Button | Notification Center bell (GAP-067 slice 1) | v1.2.0 |
+| `MainWindow_NotificationCenterUnreadBadge` | Border | Unread count badge on bell | v1.2.0 |
+| `MainWindow_NotificationCenterFlyout` | Flyout | Notification list flyout | v1.2.0 |
+| `MainWindow_NotificationCenterList` | ListView | Notification entries | v1.2.0 |
 | `MainWindow_StartupOverlay` | Border | Startup overlay (visible until backend ready) | v1.2.0 |
 | `MainWindow_DegradedModeBanner` | InfoBar | Degraded mode (429/backend stress) banner | v1.0.0 |
 | `MainWindow_WorkspaceGrid` | Grid | Primary workspace layout (panel hosts) | v1.2.0 |
@@ -92,6 +96,14 @@ Every panel MUST have a root AutomationId on its outermost container:
 | `KeyboardCustomization_SearchBox` | AutoSuggestBox | Shortcut customization search (GAP-065) | v1.2.0 |
 | `KeyboardCustomization_ShortcutList` | ListView | Shortcut list for rebinding (GAP-065) | v1.2.0 |
 | `KeyboardCustomization_ResetAllButton` | Button | Reset all shortcuts to defaults (GAP-065) | v1.2.0 |
+
+**Taskbar jump list (GAP-067 slice 2)** — not in-app AutomationIds; activation uses process command-line tokens (Win32 `ICustomDestinationList`, unpackaged app):
+
+| Token / pattern | Purpose |
+|-----------------|--------|
+| `--jumplist-new` | Static task: create new project (same intent as File → New Project) |
+| `--jumplist-open-dialog` | Static task: open project picker (same intent as File → Open Project) |
+| `--jumplist-open` | Recent item: followed by quoted or unquoted project file path |
 
 ---
 

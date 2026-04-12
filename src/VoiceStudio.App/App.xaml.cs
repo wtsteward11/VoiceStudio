@@ -163,6 +163,18 @@ namespace VoiceStudio.App
       var uiSmoke = IsUiSmoke(args);
       var isSmokeMode = smokeExit || uiSmoke;
 
+      if (!isSmokeMode && !IsIconLaunchSmokeRequested())
+      {
+        try
+        {
+          JumpListActivation.SetPendingIfParsed(args.Arguments, Environment.GetCommandLineArgs());
+        }
+        catch (Exception ex)
+        {
+          Debug.WriteLine($"[JumpList] Activation parse failed: {ex.Message}");
+        }
+      }
+
       // For UI smoke, ensure backend is ready before MainWindow/smoke (backend-dependent actions)
       if (uiSmoke)
       {

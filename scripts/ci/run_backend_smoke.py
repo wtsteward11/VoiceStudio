@@ -2,9 +2,9 @@
 """
 Bounded operator smoke: prerequisites → uvicorn → /health → /api/health.
 
-Emits docs/reports/verification/PROOF_BACKEND_SMOKE_<timestamp>.json.
+Emits docs/reports/verification/PROOF_BACKEND_SMOKE_<timestamp>.json (schema v1).
 
-Exit codes: 0 PASS, 1 FAIL, 2 BLOCKED (check_runtime_prerequisites.py).
+Exit codes: 0 PASS, 1 FAIL, 2 BLOCKED (check_runtime_prerequisites.py exit 2).
 """
 from __future__ import annotations
 
@@ -24,6 +24,14 @@ if str(ROOT) not in sys.path:
 
 VERIFICATION_DIR = ROOT / "docs" / "reports" / "verification"
 DEADLINE_S = 90
+
+SMOKE_SCHEMA_VERSION = 1
+
+ENVIRONMENT_HINTS_DEFAULT = [
+    "Set VOICESTUDIO_MODELS_PATH if using local models",
+    "Ensure Piper / engine assets per check_runtime_prerequisites.py",
+    "Run: python scripts/ci/check_runtime_prerequisites.py",
+]
 
 
 def _find_available_port() -> int:
@@ -54,7 +62,45 @@ def _read_startup_artifact() -> dict[str, Any] | None:
     return None
 
 
-def _prerequisites_exit_code() -> int:
+def _proof_blocked_prerequisites() -> dict[str, Any]:
+    return {
+        "schema_version": SMOKE_SCHEMA_VERSION,
+        "status": "BLOCKED",
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "port": None,
+        "cold_start_ms": None,
+        "health_probe_result": False,
+        "engines_ready_value": None,
+        "api_call_result": None,
+        "startup_decision_artifact": None,
+        "blocking_reason": "check_runtime_prerequisites exit 2 (prerequisites not satisfied)",
+        "failure_reason": None,
+        "environment_hints": list(ENVIRONMENT_HINTS_DEFAULT),
+    }
+
+
+def _proof_fail_prerequisites(stderr_snippet: str | None) -> dict[str, Any]:
+    fr = "check_runtime_prerequisites non-zero exit"
+    if stderr_snippet and stderr_snippet.strip():
+        fr = f"{fr}: {(stderr_snippet.strip())[:1500]}"
+    return {
+        "schema_version": SMOKE_SCHEMA_VERSION,
+        "status": "FAIL",
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "port": None,
+        "cold_start_ms": None,
+        "health_probe_result": False,
+        "engines_ready_value": None,
+        "api_call_result": None,
+        "startup_decision_artifact": None,
+        "blocking_reason": None,
+        "failure_reason": fr,
+        "environment_hints": list(ENVIRONMENT_HINTS_DEFAULT),
+    }
+
+
+def _run_prerequisites_check() -> tuple[int, str | None]:
+    """Returns (exit_code, stderr_snippet_for_fail). Exit 0 = ok, 1 = fail, 2 = blocked."""
     prereq = ROOT / "scripts" / "ci" / "check_runtime_prerequisites.py"
     proc_pr = subprocess.run(
         [sys.executable, str(prereq)],
@@ -65,19 +111,23 @@ def _prerequisites_exit_code() -> int:
         check=False,
     )
     if proc_pr.returncode == 2:
-        msg = {"status": "BLOCKED", "reason": "check_runtime_prerequisites exit 2"}
+        msg = {
+            "status": "BLOCKED",
+            "blocking_reason": "check_runtime_prerequisites exit 2",
+        }
         print(json.dumps(msg, indent=2))
-        return 2
+        return 2, None
     if proc_pr.returncode != 0:
+        stderr = (proc_pr.stderr or "")[:2000]
         body = {
             "status": "FAIL",
-            "reason": "check_runtime_prerequisites non-zero",
+            "failure_reason": "check_runtime_prerequisites non-zero",
             "exit_code": proc_pr.returncode,
-            "stderr": (proc_pr.stderr or "")[:2000],
+            "stderr": stderr,
         }
         print(json.dumps(body, indent=2))
-        return 1
-    return 0
+        return 1, stderr
+    return 0, None
 
 
 def _env_with_pythonpath() -> dict[str, str]:
@@ -124,10 +174,41 @@ def _get_api_health_json(url: str) -> tuple[dict[str, Any] | None, str | None]:
     return cast(dict[str, Any], data), None
 
 
+def _write_proof(proof: dict[str, Any]) -> Path:
+    VERIFICATION_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    out = VERIFICATION_DIR / f"PROOF_BACKEND_SMOKE_{ts}.json"
+    out.write_text(json.dumps(proof, indent=2), encoding="utf-8")
+    summary = {"proof_path": str(out), "status": proof.get("status")}
+    print(json.dumps(summary, indent=2))
+    return out
+
+
+def _base_proof_running(port: int) -> dict[str, Any]:
+    return {
+        "schema_version": SMOKE_SCHEMA_VERSION,
+        "status": "FAIL",
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "port": port,
+        "cold_start_ms": None,
+        "health_probe_result": False,
+        "engines_ready_value": None,
+        "api_call_result": None,
+        "startup_decision_artifact": None,
+        "blocking_reason": None,
+        "failure_reason": None,
+        "environment_hints": [],
+    }
+
+
 def main() -> int:
-    pre = _prerequisites_exit_code()
-    if pre != 0:
-        return pre
+    pre, stderr_snip = _run_prerequisites_check()
+    if pre == 2:
+        _write_proof(_proof_blocked_prerequisites())
+        return 2
+    if pre == 1:
+        _write_proof(_proof_fail_prerequisites(stderr_snip))
+        return 1
 
     port = _find_available_port()
     health_url = f"http://127.0.0.1:{port}/health"
@@ -154,22 +235,13 @@ def main() -> int:
         stderr=subprocess.DEVNULL,
     )
 
-    proof: dict = {
-        "status": "FAIL",
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-        "port": port,
-        "cold_start_ms": None,
-        "health_probe_result": False,
-        "engines_ready_value": None,
-        "api_call_result": None,
-        "startup_decision_artifact": None,
-    }
+    proof: dict[str, Any] = _base_proof_running(port)
 
     try:
         start = time.monotonic()
         cold_start_ms, health_ok = _wait_health_200(health_url, start, DEADLINE_S)
         if not health_ok:
-            proof["reason"] = "GET /health did not return 200 within 90s"
+            proof["failure_reason"] = "GET /health did not return 200 within 90s"
             proof["cold_start_ms"] = (time.monotonic() - start) * 1000
             _write_proof(proof)
             return 1
@@ -180,6 +252,7 @@ def main() -> int:
         api_json, api_err = _get_api_health_json(api_url)
         if api_json is None:
             proof["api_call_result"] = {"ok": False, "error": api_err}
+            proof["failure_reason"] = api_err or "GET /api/health failed"
             _write_proof(proof)
             return 1
 
@@ -188,6 +261,7 @@ def main() -> int:
                 "ok": False,
                 "error": "engines_ready missing from /api/health JSON",
             }
+            proof["failure_reason"] = "engines_ready missing from /api/health JSON"
             _write_proof(proof)
             return 1
 
@@ -209,15 +283,6 @@ def main() -> int:
                 prev = proof.get("cleanup_error", "")
                 suffix = f"; kill_failed: {exc_kill}"
                 proof["cleanup_error"] = (str(prev) + suffix)[:500]
-
-
-def _write_proof(proof: dict) -> None:
-    VERIFICATION_DIR.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    out = VERIFICATION_DIR / f"PROOF_BACKEND_SMOKE_{ts}.json"
-    out.write_text(json.dumps(proof, indent=2), encoding="utf-8")
-    summary = {"proof_path": str(out), "status": proof.get("status")}
-    print(json.dumps(summary, indent=2))
 
 
 if __name__ == "__main__":

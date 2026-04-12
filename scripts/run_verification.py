@@ -19,6 +19,10 @@ Flags:
   --enforce-runtime-proof — `runtime_proof_staleness` fails the run if
     PROOF_GOLDEN_PATH_REAL_*.json is missing or older than 72 hours (GAP-015 slice 2).
   --skip-runtime-proof-staleness — omit the staleness row entirely.
+  --enforce-backend-smoke — `backend_smoke_freshness` fails the run if
+    PROOF_BACKEND_SMOKE_*.json is missing, older than 72 hours, or status=FAIL (GAP-069 slice 3).
+    Latest proof with status=BLOCKED never fails (prerequisites absent; not a regression).
+  --skip-backend-smoke-staleness — omit the backend smoke freshness row entirely.
 
 Always-on advisory (GAP-015 slice 3): `slo_baseline_freshness` scans for
 `slo_baselines.json` under `artifacts/verify/*/` and `docs/reports/verification/`;
@@ -169,6 +173,170 @@ def _slo_baseline_freshness_result(project_root: Path) -> dict:
             f"age_hours={age_hours:.2f} (policy_window_hours=72; advisory only, does not fail exit code)"
         ),
         "enforce": False,
+    }
+
+
+def _backend_smoke_freshness_result(project_root: Path, *, enforce: bool = False) -> dict:
+    """
+    GAP-069 slice 3: Report freshness of PROOF_BACKEND_SMOKE_*.json artifacts.
+
+    When enforce=False (default): advisory only for missing/stale/FAIL; passed=True unless
+    enforce path would fail (we still set passed True for advisory mode for the row).
+    When enforce=True: missing, stale (>72h), status=FAIL, or parse error fails the run.
+    status=BLOCKED always passes (honest prerequisite gap; not a product regression).
+    """
+    start_time = datetime.now()
+    ver_dir = project_root / "docs" / "reports" / "verification"
+    name = "backend_smoke_freshness"
+    cmd = "scan docs/reports/verification/PROOF_BACKEND_SMOKE_*.json"
+
+    try:
+        files = sorted(
+            ver_dir.glob("PROOF_BACKEND_SMOKE_*.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+    except OSError as e:
+        duration = (datetime.now() - start_time).total_seconds()
+        passed = not enforce
+        return {
+            "name": name,
+            "command": cmd,
+            "exit_code": 0 if passed else 1,
+            "passed": passed,
+            "duration_seconds": round(duration, 2),
+            "output_sample": f"STATUS=ERROR listing proofs: {e}",
+            "enforce": enforce,
+        }
+
+    if not files:
+        duration = (datetime.now() - start_time).total_seconds()
+        msg = (
+            "STATUS=MISSING: no PROOF_BACKEND_SMOKE_*.json under docs/reports/verification "
+            "(optional; generate via python scripts/ci/run_backend_smoke.py or verify.ps1 -BackendSmoke). "
+        )
+        if enforce:
+            msg += "Enforce mode: this is a hard failure."
+        else:
+            msg += "Advisory only; does not fail the run."
+        passed = not enforce
+        return {
+            "name": name,
+            "command": cmd,
+            "exit_code": 0 if passed else 1,
+            "passed": passed,
+            "duration_seconds": round(duration, 2),
+            "output_sample": msg,
+            "enforce": enforce,
+        }
+
+    latest = files[0]
+    duration = (datetime.now() - start_time).total_seconds()
+
+    try:
+        raw = latest.read_text(encoding="utf-8")
+        data = json.loads(raw)
+    except (OSError, json.JSONDecodeError) as e:
+        msg = f"STATUS=ERROR: could not read/parse {latest.name}: {e}"
+        passed = not enforce
+        return {
+            "name": name,
+            "command": cmd,
+            "exit_code": 0 if passed else 1,
+            "passed": passed,
+            "duration_seconds": round(duration, 2),
+            "output_sample": msg,
+            "enforce": enforce,
+        }
+
+    if not isinstance(data, dict):
+        msg = f"STATUS=ERROR: root JSON is not an object in {latest.name}"
+        passed = not enforce
+        return {
+            "name": name,
+            "command": cmd,
+            "exit_code": 0 if passed else 1,
+            "passed": passed,
+            "duration_seconds": round(duration, 2),
+            "output_sample": msg,
+            "enforce": enforce,
+        }
+
+    status = data.get("status")
+    mtime = datetime.fromtimestamp(latest.stat().st_mtime, tz=timezone.utc)
+    age_hours = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600.0
+
+    if status == "BLOCKED":
+        msg = (
+            f"STATUS=BLOCKED: latest_file={latest.name} age_hours={age_hours:.2f} "
+            "(prerequisites absent when smoke ran; advisory only; never fails enforce mode)"
+        )
+        return {
+            "name": name,
+            "command": cmd,
+            "exit_code": 0,
+            "passed": True,
+            "duration_seconds": round(duration, 2),
+            "output_sample": msg,
+            "enforce": enforce,
+        }
+
+    if status == "FAIL":
+        msg = (
+            f"STATUS=FAIL: latest_file={latest.name} age_hours={age_hours:.2f} "
+            f"(failure_reason={data.get('failure_reason')!r})"
+        )
+        if enforce:
+            msg += " Enforce mode: hard failure."
+        else:
+            msg += " Advisory only; does not fail the run."
+        passed = not enforce
+        return {
+            "name": name,
+            "command": cmd,
+            "exit_code": 0 if passed else 1,
+            "passed": passed,
+            "duration_seconds": round(duration, 2),
+            "output_sample": msg,
+            "enforce": enforce,
+        }
+
+    if status == "PASS":
+        fresh = age_hours <= 72.0
+        st = "FRESH" if fresh else "STALE"
+        if enforce:
+            passed = fresh
+            tail = "Enforce mode: STALE or MISSING fails exit code."
+        else:
+            passed = True
+            tail = "advisory only, does not fail exit code"
+        return {
+            "name": name,
+            "command": cmd,
+            "exit_code": 0 if passed else 1,
+            "passed": passed,
+            "duration_seconds": round(duration, 2),
+            "output_sample": (
+                f"STATUS={st}: latest_file={latest.name} age_hours={age_hours:.2f} "
+                f"(policy_window_hours=72; {tail})"
+            ),
+            "enforce": enforce,
+        }
+
+    msg = f"STATUS=UNKNOWN: latest_file={latest.name} status={status!r}"
+    if enforce:
+        msg += " Enforce mode: hard failure."
+    else:
+        msg += " Advisory only."
+    passed = not enforce
+    return {
+        "name": name,
+        "command": cmd,
+        "exit_code": 0 if passed else 1,
+        "passed": passed,
+        "duration_seconds": round(duration, 2),
+        "output_sample": msg,
+        "enforce": enforce,
     }
 
 
@@ -447,6 +615,10 @@ def main():
     skip_runtime_stale = "--skip-runtime-proof-staleness" in sys.argv
     enforce_runtime_proof = "--enforce-runtime-proof" in sys.argv
 
+    # GAP-069 slice 3: optional backend smoke proof freshness
+    skip_backend_smoke_stale = "--skip-backend-smoke-staleness" in sys.argv
+    enforce_backend_smoke = "--enforce-backend-smoke" in sys.argv
+
     # Run checks
     results = []
     print("=" * 60)
@@ -493,6 +665,25 @@ def main():
         f"(exit {slo_fresh_result['exit_code']}, {slo_fresh_result['duration_seconds']}s)"
     )
     print(f"       {slo_fresh_result['output_sample'][:300]}")
+
+    if not skip_backend_smoke_stale:
+        smoke_result = _backend_smoke_freshness_result(
+            project_root, enforce=enforce_backend_smoke
+        )
+        results.append(smoke_result)
+        sample = smoke_result["output_sample"]
+        if smoke_result["passed"]:
+            if sample.startswith("STATUS=BLOCKED"):
+                tag = "ADVISORY"
+            else:
+                tag = "PASS" if enforce_backend_smoke else "ADVISORY"
+        else:
+            tag = "FAIL"
+        print(
+            f"  [{tag}] {smoke_result['name']} "
+            f"(exit {smoke_result['exit_code']}, {smoke_result['duration_seconds']}s)"
+        )
+        print(f"       {smoke_result['output_sample'][:300]}")
 
     # Summary
     all_passed = all(r["passed"] for r in results)

@@ -55,6 +55,10 @@ namespace VoiceStudio.App.Views.Panels
     private readonly ITimelineSelectedProjectGate? _timelineProjectGate;
     private readonly ITimelineUseCase? _timelineUseCase;
     private readonly IProjectRepository? _projectRepository;
+    private readonly IShellProgressPublisher _shellProgress;
+
+    /// <summary>GAP-067 slice 3: fixed shell progress source id for timeline synthesis (single-flight).</summary>
+    public const string TimelineSynthesisShellSourceId = "timeline-synthesis";
 
     /// <summary>
     /// GAP-045 cross-consumer: backend transcription id currently driving the subtitle overlay (null if cleared / never loaded).
@@ -499,7 +503,8 @@ namespace VoiceStudio.App.Views.Panels
       IProjectSessionDirtyState? sessionDirty = null,
       IClipTranscriptLinkageService? clipTranscriptLinkageService = null,
       IProjectRepository? projectRepository = null,
-      ITimelineUseCase? timelineUseCase = null)
+      ITimelineUseCase? timelineUseCase = null,
+      IShellProgressPublisher? shellProgressPublisher = null)
         : base(AppServices.GetViewModelContext())
     {
       _synthesisService = synthesisService ?? throw new ArgumentNullException(nameof(synthesisService));
@@ -531,6 +536,7 @@ namespace VoiceStudio.App.Views.Panels
       _timelineProjectGate = AppServices.TryGetTimelineSelectedProjectGate();
       _timelineUseCase = timelineUseCase;
       _projectRepository = projectRepository ?? AppServices.TryGetProjectRepository();
+      _shellProgress = shellProgressPublisher ?? NullShellProgressPublisher.Instance;
 
       Tracks.CollectionChanged += (_, _) =>
       {
@@ -1949,7 +1955,12 @@ namespace VoiceStudio.App.Views.Panels
 
       try
       {
-        var progress = new Progress<int>(p => SynthesizeCommand.ReportProgress(p));
+        var shellId = TimelineSynthesisShellSourceId;
+        var progress = new Progress<int>(p =>
+        {
+          SynthesizeCommand.ReportProgress(p);
+          _shellProgress.ReportProgress(shellId, Math.Clamp(p / 100.0, 0.0, 1.0));
+        });
         var projectId = SelectedProject?.Id;
         var result = await _synthesisService.SynthesizeAndSaveAsync(
           SelectedEngine,
@@ -1959,6 +1970,8 @@ namespace VoiceStudio.App.Views.Panels
           projectId,
           progress,
           cancellationToken).ConfigureAwait(true);
+
+        _shellProgress.ReportComplete(shellId);
 
         LastQualityScore = result.QualityScore;
         LastSynthesizedAudioUrl = result.AudioUrl;
@@ -1979,10 +1992,12 @@ namespace VoiceStudio.App.Views.Panels
       }
       catch (OperationCanceledException)
       {
+        _shellProgress.ReportCancelled(TimelineSynthesisShellSourceId);
         return;
       }
       catch (Exception ex)
       {
+        _shellProgress.ReportError(TimelineSynthesisShellSourceId);
         ErrorMessage = ErrorHandler.GetUserFriendlyMessage(ex);
         _errorService?.ShowError(ex, ResourceHelper.GetString("Error.SynthesizeFailed", "Failed to synthesize voice"));
         _logService?.LogError(ex, "Synthesize");

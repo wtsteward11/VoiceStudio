@@ -533,6 +533,16 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<RecentProjectsService>();
       services.AddSingleton<ToolbarConfigurationService>();
       services.AddSingleton<INotificationCenterService, NotificationCenterService>();
+      services.AddSingleton<NotificationCenterViewModel>();
+      services.AddSingleton<JumpListService>(sp =>
+      {
+        var dq = DispatcherQueue.GetForCurrentThread()
+                  ?? Microsoft.UI.Dispatching.DispatcherQueueController.CreateOnDedicatedThread().DispatcherQueue;
+        return new JumpListService(sp.GetRequiredService<RecentProjectsService>(), dq);
+      });
+      services.AddSingleton<ITaskbarProgressService, TaskbarProgressService>();
+      services.AddSingleton<ShellProgressCoordinator>();
+      services.AddSingleton<IShellProgressPublisher>(sp => sp.GetRequiredService<ShellProgressCoordinator>());
       services.AddSingleton<IAnimationService, AnimationService>();
       services.AddSingleton<StatusBarActivityService>();
       services.AddSingleton<StatusBarCoordinator>();
@@ -848,6 +858,15 @@ namespace VoiceStudio.App.Services
     public static UndoRedoService? TryGetUndoRedoService() => GetService<UndoRedoService>();
     public static RecentProjectsService GetRecentProjectsService() => GetRequiredService<RecentProjectsService>();
     public static RecentProjectsService? TryGetRecentProjectsService() => GetService<RecentProjectsService>();
+
+    public static JumpListService GetJumpListService() => GetRequiredService<JumpListService>();
+
+    public static JumpListService? TryGetJumpListService() => GetService<JumpListService>();
+
+    public static ITaskbarProgressService? TryGetTaskbarProgressService() => GetService<ITaskbarProgressService>();
+
+    public static ShellProgressCoordinator? TryGetShellProgressCoordinator() => GetService<ShellProgressCoordinator>();
+
     public static ToolbarConfigurationService GetToolbarConfigurationService() => GetRequiredService<ToolbarConfigurationService>();
     public static ToolbarConfigurationService? TryGetToolbarConfigurationService() => GetService<ToolbarConfigurationService>();
     public static ToolbarViewModel GetToolbarViewModel() => GetRequiredService<ToolbarViewModel>();

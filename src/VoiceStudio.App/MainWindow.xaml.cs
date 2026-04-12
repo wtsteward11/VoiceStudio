@@ -17,6 +17,7 @@ using System.Diagnostics;
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using Microsoft.UI.Xaml.Media.Animation;
 using VoiceStudio.App.Controls;
@@ -48,6 +49,7 @@ namespace VoiceStudio.App
         private System.Threading.Timer? _previewHideTimer;
         private Popup? _panelQuickSwitchPopup;
         private PanelQuickSwitchIndicator? _panelQuickSwitchIndicator;
+        private NotificationCenterViewModel? _notificationCenterViewModel;
         private DispatcherTimer? _quickSwitchHideTimer;
         private bool _isMiniTimelineVisible;
         private bool GetShowExperimentalPanels()
@@ -327,6 +329,11 @@ namespace VoiceStudio.App
                 {
                     // Initialize canonical XamlRoot for dialogs (prevents "XamlRoot must be explicitly set for unparented popup")
                     ErrorDialogService.Root = contentFE.XamlRoot;
+
+                    WireNotificationCenter();
+                    WireJumpListShell();
+                    WireTaskbarProgressShell();
+                    TryDispatchPendingJumpListActivation();
 
                     _sessionLifecycle.AttachRecoveryHandlers(this, contentFE);
 
@@ -2254,6 +2261,166 @@ namespace VoiceStudio.App
             }
         }
 
+        /// <summary>
+        /// GAP-067 slice 1: wire notification center VM to shell (Loaded-only; ADR-047).
+        /// </summary>
+        /// <summary>
+        /// GAP-067 slice 2: initial taskbar jump list sync (Loaded-only; ADR-047).
+        /// </summary>
+        private void WireJumpListShell()
+        {
+            try
+            {
+                AppServices.TryGetJumpListService()?.UpdateJumpList();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindow] Jump list shell wire failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// GAP-067 slice 3: associate HWND with taskbar progress (<c>ITaskbarList3</c>) — Loaded-only (ADR-047).
+        /// </summary>
+        private void WireTaskbarProgressShell()
+        {
+            try
+            {
+                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                AppServices.TryGetTaskbarProgressService()?.SetWindowHandle(hwnd);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindow] Taskbar progress shell wire failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// GAP-067 slice 2: consume jump list activation after startup is ready.
+        /// </summary>
+        private void TryDispatchPendingJumpListActivation()
+        {
+            var pending = JumpListActivation.TryConsumePending();
+            if (pending == null)
+            {
+                return;
+            }
+
+            var coordinator = _projectWorkflowCoordinator;
+            if (coordinator == null)
+            {
+                return;
+            }
+
+            var startup = ServiceProvider.GetStartupStateService();
+
+            void Run()
+            {
+                _ = RunJumpListPendingAsync(pending, coordinator);
+            }
+
+            if (startup.IsReady)
+            {
+                Run();
+                return;
+            }
+
+            void Handler(object? s, StartupStateChangedEventArgs e)
+            {
+                if (!startup.IsReady)
+                {
+                    return;
+                }
+
+                startup.StateChanged -= Handler;
+                Run();
+            }
+
+            startup.StateChanged += Handler;
+        }
+
+        private async Task RunJumpListPendingAsync(JumpListPendingAction pending, IProjectWorkflowCoordinator coordinator)
+        {
+            try
+            {
+                switch (pending.Kind)
+                {
+                    case JumpListPendingKind.NewProject:
+                        await coordinator.CreateNewProjectAsync().ConfigureAwait(true);
+                        break;
+                    case JumpListPendingKind.OpenDialog:
+                        await coordinator.OpenProjectAsync().ConfigureAwait(true);
+                        break;
+                    case JumpListPendingKind.OpenProject:
+                        if (!string.IsNullOrWhiteSpace(pending.ProjectPath))
+                        {
+                            var name = System.IO.Path.GetFileNameWithoutExtension(pending.ProjectPath);
+                            await coordinator.OpenRecentProjectAsync(pending.ProjectPath!, name).ConfigureAwait(true);
+                        }
+
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[JumpList] Activation failed: {ex}");
+                ServiceProvider.TryGetToastNotificationService()?.ShowError(ex.Message, "Jump list");
+            }
+        }
+
+        private void WireNotificationCenter()
+        {
+            try
+            {
+                var ncVm = AppServices.GetService<NotificationCenterViewModel>();
+                if (ncVm == null)
+                    return;
+                _notificationCenterViewModel = ncVm;
+                NotificationCenterButton.DataContext = ncVm;
+                NotificationCenterFlyoutRoot.DataContext = ncVm;
+                NotificationCenterList.ItemsSource = ncVm.Notifications;
+                ncVm.PropertyChanged += NotificationCenterViewModel_PropertyChanged;
+                UpdateNotificationCenterBadge();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindow] Notification center wire failed: {ex.Message}");
+            }
+        }
+
+        private void NotificationCenterViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is nameof(NotificationCenterViewModel.UnreadCount)
+                or nameof(NotificationCenterViewModel.HasUnread))
+            {
+                UpdateNotificationCenterBadge();
+            }
+        }
+
+        private void UpdateNotificationCenterBadge()
+        {
+            var vm = _notificationCenterViewModel;
+            if (vm == null)
+                return;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                UnreadBadge.Visibility = vm.HasUnread ? Visibility.Visible : Visibility.Collapsed;
+                UnreadBadgeText.Text = vm.UnreadCount > 99 ? "99+" : vm.UnreadCount.ToString();
+            });
+        }
+
+        private void NotificationCenterMarkAllRead_Click(object sender, RoutedEventArgs e)
+        {
+            if (_notificationCenterViewModel != null)
+                _notificationCenterViewModel.MarkAllReadCommand.Execute(null);
+        }
+
+        private void NotificationCenterDismissItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.DataContext is AppNotificationItem item && _notificationCenterViewModel != null)
+                _notificationCenterViewModel.DismissItemCommand.Execute(item);
+        }
+
         private void Cleanup()
         {
             if (_disposed)
@@ -2300,6 +2467,30 @@ namespace VoiceStudio.App
             _transportShortcutCoordinator = null;
             _statusBarCoordinator?.Unsubscribe();
             _statusBarCoordinator = null;
+
+            try
+            {
+                AppServices.TryGetJumpListService()?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindow] JumpListService dispose: {ex.Message}");
+            }
+
+            try
+            {
+                AppServices.TryGetTaskbarProgressService()?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindow] TaskbarProgressService dispose: {ex.Message}");
+            }
+
+            if (_notificationCenterViewModel != null)
+            {
+                _notificationCenterViewModel.PropertyChanged -= NotificationCenterViewModel_PropertyChanged;
+                _notificationCenterViewModel = null;
+            }
             if (_globalTransport != null)
             {
                 _globalTransport.PlayRequested -= OnPlayRequested;

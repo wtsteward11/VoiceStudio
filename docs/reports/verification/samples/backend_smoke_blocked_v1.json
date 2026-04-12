@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "status": "BLOCKED",
+  "timestamp_utc": "2026-04-11T00:00:00+00:00",
+  "port": null,
+  "cold_start_ms": null,
+  "health_probe_result": false,
+  "engines_ready_value": null,
+  "api_call_result": null,
+  "startup_decision_artifact": null,
+  "blocking_reason": "check_runtime_prerequisites exit 2 (prerequisites not satisfied)",
+  "failure_reason": null,
+  "environment_hints": [
+    "Set VOICESTUDIO_MODELS_PATH if using local models",
+    "Ensure Piper / engine assets per check_runtime_prerequisites.py",
+    "Run: python scripts/ci/check_runtime_prerequisites.py"
+  ]
+}

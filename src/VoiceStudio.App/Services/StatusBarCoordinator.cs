@@ -148,11 +148,22 @@ public sealed class StatusBarCoordinator
         _dispatcherQueue?.TryEnqueue(() =>
         {
             var banner = _findName?.Invoke("DegradedModeBanner") as Microsoft.UI.Xaml.Controls.InfoBar;
-            if (banner == null)
-                return;
-            banner.IsOpen = isDegraded;
-            if (isDegraded && sender is GracefulDegradationService gds)
-                banner.Message = gds.DegradationReason ?? "Backend temporarily unavailable.";
+            if (banner != null)
+            {
+                banner.IsOpen = isDegraded;
+                if (isDegraded && sender is GracefulDegradationService gds)
+                    banner.Message = gds.DegradationReason ?? "Backend temporarily unavailable.";
+            }
+
+            // GAP-067 slice 1: mirror degraded entry into notification center (authoritative store).
+            if (isDegraded && sender is GracefulDegradationService gds2)
+            {
+                AppServices.TryGetNotificationCenterService()?.AddNotification(
+                    type: AppNotificationType.Warning,
+                    message: gds2.DegradationReason ?? "Backend temporarily unavailable.",
+                    title: "Backend Unavailable",
+                    priority: AppNotificationPriority.High);
+            }
         });
     }
 

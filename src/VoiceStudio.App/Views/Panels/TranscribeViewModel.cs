@@ -51,6 +51,7 @@ namespace VoiceStudio.App.Views.Panels
     private readonly UndoRedoService? _undoRedoService;
     private readonly MultiSelectService _multiSelectService;
     private MultiSelectState? _multiSelectState;
+    private readonly IShellProgressPublisher _shellProgress;
 
     public string PanelId => PanelIds.Transcribe;
     public string DisplayName => ResourceHelper.GetString("Panel.Transcribe.DisplayName", "Transcribe");
@@ -203,12 +204,14 @@ namespace VoiceStudio.App.Views.Panels
         IViewModelContext context,
         ITranscriptionClient transcriptionClient,
         IProjectAudioClient projectAudioClient,
-        IProjectRepository? projectRepository = null)
+        IProjectRepository? projectRepository = null,
+        IShellProgressPublisher? shellProgressPublisher = null)
         : base(context)
     {
       _transcriptionClient = transcriptionClient ?? throw new ArgumentNullException(nameof(transcriptionClient));
       _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
       _projectRepository = projectRepository ?? AppServices.TryGetProjectRepository();
+      _shellProgress = shellProgressPublisher ?? NullShellProgressPublisher.Instance;
       _logService = ServiceProvider.TryGetErrorLoggingService();
 
       // Get multi-select service
@@ -952,12 +955,37 @@ namespace VoiceStudio.App.Views.Panels
           entry.JobProgress = report.Progress;
           entry.CurrentStep = report.CurrentStep;
           var op = TranscriptApplyJobStatusMapper.MapToOperator(report.BackendStatus);
+          // Ordering: coordinator completion may enqueue Finalize before an earlier "pending" Apply runs.
+          // Never let stale non-terminal progress clobber a terminal row (fixes flaky tests / UI flicker).
+          if (entry.OperatorStatus is TranscriptApplyOperatorJobStatus.Succeeded
+              or TranscriptApplyOperatorJobStatus.Failed)
+          {
+            if (op is TranscriptApplyOperatorJobStatus.Queued or TranscriptApplyOperatorJobStatus.Running)
+              return;
+          }
+
           entry.OperatorStatus = op;
           entry.StatusMessage = TranscriptApplyJobStatusMapper.BuildStatusMessage(report, op);
           if (op is TranscriptApplyOperatorJobStatus.Succeeded or TranscriptApplyOperatorJobStatus.Failed)
             entry.CompletedUtc = DateTimeOffset.UtcNow;
           else
             entry.CompletedUtc = null;
+
+          switch (op)
+          {
+            case TranscriptApplyOperatorJobStatus.Running:
+              _shellProgress.ReportProgress(operationCorrelationId, report.Progress);
+              break;
+            case TranscriptApplyOperatorJobStatus.Succeeded:
+              _shellProgress.ReportComplete(operationCorrelationId);
+              break;
+            case TranscriptApplyOperatorJobStatus.Failed:
+              _shellProgress.ReportError(operationCorrelationId);
+              break;
+            case TranscriptApplyOperatorJobStatus.Queued:
+            default:
+              break;
+          }
         }
 
         if (!Dispatcher.TryEnqueue(Apply))

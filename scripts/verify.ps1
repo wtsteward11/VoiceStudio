@@ -39,6 +39,8 @@
     - Quick (-Quick): Build, lint, Quick Critical Gates, Security Tests, Gate/Ledger. Skips C#/Python unit tests, contract, integration, UI. Typical duration 3-5 minutes depending on machine.
     - Runtime proof (-RuntimeProof): Standalone only (GAP-015). Runs real-mode golden-loop synthesis + training export honesty CI tests; writes artifacts/verify/{timestamp}/runtime_proof.json (schema v2) and slo_baselines.json (schema v1, advisory SLO samples). Prerequisites: python, pytest, piper engine + consent routes. Forbidden with -Quick.
     - Enforce runtime proof freshness (-EnforceRuntimeProof): Passes --enforce-runtime-proof to Gate/Ledger (run_verification.py) so stale/missing PROOF_GOLDEN_PATH_REAL_*.json fails. Forbidden with -Quick. Does not affect -RuntimeProof standalone.
+    - Backend smoke (-BackendSmoke): Standalone only (GAP-069 slice 3). Runs scripts/ci/run_backend_smoke.py; writes docs/reports/verification/PROOF_BACKEND_SMOKE_*.json (schema v1). Exit 2 (BLOCKED prerequisites) is treated as advisory success for the harness. Forbidden with -Quick.
+    - Enforce backend smoke freshness (-EnforceBackendSmoke): Passes --enforce-backend-smoke to Gate/Ledger so missing/stale/FAIL PROOF_BACKEND_SMOKE_*.json fails; BLOCKED proofs never fail. Forbidden with -Quick.
     
     SIDE EFFECTS: Creates artifacts/verify/{timestamp}/, updates artifacts/verify/latest symlink, prunes runs older than KeepCount (10).
 .PARAMETER Quick
@@ -82,6 +84,8 @@
     .\scripts\verify.ps1 -OnlyStage "C# Unit Tests - ViewModels Seam A-D"
     .\scripts\verify.ps1 -RuntimeProof
     .\scripts\verify.ps1 -EnforceRuntimeProof
+    .\scripts\verify.ps1 -BackendSmoke
+    .\scripts\verify.ps1 -EnforceBackendSmoke
 #>
 [CmdletBinding()]
 param(
@@ -104,6 +108,8 @@ param(
     [switch]$ReleaseCandidate,
     [switch]$RuntimeProof,
     [switch]$EnforceRuntimeProof,
+    [switch]$BackendSmoke,
+    [switch]$EnforceBackendSmoke,
     [ValidateSet("", "Clean Build", "Python Quality", "Quick Critical Gates", "C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other", "Python Unit Tests", "Contract Tests", "Security Tests", "Backend Integration", "UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke", "Gate/Ledger Validation")]
     [string]$OnlyStage = ""
 )
@@ -161,6 +167,18 @@ if ($RuntimeProof -and $OnlyStage) {
 }
 if ($Quick -and $EnforceRuntimeProof) {
     Write-Host "ERROR: -EnforceRuntimeProof cannot be combined with -Quick" -ForegroundColor Red
+    exit 1
+}
+if ($Quick -and $BackendSmoke) {
+    Write-Host "ERROR: -BackendSmoke cannot be combined with -Quick" -ForegroundColor Red
+    exit 1
+}
+if ($BackendSmoke -and $OnlyStage) {
+    Write-Host "ERROR: -BackendSmoke is standalone; do not combine with -OnlyStage" -ForegroundColor Red
+    exit 1
+}
+if ($Quick -and $EnforceBackendSmoke) {
+    Write-Host "ERROR: -EnforceBackendSmoke cannot be combined with -Quick" -ForegroundColor Red
     exit 1
 }
 
@@ -334,6 +352,12 @@ if ($RuntimeProof) {
 }
 if ($EnforceRuntimeProof) {
     $proofLines += "EnforceRuntimeProof: Gate/Ledger uses --enforce-runtime-proof (stale/missing Grade-R proof fails)"
+}
+if ($BackendSmoke) {
+    $proofLines += "BackendSmoke: standalone GAP-069 uvicorn /health + /api/health proof (PROOF_BACKEND_SMOKE_*.json)"
+}
+if ($EnforceBackendSmoke) {
+    $proofLines += "EnforceBackendSmoke: Gate/Ledger uses --enforce-backend-smoke (missing/stale/FAIL smoke proof fails; BLOCKED exempt)"
 }
 $proofLines += "StageTimeouts:"
 foreach ($key in $StageTimeouts.Keys) {
@@ -1031,6 +1055,33 @@ if ($RuntimeProof) {
     Write-Host ""
     Write-Host "RUNTIME PROOF PASSED" -ForegroundColor Green
     Write-Host "  $proofJson" -ForegroundColor Cyan
+    exit 0
+}
+
+# ============================================================================
+# STANDALONE: Backend smoke (GAP-069 slice 3) — uvicorn /health + /api/health
+# ============================================================================
+if ($BackendSmoke) {
+    Write-Host ""
+    Write-Host ("=" * 70) -ForegroundColor Cyan
+    Write-Host "  BACKEND SMOKE (-BackendSmoke)" -ForegroundColor Cyan
+    Write-Host "  scripts/ci/run_backend_smoke.py -> PROOF_BACKEND_SMOKE_*.json under docs/reports/verification/" -ForegroundColor Cyan
+    Write-Host ("=" * 70) -ForegroundColor Cyan
+    Write-Host ""
+
+    $smokeScript = Join-Path $ScriptDir "ci\run_backend_smoke.py"
+    & python $smokeScript
+    $smokeExit = $LASTEXITCODE
+    if ($smokeExit -eq 2) {
+        Write-Host "  [ADVISORY] Backend smoke BLOCKED (prerequisites not satisfied; proof file still written)" -ForegroundColor Yellow
+        exit 0
+    }
+    if ($smokeExit -ne 0) {
+        Write-Host "BACKEND SMOKE FAILED (exit $smokeExit)" -ForegroundColor Red
+        exit $smokeExit
+    }
+    Write-Host ""
+    Write-Host "BACKEND SMOKE PASSED" -ForegroundColor Green
     exit 0
 }
 
@@ -1764,6 +1815,12 @@ $stage9Passed = Invoke-Stage -Name "Gate/Ledger Validation" -Description "Check 
         Write-Host "  Gate/Ledger: runtime_proof_staleness enforce mode ON (GAP-015 slice 2)" -ForegroundColor Cyan
     } else {
         Write-Host "  Gate/Ledger: runtime_proof_staleness advisory (use -EnforceRuntimeProof for hard fail)" -ForegroundColor DarkGray
+    }
+    if ($EnforceBackendSmoke) {
+        $rvArgs += "--enforce-backend-smoke"
+        Write-Host "  Gate/Ledger: backend_smoke_freshness enforce mode ON (GAP-069 slice 3)" -ForegroundColor Cyan
+    } else {
+        Write-Host "  Gate/Ledger: backend_smoke_freshness advisory (use -EnforceBackendSmoke for hard fail)" -ForegroundColor DarkGray
     }
     & python @rvArgs
     return $LASTEXITCODE

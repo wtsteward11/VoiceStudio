@@ -73,6 +73,7 @@ namespace VoiceStudio.App
           Controls.PanelHost? rightPanelHost,
           Controls.PanelHost? bottomPanelHost)
         {
+            ColdStartTimingCollector.RecordPanelsInitStart();
             try
             {
                 var (restored, hadRegions, failedItems) = await RestorePanelsFromLayoutAsync();
@@ -182,6 +183,10 @@ namespace VoiceStudio.App
                 {
                     Debug.WriteLine($"[Startup] Fallback panel open failed: {fallbackEx.Message}");
                 }
+            }
+            finally
+            {
+                ColdStartTimingCollector.RecordPanelsInitEnd();
             }
         }
 

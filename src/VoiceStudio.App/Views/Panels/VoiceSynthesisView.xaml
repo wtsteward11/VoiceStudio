@@ -124,128 +124,152 @@
              ScrollViewer.VerticalScrollBarVisibility="Auto"
              Margin="0,0,0,12"/>
     
-    <!-- Row 3: Voice Controls -->
-    <Border Grid.Row="3" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
-            CornerRadius="{StaticResource VSQ.CornerRadius.Panel}"
-            Padding="12" Margin="0,0,0,8">
-      <StackPanel Spacing="8">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <FontIcon Glyph="&#xE9D9;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}" />
-          <TextBlock Text="Controls" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
-        </StackPanel>
+    <!-- Row 3: Voice Controls (GAP-067 slice 5: primary tuning + Expander for advanced) -->
+    <Grid Grid.Row="3" Margin="0,0,0,8">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <Border Grid.Row="0" Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
+              CornerRadius="{StaticResource VSQ.CornerRadius.Panel}"
+              Padding="12">
+        <StackPanel Spacing="8">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <FontIcon Glyph="&#xE9D9;" FontSize="12" Foreground="{StaticResource VSQ.Accent.CyanBrush}" />
+            <TextBlock Text="Controls" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
+          </StackPanel>
 
-        <!-- Speed -->
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="90" />
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="50" />
-          </Grid.ColumnDefinitions>
-          <TextBlock Grid.Column="0" Text="Speed" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
-          <Slider Grid.Column="1" Minimum="0.5" Maximum="2.0" StepFrequency="0.05"
-                  Value="{x:Bind ViewModel.Speed, Mode=TwoWay}" Height="{StaticResource VSQ.Touch.MinSize}" />
-          <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Speed, Mode=OneWay}" VerticalAlignment="Center" FontSize="12" HorizontalAlignment="Right" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
-        </Grid>
+          <!-- Speed -->
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="90" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="50" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="SpeedLabel" Grid.Column="0" Text="Speed" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+            <Slider Grid.Column="1" Minimum="0.5" Maximum="2.0" StepFrequency="0.05"
+                    AutomationProperties.LabeledBy="{x:Bind SpeedLabel}"
+                    Value="{x:Bind ViewModel.Speed, Mode=TwoWay}" Height="{StaticResource VSQ.Touch.MinSize}" />
+            <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Speed, Mode=OneWay}" VerticalAlignment="Center" FontSize="12" HorizontalAlignment="Right" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
+          </Grid>
 
-        <!-- Pitch -->
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="90" />
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="50" />
-          </Grid.ColumnDefinitions>
-          <TextBlock Grid.Column="0" Text="Pitch Shift" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
-          <Slider Grid.Column="1" Minimum="-12" Maximum="12" StepFrequency="1"
-                  Value="{x:Bind ViewModel.Pitch, Mode=TwoWay}" Height="{StaticResource VSQ.Touch.MinSize}" />
-          <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Pitch, Mode=OneWay}" VerticalAlignment="Center" FontSize="12" HorizontalAlignment="Right" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
-        </Grid>
+          <!-- Pitch -->
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="90" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="50" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="PitchShiftLabel" Grid.Column="0" Text="Pitch Shift" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+            <Slider Grid.Column="1" Minimum="-12" Maximum="12" StepFrequency="1"
+                    AutomationProperties.LabeledBy="{x:Bind PitchShiftLabel}"
+                    Value="{x:Bind ViewModel.Pitch, Mode=TwoWay}" Height="{StaticResource VSQ.Touch.MinSize}" />
+            <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Pitch, Mode=OneWay}" VerticalAlignment="Center" FontSize="12" HorizontalAlignment="Right" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
+          </Grid>
 
-        <!-- Stability -->
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="90" />
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="50" />
-          </Grid.ColumnDefinitions>
-          <TextBlock Grid.Column="0" Text="Stability" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
-          <Slider Grid.Column="1" Minimum="0" Maximum="1" StepFrequency="0.01"
-                  Value="{x:Bind ViewModel.Stability, Mode=TwoWay}" Height="{StaticResource VSQ.Touch.MinSize}" />
-          <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Stability, Mode=OneWay}" VerticalAlignment="Center" FontSize="12" HorizontalAlignment="Right" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
-        </Grid>
-
-        <!-- Clarity -->
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="90" />
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="50" />
-          </Grid.ColumnDefinitions>
-          <TextBlock Grid.Column="0" Text="Clarity" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
-          <Slider Grid.Column="1" Minimum="0" Maximum="1" StepFrequency="0.01"
-                  Value="{x:Bind ViewModel.Clarity, Mode=TwoWay}" Height="{StaticResource VSQ.Touch.MinSize}" />
-          <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Clarity, Mode=OneWay}" VerticalAlignment="Center" FontSize="12" HorizontalAlignment="Right" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
-        </Grid>
-
-        <!-- Temperature -->
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="90" />
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="50" />
-          </Grid.ColumnDefinitions>
-          <TextBlock Grid.Column="0" Text="Temperature" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
-          <Slider Grid.Column="1" Minimum="0" Maximum="1" StepFrequency="0.01"
-                  Value="{x:Bind ViewModel.Temperature, Mode=TwoWay}" Height="{StaticResource VSQ.Touch.MinSize}" />
-          <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Temperature, Mode=OneWay}" VerticalAlignment="Center" FontSize="12" HorizontalAlignment="Right" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
-        </Grid>
-
-        <!-- Options row -->
-        <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,4,0,0">
           <CheckBox Content="Enhance Quality"
                     AutomationProperties.AutomationId="VoiceSynthesisView_EnhanceQualityCheckBox"
                     IsChecked="{x:Bind ViewModel.EnhanceQuality, Mode=TwoWay}" FontSize="11" />
-          <CheckBox Content="Multi-Engine"
-                    AutomationProperties.AutomationId="VoiceSynthesisView_MultiEngineCheckBox"
-                    IsChecked="{x:Bind ViewModel.UseMultiEngineEnsemble, Mode=TwoWay}" FontSize="11" />
-          <CheckBox Content="Auto-Optimize"
-                    AutomationProperties.AutomationId="VoiceSynthesisView_AutoApplyCheckBox"
-                    IsChecked="{x:Bind ViewModel.AutoApplyRecommendations, Mode=TwoWay}"
-                    ToolTipService.ToolTip="Automatically apply quality recommendations" FontSize="11" />
-          <CheckBox Content="Streaming"
-                    AutomationProperties.AutomationId="VoiceSynthesisView_StreamingModeCheckBox"
-                    IsChecked="{x:Bind ViewModel.StreamingMode, Mode=TwoWay}"
-                    ToolTipService.ToolTip="Enable real-time streaming playback" FontSize="11" />
-          <CheckBox Content="Long-form mode"
-                    AutomationProperties.AutomationId="VoiceSynthesisView_LongFormToggle"
-                    IsChecked="{x:Bind ViewModel.UseLongForm, Mode=TwoWay}"
-                    ToolTipService.ToolTip="Split long text into chunks on the server and merge into one file"
-                    FontSize="11" />
         </StackPanel>
+      </Border>
 
-        <TextBlock Margin="0,4,0,0"
-                   FontSize="12"
-                   Opacity="0.85"
-                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
-                   Text="{x:Bind ViewModel.LongFormProgressText, Mode=OneWay}"
-                   AutomationProperties.AutomationId="VoiceSynthesisView_LongFormProgressText"
-                   Visibility="{x:Bind ViewModel.IsLongFormRunning, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
-        
-        <!-- Streaming status (visible when streaming is enabled) -->
-        <Grid Visibility="{x:Bind ViewModel.StreamingMode, Mode=OneWay}" Margin="0,8,0,0">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
-          </Grid.ColumnDefinitions>
-          <FontIcon Grid.Column="0" Glyph="&#xE93E;" FontSize="12" Foreground="{StaticResource VSQ.Accent.MagentaBrush}" 
-                    Visibility="{x:Bind ViewModel.IsStreaming, Mode=OneWay}" Margin="0,0,8,0"/>
-          <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StreamingStatus, Mode=OneWay}" 
-                     FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" VerticalAlignment="Center"/>
-          <TextBlock Grid.Column="2" FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" VerticalAlignment="Center"
-                     Text="{x:Bind ViewModel.StreamingChunksSummary, Mode=OneWay}"/>
-        </Grid>
-      </StackPanel>
-    </Border>
+      <Expander Grid.Row="1"
+                IsExpanded="{x:Bind ViewModel.IsAdvancedSynthesisControlsExpanded, Mode=TwoWay}"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch"
+                AutomationProperties.AutomationId="VoiceSynthesisView_AdvancedControlsExpander"
+                AutomationProperties.Name="Advanced synthesis controls">
+        <Expander.Header>
+          <TextBlock Text="Advanced synthesis controls" FontWeight="SemiBold" />
+        </Expander.Header>
+        <StackPanel Spacing="8" Padding="0,4,0,0">
+          <!-- Stability -->
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="90" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="50" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="StabilityLabel" Grid.Column="0" Text="Stability" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+            <Slider Grid.Column="1" Minimum="0" Maximum="1" StepFrequency="0.01"
+                    AutomationProperties.LabeledBy="{x:Bind StabilityLabel}"
+                    Value="{x:Bind ViewModel.Stability, Mode=TwoWay}" Height="{StaticResource VSQ.Touch.MinSize}" />
+            <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Stability, Mode=OneWay}" VerticalAlignment="Center" FontSize="12" HorizontalAlignment="Right" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
+          </Grid>
+
+          <!-- Clarity -->
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="90" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="50" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="ClarityLabel" Grid.Column="0" Text="Clarity" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+            <Slider Grid.Column="1" Minimum="0" Maximum="1" StepFrequency="0.01"
+                    AutomationProperties.LabeledBy="{x:Bind ClarityLabel}"
+                    Value="{x:Bind ViewModel.Clarity, Mode=TwoWay}" Height="{StaticResource VSQ.Touch.MinSize}" />
+            <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Clarity, Mode=OneWay}" VerticalAlignment="Center" FontSize="12" HorizontalAlignment="Right" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
+          </Grid>
+
+          <!-- Temperature -->
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="90" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="50" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="TemperatureLabel" Grid.Column="0" Text="Temperature" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+            <Slider Grid.Column="1" Minimum="0" Maximum="1" StepFrequency="0.01"
+                    AutomationProperties.LabeledBy="{x:Bind TemperatureLabel}"
+                    Value="{x:Bind ViewModel.Temperature, Mode=TwoWay}" Height="{StaticResource VSQ.Touch.MinSize}" />
+            <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.Temperature, Mode=OneWay}" VerticalAlignment="Center" FontSize="12" HorizontalAlignment="Right" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
+          </Grid>
+
+          <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,4,0,0">
+            <CheckBox Content="Multi-Engine"
+                      AutomationProperties.AutomationId="VoiceSynthesisView_MultiEngineCheckBox"
+                      IsChecked="{x:Bind ViewModel.UseMultiEngineEnsemble, Mode=TwoWay}" FontSize="11" />
+            <CheckBox Content="Auto-Optimize"
+                      AutomationProperties.AutomationId="VoiceSynthesisView_AutoApplyCheckBox"
+                      IsChecked="{x:Bind ViewModel.AutoApplyRecommendations, Mode=TwoWay}"
+                      ToolTipService.ToolTip="Automatically apply quality recommendations" FontSize="11" />
+            <CheckBox Content="Streaming"
+                      AutomationProperties.AutomationId="VoiceSynthesisView_StreamingModeCheckBox"
+                      IsChecked="{x:Bind ViewModel.StreamingMode, Mode=TwoWay}"
+                      ToolTipService.ToolTip="Enable real-time streaming playback" FontSize="11" />
+            <CheckBox Content="Long-form mode"
+                      AutomationProperties.AutomationId="VoiceSynthesisView_LongFormToggle"
+                      IsChecked="{x:Bind ViewModel.UseLongForm, Mode=TwoWay}"
+                      ToolTipService.ToolTip="Split long text into chunks on the server and merge into one file"
+                      FontSize="11" />
+          </StackPanel>
+
+          <Grid Visibility="{x:Bind ViewModel.StreamingMode, Mode=OneWay}" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <FontIcon Grid.Column="0" Glyph="&#xE93E;" FontSize="12" Foreground="{StaticResource VSQ.Accent.MagentaBrush}"
+                      Visibility="{x:Bind ViewModel.IsStreaming, Mode=OneWay}" Margin="0,0,8,0"/>
+            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StreamingStatus, Mode=OneWay}"
+                       FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="2" FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" VerticalAlignment="Center"
+                       Text="{x:Bind ViewModel.StreamingChunksSummary, Mode=OneWay}"/>
+          </Grid>
+        </StackPanel>
+      </Expander>
+
+      <TextBlock Grid.Row="2"
+                 Margin="0,8,0,0"
+                 FontSize="12"
+                 Opacity="0.85"
+                 Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                 Text="{x:Bind ViewModel.LongFormProgressText, Mode=OneWay}"
+                 AutomationProperties.AutomationId="VoiceSynthesisView_LongFormProgressText"
+                 Visibility="{x:Bind ViewModel.IsLongFormRunning, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+    </Grid>
     
     <!-- Row 4: Actions -->
     <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">

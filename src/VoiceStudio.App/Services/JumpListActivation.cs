@@ -51,6 +51,17 @@ public static class JumpListActivation
   }
 
   /// <summary>
+  /// Returns whether a pending jump list action is queued (read-only). Used so file association does not override jump list argv.
+  /// </summary>
+  public static bool HasPending()
+  {
+    lock (Gate)
+    {
+      return _pending != null;
+    }
+  }
+
+  /// <summary>
   /// Returns and clears the pending action, if any.
   /// </summary>
   public static JumpListPendingAction? TryConsumePending()

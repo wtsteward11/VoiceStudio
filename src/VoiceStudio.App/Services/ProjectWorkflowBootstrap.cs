@@ -28,6 +28,7 @@ public static class ProjectWorkflowBootstrap
     /// <param name="startup">Startup state service (required).</param>
     /// <param name="backend">Backend client for project loading (required).</param>
     /// <param name="projectsClient">Projects transport facade for save (required).</param>
+    /// <param name="projectRepository">Local project file repository (required for shell file activation).</param>
     /// <param name="recentProjects">Recent projects service (optional).</param>
     /// <param name="toast">Toast notification service (optional; may be null at init).</param>
     /// <param name="logger">Logger for workflow failures (optional).</param>
@@ -42,6 +43,7 @@ public static class ProjectWorkflowBootstrap
         IStartupStateService startup,
         IBackendClient backend,
         IProjectsClient projectsClient,
+        IProjectRepository projectRepository,
         RecentProjectsService? recentProjects = null,
         IToastNotificationService? toast = null,
         ILogger<ProjectWorkflowCoordinator>? logger = null,
@@ -62,12 +64,14 @@ public static class ProjectWorkflowBootstrap
             throw new ArgumentNullException(nameof(backend));
         if (projectsClient == null)
             throw new ArgumentNullException(nameof(projectsClient));
+        if (projectRepository == null)
+            throw new ArgumentNullException(nameof(projectRepository));
 
         return new ProjectWorkflowCoordinator(
             startup,
             shellNav,
             new TimelineProjectCreateHandler(getTimeline),
-            new TimelineProjectOpenHandler(getTimeline, backend, sessionDirty),
+            new TimelineProjectOpenHandler(getTimeline, backend, projectRepository, sessionDirty, recentProjects),
             new UnifiedProjectSaveHandler(getTimeline, getMixer, projectsClient, sessionDirty, crashRecovery),
             setActiveNavButton,
             recentProjects,

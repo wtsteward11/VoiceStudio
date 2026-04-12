@@ -32,6 +32,7 @@ namespace VoiceStudio.App
     {
       this.UnhandledException += App_UnhandledException;
       _appStartTime = DateTime.UtcNow;
+      ColdStartTimingCollector.SetAppStartUtc(_appStartTime);
       _startupProfiler = PerformanceProfiler.Start("Application Startup");
       _startupProfiler.Checkpoint("App Constructor Start");
 
@@ -172,6 +173,18 @@ namespace VoiceStudio.App
         catch (Exception ex)
         {
           Debug.WriteLine($"[JumpList] Activation parse failed: {ex.Message}");
+        }
+
+        if (!JumpListActivation.HasPending())
+        {
+          try
+          {
+            FileActivation.SetPendingIfParsed(args.Arguments, Environment.GetCommandLineArgs());
+          }
+          catch (Exception ex)
+          {
+            Debug.WriteLine($"[FileActivation] Parse failed: {ex.Message}");
+          }
         }
       }
 
@@ -568,6 +581,7 @@ namespace VoiceStudio.App
       {
         _ = Task.Run(async () =>
         {
+          ColdStartTimingCollector.RecordDeferredInitStart();
           try
           {
             // Small delay to let the window fully render
@@ -581,6 +595,10 @@ namespace VoiceStudio.App
           {
             Debug.WriteLine($"[App] Deferred initialization error: {ex.Message}");
             ErrorLogger.LogWarning($"Deferred initialization failed: {ex.Message}", "App.DeferredInit");
+          }
+          finally
+          {
+            ColdStartTimingCollector.RecordDeferredInitEnd();
           }
         });
       }
@@ -612,6 +630,7 @@ namespace VoiceStudio.App
       // Log startup performance
       if (_startupProfiler != null)
       {
+        ColdStartTimingCollector.CaptureApplicationStartupCheckpoints(_startupProfiler, _appStartTime);
         var totalTime = _startupProfiler.ElapsedMilliseconds;
         AppServices.AppStartupMs = totalTime;
         Debug.WriteLine(_startupProfiler.GetReport());
@@ -1063,6 +1082,7 @@ namespace VoiceStudio.App
       startupState.SetBackendStarting();
       backendManager.BackendStarted += OnBackendStarted;
       backendManager.BackendStartFailed += OnBackendStartFailed;
+      ColdStartTimingCollector.RecordWallClockMarker("backend_start_ms");
       _ = Task.Run(async () =>
       {
         try
@@ -1088,6 +1108,7 @@ namespace VoiceStudio.App
 
     private static void OnBackendStarted(object? sender, EventArgs e)
     {
+      ColdStartTimingCollector.RecordWallClockMarker("backend_ready_ms");
       if (sender is BackendProcessManager mgr)
       {
         mgr.BackendStarted -= OnBackendStarted;

@@ -53,6 +53,11 @@ namespace VoiceStudio.Core.Services
     Task<Project?> OpenAsync(string projectId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// GAP-067 slice 4: load project JSON from an absolute file path (shell .voiceproj association).
+    /// </summary>
+    Task<Project?> OpenProjectFileAsync(string absolutePath, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// GAP-045: persist last Timeline subtitle overlay transcription id for a project (local JSON).
     /// </summary>
     Task SaveLastSubtitleTranscriptionIdAsync(string projectId, string? transcriptionId, CancellationToken cancellationToken = default);

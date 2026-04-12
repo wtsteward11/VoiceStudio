@@ -195,6 +195,48 @@ namespace VoiceStudio.App.Services
         => GetByIdAsync(projectId, cancellationToken);
 
     /// <inheritdoc />
+    public async Task<Project?> OpenProjectFileAsync(string absolutePath, CancellationToken cancellationToken = default)
+    {
+      if (string.IsNullOrWhiteSpace(absolutePath))
+        return null;
+
+      string full;
+      try
+      {
+        full = Path.GetFullPath(absolutePath);
+      }
+      catch (Exception)
+      {
+        return null;
+      }
+
+      if (!File.Exists(full))
+        return null;
+
+      var ext = Path.GetExtension(full);
+      if (!ext.Equals(".voiceproj", StringComparison.OrdinalIgnoreCase)
+          && !ext.Equals(".json", StringComparison.OrdinalIgnoreCase))
+      {
+        return null;
+      }
+
+      await _lock.WaitAsync(cancellationToken);
+      try
+      {
+        var json = await File.ReadAllTextAsync(full, cancellationToken);
+        var project = JsonSerializer.Deserialize<Project>(json, _jsonOptions);
+        if (project == null)
+          return null;
+        EnsureReadableSchemaVersion(project);
+        return project;
+      }
+      finally
+      {
+        _lock.Release();
+      }
+    }
+
+    /// <inheritdoc />
     public async Task SaveLastSubtitleTranscriptionIdAsync(string projectId, string? transcriptionId, CancellationToken cancellationToken = default)
     {
       if (string.IsNullOrEmpty(projectId))

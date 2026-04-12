@@ -49,13 +49,31 @@
                 <FontIcon Glyph="&#xE7A6;" FontSize="16" FontFamily="Segoe Fluent Icons" />
             </Button>
         </StackPanel>
-        <!-- Performance Section -->
-        <StackPanel x:Name="PerformanceSection" Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="12">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-                <TextBlock Text="MOUT" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" VerticalAlignment="Center" />
-                <ProgressBar x:Name="PerfCpuBar" Value="12" Width="40" Height="4" VerticalAlignment="Center" />
-            </StackPanel>
-            <TextBlock x:Name="PerfLatency" Text="96 ms" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" VerticalAlignment="Center" />
-        </StackPanel>
+        <!-- Performance Section (GAP-067 slice 5: overflow flyout to reduce idle chrome density) -->
+        <Grid Grid.Column="3" HorizontalAlignment="Right" VerticalAlignment="Center">
+            <Button x:Name="ToolbarPerformanceOverflowButton"
+                ToolTipService.ToolTip="Toolbar performance metrics"
+                AutomationProperties.AutomationId="CustomizableToolbar_PerformanceOverflowButton"
+                AutomationProperties.Name="Performance metrics"
+                Padding="6,4"
+                Background="Transparent"
+                BorderThickness="0">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE9D9;" FontSize="14" FontFamily="Segoe Fluent Icons" />
+                    <TextBlock Text="Perf" FontSize="11" VerticalAlignment="Center"
+                        Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                </StackPanel>
+                <Button.Flyout>
+                    <Flyout AutomationProperties.AutomationId="CustomizableToolbar_PerformanceFlyout">
+                        <StackPanel Orientation="Vertical" MinWidth="200" Spacing="8" Padding="4">
+                            <TextBlock Text="Toolbar performance" FontWeight="SemiBold" FontSize="12" />
+                            <ScrollViewer MaxHeight="280">
+                                <StackPanel x:Name="PerformanceSection" Orientation="Vertical" Spacing="8" />
+                            </ScrollViewer>
+                        </StackPanel>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+        </Grid>
     </Grid>
 </UserControl>

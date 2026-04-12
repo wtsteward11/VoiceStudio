@@ -34,6 +34,8 @@ namespace VoiceStudio.App.Tests.Services
             _mockShellNav = new Mock<IShellNavigationCoordinator>();
             _mockCreateHandler = new Mock<IProjectCreateHandler>();
             _mockOpenHandler = new Mock<IProjectOpenHandler>();
+            _mockOpenHandler.Setup(x => x.OpenProjectByPathAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
             _mockSaveHandler = new Mock<IProjectSaveHandler>();
             _recents = new RecentProjectsService();
             _lastSetActiveNavButton = null;

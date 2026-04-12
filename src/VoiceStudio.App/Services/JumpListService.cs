@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using VoiceStudio.App.Interop;
 
@@ -75,14 +76,43 @@ public sealed class JumpListService : IDisposable
   /// <summary>
   /// Enqueues a full jump list rebuild (initial load, manual refresh).
   /// </summary>
-  public void UpdateJumpList()
+  public void UpdateJumpList(Microsoft.UI.Dispatching.DispatcherQueuePriority priority = Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal)
   {
     if (_disposed)
     {
       return;
     }
 
-    _dispatcherQueue.TryEnqueue(RebuildCore);
+    _dispatcherQueue.TryEnqueue(priority, RebuildCore);
+  }
+
+  /// <summary>
+  /// GAP-067 slice 7: defer first COM-heavy rebuild until after first paint (delay + low dispatcher priority).
+  /// </summary>
+  public void ScheduleInitialRebuildAfterDelay(int delayMilliseconds = 200)
+  {
+    if (_disposed)
+    {
+      return;
+    }
+
+    _ = Task.Run(async () =>
+    {
+      try
+      {
+        await Task.Delay(delayMilliseconds).ConfigureAwait(false);
+        if (_disposed)
+        {
+          return;
+        }
+
+        _dispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, RebuildCore);
+      }
+      catch (Exception ex)
+      {
+        Debug.WriteLine($"[JumpList] ScheduleInitialRebuildAfterDelay: {ex.Message}");
+      }
+    });
   }
 
   private void RebuildCore()

@@ -93,6 +93,11 @@ Every panel MUST have a root AutomationId on its outermost container:
 | `StatusBar_JobStatusText` | TextBlock | Job status | v1.0.0 |
 | `StatusBar_JobProgressBar` | ProgressBar | Job progress | v1.0.0 |
 | `StatusBar_CurrentMedia` | TextBlock | Current media info | v1.0.0 |
+| `MainWindow_StatusBar_SystemMetricsButton` | Button | System metrics flyout (CPU/GPU/RAM, format, latency, collaborators) — GAP-067 slice 5 | v1.2.0 |
+| `MainWindow_StatusBar_SystemMetricsFlyout` | Flyout | System metrics flyout surface | v1.2.0 |
+| `MainWindow_StatusBar_CollaboratorsButton` | Button | Collaborators toggle inside system metrics flyout — GAP-067 slice 6 | v1.2.0 |
+| `CustomizableToolbar_PerformanceOverflowButton` | Button | Toolbar performance metrics flyout — GAP-067 slice 5 | v1.2.0 |
+| `CustomizableToolbar_PerformanceFlyout` | Flyout | Dynamic toolbar performance items | v1.2.0 |
 | `KeyboardCustomization_SearchBox` | AutoSuggestBox | Shortcut customization search (GAP-065) | v1.2.0 |
 | `KeyboardCustomization_ShortcutList` | ListView | Shortcut list for rebinding (GAP-065) | v1.2.0 |
 | `KeyboardCustomization_ResetAllButton` | Button | Reset all shortcuts to defaults (GAP-065) | v1.2.0 |
@@ -160,6 +165,7 @@ Primary voice synthesis interface.
 | `VoiceSynthesisView_ErrorInfoBar` | InfoBar | Error display | v1.0.0 |
 | `VoiceSynthesisView_LongFormToggle` | CheckBox | Long-form (chunked) synthesis mode | v1.2.0 |
 | `VoiceSynthesisView_LongFormProgressText` | TextBlock | Long-form processing status | v1.2.0 |
+| `VoiceSynthesisView_AdvancedControlsExpander` | Expander | Advanced synthesis sliders + mode toggles — GAP-067 slice 5 | v1.2.0 |
 
 #### SpeechToSpeechView
 Batch speech-to-speech conversion (RVC) — GAP-051.
@@ -268,6 +274,22 @@ Audio analysis tools.
 | `Analyzer_AudioIdTextBox` | TextBox | Audio ID input | v1.0.0 |
 | `Analyzer_LoadButton` | Button | Load audio | v1.0.0 |
 
+#### TimelineView
+Main timeline / arrangement surface.
+
+| AutomationId | Control Type | Purpose | Stable Since |
+|--------------|--------------|---------|--------------|
+| `TimelineView_Root` | Grid | Panel root container | v1.0.0 |
+| `TimelineView_TransportMoreButton` | Button | More transport flyout (record, loop, zoom) — GAP-067 slice 5 | v1.2.0 |
+| `TimelineView_TransportMoreFlyout` | Flyout | Transport overflow content | v1.2.0 |
+| `TimelineView_AddTrackButton` | Button | Add track (primary transport) — GAP-067 slice 5 | v1.2.0 |
+| `TimelineView_PlayButton` | Button | Play transport button — GAP-067 slice 6 | v1.2.0 |
+| `TimelineView_StopButton` | Button | Stop transport button — GAP-067 slice 6 | v1.2.0 |
+| `TimelineView_OpenRecordingButton` | Button | Open Recording inside transport flyout — GAP-067 slice 6 | v1.2.0 |
+| `TimelineView_LoopToggle` | ToggleSwitch | Loop playback inside transport flyout — GAP-067 slice 6 | v1.2.0 |
+| `TimelineView_ZoomInButton` | Button | Zoom in inside transport flyout — GAP-067 slice 6 | v1.2.0 |
+| `TimelineView_ZoomOutButton` | Button | Zoom out inside transport flyout — GAP-067 slice 6 | v1.2.0 |
+
 #### MiniTimelineView
 Compact playback timeline.
 
@@ -322,6 +344,7 @@ Every panel has a `_Root` AutomationId for test navigation:
 | TranscribeView (GOV-EDIT-APPLY-JOB-STATUS: apply/regenerate job status list) | `TranscribeView_ApplyJobStatusList` |
 | TranscribeView (GOV-VOICESTUDIO-EDIT-APPLY-RETRY-RECOVERY-01: retry failed job row) | `TranscribeView_ApplyJobRetryButton` |
 | TranscribeView (GOV-EDIT-APPLY-JOB-STATUS: clear job status rows) | `TranscribeView_ClearApplyJobStatusButton` |
+| TranscribeView (GAP-067 slice 5 advanced options) | `TranscribeView_AdvancedOptionsExpander` |
 | LibraryView (import vs drag-drop scope footnote, Pass 01 slice 2) | `LibraryView_ImportDragDropScopeFootnote` |
 | TrainingView (surface maturity footnote, Pass 01 slice 3) | `TrainingView_SurfaceMaturityFootnote` |
 | QualityBenchmarkView (surface maturity footnote, Pass 01 slice 4) | `QualityBenchmarkView_SurfaceMaturityFootnote` |

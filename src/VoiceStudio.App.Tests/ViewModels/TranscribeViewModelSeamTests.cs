@@ -88,6 +88,15 @@ namespace VoiceStudio.App.Tests.ViewModels
     }
 
     [TestMethod]
+    public void AdvancedTranscribeOptionsExpanded_TogglesForDisclosureState()
+    {
+      var vm = CreateSut();
+      Assert.IsFalse(vm.IsAdvancedTranscribeOptionsExpanded);
+      vm.IsAdvancedTranscribeOptionsExpanded = true;
+      Assert.IsTrue(vm.IsAdvancedTranscribeOptionsExpanded);
+    }
+
+    [TestMethod]
     public void Constructor_WithITranscriptionClient_CreatesInstance()
     {
       var vm = CreateSut();

@@ -84,6 +84,10 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private bool useVad;
 
+    /// <summary>GAP-067 slice 5: progressive disclosure for optional project scope and STT toggles.</summary>
+    [ObservableProperty]
+    private bool isAdvancedTranscribeOptionsExpanded;
+
     [ObservableProperty]
     private bool isLoading;
 

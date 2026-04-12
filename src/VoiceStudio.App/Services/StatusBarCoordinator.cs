@@ -52,9 +52,8 @@ public sealed class StatusBarCoordinator
 
         _contextManager.TransportContextChanged += OnTransportContextChanged;
 
-        if (AppServices.TryGetErrorPresentationService() is ErrorPresentationService eps)
+        if (AppServices.TryGetErrorPresentationService() is not null)
         {
-            eps.StartBackendMonitoring();
             ErrorPresentationService.BackendReachabilityChanged += OnBackendReachabilityChanged;
         }
 
@@ -69,6 +68,23 @@ public sealed class StatusBarCoordinator
 
         UpdateCurrentMedia(_contextManager);
         _subscribed = true;
+    }
+
+    /// <summary>
+    /// GAP-067 slice 7: starts <see cref="ErrorPresentationService.StartBackendMonitoring"/> after shell is visible (post-T1).
+    /// Call from MainWindow Loaded after first paint.
+    /// </summary>
+    public void StartBackendHealthMonitoring()
+    {
+        if (!_subscribed)
+        {
+            return;
+        }
+
+        if (AppServices.TryGetErrorPresentationService() is ErrorPresentationService eps)
+        {
+            eps.StartBackendMonitoring();
+        }
     }
 
     /// <summary>

@@ -284,20 +284,51 @@
             AutomationProperties.AutomationId="StatusBar_JobProgressBar" />
         </StackPanel>
         <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Right"
-          VerticalAlignment="Center" Spacing="4">
-          <TextBlock x:Name="CpuText" Text="CPU 0%" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
-          <TextBlock x:Name="GpuText" Text="GPU 0%" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
-          <TextBlock x:Name="RamText" Text="RAM 0%" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
-          <Rectangle Width="1" Height="12" Fill="{StaticResource VSQ.Panel.BorderBrush}" Margin="4,0" />
-          <TextBlock x:Name="SampleRateText" Text="48 kHz" FontSize="10" Foreground="{StaticResource VSQ.Accent.CyanBrush}" />
-          <TextBlock x:Name="LatencyText" Text="--ms" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
-          <Rectangle Width="1" Height="12" Fill="{StaticResource VSQ.Panel.BorderBrush}" Margin="4,0" />
-          <Button x:Name="CollaboratorsToggleButton" ToolTipService.ToolTip="Show Collaborators"
-            Click="CollaboratorsToggleButton_Click" Padding="2" Background="Transparent" BorderThickness="0">
-            <FontIcon Glyph="&#xE716;" FontSize="12" FontFamily="Segoe Fluent Icons" />
+          VerticalAlignment="Center" Spacing="8">
+          <Button x:Name="StatusBar_SystemMetricsButton"
+            ToolTipService.ToolTip="System metrics (CPU, GPU, RAM, format, latency, collaborators)"
+            AutomationProperties.AutomationId="MainWindow_StatusBar_SystemMetricsButton"
+            AutomationProperties.Name="System metrics"
+            Padding="4,2"
+            Background="Transparent"
+            BorderThickness="0">
+            <FontIcon Glyph="&#xE9D9;" FontSize="14" FontFamily="Segoe Fluent Icons" />
+            <Button.Flyout>
+              <Flyout Placement="TopEdgeAlignedRight"
+                AutomationProperties.AutomationId="MainWindow_StatusBar_SystemMetricsFlyout">
+                <StackPanel Padding="8" Spacing="8" MinWidth="260">
+                  <TextBlock Text="System metrics" FontWeight="SemiBold" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock x:Name="CpuText" Text="CPU 0%" FontSize="10"
+                      Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                    <TextBlock x:Name="GpuText" Text="GPU 0%" FontSize="10"
+                      Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                    <TextBlock x:Name="RamText" Text="RAM 0%" FontSize="10"
+                      Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock x:Name="SampleRateText" Text="48 kHz" FontSize="10"
+                      Foreground="{StaticResource VSQ.Accent.CyanBrush}" />
+                    <TextBlock x:Name="LatencyText" Text="--ms" FontSize="10"
+                      Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+                  </StackPanel>
+                  <Button x:Name="CollaboratorsToggleButton" HorizontalAlignment="Left"
+                    ToolTipService.ToolTip="Show Collaborators"
+                    AutomationProperties.AutomationId="MainWindow_StatusBar_CollaboratorsButton"
+                    AutomationProperties.Name="Collaborators"
+                    Click="CollaboratorsToggleButton_Click" Padding="4" Background="Transparent"
+                    BorderThickness="0">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <FontIcon Glyph="&#xE716;" FontSize="12" FontFamily="Segoe Fluent Icons" />
+                      <TextBlock Text="Collaborators" FontSize="11" />
+                    </StackPanel>
+                  </Button>
+                </StackPanel>
+              </Flyout>
+            </Button.Flyout>
           </Button>
-          <Rectangle Width="1" Height="12" Fill="{StaticResource VSQ.Panel.BorderBrush}" Margin="4,0" />
-          <TextBlock x:Name="ClockText" Text="00:00" FontSize="10" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
+          <TextBlock x:Name="ClockText" Text="00:00" FontSize="10"
+            Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
         </StackPanel>
       </Grid>
     </Border>

@@ -59,26 +59,10 @@
                 BorderBrush="{StaticResource VSQ.Panel.Background.HeaderBrush}"
                 BorderThickness="0,0,0,1">
             <StackPanel Spacing="12">
-                <!-- Audio ID and Project ID inputs -->
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <TextBox Grid.Column="0"
-                             AutomationProperties.AutomationId="TranscribeView_AudioIdInput"
-                             Header="Audio ID"
-                             PlaceholderText="Enter audio ID to transcribe"
-                             Text="{x:Bind ViewModel.SelectedAudioId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                    <TextBox Grid.Column="2"
-                             AutomationProperties.AutomationId="TranscribeView_ProjectIdInput"
-                             Header="Project ID (optional)"
-                             PlaceholderText="Enter project ID"
-                             Text="{x:Bind ViewModel.SelectedProjectId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                </Grid>
+                <TextBox AutomationProperties.AutomationId="TranscribeView_AudioIdInput"
+                         Header="Audio ID"
+                         PlaceholderText="Enter audio ID to transcribe"
+                         Text="{x:Bind ViewModel.SelectedAudioId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                 <!-- Engine and Language selection -->
                 <Grid>
@@ -119,40 +103,55 @@
                             MinWidth="120" />
                 </Grid>
 
-                <!-- Options toggles -->
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="24" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="24" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                <Expander IsExpanded="{x:Bind ViewModel.IsAdvancedTranscribeOptionsExpanded, Mode=TwoWay}"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Stretch"
+                          AutomationProperties.AutomationId="TranscribeView_AdvancedOptionsExpander"
+                          AutomationProperties.Name="Advanced transcription options">
+                    <Expander.Header>
+                        <TextBlock Text="Advanced transcription options" FontWeight="SemiBold" />
+                    </Expander.Header>
+                    <StackPanel Spacing="12" Padding="0,4,0,0">
+                        <TextBox AutomationProperties.AutomationId="TranscribeView_ProjectIdInput"
+                                 Header="Project ID (optional)"
+                                 PlaceholderText="Enter project ID"
+                                 Text="{x:Bind ViewModel.SelectedProjectId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <ToggleSwitch Grid.Column="0"
-                                  AutomationProperties.AutomationId="TranscribeView_WordTimestampsToggle"
-                                  Header="Word Timestamps"
-                                  IsOn="{x:Bind ViewModel.WordTimestamps, Mode=TwoWay}"
-                                  OffContent="Off"
-                                  OnContent="On" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
 
-                    <ToggleSwitch Grid.Column="2"
-                                  AutomationProperties.AutomationId="TranscribeView_DiarizationToggle"
-                                  Header="Diarization"
-                                  IsOn="{x:Bind ViewModel.Diarization, Mode=TwoWay}"
-                                  OffContent="Off"
-                                  OnContent="On"
-                                  ToolTipService.ToolTip="Speaker diarization - identifies different speakers (requires WhisperX engine)" />
+                            <ToggleSwitch Grid.Column="0"
+                                          AutomationProperties.AutomationId="TranscribeView_WordTimestampsToggle"
+                                          Header="Word Timestamps"
+                                          IsOn="{x:Bind ViewModel.WordTimestamps, Mode=TwoWay}"
+                                          OffContent="Off"
+                                          OnContent="On" />
 
-                    <ToggleSwitch Grid.Column="4"
-                                  AutomationProperties.AutomationId="TranscribeView_VadToggle"
-                                  Header="Voice Activity Detection"
-                                  IsOn="{x:Bind ViewModel.UseVad, Mode=TwoWay}"
-                                  OffContent="Off"
-                                  OnContent="On"
-                                  ToolTipService.ToolTip="Improves accuracy by detecting voice segments before transcription" />
-                </Grid>
+                            <ToggleSwitch Grid.Column="2"
+                                          AutomationProperties.AutomationId="TranscribeView_DiarizationToggle"
+                                          Header="Diarization"
+                                          IsOn="{x:Bind ViewModel.Diarization, Mode=TwoWay}"
+                                          OffContent="Off"
+                                          OnContent="On"
+                                          ToolTipService.ToolTip="Speaker diarization - identifies different speakers (requires WhisperX engine)" />
+
+                            <ToggleSwitch Grid.Column="4"
+                                          AutomationProperties.AutomationId="TranscribeView_VadToggle"
+                                          Header="Voice Activity Detection"
+                                          IsOn="{x:Bind ViewModel.UseVad, Mode=TwoWay}"
+                                          OffContent="Off"
+                                          OnContent="On"
+                                          ToolTipService.ToolTip="Improves accuracy by detecting voice segments before transcription" />
+                        </Grid>
+                    </StackPanel>
+                </Expander>
 
                 <InfoBar
                     AutomationProperties.AutomationId="TranscribeView_TranscriptTruthInfoBar"

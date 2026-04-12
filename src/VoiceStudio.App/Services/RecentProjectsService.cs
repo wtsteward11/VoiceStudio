@@ -20,16 +20,32 @@ namespace VoiceStudio.App.Services
     private const int MaxPinnedProjects = 3;
     private readonly List<RecentProject> _recentProjects = new();
     private readonly List<RecentProject> _pinnedProjects = new();
+    private readonly object _loadSync = new();
+    private bool _recentDataLoaded;
 
     /// <summary>
     /// Gets the list of recent projects (excluding pinned).
     /// </summary>
-    public IReadOnlyList<RecentProject> RecentProjects => _recentProjects.AsReadOnly();
+    public IReadOnlyList<RecentProject> RecentProjects
+    {
+      get
+      {
+        EnsureRecentDataLoaded();
+        return _recentProjects.AsReadOnly();
+      }
+    }
 
     /// <summary>
     /// Gets the list of pinned projects.
     /// </summary>
-    public IReadOnlyList<RecentProject> PinnedProjects => _pinnedProjects.AsReadOnly();
+    public IReadOnlyList<RecentProject> PinnedProjects
+    {
+      get
+      {
+        EnsureRecentDataLoaded();
+        return _pinnedProjects.AsReadOnly();
+      }
+    }
 
     /// <summary>
     /// Gets all projects (pinned first, then recent).
@@ -38,15 +54,47 @@ namespace VoiceStudio.App.Services
     {
       get
       {
+        EnsureRecentDataLoaded();
         var all = new List<RecentProject>(_pinnedProjects);
         all.AddRange(_recentProjects);
         return all.AsReadOnly();
       }
     }
 
+    /// <summary>
+    /// GAP-067 slice 7: loads persisted recents on first access (not in ctor) to keep shell ctor off the critical path.
+    /// </summary>
+    /// <summary>True after first successful load attempt (including empty file).</summary>
+    public bool IsRecentDataLoaded
+    {
+      get
+      {
+        lock (_loadSync)
+        {
+          return _recentDataLoaded;
+        }
+      }
+    }
+
+    public void EnsureRecentDataLoaded()
+    {
+      lock (_loadSync)
+      {
+        if (_recentDataLoaded)
+        {
+          return;
+        }
+
+        LoadRecentProjectsCore();
+        _recentDataLoaded = true;
+        OnPropertyChanged(nameof(RecentProjects));
+        OnPropertyChanged(nameof(PinnedProjects));
+        OnPropertyChanged(nameof(AllProjects));
+      }
+    }
+
     public RecentProjectsService()
     {
-      LoadRecentProjects();
     }
 
     /// <summary>
@@ -56,6 +104,8 @@ namespace VoiceStudio.App.Services
     {
       if (string.IsNullOrEmpty(projectPath))
         return;
+
+      EnsureRecentDataLoaded();
 
       // Remove if already exists
       var existing = _recentProjects.FirstOrDefault(p => p.Path == projectPath);
@@ -104,6 +154,8 @@ namespace VoiceStudio.App.Services
     /// </summary>
     public async Task PinProjectAsync(string projectPath)
     {
+      EnsureRecentDataLoaded();
+
       if (_pinnedProjects.Count >= MaxPinnedProjects)
         throw new InvalidOperationException($"Cannot pin more than {MaxPinnedProjects} projects");
 
@@ -140,6 +192,8 @@ namespace VoiceStudio.App.Services
     /// </summary>
     public async Task UnpinProjectAsync(string projectPath)
     {
+      EnsureRecentDataLoaded();
+
       var pinned = _pinnedProjects.FirstOrDefault(p => p.Path == projectPath);
       if (pinned == null)
         return;
@@ -168,6 +222,8 @@ namespace VoiceStudio.App.Services
     /// </summary>
     public async Task RemoveRecentProjectAsync(string projectPath)
     {
+      EnsureRecentDataLoaded();
+
       var project = _recentProjects.FirstOrDefault(p => p.Path == projectPath);
       if (project != null)
       {
@@ -183,6 +239,8 @@ namespace VoiceStudio.App.Services
     /// </summary>
     public async Task ClearRecentProjectsAsync()
     {
+      EnsureRecentDataLoaded();
+
       _recentProjects.Clear();
       await SaveRecentProjectsAsync();
       OnPropertyChanged(nameof(RecentProjects));
@@ -192,7 +250,7 @@ namespace VoiceStudio.App.Services
     /// <summary>
     /// Loads recent projects from local settings.
     /// </summary>
-    private void LoadRecentProjects()
+    private void LoadRecentProjectsCore()
     {
       try
       {
@@ -224,9 +282,9 @@ namespace VoiceStudio.App.Services
           }
         }
       }
-      catch (Exception)
+      catch (Exception ex)
       {
-        // If loading fails, start with empty list
+        ErrorLogger.LogWarning($"Recent projects load failed: {ex.Message}", "RecentProjectsService.LoadRecentProjectsCore");
         _recentProjects.Clear();
         _pinnedProjects.Clear();
       }

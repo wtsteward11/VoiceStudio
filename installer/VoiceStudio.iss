@@ -141,6 +141,11 @@ Root: HKCR; Subkey: "VoiceStudio.Profile"; ValueType: string; ValueName: ""; Val
 Root: HKCR; Subkey: "VoiceStudio.Profile\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\App\{#MyAppExeName},1"
 Root: HKCR; Subkey: "VoiceStudio.Profile\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\App\{#MyAppExeName}"" ""%1"""
 
+Root: HKCR; Subkey: ".vstudio"; ValueType: string; ValueName: ""; ValueData: "VoiceStudio.Collaboration"; Flags: uninsdeletevalue
+Root: HKCR; Subkey: "VoiceStudio.Collaboration"; ValueType: string; ValueName: ""; ValueData: "VoiceStudio Collaboration File"; Flags: uninsdeletekey
+Root: HKCR; Subkey: "VoiceStudio.Collaboration\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\App\{#MyAppExeName},2"
+Root: HKCR; Subkey: "VoiceStudio.Collaboration\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\App\{#MyAppExeName}"" ""%1"""
+
 ; Application Registry
 Root: HKLM; Subkey: "SOFTWARE\VoiceStudio"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "SOFTWARE\VoiceStudio"; ValueType: string; ValueName: "Version"; ValueData: "{#MyAppVersion}"; Flags: uninsdeletekey

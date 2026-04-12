@@ -3,6 +3,7 @@
 // Credible Hardening Task 3: Coordinator depends on IProjectCreateHandler, IProjectOpenHandler, IProjectSaveHandler.
 
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -155,6 +156,41 @@ public sealed class ProjectWorkflowCoordinator : IProjectWorkflowCoordinator
             _logger?.LogWarning(ex, "Workflow failed: {Operation}", "OpenRecentProject");
             if (_recentProjectsService != null)
                 await _recentProjectsService.RemoveRecentProjectAsync(projectId);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task OpenProjectByPathAsync(string filePath, CancellationToken ct = default)
+    {
+        if (!_startup.IsReady)
+        {
+            _toastService?.ShowInfo("Starting VoiceStudio services…", "Please wait");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(filePath))
+            return;
+
+        if (!File.Exists(filePath))
+        {
+            _toastService?.ShowToast(ToastType.Error, "Open project", $"File not found: {filePath}");
+            return;
+        }
+
+        if (!await _shellNav.OpenPanelByIdAsync("Timeline", PanelRegion.Center))
+            return;
+
+        _setActiveNavButton("NavStudio");
+        await Task.Delay(100, ct);
+        try
+        {
+            await _openHandler.OpenProjectByPathAsync(filePath, ct).ConfigureAwait(false);
+            _toastService?.ShowToast(ToastType.Success, "Project opened", Path.GetFileName(filePath));
+        }
+        catch (Exception ex)
+        {
+            _toastService?.ShowToast(ToastType.Error, "Open project failed", ex.Message);
+            _logger?.LogWarning(ex, "Workflow failed: {Operation}", "OpenProjectByPath");
         }
     }
 }

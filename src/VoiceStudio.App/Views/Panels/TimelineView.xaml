@@ -43,34 +43,69 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
-                    <Button Command="{x:Bind ViewModel.PlayAudioCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Play">
+                    <Button Command="{x:Bind ViewModel.PlayAudioCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Play"
+                            AutomationProperties.AutomationId="TimelineView_PlayButton"
+                            AutomationProperties.Name="Play">
                         <FontIcon Glyph="&#xE768;" FontSize="16" FontFamily="Segoe Fluent Icons" />
                     </Button>
-                    <Button Command="{x:Bind ViewModel.StopAudioCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Stop">
+                    <Button Command="{x:Bind ViewModel.StopAudioCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Stop"
+                            AutomationProperties.AutomationId="TimelineView_StopButton"
+                            AutomationProperties.Name="Stop">
                         <FontIcon Glyph="&#xE71A;" FontSize="16" FontFamily="Segoe Fluent Icons" />
                     </Button>
-                    <Button Command="{x:Bind ViewModel.OpenRecordingFromTimelineCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Open Recording panel (in-app capture). Timeline record-arm is not implemented.">
-                        <FontIcon Glyph="&#xE7C8;" FontSize="16" Foreground="#FF4060" FontFamily="Segoe Fluent Icons" />
+                    <Button AutomationProperties.AutomationId="TimelineView_TransportMoreButton"
+                            AutomationProperties.Name="More transport options"
+                            MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0"
+                            ToolTipService.ToolTip="More transport (record, loop, zoom)">
+                        <FontIcon Glyph="&#xE10C;" FontSize="14" FontFamily="Segoe Fluent Icons" />
+                        <Button.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedLeft" AutomationProperties.AutomationId="TimelineView_TransportMoreFlyout">
+                                <StackPanel Spacing="8" Padding="4" MinWidth="200">
+                                    <TextBlock Text="More transport" FontWeight="SemiBold" />
+                                    <Button Command="{x:Bind ViewModel.OpenRecordingFromTimelineCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Open Recording panel (in-app capture). Timeline record-arm is not implemented."
+                                            AutomationProperties.AutomationId="TimelineView_OpenRecordingButton"
+                                            AutomationProperties.Name="Open Recording">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE7C8;" FontSize="16" Foreground="#FF4060" FontFamily="Segoe Fluent Icons" />
+                                            <TextBlock Text="Open Recording" />
+                                        </StackPanel>
+                                    </Button>
+                                    <ToggleSwitch IsOn="{x:Bind ViewModel.IsTimelineLoopEnabled, Mode=TwoWay}"
+                                                  MinWidth="{StaticResource VSQ.Touch.MinSize}"
+                                                  OffContent="Loop playback"
+                                                  OnContent="Loop playback"
+                                                  AutomationProperties.AutomationId="TimelineView_LoopToggle"
+                                                  AutomationProperties.Name="Loop playback"
+                                                  ToolTipService.ToolTip="Loop playback (audio player)" />
+                                    <Button Command="{x:Bind ViewModel.ZoomInCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Zoom In"
+                                            AutomationProperties.AutomationId="TimelineView_ZoomInButton"
+                                            AutomationProperties.Name="Zoom in">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE8A3;" FontSize="14" FontFamily="Segoe Fluent Icons" />
+                                            <TextBlock Text="Zoom in" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Command="{x:Bind ViewModel.ZoomOutCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Zoom Out"
+                                            AutomationProperties.AutomationId="TimelineView_ZoomOutButton"
+                                            AutomationProperties.Name="Zoom out">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE71F;" FontSize="14" FontFamily="Segoe Fluent Icons" />
+                                            <TextBlock Text="Zoom out" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Flyout>
+                        </Button.Flyout>
                     </Button>
-                    <Rectangle Width="1" Height="24" Fill="{StaticResource VSQ.Panel.BorderBrush}" Margin="4,0" />
-                    <ToggleSwitch IsOn="{x:Bind ViewModel.IsTimelineLoopEnabled, Mode=TwoWay}"
-                                  MinWidth="{StaticResource VSQ.Touch.MinSize}"
-                                  OffContent="Loop"
-                                  OnContent="Loop"
-                                  ToolTipService.ToolTip="Loop playback (audio player)" />
                 </StackPanel>
                 <TextBlock Grid.Column="1" x:Name="TimePositionDisplay" Text="{x:Bind ViewModel.TransportTimeDisplay, Mode=OneWay}" FontSize="16" FontWeight="SemiBold"
                            Foreground="{StaticResource VSQ.Accent.CyanBrush}" FontFamily="Consolas"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
-                    <Button Command="{x:Bind ViewModel.AddTrackCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Add Track">
+                    <Button Command="{x:Bind ViewModel.AddTrackCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Add Track"
+                            AutomationProperties.AutomationId="TimelineView_AddTrackButton"
+                            AutomationProperties.Name="Add track">
                         <FontIcon Glyph="&#xE710;" FontSize="16" FontFamily="Segoe Fluent Icons" />
-                    </Button>
-                    <Button Command="{x:Bind ViewModel.ZoomInCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Zoom In">
-                        <FontIcon Glyph="&#xE8A3;" FontSize="14" FontFamily="Segoe Fluent Icons" />
-                    </Button>
-                    <Button Command="{x:Bind ViewModel.ZoomOutCommand}" MinWidth="{StaticResource VSQ.Touch.MinSize}" MinHeight="{StaticResource VSQ.Touch.MinSize}" Padding="8" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Zoom Out">
-                        <FontIcon Glyph="&#xE71F;" FontSize="14" FontFamily="Segoe Fluent Icons" />
                     </Button>
                 </StackPanel>
             </Grid>
@@ -104,7 +139,8 @@
                                     </Grid.RowDefinitions>
                                     <TextBlock Grid.Row="0" Text="{Binding Name, FallbackValue='Track'}"
                                                FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource VSQ.Text.PrimaryBrush}" />
-                                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="2" Margin="0,4,0,0">
+                                    <!-- GAP-067 slice 5: hide disabled mixer placeholders to reduce idle density -->
+                                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="2" Margin="0,4,0,0" Visibility="Collapsed">
                                         <ToggleButton Content="M" Width="24" Height="20" FontSize="9" Padding="0" IsEnabled="False" ToolTipService.ToolTip="Not implemented (track mixer out of scope for this lane)" />
                                         <ToggleButton Content="S" Width="24" Height="20" FontSize="9" Padding="0" IsEnabled="False" ToolTipService.ToolTip="Not implemented (track mixer out of scope for this lane)" />
                                         <ToggleButton Content="R" Width="24" Height="20" FontSize="9" Padding="0" Foreground="#FF4060" IsEnabled="False" ToolTipService.ToolTip="Not implemented (track mixer out of scope for this lane)" />

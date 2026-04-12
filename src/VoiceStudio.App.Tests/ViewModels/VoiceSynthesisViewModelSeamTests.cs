@@ -199,4 +199,12 @@ public sealed class VoiceSynthesisViewModelSeamTests
 
     Assert.AreEqual(string.Empty, _sut.LongFormProgressText);
   }
+
+  [TestMethod]
+  public void AdvancedSynthesisControlsExpanded_TogglesForDisclosureState()
+  {
+    Assert.IsFalse(_sut.IsAdvancedSynthesisControlsExpanded);
+    _sut.IsAdvancedSynthesisControlsExpanded = true;
+    Assert.IsTrue(_sut.IsAdvancedSynthesisControlsExpanded);
+  }
 }

@@ -72,6 +72,7 @@ namespace VoiceStudio.App
 
         private GlobalTransportControl? _globalTransport;
         private StatusBarCoordinator? _statusBarCoordinator;
+        private bool _recordedShellInteractiveTiming;
         private TransportShortcutCoordinator? _transportShortcutCoordinator;
         private IShellNavigationCoordinator? _shellNavigationCoordinator;
         private ISearchOverlayCoordinator? _searchOverlayCoordinator;
@@ -191,6 +192,7 @@ namespace VoiceStudio.App
             IStartupStateService Startup,
             IBackendClient Backend,
             IProjectsClient ProjectsClient,
+            IProjectRepository ProjectRepository,
             RecentProjectsService? RecentProjects,
             IToastNotificationService? Toast,
             ILogger<ProjectWorkflowCoordinator>? Logger);
@@ -211,6 +213,7 @@ namespace VoiceStudio.App
                 deps.Startup,
                 deps.Backend,
                 deps.ProjectsClient,
+                deps.ProjectRepository,
                 deps.RecentProjects,
                 deps.Toast,
                 deps.Logger,
@@ -278,6 +281,7 @@ namespace VoiceStudio.App
                 ServiceProvider.GetStartupStateService(),
                 ServiceProvider.GetBackendClient(),
                 AppServices.GetProjectsClient(),
+                AppServices.GetProjectRepository(),
                 ServiceProvider.TryGetRecentProjectsService(),
                 ServiceProvider.TryGetToastNotificationService(),
                 AppServices.GetService<ILogger<ProjectWorkflowCoordinator>>());
@@ -334,6 +338,15 @@ namespace VoiceStudio.App
                     WireJumpListShell();
                     WireTaskbarProgressShell();
                     TryDispatchPendingJumpListActivation();
+                    TryDispatchPendingFileActivation();
+
+                    _statusBarCoordinator?.StartBackendHealthMonitoring();
+
+                    this.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                    {
+                        _recentProjectsService?.EnsureRecentDataLoaded();
+                        PopulateRecentProjectsMenu();
+                    });
 
                     _sessionLifecycle.AttachRecoveryHandlers(this, contentFE);
 
@@ -518,8 +531,7 @@ namespace VoiceStudio.App
                     AppServices.GetService<GracefulDegradationService>());
             }
 
-            // Populate Recent Projects menu (IDEA 16)
-            PopulateRecentProjectsMenu();
+            // Recent projects menu: populated on Loaded (low priority) — GAP-067 slice 7 cold-start
 
             // Subscribe to recent projects changes
             if (_recentProjectsService != null)
@@ -559,6 +571,8 @@ namespace VoiceStudio.App
             Debug.WriteLine($"[Startup] GlobalSearchOverlay={globalSearchOverlay?.Visibility ?? Visibility.Collapsed}, CollaborationPanel={collaborationPanel?.Visibility ?? Visibility.Collapsed}");
 
             profiler.Checkpoint("MainWindow Construction Complete");
+
+            ColdStartTimingCollector.CaptureMainWindowConstructionCheckpoints(profiler);
 
             Debug.WriteLine(profiler.GetReport());
         }
@@ -920,6 +934,12 @@ namespace VoiceStudio.App
                 return;
 
             var showOverlay = state == StartupState.Starting || state == StartupState.BackendStarting || state == StartupState.BackendFailed;
+            if (!showOverlay && !_recordedShellInteractiveTiming)
+            {
+                _recordedShellInteractiveTiming = true;
+                ColdStartTimingCollector.RecordShellInteractive();
+            }
+
             overlay.Visibility = showOverlay ? Visibility.Visible : Visibility.Collapsed;
 
             if (showOverlay)
@@ -2271,7 +2291,7 @@ namespace VoiceStudio.App
         {
             try
             {
-                AppServices.TryGetJumpListService()?.UpdateJumpList();
+                AppServices.TryGetJumpListService()?.ScheduleInitialRebuildAfterDelay(200);
             }
             catch (Exception ex)
             {
@@ -2365,6 +2385,77 @@ namespace VoiceStudio.App
             {
                 Debug.WriteLine($"[JumpList] Activation failed: {ex}");
                 ServiceProvider.TryGetToastNotificationService()?.ShowError(ex.Message, "Jump list");
+            }
+        }
+
+        /// <summary>
+        /// GAP-067 slice 4: consume shell file-association argv after startup is ready.
+        /// </summary>
+        private void TryDispatchPendingFileActivation()
+        {
+            var pending = FileActivation.TryConsumePending();
+            if (pending == null)
+                return;
+
+            var coordinator = _projectWorkflowCoordinator;
+            if (coordinator == null)
+                return;
+
+            var startup = ServiceProvider.GetStartupStateService();
+
+            void Run()
+            {
+                _ = RunFileActivationPendingAsync(pending, coordinator);
+            }
+
+            if (startup.IsReady)
+            {
+                Run();
+                return;
+            }
+
+            void Handler(object? s, StartupStateChangedEventArgs e)
+            {
+                if (!startup.IsReady)
+                    return;
+
+                startup.StateChanged -= Handler;
+                Run();
+            }
+
+            startup.StateChanged += Handler;
+        }
+
+        private async Task RunFileActivationPendingAsync(FileActivationPendingAction pending, IProjectWorkflowCoordinator coordinator)
+        {
+            try
+            {
+                switch (pending.Kind)
+                {
+                    case FileActivationKind.OpenProject:
+                        await coordinator.OpenProjectByPathAsync(pending.FilePath).ConfigureAwait(true);
+                        break;
+                    case FileActivationKind.ImportProject:
+                        ServiceProvider.TryGetToastNotificationService()?.ShowInfo(
+                            "Collaboration bundle open from shell is not fully supported yet. Use File > Open, or import from the collaboration workflow.",
+                            "File activation");
+                        await coordinator.OpenProjectAsync().ConfigureAwait(true);
+                        break;
+                    case FileActivationKind.ImportProfile:
+                        ServiceProvider.TryGetToastNotificationService()?.ShowInfo(
+                            "Profile import from a .vprofile file is not available from shell yet. Use the Profiles panel.",
+                            "File activation");
+                        if (_shellNavigationCoordinator != null)
+                            await _shellNavigationCoordinator.OpenPanelByIdAsync("Profiles", PanelRegion.Left).ConfigureAwait(true);
+                        break;
+                    case FileActivationKind.Unknown:
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[FileActivation] Dispatch failed: {ex}");
+                ServiceProvider.TryGetToastNotificationService()?.ShowError(ex.Message, "File activation");
             }
         }
 

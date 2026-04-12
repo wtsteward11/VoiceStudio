@@ -22,4 +22,9 @@ public interface IProjectWorkflowCoordinator
     Task TryAutosaveProjectAsync(CancellationToken ct = default);
 
     Task OpenRecentProjectAsync(string projectId, string projectName, CancellationToken ct = default);
+
+    /// <summary>
+    /// GAP-067 slice 4: open project file from disk (shell .voiceproj association).
+    /// </summary>
+    Task OpenProjectByPathAsync(string filePath, CancellationToken ct = default);
 }

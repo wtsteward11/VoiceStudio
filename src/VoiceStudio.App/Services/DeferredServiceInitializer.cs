@@ -191,13 +191,11 @@ namespace VoiceStudio.App.Services
                 },
                 ServicePriority.Low);
             
-            // Low priority: Recent projects loading
-            // Note: RecentProjectsService loads on construction, but we ensure it's resolved
+            // Low priority: resolve recents service (data loads on first access — GAP-067 slice 7)
             initializer.RegisterAsync(
-                "RecentProjects",
+                "RecentProjectsWarmup",
                 async ct =>
                 {
-                    // Just resolve the service to ensure it's instantiated
                     _ = serviceProvider.GetService(typeof(RecentProjectsService)) as RecentProjectsService;
                     await Task.CompletedTask;
                 },
@@ -228,9 +226,9 @@ namespace VoiceStudio.App.Services
                         {
                             await healthClient.CheckHealthAsync(ct);
                         }
-                        // ALLOWED: empty catch - Backend may not be running yet, acceptable
-                        catch
+                        catch (Exception ex)
                         {
+                            ErrorLogger.LogWarning($"Deferred backend health check failed (non-fatal): {ex.Message}", "DeferredServiceInitializer.BackendHealthCheck");
                         }
                     }
                 },
@@ -247,6 +245,20 @@ namespace VoiceStudio.App.Services
                 ServicePriority.Normal);
 
             return initializer;
+        }
+
+        /// <summary>
+        /// Default deferred service registration names (order may vary by priority sort).
+        /// </summary>
+        public static IReadOnlyList<string> GetDefaultRegisteredServiceNames()
+        {
+            var initializer = CreateDefault(new ServiceProviderAdapter());
+            return initializer.GetRegisteredNamesForTests();
+        }
+
+        internal IReadOnlyList<string> GetRegisteredNamesForTests()
+        {
+            return _services.ConvertAll(static s => s.Name);
         }
     }
     

@@ -41,16 +41,22 @@ public sealed class TimelineProjectOpenHandler : IProjectOpenHandler
 {
     private readonly Func<TimelineViewModel?> _getTimeline;
     private readonly IBackendClient _backendClient;
+    private readonly IProjectRepository _projectRepository;
     private readonly IProjectSessionDirtyState? _sessionDirty;
+    private readonly RecentProjectsService? _recentProjects;
 
     public TimelineProjectOpenHandler(
         Func<TimelineViewModel?> getTimeline,
         IBackendClient backendClient,
-        IProjectSessionDirtyState? sessionDirty = null)
+        IProjectRepository projectRepository,
+        IProjectSessionDirtyState? sessionDirty = null,
+        RecentProjectsService? recentProjects = null)
     {
         _getTimeline = getTimeline ?? throw new ArgumentNullException(nameof(getTimeline));
         _backendClient = backendClient ?? throw new ArgumentNullException(nameof(backendClient));
+        _projectRepository = projectRepository ?? throw new ArgumentNullException(nameof(projectRepository));
         _sessionDirty = sessionDirty;
+        _recentProjects = recentProjects;
     }
 
     public async Task OpenProjectPickerAsync(CancellationToken ct = default)
@@ -88,6 +94,52 @@ public sealed class TimelineProjectOpenHandler : IProjectOpenHandler
             }
             else
                 throw new Exception("Project not found");
+        }
+        finally
+        {
+            _sessionDirty?.ExitSuppressDirtyNotifications();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task OpenProjectByPathAsync(string filePath, CancellationToken ct = default)
+    {
+        var vm = _getTimeline();
+        if (vm == null)
+            return;
+
+        _sessionDirty?.EnterSuppressDirtyNotifications();
+        try
+        {
+            if (vm.Projects.Count == 0)
+                await vm.LoadProjectsCommand.ExecuteAsync(null);
+
+            var fromFile = await _projectRepository.OpenProjectFileAsync(filePath, ct).ConfigureAwait(false);
+            if (fromFile == null)
+                throw new InvalidOperationException($"Could not load project from file: {filePath}");
+
+            var existing = vm.Projects.OfType<Project>().FirstOrDefault(p => p.Id == fromFile.Id);
+            if (existing != null)
+            {
+                vm.SelectedProject = existing;
+            }
+            else
+            {
+                var fromBackend = await _backendClient.GetProjectAsync(fromFile.Id);
+                if (fromBackend != null)
+                {
+                    vm.Projects.Add(fromBackend);
+                    vm.SelectedProject = fromBackend;
+                }
+                else
+                {
+                    vm.Projects.Add(fromFile);
+                    vm.SelectedProject = fromFile;
+                }
+            }
+
+            if (vm.SelectedProject != null && _recentProjects != null)
+                await _recentProjects.AddRecentProjectAsync(vm.SelectedProject.Id, vm.SelectedProject.Name);
         }
         finally
         {

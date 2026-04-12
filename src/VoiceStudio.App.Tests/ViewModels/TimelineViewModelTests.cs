@@ -107,6 +107,15 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsTrue(_sut.DisplayName.Length > 0);
     }
 
+    /// <summary>GAP-067 slice 5: loop remains reachable via transport overflow binding surface.</summary>
+    [TestMethod]
+    public void IsTimelineLoopEnabled_TogglesForTransportDisclosureReachability()
+    {
+      Assert.IsFalse(_sut.IsTimelineLoopEnabled);
+      _sut.IsTimelineLoopEnabled = true;
+      Assert.IsTrue(_sut.IsTimelineLoopEnabled);
+    }
+
     #endregion
 
     #region Constructor Tests

@@ -78,6 +78,7 @@ namespace VoiceStudio.App.Views.Panels
 
     private const string CustomKeyEmotionPreset = "VoiceSynthesis_EmotionPreset";
     private const string CustomKeySelectedEngine = "VoiceSynthesis_SelectedEngine";
+    private const string CustomKeyAdvancedControlsExpanded = "VoiceSynthesis_AdvancedControlsExpanded";
 
     [ObservableProperty]
     private ObservableCollection<VoiceProfile> profiles = new();
@@ -99,6 +100,10 @@ namespace VoiceStudio.App.Views.Panels
 
     [ObservableProperty]
     private bool enhanceQuality;
+
+    /// <summary>GAP-067 slice 5: progressive disclosure for stability/temperature/mode knobs (persisted).</summary>
+    [ObservableProperty]
+    private bool isAdvancedSynthesisControlsExpanded;
 
     [ObservableProperty]
     private bool streamingMode;
@@ -2071,6 +2076,7 @@ namespace VoiceStudio.App.Views.Panels
           state.CustomData[CustomKeySelectedEngine] = SelectedEngine;
         if (!string.IsNullOrEmpty(Emotion))
           state.CustomData[CustomKeyEmotionPreset] = Emotion!;
+        state.CustomData[CustomKeyAdvancedControlsExpanded] = IsAdvancedSynthesisControlsExpanded;
 
         return state;
       }
@@ -2096,6 +2102,21 @@ namespace VoiceStudio.App.Views.Panels
 
         if (state.CustomData != null)
         {
+          if (state.CustomData.TryGetValue(CustomKeyAdvancedControlsExpanded, out var advObj) && advObj != null)
+          {
+            try
+            {
+              IsAdvancedSynthesisControlsExpanded = System.Convert.ToBoolean(advObj, System.Globalization.CultureInfo.InvariantCulture);
+            }
+            catch (InvalidCastException ex)
+            {
+              System.Diagnostics.Debug.WriteLine($"VoiceSynthesisViewModel.RestoreStateAsync advanced expanded: {ex.Message}");
+            }
+            catch (FormatException ex)
+            {
+              System.Diagnostics.Debug.WriteLine($"VoiceSynthesisViewModel.RestoreStateAsync advanced expanded: {ex.Message}");
+            }
+          }
           if (state.CustomData.TryGetValue(CustomKeySelectedEngine, out var engObj))
           {
             var engStr = CoerceCustomStateString(engObj);

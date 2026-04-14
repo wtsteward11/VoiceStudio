@@ -98,6 +98,24 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Row stays Open.** Next bounded slice: skip or guard audio-device-dependent tests on headless runners (test category / `[TestCategory("RequiresAudioDevice")]` or `RuntimeInformation`-based skip).
 
+### Post audio-guard `workflow_dispatch` (2026-04-14 — run `24412155919`)
+
+**Commit:** `c5403d35` — `fix(test): headless audio-device + venv guards for CI certification` (`AudioDeviceGuard`, `RequiresAudioDevice` / `RequiresLocalVenv` categories).
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24412155919 |
+| **Run ID** | `24412155919` |
+| **Verify Quick Gate** | **success** (~11m46s) |
+| **Verify Checkpoint + Resume Chain** | **failure** |
+| **First failing stage** | **STAGE 6: C# Unit Tests - ViewModels Seam A-D** — **TIMED_OUT** (180s per-shard budget) |
+
+**Not** NAudio: **STAGE 13 Services** and **STAGE 14 CommandsGateways** completed with **Passed**; inconclusives/skips match headless audio + venv guards (e.g. `Record_*` skipped, `BackendProcessManagerDecision*` skipped without venv).
+
+**Current first slice for Checkpoint green:** **Seam A-D shard timeout** — investigate hang/slow tests or raise shard budget for GHA (separate bounded row if needed). Audio-device guard slice for STAGE 13–14 is **addressed** in this commit.
+
+**Row stays Open** until a full **`workflow_dispatch`** + **`run_full_chain: true`** completes **green** end-to-end.
+
 ## Rerun command (after token/UI access)
 
 ```powershell

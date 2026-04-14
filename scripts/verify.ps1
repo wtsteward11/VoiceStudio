@@ -334,8 +334,8 @@ $StageTimeouts = @{
 }
 # Per-shard timeouts for C# Unit Tests (diagnosable per shard; single bad shard cannot consume whole budget)
 $Stage3ShardTimeouts = @{
-    # Seam A-D is the largest letter-class shard; windows-latest can exceed 180s wall (JIT/diag + DispatcherQueue tests).
-    "C# Unit Tests - ViewModels Seam A-D" = 300
+    # Seam A-D: see MaxCpuCount=1 in Stage 3 loop (parallel + DispatcherQueue hang on GHA without it).
+    "C# Unit Tests - ViewModels Seam A-D" = 180
     "C# Unit Tests - ViewModels Seam E-H" = 180
     "C# Unit Tests - ViewModels Seam I-L" = 180
     "C# Unit Tests - ViewModels Seam M" = 180
@@ -1606,11 +1606,16 @@ foreach ($shard in $Stage3Shards) {
     }
     $filterLiteral = $shard.Filter -replace "'", "''"
     $shardTotal = $Stage3Shards.Count
+    # Seam A-D: parallel MSTest workers + per-test DispatcherQueueController caused multi-minute hangs on windows-latest.
+    $dotnetTestMaxCpuArg = ""
+    if ($shard.Name -eq "C# Unit Tests - ViewModels Seam A-D") {
+        $dotnetTestMaxCpuArg = " -- RunConfiguration.MaxCpuCount=1"
+    }
     $shardPassed = Invoke-Stage -Name $shard.Name -Description "C# unit tests shard $shardNum of $shardTotal" -Skip:(-not $runThisShard) -TimeoutSeconds $Stage3ShardTimeouts[$shard.Name] -ShardNum $shardNum -Action ([scriptblock]::Create(@"
 `$testProject = Join-Path '$RootDir' 'src\VoiceStudio.App.Tests\VoiceStudio.App.Tests.csproj'
 `$trxFile = Join-Path '$TestResultsDir' 'csharp_unit_tests_shard_$shardNum.trx'
 `$diagFile = Join-Path '$StageLogsDir' 'csharp_unit_tests_shard_${shardNum}_diag.txt'
-`$shardOutput = & dotnet test `$testProject -c '$Configuration' -p:Platform=x64 --no-build --filter '$filterLiteral' --blame-hang --blame-hang-timeout 5m --blame-crash --blame-hang-dump-type mini --diag `$diagFile --logger "trx;LogFileName=`$trxFile" --results-directory '$TestResultsDir' 2>&1
+`$shardOutput = & dotnet test `$testProject -c '$Configuration' -p:Platform=x64 --no-build --filter '$filterLiteral' --blame-hang --blame-hang-timeout 5m --blame-crash --blame-hang-dump-type mini --diag `$diagFile --logger "trx;LogFileName=`$trxFile" --results-directory '$TestResultsDir'$dotnetTestMaxCpuArg 2>&1
 `$shardOutput
 `$exitCode = `$LASTEXITCODE
 `$summaryLine = `$shardOutput | Where-Object { `$_ -match "Failed:\s+\d+.*Passed:\s+\d+" } | Select-Object -Last 1

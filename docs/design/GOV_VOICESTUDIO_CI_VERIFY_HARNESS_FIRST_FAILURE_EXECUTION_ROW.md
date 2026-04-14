@@ -128,7 +128,8 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Mitigations applied (2026-04-14):**
 1. **`DispatcherQueueTestHelpers.ShutdownSyncBounded`** — replace unbounded `ShutdownQueueAsync().GetAwaiter().GetResult()` in ViewModel test cleanup.
-2. **Shard budget** — `scripts/verify.ps1` **`$Stage3ShardTimeouts['C# Unit Tests - ViewModels Seam A-D']` = 300s** (was 180s) for `windows-latest` headroom; other shards unchanged.
+2. **Harness: `RunConfiguration.MaxCpuCount=1`** for the Seam A-D `dotnet test` invocation only — avoids multi-minute hangs from parallel MSTest workers + per-test `DispatcherQueueController` on `windows-latest`.
+3. **Shard budget** — remains **180s** for Seam A-D once (1)+(2) are in place (300s was insufficient while the parallel deadlock persisted).
 
 ## Rerun command (after token/UI access)
 

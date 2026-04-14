@@ -213,6 +213,19 @@ gh run download 24379285704 --dir artifacts/ci-harness-download/
 
 **Operational certification:** still **pending** until a post-fix hosted **`workflow_dispatch`** **green**.
 
+## `workflow_dispatch` — run `24426420065` (2026-04-14) — checkpoint green; resume failure
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24426420065 |
+| **Run ID** | `24426420065` |
+| **Commit SHA** | `7835f8fb4fb0232dc4a2405a522975061311f65a` |
+| **Verify Quick Gate** | **success** |
+| **Checkpoint run (stop after C# Unit Tests)** | **success** |
+| **Resume run** | **failure** — **Contract Tests** stage **exit 1** (fail-fast) |
+
+**Notes:** **`verify.ps1`** **StopAfterStage** fix validated (checkpoint no longer false-red). **`test_search.py`** collection hit **`Database not connected`** from eager **`search.py`** imports on **`main`** — addressed by **`903b4031`** (lazy storage). **Row stays open** until full-chain green on post-**`903b4031`** dispatch.
+
 ## Closure criteria
 
 | Criterion | Status |

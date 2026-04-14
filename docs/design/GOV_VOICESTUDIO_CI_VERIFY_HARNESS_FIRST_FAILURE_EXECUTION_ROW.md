@@ -187,6 +187,21 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Contract Tests slice (`8ad0a26e`):** **not** invalidated — resume leg **not reached** on this run. **Row stays Open** until a hosted **`workflow_dispatch`** **full chain** **green** after the harness fix lands on **`main`**.
 
+### GHA proof — `24426420065` (2026-04-14) — **checkpoint green; resume red**
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24426420065 |
+| **Run ID** | `24426420065` |
+| **Commit SHA** | `7835f8fb4fb0232dc4a2405a522975061311f65a` (includes **`verify.ps1`** StopAfter fix) |
+| **Verify Quick Gate** | **success** |
+| **Checkpoint run (stop after C# Unit Tests)** | **success** — harness **`StopAfterStage`** fix **confirmed** |
+| **Resume run** | **failure** — **`[Contract Tests] FAILED (exit code 1)`** (fail-fast after resume pipeline) |
+
+**Collection error on resume (Python Unit Tests / import):** **`test_search.py`** collection → **`RuntimeError: Database not connected`** from **eager** module-level **`get_projects_for_search()`** in **`backend/api/routes/search.py`** on **`main`** (pre-**`903b4031`**). **Remediation:** **`903b4031`** — lazy **`_load_search_storage()`** (GAP-069 slice 5). **Re-dispatch** **`workflow_dispatch`** after push to re-prove resume + Contract Tests.
+
+**Bounded slice (active):** **STAGE 18 — Contract Tests** on resume **or** **import/collection** unblock — **freeze** until hosted green on tip **`903b4031`**+ (do **not** reopen Seam A-D / checkpoint harness unless regression).
+
 ## Rerun command (after token/UI access)
 
 ```powershell

@@ -6,11 +6,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using VoiceStudio.App.Services;
+using VoiceStudio.App.Tests.Helpers;
 
 namespace VoiceStudio.App.Tests.Services
 {
   [TestClass]
   [TestCategory("Services")]
+  [TestCategory("RequiresAudioDevice")]
   public class AudioPlayerServiceTests
   {
     private sealed class FakeWavHttpHandler : HttpMessageHandler
@@ -44,6 +46,7 @@ namespace VoiceStudio.App.Tests.Services
     [TestMethod]
     public async Task PlayUrlAsync_Stop_DeletesTempFile()
     {
+      AudioDeviceGuard.SkipIfNoAudioOutputDevice();
       var wavBytes = MinimalWavHelper.CreateMinimalWavBytes();
       var handler = new FakeWavHttpHandler(wavBytes);
       var httpClient = new HttpClient(handler);
@@ -72,6 +75,7 @@ namespace VoiceStudio.App.Tests.Services
     [TestMethod]
     public async Task PlayUrlAsync_NormalCompletion_DeletesTempFile()
     {
+      AudioDeviceGuard.SkipIfNoAudioOutputDevice();
       var testTemp = Path.Combine(Path.GetTempPath(), "voicestudio_test_" + Guid.NewGuid().ToString("N"));
       Directory.CreateDirectory(testTemp);
       var oldTmp = Environment.GetEnvironmentVariable("TMP");
@@ -108,6 +112,7 @@ namespace VoiceStudio.App.Tests.Services
     [TestMethod]
     public async Task PlayUrlAsync_Dispose_DeletesTempFile()
     {
+      AudioDeviceGuard.SkipIfNoAudioOutputDevice();
       var wavBytes = MinimalWavHelper.CreateMinimalWavBytes();
       var handler = new FakeWavHttpHandler(wavBytes);
       var httpClient = new HttpClient(handler);
@@ -136,6 +141,7 @@ namespace VoiceStudio.App.Tests.Services
     [TestMethod]
     public async Task PlayUrlAsync_StreamingDownload_CreatesPlayableFile()
     {
+      AudioDeviceGuard.SkipIfNoAudioOutputDevice();
       var wavBytes = MinimalWavHelper.CreateMinimalWavBytes();
       var handler = new FakeWavHttpHandler(wavBytes);
       var httpClient = new HttpClient(handler);

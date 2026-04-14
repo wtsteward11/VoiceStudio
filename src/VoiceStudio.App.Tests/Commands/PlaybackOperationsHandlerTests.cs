@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using VoiceStudio.App.Commands;
 using VoiceStudio.App.Core.Commands;
 using VoiceStudio.App.Services;
+using VoiceStudio.App.Tests.Helpers;
 using VoiceStudio.Core.Recording;
 
 namespace VoiceStudio.App.Tests.Commands
@@ -347,8 +348,10 @@ namespace VoiceStudio.App.Tests.Commands
         }
 
         [TestMethod]
+        [TestCategory("RequiresAudioDevice")]
         public async Task Record_StartsRecording()
         {
+            AudioDeviceGuard.SkipIfNoAudioInputDevice();
             // Act
             await Registry.ExecuteAsync("playback.record");
 
@@ -357,8 +360,10 @@ namespace VoiceStudio.App.Tests.Commands
         }
 
         [TestMethod]
+        [TestCategory("RequiresAudioDevice")]
         public async Task Record_WhenRecording_StopsRecording()
         {
+            AudioDeviceGuard.SkipIfNoAudioInputDevice();
             // Arrange
             await _handler.StartRecordingAsync();
             Assert.IsTrue(_handler.IsRecording);

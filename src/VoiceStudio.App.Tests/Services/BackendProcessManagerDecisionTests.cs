@@ -14,6 +14,7 @@ namespace VoiceStudio.App.Tests.Services;
 [TestClass]
 [DoNotParallelize]
 [TestCategory("Services")]
+[TestCategory("RequiresLocalVenv")]
 public class BackendProcessManagerDecisionTests
 {
     private static readonly string RepoRoot = FindRepoRoot();
@@ -23,6 +24,16 @@ public class BackendProcessManagerDecisionTests
         "VoiceStudio",
         "crashes",
         "startup_decision.json");
+
+    [TestInitialize]
+    public void SkipIfNoPythonVenv()
+    {
+        if (!File.Exists(PythonPath))
+        {
+            Assert.Inconclusive(
+                $"Skipped: Python venv not found at {PythonPath} (CI runner).");
+        }
+    }
 
     private static async Task WaitForHealthAsync(string baseUrl, int timeoutSeconds = 30)
     {

@@ -42,6 +42,12 @@
 - **Pip resilience:** both **Install Python dependencies** steps in [`.github/workflows/verify-harness.yml`](../../.github/workflows/verify-harness.yml) now use explicit **`--retries 5`** and **`--timeout 60`** on **`pip`** / **`python -m pip`** (see [closure report](../reports/verification/VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md) § Workflow hardening).
 - **Next:** operator **`workflow_dispatch`** on **`main`** with **`run_full_chain: true`**; if still red, freeze **first failing step only** and update this row (do not smear root causes).
 
+### Supplemental GHA signal (2026-04-14 — push `887ae942`)
+
+After pip hardening reached **`main`**, GitHub Actions run **`24381385977`** (**[link](https://github.com/wtsteward11/VoiceStudio/actions/runs/24381385977)**) **passed** **Install Python dependencies** and **failed** **Verify Quick Gate** at **Security Tests**: `test_plugin_sandbox_security.py::TestPermissionEnforcement::test_path_allowed_only_in_whitelist`. **Not** pip; **not** `workflow_dispatch` (checkpoint job **skipped**).
+
+**Bounded fix:** [`backend/services/plugin_sandbox.py`](../../backend/services/plugin_sandbox.py) — `can_access_path` now compares **resolved** roots and uses **`relative_to()`** for containment (Windows runner-safe). **Row stays Open** until a green **`workflow_dispatch`** + **`run_full_chain: true`** is recorded in the [closure report](../reports/verification/VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md) and a fresh GHA **Quick** run confirms the security stage on **`main`**.
+
 ## Rerun command (after token/UI access)
 
 ```powershell

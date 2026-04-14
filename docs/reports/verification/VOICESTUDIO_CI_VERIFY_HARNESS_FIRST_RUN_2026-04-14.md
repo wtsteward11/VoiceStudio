@@ -9,7 +9,7 @@
 | Verdict | Meaning |
 | --- | --- |
 | **Implemented on `main`** | **Yes** — workflow + contracts + lineage tooling ship on default branch. |
-| **Operationally certified (GHA)** | **No** — first observed GitHub Actions run is **`BucketC_InfraRed`** (pip SSL during dependency install); **no** successful **`workflow_dispatch`** with **`run_full_chain: true`** has been recorded yet. |
+| **Operationally certified (GHA)** | **No** — **`workflow_dispatch`** + **`run_full_chain: true`** green **not** recorded; post-`887ae942` **push** run **`24381385977`** reached **`verify.ps1 -Quick`** and failed in **Security Tests** (see **Post-`887ae942` push observation** below), not pip. |
 | **Authoritative `workflow_dispatch` run** | **Not yet executed** — automation **`gh workflow run`** returns **HTTP 403** from the active token; **operator must use Actions UI** (or a token with workflow dispatch permission). See **Dispatch path** below. |
 
 ## Workflow
@@ -31,9 +31,26 @@
 
 **Truth:** Certification today is **unblocked only via UI** unless the operator rotates to a dispatch-capable token.
 
-## Run identity — observed first GHA execution (push; not authoritative dispatch)
+## Authoritative `workflow_dispatch` (full chain) — capture template
 
-This is the **only** completed run available for immutable evidence as of closure update. It is **not** a substitute for **`workflow_dispatch`** + **`run_full_chain`**.
+**Status:** **Not yet recorded** (automation **`gh workflow run`** returns **HTTP 403** with the token used in this environment).
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | *Pending — paste after UI run* |
+| **Run ID** | *Pending* |
+| **Commit SHA** | *Pending (expect `main` tip)* |
+| **Event** | `workflow_dispatch` |
+| **Inputs** | `run_full_chain: true` |
+| **Verify Quick Gate** | *Pending* |
+| **Verify Checkpoint + Resume Chain** | *Pending* |
+| **Artifacts** | *Pending (`verify-quick-artifacts`, `verify-checkpoint-resume-artifacts`)* |
+
+## Run identity — observed GHA executions (push; not authoritative dispatch)
+
+These runs are **not** a substitute for **`workflow_dispatch`** + **`run_full_chain`**.
+
+### Run A — first workflow landing (`24379285704`)
 
 | Field | Value |
 | --- | --- |
@@ -52,6 +69,23 @@ This is the **only** completed run available for immutable evidence as of closur
 | --- | --- | --- |
 | **Verify Quick Gate** | **failure** | Failed before **Quick verification gate** step. |
 | **Verify Checkpoint + Resume Chain** | **skipped** | Expected for **`push`**: second job runs only for **`workflow_dispatch` + `run_full_chain`** or **`schedule`**. |
+
+### Run B — post pip-hardening push (`24381385977`, commit `887ae942`)
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24381385977 |
+| **Run ID** | `24381385977` |
+| **Commit SHA** | `887ae942fce3deab94feb599f98108f4238789f6` |
+| **Trigger** | `push` (workflow / harness paths) |
+| **Install Python dependencies** | **success** (pip retries/timeouts; SSL path cleared) |
+| **First failing step (fail-fast)** | **Quick verification gate** → **STAGE 20: Security Tests** — `tests/security/test_plugin_sandbox_security.py::TestPermissionEnforcement::test_path_allowed_only_in_whitelist` (**AssertionError**). |
+| **Python Quality** | **passed** (console noted **Mypy strict scope** delta **+1** vs budget **0** as advisory in that stage; stage still **PASSED** per harness) |
+| **Verify Checkpoint + Resume Chain** | **skipped** | Same as run A — **`push`** does not run full chain. |
+
+**Remediation (repo):** `SandboxPermissions.can_access_path` in [`backend/services/plugin_sandbox.py`](../../../backend/services/plugin_sandbox.py) now resolves allow-list roots and uses **`Path.relative_to()`** so paths outside the workspace are rejected on Windows-hosted runners (fixes false allow on `windows-latest`). Re-verify on next GHA **Quick** run after push.
+
+**Authoritative `workflow_dispatch` evidence:** still **pending** — `gh workflow run` returns **HTTP 403**; operator must use **Actions UI** (or a dispatch-capable PAT) and record URL/ID/SHA + both job conclusions here.
 
 ## Outcome classification rule (this session)
 

@@ -263,7 +263,7 @@ These do not sunset with v1.1.0; they remain non-negotiable for merge:
 | **C-1** | C# skip debt: 274 → < 50 with documented reasons ([SKIP_DEBT_CLEANUP_SUBPLAN.md](../design/SKIP_DEBT_CLEANUP_SUBPLAN.md)) |
 | **C-2** | Full `verify.ps1` in GitHub Actions (not local-only) |
 | **C-3** | Real-engine golden path in CI (policy decision: [GOLDEN_PATH_PROOF_STATUS.md](../reports/verification/GOLDEN_PATH_PROOF_STATUS.md)) |
-| **C-4** | Mypy strict burn-down ([STRICT_MYPY_BURNDOWN_SUBPLAN.md](../design/STRICT_MYPY_BURNDOWN_SUBPLAN.md)) |
+| **C-4** | Mypy strict burn-down — **narrow scoped contract at baseline 0** ([STRICT_MYPY_BURNDOWN_SUBPLAN.md](../design/STRICT_MYPY_BURNDOWN_SUBPLAN.md) § Completion); broader routes/services expansion remains continuous |
 | **C-5** | Workflow deduplication ([WORKFLOW_CONSOLIDATION_SUBPLAN.md](../design/WORKFLOW_CONSOLIDATION_SUBPLAN.md)) |
 | **C-6** | E2E tests per hero workflow |
 | **C-7** | Performance regression suite (SLO enforcement) |

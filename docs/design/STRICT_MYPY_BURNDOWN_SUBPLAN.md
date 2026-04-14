@@ -206,3 +206,13 @@ Run mypy with `--strict` and address findings incrementally. Target modules: `ba
 ## Owner
 
 TBD (assign in task brief when work starts)
+
+---
+
+## Completion — narrow C-4 contract (2026-04-14)
+
+The **CI gate scope** in [`.ci/mypy_strict_baseline.json`](../../.ci/mypy_strict_baseline.json) is **at zero errors** with **`baseline_errors`: 0** and **`last_updated`**: **2026-04-14**. Enforcement: [`tests/ci/test_mypy_strict_scope.py`](../../tests/ci/test_mypy_strict_scope.py) (collected under default `pytest tests/`). **Baseline bump rule:** any increase requires an explicit commit justification **and** an update to this subplan section **and** the JSON baseline — no silent regressions.
+
+**Relationship to full subplan scope:** Historical slices above targeted broader `backend/api/routes/` and `backend/services/` strictness. The **maintained contract** for “C-4 lane closure” in tracker/roadmap is the **baseline-gated paths** above; expanding strict coverage to additional modules is **new work** under the same discipline (incremental slices), not a reopening of this closure row.
+
+**Proof:** gate PASS locally/CI; see [.cursor/STATE.md](../../.cursor/STATE.md) **LATEST PROOF INDEX** row **C-4 mypy strict-scope**.

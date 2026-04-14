@@ -94,10 +94,23 @@ class SandboxPermissions:
 
     def can_access_path(self, path: Path) -> bool:
         """Check if path access is allowed. Target must be the allowed dir or under it."""
-        resolved = path.resolve()
-        return any(
-            resolved == allowed or allowed in resolved.parents for allowed in self.allowed_paths
-        )
+        try:
+            resolved_target = path.resolve()
+        except OSError:
+            resolved_target = path.absolute()
+        for allowed in self.allowed_paths:
+            try:
+                resolved_allowed = allowed.resolve()
+            except OSError:
+                resolved_allowed = allowed.absolute()
+            if resolved_target == resolved_allowed:
+                return True
+            try:
+                resolved_target.relative_to(resolved_allowed)
+                return True
+            except ValueError:
+                continue
+        return False
 
     def can_access_network(self, host: str, port: int) -> bool:
         """Check if network access is allowed."""

@@ -9,6 +9,7 @@ on:
         default: true
   schedule:
     - cron: "0 6 * * 1" # Weekly Monday 06:00 UTC
+  # Path-filter touch 2026-04-14: re-trigger verify-harness on main after be2c10b4 sandbox fix (gh workflow_dispatch 403).
   push:
     branches: [main]
     paths:

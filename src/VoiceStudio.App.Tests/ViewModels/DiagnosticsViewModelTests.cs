@@ -44,7 +44,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     public void Cleanup()
     {
       _sut?.Dispose();
-      _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
+      DispatcherQueueTestHelpers.ShutdownSyncBounded(_dispatcherController);
     }
 
     #region Panel Properties Tests

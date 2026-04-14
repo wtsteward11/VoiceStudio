@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Dispatching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Panels;
@@ -30,7 +31,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         [TestCleanup]
         public void Cleanup()
         {
-            _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
+            DispatcherQueueTestHelpers.ShutdownSyncBounded(_dispatcherController);
         }
 
         [TestMethod]

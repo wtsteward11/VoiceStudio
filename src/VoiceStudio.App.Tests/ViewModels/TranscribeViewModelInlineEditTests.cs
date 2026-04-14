@@ -52,7 +52,7 @@ public sealed class TranscribeViewModelInlineEditTests
     {
       if (_dispatcherController != null)
       {
-        _dispatcherController.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
+        DispatcherQueueTestHelpers.ShutdownSyncBounded(_dispatcherController);
         _dispatcherController = null;
       }
 
@@ -70,7 +70,7 @@ public sealed class TranscribeViewModelInlineEditTests
     {
     if (_dispatcherController != null)
     {
-      _dispatcherController.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
+      DispatcherQueueTestHelpers.ShutdownSyncBounded(_dispatcherController);
       _dispatcherController = null;
     }
 
@@ -210,7 +210,7 @@ public sealed class TranscribeViewModelInlineEditTests
     {
     if (_dispatcherController != null)
     {
-      _dispatcherController.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
+      DispatcherQueueTestHelpers.ShutdownSyncBounded(_dispatcherController);
       _dispatcherController = null;
     }
 

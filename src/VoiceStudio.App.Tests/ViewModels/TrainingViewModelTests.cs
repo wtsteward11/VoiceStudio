@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
@@ -45,7 +46,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestCleanup]
     public void Cleanup()
     {
-      _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
+      DispatcherQueueTestHelpers.ShutdownSyncBounded(_dispatcherController);
     }
 
     #region Training Request Tests

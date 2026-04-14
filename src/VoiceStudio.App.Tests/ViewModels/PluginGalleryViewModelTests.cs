@@ -37,7 +37,7 @@ namespace VoiceStudio.App.Tests.ViewModels
         public void Cleanup()
         {
             _viewModel?.Dispose();
-            _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
+            DispatcherQueueTestHelpers.ShutdownSyncBounded(_dispatcherController);
         }
 
         #region Initialization Tests

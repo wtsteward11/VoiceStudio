@@ -10,6 +10,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using VoiceStudio.App.Services;
+using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.Core.Models;
 using CoreSettingsData = VoiceStudio.Core.Models.SettingsData;
@@ -49,7 +50,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestCleanup]
     public void Cleanup()
     {
-      _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
+      DispatcherQueueTestHelpers.ShutdownSyncBounded(_dispatcherController);
     }
 
     [TestMethod]

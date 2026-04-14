@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Core.Models;
 using VoiceStudio.App.Services;
+using VoiceStudio.App.Tests.Fixtures;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Events;
@@ -58,7 +59,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestCleanup]
     public void Cleanup()
     {
-      _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
+      DispatcherQueueTestHelpers.ShutdownSyncBounded(_dispatcherController);
     }
 
     /// <summary>

@@ -116,6 +116,16 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Row stays Open** until a full **`workflow_dispatch`** + **`run_full_chain: true`** completes **green** end-to-end.
 
+### Bounded slice (active): STAGE 6 — ViewModels Seam A-D timeout
+
+**Frozen scope (only):** **`C# Unit Tests - ViewModels Seam A-D`** — harness **`TIMED_OUT`** at **180s** on hosted **`windows-latest`** (Checkpoint job). Diagnose hang vs budget vs contamination; fix test/runtime or shard split; **not** timeout inflation until shard health is proven.
+
+**Hard OUT:** audio-device guards, venv guards, `startup_artifact_check`, `GITHUB_TOKEN` / dispatch mechanics, unrelated CI cleanup, broad ViewModel refactors.
+
+**Evidence anchor:** run **`24412155919`**; filter = **`$SeamAD`** in [`scripts/verify.ps1`](../../scripts/verify.ps1) (`$SeamBase` + A–D FQN tokens).
+
+**Exit:** green **`workflow_dispatch`** + **`run_full_chain: true`** with Seam A-D **PASSED** under budget, or documented follow-up row if a **different** stage fails first after fix.
+
 ## Rerun command (after token/UI access)
 
 ```powershell

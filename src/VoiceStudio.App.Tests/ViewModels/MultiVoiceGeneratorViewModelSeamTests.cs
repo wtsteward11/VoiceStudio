@@ -45,7 +45,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     [TestCleanup]
     public void Cleanup()
     {
-      _dispatcherController?.ShutdownQueueAsync().AsTask().GetAwaiter().GetResult();
+      DispatcherQueueTestHelpers.ShutdownSyncBounded(_dispatcherController);
     }
 
     /// <summary>

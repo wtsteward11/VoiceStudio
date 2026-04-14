@@ -197,6 +197,22 @@ gh run download 24379285704 --dir artifacts/ci-harness-download/
 
 - **Single execution row:** [GOV_VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_FAILURE_EXECUTION_ROW.md](../../design/GOV_VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_FAILURE_EXECUTION_ROW.md)
 
+## `workflow_dispatch` — run `24424525825` (2026-04-14) — false checkpoint failure
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24424525825 |
+| **Run ID** | `24424525825` |
+| **Commit SHA** | `1695cd347016bbf9ef322ba555bb27579dd0547b` |
+| **Inputs** | `run_full_chain: true` |
+| **Verify Quick Gate** | **success** |
+| **Verify Checkpoint + Resume Chain** | **failure** — **Checkpoint run (stop after C# Unit Tests)** exit **1** |
+| **Resume** | **skipped** |
+
+**Bucket:** **`BucketB_HarnessRed`** — not a test failure: **STAGE 1–16** all **PASSED** in logs; **`Invoke-StopIfRequested`** exited **`1`** because **`$script:OverallPassed`** was never initialized **`$true`** while **`$OverallPassed`** was. **Remediation:** [`scripts/verify.ps1`](../../scripts/verify.ps1) — initialize and sync **`$script:OverallPassed`** with **`$OverallPassed`**; **StopAfterStage** exit uses **`$OverallPassed`**. **Local proof:** **`verify.ps1 -StopAfterStage "C# Unit Tests - Other"`** → **exit 0** (`artifacts/verify/20260414_173048/`).
+
+**Operational certification:** still **pending** until a post-fix hosted **`workflow_dispatch`** **green**.
+
 ## Closure criteria
 
 | Criterion | Status |

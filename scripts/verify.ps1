@@ -412,6 +412,8 @@ $proofLines -join "`n" | Out-File -FilePath $proofStampPath -Encoding utf8
 $Stages = @()
 $OverallStartTime = Get-Date
 $OverallPassed = $true
+# Must match $OverallPassed — Invoke-StopIfRequested and Write-Checkpoint use script scope.
+$script:OverallPassed = $true
 
 if ($ResumeFrom) {
     $cpPath = Join-Path $LatestLink "checkpoint.json"
@@ -510,6 +512,7 @@ if ($ResumeFrom) {
         }
         if ($origStatus -in @("FAILED", "TIMED_OUT")) {
             $script:OverallPassed = $false
+            $OverallPassed = $false
         }
     }
 }
@@ -554,6 +557,7 @@ function Add-StageResult {
     
     if ($Status -in @("FAILED", "TIMED_OUT")) {
         $script:OverallPassed = $false
+        $OverallPassed = $false
     }
     Write-Checkpoint
 }
@@ -830,6 +834,7 @@ exit `$script:__vsTimedStageExit
             ($integrityMsg, "Fallback diagnostic: exitCode=$exitCode stage='$Name'") | Out-File -FilePath $logFile -Encoding utf8
             Add-StageResult -Name $Name -Status "FAILED" -ExitCode 99 -DurationSeconds $duration -LogFile $logFile -TimeoutSeconds $TimeoutSeconds
             $script:OverallPassed = $false
+            $OverallPassed = $false
             return $false
         }
     }
@@ -852,7 +857,7 @@ function Invoke-StopIfRequested {
     Write-Host ""
     Write-Host "[StopAfterStage] Completed '$StageName'. Writing final report and exiting." -ForegroundColor Yellow
     Write-Report
-    exit $(if ($script:OverallPassed) { 0 } else { 1 })
+    exit $(if ($OverallPassed) { 0 } else { 1 })
 }
 
 function Write-Report {

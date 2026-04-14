@@ -168,6 +168,25 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Next:** operator **`workflow_dispatch`** + **`run_full_chain: true`** — fine-grained PAT must include **Actions: Read and write** (or classic **`workflow`**); **`gh workflow run`** may return **HTTP 403** if **`GITHUB_TOKEN`** overrides keyring without dispatch scope — **unset `GITHUB_TOKEN`** for **`gh`** or use **Actions UI**. Record run URL/ID/SHA here when observed.
 
+### GHA proof — `24424525825` (2026-04-14) — **false checkpoint failure (harness)**
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24424525825 |
+| **Run ID** | `24424525825` |
+| **Commit SHA** | `1695cd347016bbf9ef322ba555bb27579dd0547b` (truth-sync docs on `main`) |
+| **Verify Quick Gate** | **success** (~11m14s) |
+| **Verify Checkpoint + Resume Chain** | **failure** — step **Checkpoint run (stop after C# Unit Tests)** exit **1** |
+| **Resume leg** | **skipped** (checkpoint step failed) |
+
+**Observed harness behavior:** All checkpoint stages **STAGE 1–16** reported **PASSED** (including **STAGE 16: C# Unit Tests - Other**). **`[StopAfterStage]`** ran, then **`##[error]Process completed with exit code 1`**.
+
+**Root cause:** [`scripts/verify.ps1`](../../scripts/verify.ps1) **`Invoke-StopIfRequested`** exited with **`$script:OverallPassed`**, which was **never initialized to `$true`** (only **`$OverallPassed`** was). On an all-green checkpoint, **`$script:OverallPassed`** stayed **`$null`** → **exit 1** despite success.
+
+**Remediation (repo):** Initialize **`$script:OverallPassed = $true`** with **`$OverallPassed`**; keep both in sync on failures; **`Invoke-StopIfRequested`** exits on **`$OverallPassed`**. **Local proof:** **`verify.ps1 -StopAfterStage "C# Unit Tests - Other"`** (narrow skips) → **exit 0**; artifact dir **`artifacts/verify/20260414_173048/`**.
+
+**Contract Tests slice (`8ad0a26e`):** **not** invalidated — resume leg **not reached** on this run. **Row stays Open** until a hosted **`workflow_dispatch`** **full chain** **green** after the harness fix lands on **`main`**.
+
 ## Rerun command (after token/UI access)
 
 ```powershell

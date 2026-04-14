@@ -1,0 +1,210 @@
+name: Verify Harness (Checkpoint + Resume)
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_full_chain:
+        description: "Run checkpoint+resume chain (not just Quick)"
+        type: boolean
+        default: true
+  schedule:
+    - cron: "0 6 * * 1" # Weekly Monday 06:00 UTC
+  push:
+    branches: [main]
+    paths:
+      - "scripts/verify.ps1"
+      - "scripts/*-failure-smoke.ps1"
+      - "scripts/ci/**"
+      - ".github/workflows/verify-harness.yml"
+      - "scripts/show-checkpoint-lineage.ps1"
+
+env:
+  PYTHON_VERSION: "3.11"
+  DOTNET_VERSION: "8.0.x"
+
+jobs:
+  verify-quick:
+    name: Verify Quick Gate
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,extras]"
+
+      - name: Restore .NET dependencies
+        run: dotnet restore VoiceStudio.sln -r win-x64 -p:Platform=x64
+
+      - name: Quick verification gate
+        run: .\scripts\verify.ps1 -Quick
+        shell: pwsh
+
+      - name: Write Quick summary
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $summaryPath = 'artifacts/verify/latest/summary.json'
+          $lines = @(
+            '## Verify Quick Gate',
+            '',
+            "| Field | Value |",
+            "| --- | --- |"
+          )
+          if (Test-Path $summaryPath) {
+            $summary = Get-Content $summaryPath -Raw | ConvertFrom-Json
+            $lines += "| Status | **$($summary.overall_status)** |"
+            $lines += "| Passed | $($summary.passed) |"
+            $lines += "| Failed | $($summary.failed) |"
+            $lines += "| Duration (s) | $($summary.duration_seconds) |"
+          } else {
+            $lines += "| Status | **summary.json missing** |"
+          }
+          $lines -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Upload Quick artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verify-quick-artifacts
+          path: artifacts/verify/
+          retention-days: 7
+
+  verify-checkpoint-resume:
+    name: Verify Checkpoint + Resume Chain
+    runs-on: windows-latest
+    needs: [verify-quick]
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.run_full_chain) ||
+      github.event_name == 'schedule'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,extras]"
+
+      - name: Restore .NET dependencies
+        run: dotnet restore VoiceStudio.sln -r win-x64 -p:Platform=x64
+
+      - name: Build frontend
+        run: dotnet build VoiceStudio.sln -c Debug -p:Platform=x64
+
+      # Checkpoint: run stages up to and including "C# Unit Tests - Other",
+      # then stop and write checkpoint.json for the resume step.
+      - name: Checkpoint run (stop after C# Unit Tests)
+        run: .\scripts\verify.ps1 -StopAfterStage "C# Unit Tests - Other"
+        shell: pwsh
+
+      - name: Show checkpoint lineage
+        shell: pwsh
+        run: .\scripts\show-checkpoint-lineage.ps1
+
+      # Resume: pick up from "Python Unit Tests" using the checkpoint.
+      # This exercises the lineage validation and stage inheritance path.
+      # Failure-Path Smoke stages require a built .exe that can bind ports and
+      # launch WinUI — on headless GitHub runners these stages may fail; the
+      # checkpoint/resume mechanism itself is what this workflow proves.
+      - name: Resume run (from Python Unit Tests)
+        run: .\scripts\verify.ps1 -ResumeFrom "Python Unit Tests"
+        shell: pwsh
+
+      - name: Gate and ledger validation
+        run: python scripts/run_verification.py
+
+      - name: Validate required harness artifacts
+        if: always()
+        shell: pwsh
+        run: |
+          $required = @(
+            'artifacts/verify/latest/summary.json',
+            'artifacts/verify/latest/checkpoint.json',
+            'artifacts/verify/latest/verification_report.md'
+          )
+          $missing = $required | Where-Object { -not (Test-Path $_) }
+          if ($missing) {
+            Write-Host "ERROR: Required artifacts missing:" -ForegroundColor Red
+            $missing | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+            exit 1
+          }
+          Write-Host "All required harness artifacts present." -ForegroundColor Green
+
+      - name: Write checkpoint+resume summary
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $summaryPath = 'artifacts/verify/latest/summary.json'
+          $cpPath = 'artifacts/verify/latest/checkpoint.json'
+          $lines = @(
+            '## Verify Checkpoint + Resume',
+            '',
+            "| Field | Value |",
+            "| --- | --- |"
+          )
+          if (Test-Path $cpPath) {
+            $cp = Get-Content $cpPath -Raw | ConvertFrom-Json
+            $lines += "| Checkpoint run_timestamp | $($cp.run_timestamp) |"
+            $lines += "| Checkpoint artifact_dir | $($cp.artifact_dir) |"
+            $lines += "| Last completed stage | $($cp.last_completed_stage) |"
+            $lines += "| Completed stages count | $($cp.completed_stages_count) |"
+          } else {
+            $lines += "| Checkpoint | **missing** |"
+          }
+          if (Test-Path $summaryPath) {
+            $summary = Get-Content $summaryPath -Raw | ConvertFrom-Json
+            $lines += "| Overall status | **$($summary.overall_status)** |"
+            $lines += "| Passed | $($summary.passed) |"
+            $lines += "| Failed | $($summary.failed) |"
+            $lines += "| Duration (s) | $($summary.duration_seconds) |"
+            $stages = @($summary.stages)
+            $firstFail = ($stages | Where-Object { $_.status -eq 'FAILED' } | Select-Object -First 1)
+            if ($firstFail) {
+              $lines += "| First failed stage | $($firstFail.name) |"
+            }
+          } else {
+            $lines += "| Summary | **summary.json missing** |"
+          }
+          $lr = '.buildlogs/verification/last_run.json'
+          if (Test-Path $lr) {
+            $ver = Get-Content $lr -Raw | ConvertFrom-Json
+            $lines += "| run_verification all_passed | $($ver.all_passed) |"
+          }
+          $lines -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Upload checkpoint+resume artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verify-checkpoint-resume-artifacts
+          path: |
+            artifacts/verify/
+            .buildlogs/verification/last_run.json
+          retention-days: 7

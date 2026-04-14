@@ -41,6 +41,7 @@
     - Enforce runtime proof freshness (-EnforceRuntimeProof): Passes --enforce-runtime-proof to Gate/Ledger (run_verification.py) so stale/missing PROOF_GOLDEN_PATH_REAL_*.json fails. Forbidden with -Quick. Does not affect -RuntimeProof standalone.
     - Backend smoke (-BackendSmoke): Standalone only (GAP-069 slice 3). Runs scripts/ci/run_backend_smoke.py; writes docs/reports/verification/PROOF_BACKEND_SMOKE_*.json (schema v1). Exit 2 (BLOCKED prerequisites) is treated as advisory success for the harness. Forbidden with -Quick.
     - Enforce backend smoke freshness (-EnforceBackendSmoke): Passes --enforce-backend-smoke to Gate/Ledger so missing/stale/FAIL PROOF_BACKEND_SMOKE_*.json fails; BLOCKED proofs never fail. Forbidden with -Quick.
+    - Skip backend smoke auto-probe (-SkipSmoke): Full verify only (GAP-069 slice 4). Skips the automatic Backend Smoke Auto-Probe stage before Gate/Ledger. Use when prerequisites are known absent. Redundant with -Quick (smoke already skipped).
     
     SIDE EFFECTS: Creates artifacts/verify/{timestamp}/, updates artifacts/verify/latest symlink, prunes runs older than KeepCount (10).
 .PARAMETER Quick
@@ -110,8 +111,13 @@ param(
     [switch]$EnforceRuntimeProof,
     [switch]$BackendSmoke,
     [switch]$EnforceBackendSmoke,
-    [ValidateSet("", "Clean Build", "Python Quality", "Quick Critical Gates", "C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other", "Python Unit Tests", "Contract Tests", "Security Tests", "Backend Integration", "UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke", "Gate/Ledger Validation")]
-    [string]$OnlyStage = ""
+    [switch]$SkipSmoke,
+    [ValidateSet("", "Clean Build", "Python Quality", "Quick Critical Gates", "C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other", "Python Unit Tests", "Contract Tests", "Security Tests", "Backend Integration", "UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke", "Backend Smoke Auto-Probe", "Gate/Ledger Validation")]
+    [string]$OnlyStage = "",
+    [ValidateSet("", "Clean Build", "Python Quality", "Quick Critical Gates", "C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other", "Python Unit Tests", "Contract Tests", "Security Tests", "Backend Integration", "UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke", "Backend Smoke Auto-Probe", "Gate/Ledger Validation")]
+    [string]$ResumeFrom = "",
+    [ValidateSet("", "Clean Build", "Python Quality", "Quick Critical Gates", "C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other", "Python Unit Tests", "Contract Tests", "Security Tests", "Backend Integration", "UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke", "Backend Smoke Auto-Probe", "Gate/Ledger Validation")]
+    [string]$StopAfterStage = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -122,6 +128,7 @@ $ArtifactsDir = Join-Path $RootDir "artifacts\verify\$Timestamp"
 $LatestLink = Join-Path $RootDir "artifacts\verify\latest"
 $ReportFile = Join-Path $ArtifactsDir "verification_report.md"
 $SummaryFile = Join-Path $ArtifactsDir "summary.json"
+$CheckpointFile = Join-Path $ArtifactsDir "checkpoint.json"
 
 # Unbuffered Python: when verify output is piped (e.g. Tee-Object), buffered pytest can leave the
 # PowerShell pipeline waiting on stdin/stdout close after tests finish — appears as a hang after Contract.
@@ -179,6 +186,25 @@ if ($BackendSmoke -and $OnlyStage) {
 }
 if ($Quick -and $EnforceBackendSmoke) {
     Write-Host "ERROR: -EnforceBackendSmoke cannot be combined with -Quick" -ForegroundColor Red
+    exit 1
+}
+if ($Quick -and $SkipSmoke) {
+    Write-Host "NOTE: -SkipSmoke is redundant with -Quick (backend smoke is already skipped)" -ForegroundColor DarkYellow
+}
+if ($ResumeFrom -and $OnlyStage) {
+    Write-Host "ERROR: -ResumeFrom cannot be combined with -OnlyStage" -ForegroundColor Red
+    exit 1
+}
+if ($ResumeFrom -and $StopAfterStage) {
+    Write-Host "ERROR: -ResumeFrom cannot be combined with -StopAfterStage" -ForegroundColor Red
+    exit 1
+}
+if ($ResumeFrom -and $Quick) {
+    Write-Host "ERROR: -ResumeFrom cannot be combined with -Quick (checkpoint is from a full or non-Quick harness shape)" -ForegroundColor Red
+    exit 1
+}
+if ($ResumeFrom -and ($RuntimeProof -or $BackendSmoke)) {
+    Write-Host "ERROR: -ResumeFrom applies only to the main verification harness" -ForegroundColor Red
     exit 1
 }
 
@@ -297,12 +323,14 @@ New-Item -ItemType Directory -Path $TestResultsDir -Force | Out-Null
 
 # Stage time budgets (seconds). 0 = no timeout. Must be defined before proof_stamp.
 $StageTimeouts = @{
+    "Python Unit Tests" = 1200
     "Backend Integration" = 600
     "UI Smoke Tests" = 600
     "UI Self-Test" = 300
     "Icon-Launch Smoke" = 300
     "Failure-Path Smoke" = 180
     "Runtime-Missing Failure Smoke" = 180
+    "Backend Smoke Auto-Probe" = 120
 }
 # Per-shard timeouts for C# Unit Tests (diagnosable per shard; single bad shard cannot consume whole budget)
 $Stage3ShardTimeouts = @{
@@ -359,6 +387,15 @@ if ($BackendSmoke) {
 if ($EnforceBackendSmoke) {
     $proofLines += "EnforceBackendSmoke: Gate/Ledger uses --enforce-backend-smoke (missing/stale/FAIL smoke proof fails; BLOCKED exempt)"
 }
+if ($SkipSmoke) {
+    $proofLines += "SkipSmoke: Backend Smoke Auto-Probe skipped (GAP-069 slice 4)"
+}
+if ($ResumeFrom) {
+    $proofLines += "ResumeFrom: $ResumeFrom (GAP-069 slice 9 — inherited stages from latest/checkpoint.json)"
+}
+if ($StopAfterStage) {
+    $proofLines += "StopAfterStage: $StopAfterStage (GAP-069 slice 9 — exit after this stage completes)"
+}
 $proofLines += "StageTimeouts:"
 foreach ($key in $StageTimeouts.Keys) {
     $proofLines += "  $key`: $($StageTimeouts[$key])s"
@@ -374,6 +411,107 @@ $proofLines -join "`n" | Out-File -FilePath $proofStampPath -Encoding utf8
 $Stages = @()
 $OverallStartTime = Get-Date
 $OverallPassed = $true
+
+if ($ResumeFrom) {
+    $cpPath = Join-Path $LatestLink "checkpoint.json"
+    if (-not (Test-Path $LatestLink) -or -not (Test-Path $cpPath)) {
+        Write-Host "ERROR: -ResumeFrom requires artifacts/verify/latest/checkpoint.json from a prior harness run." -ForegroundColor Red
+        Write-Host "       Run a partial/full verify first, or use -StopAfterStage to emit a checkpoint." -ForegroundColor Yellow
+        exit 1
+    }
+    $cpJson = Get-Content $cpPath -Raw | ConvertFrom-Json
+    $stagesFromCp = $cpJson.stages
+    if ($null -eq $stagesFromCp) {
+        Write-Host "ERROR: checkpoint.json has no 'stages' array." -ForegroundColor Red
+        exit 1
+    }
+    if ($stagesFromCp -isnot [System.Array]) {
+        $stagesFromCp = @($stagesFromCp)
+    }
+    # Lineage validation: junction target must match checkpoint's artifact_dir
+    if (Test-Path $LatestLink) {
+        $resolvedLatest = (Get-Item $LatestLink).Target
+        $cpArtifactDir = $cpJson.artifact_dir
+        if ($resolvedLatest -and $cpArtifactDir -and ($resolvedLatest -ne $cpArtifactDir)) {
+            Write-Host "ERROR: latest junction points to '$resolvedLatest' but checkpoint claims artifact_dir '$cpArtifactDir'" -ForegroundColor Red
+            Write-Host "       The checkpoint was produced by a different run than 'latest' points to." -ForegroundColor Red
+            Write-Host "       Re-run -StopAfterStage to create a fresh checkpoint, or fix the latest junction." -ForegroundColor Yellow
+            exit 1
+        }
+        $pointerPath = Join-Path (Split-Path $LatestLink) "latest_pointer.json"
+        if (Test-Path $pointerPath) {
+            $pointerJson = Get-Content $pointerPath -Raw | ConvertFrom-Json
+            if ($pointerJson.run_dir -and $cpArtifactDir -and ($pointerJson.run_dir -ne $cpArtifactDir)) {
+                Write-Host "ERROR: latest_pointer.json run_dir '$($pointerJson.run_dir)' disagrees with checkpoint artifact_dir '$cpArtifactDir'" -ForegroundColor Red
+                exit 1
+            }
+        }
+    }
+
+    Write-Host ""
+    Write-Host "=== RESUME LINEAGE ===" -ForegroundColor Cyan
+    Write-Host "  Checkpoint run:    $($cpJson.run_timestamp)" -ForegroundColor Cyan
+    Write-Host "  Artifact dir:      $($cpJson.artifact_dir)" -ForegroundColor Cyan
+    Write-Host "  Last stage:        $($cpJson.last_completed_stage)" -ForegroundColor Cyan
+    Write-Host "  Stages inherited:  $($stagesFromCp.Count)" -ForegroundColor Cyan
+    Write-Host "  Resuming from:     $ResumeFrom" -ForegroundColor Cyan
+    Write-Host "======================" -ForegroundColor Cyan
+    Write-Host ""
+
+    $knownResumeStages = @(
+        "Clean Build",
+        "XAML Health",
+        "Resolved Packages",
+        "Release XAML Smoke",
+        "Python Quality",
+        "Quick Critical Gates",
+        "C# Unit Tests",
+        "C# Unit Tests - ViewModels Seam A-D",
+        "C# Unit Tests - ViewModels Seam E-H",
+        "C# Unit Tests - ViewModels Seam I-L",
+        "C# Unit Tests - ViewModels Seam M",
+        "C# Unit Tests - ViewModels Seam N-Z",
+        "C# Unit Tests - ViewModels Lifecycle",
+        "C# Unit Tests - ViewModels Legacy",
+        "C# Unit Tests - Services",
+        "C# Unit Tests - CommandsGateways",
+        "C# Unit Tests - UIPanels",
+        "C# Unit Tests - Other",
+        "Python Unit Tests",
+        "Contract Tests",
+        "Security Tests",
+        "Backend Integration",
+        "UI Smoke Tests",
+        "UI Self-Test",
+        "Icon-Launch Smoke",
+        "Failure-Path Smoke",
+        "Runtime-Missing Failure Smoke",
+        "Backend Smoke Auto-Probe",
+        "Gate/Ledger Validation"
+    )
+    if ($ResumeFrom -notin $knownResumeStages) {
+        Write-Host "ERROR: -ResumeFrom '$ResumeFrom' is not a recognized stage name." -ForegroundColor Red
+        Write-Host "       Known stages: $($knownResumeStages -join ', ')" -ForegroundColor Yellow
+        exit 1
+    }
+
+    foreach ($s in $stagesFromCp) {
+        $origStatus = [string]$s.status
+        $script:Stages += [PSCustomObject]@{
+            Name = [string]$s.name
+            Status = "INHERITED"
+            ExitCode = [int]$s.exit_code
+            DurationSeconds = [double]$s.duration_seconds
+            LogFile = [string]$s.log_file
+            TimeoutSeconds = 0
+            TimedOut = $false
+            InheritedFromStatus = $origStatus
+        }
+        if ($origStatus -in @("FAILED", "TIMED_OUT")) {
+            $script:OverallPassed = $false
+        }
+    }
+}
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -416,12 +554,61 @@ function Add-StageResult {
     if ($Status -in @("FAILED", "TIMED_OUT")) {
         $script:OverallPassed = $false
     }
+    Write-Checkpoint
+}
+
+function Write-Checkpoint {
+    if ($null -eq $script:Stages -or $script:Stages.Count -eq 0) { return }
+    # Force array so ConvertTo-Json always emits "stages": [ {...}, ... ] (single-stage runs must not collapse to one object)
+    $stageSummaries = @( $script:Stages | ForEach-Object {
+        @{
+            name = $_.Name
+            status = $_.Status
+            exit_code = $_.ExitCode
+            duration_seconds = $_.DurationSeconds
+            log_file = $_.LogFile
+        }
+    } )
+    $lastStage = if ($script:Stages.Count -gt 0) { $script:Stages[-1].Name } else { "" }
+    $cp = @{
+        run_timestamp = $script:Timestamp
+        artifact_dir = $script:ArtifactsDir
+        last_completed_stage = $lastStage
+        completed_stages_count = $script:Stages.Count
+        overall_passed_so_far = $script:OverallPassed
+        is_partial = $true
+        stages = $stageSummaries
+    }
+    $cp | ConvertTo-Json -Depth 12 | Out-File -FilePath $script:CheckpointFile -Encoding utf8 -Force
+
+    $passedCount = ($script:Stages | Where-Object { $_.Status -eq "PASSED" }).Count
+    $failedCount = ($script:Stages | Where-Object { $_.Status -eq "FAILED" }).Count
+    $timedOutCount = ($script:Stages | Where-Object { $_.Status -eq "TIMED_OUT" }).Count
+    $skippedCount = ($script:Stages | Where-Object { $_.Status -in @("SKIPPED", "INHERITED") }).Count
+    $partialSummary = @{
+        timestamp = (Get-Date -Format "o")
+        run_timestamp = $script:Timestamp
+        is_partial = $true
+        overall_status = if ($script:OverallPassed) { "PASSED_SO_FAR" } else { "FAILED" }
+        passed = $passedCount
+        failed = $failedCount
+        timed_out = $timedOutCount
+        skipped = $skippedCount
+        stages = $stageSummaries
+    }
+    $partialSummary | ConvertTo-Json -Depth 12 | Out-File -FilePath $script:SummaryFile -Encoding utf8 -Force
 }
 
 function ShouldRunStage {
     param([string]$StageName, [bool]$WouldSkip)
-    if (-not $OnlyStage) { return -not $WouldSkip }
-    return $StageName -eq $OnlyStage
+    # OnlyStage: run exactly one named stage (absolute precedence when set; invalid with -ResumeFrom)
+    if ($OnlyStage) { return $StageName -eq $OnlyStage }
+    # ResumeFrom: stages restored from checkpoint.json are INHERITED — do not re-execute
+    if ($ResumeFrom) {
+        $inh = $script:Stages | Where-Object { $_.Name -eq $StageName -and $_.Status -eq "INHERITED" }
+        if ($inh) { return $false }
+    }
+    return -not $WouldSkip
 }
 
 function Invoke-PostStageCleanup {
@@ -476,6 +663,14 @@ function Invoke-Stage {
     $stageNumber = $script:Stages.Count + 1
     $sanitizedName = $Name.ToLower().Replace(' ', '_').Replace('/', '_').Replace('\', '_')
     $logFile = Join-Path $StageLogsDir "$sanitizedName.log"
+
+    if ($script:ResumeFrom) {
+        $inh = $script:Stages | Where-Object { $_.Name -eq $Name -and $_.Status -eq "INHERITED" }
+        if ($inh) {
+            Write-Host "[ResumeFrom] Skipping inherited stage '$Name' (see checkpoint)." -ForegroundColor DarkYellow
+            return $true
+        }
+    }
     
     Write-Host ""
     Write-Host "=" * 70 -ForegroundColor Cyan
@@ -567,7 +762,10 @@ exit `$script:__vsTimedStageExit
             }
             $exitCode = 0
             if (Test-Path $exitFile) {
-                $exitCode = [int](Get-Content $exitFile -Raw).Trim()
+                $exitRaw = Get-Content $exitFile -Raw
+                if ($null -ne $exitRaw -and $exitRaw.Trim().Length -gt 0) {
+                    $exitCode = [int]$exitRaw.Trim()
+                }
             }
             $output = @()
             if (Test-Path $outFile) { $output += Get-Content $outFile -Raw }
@@ -646,13 +844,23 @@ exit `$script:__vsTimedStageExit
         }
 }
 
+function Invoke-StopIfRequested {
+    param([string]$StageName)
+    if (-not $script:StopAfterStage) { return }
+    if ($StageName -ne $script:StopAfterStage) { return }
+    Write-Host ""
+    Write-Host "[StopAfterStage] Completed '$StageName'. Writing final report and exiting." -ForegroundColor Yellow
+    Write-Report
+    exit $(if ($script:OverallPassed) { 0 } else { 1 })
+}
+
 function Write-Report {
     $overallDuration = ((Get-Date) - $OverallStartTime).TotalSeconds
     $overallStatus = if ($OverallPassed) { "PASSED" } else { "FAILED" }
     $passedCount = ($Stages | Where-Object { $_.Status -eq "PASSED" }).Count
     $failedCount = ($Stages | Where-Object { $_.Status -eq "FAILED" }).Count
     $timedOutCount = ($Stages | Where-Object { $_.Status -eq "TIMED_OUT" }).Count
-    $skippedCount = ($Stages | Where-Object { $_.Status -eq "SKIPPED" }).Count
+    $skippedCount = ($Stages | Where-Object { $_.Status -in @("SKIPPED", "INHERITED") }).Count
     
     # Markdown report — built with string concatenation to avoid
     # PowerShell parsing pipe chars in here-strings as pipeline operators.
@@ -686,6 +894,7 @@ function Write-Report {
             "FAILED" { "FAIL" }
             "TIMED_OUT" { "TIMEOUT" }
             "SKIPPED" { "SKIP" }
+            "INHERITED" { "INH" }
             default { "?" }
         }
         $row = [string]::Format("| {0} | {1} | {2} {3} | {4} | {5}s |", $stageNum, $stage.Name, $icon, $stage.Status, $stage.ExitCode, $stage.DurationSeconds)
@@ -708,7 +917,10 @@ function Write-Report {
     $report += "- **Test Results:** $TestResultsDir" + $nl + $nl
     $report += "## Failed Stages" + $nl + $nl
 
-    $failedStages = @($Stages | Where-Object { $_.Status -in @("FAILED", "TIMED_OUT") })
+    $failedStages = @($Stages | Where-Object {
+            $_.Status -in @("FAILED", "TIMED_OUT") -or
+            ($_.Status -eq "INHERITED" -and $_.InheritedFromStatus -in @("FAILED", "TIMED_OUT"))
+        })
     if ($failedStages.Count -gt 0) {
         foreach ($stage in $failedStages) {
             $report += "### $($stage.Name)" + $nl + $nl
@@ -728,7 +940,10 @@ function Write-Report {
         $report += "No failures." + $nl
     }
 
-    $timedOutStages = @($Stages | Where-Object { $_.Status -eq "TIMED_OUT" })
+    $timedOutStages = @($Stages | Where-Object {
+            $_.Status -eq "TIMED_OUT" -or
+            ($_.Status -eq "INHERITED" -and $_.InheritedFromStatus -eq "TIMED_OUT")
+        })
     if ($timedOutStages.Count -gt 0) {
         $report += $nl + "## Timed Out Stages" + $nl + $nl
         $report += "Stage exceeded its time budget. Check for hanging tests, deadlocks, or environment issues. Use -OnlyStage to re-run this stage in isolation. Review blame-hang dumps if available." + $nl + $nl
@@ -786,7 +1001,7 @@ function Write-Report {
     $report | Out-File -FilePath $ReportFile -Encoding utf8
     
     # JSON summary (stages include timeout_seconds and timed_out per plan)
-    $stageSummaries = $Stages | ForEach-Object {
+    $stageSummaries = @( $Stages | ForEach-Object {
         @{
             name = $_.Name
             status = $_.Status
@@ -796,7 +1011,7 @@ function Write-Report {
             timeout_seconds = $_.TimeoutSeconds
             timed_out = $_.TimedOut
         }
-    }
+    } )
     $summary = @{
         timestamp = (Get-Date -Format "o")
         configuration = $Configuration
@@ -804,6 +1019,7 @@ function Write-Report {
         real_ui = $RealUI.IsPresent
         overall_status = $overallStatus
         duration_seconds = [math]::Round($overallDuration, 2)
+        is_partial = $false
         passed = $passedCount
         failed = $failedCount
         timed_out = $timedOutCount
@@ -1145,6 +1361,7 @@ $stage1Passed = Invoke-Stage -Name "Clean Build" -Description "Build C# solution
     & dotnet build VoiceStudio.sln -c $Configuration -p:Platform=x64 /bl:$binlogPath
     return $LASTEXITCODE
 }
+Invoke-StopIfRequested "Clean Build"
 
 if (-not $stage1Passed -and -not $SkipBuild) {
     Write-Host ""
@@ -1257,6 +1474,7 @@ $stage2Passed = Invoke-Stage -Name "Python Quality" -Description "Lint and type-
     
     cmd /c "exit 0"
 }
+Invoke-StopIfRequested "Python Quality"
 
 if (-not $stage2Passed -and -not $SkipPythonLint) {
     Write-Host ""
@@ -1337,6 +1555,7 @@ if ($Quick -and (-not $OnlyStage -or $OnlyStage -eq "Quick Critical Gates")) {
         $merged | Out-File -FilePath $LogFile -Encoding utf8
         return $exitCode
     }
+    Invoke-StopIfRequested "Quick Critical Gates"
 }
 
 # ============================================================================
@@ -1401,6 +1620,7 @@ if (`$summaryLine -match "Failed:\s+0.*Passed:\s+(\d+)" -and [int]`$Matches[1] -
     cmd /c "exit `$exitCode"
 }
 "@))
+    Invoke-StopIfRequested $shard.Name
     if (-not $shardPassed -and $runThisShard) { $stage3Passed = $false }
     # Between shards: cleanup to reduce cross-shard contamination (Stage 13 hang mitigation)
     if ($runThisShard -and $shardNum -lt $Stage3Shards.Count) {
@@ -1420,19 +1640,93 @@ if (-not $SkipCSharpTests) { Invoke-PostStageCleanup }
 # STAGE 4: Python Unit Tests
 # ============================================================================
 
-$stage4Passed = Invoke-Stage -Name "Python Unit Tests" -Description "Run Python unit tests from tests/unit" -Skip:(($OnlyStage -and "Python Unit Tests" -ne $OnlyStage) -or (-not $OnlyStage -and $SkipPythonTests)) -Action {
+$stage4Passed = Invoke-Stage -Name "Python Unit Tests" -Description "Run Python unit tests from tests/unit" -Skip:(($OnlyStage -and "Python Unit Tests" -ne $OnlyStage) -or (-not $OnlyStage -and $SkipPythonTests)) -TimeoutSeconds $StageTimeouts["Python Unit Tests"] -Action {
     $junitFile = Join-Path $TestResultsDir "python_unit_tests.xml"
-    
-    & python -u -m pytest tests/unit `
-        -v `
-        --tb=short `
-        -x `
-        --junitxml=$junitFile `
-        -m "not slow and not gpu and not engine" `
-        --ignore=tests/unit/backend/api/routes/_archived
-    
-    return $LASTEXITCODE
+    $outF = Join-Path $StageLogsDir "python_unit_tests_subprocess_stdout.log"
+    $errF = Join-Path $StageLogsDir "python_unit_tests_subprocess_stderr.log"
+    if (Test-Path $junitFile) { Remove-Item $junitFile -Force -ErrorAction SilentlyContinue }
+    # Reduce TensorFlow / transformers chatter during teardown; does not disable tests (GAP-069 Slice 10).
+    if (-not $env:TF_CPP_MIN_LOG_LEVEL) { $env:TF_CPP_MIN_LOG_LEVEL = "2" }
+    if (-not $env:TRANSFORMERS_VERBOSITY) { $env:TRANSFORMERS_VERBOSITY = "error" }
+
+    # Child process: some Windows hosts leave python.exe alive after pytest finishes (ML stack / threads).
+    # Parity with Contract Tests: if junitxml is complete and green, bounded wait then terminate (Slice 10).
+    $py = (Get-Command python -ErrorAction Stop).Source
+    # Single Win32 argument string (Start-Process string[] breaks `-m "not slow ..."` when embedded in timed temp script).
+    $argStr = "-u -m pytest tests/unit -v --tb=short -x --junitxml=""$junitFile"" -m ""not slow and not gpu and not engine"" --ignore=tests/unit/backend/api/routes/_archived"
+    $p = Start-Process -FilePath $py -ArgumentList $argStr `
+        -WorkingDirectory $RootDir `
+        -RedirectStandardOutput $outF -RedirectStandardError $errF `
+        -PassThru -NoNewWindow
+
+    if ($null -eq $p) {
+        Write-Output "ERROR: Start-Process did not return a process handle for pytest."
+        return 1
+    }
+
+    # Keep in sync with $StageTimeouts["Python Unit Tests"] (currently 1200s).
+    $maxMs = 1200000
+    $deadline = (Get-Date).AddMilliseconds($maxMs)
+    $graceAfterGreenJunitMs = 120000
+
+    while (-not $p.HasExited) {
+        if ((Get-Date) -gt $deadline) { break }
+        if (Test-Path $junitFile) {
+            try {
+                [xml]$jx = Get-Content $junitFile -Raw
+                if ($null -eq $jx -or $null -eq $jx.testsuites) { throw "junit missing testsuites" }
+                $failTotal = 0; $errTotal = 0; $nTests = 0
+                foreach ($suite in @($jx.testsuites.testsuite)) {
+                    if ($null -eq $suite) { continue }
+                    $failTotal += [int]$suite.failures
+                    $errTotal += [int]$suite.errors
+                    $nTests += [int]$suite.tests
+                }
+                if ($failTotal -eq 0 -and $errTotal -eq 0 -and $nTests -gt 0) {
+                    $null = $p.WaitForExit($graceAfterGreenJunitMs)
+                    if (-not $p.HasExited) {
+                        try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { }
+                        Start-Sleep -Milliseconds 400
+                        "`nHARNESS NOTE (GAP-069 Slice 10): junitxml shows 0 failures/0 errors; pytest did not exit within ${graceAfterGreenJunitMs}ms - child terminated so verify can continue." | Out-File -FilePath $outF -Encoding utf8 -Append
+                    }
+                    break
+                }
+            } catch { }
+        }
+        Start-Sleep -Milliseconds 500
+    }
+
+    if (-not $p.HasExited) {
+        try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { }
+        Start-Sleep -Milliseconds 400
+    }
+
+    $exitCode = 1
+    if ($p.HasExited) {
+        $exitCode = $p.ExitCode
+    }
+    if ($exitCode -ne 0 -and (Test-Path $junitFile)) {
+        try {
+            [xml]$jx = Get-Content $junitFile -Raw
+            if ($null -ne $jx.testsuites) {
+                $failTotal = 0; $errTotal = 0
+                foreach ($suite in @($jx.testsuites.testsuite)) {
+                    if ($null -eq $suite) { continue }
+                    $failTotal += [int]$suite.failures
+                    $errTotal += [int]$suite.errors
+                }
+                if ($failTotal -eq 0 -and $errTotal -eq 0) { $exitCode = 0 }
+            }
+        } catch { }
+    }
+
+    if (Test-Path $outF) { Write-Output (Get-Content $outF -Raw) }
+    if (Test-Path $errF) { Write-Output (Get-Content $errF -Raw) }
+    # Timed Invoke-Stage captures $LASTEXITCODE from native commands; `return` alone does not set it (verify.ps1 ~699).
+    cmd.exe /c "exit /b $exitCode"
+    return $exitCode
 }
+Invoke-StopIfRequested "Python Unit Tests"
 
 if (-not $stage4Passed -and -not $SkipPythonTests) {
     Write-Host ""
@@ -1498,6 +1792,7 @@ $stage5Passed = Invoke-Stage -Name "Contract Tests" -Description "Validate CShar
     $merged | Out-File -FilePath $LogFile -Encoding utf8
     return $exitCode
 }
+Invoke-StopIfRequested "Contract Tests"
 
 if (-not $stage5Passed -and -not $SkipContractTests) {
     Write-Host ""
@@ -1526,6 +1821,7 @@ $stage6Passed = Invoke-Stage -Name "Security Tests" -Description "Run security t
         --junitxml=$junitFile
     return $LASTEXITCODE
 }
+Invoke-StopIfRequested "Security Tests"
 
 if (-not $stage6Passed -and -not $SkipSecurity) {
     Write-Host ""
@@ -1601,6 +1897,7 @@ $stage7Passed = Invoke-Stage -Name "Backend Integration" -Description "Golden-lo
     $merged | Out-File -FilePath $LogFile -Encoding utf8
     return $exitCode
 }
+Invoke-StopIfRequested "Backend Integration"
 
 if (-not $stage7Passed -and -not $SkipIntegration) {
     Write-Host ""
@@ -1617,20 +1914,19 @@ $stage8Passed = Invoke-Stage -Name "UI Smoke Tests" -Description "Verify app lau
     $trxFile = Join-Path $TestResultsDir "ui_smoke_tests.trx"
     $testProject = Join-Path $RootDir "src\VoiceStudio.App.Tests\VoiceStudio.App.Tests.csproj"
     
-    # Set environment for UI tests
-    if ($RealUI) {
-        $env:VOICESTUDIO_USE_REAL_UI_AUTOMATION = "true"
-    } else {
-        $env:VOICESTUDIO_USE_REAL_UI_AUTOMATION = "false"
-    }
+    # FlaUI E2E (SmokeTests.cs) requires interactive desktop enumeration; always opt in for this stage so
+    # dotnet test inherits VOICESTUDIO_USE_REAL_UI_AUTOMATION=true (-RealUI remains the operator hint for session).
+    $env:VOICESTUDIO_USE_REAL_UI_AUTOMATION = "true"
     $env:VOICESTUDIO_TEST_ARTIFACTS = $ScreenshotsDir
     
     try {
+        # Scope to E2E FlaUI SmokeTests only. Other types still carry TestCategory=Smoke but are Ignored/inconclusive;
+        # running the full filter kept a huge discovery list and risked harness timeouts when cleanup stalls.
         & dotnet test $testProject `
             -c $Configuration `
             -p:Platform=x64 `
             --no-build `
-            --filter "TestCategory=Smoke" `
+            --filter "TestCategory=Smoke&FullyQualifiedName~VoiceStudio.App.Tests.UI.E2E.SmokeTests" `
             --logger "trx;LogFileName=$trxFile" `
             --results-directory $TestResultsDir
         
@@ -1642,6 +1938,7 @@ $stage8Passed = Invoke-Stage -Name "UI Smoke Tests" -Description "Verify app lau
         Remove-Item Env:VOICESTUDIO_TEST_ARTIFACTS -ErrorAction SilentlyContinue
     }
 }
+Invoke-StopIfRequested "UI Smoke Tests"
 
 if (-not $stage8Passed -and -not $SkipUI) {
     Write-Host ""
@@ -1689,6 +1986,7 @@ $stage8_5Passed = Invoke-Stage -Name "UI Self-Test" -Description "Run app with -
     }
     cmd /c "exit $exitCode"
 }
+Invoke-StopIfRequested "UI Self-Test"
 
 if (-not $stage8_5Passed -and -not $SkipUI) {
     Write-Host ""
@@ -1739,6 +2037,7 @@ $stage8_6Passed = Invoke-Stage -Name "Icon-Launch Smoke" -Description "Run app w
     }
     cmd /c "exit $exitCode"
 }
+Invoke-StopIfRequested "Icon-Launch Smoke"
 
 if (-not $stage8_6Passed -and -not $SkipUI) {
     Write-Host ""
@@ -1767,6 +2066,7 @@ $stage8_7Passed = Invoke-Stage -Name "Failure-Path Smoke" -Description "Port occ
     & "$ScriptDir\icon-launch-failure-smoke.ps1" -ExePath $exePath -ReportPath $reportPath
     cmd /c "exit $LASTEXITCODE"
 }
+Invoke-StopIfRequested "Failure-Path Smoke"
 
 if (-not $stage8_7Passed -and -not $SkipUI) {
     Write-Host ""
@@ -1795,6 +2095,7 @@ $stage8_8Passed = Invoke-Stage -Name "Runtime-Missing Failure Smoke" -Descriptio
     & "$ScriptDir\runtime-missing-failure-smoke.ps1" -ExePath $exePath -ReportPath $reportPath
     cmd /c "exit $LASTEXITCODE"
 }
+Invoke-StopIfRequested "Runtime-Missing Failure Smoke"
 
 if (-not $stage8_8Passed -and -not $SkipUI) {
     Write-Host ""
@@ -1803,6 +2104,34 @@ if (-not $stage8_8Passed -and -not $SkipUI) {
     exit 1
 }
 if (-not $SkipUI) { Invoke-PostStageCleanup }
+
+# ============================================================================
+# STAGE 8.9: Backend Smoke Auto-Probe (GAP-069 slice 4)
+# ============================================================================
+# Runs scripts/ci/run_backend_smoke.py so docs/reports/verification/PROOF_BACKEND_SMOKE_*.json
+# exists before Gate/Ledger freshness check. Exit 2 (BLOCKED) is success for the harness.
+
+$skipBackendSmokeAuto = $Quick -or $SkipSmoke -or ($OnlyStage -and $OnlyStage -ne "Gate/Ledger Validation")
+
+$stage8_9Passed = Invoke-Stage -Name "Backend Smoke Auto-Probe" -Description "Canonical backend smoke proof (uvicorn /health + /api/health) before Gate/Ledger" -Skip:$skipBackendSmokeAuto -TimeoutSeconds $StageTimeouts["Backend Smoke Auto-Probe"] -Action {
+    $smokeScript = Join-Path $ScriptDir "ci\run_backend_smoke.py"
+    & python $smokeScript
+    $smokeExit = $LASTEXITCODE
+    if ($smokeExit -eq 2) {
+        Write-Host "  [ADVISORY] Backend smoke BLOCKED (prerequisites not satisfied; proof file still written)" -ForegroundColor Yellow
+        cmd /c "exit 0"
+        return
+    }
+    cmd /c "exit $smokeExit"
+}
+Invoke-StopIfRequested "Backend Smoke Auto-Probe"
+
+if (-not $stage8_9Passed -and -not $skipBackendSmokeAuto) {
+    Write-Host ""
+    Write-Host "BACKEND SMOKE AUTO-PROBE FAILED - Stopping verification (fail-fast)" -ForegroundColor Red
+    Write-Report
+    exit 1
+}
 
 # ============================================================================
 # STAGE 9: Gate/Ledger Validation
@@ -1825,6 +2154,7 @@ $stage9Passed = Invoke-Stage -Name "Gate/Ledger Validation" -Description "Check 
     & python @rvArgs
     return $LASTEXITCODE
 }
+Invoke-StopIfRequested "Gate/Ledger Validation"
 
 # ============================================================================
 # FINAL REPORT

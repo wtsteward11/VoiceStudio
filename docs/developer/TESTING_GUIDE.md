@@ -427,6 +427,14 @@ The test workflow (`.github/workflows/test.yml`) runs:
 5. **performance-tests**: Benchmarks (on release branches)
 6. **e2e-full-app**: Full E2E tests (manual trigger)
 
+### Windows verify-harness (checkpoint + resume)
+
+The workflow [`.github/workflows/verify-harness.yml`](../.github/workflows/verify-harness.yml) runs on **`windows-latest`** and is the authoritative CI reproduction of **`scripts/verify.ps1`** Quick mode and (on `workflow_dispatch` with `run_full_chain` or on weekly schedule) **checkpoint + resume** (`-StopAfterStage "C# Unit Tests - Other"` then `-ResumeFrom "Python Unit Tests"`). It uploads **`artifacts/verify/`** and **`.buildlogs/verification/last_run.json`** as workflow artifacts.
+
+**When to use:** After changing the verification harness, failure-path smoke scripts, or CI templates; or run the weekly scheduled job for drift detection. Trigger manually: **Actions → Verify Harness (Checkpoint + Resume) → Run workflow**.
+
+**Discipline:** See [EXECUTION_ROW_DISCIPLINE.md](../governance/EXECUTION_ROW_DISCIPLINE.md) §8. Contract tests: `tests/unit/test_verify_harness_contract.py`.
+
 ### Required Checks
 
 | Job | Required | Blocking |

@@ -46,7 +46,13 @@
 
 After pip hardening reached **`main`**, GitHub Actions run **`24381385977`** (**[link](https://github.com/wtsteward11/VoiceStudio/actions/runs/24381385977)**) **passed** **Install Python dependencies** and **failed** **Verify Quick Gate** at **Security Tests**: `test_plugin_sandbox_security.py::TestPermissionEnforcement::test_path_allowed_only_in_whitelist`. **Not** pip; **not** `workflow_dispatch` (checkpoint job **skipped**).
 
-**Bounded fix:** [`backend/services/plugin_sandbox.py`](../../backend/services/plugin_sandbox.py) — `can_access_path` now compares **resolved** roots and uses **`relative_to()`** for containment (Windows runner-safe). **Row stays Open** until a green **`workflow_dispatch`** + **`run_full_chain: true`** is recorded in the [closure report](../reports/verification/VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md) and a fresh GHA **Quick** run confirms the security stage on **`main`**.
+**Bounded fix:** [`backend/services/plugin_sandbox.py`](../../backend/services/plugin_sandbox.py) — `can_access_path` now compares **resolved** roots and uses **`relative_to()`** for containment (Windows runner-safe).
+
+**Supplemental GHA signal (2026-04-14 — push `b7a4ddf5`, run `24382787205`)**
+
+Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: **[run](https://github.com/wtsteward11/VoiceStudio/actions/runs/24382787205)**. **Verify Quick Gate:** **failure**. **STAGE 20: Security Tests:** **PASS** (hosted confirmation — prior **`24381385977`** sandbox failure **superseded**). **First terminal failure (single slice):** **STAGE 28: Gate/Ledger Validation** → **`startup_artifact_check`** **exit 1** (**not** sandbox; **not** pip). Checkpoint/resume job **skipped** (`push`).
+
+**Row stays Open** until a green **`workflow_dispatch`** + **`run_full_chain: true`** is recorded in the [closure report](../reports/verification/VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md) **and** hosted **Quick** is green end-to-end (or a **new** bounded row documents the **`startup_artifact_check`** slice without smearing sandbox scope).
 
 ## Rerun command (after token/UI access)
 

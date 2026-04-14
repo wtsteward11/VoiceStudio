@@ -9,8 +9,8 @@
 | Verdict | Meaning |
 | --- | --- |
 | **Implemented on `main`** | **Yes** — workflow + contracts + lineage tooling ship on default branch. |
-| **Operationally certified (GHA)** | **No** — **`workflow_dispatch`** + **`run_full_chain: true`** green **not** recorded; post-`887ae942` **push** run **`24381385977`** reached **`verify.ps1 -Quick`** and failed in **Security Tests** (see **Post-`887ae942` push observation** below), not pip. |
-| **Authoritative `workflow_dispatch` run** | **Not yet executed** — automation **`gh workflow run`** returns **HTTP 403** from the active token; **operator must use Actions UI** (or a token with workflow dispatch permission). See **Dispatch path** below. |
+| **Operationally certified (GHA)** | **No** — authoritative **`workflow_dispatch`** + **`run_full_chain: true`** green **not** recorded (**`gh workflow run`** **HTTP 403**). **Post-fix push** **`24382787205`** (**`b7a4ddf5`**) reached **STAGE 20: Security Tests** **PASS** (sandbox remediation verified on **`windows-latest`**); **Quick** still **failure** at **STAGE 28: Gate/Ledger Validation** — first failing sub-check **`startup_artifact_check`** **exit 1** (not sandbox; not pip). |
+| **Authoritative `workflow_dispatch` run** | **Not yet executed** — automation **`gh workflow run`** returns **HTTP 403**; **operator must use Actions UI** (or a token with workflow dispatch permission). **Push run `24382787205`** is **substitute evidence only** (Quick + path-filter), **not** a full-chain dispatch. See **Dispatch path** and **Run C** below. |
 
 ## Workflow
 
@@ -33,18 +33,20 @@
 
 ## Authoritative `workflow_dispatch` (full chain) — capture template
 
-**Status:** **Not yet recorded** (automation **`gh workflow run`** returns **HTTP 403** with the token used in this environment).
+**Status:** **Not yet recorded** — automation **`gh workflow run`** returns **HTTP 403** (`Resource not accessible by personal access token`). **2026-04-14:** Path-filter **push** on **`.github/workflows/verify-harness.yml`** triggered **Run C** (`24382787205`) as **substitute** for hosted signal; **does not** replace **`workflow_dispatch`** + **`run_full_chain`**.
 
 | Field | Value |
 | --- | --- |
-| **Run URL** | *Pending — paste after UI run* |
+| **Run URL** | *Pending UI dispatch — use Actions → Run workflow* |
 | **Run ID** | *Pending* |
-| **Commit SHA** | *Pending (expect `main` tip)* |
+| **Commit SHA** | *Pending (expect `main` tip at dispatch time)* |
 | **Event** | `workflow_dispatch` |
 | **Inputs** | `run_full_chain: true` |
 | **Verify Quick Gate** | *Pending* |
 | **Verify Checkpoint + Resume Chain** | *Pending* |
 | **Artifacts** | *Pending (`verify-quick-artifacts`, `verify-checkpoint-resume-artifacts`)* |
+
+**Push substitute (NOT dispatch):** Run **`24382787205`** — see **Run C** below.
 
 ## Run identity — observed GHA executions (push; not authoritative dispatch)
 
@@ -83,9 +85,24 @@ These runs are **not** a substitute for **`workflow_dispatch`** + **`run_full_ch
 | **Python Quality** | **passed** (console noted **Mypy strict scope** delta **+1** vs budget **0** as advisory in that stage; stage still **PASSED** per harness) |
 | **Verify Checkpoint + Resume Chain** | **skipped** | Same as run A — **`push`** does not run full chain. |
 
-**Remediation (repo):** `SandboxPermissions.can_access_path` in [`backend/services/plugin_sandbox.py`](../../../backend/services/plugin_sandbox.py) now resolves allow-list roots and uses **`Path.relative_to()`** so paths outside the workspace are rejected on Windows-hosted runners (fixes false allow on `windows-latest`). Re-verify on next GHA **Quick** run after push.
+**Remediation (repo):** `SandboxPermissions.can_access_path` in [`backend/services/plugin_sandbox.py`](../../../backend/services/plugin_sandbox.py) now resolves allow-list roots and uses **`Path.relative_to()`** so paths outside the workspace are rejected on Windows-hosted runners (fixes false allow on `windows-latest`).
 
-**Authoritative `workflow_dispatch` evidence:** still **pending** — `gh workflow run` returns **HTTP 403**; operator must use **Actions UI** (or a dispatch-capable PAT) and record URL/ID/SHA + both job conclusions here.
+### Run C — path-filter push after sandbox + STATE sync (`24382787205`, commit `b7a4ddf5`)
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24382787205 |
+| **Run ID** | `24382787205` |
+| **Commit SHA** | `b7a4ddf5d769cc145250141cd42887f78cfcc0b6` |
+| **Trigger** | `push` (path-filter: **`.github/workflows/verify-harness.yml`** comment touch — re-trigger after **`be2c10b4`** sandbox fix; **`gh workflow_dispatch`** **403**) |
+| **Verify Quick Gate** | **failure** |
+| **Verify Checkpoint + Resume Chain** | **skipped** (expected for **`push`**) |
+| **Install Python dependencies** | **success** |
+| **STAGE 20: Security Tests** | **PASS** (~140s) — **hosted proof** that prior **`24381385977`** **`test_path_allowed_only_in_whitelist`** failure is **resolved** (full security stage green). |
+| **First failing step (fail-fast terminal)** | **STAGE 28: Gate/Ledger Validation** → **`startup_artifact_check`** **exit 1** (`ledger_validate` **PASS**; overall Gate/Ledger **FAIL**). |
+| **Artifacts** | **`verify-quick-artifacts`** uploaded (run log + `artifacts/verify/20260414_053817/`) |
+
+**Authoritative `workflow_dispatch` evidence:** still **pending** — use **Actions UI** for **`run_full_chain: true`**; **`24382787205`** is **Quick-only** substitute.
 
 ## Outcome classification rule (this session)
 
@@ -157,7 +174,7 @@ gh run download 24379285704 --dir artifacts/ci-harness-download/
 | --- | --- |
 | Workflow exists on default branch and is triggerable | **Met** |
 | At least one **GitHub Actions** run recorded with **immutable URL/ID/SHA** (push run `24379285704`) | **Met** |
-| **`workflow_dispatch`** with **`run_full_chain: true`** **completed green** | **Pending** (operator UI or dispatch-capable token) |
+| **`workflow_dispatch`** with **`run_full_chain: true`** **completed green** | **Pending** (operator UI or dispatch-capable token); push **`24382787205`** **does not** satisfy this row |
 | Outcome bucket recorded without ambiguity (**`BucketC_InfraRed`** for observed run) | **Met** |
 | If non-green: exactly **one** bounded CI-only slice opened | **Met** |
 

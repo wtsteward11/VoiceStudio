@@ -7,6 +7,7 @@ Implements IDEA 36: Advanced Search with Natural Language.
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -27,11 +28,36 @@ from backend.services.profile_search_service import get_profiles_for_search
 from backend.services.project_search_service import get_projects_for_search
 from backend.services.script_store import get_scripts_for_search
 
-_markers = get_marker_store()
-_profiles = get_profiles_for_search()
-_projects = get_projects_for_search()
-_scripts = get_scripts_for_search()
-STORAGE_AVAILABLE = True
+_markers: Any = None
+_profiles: Any = None
+_projects: Any = None
+_scripts: Any = None
+STORAGE_AVAILABLE = False
+_storage_lock = threading.Lock()
+
+
+def _load_search_storage() -> None:
+    """
+    Lazy-initialize search storage backends on first route request.
+
+    GAP-069 slice 5: Avoid import-time DB / store access so unit tests can collect
+    without a connected database. Assign globals only after all getters succeed.
+    """
+    global _markers, _profiles, _projects, _scripts, STORAGE_AVAILABLE
+    if STORAGE_AVAILABLE:
+        return
+    with _storage_lock:
+        if STORAGE_AVAILABLE:
+            return
+        markers = get_marker_store()
+        profiles = get_profiles_for_search()
+        projects = get_projects_for_search()
+        scripts = get_scripts_for_search()
+        _markers = markers
+        _profiles = profiles
+        _projects = projects
+        _scripts = scripts
+        STORAGE_AVAILABLE = True
 
 
 class SearchResultItem(BaseModel):
@@ -401,6 +427,8 @@ async def search(
     """
     if len(q) < 2:
         raise HTTPException(status_code=400, detail="Search query must be at least 2 characters")
+
+    _load_search_storage()
 
     # Check storage availability - return proper error instead of empty results
     if not STORAGE_AVAILABLE:

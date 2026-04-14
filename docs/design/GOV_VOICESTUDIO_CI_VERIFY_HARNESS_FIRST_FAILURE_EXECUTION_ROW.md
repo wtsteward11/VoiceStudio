@@ -131,6 +131,18 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 2. **Harness: `RunConfiguration.MaxCpuCount=1`** for the Seam A-D `dotnet test` invocation only — avoids multi-minute hangs from parallel MSTest workers + per-test `DispatcherQueueController` on `windows-latest`.
 3. **Shard budget** — remains **180s** for Seam A-D once (1)+(2) are in place (300s was insufficient while the parallel deadlock persisted).
 
+### Post Seam A-D fix — `workflow_dispatch` `24417704302` (2026-04-14)
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24417704302 |
+| **Checkpoint: STAGE 6 Seam A-D** | **PASSED** (~8s) — `RunConfiguration.MaxCpuCount=1` + bounded dispatcher shutdown (`6772b9b3` on `main`) |
+| **Verify Quick Gate** | **success** |
+| **Verify Checkpoint + Resume Chain** | **failure** (resume path) |
+| **First failing stage after checkpoint** | **STAGE 18: Contract Tests** — **FAILED** (pytest exit **1**); see job artifact `logs/contract_tests.log` |
+
+**Seam A-D bounded slice:** **addressed** (no longer the first failing stage). **Row stays Open** until full chain green; **next bounded slice** = **Contract Tests** failure analysis (do not re-open Seam A-D unless regression).
+
 ## Rerun command (after token/UI access)
 
 ```powershell

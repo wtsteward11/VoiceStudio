@@ -138,7 +138,7 @@
         "properties": {
           "type": {"type": "string"},
           "default": {},
-          "enum": {"type": "array"},
+          "enum": {"type": "array", "items": {"type": "string"}},
           "minimum": {"type": "number"},
           "maximum": {"type": "number"},
           "description": {"type": "string"}

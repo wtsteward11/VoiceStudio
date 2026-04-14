@@ -7,12 +7,13 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
-from typing import Any
+from typing import Annotated, Any
 
 import numpy as np
-from fastapi import File, HTTPException, Request, UploadFile
+from fastapi import Body, File, HTTPException, UploadFile
 
 from ...models_additional import (
+    PronunciationTestRequest,
     VoiceAnalyzeResponse,
     VoiceCharacteristicAnalysisRequest,
     VoiceCharacteristicAnalysisResponse,
@@ -455,12 +456,13 @@ async def analyze_voice_characteristics_endpoint(
 
 
 @router.post("/test-pronunciation")
-async def test_pronunciation(request: Request) -> dict[str, Any]:
+async def test_pronunciation(
+    body: Annotated[PronunciationTestRequest, Body(...)],
+) -> dict[str, Any]:
     """Test pronunciation of a word."""
-    body = await request.json()
-    word = body.get("word", "")
-    phonemes = body.get("phonemes") or word
-    language = body.get("language", "en")
+    word = body.word
+    phonemes = body.phonemes or word
+    language = body.language
     return {
         "word": word,
         "phonemes": phonemes,

@@ -7,12 +7,9 @@
   "description": "OpenAI-compatible local LLM inference via LocalAI. Supports streaming, function calling, and multiple model backends.",
   "entry_point": "app.core.engines.llm_local_adapter:LocalAILLMProvider",
   "dependencies": {
-    "python": [
-      "httpx>=0.25.0"
-    ],
-    "system": [
-      "localai"
-    ]
+    "python": ">=3.10",
+    "httpx": ">=0.25.0",
+    "system": "localai>=0.0.0"
   },
   "capabilities": [
     "text_generation",

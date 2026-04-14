@@ -7,12 +7,9 @@
   "description": "Local-first LLM inference via Ollama. Supports streaming, function calling, and offline operation.",
   "entry_point": "app.core.engines.llm_local_adapter:OllamaLLMProvider",
   "dependencies": {
-    "python": [
-      "httpx>=0.25.0"
-    ],
-    "system": [
-      "ollama"
-    ]
+    "python": ">=3.10",
+    "httpx": ">=0.25.0",
+    "system": "ollama>=0.0.0"
   },
   "capabilities": [
     "text_generation",

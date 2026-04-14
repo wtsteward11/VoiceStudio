@@ -43,7 +43,7 @@ TYPE_REQUIRED_FIELDS = {
 }
 
 # Valid engine types
-VALID_ENGINE_TYPES = {"audio", "image", "video"}
+VALID_ENGINE_TYPES = {"audio", "image", "video", "llm"}
 
 # Valid subtypes per engine type
 VALID_SUBTYPES = {

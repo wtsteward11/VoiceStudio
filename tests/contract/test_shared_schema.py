@@ -265,7 +265,10 @@ class TestSchemaReferences:
                             break
                 # External refs (file paths)
                 elif not ref_value.startswith("http"):
-                    ref_file = shared_dir / ref_value
+                    current_schema = shared_dir / schema_path
+                    ref_file = current_schema.parent / ref_value
+                    if not ref_file.exists():
+                        ref_file = shared_dir / ref_value
                     if not ref_file.exists():
                         errors.append(f"{schema_path}{ref_path}: file not found {ref_value}")
 

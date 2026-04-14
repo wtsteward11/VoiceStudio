@@ -7,9 +7,8 @@
   "description": "Cloud LLM via OpenAI chat completions API. Optional -- requires API key. Local providers preferred.",
   "entry_point": "app.core.engines.llm_openai_adapter:OpenAILLMProvider",
   "dependencies": {
-    "python": [
-      "httpx>=0.25.0"
-    ]
+    "python": ">=3.10",
+    "httpx": ">=0.25.0"
   },
   "capabilities": [
     "text_generation",

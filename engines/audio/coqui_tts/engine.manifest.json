@@ -1,115 +1,69 @@
 {
   "$schema": "../../../shared/schemas/engine.manifest.schema.json",
-  "id": "coqui_tts",
+  "engine_id": "coqui_tts",
   "name": "Coqui TTS",
+  "type": "audio",
+  "subtype": "tts",
   "version": "0.22.0",
   "description": "Multi-model TTS library with 100+ pretrained models and voice cloning support",
-  "category": "tts",
   "author": "Coqui AI",
   "license": "MPL-2.0",
   "homepage": "https://github.com/coqui-ai/TTS",
-  
-  "capabilities": {
-    "primary": ["tts", "clone"],
-    "secondary": ["multilingual", "multi_speaker", "emotion"],
-    "multi_reference": true,
-    "streaming": true
-  },
-  
-  "languages": ["en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar", "hi", "nl", "pl", "tr", "uk", "vi"],
-  
-  "requirements": {
+  "dependencies": {
     "python": ">=3.10,<3.12",
-    "venv_family": "CORE_TTS",
-    "packages": [
-      "TTS>=0.22.0",
-      "torch>=2.0.0",
-      "torchaudio>=2.0.0"
-    ],
-    "device": {
-      "gpu_required": false,
-      "gpu_recommended": true,
-      "min_vram_mb": 4096,
-      "min_ram_mb": 8192,
-      "cuda_versions": ["11.8", "12.1", "12.4"]
-    }
+    "TTS": ">=0.22.0",
+    "torch": ">=2.0.0",
+    "torchaudio": ">=2.0.0"
   },
-  
-  "models": {
-    "default": "tts_models/en/ljspeech/tacotron2-DDC",
-    "storage_path": "%PROGRAMDATA%/VoiceStudio/models/coqui_tts",
-    "auto_download": true,
-    "model_zoo": "https://github.com/coqui-ai/TTS/wiki/Released-Models",
-    "popular_models": [
-      {
-        "name": "tts_models/en/ljspeech/tacotron2-DDC",
-        "description": "English female, LJSpeech trained",
-        "size_mb": 150
-      },
-      {
-        "name": "tts_models/en/ljspeech/vits",
-        "description": "English female, VITS architecture",
-        "size_mb": 120
-      },
-      {
-        "name": "tts_models/multilingual/multi-dataset/your_tts",
-        "description": "Multilingual voice cloning",
-        "size_mb": 200
-      },
-      {
-        "name": "tts_models/en/vctk/vits",
-        "description": "English multi-speaker VITS",
-        "size_mb": 150
-      }
-    ]
+  "capabilities": [
+    "multi_language_tts",
+    "zero_shot_cloning",
+    "emotion_control",
+    "streaming",
+    "high_quality_synthesis",
+    "style_transfer"
+  ],
+  "languages": ["en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar", "hi", "nl", "pl", "tr", "uk", "vi"],
+  "model_paths": {
+    "base": "%PROGRAMDATA%/VoiceStudio/models/coqui_tts",
+    "cache": "%PROGRAMDATA%/VoiceStudio/models/coqui_tts/cache"
   },
-  
-  "entry_point": {
-    "type": "class",
-    "module": "app.core.engines.tts.coqui_engine",
-    "class_name": "CoquiTTSEngine",
-    "init_args": {}
-  },
-  
+  "entry_point": "app.core.engines.tts.coqui_engine.CoquiTTSEngine",
   "config_schema": {
-    "type": "object",
-    "properties": {
-      "model_name": {
-        "type": "string",
-        "default": "tts_models/en/ljspeech/tacotron2-DDC",
-        "description": "Coqui TTS model identifier"
-      },
-      "speaker": {
-        "type": "string",
-        "default": null,
-        "description": "Speaker name for multi-speaker models"
-      },
-      "language": {
-        "type": "string",
-        "default": "en",
-        "description": "Target language for multilingual models"
-      },
-      "speaker_wav": {
-        "type": "string",
-        "default": null,
-        "description": "Path to reference audio for voice cloning"
-      },
-      "emotion": {
-        "type": "string",
-        "enum": ["neutral", "happy", "sad", "angry", "surprised"],
-        "default": "neutral",
-        "description": "Emotion for emotion-capable models"
-      },
-      "speed": {
-        "type": "number",
-        "default": 1.0,
-        "minimum": 0.5,
-        "maximum": 2.0,
-        "description": "Speech speed"
-      }
+    "model_name": {
+      "type": "string",
+      "default": "tts_models/en/ljspeech/tacotron2-DDC",
+      "description": "Coqui TTS model identifier"
+    },
+    "speaker": {
+      "type": "string",
+      "default": "",
+      "description": "Speaker name for multi-speaker models"
+    },
+    "language": {
+      "type": "string",
+      "default": "en",
+      "description": "Target language for multilingual models"
+    },
+    "speaker_wav": {
+      "type": "string",
+      "default": "",
+      "description": "Path to reference audio for voice cloning"
+    },
+    "emotion": {
+      "type": "string",
+      "enum": ["neutral", "happy", "sad", "angry", "surprised"],
+      "default": "neutral",
+      "description": "Emotion for emotion-capable models"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1.0,
+      "minimum": 0.5,
+      "maximum": 2.0,
+      "description": "Speech speed"
     }
   },
-  
   "status": "stable",
   "quality_rating": 8,
   "speed_rating": 7,

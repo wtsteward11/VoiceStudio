@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, Request
+from typing import Annotated
+
+from fastapi import Body, Depends, HTTPException, Request
 
 from backend.api.dependencies import require_synthesis_clearance
 from backend.api.deps import EngineConfigServiceDep
@@ -9,8 +11,10 @@ from backend.api.models_additional import (
     LongFormSynthesisResponse,
     MultiPassSynthesisRequest,
     MultiPassSynthesisResponse,
+    VoiceSynthesizeCrossLingualRequest,
     VoiceSynthesizeRequest,
     VoiceSynthesizeResponse,
+    VoiceSynthesizeWithStyleRequest,
 )
 from backend.core.exceptions import ServiceError
 from backend.services.synthesis_service import SynthesisService
@@ -81,38 +85,26 @@ async def synthesize_long_form(
 
 async def synthesize_with_style(
     request: Request,
-    text: str,
-    profile_id: str,
-    engine: str = "openvoice",
-    language: str = "en",
-    emotion: str | None = None,
-    accent: str | None = None,
-    rhythm: float | None = None,
-    pauses: str | None = None,
-    pitch_shift: float | None = None,
-    pitch_variance: float | None = None,
-    energy: float | None = None,
-    enhance_quality: bool = True,
-    calculate_quality: bool = True,
+    body: Annotated[VoiceSynthesizeWithStyleRequest, Body(...)],
     _policy: None = Depends(require_synthesis_clearance),
 ) -> VoiceSynthesizeResponse:
     """Style synthesis; delegates to SynthesisService."""
     try:
         return await SynthesisService.synthesize_with_style(
             _request=request,
-            text=text,
-            profile_id=profile_id,
-            engine=engine,
-            language=language,
-            emotion=emotion,
-            accent=accent,
-            rhythm=rhythm,
-            pauses=pauses,
-            pitch_shift=pitch_shift,
-            pitch_variance=pitch_variance,
-            energy=energy,
-            enhance_quality=enhance_quality,
-            calculate_quality=calculate_quality,
+            text=body.text,
+            profile_id=body.profile_id,
+            engine=body.engine,
+            language=body.language,
+            emotion=body.emotion,
+            accent=body.accent,
+            rhythm=body.rhythm,
+            pauses=body.pauses,
+            pitch_shift=body.pitch_shift,
+            pitch_variance=body.pitch_variance,
+            energy=body.energy,
+            enhance_quality=body.enhance_quality,
+            calculate_quality=body.calculate_quality,
         )
     except ServiceError as e:
         _raise_synthesis_service_error(e)
@@ -120,26 +112,20 @@ async def synthesize_with_style(
 
 async def synthesize_cross_lingual(
     request: Request,
-    text: str,
-    profile_id: str,
-    source_language: str = "en",
-    target_language: str = "es",
-    engine: str = "openvoice",
-    enhance_quality: bool = True,
-    calculate_quality: bool = True,
+    body: Annotated[VoiceSynthesizeCrossLingualRequest, Body(...)],
     _policy: None = Depends(require_synthesis_clearance),
 ) -> VoiceSynthesizeResponse:
     """Cross-lingual synthesis; delegates to SynthesisService."""
     try:
         return await SynthesisService.synthesize_cross_lingual(
             _request=request,
-            text=text,
-            profile_id=profile_id,
-            source_language=source_language,
-            target_language=target_language,
-            engine=engine,
-            enhance_quality=enhance_quality,
-            calculate_quality=calculate_quality,
+            text=body.text,
+            profile_id=body.profile_id,
+            source_language=body.source_language,
+            target_language=body.target_language,
+            engine=body.engine,
+            enhance_quality=body.enhance_quality,
+            calculate_quality=body.calculate_quality,
         )
     except ServiceError as e:
         _raise_synthesis_service_error(e)

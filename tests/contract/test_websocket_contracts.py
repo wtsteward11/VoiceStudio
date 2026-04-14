@@ -1,49 +1,53 @@
 """WebSocket contract tests for VoiceStudio endpoints.
 
 Validates message schemas for /ws/events, /ws/realtime, and /ws/plugins.
+HTTP GET against WebSocket-only routes returns 404 under ASGI; registration is
+checked via the Starlette route table instead.
 """
 
 from __future__ import annotations
 
-import json
-
 import pytest
-from httpx import ASGITransport, AsyncClient
+from starlette.routing import WebSocketRoute
 
 from backend.api.main import app
 
 
-@pytest.fixture
-def anyio_backend():
-    return "asyncio"
+def _websocket_paths() -> set[str]:
+    """Collect WebSocket route paths from the FastAPI app (including mounted routers)."""
+    paths: set[str] = set()
+
+    def walk(routes: list) -> None:
+        for route in routes:
+            if isinstance(route, WebSocketRoute):
+                paths.add(route.path)
+            nested = getattr(route, "routes", None)
+            if nested:
+                walk(list(nested))
+
+    walk(list(app.routes))
+    return paths
 
 
-@pytest.fixture
-async def client():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
-
-
-@pytest.mark.asyncio
-async def test_events_endpoint_exists(client: AsyncClient):
-    """The /ws/events endpoint must be registered and not 404."""
-    resp = await client.get("/ws/events")
-    assert resp.status_code != 404, "/ws/events endpoint not registered"
-
-
-@pytest.mark.asyncio
-async def test_realtime_endpoint_exists(client: AsyncClient):
-    """The /ws/realtime endpoint must be registered and not 404."""
-    resp = await client.get("/ws/realtime")
-    assert resp.status_code != 404, "/ws/realtime endpoint not registered"
+_WS_PATHS = _websocket_paths()
 
 
 @pytest.mark.asyncio
-async def test_plugins_endpoint_exists(client: AsyncClient):
-    """The /ws/plugins endpoint must be registered and not 404."""
-    resp = await client.get("/ws/plugins")
-    assert resp.status_code != 404, "/ws/plugins endpoint not registered"
+async def test_events_endpoint_exists():
+    """The /ws/events endpoint must be registered on the app."""
+    assert "/ws/events" in _WS_PATHS, "/ws/events endpoint not registered"
+
+
+@pytest.mark.asyncio
+async def test_realtime_endpoint_exists():
+    """The /ws/realtime endpoint must be registered on the app."""
+    assert "/ws/realtime" in _WS_PATHS, "/ws/realtime endpoint not registered"
+
+
+@pytest.mark.asyncio
+async def test_plugins_endpoint_exists():
+    """The /ws/plugins endpoint must be registered on the app."""
+    assert "/ws/plugins" in _WS_PATHS, "/ws/plugins endpoint not registered"
 
 
 class TestWebSocketMessageSchemas:

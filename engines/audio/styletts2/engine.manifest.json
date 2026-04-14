@@ -1,118 +1,69 @@
 {
   "$schema": "../../../shared/schemas/engine.manifest.schema.json",
-  "id": "styletts2",
+  "engine_id": "styletts2",
   "name": "StyleTTS 2",
+  "type": "audio",
+  "subtype": "tts",
   "version": "2.0.0",
   "description": "State-of-the-art TTS achieving human-level naturalness with style diffusion",
-  "category": "tts",
   "author": "yl4579",
   "license": "MIT",
   "homepage": "https://github.com/yl4579/StyleTTS2",
-  
-  "capabilities": {
-    "primary": ["tts", "clone"],
-    "secondary": ["style_transfer", "prosody_control", "emotion"],
-    "multi_reference": true,
-    "streaming": false
-  },
-  
-  "languages": ["en"],
-  
-  "requirements": {
+  "dependencies": {
     "python": ">=3.10,<3.12",
-    "venv_family": "ADVANCED_TTS",
-    "packages": [
-      "torch>=2.0.0",
-      "torchaudio>=2.0.0",
-      "phonemizer>=3.2.0",
-      "munch>=2.5.0",
-      "pydub>=0.25.0"
-    ],
-    "device": {
-      "gpu_required": true,
-      "gpu_recommended": true,
-      "min_vram_mb": 6144,
-      "min_ram_mb": 12288,
-      "cuda_versions": ["11.8", "12.1", "12.4"]
-    }
+    "torch": ">=2.0.0",
+    "torchaudio": ">=2.0.0",
+    "phonemizer": ">=3.2.0"
   },
-  
-  "models": {
-    "default": "styletts2_ljspeech",
-    "storage_path": "%PROGRAMDATA%/VoiceStudio/models/styletts2",
-    "auto_download": true,
-    "files": [
-      {
-        "name": "epoch_2nd_00100.pth",
-        "size_mb": 250,
-        "description": "StyleTTS2 main model"
-      },
-      {
-        "name": "config.yml",
-        "size_mb": 1,
-        "description": "Model configuration"
-      },
-      {
-        "name": "ASR/epoch_00080.pth",
-        "size_mb": 150,
-        "description": "ASR alignment model"
-      },
-      {
-        "name": "JDC/bst.t7",
-        "size_mb": 30,
-        "description": "F0 predictor"
-      }
-    ]
+  "capabilities": [
+    "high_quality_synthesis",
+    "zero_shot_cloning",
+    "style_transfer",
+    "emotion_control",
+    "expressive_speech"
+  ],
+  "languages": ["en"],
+  "model_paths": {
+    "base": "%PROGRAMDATA%/VoiceStudio/models/styletts2"
   },
-  
-  "entry_point": {
-    "type": "class",
-    "module": "app.core.engines.tts.styletts2_engine",
-    "class_name": "StyleTTS2Engine",
-    "init_args": {}
-  },
-  
+  "entry_point": "app.core.engines.tts.styletts2_engine.StyleTTS2Engine",
   "config_schema": {
-    "type": "object",
-    "properties": {
-      "diffusion_steps": {
-        "type": "integer",
-        "default": 5,
-        "minimum": 1,
-        "maximum": 20,
-        "description": "Number of diffusion steps (more = better quality, slower)"
-      },
-      "embedding_scale": {
-        "type": "number",
-        "default": 1.0,
-        "minimum": 0.0,
-        "maximum": 2.0,
-        "description": "Style embedding strength"
-      },
-      "alpha": {
-        "type": "number",
-        "default": 0.3,
-        "minimum": 0.0,
-        "maximum": 1.0,
-        "description": "Prosody interpolation"
-      },
-      "beta": {
-        "type": "number",
-        "default": 0.7,
-        "minimum": 0.0,
-        "maximum": 1.0,
-        "description": "Style interpolation"
-      },
-      "noise_scale": {
-        "type": "number",
-        "default": 0.667,
-        "minimum": 0.0,
-        "maximum": 1.0,
-        "description": "Variation/expressiveness"
-      }
+    "diffusion_steps": {
+      "type": "integer",
+      "default": 5,
+      "minimum": 1,
+      "maximum": 20,
+      "description": "Number of diffusion steps (more = better quality, slower)"
+    },
+    "embedding_scale": {
+      "type": "number",
+      "default": 1.0,
+      "minimum": 0.0,
+      "maximum": 2.0,
+      "description": "Style embedding strength"
+    },
+    "alpha": {
+      "type": "number",
+      "default": 0.3,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Prosody interpolation"
+    },
+    "beta": {
+      "type": "number",
+      "default": 0.7,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Style interpolation"
+    },
+    "noise_scale": {
+      "type": "number",
+      "default": 0.667,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Variation/expressiveness"
     }
   },
-  
   "status": "stable",
   "quality_rating": 10,
   "speed_rating": 5,

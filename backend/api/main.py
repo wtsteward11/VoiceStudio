@@ -275,36 +275,38 @@ _openapi_schema_generated = False
 
 
 def custom_openapi():
-    """Generate custom OpenAPI schema with enhancements (lazy)."""
+    """Generate custom OpenAPI schema with enhancements (lazy, recomputable).
+
+    Callers may set ``app.openapi_schema = None`` to force regeneration (e.g. contract
+    tests after route registration). The previous implementation gated generation on
+    ``_openapi_schema_generated`` only, so clearing the cache without resetting that
+    flag returned ``None`` and broke OpenAPI-dependent tests (e.g. /api/voice/voices).
+    """
     global _openapi_schema_generated
 
     if app.openapi_schema:
         return app.openapi_schema
 
-    # Only generate schema on first request (not during startup)
-    if not _openapi_schema_generated:
-        try:
-            from .documentation import enhance_openapi_schema
+    try:
+        from .documentation import enhance_openapi_schema
 
-            openapi_schema = enhance_openapi_schema(app)
-            app.openapi_schema = openapi_schema
-            _openapi_schema_generated = True
-            return app.openapi_schema
-        except ImportError:
-            # Fallback to default OpenAPI generation
-            from fastapi.openapi.utils import get_openapi
+        openapi_schema = enhance_openapi_schema(app)
+        app.openapi_schema = openapi_schema
+        _openapi_schema_generated = True
+        return app.openapi_schema
+    except ImportError:
+        # Fallback to default OpenAPI generation
+        from fastapi.openapi.utils import get_openapi
 
-            openapi_schema = get_openapi(
-                title=app.title,
-                version=app.version,
-                description=app.description,
-                routes=app.routes,
-            )
-            app.openapi_schema = openapi_schema
-            _openapi_schema_generated = True
-            return app.openapi_schema
-
-    return app.openapi_schema
+        openapi_schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+        )
+        app.openapi_schema = openapi_schema
+        _openapi_schema_generated = True
+        return app.openapi_schema
 
 
 app.openapi = custom_openapi

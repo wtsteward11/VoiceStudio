@@ -166,6 +166,49 @@ class AssistantRunRequest(VoiceStudioBaseModel):
 
 
 # =============================================================================
+# Voice style / pronunciation (explicit JSON bodies for OpenAPI contract)
+# =============================================================================
+
+
+class PronunciationTestRequest(VoiceStudioBaseModel):
+    """Request body for pronunciation testing."""
+
+    word: str = ""
+    phonemes: str | None = None
+    language: str = "en"
+
+
+class VoiceSynthesizeWithStyleRequest(VoiceStudioBaseModel):
+    """JSON body for style-controlled synthesis (replaces query-only parameters)."""
+
+    text: str = Field(..., min_length=1, max_length=10000)
+    profile_id: str = Field(..., min_length=1, max_length=100)
+    engine: str = Field(default="openvoice", max_length=50)
+    language: str = Field(default="en", max_length=10)
+    emotion: str | None = Field(default=None, max_length=50)
+    accent: str | None = Field(default=None, max_length=50)
+    rhythm: float | None = Field(default=None)
+    pauses: str | None = Field(default=None, max_length=200)
+    pitch_shift: float | None = Field(default=None)
+    pitch_variance: float | None = Field(default=None)
+    energy: float | None = Field(default=None)
+    enhance_quality: bool = True
+    calculate_quality: bool = True
+
+
+class VoiceSynthesizeCrossLingualRequest(VoiceStudioBaseModel):
+    """JSON body for cross-lingual synthesis."""
+
+    text: str = Field(..., min_length=1, max_length=10000)
+    profile_id: str = Field(..., min_length=1, max_length=100)
+    source_language: str = Field(default="en", max_length=10)
+    target_language: str = Field(default="es", max_length=10)
+    engine: str = Field(default="openvoice", max_length=50)
+    enhance_quality: bool = True
+    calculate_quality: bool = True
+
+
+# =============================================================================
 # Voice Cloning Models (GAP-I16: Use VoiceStudioBaseModel)
 # =============================================================================
 

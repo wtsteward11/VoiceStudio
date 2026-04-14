@@ -79,7 +79,16 @@ def openapi_schema() -> dict | None:
         app.openapi_schema = None
 
         schema = app.openapi()
-        if schema and schema.get("paths"):
+        paths = schema.get("paths") if schema else None
+        # Route-enumeration tests may call app.openapi() before this fixture; if generation
+        # skipped gateway alias routes, force a second pass (static fallback lacks /api/voice/voices).
+        if paths and "/api/voice/voices" not in paths:
+            app.openapi_schema = None
+            _register_all_routes()
+            schema = app.openapi()
+            paths = schema.get("paths") if schema else None
+
+        if schema and paths:
             return schema
     except Exception as e:
         print(f"Failed to load live schema: {e}")

@@ -143,6 +143,27 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Seam A-D bounded slice:** **addressed** (no longer the first failing stage). **Row stays Open** until full chain green; **next bounded slice** = **Contract Tests** failure analysis (do not re-open Seam A-D unless regression).
 
+### Bounded slice (active): STAGE 18 — Resume-leg Contract Tests (`24417704302`)
+
+**Frozen scope (only):** **`workflow_dispatch` resume leg** → **STAGE 18: Contract Tests** — pytest exit **1** on **`main @ 6772b9b3`** (hosted). **Not** Seam A-D, audio guards, venv guards, or harness plumbing.
+
+**Evidence anchor:** run **`24417704302`**; resume **`summary.json`**: **Python Unit Tests** **PASSED**; **Contract Tests** **FAILED** (19 failed, 205 passed); artifact **`logs/contract_tests.log`** / **`test-results/contract_tests.xml`**.
+
+**Failure clusters (19 tests, grouped for fix order):**
+
+| Cluster | Count | Theme | Examples |
+| --- | --- | --- | --- |
+| **1** | 10 | Engine manifest v3 migration not on `main` | Duplicate legacy `engines/bark/` vs `engines/audio/bark/`; old `type`/`capabilities`/`dependencies` shape; `coqui_tts`/`styletts2` incomplete v3 fields |
+| **2** | 5 | Contract test expectations vs current API/OpenAPI | POST without `requestBody` whitelist; `/api/voice/voices`; paginated profiles; shared schema `$ref` / `items` |
+| **3** | 3 | WebSocket route visibility in `TestClient` | `/ws/realtime`, `/ws/events`, `/ws/plugins` 404 |
+| **4** | 1–2 | Environment / optional deps | `aiohttp` import in plugin contract test; library DB table on cold runner |
+
+**Remediation (repo):** single coherent commit — remove duplicate legacy engine manifests, finalize v3 manifests under `engines/audio/` and `engines/llm/`, align `tests/contract/*` and backend route registration with **`shared/schemas/engine_manifest_v3.schema.json`**. Prove locally: **`pytest tests/contract`** then **`verify.ps1 -OnlyStage "Contract Tests"`**.
+
+**Hard OUT:** reopen Seam A-D; broad unrelated refactors; mixing unrelated backend slices in the same “contract” commit beyond what contract tests require.
+
+**Exit:** green **`workflow_dispatch`** + **`run_full_chain: true`** with **Contract Tests** **PASSED** on resume, or freeze **next** failing stage only if a different stage fails first after this lands.
+
 ## Rerun command (after token/UI access)
 
 ```powershell

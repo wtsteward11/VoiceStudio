@@ -66,8 +66,12 @@ async def test_engines_list_returns_array(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_profiles_returns_list(client: AsyncClient):
-    """Profiles endpoint must return a list."""
+    """Profiles endpoint must return a list or paginated envelope with items."""
     resp = await client.get("/api/profiles")
     if resp.status_code == 200:
         data = resp.json()
-        assert isinstance(data, list)
+        if isinstance(data, dict):
+            assert "items" in data, "Paginated response must contain 'items'"
+            assert isinstance(data["items"], list)
+        else:
+            assert isinstance(data, list)

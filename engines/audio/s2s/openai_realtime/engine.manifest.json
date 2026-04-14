@@ -7,9 +7,8 @@
   "description": "End-to-end speech-to-speech via OpenAI Realtime API. Sub-500ms latency, preserves tone and emotion.",
   "entry_point": "app.core.engines.openai_realtime_engine:OpenAIRealtimeProvider",
   "dependencies": {
-    "python": [
-      "websockets>=12.0"
-    ]
+    "python": ">=3.10",
+    "websockets": ">=12.0"
   },
   "capabilities": [
     "speech_to_speech",

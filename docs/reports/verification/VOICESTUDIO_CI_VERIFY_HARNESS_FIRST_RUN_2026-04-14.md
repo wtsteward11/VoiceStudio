@@ -106,8 +106,18 @@ These runs are **not** a substitute for **`workflow_dispatch`** + **`run_full_ch
 
 ## Outcome classification rule (this session)
 
-- **Single bucket:** **`BucketC_InfraRed`** — failure on hosted runner during **pip** / SSL **before** meaningful **`verify.ps1`** signal.
-- **No blending** — harness checkpoint/resume was **not** exercised on this run.
+**Do not collapse to a single bucket.** Observed push runs have **different** failure modes:
+
+| Run | ID | Bucket | First meaningful failure | `verify.ps1` signal? |
+| --- | --- | --- | --- | --- |
+| **A** | `24379285704` | **`BucketC_InfraRed`** | **pip** / SSL during **Install Python dependencies** | **No** — failed before Quick stages |
+| **B** | `24381385977` | **`BucketB_HarnessRed`** | **STAGE 20: Security Tests** — `test_path_allowed_only_in_whitelist` | **Yes** |
+| **C** | `24382787205` | **`BucketB_HarnessRed`** | **STAGE 28: Gate/Ledger** — **`startup_artifact_check`** exit **1** (missing `%LOCALAPPDATA%\...\startup_decision.json` on clean runner) | **Yes** |
+
+- **`BucketC_InfraRed`** applies to **Run A only** (infra before harness).
+- **`BucketB_HarnessRed`** = hosted Quick reached **`verify.ps1`** stages and failed on a **real stage** (Security, Gate/Ledger sub-check, etc.).
+- **No blending** — do not attribute Run B/C failures to pip SSL; do not attribute Run A to Security or startup artifact.
+- **Checkpoint/resume** on **`push`** is **skipped by design** until authoritative **`workflow_dispatch`**.
 
 ## Jobs (expected layout)
 
@@ -175,7 +185,7 @@ gh run download 24379285704 --dir artifacts/ci-harness-download/
 | Workflow exists on default branch and is triggerable | **Met** |
 | At least one **GitHub Actions** run recorded with **immutable URL/ID/SHA** (push run `24379285704`) | **Met** |
 | **`workflow_dispatch`** with **`run_full_chain: true`** **completed green** | **Pending** (operator UI or dispatch-capable token); push **`24382787205`** **does not** satisfy this row |
-| Outcome bucket recorded without ambiguity (**`BucketC_InfraRed`** for observed run) | **Met** |
+| Outcome buckets classified without ambiguity (Run A **`BucketC_InfraRed`**; Run B/C **`BucketB_HarnessRed`** — see **Outcome classification rule**) | **Met** |
 | If non-green: exactly **one** bounded CI-only slice opened | **Met** |
 
 ---

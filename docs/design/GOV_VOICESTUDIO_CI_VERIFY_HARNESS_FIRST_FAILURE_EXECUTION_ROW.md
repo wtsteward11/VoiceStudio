@@ -54,6 +54,16 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Row stays Open** until a green **`workflow_dispatch`** + **`run_full_chain: true`** is recorded in the [closure report](../reports/verification/VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md) **and** hosted **Quick** is green end-to-end (or a **new** bounded row documents the **`startup_artifact_check`** slice without smearing sandbox scope).
 
+### Bounded slice — `startup_artifact_check` on hosted Quick (2026-04-14)
+
+**Scope (only):** GHA Quick red at **`startup_artifact_check`** — `scripts/ci/check_startup_artifact.py` expects **`%LOCALAPPDATA%\VoiceStudio\crashes\startup_decision.json`** (written by the WinUI app); clean **`windows-latest`** has no such file.
+
+**Fix (repo):** workflow-level env **`VOICESTUDIO_SKIP_STARTUP_ARTIFACT_CHECK: "true"`** in [`.github/workflows/verify-harness.yml`](../../.github/workflows/verify-harness.yml) (honest skip: CI does not launch the desktop app). Wired in [`scripts/run_verification.py`](../../scripts/run_verification.py) when appending the **`startup_artifact_check`** subprocess.
+
+**Hard OUT:** no checkpoint/resume edits; no Gate/Ledger refactor beyond this env; no fake seeding of **`startup_decision.json`** unless policy changes.
+
+**Proof target:** next path-filter **push** run (**Run D**) — **Verify Quick Gate** **success** through **STAGE 28**; then operator may spend **`workflow_dispatch`** + **`run_full_chain: true`**.
+
 ## Rerun command (after token/UI access)
 
 ```powershell

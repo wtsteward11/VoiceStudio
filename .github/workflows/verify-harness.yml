@@ -22,6 +22,8 @@ on:
 env:
   PYTHON_VERSION: "3.11"
   DOTNET_VERSION: "8.0.x"
+  # Hosted runners have no WinUI app / %LOCALAPPDATA%\VoiceStudio\crashes\startup_decision.json — skip GAP-069 guard in run_verification.py
+  VOICESTUDIO_SKIP_STARTUP_ARTIFACT_CHECK: "true"
 
 jobs:
   verify-quick:

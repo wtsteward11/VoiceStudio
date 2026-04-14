@@ -126,6 +126,10 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Exit:** green **`workflow_dispatch`** + **`run_full_chain: true`** with Seam A-D **PASSED** under budget, or documented follow-up row if a **different** stage fails first after fix.
 
+**Mitigations applied (2026-04-14):**
+1. **`DispatcherQueueTestHelpers.ShutdownSyncBounded`** — replace unbounded `ShutdownQueueAsync().GetAwaiter().GetResult()` in ViewModel test cleanup.
+2. **Shard budget** — `scripts/verify.ps1` **`$Stage3ShardTimeouts['C# Unit Tests - ViewModels Seam A-D']` = 300s** (was 180s) for `windows-latest` headroom; other shards unchanged.
+
 ## Rerun command (after token/UI access)
 
 ```powershell

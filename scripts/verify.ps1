@@ -334,7 +334,8 @@ $StageTimeouts = @{
 }
 # Per-shard timeouts for C# Unit Tests (diagnosable per shard; single bad shard cannot consume whole budget)
 $Stage3ShardTimeouts = @{
-    "C# Unit Tests - ViewModels Seam A-D" = 180
+    # Seam A-D is the largest letter-class shard; windows-latest can exceed 180s wall (JIT/diag + DispatcherQueue tests).
+    "C# Unit Tests - ViewModels Seam A-D" = 300
     "C# Unit Tests - ViewModels Seam E-H" = 180
     "C# Unit Tests - ViewModels Seam I-L" = 180
     "C# Unit Tests - ViewModels Seam M" = 180

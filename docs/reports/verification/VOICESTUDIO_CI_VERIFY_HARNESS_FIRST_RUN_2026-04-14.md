@@ -35,10 +35,12 @@
 
 **Status:** **Not yet recorded** — automation **`gh workflow run`** returns **HTTP 403** (`Resource not accessible by personal access token`). **2026-04-14:** Path-filter **push** on **`.github/workflows/verify-harness.yml`** triggered **Run C** (`24382787205`) as **substitute** for hosted signal; **does not** replace **`workflow_dispatch`** + **`run_full_chain`**.
 
+**Agent poll (2026-04-14):** `gh run list --workflow="Verify Harness (Checkpoint + Resume)" --event workflow_dispatch` returned **no rows**; `GET /repos/wtsteward11/VoiceStudio/actions/workflows/verify-harness.yml/runs` with client-side filter **`event == workflow_dispatch`** returned **zero** runs. **Conclusion:** no authoritative dispatch has landed in GitHub history yet — **operator Actions UI** (or a dispatch-capable PAT) remains required before this template can be filled with real URL/ID/SHA/conclusions.
+
 | Field | Value |
 | --- | --- |
 | **Run URL** | *Pending UI dispatch — use Actions → Run workflow* |
-| **Run ID** | *Pending* |
+| **Run ID** | *Pending (poll: none in GHA history as of 2026-04-14)* |
 | **Commit SHA** | *Pending (expect `main` tip at dispatch time)* |
 | **Event** | `workflow_dispatch` |
 | **Inputs** | `run_full_chain: true` |
@@ -154,6 +156,8 @@ These runs are **not** a substitute for **`workflow_dispatch`** + **`run_full_ch
 - No interactive display; **UI Smoke** / **Failure-Path Smoke** / **Runtime-Missing Failure Smoke** may fail or degrade vs a developer machine with WinUI + built `VoiceStudio.App.exe`.
 - **Primary proof:** checkpoint/resume lineage + inherited stages + `run_verification.py` outcome — not necessarily every UI stage green.
 - **Transient pip/SSL** on `windows-latest` can fail installs without repo changes — classify as **infra** unless reproducible locally.
+
+**Startup artifact check (`startup_decision.json`):** Skipped on hosted runners via `VOICESTUDIO_SKIP_STARTUP_ARTIFACT_CHECK: "true"` in workflow `env`. This is a runner-environment exception only — hosted Windows runners do not launch the WinUI desktop app, so `%LOCALAPPDATA%\VoiceStudio\crashes\startup_decision.json` is never produced. Local `verify.ps1` and `run_verification.py` continue to enforce the startup artifact contract when the env var is absent. This skip must not propagate to local developer workflows, `.env` files, or non-CI invocations.
 
 ## Workflow hardening (pip resilience; 2026-04-14)
 

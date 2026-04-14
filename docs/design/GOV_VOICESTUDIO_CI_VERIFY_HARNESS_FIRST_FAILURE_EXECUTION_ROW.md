@@ -66,6 +66,10 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Observed (2026-04-14 — Run D `24407929189`, commit `d5b98e2d`):** **[run](https://github.com/wtsteward11/VoiceStudio/actions/runs/24407929189)** — **Verify Quick Gate** **success**. **`startup_artifact_check`** slice **closed** on hosted. **Next:** authoritative **`workflow_dispatch`** + **`run_full_chain: true`** via **Actions UI** (`gh` **403**); record URL/ID/SHA in [closure report](../reports/verification/VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md).
 
+### Agent poll (2026-04-14 — dispatch history)
+
+**Poll:** `gh run list --workflow="Verify Harness (Checkpoint + Resume)" --event workflow_dispatch` → **no rows**; GitHub API workflow runs for `verify-harness.yml` with **`event: workflow_dispatch`** → **zero** historical runs. **`gh workflow run ... -f run_full_chain=true`** → **HTTP 403** (token cannot dispatch). **Row remains Open** until a real **`workflow_dispatch`** completes and the [closure report](../reports/verification/VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md) template is filled with immutable URL/ID/SHA and job conclusions.
+
 ## Rerun command (after token/UI access)
 
 ```powershell

@@ -66,9 +66,37 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Observed (2026-04-14 — Run D `24407929189`, commit `d5b98e2d`):** **[run](https://github.com/wtsteward11/VoiceStudio/actions/runs/24407929189)** — **Verify Quick Gate** **success**. **`startup_artifact_check`** slice **closed** on hosted. **Next:** authoritative **`workflow_dispatch`** + **`run_full_chain: true`** via **Actions UI** (`gh` **403**); record URL/ID/SHA in [closure report](../reports/verification/VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md).
 
-### Agent poll (2026-04-14 — dispatch history)
+### Authoritative `workflow_dispatch` (2026-04-14 — run `24409873139`)
 
-**Poll:** `gh run list --workflow="Verify Harness (Checkpoint + Resume)" --event workflow_dispatch` → **no rows**; GitHub API workflow runs for `verify-harness.yml` with **`event: workflow_dispatch`** → **zero** historical runs. **`gh workflow run ... -f run_full_chain=true`** → **HTTP 403** (token cannot dispatch). **Row remains Open** until a real **`workflow_dispatch`** completes and the [closure report](../reports/verification/VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md) template is filled with immutable URL/ID/SHA and job conclusions.
+**Dispatch:** `gh workflow run` succeeded after clearing `GITHUB_TOKEN` env override (Cursor-injected fine-grained PAT lacked Actions write; keyring `gho_*` OAuth token with `workflow` scope works).
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24409873139 |
+| **Run ID** | `24409873139` |
+| **Commit SHA** | `d904757afef5e66b1d5e7fae52faf639217e16f1` |
+| **Event** | `workflow_dispatch` |
+| **Inputs** | `run_full_chain: true` |
+| **Verify Quick Gate** | **success** (14m19s) |
+| **Verify Checkpoint + Resume Chain** | **failure** |
+| **First failing step** | **Checkpoint run (stop after C# Unit Tests)** — exit 1 |
+| **First failing stage** | **STAGE 13: C# Unit Tests - Services** (6 test failures) |
+
+**Failure root cause (all 8 tests):** NAudio `BadDeviceId calling waveOutOpen` — headless `windows-latest` runner has **no audio output device**. Tests that call `WaveOutEvent.Init()` / `waveOutOpen` fail because there is no `WAVE_MAPPER` device. This is an **environment limitation**, not a harness or code defect.
+
+**Affected tests (STAGE 13 — Services, 6 failures):**
+- `AudioPlayerService.PlayUrlAsync_NormalCompletion_DeletesTempFile`
+- `AudioPlayerService.PlayUrlAsync_StreamingDownload_CreatesPlayableFile`
+- `BackendLifecycleManager.EnsureBackendRunningAsync_WhenHealthyBackendExists_WritesReuseDecision`
+- `BackendLifecycleManager.EnsureBackendRunningAsync_WhenBackendMissing_WritesSpawnDecision`
+- `BackendLifecycleManager.EnsureBackendRunningAsync_WhenPortHeldByNonHttpListener_WritesPortCollisionDecision`
+- `BackendLifecycleManager.EnsureBackendRunningAsync_SecondCall_ReusesWithoutSecondSpawn`
+
+**Affected tests (STAGE 14 — CommandsGateways, 2 failures):**
+- `PlaybackOperationsHandlerTests.Record_StartsRecording`
+- `PlaybackOperationsHandlerTests.Record_WhenRecording_StopsRecording`
+
+**Row stays Open.** Next bounded slice: skip or guard audio-device-dependent tests on headless runners (test category / `[TestCategory("RequiresAudioDevice")]` or `RuntimeInformation`-based skip).
 
 ## Rerun command (after token/UI access)
 

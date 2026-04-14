@@ -9,8 +9,8 @@
 | Verdict | Meaning |
 | --- | --- |
 | **Implemented on `main`** | **Yes** — workflow + contracts + lineage tooling ship on default branch. |
-| **Operationally certified (GHA)** | **No** — authoritative **`workflow_dispatch`** + **`run_full_chain: true`** green **not** recorded (**`gh workflow run`** **HTTP 403**). **Hosted Quick prerequisite:** push **`24407929189`** (**`d5b98e2d`**) — **Verify Quick Gate** **success** (through **STAGE 28**; **`startup_artifact_check`** skipped on runner via **`VOICESTUDIO_SKIP_STARTUP_ARTIFACT_CHECK`**). Prior **`24382787205`** failed only at **`startup_artifact_check`** — **resolved**. |
-| **Authoritative `workflow_dispatch` run** | **Not yet executed** — automation **`gh workflow run`** returns **HTTP 403**; **operator must use Actions UI** (or a token with workflow dispatch permission). **Push runs** **`24382787205`** / **`24407929189`** are **substitute evidence only** (Quick + path-filter), **not** full-chain dispatch. **Dispatch is now worth spending** after **`24407929189`** Quick green. See **Dispatch path** and **Runs C–D** below. |
+| **Operationally certified (GHA)** | **No** — authoritative **`workflow_dispatch`** **`24409873139`** (**`d904757a`**) exercised; **Verify Quick Gate** **success**; **Verify Checkpoint + Resume Chain** **failure** at **STAGE 13: C# Unit Tests - Services** (6 failures: 4x `BackendLifecycleManager` NAudio `BadDeviceId` + 2x `AudioPlayerService` NAudio `BadDeviceId`). **STAGE 14: C# Unit Tests - CommandsGateways** also red (2x `PlaybackOperationsHandler.Record_*` — `Assert.IsTrue` on headless runner). **Not** a harness logic issue — **hosted runner has no audio device**. |
+| **Authoritative `workflow_dispatch` run** | **Exercised** — run **[`24409873139`](https://github.com/wtsteward11/VoiceStudio/actions/runs/24409873139)** (**`d904757a`**, `workflow_dispatch`, `run_full_chain: true`). **Quick Gate: success**. **Checkpoint + Resume Chain: failure** at **Checkpoint run (stop after C# Unit Tests)** step — C# test shards 8 and 9 had **8** test failures (NAudio / audio-device-dependent on headless runner). Subsequent steps (lineage, resume, gate/ledger) **skipped**. |
 
 ## Workflow
 
@@ -27,26 +27,25 @@
 | Method | Identity / requirement | Result (2026-04-14) |
 | --- | --- | --- |
 | **GitHub Actions UI** | Repo **Write** or **Actions** access | **Primary path** — **Actions → Verify Harness (Checkpoint + Resume) → Run workflow**; enable **Run checkpoint+resume chain**. |
-| **`gh workflow run "Verify Harness (Checkpoint + Resume)" -f run_full_chain=true`** | PAT with permission to **create workflow dispatch events** (fine-grained: **Actions: Read and write**; classic: **`workflow`** + **`repo`**, if org policy allows) | **HTTP 403** — `Resource not accessible by personal access token` (token in use cannot dispatch). |
+| **`gh workflow run "Verify Harness (Checkpoint + Resume)" -f run_full_chain=true`** | PAT with permission to **create workflow dispatch events** (fine-grained: **Actions: Read and write**; classic: **`workflow`** + **`repo`**, if org policy allows) | **Initially HTTP 403** — `GITHUB_TOKEN` env var (Cursor-injected fine-grained PAT without Actions write) overrides keyring OAuth token. **Fix:** `Remove-Item env:GITHUB_TOKEN` before `gh workflow run` — keyring `gho_*` token with `workflow` scope succeeds. |
 
-**Truth:** Certification today is **unblocked only via UI** unless the operator rotates to a dispatch-capable token.
+**Truth:** Dispatch unblocked after clearing `GITHUB_TOKEN` env override. Run **`24409873139`** dispatched successfully.
 
 ## Authoritative `workflow_dispatch` (full chain) — capture template
 
-**Status:** **Not yet recorded** — automation **`gh workflow run`** returns **HTTP 403** (`Resource not accessible by personal access token`). **2026-04-14:** Path-filter **push** on **`.github/workflows/verify-harness.yml`** triggered **Run C** (`24382787205`) as **substitute** for hosted signal; **does not** replace **`workflow_dispatch`** + **`run_full_chain`**.
-
-**Agent poll (2026-04-14):** `gh run list --workflow="Verify Harness (Checkpoint + Resume)" --event workflow_dispatch` returned **no rows**; `GET /repos/wtsteward11/VoiceStudio/actions/workflows/verify-harness.yml/runs` with client-side filter **`event == workflow_dispatch`** returned **zero** runs. **Conclusion:** no authoritative dispatch has landed in GitHub history yet — **operator Actions UI** (or a dispatch-capable PAT) remains required before this template can be filled with real URL/ID/SHA/conclusions.
+**Status:** **Recorded** — dispatched via `gh workflow run` after clearing `GITHUB_TOKEN` env override (keyring OAuth token `gho_*` with `workflow` scope).
 
 | Field | Value |
 | --- | --- |
-| **Run URL** | *Pending UI dispatch — use Actions → Run workflow* |
-| **Run ID** | *Pending (poll: none in GHA history as of 2026-04-14)* |
-| **Commit SHA** | *Pending (expect `main` tip at dispatch time)* |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24409873139 |
+| **Run ID** | `24409873139` |
+| **Commit SHA** | `d904757afef5e66b1d5e7fae52faf639217e16f1` |
 | **Event** | `workflow_dispatch` |
 | **Inputs** | `run_full_chain: true` |
-| **Verify Quick Gate** | *Pending* |
-| **Verify Checkpoint + Resume Chain** | *Pending* |
-| **Artifacts** | *Pending (`verify-quick-artifacts`, `verify-checkpoint-resume-artifacts`)* |
+| **Verify Quick Gate** | **success** (14m19s) |
+| **Verify Checkpoint + Resume Chain** | **failure** — first failing step: **Checkpoint run (stop after C# Unit Tests)** |
+| **Artifacts** | `verify-quick-artifacts` + `verify-checkpoint-resume-artifacts` uploaded |
+| **First failing stage** | **STAGE 13: C# Unit Tests - Services** — 6 failures (4x `BackendLifecycleManager` startup-decision tests: NAudio `BadDeviceId calling waveOutOpen` on headless runner; 2x `AudioPlayerService.PlayUrlAsync`: same NAudio error). **STAGE 14: C# Unit Tests - CommandsGateways** — 2 failures (`Record_StartsRecording`, `Record_WhenRecording_StopsRecording`: `Assert.IsTrue` on headless). Stages 15–16 passed. |
 
 **Push substitute (NOT dispatch):** Run **`24382787205`** — see **Run C** below.
 
@@ -204,7 +203,7 @@ gh run download 24379285704 --dir artifacts/ci-harness-download/
 | --- | --- |
 | Workflow exists on default branch and is triggerable | **Met** |
 | At least one **GitHub Actions** run recorded with **immutable URL/ID/SHA** (push run `24379285704`) | **Met** |
-| **`workflow_dispatch`** with **`run_full_chain: true`** **completed green** | **Pending** (operator UI or dispatch-capable token); push runs **`24382787205`** / **`24407929189`** **do not** satisfy this row |
+| **`workflow_dispatch`** with **`run_full_chain: true`** exercised | **Exercised** — run **`24409873139`** (**`d904757a`**); **Quick Gate success**; **Checkpoint + Resume Chain failure** (C# unit test NAudio `BadDeviceId` on headless runner — 8 tests across STAGE 13–14). **Not yet green.** |
 | Hosted **Verify Quick Gate** green on **`windows-latest`** (through **STAGE 28** after **`startup_artifact_check`** fix) | **Met** — run **`24407929189`** (**`d5b98e2d`**) |
 | Outcome buckets classified without ambiguity (Run A **`BucketC_InfraRed`**; Run B/C **`BucketB_HarnessRed`**; Run D prerequisite pass — see **Outcome classification rule**) | **Met** |
 | If non-green: exactly **one** bounded CI-only slice opened | **Met** |

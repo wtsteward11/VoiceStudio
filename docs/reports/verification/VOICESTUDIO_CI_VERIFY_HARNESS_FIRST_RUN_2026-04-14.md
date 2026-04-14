@@ -9,8 +9,8 @@
 | Verdict | Meaning |
 | --- | --- |
 | **Implemented on `main`** | **Yes** — workflow + contracts + lineage tooling ship on default branch. |
-| **Operationally certified (GHA)** | **No** — authoritative **`workflow_dispatch`** + **`run_full_chain: true`** green **not** recorded (**`gh workflow run`** **HTTP 403**). **Post-fix push** **`24382787205`** (**`b7a4ddf5`**) reached **STAGE 20: Security Tests** **PASS** (sandbox remediation verified on **`windows-latest`**); **Quick** still **failure** at **STAGE 28: Gate/Ledger Validation** — first failing sub-check **`startup_artifact_check`** **exit 1** (not sandbox; not pip). |
-| **Authoritative `workflow_dispatch` run** | **Not yet executed** — automation **`gh workflow run`** returns **HTTP 403**; **operator must use Actions UI** (or a token with workflow dispatch permission). **Push run `24382787205`** is **substitute evidence only** (Quick + path-filter), **not** a full-chain dispatch. See **Dispatch path** and **Run C** below. |
+| **Operationally certified (GHA)** | **No** — authoritative **`workflow_dispatch`** + **`run_full_chain: true`** green **not** recorded (**`gh workflow run`** **HTTP 403**). **Hosted Quick prerequisite:** push **`24407929189`** (**`d5b98e2d`**) — **Verify Quick Gate** **success** (through **STAGE 28**; **`startup_artifact_check`** skipped on runner via **`VOICESTUDIO_SKIP_STARTUP_ARTIFACT_CHECK`**). Prior **`24382787205`** failed only at **`startup_artifact_check`** — **resolved**. |
+| **Authoritative `workflow_dispatch` run** | **Not yet executed** — automation **`gh workflow run`** returns **HTTP 403**; **operator must use Actions UI** (or a token with workflow dispatch permission). **Push runs** **`24382787205`** / **`24407929189`** are **substitute evidence only** (Quick + path-filter), **not** full-chain dispatch. **Dispatch is now worth spending** after **`24407929189`** Quick green. See **Dispatch path** and **Runs C–D** below. |
 
 ## Workflow
 
@@ -104,6 +104,21 @@ These runs are **not** a substitute for **`workflow_dispatch`** + **`run_full_ch
 
 **Authoritative `workflow_dispatch` evidence:** still **pending** — use **Actions UI** for **`run_full_chain: true`**; **`24382787205`** is **Quick-only** substitute.
 
+### Run D — `startup_artifact_check` skip on hosted (`24407929189`, commit `d5b98e2d`)
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24407929189 |
+| **Run ID** | `24407929189` |
+| **Commit SHA** | `d5b98e2d42a7e361b2b985e1305d68d2548a7f67` |
+| **Trigger** | `push` (path-filter: **`.github/workflows/verify-harness.yml`** — **`VOICESTUDIO_SKIP_STARTUP_ARTIFACT_CHECK: "true"`**) |
+| **Verify Quick Gate** | **success** |
+| **Verify Checkpoint + Resume Chain** | **skipped** (expected for **`push`**) |
+| **STAGE 28: Gate/Ledger** | **PASS** — **`startup_artifact_check`** not run (env skip; CI has no desktop **`startup_decision.json`**) |
+| **Artifacts** | **`verify-quick-artifacts`** uploaded |
+
+**Authoritative `workflow_dispatch` evidence:** still **pending** — **operator** should run **Actions → Verify Harness → Run workflow** with **`run_full_chain: true`** now that hosted **Quick** is green (**prerequisite satisfied**).
+
 ## Outcome classification rule (this session)
 
 **Do not collapse to a single bucket.** Observed push runs have **different** failure modes:
@@ -113,6 +128,7 @@ These runs are **not** a substitute for **`workflow_dispatch`** + **`run_full_ch
 | **A** | `24379285704` | **`BucketC_InfraRed`** | **pip** / SSL during **Install Python dependencies** | **No** — failed before Quick stages |
 | **B** | `24381385977` | **`BucketB_HarnessRed`** | **STAGE 20: Security Tests** — `test_path_allowed_only_in_whitelist` | **Yes** |
 | **C** | `24382787205` | **`BucketB_HarnessRed`** | **STAGE 28: Gate/Ledger** — **`startup_artifact_check`** exit **1** (missing `%LOCALAPPDATA%\...\startup_decision.json` on clean runner) | **Yes** |
+| **D** | `24407929189` | **Hosted Quick PASS** (not a failure bucket) | **STAGE 28** **PASS** — workflow sets **`VOICESTUDIO_SKIP_STARTUP_ARTIFACT_CHECK`**; **Verify Quick Gate** job **success** | **Yes** |
 
 - **`BucketC_InfraRed`** applies to **Run A only** (infra before harness).
 - **`BucketB_HarnessRed`** = hosted Quick reached **`verify.ps1`** stages and failed on a **real stage** (Security, Gate/Ledger sub-check, etc.).
@@ -184,8 +200,9 @@ gh run download 24379285704 --dir artifacts/ci-harness-download/
 | --- | --- |
 | Workflow exists on default branch and is triggerable | **Met** |
 | At least one **GitHub Actions** run recorded with **immutable URL/ID/SHA** (push run `24379285704`) | **Met** |
-| **`workflow_dispatch`** with **`run_full_chain: true`** **completed green** | **Pending** (operator UI or dispatch-capable token); push **`24382787205`** **does not** satisfy this row |
-| Outcome buckets classified without ambiguity (Run A **`BucketC_InfraRed`**; Run B/C **`BucketB_HarnessRed`** — see **Outcome classification rule**) | **Met** |
+| **`workflow_dispatch`** with **`run_full_chain: true`** **completed green** | **Pending** (operator UI or dispatch-capable token); push runs **`24382787205`** / **`24407929189`** **do not** satisfy this row |
+| Hosted **Verify Quick Gate** green on **`windows-latest`** (through **STAGE 28** after **`startup_artifact_check`** fix) | **Met** — run **`24407929189`** (**`d5b98e2d`**) |
+| Outcome buckets classified without ambiguity (Run A **`BucketC_InfraRed`**; Run B/C **`BucketB_HarnessRed`**; Run D prerequisite pass — see **Outcome classification rule**) | **Met** |
 | If non-green: exactly **one** bounded CI-only slice opened | **Met** |
 
 ---

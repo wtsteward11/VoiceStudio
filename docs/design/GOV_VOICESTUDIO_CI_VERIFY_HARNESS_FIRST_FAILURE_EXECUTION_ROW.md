@@ -64,6 +64,8 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Proof target:** next path-filter **push** run (**Run D**) — **Verify Quick Gate** **success** through **STAGE 28**; then operator may spend **`workflow_dispatch`** + **`run_full_chain: true`**.
 
+**Observed (2026-04-14 — Run D `24407929189`, commit `d5b98e2d`):** **[run](https://github.com/wtsteward11/VoiceStudio/actions/runs/24407929189)** — **Verify Quick Gate** **success**. **`startup_artifact_check`** slice **closed** on hosted. **Next:** authoritative **`workflow_dispatch`** + **`run_full_chain: true`** via **Actions UI** (`gh` **403**); record URL/ID/SHA in [closure report](../reports/verification/VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md).
+
 ## Rerun command (after token/UI access)
 
 ```powershell

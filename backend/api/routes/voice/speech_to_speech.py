@@ -1,3 +1,5 @@
+# mypy: disable-error-code="untyped-decorator"
+# SAFETY: FastAPI router decorators lack complete type stubs; route handlers are correctly typed.
 """Thin routes for speech-to-speech conversion (GAP-051)."""
 
 from __future__ import annotations

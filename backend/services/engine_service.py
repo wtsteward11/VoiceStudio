@@ -15,9 +15,11 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Union, cast
 
 import numpy as np
+
+from backend.adapters.engine_adapter import EngineAdapter
 
 from backend.services.circuit_breaker import (
     CircuitBreaker,
@@ -134,7 +136,7 @@ class IEngineService(ABC):
 
     @abstractmethod
     def calculate_snr(
-        self, audio: Union[AudioPath, np.ndarray], sample_rate: int | None = None
+        self, audio: Union[AudioPath, Any], sample_rate: int | None = None
     ) -> float:
         """Calculate Signal-to-Noise Ratio for audio (path or numpy array)."""
         ...
@@ -246,7 +248,7 @@ class IEngineService(ABC):
         ...
 
     @abstractmethod
-    def get_llm_message_classes(self) -> tuple | None:
+    def get_llm_message_classes(self) -> tuple[type, type] | None:
         """Get the Message and MessageRole classes for LLM messaging."""
         ...
 
@@ -331,7 +333,7 @@ class EngineService(IEngineService):
         "faster_whisper": ["whisper"],
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the engine service with lazy loading."""
         self._engine_router = None
         self._quality_metrics = None
@@ -984,11 +986,11 @@ class EngineService(IEngineService):
         try:
             from app.core.engines.llm_interface import LLMConfig
 
-            return LLMConfig
+            return cast(type | None, LLMConfig)
         except ImportError:
             return None
 
-    def get_llm_message_classes(self) -> tuple | None:
+    def get_llm_message_classes(self) -> tuple[type, type] | None:
         """Get the Message and MessageRole classes for LLM messaging."""
         try:
             from app.core.engines.llm_interface import Message, MessageRole
@@ -1080,7 +1082,7 @@ class EngineService(IEngineService):
         try:
             engines = registry.get_all_engines()
             auditor.audit_all_engines(engines)
-            return auditor.get_audit_summary()
+            return cast(dict[str, Any], auditor.get_audit_summary())
         except Exception as e:
             return {"error": str(e)}
 
@@ -1144,7 +1146,7 @@ class EngineService(IEngineService):
             # Try to import metrics from the engine layer
             from app.core.engines.metrics import get_engine_metrics
 
-            return get_engine_metrics()
+            return cast(dict[str, Any], get_engine_metrics())
         except ImportError:
             logger.debug("Engine metrics module not available")
             return {"available": False, "error": "Engine metrics not available"}
@@ -1212,7 +1214,7 @@ def get_engine_by_id(engine_id: str) -> Any | None:
     return service.get_engine(engine_id)
 
 
-def get_engine_port():
+def get_engine_port() -> EngineAdapter:
     """Get the engine port interface for Clean Architecture patterns.
 
     This provides access to the IEnginePort interface defined in

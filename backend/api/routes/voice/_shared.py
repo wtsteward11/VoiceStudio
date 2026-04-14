@@ -136,7 +136,7 @@ except Exception as e:
     HAS_QUALITY_OPTIMIZATION = False
     logger.warning("Quality optimization not available: %s", e)
 
-router = APIRouter(
+router: APIRouter = APIRouter(
     prefix="/api/voice",
     tags=["voice"],
     dependencies=[

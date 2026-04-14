@@ -8,7 +8,7 @@ import logging
 import os
 import tempfile
 import uuid
-from typing import Any
+from typing import Any, Callable, cast
 
 import numpy as np
 from fastapi import HTTPException
@@ -692,7 +692,9 @@ async def post_process_pipeline(
                     import cv2
                     import numpy as np
 
-                    _fourcc_fn: Any = cv2.VideoWriter_fourcc
+                    _fourcc_fn = cast(
+                        Callable[..., int], getattr(cv2, "VideoWriter_fourcc")
+                    )
                     processed_video_path = video_path
                     stages_applied = []
                     total_quality_improvement = 0.0

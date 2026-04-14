@@ -19,9 +19,10 @@
 | Field | Value |
 | --- | --- |
 | **Repository** | `wtsteward11/VoiceStudio` |
-| **Run URL** | _Filled after `gh workflow run` — see session commit / `gh run view`_ |
+| **Workflow landed on `main`** | `18abac07` — adds `.github/workflows/verify-harness.yml`, harness contracts, governance, `show-checkpoint-lineage.ps1` |
+| **Run URL** | _Pending — trigger manually (see below)_ |
 | **Run ID** | _TBD_ |
-| **Commit** | _SHA at dispatch time_ |
+| **Automated `gh workflow dispatch`** | **HTTP 403** from this environment (PAT lacks `workflow` scope or org policy). **Operator:** open **Actions → Verify Harness (Checkpoint + Resume) → Run workflow**, enable **Run checkpoint+resume chain**, then paste **run URL** and **conclusion** here. Alternative: `gh workflow run "Verify Harness (Checkpoint + Resume)" -f run_full_chain=true` with a token that has **`workflow`** scope. |
 
 ## Jobs (expected layout)
 
@@ -60,8 +61,8 @@ gh run download <run-id> --dir artifacts/ci-harness-download/
 
 ## Closure criteria
 
-- [x] Workflow exists on default branch and is triggerable  
-- [ ] At least one **`workflow_dispatch`** run completed (update **Run identity** above with URL/ID/conclusion)  
+- [x] Workflow exists on default branch and is triggerable (`18abac07` on `main`)  
+- [ ] At least one **`workflow_dispatch`** run completed (update **Run identity** above with URL/ID/conclusion) — **blocked on manual trigger** (403 from automation)  
 - [ ] If any job failed: open a **single** bounded CI-only slice (one root cause), do not smear  
 
 ---

@@ -164,6 +164,10 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Exit:** green **`workflow_dispatch`** + **`run_full_chain: true`** with **Contract Tests** **PASSED** on resume, or freeze **next** failing stage only if a different stage fails first after this lands.
 
+**Remediation committed (2026-04-14 — `8ad0a26e` on `main`):** Remove duplicate legacy **`engines/{bark,chatterbox,openvoice,piper,whisper,xtts}/engine.manifest.json`**; finalize v3 manifests under **`engines/audio/`** / **`engines/llm/`**; align **`tests/contract/*`** + voice route registration with **`shared/schemas/engine_manifest_v3.schema.json`**. **Local proof:** **`pytest tests/contract`** **238** passed / **5** skipped; **`verify.ps1 -OnlyStage "Contract Tests"`** **PASS** **`artifacts/verify/20260414_163511/`**.
+
+**Next:** operator **`workflow_dispatch`** + **`run_full_chain: true`** — fine-grained PAT must include **Actions: Read and write** (or classic **`workflow`**); **`gh workflow run`** may return **HTTP 403** without dispatch scope — use **Actions UI** if needed. Record run URL/ID/SHA here when observed.
+
 ## Rerun command (after token/UI access)
 
 ```powershell

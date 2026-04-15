@@ -240,7 +240,27 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 | **Local proof** | **`verify.ps1 -OnlyStage "Python Unit Tests"`** → **`artifacts/verify/20260414_212900/`** — **5442** passed / **309** skipped (**PASS**) |
 | **Hosted full chain** | **Pending** — dispatch after push (this environment: **`gh workflow run`** **HTTP 403**) |
 
-**Row stays Open** until a **`workflow_dispatch`** + **`run_full_chain: true`** run on **`main`** at or after **`7f887c4a`** records **Quick + Checkpoint + Resume** outcome (green or new first-failing stage).
+### GHA proof — `24435050079` (2026-04-15) — post-XTTS guard; STAGE 17 **PASSED**; resume red (**STAGE 18**)
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24435050079 |
+| **Run ID** | `24435050079` |
+| **Commit SHA** | `7df1152033c0a5662f55ffbdd31753c182e1e592` |
+| **Event** | `workflow_dispatch` |
+| **Inputs** | `run_full_chain: true` |
+| **Verify Quick Gate** | **success** (~13m) |
+| **Checkpoint run (stop after C# Unit Tests)** | **success** — all 11 C# shards **PASSED** |
+| **Resume — STAGE 17: Python Unit Tests** | **PASSED** (~49s) — **XTTS / Coqui guard confirmed** (STAGE 17 slice **closed**) |
+| **Resume — STAGE 18: Contract Tests** | **FAILED** (exit code 1) |
+| **First failing test** | `test_legacy_body_process_bypass_ok_when_no_enabled` — `AssertionError: {"detail":"Audio processing libraries not available"}` |
+| **Contract Tests summary** | 1 failed, 295 passed, 85 skipped |
+
+**STAGE 17 — CLOSED.** The Coqui / XTTS guard (**`7f887c4a`**) is confirmed working on hosted CI. The module-level `pytest.skip` fires when `TTS is None`, and STAGE 17 now passes cleanly.
+
+**Bounded slice (active): STAGE 18 — Contract Tests** — `test_effects.py::test_legacy_body_process_bypass_ok_when_no_enabled` fails with `{"detail":"Audio processing libraries not available"}` on `windows-latest`. This is a **hosted environment limitation** (no audio processing libs in default CI install). Freeze first failing test only; do **not** reopen STAGE 17.
+
+**Row stays Open** until STAGE 18 Contract Tests is resolved and a subsequent full-chain run is green end-to-end.
 
 ## Rerun command (after token/UI access)
 

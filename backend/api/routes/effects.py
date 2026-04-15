@@ -475,6 +475,16 @@ def process_audio_with_chain(
             logger.warning(f"Effect chain {chain_id} does not belong to project {project_id}")
             raise HTTPException(status_code=404, detail=f"Effect chain not found: {chain_id}")
 
+        if bypass_chain:
+            return EffectProcessResponse(
+                success=True,
+                output_audio_id=request.audio_id,
+                message=(
+                    "Effect chain bypass: dry signal (input unchanged)"
+                    + _preview_suffix(preview)
+                ),
+            )
+
         # Load audio file
         from backend.services.audio_artifacts import AudioRegistry
 
@@ -503,17 +513,16 @@ def process_audio_with_chain(
             chain,
             audio,
             sample_rate,
-            bypass_chain=bypass_chain,
+            bypass_chain=False,
             strict_no_enabled=True,
         )
 
         if passthrough:
-            # With strict_no_enabled=True, passthrough only occurs when bypass_chain=True.
             return EffectProcessResponse(
                 success=True,
                 output_audio_id=request.audio_id,
                 message=(
-                    "Effect chain bypass: dry signal (input unchanged)"
+                    "No enabled effects in chain, audio unchanged"
                     + _preview_suffix(preview)
                 ),
             )
@@ -1068,6 +1077,16 @@ async def process_project_effect_chain(
         if chain.project_id != project_id:
             raise HTTPException(status_code=404, detail=f"Effect chain not found: {chain_id}")
 
+        if bypass_chain:
+            return EffectProcessResponse(
+                success=True,
+                output_audio_id=audio_id,
+                message=(
+                    "Effect chain bypass: dry signal (input unchanged)"
+                    + _preview_suffix(preview)
+                ),
+            )
+
         # Attempt to load and process audio (single authority: process_chain_in_memory)
         try:
             from backend.services.audio_artifacts import AudioRegistry
@@ -1093,20 +1112,18 @@ async def process_project_effect_chain(
                 chain,
                 audio,
                 sample_rate,
-                bypass_chain=bypass_chain,
+                bypass_chain=False,
                 strict_no_enabled=False,
             )
 
             if passthrough:
-                msg = (
-                    "Effect chain bypass: dry signal (input unchanged)"
-                    if bypass_chain
-                    else "No enabled effects in chain, audio unchanged"
-                )
                 return EffectProcessResponse(
                     success=True,
                     output_audio_id=audio_id,
-                    message=msg + _preview_suffix(preview),
+                    message=(
+                        "No enabled effects in chain, audio unchanged"
+                        + _preview_suffix(preview)
+                    ),
                 )
 
             # Save and register via artifact spine

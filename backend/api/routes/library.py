@@ -13,6 +13,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+import sqlite3
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -235,6 +236,23 @@ async def search_assets(
     offset: int = Query(0, ge=0),
 ):
     """Search and filter assets."""
+    try:
+        return await _search_assets_impl(query, asset_type, tags, folder_id, limit, offset)
+    except sqlite3.OperationalError as e:
+        logger.warning(f"Library database not available: {e}")
+        raise HTTPException(
+            status_code=503, detail="Library database not initialized"
+        ) from e
+
+
+async def _search_assets_impl(
+    query: str | None,
+    asset_type: str | None,
+    tags: str | None,
+    folder_id: str | None,
+    limit: int,
+    offset: int,
+) -> AssetSearchResponse:
     asset_repo = get_library_asset_repository()
 
     # Build filters
@@ -246,18 +264,14 @@ async def search_assets(
 
     # Get entities based on filters
     if query:
-        # Use search by name
         entities = await asset_repo.search_by_name(query, limit=1000)
-        # Apply additional filters
         if folder_id:
             entities = [e for e in entities if e.folder_id == folder_id]
         if asset_type:
             entities = [e for e in entities if e.type == asset_type]
     elif tags:
-        # Use search by tags
         tag_list = [t.strip() for t in tags.split(",")]
         entities = await asset_repo.search_by_tags(tag_list, limit=1000)
-        # Apply additional filters
         if folder_id:
             entities = [e for e in entities if e.folder_id == folder_id]
         if asset_type:
@@ -267,7 +281,6 @@ async def search_assets(
     else:
         entities = await asset_repo.get_all()
 
-    # Apply tag filter if not already done
     if tags and not query:
         import json
 
@@ -279,11 +292,11 @@ async def search_assets(
                 if any(tag in entity_tags for tag in tag_list):
                     filtered.append(e)
             except (json.JSONDecodeError, TypeError) as ex:
-                # GAP-PY-001: Invalid tags JSON, skip entity in tag filter
-                logger.debug(f"Failed to parse tags for entity {getattr(e, 'id', 'unknown')}: {ex}")
+                logger.debug(
+                    f"Failed to parse tags for entity {getattr(e, 'id', 'unknown')}: {ex}"
+                )
         entities = filtered
 
-    # Sort by modified date (newest first) - already done by repository
     total = len(entities)
     paginated = entities[offset : offset + limit]
 

@@ -298,7 +298,24 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 | **Env** | **`VOICESTUDIO_USE_REAL_UI_AUTOMATION=true`** is set **only** when **`-RealUI`** is present (defense in depth vs. headless FlaUI failures). |
 | **Coverage** | Local / self-hosted: run **`verify.ps1 -RealUI`** (or export the env var) for full FlaUI E2E; hosted default lane proves upstream stages without false-red UI smoke. |
 
-**Row stays Open** until a post-remediation **`workflow_dispatch`** with **`run_full_chain: true`** completes **green** end-to-end (**STAGE 21** expected **SKIPPED** on GitHub-hosted `windows-latest`), or the row is superseded per [EXECUTION_ROW_DISCIPLINE.md](../governance/EXECUTION_ROW_DISCIPLINE.md).
+### GHA proof — `24456263743` (2026-04-15) — post-guard **`55daa2cc`**; **STAGE 21 SKIPPED**; resume red (**Failure-Path Smoke**)
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24456263743 |
+| **Run ID** | `24456263743` |
+| **Commit SHA** | `55daa2cc` |
+| **Event** | `workflow_dispatch` |
+| **Inputs** | `run_full_chain: true` |
+| **Verify Quick Gate** | **success** |
+| **Checkpoint run** | **success** |
+| **Resume — through STAGE 20 (Backend Integration)** | **PASSED** |
+| **Resume — STAGE 21: UI Smoke Tests** | **SKIPPED** (headless runner guard — no **`-RealUI`**) |
+| **Resume — STAGE 22+** | **Failure-Path Smoke FAILED** (exit code **1**) — new first failing stage after STAGE 21 |
+
+**STAGE 21 guard: VERIFIED on hosted.** Full-chain operational certification **not** claimed — resume chain **red** at **Failure-Path Smoke** (not an STAGE 21 / FlaUI regression).
+
+**Row stays Open** until a **`workflow_dispatch`** full chain completes **green** end-to-end (all stages **PASS** or allowed **SKIP**), or the row is superseded per [EXECUTION_ROW_DISCIPLINE.md](../governance/EXECUTION_ROW_DISCIPLINE.md). **Next bounded freeze:** **Failure-Path Smoke** on hosted (**`24456263743`**).
 
 ## Rerun command (after token/UI access)
 

@@ -340,6 +340,36 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Full-chain hosted proof** (resume path exercises Failure-Path / Runtime-Missing **SKIPPED** on GHA): run **`workflow_dispatch`** with **`run_full_chain: true`** on tip **`3a7dd8c4`** or later (Actions UI if `gh workflow dispatch` returns **403**).
 
+### GHA proof — `24483278551` (2026-04-15) — `workflow_dispatch` **`90a7aba0`**; **Checkpoint TIMED_OUT** (Seam A-D + E-H 180s); Resume **never ran**
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24483278551 |
+| **Run ID** | `24483278551` |
+| **Commit SHA** | `90a7aba0` |
+| **Event** | `workflow_dispatch` |
+| **Inputs** | `run_full_chain: true` |
+| **Verify Quick Gate** | **success** (~12m) |
+| **Checkpoint — STAGE 1: Clean Build** | **PASSED** (74.1s) |
+| **Checkpoint — STAGE 2: XAML Health** | **PASSED** (0.56s) |
+| **Checkpoint — STAGE 3: Resolved Packages** | **PASSED** (0.87s) |
+| **Checkpoint — STAGE 4: Release XAML Smoke** | **PASSED** (136.0s) |
+| **Checkpoint — STAGE 5: Python Quality** | **PASSED** (40.1s) |
+| **Checkpoint — STAGE 6: C# Unit Tests - ViewModels Seam A-D** | **TIMED OUT** after 180s |
+| **Checkpoint — STAGE 7: C# Unit Tests - ViewModels Seam E-H** | **TIMED OUT** after 180s |
+| **Checkpoint — STAGE 8–16: remaining C# shards** | **PASSED** (all) |
+| **StopAfterStage exit** | **exit 1** (`$OverallPassed=false` from TIMED_OUT stages) |
+| **Resume run** | **never executed** (checkpoint exit 1 → GHA skips subsequent steps) |
+| **First failing stage** | **STAGE 6: C# Unit Tests - ViewModels Seam A-D** — TIMED_OUT (180s) |
+
+**Diagnosis:** Recurrence of the STAGE 6/7 timeout seen in **`24412155919`** (`c5403d35`). The `MaxCpuCount=1` fix from the prior Seam A-D series resolved DispatcherQueue hangs but the 180s budget remains borderline for shared GHA runners. On slower-provisioned runners, Seam A-D (~1200+ tests) and Seam E-H (~700+ tests) exceed the 180s wall-clock limit. The prior run **`24456263743`** completed within 180s on a faster runner — proving the tests themselves pass; only the timeout budget is insufficient.
+
+**Root cause:** `$Stage3ShardTimeouts["C# Unit Tests - ViewModels Seam A-D"] = 180` and `$Stage3ShardTimeouts["C# Unit Tests - ViewModels Seam E-H"] = 180` — too tight for GHA `windows-latest` variability.
+
+**Fix:** Increase both shard timeouts to **300s** (5 min) to absorb runner performance variability. The `StopAfterStage` mechanism correctly uses `exit $(if ($OverallPassed) { 0 } else { 1 })` — the exit code is faithful to the TIMED_OUT status.
+
+**Row stays Open.** Freeze: **STAGE 6 + 7 timeout budget**. Prior guards (UI Smoke, Failure-Path, Runtime-Missing) remain valid. Re-dispatch after timeout fix.
+
 ## Rerun command (after token/UI access)
 
 ```powershell

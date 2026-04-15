@@ -334,9 +334,10 @@ $StageTimeouts = @{
 }
 # Per-shard timeouts for C# Unit Tests (diagnosable per shard; single bad shard cannot consume whole budget)
 $Stage3ShardTimeouts = @{
-    # Seam A-D: see MaxCpuCount=1 in Stage 3 loop (parallel + DispatcherQueue hang on GHA without it).
-    "C# Unit Tests - ViewModels Seam A-D" = 180
-    "C# Unit Tests - ViewModels Seam E-H" = 180
+    # Seam A-D: MaxCpuCount=1 (DispatcherQueue hang on GHA); 300s absorbs shared-runner variability
+    # (180s timed out on 24483278551 and 24412155919 despite all tests passing).
+    "C# Unit Tests - ViewModels Seam A-D" = 300
+    "C# Unit Tests - ViewModels Seam E-H" = 300
     "C# Unit Tests - ViewModels Seam I-L" = 180
     "C# Unit Tests - ViewModels Seam M" = 180
     "C# Unit Tests - ViewModels Seam N-Z" = 180

@@ -15,7 +15,59 @@ dependency resolution with conflict detection, and atomic installation
 with rollback capabilities.
 """
 
-from .catalog import PluginCatalogService, get_catalog_service
+from __future__ import annotations
+
+import importlib
+from typing import Any
+
+# Submodules that import aiohttp at module level are loaded lazily so that
+# importing e.g. dependency_resolver (pure logic) does not require aiohttp
+# until catalog/installer/multi-catalog symbols are accessed.
+_LAZY_EXPORT_MODULE: dict[str, str] = {
+    # catalog
+    "PluginCatalogService": "catalog",
+    "get_catalog_service": "catalog",
+    # installer
+    "PluginInstallService": "installer",
+    "get_install_service": "installer",
+    # installer_v2
+    "AtomicInstallResult": "installer_v2",
+    "BackupInfo": "installer_v2",
+    "InstallAction": "installer_v2",
+    "InstallTransaction": "installer_v2",
+    "PackageVerificationResult": "installer_v2",
+    "PluginInstallerV2": "installer_v2",
+    "TransactionState": "installer_v2",
+    "get_installer_v2": "installer_v2",
+    "install_from_vspkg": "installer_v2",
+    "install_plugin_atomic": "installer_v2",
+    "rollback_plugin": "installer_v2",
+    # multi_catalog
+    "CatalogPriority": "multi_catalog",
+    "CatalogSource": "multi_catalog",
+    "CatalogType": "multi_catalog",
+    "MultiCatalogConfig": "multi_catalog",
+    "MultiCatalogService": "multi_catalog",
+    "add_catalog_source": "multi_catalog",
+    "get_merged_catalog": "multi_catalog",
+    "get_multi_catalog_service": "multi_catalog",
+    "remove_catalog_source": "multi_catalog",
+}
+
+
+def __getattr__(name: str) -> Any:
+    sub = _LAZY_EXPORT_MODULE.get(name)
+    if sub is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    mod = importlib.import_module(f".{sub}", __name__)
+    val = getattr(mod, name)
+    globals()[name] = val
+    return val
+
+
+def __dir__() -> list[str]:
+    return sorted(__all__)
+
 
 # Phase 5C M6: Dependency resolver
 from .dependency_resolver import (
@@ -43,20 +95,6 @@ from .gallery_v2 import (
     refresh_gallery,
     search_gallery,
 )
-from .installer import PluginInstallService, get_install_service
-from .installer_v2 import (
-    AtomicInstallResult,
-    BackupInfo,
-    InstallAction,
-    InstallTransaction,
-    PackageVerificationResult,
-    PluginInstallerV2,
-    TransactionState,
-    get_installer_v2,
-    install_from_vspkg,
-    install_plugin_atomic,
-    rollback_plugin,
-)
 
 # Phase 5C M4: Lockfile system
 from .lockfile import (
@@ -81,17 +119,6 @@ from .models import (
     InstallProgress,
     PluginCatalog,
     PluginVersion,
-)
-from .multi_catalog import (
-    CatalogPriority,
-    CatalogSource,
-    CatalogType,
-    MultiCatalogConfig,
-    MultiCatalogService,
-    add_catalog_source,
-    get_merged_catalog,
-    get_multi_catalog_service,
-    remove_catalog_source,
 )
 from .ratings import (
     PluginRating,

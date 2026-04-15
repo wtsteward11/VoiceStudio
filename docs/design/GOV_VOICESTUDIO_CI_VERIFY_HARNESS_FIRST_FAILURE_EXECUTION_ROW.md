@@ -166,7 +166,7 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Remediation committed (2026-04-14 — `8ad0a26e` on `main`):** Remove duplicate legacy **`engines/{bark,chatterbox,openvoice,piper,whisper,xtts}/engine.manifest.json`**; finalize v3 manifests under **`engines/audio/`** / **`engines/llm/`**; align **`tests/contract/*`** + voice route registration with **`shared/schemas/engine_manifest_v3.schema.json`**. **Local proof:** **`pytest tests/contract`** **238** passed / **5** skipped; **`verify.ps1 -OnlyStage "Contract Tests"`** **PASS** **`artifacts/verify/20260414_163511/`**. **Current tip:** **`e849e980`** ( **`aiohttp`** in **`extras`** + lazy **`gallery`** exports; chain through **`9d5ccb1b`** / **`6e7bb1a2`** docs; remote HEAD confirmed).
 
-**Next:** **Bounded slice** — **STAGE 17 — Python Unit Tests** — **`test_xtts_clone_voice_pipeline`** **`ImportError: Coqui TTS not installed`** on GHA (see **`24430564094`**). **`aiohttp`** / collection cleared on **`e849e980`**. **Do not** reopen **STAGE 18 Contract** until **STAGE 17** hosted green. **`workflow_dispatch`** after fix — unset **`GITHUB_TOKEN`** for **`gh`** if **403**.
+**Next:** **Remediation on `main`** — **`7f887c4a`** — module-level **`pytest.skip`** when **`TTS`** is **`None`** in **`test_xtts_clone_voice_pipeline.py`** (optional **`coqui-tts`**). **Local:** **`verify.ps1 -OnlyStage "Python Unit Tests"`** **PASS** **`artifacts/verify/20260414_212900/`**. **Hosted:** operator **`workflow_dispatch`** **`run_full_chain: true`** on **`7f887c4a`** (or later tip) — unset **`GITHUB_TOKEN`** override for **`gh`** if **403**; use **Actions UI** if needed. **Do not** reopen **Contract** row until hosted resume proves **STAGE 17** (or freeze **new** first failure).
 
 ### GHA proof — `24424525825` (2026-04-14) — **false checkpoint failure (harness)**
 
@@ -229,7 +229,18 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 | **Collection** | **5566** items collected (**`aiohttp`** / gallery import **cleared**) |
 | **Contract Tests (STAGE 18)** | **not reached** |
 
-**Bounded slice (active):** **STAGE 17 — Python Unit Tests** — **optional engine dependency** **`coqui-tts`** vs **`test_xtts_clone_voice_pipeline`** expectations on **`windows-latest`** — **freeze** first failing test only (do **not** reopen **Contract** until **STAGE 17** passes).
+**Bounded slice (superseded on repo — pending hosted proof):** **`24430564094`** — **STAGE 17** **`coqui-tts`** runtime failure — **fix:** **`7f887c4a`** skips tests when Coqui **`TTS`** is unavailable (matches optional engine policy).
+
+### Remediation — `7f887c4a` (2026-04-15) — STAGE 17 Coqui guard
+
+| Field | Value |
+| --- | --- |
+| **Commit** | `7f887c4aac55e250c1f4c87fdf93e4e8eb9445f3` |
+| **Change** | [`tests/unit/core/engines/test_xtts_clone_voice_pipeline.py`](../../tests/unit/core/engines/test_xtts_clone_voice_pipeline.py) — import **`TTS`** with **`XTTSEngine`**; **`pytest.skip`** (**`allow_module_level=True`**) when **`_CoquiTTS is None`** |
+| **Local proof** | **`verify.ps1 -OnlyStage "Python Unit Tests"`** → **`artifacts/verify/20260414_212900/`** — **5442** passed / **309** skipped (**PASS**) |
+| **Hosted full chain** | **Pending** — dispatch after push (this environment: **`gh workflow run`** **HTTP 403**) |
+
+**Row stays Open** until a **`workflow_dispatch`** + **`run_full_chain: true`** run on **`main`** at or after **`7f887c4a`** records **Quick + Checkpoint + Resume** outcome (green or new first-failing stage).
 
 ## Rerun command (after token/UI access)
 

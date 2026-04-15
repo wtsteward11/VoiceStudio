@@ -240,6 +240,21 @@ gh run download 24379285704 --dir artifacts/ci-harness-download/
 
 **Bucket:** **`BucketB_HarnessRed`** — dependency/import surface on hosted runner (not Contract Tests). **Operational certification:** still **No**. **Execution row** remains **Open** with **STAGE 17** bounded slice ([execution row § 24429204800](../../design/GOV_VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_FAILURE_EXECUTION_ROW.md)).
 
+## `workflow_dispatch` — run `24430564094` (2026-04-15) — fourth full chain; post-**`aiohttp`** fix
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24430564094 |
+| **Run ID** | `24430564094` |
+| **Commit SHA** | `e849e98010dd9290d25f895b306777c7b34c93cd` |
+| **Verify Quick Gate** | **success** |
+| **Checkpoint run (stop after C# Unit Tests)** | **success** |
+| **Resume run** | **failure** — **STAGE 17** — **`ImportError: Coqui TTS not installed`** in **`test_xtts_clone_voice_pipeline`** |
+| **Collection** | **5566** items ( **`aiohttp`** issue **resolved**) |
+| **Contract Tests** | **not reached** |
+
+**Bucket:** **`BucketB_HarnessRed`**. **Operational certification:** **No**. **Next bounded slice:** STAGE 17 / Coqui XTTS test vs CI install surface ([execution row § 24430564094](../../design/GOV_VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_FAILURE_EXECUTION_ROW.md)).
+
 ## Closure criteria
 
 | Criterion | Status |

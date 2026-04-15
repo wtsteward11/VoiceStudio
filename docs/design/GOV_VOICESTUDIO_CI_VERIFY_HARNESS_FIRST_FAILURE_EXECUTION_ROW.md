@@ -164,9 +164,9 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Exit:** green **`workflow_dispatch`** + **`run_full_chain: true`** with **Contract Tests** **PASSED** on resume, or freeze **next** failing stage only if a different stage fails first after this lands.
 
-**Remediation committed (2026-04-14 — `8ad0a26e` on `main`):** Remove duplicate legacy **`engines/{bark,chatterbox,openvoice,piper,whisper,xtts}/engine.manifest.json`**; finalize v3 manifests under **`engines/audio/`** / **`engines/llm/`**; align **`tests/contract/*`** + voice route registration with **`shared/schemas/engine_manifest_v3.schema.json`**. **Local proof:** **`pytest tests/contract`** **238** passed / **5** skipped; **`verify.ps1 -OnlyStage "Contract Tests"`** **PASS** **`artifacts/verify/20260414_163511/`**. **Current tip:** **`9d5ccb1b`** (truth-sync docs on chain **`8ad0a26e`** → **`7835f8fb`** → **`903b4031`** → **`69fe71aa`** → **`9d5ccb1b`**; remote HEAD confirmed).
+**Remediation committed (2026-04-14 — `8ad0a26e` on `main`):** Remove duplicate legacy **`engines/{bark,chatterbox,openvoice,piper,whisper,xtts}/engine.manifest.json`**; finalize v3 manifests under **`engines/audio/`** / **`engines/llm/`**; align **`tests/contract/*`** + voice route registration with **`shared/schemas/engine_manifest_v3.schema.json`**. **Local proof:** **`pytest tests/contract`** **238** passed / **5** skipped; **`verify.ps1 -OnlyStage "Contract Tests"`** **PASS** **`artifacts/verify/20260414_163511/`**. **Current tip:** **`e849e980`** ( **`aiohttp`** in **`extras`** + lazy **`gallery`** exports; chain through **`9d5ccb1b`** / **`6e7bb1a2`** docs; remote HEAD confirmed).
 
-**Next:** **Bounded slice** — **STAGE 17 — Python Unit Tests** — **`aiohttp`** import for **`gallery/dependency_resolver`** on GHA (see **`24429204800`**). **Do not** reopen **STAGE 18 Contract** until **STAGE 17** green. **`workflow_dispatch`** + **`run_full_chain: true`** after fix — unset **`GITHUB_TOKEN`** for **`gh`** if **403**.
+**Next:** **Bounded slice** — **STAGE 17 — Python Unit Tests** — **`test_xtts_clone_voice_pipeline`** **`ImportError: Coqui TTS not installed`** on GHA (see **`24430564094`**). **`aiohttp`** / collection cleared on **`e849e980`**. **Do not** reopen **STAGE 18 Contract** until **STAGE 17** hosted green. **`workflow_dispatch`** after fix — unset **`GITHUB_TOKEN`** for **`gh`** if **403**.
 
 ### GHA proof — `24424525825` (2026-04-14) — **false checkpoint failure (harness)**
 
@@ -214,7 +214,22 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 | **Resume run** | **failure** — **STAGE 17: Python Unit Tests** — pytest collection **`ModuleNotFoundError: No module named 'aiohttp'`** importing **`tests/unit/backend/plugins/gallery/test_dependency_resolver.py`** → **`backend.plugins.gallery.dependency_resolver`** |
 | **Contract Tests (STAGE 18)** | **not reached** (fail-fast at **STAGE 17**) |
 
-**Bounded slice (active):** **STAGE 17 — Python Unit Tests** — **`aiohttp`** dependency / import path for gallery **`dependency_resolver`** on **`windows-latest`** — **freeze** until hosted green (do **not** reopen **STAGE 18 Contract** slice until **STAGE 17** passes; do **not** reopen Seam A-D / checkpoint harness unless regression).
+**Bounded slice (superseded — `aiohttp`):** **`24429204800`** — resolved by **`e849e980`** (**`aiohttp>=3.9.0`** in **`extras`** + lazy exports in **`backend/plugins/gallery/__init__.py`**).
+
+### GHA proof — `24430564094` (2026-04-15) — post-**`aiohttp`** fix; resume red (**STAGE 17** run-time)
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24430564094 |
+| **Run ID** | `24430564094` |
+| **Commit SHA** | `e849e98010dd9290d25f895b306777c7b34c93cd` |
+| **Verify Quick Gate** | **success** |
+| **Checkpoint run (stop after C# Unit Tests)** | **success** |
+| **Resume run** | **failure** — **STAGE 17: Python Unit Tests** — **`FAILED`** **`test_xtts_clone_voice_pipeline.py::...::test_clone_voice_with_prosody_enhances_once_after_prosody`** — **`ImportError: Coqui TTS not installed. Install with: pip install coqui-tts==0.24.2`** |
+| **Collection** | **5566** items collected (**`aiohttp`** / gallery import **cleared**) |
+| **Contract Tests (STAGE 18)** | **not reached** |
+
+**Bounded slice (active):** **STAGE 17 — Python Unit Tests** — **optional engine dependency** **`coqui-tts`** vs **`test_xtts_clone_voice_pipeline`** expectations on **`windows-latest`** — **freeze** first failing test only (do **not** reopen **Contract** until **STAGE 17** passes).
 
 ## Rerun command (after token/UI access)
 

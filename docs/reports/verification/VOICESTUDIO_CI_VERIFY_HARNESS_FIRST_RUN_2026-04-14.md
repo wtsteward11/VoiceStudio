@@ -226,6 +226,20 @@ gh run download 24379285704 --dir artifacts/ci-harness-download/
 
 **Notes:** **`verify.ps1`** **StopAfterStage** fix validated (checkpoint no longer false-red). **`test_search.py`** collection hit **`Database not connected`** from eager **`search.py`** imports on **`main`** — addressed by **`903b4031`** (lazy storage). **Row stays open** until full-chain green on post-**`903b4031`** dispatch.
 
+## `workflow_dispatch` — run `24429204800` (2026-04-15) — third full chain; resume red (**STAGE 17**)
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24429204800 |
+| **Run ID** | `24429204800` |
+| **Commit SHA** | `9d5ccb1b0a45d6d79472d678ceff7c286cccee14` |
+| **Verify Quick Gate** | **success** |
+| **Checkpoint run (stop after C# Unit Tests)** | **success** |
+| **Resume run** | **failure** — **STAGE 17: Python Unit Tests** — collection error **`ModuleNotFoundError: No module named 'aiohttp'`** (`test_dependency_resolver.py` → **`dependency_resolver`**) |
+| **STAGE 18 Contract Tests** | **not reached** |
+
+**Bucket:** **`BucketB_HarnessRed`** — dependency/import surface on hosted runner (not Contract Tests). **Operational certification:** still **No**. **Execution row** remains **Open** with **STAGE 17** bounded slice ([execution row § 24429204800](../../design/GOV_VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_FAILURE_EXECUTION_ROW.md)).
+
 ## Closure criteria
 
 | Criterion | Status |

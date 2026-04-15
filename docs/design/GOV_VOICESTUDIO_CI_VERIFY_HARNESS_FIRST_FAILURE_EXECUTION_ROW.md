@@ -164,9 +164,9 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Exit:** green **`workflow_dispatch`** + **`run_full_chain: true`** with **Contract Tests** **PASSED** on resume, or freeze **next** failing stage only if a different stage fails first after this lands.
 
-**Remediation committed (2026-04-14 — `8ad0a26e` on `main`):** Remove duplicate legacy **`engines/{bark,chatterbox,openvoice,piper,whisper,xtts}/engine.manifest.json`**; finalize v3 manifests under **`engines/audio/`** / **`engines/llm/`**; align **`tests/contract/*`** + voice route registration with **`shared/schemas/engine_manifest_v3.schema.json`**. **Local proof:** **`pytest tests/contract`** **238** passed / **5** skipped; **`verify.ps1 -OnlyStage "Contract Tests"`** **PASS** **`artifacts/verify/20260414_163511/`**. **Current tip:** **`69fe71aa`** (chain: **`8ad0a26e`** contract fix → **`7835f8fb`** StopAfterStage fix → **`903b4031`** **`search.py`** lazy init → **`69fe71aa`** governance docs; remote HEAD confirmed).
+**Remediation committed (2026-04-14 — `8ad0a26e` on `main`):** Remove duplicate legacy **`engines/{bark,chatterbox,openvoice,piper,whisper,xtts}/engine.manifest.json`**; finalize v3 manifests under **`engines/audio/`** / **`engines/llm/`**; align **`tests/contract/*`** + voice route registration with **`shared/schemas/engine_manifest_v3.schema.json`**. **Local proof:** **`pytest tests/contract`** **238** passed / **5** skipped; **`verify.ps1 -OnlyStage "Contract Tests"`** **PASS** **`artifacts/verify/20260414_163511/`**. **Current tip:** **`9d5ccb1b`** (truth-sync docs on chain **`8ad0a26e`** → **`7835f8fb`** → **`903b4031`** → **`69fe71aa`** → **`9d5ccb1b`**; remote HEAD confirmed).
 
-**Next:** **`workflow_dispatch`** + **`run_full_chain: true`** on **`main @ 69fe71aa`** — fine-grained PAT must include **Actions: Read and write** (or classic **`workflow`**); **`gh workflow run`** may return **HTTP 403** if **`GITHUB_TOKEN`** overrides keyring without dispatch scope — **unset `GITHUB_TOKEN`** for **`gh`** or use **Actions UI**. Record run URL/ID/SHA here when observed.
+**Next:** **Bounded slice** — **STAGE 17 — Python Unit Tests** — **`aiohttp`** import for **`gallery/dependency_resolver`** on GHA (see **`24429204800`**). **Do not** reopen **STAGE 18 Contract** until **STAGE 17** green. **`workflow_dispatch`** + **`run_full_chain: true`** after fix — unset **`GITHUB_TOKEN`** for **`gh`** if **403**.
 
 ### GHA proof — `24424525825` (2026-04-14) — **false checkpoint failure (harness)**
 
@@ -200,7 +200,21 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Collection error on resume (Python Unit Tests / import):** **`test_search.py`** collection → **`RuntimeError: Database not connected`** from **eager** module-level **`get_projects_for_search()`** in **`backend/api/routes/search.py`** on **`main`** (pre-**`903b4031`**). **Remediation:** **`903b4031`** — lazy **`_load_search_storage()`** (GAP-069 slice 5). **Re-dispatch** **`workflow_dispatch`** after push to re-prove resume + Contract Tests.
 
-**Bounded slice (active):** **STAGE 18 — Contract Tests** on resume **or** **import/collection** unblock — **freeze** until hosted green on tip **`69fe71aa`** (do **not** reopen Seam A-D / checkpoint harness unless regression).
+**Bounded slice (superseded on older tip):** **`24426420065`** — **STAGE 18 — Contract Tests** / **`search.py`** — addressed by **`903b4031`** on **`main`**.
+
+### GHA proof — `24429204800` (2026-04-15) — Quick + checkpoint green; resume red (**STAGE 17**)
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24429204800 |
+| **Run ID** | `24429204800` |
+| **Commit SHA** | `9d5ccb1b0a45d6d79472d678ceff7c286cccee14` (**truth-sync** on **`69fe71aa`** chain) |
+| **Verify Quick Gate** | **success** (~13m) |
+| **Checkpoint run (stop after C# Unit Tests)** | **success** |
+| **Resume run** | **failure** — **STAGE 17: Python Unit Tests** — pytest collection **`ModuleNotFoundError: No module named 'aiohttp'`** importing **`tests/unit/backend/plugins/gallery/test_dependency_resolver.py`** → **`backend.plugins.gallery.dependency_resolver`** |
+| **Contract Tests (STAGE 18)** | **not reached** (fail-fast at **STAGE 17**) |
+
+**Bounded slice (active):** **STAGE 17 — Python Unit Tests** — **`aiohttp`** dependency / import path for gallery **`dependency_resolver`** on **`windows-latest`** — **freeze** until hosted green (do **not** reopen **STAGE 18 Contract** slice until **STAGE 17** passes; do **not** reopen Seam A-D / checkpoint harness unless regression).
 
 ## Rerun command (after token/UI access)
 

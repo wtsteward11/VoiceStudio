@@ -1921,13 +1921,15 @@ if (-not $stage7Passed -and -not $SkipIntegration) {
 # STAGE 7: UI Smoke Tests
 # ============================================================================
 
-$stage8Passed = Invoke-Stage -Name "UI Smoke Tests" -Description "Verify app launches, panels exist, navigation works" -Skip:(($OnlyStage -and "UI Smoke Tests" -ne $OnlyStage) -or (-not $OnlyStage -and $SkipUI)) -TimeoutSeconds $StageTimeouts["UI Smoke Tests"] -Action {
+$stage8Passed = Invoke-Stage -Name "UI Smoke Tests" -Description "Verify app launches, panels exist, navigation works" -Skip:(($OnlyStage -and "UI Smoke Tests" -ne $OnlyStage) -or (-not $OnlyStage -and $SkipUI) -or ((-not $RealUI) -and ($env:GITHUB_ACTIONS -eq 'true'))) -TimeoutSeconds $StageTimeouts["UI Smoke Tests"] -Action {
     $trxFile = Join-Path $TestResultsDir "ui_smoke_tests.trx"
     $testProject = Join-Path $RootDir "src\VoiceStudio.App.Tests\VoiceStudio.App.Tests.csproj"
     
-    # FlaUI E2E (SmokeTests.cs) requires interactive desktop enumeration; always opt in for this stage so
-    # dotnet test inherits VOICESTUDIO_USE_REAL_UI_AUTOMATION=true (-RealUI remains the operator hint for session).
-    $env:VOICESTUDIO_USE_REAL_UI_AUTOMATION = "true"
+    # FlaUI E2E (SmokeTests.cs) requires interactive desktop enumeration. Set automation only when -RealUI is passed
+    # (defense in depth: without it, SmokeTests assert Inconclusive instead of failing on headless sessions).
+    if ($RealUI) {
+        $env:VOICESTUDIO_USE_REAL_UI_AUTOMATION = "true"
+    }
     $env:VOICESTUDIO_TEST_ARTIFACTS = $ScreenshotsDir
     
     try {

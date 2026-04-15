@@ -284,13 +284,21 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 | **Resume — STAGE 19: Security Tests** | **PASSED** (~139.8s) |
 | **Resume — STAGE 20: Backend Integration** | **PASSED** (~17.3s) |
 | **Resume — STAGE 21: UI Smoke Tests** | **FAILED** (exit code 1) — **3 failed / 1 passed / 1 skipped** |
-| **First failing stage** | **STAGE 21** — WinAppDriver MSTest: **`Journey2_NavigationPanel_IsAccessible`**, **`Journey3_ContentArea_DisplaysOnNavigation`**, **`Journey4_Settings_CanBeAccessed`** — `Assert.IsNotNull failed` (NavStudio / StatusBar / NavSettings not found on headless runner) |
+| **First failing stage** | **STAGE 21** — FlaUI E2E (MSTest): **`Journey2_NavigationPanel_IsAccessible`**, **`Journey3_ContentArea_DisplaysOnNavigation`**, **`Journey4_Settings_CanBeAccessed`** — `Assert.IsNotNull failed` (NavStudio / StatusBar / NavSettings not found on headless runner) |
 
 **STAGE 18 — CLOSED.** Hosted proof **`24452191885`** confirms **`test_legacy_body_process_bypass_ok_when_no_enabled`** passes: **`bypass_chain=True`** no longer requires audio libraries. Contract coverage for **`GET /api/library/assets`** is also green: missing DB returns **503** instead of an unhandled sqlite error.
 
-**Bounded slice (active): STAGE 21 — UI Smoke Tests** — WinAppDriver UI smoke tests fail on **`windows-latest`** (no interactive desktop session / WinUI shell not composed for automation). Freeze **STAGE 21** only; do **not** reopen **STAGE 17** or **STAGE 18**.
+**Bounded slice (historical — pre-guard): STAGE 21 — UI Smoke Tests** — FlaUI E2E smoke attempted real automation on **`windows-latest`** without an interactive desktop (WinUI shell not composed for automation). **Not** WinAppDriver — labels corrected to match [`SmokeTests.cs`](../../src/VoiceStudio.App.Tests/UI/E2E/SmokeTests.cs). Freeze **STAGE 21** only; do **not** reopen **STAGE 17** or **STAGE 18**.
 
-**Row stays Open** until **STAGE 21** is resolved and a subsequent **`workflow_dispatch`** full-chain run is green end-to-end (or the row is superseded by a new single-root-cause slice per [EXECUTION_ROW_DISCIPLINE.md](../governance/EXECUTION_ROW_DISCIPLINE.md)).
+### STAGE 21 remediation — headless runner guard (verify.ps1)
+
+| Item | Detail |
+| --- | --- |
+| **Behavior** | On **`GITHUB_ACTIONS=true`**, the **UI Smoke Tests** stage is **SKIPPED** unless **`-RealUI`** is passed (self-hosted / interactive agent). |
+| **Env** | **`VOICESTUDIO_USE_REAL_UI_AUTOMATION=true`** is set **only** when **`-RealUI`** is present (defense in depth vs. headless FlaUI failures). |
+| **Coverage** | Local / self-hosted: run **`verify.ps1 -RealUI`** (or export the env var) for full FlaUI E2E; hosted default lane proves upstream stages without false-red UI smoke. |
+
+**Row stays Open** until a post-remediation **`workflow_dispatch`** with **`run_full_chain: true`** completes **green** end-to-end (**STAGE 21** expected **SKIPPED** on GitHub-hosted `windows-latest`), or the row is superseded per [EXECUTION_ROW_DISCIPLINE.md](../governance/EXECUTION_ROW_DISCIPLINE.md).
 
 ## Rerun command (after token/UI access)
 

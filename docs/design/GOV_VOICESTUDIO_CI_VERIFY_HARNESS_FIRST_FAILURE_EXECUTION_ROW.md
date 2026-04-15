@@ -258,9 +258,39 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **STAGE 17 — CLOSED.** The Coqui / XTTS guard (**`7f887c4a`**) is confirmed working on hosted CI. The module-level `pytest.skip` fires when `TTS is None`, and STAGE 17 now passes cleanly.
 
-**Bounded slice (active): STAGE 18 — Contract Tests** — `test_effects.py::test_legacy_body_process_bypass_ok_when_no_enabled` fails with `{"detail":"Audio processing libraries not available"}` on `windows-latest`. This is a **hosted environment limitation** (no audio processing libs in default CI install). Freeze first failing test only; do **not** reopen STAGE 17.
+**Bounded slice (superseded on `24435050079`):** **STAGE 18 — Contract Tests** — `test_effects.py::test_legacy_body_process_bypass_ok_when_no_enabled` failed with `{"detail":"Audio processing libraries not available"}` because the route loaded audio **before** checking `bypass_chain`. **Remediation:** **`9bfe36f1`** (see below).
 
-**Row stays Open** until STAGE 18 Contract Tests is resolved and a subsequent full-chain run is green end-to-end.
+### Remediation — `9bfe36f1` (2026-04-15) — STAGE 18 bypass route + library sqlite guard
+
+| Field | Value |
+| --- | --- |
+| **Commit** | `9bfe36f1` |
+| **Change** | [`backend/api/routes/effects.py`](../../backend/api/routes/effects.py) — **`bypass_chain=True`** returns early **before** audio registry lookup / `load_audio` in **`process_audio_with_chain`** and **`process_project_effect_chain`**. [`backend/api/routes/library.py`](../../backend/api/routes/library.py) — **`search_assets`** catches **`sqlite3.OperationalError`** and returns **HTTP 503** `"Library database not initialized"` instead of crashing ASGI when **`library_assets`** table is missing. |
+| **Local proof** | **`test_effects.py`** **7/7 PASSED**; **`test_gateway_coverage.py`** **11/11 PASSED** |
+
+### GHA proof — `24452191885` (2026-04-15) — post-**`9bfe36f1`**; STAGES 17+18 **PASSED**; resume red (**STAGE 21**)
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24452191885 |
+| **Run ID** | `24452191885` |
+| **Commit SHA** | `9bfe36f1` |
+| **Event** | `workflow_dispatch` |
+| **Inputs** | `run_full_chain: true` |
+| **Verify Quick Gate** | **success** (~12m) |
+| **Checkpoint run (stop after C# Unit Tests)** | **success** |
+| **Resume — STAGE 17: Python Unit Tests** | **PASSED** (~52.8s) |
+| **Resume — STAGE 18: Contract Tests** | **PASSED** (~48.3s) |
+| **Resume — STAGE 19: Security Tests** | **PASSED** (~139.8s) |
+| **Resume — STAGE 20: Backend Integration** | **PASSED** (~17.3s) |
+| **Resume — STAGE 21: UI Smoke Tests** | **FAILED** (exit code 1) — **3 failed / 1 passed / 1 skipped** |
+| **First failing stage** | **STAGE 21** — WinAppDriver MSTest: **`Journey2_NavigationPanel_IsAccessible`**, **`Journey3_ContentArea_DisplaysOnNavigation`**, **`Journey4_Settings_CanBeAccessed`** — `Assert.IsNotNull failed` (NavStudio / StatusBar / NavSettings not found on headless runner) |
+
+**STAGE 18 — CLOSED.** Hosted proof **`24452191885`** confirms **`test_legacy_body_process_bypass_ok_when_no_enabled`** passes: **`bypass_chain=True`** no longer requires audio libraries. Contract coverage for **`GET /api/library/assets`** is also green: missing DB returns **503** instead of an unhandled sqlite error.
+
+**Bounded slice (active): STAGE 21 — UI Smoke Tests** — WinAppDriver UI smoke tests fail on **`windows-latest`** (no interactive desktop session / WinUI shell not composed for automation). Freeze **STAGE 21** only; do **not** reopen **STAGE 17** or **STAGE 18**.
+
+**Row stays Open** until **STAGE 21** is resolved and a subsequent **`workflow_dispatch`** full-chain run is green end-to-end (or the row is superseded by a new single-root-cause slice per [EXECUTION_ROW_DISCIPLINE.md](../governance/EXECUTION_ROW_DISCIPLINE.md)).
 
 ## Rerun command (after token/UI access)
 

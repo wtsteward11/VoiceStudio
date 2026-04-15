@@ -315,7 +315,18 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **STAGE 21 guard: VERIFIED on hosted.** Full-chain operational certification **not** claimed — resume chain **red** at **Failure-Path Smoke** (not an STAGE 21 / FlaUI regression).
 
-**Row stays Open** until a **`workflow_dispatch`** full chain completes **green** end-to-end (all stages **PASS** or allowed **SKIP**), or the row is superseded per [EXECUTION_ROW_DISCIPLINE.md](../governance/EXECUTION_ROW_DISCIPLINE.md). **Next bounded freeze:** **Failure-Path Smoke** on hosted (**`24456263743`**).
+**Diagnosis (`24456263743`):** **Not** slice-13 (missing `failure_smoke_summary.json` from XAML / env on a dev box). Hosted log: stage log **~9 bytes** (`False`); WinUI app launch cannot complete the backend failure-path proof on **headless** `windows-latest` (no interactive desktop / shell composition for the same class of limitation as STAGE 21 FlaUI).
+
+### Failure-Path + Runtime-Missing headless guard (verify.ps1)
+
+| Item | Detail |
+| --- | --- |
+| **Stages** | **Failure-Path Smoke** (port occupied) and **Runtime-Missing Failure Smoke** (invalid app root). |
+| **Behavior** | On **`GITHUB_ACTIONS=true`**, both stages are **SKIPPED** unless **`-RealUI`** is passed (self-hosted / interactive agent). |
+| **Rationale** | Both invoke `VoiceStudio.App.exe` and wait for JSON under `%LOCALAPPDATA%\VoiceStudio\crashes\` from WinUI startup orchestration — unreliable on GitHub-hosted headless runners. **UI Self-Test** / **Icon-Launch Smoke** stay ungated (CLI smoke paths; green on hosted in `24456263743`). |
+| **Coverage** | Local / self-hosted: **`verify.ps1 -RealUI`** for full WinUI failure-path proofs. |
+
+**Row stays Open** until a post-remediation **`workflow_dispatch`** full chain completes **green** end-to-end (all stages **PASS** or allowed **SKIP**), or the row is superseded per [EXECUTION_ROW_DISCIPLINE.md](../governance/EXECUTION_ROW_DISCIPLINE.md). **Prior freeze:** Failure-Path on **`24456263743`** — superseded by guard commit (pending hosted proof row below).
 
 ## Rerun command (after token/UI access)
 

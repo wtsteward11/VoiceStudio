@@ -2065,8 +2065,9 @@ if (-not $SkipUI) { Invoke-PostStageCleanup }
 # ============================================================================
 # Proves: port 8000 occupied -> app shows BackendFailed overlay with port message.
 # See docs/design/STARTUP_ORCHESTRATION_HARDENING_PLAN.md Round 3 Task 2.
+# Launches WinUI; on headless GitHub-hosted runners skip unless -RealUI (same as UI Smoke).
 
-$stage8_7Passed = Invoke-Stage -Name "Failure-Path Smoke" -Description "Port occupied -> overlay shows failure, Retry visible" -Skip:(($OnlyStage -and "Failure-Path Smoke" -ne $OnlyStage) -or (-not $OnlyStage -and $SkipUI)) -TimeoutSeconds $StageTimeouts["Failure-Path Smoke"] -Action {
+$stage8_7Passed = Invoke-Stage -Name "Failure-Path Smoke" -Description "Port occupied -> overlay shows failure, Retry visible" -Skip:(($OnlyStage -and "Failure-Path Smoke" -ne $OnlyStage) -or (-not $OnlyStage -and $SkipUI) -or ((-not $RealUI) -and ($env:GITHUB_ACTIONS -eq 'true'))) -TimeoutSeconds $StageTimeouts["Failure-Path Smoke"] -Action {
     $exePath = Join-Path $RootDir ".buildlogs\x64\$Configuration\net8.0-windows10.0.19041.0\VoiceStudio.App.exe"
     $reportDir = Join-Path $RootDir ".buildlogs\verify"
     $reportPath = Join-Path $reportDir "failure_smoke.json"
@@ -2094,8 +2095,9 @@ if (-not $SkipUI) { Invoke-PostStageCleanup }
 # ============================================================================
 # Proves: app root invalid (no backend) -> app shows BackendFailed overlay with runtime message.
 # See docs/design/STARTUP_ORCHESTRATION_HARDENING_PLAN.md Round 4 Task 2.
+# Launches WinUI; on headless GitHub-hosted runners skip unless -RealUI (same as Failure-Path Smoke).
 
-$stage8_8Passed = Invoke-Stage -Name "Runtime-Missing Failure Smoke" -Description "App root invalid -> overlay shows runtime failure" -Skip:(($OnlyStage -and "Runtime-Missing Failure Smoke" -ne $OnlyStage) -or (-not $OnlyStage -and $SkipUI)) -TimeoutSeconds $StageTimeouts["Runtime-Missing Failure Smoke"] -Action {
+$stage8_8Passed = Invoke-Stage -Name "Runtime-Missing Failure Smoke" -Description "App root invalid -> overlay shows runtime failure" -Skip:(($OnlyStage -and "Runtime-Missing Failure Smoke" -ne $OnlyStage) -or (-not $OnlyStage -and $SkipUI) -or ((-not $RealUI) -and ($env:GITHUB_ACTIONS -eq 'true'))) -TimeoutSeconds $StageTimeouts["Runtime-Missing Failure Smoke"] -Action {
     $exePath = Join-Path $RootDir ".buildlogs\x64\$Configuration\net8.0-windows10.0.19041.0\VoiceStudio.App.exe"
     $reportDir = Join-Path $RootDir ".buildlogs\verify"
     $reportPath = Join-Path $reportDir "failure_runtime_smoke.json"

@@ -328,6 +328,18 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 
 **Row stays Open** until a post-remediation **`workflow_dispatch`** full chain completes **green** end-to-end (all stages **PASS** or allowed **SKIP**), or the row is superseded per [EXECUTION_ROW_DISCIPLINE.md](../governance/EXECUTION_ROW_DISCIPLINE.md). **Prior freeze:** Failure-Path on **`24456263743`** — superseded by guard commit (pending hosted proof row below).
 
+### GHA proof — push **`24482287481`** (2026-04-15) — guard commit **`3a7dd8c4`** — Quick **only**
+
+| Field | Value |
+| --- | --- |
+| **Run URL** | https://github.com/wtsteward11/VoiceStudio/actions/runs/24482287481 |
+| **Commit SHA** | `3a7dd8c4` |
+| **Event** | `push` to `main` (`scripts/verify.ps1`) |
+| **Verify Quick Gate** | **success** |
+| **Verify Checkpoint + Resume Chain** | **skipped** (expected — full chain runs only on **`workflow_dispatch`** with **`run_full_chain: true`** or **schedule**, not on push) |
+
+**Full-chain hosted proof** (resume path exercises Failure-Path / Runtime-Missing **SKIPPED** on GHA): run **`workflow_dispatch`** with **`run_full_chain: true`** on tip **`3a7dd8c4`** or later (Actions UI if `gh workflow dispatch` returns **403**).
+
 ## Rerun command (after token/UI access)
 
 ```powershell

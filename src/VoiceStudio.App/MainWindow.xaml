@@ -44,7 +44,7 @@
       <Button x:Name="NotificationCenterButton" Grid.Column="3" Width="32" Height="28" Padding="0"
         VerticalAlignment="Center" Margin="4,0,0,0"
         ToolTipService.ToolTip="Notification Center"
-        Style="{StaticResource VSQ.Button.NavToggle}"
+        Style="{StaticResource VSQ.Button.Icon}"
         AutomationProperties.AutomationId="MainWindow_NotificationCenterButton">
         <Grid>
           <FontIcon Glyph="&#xEA8F;" FontSize="16" FontFamily="Segoe Fluent Icons" />

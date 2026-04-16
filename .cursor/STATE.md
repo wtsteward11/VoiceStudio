@@ -31,15 +31,15 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## ACTIVE WINDOW
 
-- **Active Task:** **None** — **GOV-VOICESTUDIO-BACKEND-READINESS-FAILURE-PATH-SMOKE-13** (GAP-069 slice 13) **Closed** 2026-04-14 ([closure](../docs/reports/verification/VOICESTUDIO_GAP069_FAILURE_PATH_SMOKE_LANE_CLOSURE_2026-04-14.md); [execution row](../docs/design/GOV_VOICESTUDIO_BACKEND_READINESS_FAILURE_PATH_SMOKE_13_EXECUTION_ROW.md)). **Umbrella:** **GAP-069** **Closed** for bounded backend-readiness Failure-Path + honest resume chain (continuous CI backlog remains in roadmap). **GAP-067** umbrella **Closed** (all 7 slices).
+- **Active Task:** **Product Recovery Launch** — app launch, backend startup, Profiles CRUD hero workflow verified 2026-04-16. See [PRODUCT_RECOVERY_LAUNCH_2026-04-16.md](../docs/reports/verification/PRODUCT_RECOVERY_LAUNCH_2026-04-16.md).
 - **Active Plan (roadmap):** [VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](../docs/governance/VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md) with bounded execution-row discipline tracked in [PROFESSIONAL_GAP_TRACKER.md](../docs/design/PROFESSIONAL_GAP_TRACKER.md).
-- **Current Target:** **CI verify-harness operational certification ACHIEVED** — [execution row](../docs/design/GOV_VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_FAILURE_EXECUTION_ROW.md) **Closed** on **`24484587429`** @ **`24b84bbc`**. Full chain **GREEN**: Quick **PASS**; Checkpoint (16 stages) **ALL PASSED**; Resume (11 stages) **ALL PASSED** (3 **SKIPPED** — headless guards). **BucketB_Partial** (allowed SKIPs).
-- **Next 3 Steps:** (1) Execution row closed — operational certification claimed. (2) Identify next roadmap work item. (3) N/A.
+- **Current Target:** Product recovery — Windows launch + backend + hero workflow. Three gates passed.
+- **Next 3 Steps:** (1) Product recovery closed — identify next product work. (2) Address backend startup_decision race condition. (3) N/A.
 - **Current Blocker:** **None.**
-- **Truth Sync Note:** **2026-04-16 —** Full chain green on **`24484587429`** (`24b84bbc`). Execution row closed. Timeout fix (180s→300s) validated.
-- **Last Verified Commands:** GHA `24484587429` — Quick **PASS**; Checkpoint **PASS** (Seam A-D 8.1s, E-H 7.2s — within 300s budget); Resume **PASS** (Python/Contract/Security/Backend/UI Self-Test/Icon-Launch/Backend Smoke/Gate-Ledger all PASSED; UI Smoke + Failure-Path + Runtime-Missing **SKIPPED** per headless guards).
-- **Context Acknowledgment:** 2026-04-16 — CI verify-harness operational certification complete. All stages PASS or honest SKIP. No blocker.
-- **Latest verify artifact:** **GHA `24484587429`** — `workflow_dispatch` @ **`24b84bbc`** — Full chain **GREEN**.
+- **Truth Sync Note:** **2026-04-16 —** Product recovery verified: XAML style fix (ToggleButton→Button mismatch), pydantic-settings install, backend health 200, Profiles CRUD end-to-end.
+- **Last Verified Commands:** `dotnet build` 0 errors; `uvicorn backend.api.main:app` → startup complete; `GET /health` 200; `GET /api/health` 200; `POST /api/profiles` 200; `GET /api/profiles` 200 (50 profiles).
+- **Context Acknowledgment:** 2026-04-16 — Product recovery launch complete. App renders, backend healthy, Profiles CRUD works.
+- **Latest verify artifact:** [PRODUCT_RECOVERY_LAUNCH_2026-04-16.md](../docs/reports/verification/PRODUCT_RECOVERY_LAUNCH_2026-04-16.md) with screenshots.
 
 ## HISTORY LEDGER
 

@@ -451,9 +451,47 @@ public sealed class BackendProcessManager : IDisposable
         {
             var error = $"Failed to start backend: {ex.Message}";
             Debug.WriteLine($"[BackendProcessManager] {error}");
+            Debug.WriteLine($"[BackendProcessManager] Exception type: {ex.GetType().FullName}");
+            Debug.WriteLine($"[BackendProcessManager] Stack trace: {ex.StackTrace}");
+            ErrorLogger.LogError($"Spawn exception ({ex.GetType().Name}): {ex.Message}", "BackendProcessManager.StartBackendProcessAsync");
+
+            bool lastChanceHealthy = false;
+            try
+            {
+                lastChanceHealthy = await IsBackendHealthyAsync(CancellationToken.None);
+            }
+            catch
+            {
+                // Health check itself failed — genuinely unreachable
+            }
+
+            if (lastChanceHealthy)
+            {
+                Debug.WriteLine("[BackendProcessManager] Last-chance health check PASSED — treating as success despite exception");
+                _diagnostics?.Log("result", "spawn_recovered");
+                _diagnostics?.EndSession();
+                WriteStartupArtifact(
+                    success: true,
+                    decision: "spawn_recovered",
+                    healthProbeResult: true,
+                    portOccupied: false,
+                    backendPid: _backendProcess?.HasExited == false ? _backendProcess.Id : null,
+                    elapsedMs: (decisionStart ?? Stopwatch.StartNew()).Elapsed.TotalMilliseconds,
+                    spawnAttempted: true,
+                    reusedExistingBackend: false,
+                    conflictCategory: null,
+                    spawnElapsedMs: null,
+                    healthAttempts: null,
+                    healthyElapsedMs: null,
+                    lastStderrLines: GetStderrTailSnapshot(),
+                    pythonPathResolved: resolvedPythonPath);
+                LastFailure = null;
+                BackendStarted?.Invoke(this, EventArgs.Empty);
+                return true;
+            }
+
             _diagnostics?.LogFailure("spawn_failure", error);
             _diagnostics?.EndSession();
-            ErrorLogger.LogError($"Failed to start backend: {ex.Message}", "BackendProcessManager.StartBackendProcessAsync");
             WriteStartupArtifact(
                 success: false,
                 decision: "spawn_failure",

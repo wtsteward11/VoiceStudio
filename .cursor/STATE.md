@@ -31,15 +31,15 @@ git reset --hard v1.0.0-baseline  # Reset current branch to baseline (destructiv
 
 ## ACTIVE WINDOW
 
-- **Active Task:** **Product Recovery Launch** — app launch, backend startup, Profiles CRUD hero workflow verified 2026-04-16. See [PRODUCT_RECOVERY_LAUNCH_2026-04-16.md](../docs/reports/verification/PRODUCT_RECOVERY_LAUNCH_2026-04-16.md).
+- **Active Task:** **Product Recovery Slice 2 — Startup Truth** complete. False `spawn_failure` fixed; status bar shows "Ready"; overlay hidden. See screenshots in `docs/reports/verification/STARTUP_TRUTH_*.png`.
 - **Active Plan (roadmap):** [VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md](../docs/governance/VOICESTUDIO_PROFESSIONAL_ROADMAP_V3.md) with bounded execution-row discipline tracked in [PROFESSIONAL_GAP_TRACKER.md](../docs/design/PROFESSIONAL_GAP_TRACKER.md).
-- **Current Target:** Product recovery — Windows launch + backend + hero workflow. Three gates passed.
-- **Next 3 Steps:** (1) Product recovery closed — identify next product work. (2) Address backend startup_decision race condition. (3) N/A.
+- **Current Target:** Startup truth fixed. Next: stabilize Profiles ViewModel data-fetch, then next product lane.
+- **Next 3 Steps:** (1) Investigate Profiles ViewModel empty-list issue (API returns 487 profiles, panel shows 0). (2) Identify next product-visible work. (3) N/A.
 - **Current Blocker:** **None.**
-- **Truth Sync Note:** **2026-04-16 —** Product recovery verified: XAML style fix (ToggleButton→Button mismatch), pydantic-settings install, backend health 200, Profiles CRUD end-to-end.
-- **Last Verified Commands:** `dotnet build` 0 errors; `uvicorn backend.api.main:app` → startup complete; `GET /health` 200; `GET /api/health` 200; `POST /api/profiles` 200; `GET /api/profiles` 200 (50 profiles).
-- **Context Acknowledgment:** 2026-04-16 — Product recovery launch complete. App renders, backend healthy, Profiles CRUD works.
-- **Latest verify artifact:** [PRODUCT_RECOVERY_LAUNCH_2026-04-16.md](../docs/reports/verification/PRODUCT_RECOVERY_LAUNCH_2026-04-16.md) with screenshots.
+- **Truth Sync Note:** **2026-04-16 —** Startup truth fixed: last-chance health check in BackendProcessManager catch block (`spawn_recovered`); startup recovery path in ErrorPresentationService.OnBackendConnected. `startup_decision.json` now `status: "success"`.
+- **Last Verified Commands:** `dotnet build` 0 errors; app launch → overlay hidden, status bar "Ready"; `startup_decision.json` → `status: "success"`, `decision: "spawn_recovered"`; `GET /health` 200; Profiles panel renders.
+- **Context Acknowledgment:** 2026-04-16 — Startup truth recovery complete. App reports accurate health state.
+- **Latest verify artifact:** `docs/reports/verification/STARTUP_TRUTH_healthy_shell.png`, `STARTUP_TRUTH_profiles_panel.png`.
 
 ## HISTORY LEDGER
 

@@ -93,8 +93,19 @@ namespace VoiceStudio.App.Services
 
     private void OnBackendConnected(object? sender, EventArgs e)
     {
+      var startupState = AppServices.GetService<IStartupStateService>();
+      if (startupState?.CurrentState == StartupState.BackendFailed)
+      {
+        startupState.SetBackendReady();
+        ErrorLogger.LogInfo("Startup recovery: BackendFailed -> BackendReady via connection monitor");
+      }
+
       if (!IsBackendOffline)
+      {
+        if (startupState?.IsReady == true)
+          BackendReachabilityChanged?.Invoke(this, true);
         return;
+      }
 
       IsBackendOffline = false;
       _backendOfflineToastShown = false;

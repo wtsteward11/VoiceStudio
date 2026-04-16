@@ -348,6 +348,7 @@ namespace VoiceStudio.App.Tests.ViewModels
           Assert.AreEqual(3, vm.Profiles.Count);
           Assert.AreEqual(3, vm.TotalProfiles, "TotalProfiles should match Profiles.Count for footer");
           Assert.AreEqual(3, vm.FilteredCount, "FilteredCount should match with no active filters");
+          Assert.AreEqual("3 of 3 profiles", vm.FooterSummary, "FooterSummary drives ProfilesView_FooterSummary XAML binding");
 
           await vm.OnDeactivatedAsync(CancellationToken.None);
           tcs.TrySetResult(true);
@@ -387,6 +388,7 @@ namespace VoiceStudio.App.Tests.ViewModels
           Assert.AreEqual(0, vm.Profiles.Count);
           Assert.AreEqual(0, vm.TotalProfiles);
           Assert.AreEqual(0, vm.FilteredCount);
+          Assert.AreEqual("0 of 0 profiles", vm.FooterSummary);
           Assert.IsTrue(vm.ShowEmptyState, "ShowEmptyState should be true when there are no profiles and no error");
 
           await vm.OnDeactivatedAsync(CancellationToken.None);

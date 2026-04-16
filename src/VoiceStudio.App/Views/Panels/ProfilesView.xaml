@@ -309,18 +309,15 @@
             </ScrollViewer>
         </Grid>
 
-        <!-- Footer Row -->
+        <!-- Footer Row: FooterSummary mirrors Run-based counts for automation + single accessibility string -->
         <Border Grid.Row="2"
                 Background="{StaticResource VSQ.Panel.Background.HeaderBrush}"
                 Padding="{StaticResource VSQ.Spacing.Small}">
-            <TextBlock Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+            <TextBlock AutomationProperties.AutomationId="ProfilesView_FooterSummary"
+                       Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
                        FontSize="{StaticResource VSQ.FontSize.Caption}"
-                       VerticalAlignment="Center">
-                <Run Text="{x:Bind ViewModel.FilteredCount, Mode=OneWay}" />
-                <Run Text=" of " />
-                <Run Text="{x:Bind ViewModel.TotalProfiles, Mode=OneWay}" />
-                <Run Text=" profiles" />
-            </TextBlock>
+                       VerticalAlignment="Center"
+                       Text="{x:Bind ViewModel.FooterSummary, Mode=OneWay}" />
         </Border>
 
         <!-- Loading Overlay -->

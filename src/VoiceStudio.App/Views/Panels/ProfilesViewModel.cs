@@ -102,6 +102,12 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private int filteredCount;
 
+    /// <summary>
+    /// Single user-visible footer line; kept in sync with <see cref="ApplyFilters"/> so XAML and automation
+    /// read the same string as the separate Run-based count bindings.
+    /// </summary>
+    public string FooterSummary => $"{FilteredCount} of {TotalProfiles} profiles";
+
     [ObservableProperty]
     private bool isLoading;
 
@@ -1682,6 +1688,7 @@ namespace VoiceStudio.App.Views.Panels
       FilteredCount = FilteredProfiles.Count;
       System.Diagnostics.Debug.WriteLine(
           $"[ProfilesViewModel] ApplyFilters: TotalProfiles={TotalProfiles}, FilteredCount={FilteredCount}");
+      OnPropertyChanged(nameof(FooterSummary));
       OnPropertyChanged(nameof(HasProfiles));
       OnPropertyChanged(nameof(ShowEmptyState));
     }

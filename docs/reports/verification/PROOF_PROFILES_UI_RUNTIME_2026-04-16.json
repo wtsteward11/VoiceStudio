@@ -1,0 +1,45 @@
+{
+  "schema": "VoiceStudio.runtime_ui_proof.v1",
+  "capture_timestamp_utc": "2026-04-16T11:05:00.0000000Z",
+  "classification": "Case_A",
+  "classification_note": "Live HTTP + real BackendClient + ProfilesViewModel.OnActivatedAsync: TotalProfiles, FilteredCount, FooterSummary, and Profiles.Count match GET /api/profiles items length. Pixel-level WinUI screenshot optional; footer text is now single-bound via FooterSummary + AutomationId ProfilesView_FooterSummary.",
+  "api_baseline": {
+    "health_url": "http://127.0.0.1:8000/health",
+    "health_status": "ok",
+    "profiles_url": "http://127.0.0.1:8000/api/profiles",
+    "profiles_items_count": 50,
+    "pagination_note": "Backend returns paginated JSON; items array length used as truth for default page (page_size=50)."
+  },
+  "ui_observed": {
+    "capture_mode": "live_backend_viewmodel_activation",
+    "footer_text_equivalent": "50 of 50 profiles",
+    "total_profiles_shown": 50,
+    "filtered_count_shown": 50,
+    "grid_rows_visible": "not_pixel_captured",
+    "grid_rows_note": "GridView binds to FilteredProfiles; seam + live-backend test prove non-zero collection. Operator PNG optional for pixel closure.",
+    "automation_id_footer": "ProfilesView_FooterSummary",
+    "match": true
+  },
+  "automated_proof": {
+    "test_class": "ProfilesRuntimeLiveBackendTests",
+    "test_method": "OnActivatedAsync_LiveBackend_ViewModelCountsAndFooterMatchApiItems",
+    "result": "Passed",
+    "requires_backend": "127.0.0.1:8000 reachable; otherwise MSTest Inconclusive",
+    "command": "dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --filter \"FullyQualifiedName~ProfilesRuntimeLiveBackendTests\""
+  },
+  "diagnostics_expected": [
+    "[ProfilesViewModel] LoadProfilesAsync: entering",
+    "[ProfilesViewModel] LoadProfilesAsync: received N profile(s) from use case",
+    "[ProfilesViewModel] ApplyFilters: TotalProfiles=N, FilteredCount=N"
+  ],
+  "diagnostics_capture_note": "Debug.WriteLine requires attached debugger (Visual Studio F5) or Sysinternals DebugView for a live app session; not captured in MSTest on .NET 8.",
+  "slice2_regression": {
+    "startup_overlay_cleared": null,
+    "status_bar_ready": null,
+    "retry_button_absent": null,
+    "no_competing_modals": null,
+    "verification": "operator_interactive_recommended",
+    "reference": "docs/reports/verification/VOICESTUDIO_UNIFIED_STARTUP_SLICE2_PROOF_2026-03-28.md"
+  },
+  "screenshot_path": null
+}

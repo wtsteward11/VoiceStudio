@@ -406,7 +406,13 @@ namespace VoiceStudio.App.Views.Panels
     }
 
     /// <inheritdoc />
-    public Task OnActivatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public async Task OnActivatedAsync(CancellationToken cancellationToken = default)
+    {
+      if (Profiles.Count == 0)
+      {
+        await LoadProfilesAsync(cancellationToken);
+      }
+    }
 
     /// <inheritdoc />
     /// <summary>Unsubscribe from EventAggregator to prevent memory leaks (GAP-W3).</summary>
@@ -1061,22 +1067,28 @@ namespace VoiceStudio.App.Views.Panels
 
     private async Task LoadProfilesAsync(CancellationToken cancellationToken)
     {
+      System.Diagnostics.Debug.WriteLine("[ProfilesViewModel] LoadProfilesAsync: entering");
       IsLoading = true;
       ErrorMessage = null;
 
       try
       {
         var profilesList = await _profilesUseCase.ListAsync(cancellationToken);
+        ArgumentNullException.ThrowIfNull(profilesList);
+        System.Diagnostics.Debug.WriteLine(
+            $"[ProfilesViewModel] LoadProfilesAsync: received {profilesList.Count} profile(s) from use case");
         ReplaceProfiles(profilesList);
         UpdateAvailableFilters();
         ApplyFilters();
       }
       catch (OperationCanceledException)
       {
+        System.Diagnostics.Debug.WriteLine("[ProfilesViewModel] LoadProfilesAsync: cancelled (OperationCanceledException)");
         return;
       }
       catch (Exception ex)
       {
+        System.Diagnostics.Debug.WriteLine($"[ProfilesViewModel] LoadProfilesAsync: error — {ex.GetType().Name}: {ex.Message}");
         ErrorMessage = ErrorHandler.GetUserFriendlyMessage(ex);
         _errorService?.ShowError(ex, ResourceHelper.GetString("Profile.LoadFailed", "Failed to load profiles"));
         _logService?.LogError(ex, "LoadProfiles");

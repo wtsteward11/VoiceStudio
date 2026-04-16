@@ -174,6 +174,95 @@ namespace VoiceStudio.App.Tests.ViewModels
       await tcs.Task;
     }
 
+    /// <summary>Bounded Slice 3: <see cref="IPanelLifecycle.OnActivatedAsync"/> loads profiles when the panel activates with an empty cache (PanelHost contract).</summary>
+    [TestMethod]
+    public async Task OnActivatedAsync_WhenEmpty_LoadsProfilesOnce()
+    {
+      TestAppServicesHelper.EnsureInitialized();
+      var dq = TestAppServicesHelper.GetDispatcher();
+      Assert.IsNotNull(dq, "Test dispatcher required");
+
+      var listCalls = 0;
+      var mockUseCase = new Mock<IProfilesUseCase>();
+      mockUseCase.Setup(u => u.ListAsync(It.IsAny<CancellationToken>()))
+        .ReturnsAsync(() =>
+        {
+          listCalls++;
+          return new List<VoiceProfile> { new() { Id = "p1", Name = "One" } };
+        });
+
+      var mockClient = new Mock<IProfilesClient>();
+      mockClient.Setup(c => c.GetProfilesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<VoiceProfile>());
+
+      var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+      dq.TryEnqueue(async () =>
+      {
+        try
+        {
+          var vm = CreateProfilesViewModel(mockClient.Object, mockUseCase.Object);
+          Assert.AreEqual(0, vm.Profiles.Count, "Precondition: no profiles before activation");
+
+          await vm.OnActivatedAsync(CancellationToken.None);
+
+          Assert.AreEqual(1, listCalls, "ListAsync should run once on first activation");
+          Assert.AreEqual(1, vm.Profiles.Count, "Profiles should populate after activation");
+          mockUseCase.Verify(u => u.ListAsync(It.IsAny<CancellationToken>()), Times.Once);
+          await vm.OnDeactivatedAsync(CancellationToken.None);
+          tcs.TrySetResult(true);
+        }
+        catch (Exception ex)
+        {
+          tcs.TrySetException(ex);
+        }
+      });
+
+      await tcs.Task;
+    }
+
+    /// <summary>Bounded Slice 3: Second activation does not refetch when data is already present (avoids redundant load).</summary>
+    [TestMethod]
+    public async Task OnActivatedAsync_WhenAlreadyLoaded_SkipsSecondFetch()
+    {
+      TestAppServicesHelper.EnsureInitialized();
+      var dq = TestAppServicesHelper.GetDispatcher();
+      Assert.IsNotNull(dq, "Test dispatcher required");
+
+      var listCalls = 0;
+      var mockUseCase = new Mock<IProfilesUseCase>();
+      mockUseCase.Setup(u => u.ListAsync(It.IsAny<CancellationToken>()))
+        .ReturnsAsync(() =>
+        {
+          listCalls++;
+          return new List<VoiceProfile> { new() { Id = "p1", Name = "One" } };
+        });
+
+      var mockClient = new Mock<IProfilesClient>();
+      mockClient.Setup(c => c.GetProfilesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<VoiceProfile>());
+
+      var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+      dq.TryEnqueue(async () =>
+      {
+        try
+        {
+          var vm = CreateProfilesViewModel(mockClient.Object, mockUseCase.Object);
+          await vm.OnActivatedAsync(CancellationToken.None);
+          Assert.AreEqual(1, listCalls);
+
+          await vm.OnActivatedAsync(CancellationToken.None);
+          Assert.AreEqual(1, listCalls, "Second activation should not call ListAsync when Profiles is non-empty");
+
+          await vm.OnDeactivatedAsync(CancellationToken.None);
+          tcs.TrySetResult(true);
+        }
+        catch (Exception ex)
+        {
+          tcs.TrySetException(ex);
+        }
+      });
+
+      await tcs.Task;
+    }
+
     /// <summary>GAP-028: ProfileUpdatedEvent from Training triggers list reload for fresh metadata.</summary>
     [TestMethod]
     public async Task ProfileUpdatedEvent_FromTraining_TriggersSecondListLoad()

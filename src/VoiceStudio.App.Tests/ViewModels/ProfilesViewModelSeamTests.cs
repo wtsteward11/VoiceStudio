@@ -263,6 +263,194 @@ namespace VoiceStudio.App.Tests.ViewModels
       await tcs.Task;
     }
 
+    /// <summary>Runtime proof hardening: first load fails; second activation retries because Profiles stays empty.</summary>
+    [TestMethod]
+    public async Task OnActivatedAsync_AfterFailedLoad_RetriesOnNextActivation()
+    {
+      TestAppServicesHelper.EnsureInitialized();
+      var dq = TestAppServicesHelper.GetDispatcher();
+      Assert.IsNotNull(dq, "Test dispatcher required");
+
+      var listCalls = 0;
+      var mockUseCase = new Mock<IProfilesUseCase>();
+      mockUseCase.Setup(u => u.ListAsync(It.IsAny<CancellationToken>()))
+        .Returns(() =>
+        {
+          listCalls++;
+          if (listCalls == 1)
+          {
+            return Task.FromException<IReadOnlyList<VoiceProfile>>(new InvalidOperationException("simulated network failure"));
+          }
+
+          return Task.FromResult<IReadOnlyList<VoiceProfile>>(
+              new List<VoiceProfile> { new() { Id = "recovered", Name = "Recovered" } });
+        });
+
+      var mockClient = new Mock<IProfilesClient>();
+      mockClient.Setup(c => c.GetProfilesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<VoiceProfile>());
+
+      var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+      dq.TryEnqueue(async () =>
+      {
+        try
+        {
+          var vm = CreateProfilesViewModel(mockClient.Object, mockUseCase.Object);
+
+          await vm.OnActivatedAsync(CancellationToken.None);
+          Assert.AreEqual(0, vm.Profiles.Count, "After failed load, Profiles should stay empty");
+          Assert.IsFalse(string.IsNullOrEmpty(vm.ErrorMessage), "ErrorMessage should surface load failure");
+
+          await vm.OnActivatedAsync(CancellationToken.None);
+          Assert.AreEqual(2, listCalls, "Second activation should call ListAsync again");
+          Assert.IsTrue(vm.Profiles.Count > 0, "Recovery load should populate Profiles");
+          Assert.AreEqual("recovered", vm.Profiles[0].Id);
+
+          await vm.OnDeactivatedAsync(CancellationToken.None);
+          tcs.TrySetResult(true);
+        }
+        catch (Exception ex)
+        {
+          tcs.TrySetException(ex);
+        }
+      });
+
+      await tcs.Task;
+    }
+
+    /// <summary>Runtime proof hardening: TotalProfiles and FilteredCount match collection after activation (footer bindings).</summary>
+    [TestMethod]
+    public async Task OnActivatedAsync_AfterLoad_SetsCountProperties()
+    {
+      TestAppServicesHelper.EnsureInitialized();
+      var dq = TestAppServicesHelper.GetDispatcher();
+      Assert.IsNotNull(dq, "Test dispatcher required");
+
+      var mockUseCase = new Mock<IProfilesUseCase>();
+      mockUseCase.Setup(u => u.ListAsync(It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<VoiceProfile>
+        {
+          new() { Id = "a", Name = "A", Language = "en" },
+          new() { Id = "b", Name = "B", Language = "en" },
+          new() { Id = "c", Name = "C", Language = "en" },
+        });
+
+      var mockClient = new Mock<IProfilesClient>();
+      mockClient.Setup(c => c.GetProfilesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<VoiceProfile>());
+
+      var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+      dq.TryEnqueue(async () =>
+      {
+        try
+        {
+          var vm = CreateProfilesViewModel(mockClient.Object, mockUseCase.Object);
+          await vm.OnActivatedAsync(CancellationToken.None);
+
+          Assert.AreEqual(3, vm.Profiles.Count);
+          Assert.AreEqual(3, vm.TotalProfiles, "TotalProfiles should match Profiles.Count for footer");
+          Assert.AreEqual(3, vm.FilteredCount, "FilteredCount should match with no active filters");
+
+          await vm.OnDeactivatedAsync(CancellationToken.None);
+          tcs.TrySetResult(true);
+        }
+        catch (Exception ex)
+        {
+          tcs.TrySetException(ex);
+        }
+      });
+
+      await tcs.Task;
+    }
+
+    /// <summary>Runtime proof hardening: empty API list yields honest empty state (ShowEmptyState).</summary>
+    [TestMethod]
+    public async Task OnActivatedAsync_EmptyResponse_ShowsEmptyState()
+    {
+      TestAppServicesHelper.EnsureInitialized();
+      var dq = TestAppServicesHelper.GetDispatcher();
+      Assert.IsNotNull(dq, "Test dispatcher required");
+
+      var mockUseCase = new Mock<IProfilesUseCase>();
+      mockUseCase.Setup(u => u.ListAsync(It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<VoiceProfile>());
+
+      var mockClient = new Mock<IProfilesClient>();
+      mockClient.Setup(c => c.GetProfilesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<VoiceProfile>());
+
+      var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+      dq.TryEnqueue(async () =>
+      {
+        try
+        {
+          var vm = CreateProfilesViewModel(mockClient.Object, mockUseCase.Object);
+          await vm.OnActivatedAsync(CancellationToken.None);
+
+          Assert.AreEqual(0, vm.Profiles.Count);
+          Assert.AreEqual(0, vm.TotalProfiles);
+          Assert.AreEqual(0, vm.FilteredCount);
+          Assert.IsTrue(vm.ShowEmptyState, "ShowEmptyState should be true when there are no profiles and no error");
+
+          await vm.OnDeactivatedAsync(CancellationToken.None);
+          tcs.TrySetResult(true);
+        }
+        catch (Exception ex)
+        {
+          tcs.TrySetException(ex);
+        }
+      });
+
+      await tcs.Task;
+    }
+
+    /// <summary>Runtime proof hardening: search narrows FilteredCount but TotalProfiles stays full catalog size.</summary>
+    [TestMethod]
+    public async Task ApplyFilters_WithSearchQuery_PreservesTotalCount()
+    {
+      TestAppServicesHelper.EnsureInitialized();
+      var dq = TestAppServicesHelper.GetDispatcher();
+      Assert.IsNotNull(dq, "Test dispatcher required");
+
+      var mockUseCase = new Mock<IProfilesUseCase>();
+      mockUseCase.Setup(u => u.ListAsync(It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<VoiceProfile>
+        {
+          new() { Id = "1", Name = "Alpha", Language = "en" },
+          new() { Id = "2", Name = "Beta", Language = "en" },
+          new() { Id = "3", Name = "Gamma", Language = "en" },
+        });
+
+      var mockClient = new Mock<IProfilesClient>();
+      mockClient.Setup(c => c.GetProfilesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<VoiceProfile>());
+
+      var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+      dq.TryEnqueue(async () =>
+      {
+        try
+        {
+          var vm = CreateProfilesViewModel(mockClient.Object, mockUseCase.Object);
+          await vm.OnActivatedAsync(CancellationToken.None);
+          Assert.AreEqual(3, vm.TotalProfiles);
+          Assert.AreEqual(3, vm.FilteredCount);
+
+          vm.SearchQuery = "Alpha";
+          await Task.Delay(600);
+
+          Assert.AreEqual(3, vm.TotalProfiles, "Total catalog size must not shrink when searching");
+          Assert.AreEqual(1, vm.FilteredCount, "Only Alpha should match search");
+          Assert.AreEqual(1, vm.FilteredProfiles.Count);
+          Assert.AreEqual("Alpha", vm.FilteredProfiles[0].Name);
+
+          await vm.OnDeactivatedAsync(CancellationToken.None);
+          tcs.TrySetResult(true);
+        }
+        catch (Exception ex)
+        {
+          tcs.TrySetException(ex);
+        }
+      });
+
+      await tcs.Task;
+    }
+
     /// <summary>GAP-028: ProfileUpdatedEvent from Training triggers list reload for fresh metadata.</summary>
     [TestMethod]
     public async Task ProfileUpdatedEvent_FromTraining_TriggersSecondListLoad()

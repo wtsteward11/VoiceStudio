@@ -1680,6 +1680,8 @@ namespace VoiceStudio.App.Views.Panels
 
       TotalProfiles = Profiles.Count;
       FilteredCount = FilteredProfiles.Count;
+      System.Diagnostics.Debug.WriteLine(
+          $"[ProfilesViewModel] ApplyFilters: TotalProfiles={TotalProfiles}, FilteredCount={FilteredCount}");
       OnPropertyChanged(nameof(HasProfiles));
       OnPropertyChanged(nameof(ShowEmptyState));
     }

@@ -1,0 +1,16 @@
+{
+  "schema": "VoiceStudio.runtime_api_probe.v1",
+  "probe_timestamp_utc": "2026-04-16T10:32:07.9390701Z",
+  "health": {
+    "url": "http://127.0.0.1:8000/health",
+    "status": "ok",
+    "version": "1.0",
+    "portable_mode": false,
+    "engines_ready": true
+  },
+  "profiles_list": {
+    "url": "http://127.0.0.1:8000/api/profiles",
+    "items_count": 50
+  },
+  "interpretation": "At probe time the backend returned a non-zero profile catalog. Footer TotalProfiles should match items_count when the app loads against this backend with no filters. Pixel-level WinUI screenshot of the Profiles grid remains an optional operator artifact; ViewModel truth is additionally covered by ProfilesViewModelSeamTests (9 tests)."
+}

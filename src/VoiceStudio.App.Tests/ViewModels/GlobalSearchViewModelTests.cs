@@ -223,6 +223,69 @@ namespace VoiceStudio.App.Tests.ViewModels
     }
 
     [TestMethod]
+    public async Task SearchAsync_SecondQuery_ReplacesFirstResults()
+    {
+      _mockSearchClient!.SearchResponse = new SearchResponse
+      {
+        Results = new List<SearchResultItem>
+        {
+          new SearchResultItem { Id = "a", Title = "A", Type = "profile" },
+        },
+        TotalResults = 1,
+        ResultsByType = new Dictionary<string, int> { { "profile", 1 } },
+      };
+      _viewModel!.SearchQuery = "first";
+      await _viewModel.SearchAsync();
+
+      _mockSearchClient.SearchResponse = new SearchResponse
+      {
+        Results = new List<SearchResultItem>
+        {
+          new SearchResultItem { Id = "b", Title = "B", Type = "project" },
+          new SearchResultItem { Id = "c", Title = "C", Type = "project" },
+        },
+        TotalResults = 2,
+        ResultsByType = new Dictionary<string, int> { { "project", 2 } },
+      };
+      _viewModel.SearchQuery = "second";
+      await _viewModel.SearchAsync();
+
+      Assert.AreEqual(2, _viewModel.Results.Count);
+      Assert.AreEqual(2, _viewModel.TotalResults);
+      Assert.AreEqual("b", _viewModel.SelectedResult?.Id);
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_NoResults_ClearsSelectionAndCollections()
+    {
+      _mockSearchClient!.SearchResponse = new SearchResponse
+      {
+        Results = new List<SearchResultItem>
+        {
+          new SearchResultItem { Id = "x", Title = "X", Type = "profile" },
+        },
+        TotalResults = 1,
+        ResultsByType = new Dictionary<string, int> { { "profile", 1 } },
+      };
+      _viewModel!.SearchQuery = "has";
+      await _viewModel.SearchAsync();
+      Assert.IsNotNull(_viewModel.SelectedResult);
+
+      _mockSearchClient.SearchResponse = new SearchResponse
+      {
+        Results = new List<SearchResultItem>(),
+        TotalResults = 0,
+        ResultsByType = new Dictionary<string, int>(),
+      };
+      _viewModel.SearchQuery = "none";
+      await _viewModel.SearchAsync();
+
+      Assert.AreEqual(0, _viewModel.Results.Count);
+      Assert.AreEqual(0, _viewModel.TotalResults);
+      Assert.IsNull(_viewModel.SelectedResult);
+    }
+
+    [TestMethod]
     public async Task OnSearchQueryChanged_DebouncesSearch()
     {
       // Arrange

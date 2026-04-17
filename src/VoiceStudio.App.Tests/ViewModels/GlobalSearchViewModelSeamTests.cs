@@ -113,5 +113,28 @@ namespace VoiceStudio.App.Tests.ViewModels
           x => x.SearchAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
           Times.Never);
     }
+
+    [TestMethod]
+    public async Task SearchAsync_UsesTotalResultsFromResponse_NotListCountAssumption()
+    {
+      _mockClient
+          .Setup(x => x.SearchAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new SearchResponse
+          {
+            Results = new List<SearchResultItem>
+            {
+              new SearchResultItem { Id = "1", Title = "One", Type = "profile" },
+            },
+            TotalResults = 42,
+            ResultsByType = new Dictionary<string, int> { { "profile", 1 } },
+          });
+
+      var vm = new GlobalSearchViewModel(_mockClient.Object);
+      vm.SearchQuery = "ab";
+      await vm.SearchAsync();
+
+      Assert.AreEqual(42, vm.TotalResults);
+      Assert.AreEqual(1, vm.Results.Count);
+    }
   }
 }

@@ -260,14 +260,22 @@ public sealed class BackendProcessManager : IDisposable
 
             // Search for Python in priority order:
             // 1. Bundled runtime (installed by installer/prepare-runtime.ps1)
-            // 2. Local venv
-            // 3. Alternate venv (.venv)
+            // 2-3. Dev venvs — .venv preferred in Debug builds (canonical dev env)
+#if DEBUG
+            var pythonCandidates = new[]
+            {
+                Path.Combine(appRoot, "Runtime", "python", "python.exe"),
+                Path.Combine(appRoot, ".venv", "Scripts", "python.exe"),
+                Path.Combine(appRoot, "venv", "Scripts", "python.exe"),
+            };
+#else
             var pythonCandidates = new[]
             {
                 Path.Combine(appRoot, "Runtime", "python", "python.exe"),
                 Path.Combine(appRoot, "venv", "Scripts", "python.exe"),
                 Path.Combine(appRoot, ".venv", "Scripts", "python.exe"),
             };
+#endif
 
             var venvPython = Array.Find(pythonCandidates, File.Exists);
             resolvedPythonPath = venvPython;
@@ -400,6 +408,50 @@ public sealed class BackendProcessManager : IDisposable
             if (metrics.Success)
             {
                 Debug.WriteLine("[BackendProcessManager] Backend is healthy");
+
+                bool? baselineDepsValid = null;
+                try
+                {
+                    var healthJson = await _httpClient.GetStringAsync("/health", cancellationToken);
+                    using var doc = System.Text.Json.JsonDocument.Parse(healthJson);
+                    if (doc.RootElement.TryGetProperty("baseline_deps_valid", out var bdv))
+                    {
+                        baselineDepsValid = bdv.GetBoolean();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(
+                        $"[BackendProcessManager] Baseline health detail fetch failed (non-fatal): {ex.Message}");
+                }
+
+                if (baselineDepsValid == false)
+                {
+                    var error = "Backend is reachable but baseline dependency validation failed — Python environment is misconfigured.";
+                    Debug.WriteLine($"[BackendProcessManager] {error}");
+                    _diagnostics?.LogFailure("baseline_deps_failed", error);
+                    _diagnostics?.EndSession();
+                    WriteStartupArtifact(
+                        success: false,
+                        decision: "baseline_deps_failed",
+                        healthProbeResult: true,
+                        portOccupied: false,
+                        backendPid: _backendProcess?.HasExited == false ? _backendProcess.Id : null,
+                        elapsedMs: (decisionStart ?? sessionStart).Elapsed.TotalMilliseconds,
+                        spawnAttempted: true,
+                        reusedExistingBackend: false,
+                        conflictCategory: null,
+                        spawnElapsedMs: metrics.SpawnToFirstHealthAttemptMs,
+                        healthAttempts: metrics.Attempts,
+                        healthyElapsedMs: metrics.HealthPhaseMs,
+                        lastStderrLines: GetStderrTailSnapshot(),
+                        pythonPathResolved: venvPython,
+                        baselineDepsValid: false);
+                    LastFailure = new BackendStartFailedEventArgs(BackendStartFailureCategory.BaselineDepsFailure, error);
+                    BackendStartFailed?.Invoke(this, LastFailure);
+                    return false;
+                }
+
                 _diagnostics?.Log("result", "success");
                 _diagnostics?.EndSession();
                 WriteStartupArtifact(
@@ -416,7 +468,8 @@ public sealed class BackendProcessManager : IDisposable
                     healthAttempts: metrics.Attempts,
                     healthyElapsedMs: metrics.HealthPhaseMs,
                     lastStderrLines: GetStderrTailSnapshot(),
-                    pythonPathResolved: venvPython);
+                    pythonPathResolved: venvPython,
+                    baselineDepsValid: baselineDepsValid);
                 LastFailure = null;
                 BackendStarted?.Invoke(this, EventArgs.Empty);
                 return true;
@@ -460,9 +513,10 @@ public sealed class BackendProcessManager : IDisposable
             {
                 lastChanceHealthy = await IsBackendHealthyAsync(CancellationToken.None);
             }
-            catch
+            catch (Exception ex)
             {
-                // Health check itself failed — genuinely unreachable
+                Debug.WriteLine(
+                    $"[BackendProcessManager] Last-chance health check failed (treating as unreachable): {ex.Message}");
             }
 
             if (lastChanceHealthy)
@@ -664,7 +718,7 @@ public sealed class BackendProcessManager : IDisposable
 
     /// <summary>
     /// Writes startup diagnostics to %LocalAppData%\VoiceStudio\crashes\startup_decision.json.
-    /// Includes <c>status</c> success/failure and <c>schema_version</c> 2.
+    /// Includes <c>status</c> success/failure and <c>schema_version</c> 3.
     /// </summary>
     private void WriteStartupArtifact(
         bool success,
@@ -680,9 +734,10 @@ public sealed class BackendProcessManager : IDisposable
         int? healthAttempts,
         double? healthyElapsedMs,
         IReadOnlyList<string>? lastStderrLines,
-        string? pythonPathResolved)
+        string? pythonPathResolved,
+        bool? baselineDepsValid = null)
     {
-        const int schemaVersion = 2;
+        const int schemaVersion = 3;
         try
         {
             var crashDir = Path.Combine(
@@ -714,6 +769,7 @@ public sealed class BackendProcessManager : IDisposable
                 healthy_elapsed_ms = healthyElapsedMs.HasValue ? Math.Round(healthyElapsedMs.Value, 2) : (double?)null,
                 last_stderr_lines = stderrSnapshot,
                 python_path_resolved = pythonPathResolved,
+                baseline_deps_valid = baselineDepsValid,
             };
 
             const string fileName = "startup_decision.json";

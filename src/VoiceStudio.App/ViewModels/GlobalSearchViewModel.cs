@@ -91,6 +91,7 @@ namespace VoiceStudio.App.ViewModels
         FilteredResults.Clear();
         TotalResults = 0;
         ResultsByType.Clear();
+        SelectedResult = null;
         return;
       }
 
@@ -117,10 +118,14 @@ namespace VoiceStudio.App.ViewModels
           TotalResults = response.TotalResults;
           ResultsByType = response.ResultsByType;
 
-          // Select first result if available
+          // Select first result if available; clear selection when no hits (honest empty state)
           if (FilteredResults.Count > 0)
           {
             SelectedResult = FilteredResults[0];
+          }
+          else
+          {
+            SelectedResult = null;
           }
         }
         finally

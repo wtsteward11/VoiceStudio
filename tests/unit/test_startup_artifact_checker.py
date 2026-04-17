@@ -1,4 +1,4 @@
-"""Unit tests for scripts/ci/check_startup_artifact.py (schema v2 regression guard)."""
+"""Unit tests for scripts/ci/check_startup_artifact.py (schema v3 regression guard)."""
 from __future__ import annotations
 
 import json
@@ -12,7 +12,7 @@ from scripts.ci.check_startup_artifact import ADVISORY_HEALTHY_ELAPSED_MS, check
 def _minimal_valid_v2(**overrides: object) -> dict:
     """Payload shape aligned with BackendProcessManager.WriteStartupArtifact."""
     base = {
-        "schema_version": 2,
+        "schema_version": 3,
         "status": "success",
         "timestamp_utc": "2026-04-11T12:00:00.0000000Z",
         "decision": "spawn",
@@ -29,6 +29,7 @@ def _minimal_valid_v2(**overrides: object) -> dict:
         "healthy_elapsed_ms": 30.0,
         "last_stderr_lines": [],
         "python_path_resolved": r"C:\Python\python.exe",
+        "baseline_deps_valid": None,
     }
     base.update(overrides)
     return base

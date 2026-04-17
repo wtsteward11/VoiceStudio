@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Canonical validator for %LocalAppData%\\VoiceStudio\\crashes\\startup_decision.json (schema v2).
+Canonical validator for %LocalAppData%\\VoiceStudio\\crashes\\startup_decision.json (schema v3).
 
 Written by BackendProcessManager.WriteStartupArtifact (see src/VoiceStudio.App/Services/BackendProcessManager.cs).
 
@@ -23,7 +23,7 @@ from typing import Any
 # ---------------------------------------------------------------------------
 # Constants — advisory vs hard fail is documented in execution row / closure report.
 # ---------------------------------------------------------------------------
-REQUIRED_SCHEMA_VERSION = 2
+REQUIRED_SCHEMA_VERSION = 3
 
 # Operational class: failure status with these decisions is a hard regression for this guard.
 HARD_FAIL_DECISIONS = frozenset(
@@ -40,7 +40,7 @@ ADVISORY_HEALTHY_ELAPSED_MS = 45_000
 ADVISORY_SPAWN_ELAPSED_MS = 10_000
 
 # Keys that must exist on the parsed object (values may be JSON null).
-# Matches BackendProcessManager payload shape (schema v2).
+# Matches BackendProcessManager payload shape (schema v3).
 REQUIRED_KEYS = frozenset(
     {
         "schema_version",
@@ -60,6 +60,7 @@ REQUIRED_KEYS = frozenset(
         "healthy_elapsed_ms",
         "last_stderr_lines",
         "python_path_resolved",
+        "baseline_deps_valid",
     }
 )
 

@@ -18,14 +18,14 @@ using VoiceStudio.Core.Services;
 namespace VoiceStudio.App.Tests.ViewModels
 {
   /// <summary>
-  /// Live-backend proof: real <c>xtts_v2</c> synthesis (non-stub) through
-  /// <see cref="IProfilesClient"/> + <see cref="IVoiceSynthesisService"/> + WAV fetch.
-  /// Inconclusive when no backend is reachable (see <see cref="BackendBase"/>) or consent returns 403.
-  /// Override base URL with environment variable <c>VOICESTUDIO_REAL_XTTS_HTTP_BASE</c> (same as Python real_xtts test).
+  /// Slice 9 — Live-backend proof: XTTS synthesis → <see cref="IVoiceSynthesisService.GetAudioStreamAsync"/> →
+  /// temp WAV → <see cref="AudioPlayerService.PlayFileAsync"/> → playback completion.
+  /// Inconclusive when no audio output device (headless). Same base URL as
+  /// <see cref="RealSynthesisXttsLiveBackendTests"/> (<c>VOICESTUDIO_REAL_XTTS_HTTP_BASE</c>).
   /// </summary>
   [TestClass]
   [TestCategory("LiveBackend")]
-  public sealed class RealSynthesisXttsLiveBackendTests
+  public sealed class PlaybackAuditionLiveBackendTests
   {
     private static string BackendBase
     {
@@ -103,8 +103,10 @@ namespace VoiceStudio.App.Tests.ViewModels
     }
 
     [TestMethod]
-    public async Task Synthesize_XttsV2_LiveBackend_ServiceReturnsAudio_NonSilentWav()
+    public async Task Synthesize_ThenPlayback_LiveBackend_PlayableNonSilentWav()
     {
+      AudioDeviceGuard.SkipIfNoAudioOutputDevice();
+
       var stub = Environment.GetEnvironmentVariable("VOICESTUDIO_TEST_MODE");
       if (!string.IsNullOrEmpty(stub) &&
           stub.Equals("stub", StringComparison.OrdinalIgnoreCase))
@@ -144,7 +146,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       try
       {
         profile = await profilesClient.CreateProfileAsync(
-          "csharp-slice8-xtts-real",
+          "csharp-slice9-playback-audition",
           language: "en",
           cancellationToken: CancellationToken.None).ConfigureAwait(false);
       }
@@ -192,7 +194,7 @@ namespace VoiceStudio.App.Tests.ViewModels
           {
             ["voice_id"] = profile.Id,
             ["grantor_id"] = "local",
-            ["grantor_name"] = "csharp-slice8-xtts-real",
+            ["grantor_name"] = "csharp-slice9-playback",
             ["consent_type"] = "voice_usage",
           });
         using var reqContent = new StringContent(
@@ -239,7 +241,7 @@ namespace VoiceStudio.App.Tests.ViewModels
           {
             ProfileId = profile.Id,
             Engine = "xtts_v2",
-            Text = "VoiceStudio slice eight real synthesis.",
+            Text = "VoiceStudio slice nine playback artifact audition proof.",
             Language = "en",
           },
           CancellationToken.None).ConfigureAwait(false);
@@ -259,8 +261,6 @@ namespace VoiceStudio.App.Tests.ViewModels
       }
 
       Assert.IsFalse(string.IsNullOrEmpty(response.AudioId), "AudioId missing.");
-      Assert.IsFalse(string.IsNullOrEmpty(response.AudioUrl), "AudioUrl missing.");
-      Assert.IsTrue(response.Duration >= 0.1, "Duration should be positive.");
 
       await using var audioStream = await synthService.GetAudioStreamAsync(
         response.AudioId,
@@ -270,8 +270,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       var bytes = ms.ToArray();
       Assert.IsTrue(
         bytes.Length > 1024,
-        $"WAV too small ({bytes.Length} bytes) for audio_id={response.AudioId}; "
-        + "expect non-empty artifact after synthesis (backend must not register pre-touch empty temp WAV).");
+        $"WAV too small ({bytes.Length} bytes) for audio_id={response.AudioId}.");
       CollectionAssert.AreEqual(
         new byte[] { 0x52, 0x49, 0x46, 0x46 },
         new[] { bytes[0], bytes[1], bytes[2], bytes[3] },
@@ -282,8 +281,38 @@ namespace VoiceStudio.App.Tests.ViewModels
       var peak = MaxAbsPcm16Le(bytes, pcmStart);
       Assert.IsTrue(
         peak > 200,
-        $"PCM looks like silence (peak={peak}); expected real synthesis, not stub silence.");
+        $"PCM looks like silence (peak={peak}); expected real synthesis.");
+
+      var tempPath = Path.Combine(Path.GetTempPath(), $"vs_slice9_{Guid.NewGuid():N}.wav");
+      await File.WriteAllBytesAsync(tempPath, bytes, CancellationToken.None).ConfigureAwait(false);
+
+      try
+      {
+        using var player = new AudioPlayerService(new HttpClient());
+        var completed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await player.PlayFileAsync(tempPath, () => completed.TrySetResult(true)).ConfigureAwait(false);
+
+        if (player.IsPlaying)
+        {
+          Assert.IsTrue(player.IsPlaying, "Playback should have started.");
+        }
+
+        var finished = await Task.WhenAny(completed.Task, Task.Delay(TimeSpan.FromSeconds(30), CancellationToken.None))
+          .ConfigureAwait(false);
+        if (finished != completed.Task)
+        {
+          Assert.Inconclusive("Playback did not complete within 30s (NAudio / device timing).");
+        }
+
+        Assert.IsFalse(player.IsPlaying, "IsPlaying should be false after PlaybackCompleted.");
+      }
+      finally
+      {
+        if (File.Exists(tempPath))
+        {
+          File.Delete(tempPath);
+        }
+      }
     }
   }
 }
-

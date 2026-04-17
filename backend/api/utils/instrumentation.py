@@ -15,6 +15,44 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Keys that must never appear in ``logger.*(..., extra=...)`` — LogRecord / correlation
+# factory already set ``correlation_id`` / ``trace_id`` / ``span_id``; merging them again
+# raises KeyError (Python 3.11+). Other names collide with LogRecord internals.
+_EXTRA_KEYS_FORBIDDEN: frozenset[str] = frozenset(
+    {
+        "correlation_id",
+        "trace_id",
+        "span_id",
+        "name",
+        "msg",
+        "args",
+        "levelname",
+        "levelno",
+        "pathname",
+        "filename",
+        "module",
+        "lineno",
+        "funcName",
+        "created",
+        "msecs",
+        "relativeCreated",
+        "thread",
+        "threadName",
+        "processName",
+        "process",
+        "exc_info",
+        "exc_text",
+        "stack_info",
+        "message",
+        "getMessage",
+    }
+)
+
+
+def _sanitize_logging_extra(d: dict[str, Any]) -> dict[str, Any]:
+    """Strip keys that cannot be passed to ``logging`` ``extra`` without collision."""
+    return {k: v for k, v in d.items() if k not in _EXTRA_KEYS_FORBIDDEN}
+
 
 # Event types for key flows
 class EventType:
@@ -62,7 +100,7 @@ class StructuredEvent:
 
     def log(self, level: int = logging.INFO):
         """Log the event."""
-        event_dict = self.to_dict()
+        event_dict = _sanitize_logging_extra(self.to_dict())
         logger.log(level, f"Event: {self.event_type}", extra=event_dict)
 
 

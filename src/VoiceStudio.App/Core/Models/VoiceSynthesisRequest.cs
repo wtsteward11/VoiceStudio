@@ -11,11 +11,16 @@ namespace VoiceStudio.Core.Models
     public string Language { get; set; } = "en";
     public string? Emotion { get; set; }
     public bool EnhanceQuality { get; set; }  // Enable quality enhancement pipeline
-    public float Speed { get; set; } = 1.0f;
-    public float Pitch { get; set; } = 0f;
-    public float Stability { get; set; } = 0.72f;
-    public float Clarity { get; set; } = 0.58f;
-    public float Temperature { get; set; } = 0.35f;
+    /// <summary>
+    /// Optional prosody/engine tuning. When null, properties are omitted from the backend JSON body so the
+    /// server uses its defaults (matches minimal HTTP clients). Sending implicit UI defaults as numbers
+    /// previously caused extra kwargs to be forwarded to Coqui XTTS and could break synthesis.
+    /// </summary>
+    public float? Speed { get; set; }
+    public float? Pitch { get; set; }
+    public float? Stability { get; set; }
+    public float? Clarity { get; set; }
+    public float? Temperature { get; set; }
   }
 
   public class VoiceSynthesisResponse
@@ -59,8 +64,8 @@ namespace VoiceStudio.Core.Models
     public bool UseRvcPostprocessing { get; set; }  // Apply RVC post-processing for enhanced voice similarity
     public string Language { get; set; } = "en"; // Language code for synthesis
     public Dictionary<string, double>? ProsodyParams { get; set; } // Advanced prosody control: pitch (semitones), tempo (multiplier), formant_shift (factor), energy (multiplier)
-    public string? ProjectId { get; set; } // Optional project association for saved outputs
-    public string? ProfileName { get; set; } // Custom name for the created voice profile
+    public string? ProjectId { get; set; }  // Optional project association for saved outputs
+    public string? ProfileName { get; set; }  // Custom name for the created voice profile
   }
 
   public class VoiceCloneResponse

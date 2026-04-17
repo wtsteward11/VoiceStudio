@@ -3,7 +3,7 @@
 
 param(
     [int]$Port = 8000,
-    [string]$VenvDir = "venv",
+    [string]$VenvDir = ".venv",
     [switch]$CoquiTosAgreed,
     [switch]$Gpu
 )
@@ -44,8 +44,11 @@ Write-Host "Backend URL: http://localhost:$Port" -ForegroundColor Cyan
 Write-Host "API Docs: http://localhost:$Port/docs" -ForegroundColor Cyan
 Write-Host ""
 
-# Set PYTHONPATH to project root
-$env:PYTHONPATH = "$PSScriptRoot"
+# Project root (repo root): scripts/backend -> .. -> VoiceStudio
+$projectRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
+
+# Set PYTHONPATH to project root so `backend` and `app` packages resolve
+$env:PYTHONPATH = $projectRoot
 
 # Force Hugging Face router endpoint to avoid deprecated inference API
 $env:HF_INFERENCE_API_BASE = "https://router.huggingface.co"
@@ -110,9 +113,6 @@ if ($Gpu -and $VenvDir -eq "venv") {
     Write-Host "  Expected latency improvement: ~42s CPU -> ~5s GPU" -ForegroundColor Green
 }
 
-# Determine project root (two levels up from scripts/backend/)
-$projectRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
-
 # Check for venv in multiple locations (project root first, then .venv, then script dir)
 $venvPython = $null
 $venvCandidates = @(
@@ -145,13 +145,13 @@ if (-not $venvPython) {
 }
 
 # Start uvicorn from project root using module path
-Set-Location "$PSScriptRoot"
+Set-Location $projectRoot
 if (Test-Path $venvPython) {
     # Ensure backend runtime deps exist in the same venv (uvicorn/fastapi).
     # Note: FastAPI file-upload/form endpoints require python-multipart (imported as `multipart`).
     & $venvPython -c "import uvicorn, fastapi, multipart" 2>$null
     if ($LASTEXITCODE -ne 0) {
-        $backendReq = Join-Path $PSScriptRoot "backend\\requirements.txt"
+        $backendReq = Join-Path $projectRoot "backend\\requirements.txt"
         if (Test-Path $backendReq) {
             Write-Host "uvicorn/fastapi not found in venv. Installing backend requirements..." -ForegroundColor Yellow
             & $venvPython -m pip install --index-url https://pypi.org/simple -r $backendReq
@@ -186,4 +186,5 @@ else {
         exit $LASTEXITCODE
     }
 }
+
 

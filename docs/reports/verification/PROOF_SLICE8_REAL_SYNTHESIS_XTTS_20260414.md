@@ -59,3 +59,23 @@ python -m pytest tests/integration/test_synthesis_xtts_real.py -v --tb=short -m 
 
 - If XTTS or models are missing in an environment, the **integration test skips** (does not PASS closure on that machine until provisioned).
 - If engine fails after provisioned, record **Slice 8.x — XTTS engine readiness** in STATE; do not claim Slice 8 closed.
+
+## 6) Runtime proof execution (2026-04-17, agent session)
+
+| Gate | Result | Notes |
+|------|--------|--------|
+| `pytest -m real_xtts tests/integration/test_synthesis_xtts_real.py` | **PASS** | Backend: `.venv` uvicorn; `VOICESTUDIO_REAL_XTTS_HTTP_BASE=http://127.0.0.1:8010`; `VOICESTUDIO_ALLOW_XTTS_DOWNLOAD_IN_TEST=1`; `VOICESTUDIO_TEST_MODE` unset. Artifact: [slice8/slice8_output.wav](slice8/slice8_output.wav). |
+| `dotnet test` `RealSynthesisXttsLiveBackendTests` | **PASS** | Same base URL env as Python test. Requires **rebuild** after seam changes; `--no-build` after editing tests can run stale binaries. |
+| Live-backend filter (Slice 6/7 regression) | **5 passed, 1 skipped** | Same filter as section 3. |
+| `pytest tests/unit/backend/api/routes/test_search.py` | **15 passed** | |
+| `python scripts/run_verification.py` | **Overall PASS** | `.buildlogs/verification/last_run.json` |
+| `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` | **0 errors** | Warnings only (pre-existing). |
+
+**Seam fixes in this closure**
+
+1. **C# `VoiceSynthesisRequest`:** `Speed`, `Pitch`, `Stability`, `Clarity`, `Temperature` are optional (`float?`). Omitted JSON properties match minimal Python/httpx bodies so the backend does not forward implicit UI defaults as `**kwargs` into Coqui XTTS (avoids fallback-to-openvoice + init failure on bad kwargs).
+2. **`RealSynthesisXttsLiveBackendTests`:** `BackendBase` reads `VOICESTUDIO_REAL_XTTS_HTTP_BASE` (default `http://127.0.0.1:8000`), aligned with the Python integration test.
+3. **`scripts/backend/start_backend.ps1`:** `PYTHONPATH` and working directory are the **repository root** (not `scripts/backend`); `backend/requirements.txt` path resolved from repo root. Prevents accidental **system Python** uvicorn without Coqui.
+
+**UI pixel media:** `ui_synthesis_success.png` is still **operator-only** on an interactive desktop (see [slice8/UI_PROOF_OPERATOR_SESSION.md](slice8/UI_PROOF_OPERATOR_SESSION.md)). Automation proof for the synthesis seam is covered by the two live tests above.
+

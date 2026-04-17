@@ -513,10 +513,10 @@ public sealed class BackendProcessManager : IDisposable
             {
                 lastChanceHealthy = await IsBackendHealthyAsync(CancellationToken.None);
             }
-            catch (Exception ex)
+            catch (Exception healthEx)
             {
                 Debug.WriteLine(
-                    $"[BackendProcessManager] Last-chance health check failed (treating as unreachable): {ex.Message}");
+                    $"[BackendProcessManager] Last-chance health check failed (treating as unreachable): {healthEx.Message}");
             }
 
             if (lastChanceHealthy)

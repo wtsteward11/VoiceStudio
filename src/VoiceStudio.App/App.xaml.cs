@@ -162,6 +162,15 @@ namespace VoiceStudio.App
 
       var smokeExit = IsSmokeExit(args);
       var uiSmoke = IsUiSmoke(args);
+      // Failure-path smoketests must run the normal MainWindow + StartBackendWithTracking path.
+      // Inherited VOICE_STUDIO_SMOKE_UI / VOICE_STUDIO_SMOKE_EXIT (e.g. from developer env) would
+      // otherwise skip that path and never emit failure_smoke_summary.json.
+      if (IsSmokeFailurePortRequested() || IsSmokeFailureRuntimeRequested())
+      {
+        smokeExit = false;
+        uiSmoke = false;
+      }
+
       var isSmokeMode = smokeExit || uiSmoke;
 
       if (!isSmokeMode && !IsIconLaunchSmokeRequested())
@@ -347,7 +356,8 @@ namespace VoiceStudio.App
       }
 
       // GAP-X02 / GAP-063: Check if first-run wizard should be shown (skip for smoke modes)
-      if (!isSmokeMode && !IsIconLaunchSmokeRequested() && !IsSmokeFailurePortRequested() && await FirstRunWizard.ShouldShowWizardAsync())
+      // GAP-069: FlaUI E2E (MSTest) sets VOICE_STUDIO_FLAUI_AUTOMATION=1 — skip wizard so MainWindow exists for UIA.
+      if (!isSmokeMode && !IsIconLaunchSmokeRequested() && !IsSmokeFailurePortRequested() && !IsFlaUiAutomationSessionRequested() && await FirstRunWizard.ShouldShowWizardAsync())
       {
         _startupProfiler?.Checkpoint("FirstRunWizard Check - Should Show");
 
@@ -372,6 +382,150 @@ namespace VoiceStudio.App
           Application.Current.Exit();
           return;
         }
+      }
+
+      // GAP-069 Slice 13: Failure-path smoketests must register backend observers and start the backend
+      // *before* MainWindow is created. If MainWindow.InitializeComponent throws (XAML parse), we still
+      // need failure_smoke_summary.json for verify.ps1; previously handlers ran only after MainWindow ctor.
+      if (!isSmokeMode)
+      {
+        if (IsSmokeFailurePortRequested())
+        {
+          var startupStateEarly = ServiceProvider.GetStartupStateService();
+          void PortHandler(object? s, StartupStateChangedEventArgs e)
+          {
+            if (e.NewState == StartupState.BackendFailed)
+            {
+              startupStateEarly.StateChanged -= PortHandler;
+              var msg = e.FailureMessage ?? "";
+              var hasPortMsg = msg.IndexOf("port", StringComparison.OrdinalIgnoreCase) >= 0
+                  || msg.IndexOf("in use", StringComparison.OrdinalIgnoreCase) >= 0;
+              var payload = new
+              {
+                status = hasPortMsg ? "PASS" : "FAIL",
+                timestamp_utc = DateTime.UtcNow.ToString("o"),
+                backend_failed = true,
+                failure_message = msg,
+                expected_port_message = hasPortMsg,
+                startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
+              };
+              WriteFailureSmokeSummary(GetCrashDir(), payload);
+              Environment.Exit(hasPortMsg ? 0 : 1);
+            }
+            else if (e.NewState == StartupState.BackendReady)
+            {
+              startupStateEarly.StateChanged -= PortHandler;
+              var payload = new
+              {
+                status = "FAIL",
+                timestamp_utc = DateTime.UtcNow.ToString("o"),
+                backend_failed = false,
+                failure_message = (string?)null,
+                expected_port_message = false,
+                error = "Expected BackendFailed (port occupied) but got BackendReady",
+                startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
+              };
+              WriteFailureSmokeSummary(GetCrashDir(), payload);
+              Environment.Exit(1);
+            }
+          }
+
+          startupStateEarly.StateChanged += PortHandler;
+          _ = Task.Run(async () =>
+          {
+            await Task.Delay(30_000).ConfigureAwait(false);
+            startupStateEarly.StateChanged -= PortHandler;
+            var payload = new
+            {
+              status = "FAIL",
+              timestamp_utc = DateTime.UtcNow.ToString("o"),
+              backend_failed = false,
+              failure_message = (string?)null,
+              expected_port_message = false,
+              error = "Timeout: did not get BackendFailed within 30s",
+              startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
+            };
+            WriteFailureSmokeSummary(GetCrashDir(), payload);
+            Environment.Exit(1);
+          });
+          StartBackendWithTracking();
+        }
+        else if (IsSmokeFailureRuntimeRequested())
+        {
+          var tempDirEarly = Path.Combine(Path.GetTempPath(), "VoiceStudio_RuntimeSmoke_" + Guid.NewGuid().ToString("N")[..8]);
+          Directory.CreateDirectory(tempDirEarly);
+          Environment.SetEnvironmentVariable("VOICESTUDIO_APP_ROOT", tempDirEarly);
+          var startupStateEarly = ServiceProvider.GetStartupStateService();
+          void RuntimeHandler(object? s, StartupStateChangedEventArgs e)
+          {
+            if (e.NewState == StartupState.BackendFailed)
+            {
+              startupStateEarly.StateChanged -= RuntimeHandler;
+              var msg = e.FailureMessage ?? "";
+              var hasRuntimeMsg = msg.IndexOf("app root", StringComparison.OrdinalIgnoreCase) >= 0
+                  || msg.IndexOf("VOICESTUDIO_APP_ROOT", StringComparison.OrdinalIgnoreCase) >= 0
+                  || msg.IndexOf("Python", StringComparison.OrdinalIgnoreCase) >= 0
+                  || msg.IndexOf("runtime", StringComparison.OrdinalIgnoreCase) >= 0;
+              var payload = new
+              {
+                status = hasRuntimeMsg ? "PASS" : "FAIL",
+                timestamp_utc = DateTime.UtcNow.ToString("o"),
+                backend_failed = true,
+                failure_message = msg,
+                expected_runtime_message = hasRuntimeMsg,
+                startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
+              };
+              WriteFailureRuntimeSmokeSummary(GetCrashDir(), payload);
+              _ = ErrorBoundary.TryExecute(() => Directory.Delete(tempDirEarly, recursive: false), "cleanup temp dir before exit");
+              Environment.Exit(hasRuntimeMsg ? 0 : 1);
+            }
+            else if (e.NewState == StartupState.BackendReady)
+            {
+              startupStateEarly.StateChanged -= RuntimeHandler;
+              var payload = new
+              {
+                status = "FAIL",
+                timestamp_utc = DateTime.UtcNow.ToString("o"),
+                backend_failed = false,
+                failure_message = (string?)null,
+                expected_runtime_message = false,
+                error = "Expected BackendFailed (runtime missing) but got BackendReady",
+                startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
+              };
+              WriteFailureRuntimeSmokeSummary(GetCrashDir(), payload);
+              _ = ErrorBoundary.TryExecute(() => Directory.Delete(tempDirEarly, recursive: false), "cleanup temp dir before exit");
+              Environment.Exit(1);
+            }
+          }
+
+          startupStateEarly.StateChanged += RuntimeHandler;
+          _ = Task.Run(async () =>
+          {
+            await Task.Delay(30_000).ConfigureAwait(false);
+            startupStateEarly.StateChanged -= RuntimeHandler;
+            var payload = new
+            {
+              status = "FAIL",
+              timestamp_utc = DateTime.UtcNow.ToString("o"),
+              backend_failed = false,
+              failure_message = (string?)null,
+              expected_runtime_message = false,
+              error = "Timeout: did not get BackendFailed within 30s",
+              startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
+            };
+            WriteFailureRuntimeSmokeSummary(GetCrashDir(), payload);
+            _ = ErrorBoundary.TryExecute(() => Directory.Delete(tempDirEarly, recursive: false), "cleanup temp dir before exit");
+            Environment.Exit(1);
+          });
+          StartBackendWithTracking();
+        }
+      }
+
+      // Port/runtime failure proofs are satisfied by backend state + summary JSON only; loading MainWindow
+      // is unnecessary and can fail XAML validation while the harness still expects failure_smoke_summary.json.
+      if (!isSmokeMode && (IsSmokeFailurePortRequested() || IsSmokeFailureRuntimeRequested()))
+      {
+        return;
       }
 
       m_window = new MainWindow();
@@ -409,135 +563,10 @@ namespace VoiceStudio.App
       }
 
       // Explicit backend startup with tracked state (STARTUP_ORCHESTRATION_HARDENING_PLAN)
-      // MainWindow shows startup overlay until BackendReady or BackendFailed
-      if (!isSmokeMode)
+      // MainWindow shows startup overlay until BackendReady or BackendFailed.
+      // Failure-path port/runtime smoketests already started the backend before MainWindow (see above).
+      if (!isSmokeMode && !IsSmokeFailurePortRequested() && !IsSmokeFailureRuntimeRequested())
       {
-        if (IsSmokeFailurePortRequested())
-        {
-          var startupState = ServiceProvider.GetStartupStateService();
-          void Handler(object? s, StartupStateChangedEventArgs e)
-          {
-            if (e.NewState == StartupState.BackendFailed)
-            {
-              startupState.StateChanged -= Handler;
-              var msg = e.FailureMessage ?? "";
-              var hasPortMsg = msg.IndexOf("port", StringComparison.OrdinalIgnoreCase) >= 0
-                  || msg.IndexOf("in use", StringComparison.OrdinalIgnoreCase) >= 0;
-              var payload = new
-              {
-                status = hasPortMsg ? "PASS" : "FAIL",
-                timestamp_utc = DateTime.UtcNow.ToString("o"),
-                backend_failed = true,
-                failure_message = msg,
-                expected_port_message = hasPortMsg,
-                startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
-              };
-              WriteFailureSmokeSummary(GetCrashDir(), payload);
-              Environment.Exit(hasPortMsg ? 0 : 1);
-            }
-            else if (e.NewState == StartupState.BackendReady)
-            {
-              startupState.StateChanged -= Handler;
-              var payload = new
-              {
-                status = "FAIL",
-                timestamp_utc = DateTime.UtcNow.ToString("o"),
-                backend_failed = false,
-                failure_message = (string?)null,
-                expected_port_message = false,
-                error = "Expected BackendFailed (port occupied) but got BackendReady",
-                startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
-              };
-              WriteFailureSmokeSummary(GetCrashDir(), payload);
-              Environment.Exit(1);
-            }
-          }
-          startupState.StateChanged += Handler;
-          _ = Task.Run(async () =>
-          {
-            await Task.Delay(30_000).ConfigureAwait(false);
-            startupState.StateChanged -= Handler;
-            var payload = new
-            {
-              status = "FAIL",
-              timestamp_utc = DateTime.UtcNow.ToString("o"),
-              backend_failed = false,
-              failure_message = (string?)null,
-              expected_port_message = false,
-              error = "Timeout: did not get BackendFailed within 30s",
-              startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
-            };
-            WriteFailureSmokeSummary(GetCrashDir(), payload);
-            Environment.Exit(1);
-          });
-        }
-        else if (IsSmokeFailureRuntimeRequested())
-        {
-          var tempDir = Path.Combine(Path.GetTempPath(), "VoiceStudio_RuntimeSmoke_" + Guid.NewGuid().ToString("N")[..8]);
-          Directory.CreateDirectory(tempDir);
-          Environment.SetEnvironmentVariable("VOICESTUDIO_APP_ROOT", tempDir);
-          var startupState = ServiceProvider.GetStartupStateService();
-          void Handler(object? s, StartupStateChangedEventArgs e)
-          {
-            if (e.NewState == StartupState.BackendFailed)
-            {
-              startupState.StateChanged -= Handler;
-              var msg = e.FailureMessage ?? "";
-              var hasRuntimeMsg = msg.IndexOf("app root", StringComparison.OrdinalIgnoreCase) >= 0
-                  || msg.IndexOf("VOICESTUDIO_APP_ROOT", StringComparison.OrdinalIgnoreCase) >= 0
-                  || msg.IndexOf("Python", StringComparison.OrdinalIgnoreCase) >= 0
-                  || msg.IndexOf("runtime", StringComparison.OrdinalIgnoreCase) >= 0;
-              var payload = new
-              {
-                status = hasRuntimeMsg ? "PASS" : "FAIL",
-                timestamp_utc = DateTime.UtcNow.ToString("o"),
-                backend_failed = true,
-                failure_message = msg,
-                expected_runtime_message = hasRuntimeMsg,
-                startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
-              };
-              WriteFailureRuntimeSmokeSummary(GetCrashDir(), payload);
-              _ = ErrorBoundary.TryExecute(() => Directory.Delete(tempDir, recursive: false), "cleanup temp dir before exit");
-              Environment.Exit(hasRuntimeMsg ? 0 : 1);
-            }
-            else if (e.NewState == StartupState.BackendReady)
-            {
-              startupState.StateChanged -= Handler;
-              var payload = new
-              {
-                status = "FAIL",
-                timestamp_utc = DateTime.UtcNow.ToString("o"),
-                backend_failed = false,
-                failure_message = (string?)null,
-                expected_runtime_message = false,
-                error = "Expected BackendFailed (runtime missing) but got BackendReady",
-                startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
-              };
-              WriteFailureRuntimeSmokeSummary(GetCrashDir(), payload);
-              _ = ErrorBoundary.TryExecute(() => Directory.Delete(tempDir, recursive: false), "cleanup temp dir before exit");
-              Environment.Exit(1);
-            }
-          }
-          startupState.StateChanged += Handler;
-          _ = Task.Run(async () =>
-          {
-            await Task.Delay(30_000).ConfigureAwait(false);
-            startupState.StateChanged -= Handler;
-            var payload = new
-            {
-              status = "FAIL",
-              timestamp_utc = DateTime.UtcNow.ToString("o"),
-              backend_failed = false,
-              failure_message = (string?)null,
-              expected_runtime_message = false,
-              error = "Timeout: did not get BackendFailed within 30s",
-              startup_dialog = ErrorDialogService.GetStartupDialogDiagnostics(),
-            };
-            WriteFailureRuntimeSmokeSummary(GetCrashDir(), payload);
-            _ = ErrorBoundary.TryExecute(() => Directory.Delete(tempDir, recursive: false), "cleanup temp dir before exit");
-            Environment.Exit(1);
-          });
-        }
         StartBackendWithTracking();
       }
 
@@ -761,6 +790,29 @@ namespace VoiceStudio.App
       try
       {
         var env = Environment.GetEnvironmentVariable("VOICE_STUDIO_SMOKE_UI");
+        if (string.IsNullOrWhiteSpace(env))
+        {
+          return false;
+        }
+
+        return env.Equals("1", StringComparison.OrdinalIgnoreCase)
+            || env.Equals("true", StringComparison.OrdinalIgnoreCase);
+      }
+      catch
+      {
+        return false;
+      }
+    }
+
+    /// <summary>
+    /// When true, MSTest FlaUI smoke launched the process with automation env — skip first-run wizard
+    /// so <see cref="MainWindow"/> is created without blocking on user input. Does not enable Gate C / --smoke-ui.
+    /// </summary>
+    private static bool IsFlaUiAutomationSessionRequested()
+    {
+      try
+      {
+        var env = Environment.GetEnvironmentVariable("VOICE_STUDIO_FLAUI_AUTOMATION");
         if (string.IsNullOrWhiteSpace(env))
         {
           return false;

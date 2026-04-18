@@ -73,7 +73,14 @@ def pytest_collection_modifyitems(config, items):
     skip_models = pytest.mark.skip(reason="VOICESTUDIO_MODELS_PATH not set or empty")
     skip_backend = pytest.mark.skip(reason="VOICESTUDIO_BACKEND_URL not set or backend not running")
     skip_winappdriver = pytest.mark.skip(reason="WinAppDriver not available")
-    skip_gpu = pytest.mark.skip(reason="GPU not available")
+    skip_gpu_env = pytest.mark.skip(reason="GPU not available")
+    try:
+        import torch
+
+        torch_cuda_available = torch.cuda.is_available()
+    except (ImportError, AttributeError):
+        torch_cuda_available = False
+    skip_gpu_torch = pytest.mark.skip(reason="GPU not available")
 
     for item in items:
         if "requires_models" in item.keywords and not os.getenv("VOICESTUDIO_MODELS_PATH"):
@@ -83,7 +90,9 @@ def pytest_collection_modifyitems(config, items):
         if "requires_winappdriver" in item.keywords and os.getenv("VOICESTUDIO_WINAPPDRIVER", "").lower() not in ("1", "true", "yes"):
             item.add_marker(skip_winappdriver)
         if "requires_gpu" in item.keywords and os.getenv("VOICESTUDIO_GPU", "").lower() not in ("1", "true", "yes"):
-            item.add_marker(skip_gpu)
+            item.add_marker(skip_gpu_env)
+        if "gpu" in item.keywords and not torch_cuda_available:
+            item.add_marker(skip_gpu_torch)
 
 
 # ============================================================================
@@ -91,12 +100,42 @@ def pytest_collection_modifyitems(config, items):
 # ============================================================================
 
 
+def _close_session_event_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """Cancel pending tasks and shut down executors before ``loop.close()`` (Windows Proactor hang fix)."""
+    if loop.is_closed():
+        return
+    try:
+        asyncio.set_event_loop(loop)
+    except RuntimeError:
+        pass
+    try:
+        pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+        for task in pending:
+            task.cancel()
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+    except RuntimeError:
+        pass
+    try:
+        loop.run_until_complete(loop.shutdown_asyncgens())
+    except RuntimeError:
+        pass
+    try:
+        if hasattr(loop, "shutdown_default_executor"):
+            loop.run_until_complete(loop.shutdown_default_executor())
+    except RuntimeError:
+        pass
+    loop.close()
+
+
 @pytest.fixture(scope="session")
 def event_loop():
     """Create an event loop for the test session."""
-    loop = asyncio.new_event_loop()
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
+    asyncio.set_event_loop(loop)
     yield loop
-    loop.close()
+    _close_session_event_loop(loop)
 
 
 # ============================================================================
@@ -365,19 +404,12 @@ def clear_route_job_stores():
 # ============================================================================
 
 
-def pytest_collection_modifyitems(config, items):
-    """Modify test collection."""
-    # Skip GPU tests if no GPU available
-    skip_gpu = pytest.mark.skip(reason="GPU not available")
+def pytest_sessionfinish(session, exitstatus: int) -> None:
+    """Session cleanup hook (reserved).
 
-    try:
-        import torch
-
-        has_gpu = torch.cuda.is_available()
-    except (ImportError, AttributeError):
-        # AttributeError can occur with partial torch initialization (circular import)
-        has_gpu = False
-
-    for item in items:
-        if "gpu" in item.keywords and not has_gpu:
-            item.add_marker(skip_gpu)
+    Do **not** scan ``gc.get_objects()`` here: after large ML imports the heap can
+    contain millions of tracked objects; a full scan can stall for minutes and
+    block process exit (GAP-069 Slice 10). ``EnhancedResourceManager`` teardown
+    is handled in ``tests/unit/core/runtime/test_resource_manager_enhanced.py``
+    (autouse fixture) and ``shutdown()`` joins the monitoring thread.
+    """

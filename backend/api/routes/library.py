@@ -102,6 +102,12 @@ class AssetSearchRequest(BaseModel):
     offset: int = 0
 
 
+class FoldersResponse(BaseModel):
+    """Response from folder listing."""
+
+    folders: list[LibraryFolder]
+
+
 class AssetSearchResponse(BaseModel):
     """Response from asset search."""
 
@@ -166,25 +172,30 @@ def _entity_to_folder(entity: LibraryFolderEntity, asset_count: int = 0) -> Libr
     )
 
 
-@router.get("/folders", response_model=list[LibraryFolder])
-@cache_response(ttl=60)  # Cache for 60 seconds (folders change moderately)
+@router.get("/folders", response_model=FoldersResponse)
+@cache_response(ttl=60)
 async def get_folders(parent_id: str | None = Query(None, description="Parent folder ID")):
     """Get all folders, optionally filtered by parent."""
-    folder_repo = get_library_folder_repository()
-    asset_repo = get_library_asset_repository()
+    try:
+        folder_repo = get_library_folder_repository()
+        asset_repo = get_library_asset_repository()
 
-    if parent_id is None:
-        folder_entities = await folder_repo.get_root_folders()
-    else:
-        folder_entities = await folder_repo.get_children(parent_id)
+        if parent_id is None:
+            folder_entities = await folder_repo.get_root_folders()
+        else:
+            folder_entities = await folder_repo.get_children(parent_id)
 
-    # Get asset counts for each folder
-    folders = []
-    for entity in folder_entities:
-        count = await asset_repo.count({"folder_id": entity.id})
-        folders.append(_entity_to_folder(entity, asset_count=count))
+        folders = []
+        for entity in folder_entities:
+            count = await asset_repo.count({"folder_id": entity.id})
+            folders.append(_entity_to_folder(entity, asset_count=count))
 
-    return sorted(folders, key=lambda x: x.name)
+        return FoldersResponse(folders=sorted(folders, key=lambda x: x.name))
+    except sqlite3.OperationalError as e:
+        logger.warning(f"Library database not available: {e}")
+        raise HTTPException(
+            status_code=503, detail="Library database not initialized"
+        ) from e
 
 
 @router.post("/folders", response_model=LibraryFolder)

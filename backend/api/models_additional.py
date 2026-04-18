@@ -432,6 +432,11 @@ class VoiceSynthesizeResponse(VoiceStudioBaseModel):
     quality_metrics: QualityMetrics | None = None
     # Present when SSML markup was detected or transformed (GAP-054).
     ssml_handling: SsmlHandlingDiagnostics | None = None
+    # Normalized engine id that produced this artifact (Slice 10 parity; no silent substitution).
+    routed_engine: str = Field(
+        default="",
+        description="Engine id that actually produced audio (matches requested engine when no utility fallback).",
+    )
 
 
 class ABTestRequest(VoiceStudioBaseModel):

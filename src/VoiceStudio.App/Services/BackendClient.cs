@@ -633,7 +633,11 @@ namespace VoiceStudio.App.Services
         if (!response.IsSuccessStatusCode)
           throw await _pipeline.CreateExceptionFromResponseAsync(response);
 
-        return await response.Content.ReadAsStreamAsync(cancellationToken);
+        // Buffer into MemoryStream so callers can read after this scope completes.
+        // ReadAsStreamAsync can yield an empty or unusable stream once the HttpResponseMessage
+        // is finalized; synthesis proof (live-backend tests) depends on full byte capture.
+        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        return new MemoryStream(bytes, writable: false);
       });
     }
 

@@ -4,6 +4,7 @@ Tests all optimizations: priority queues, VRAM admission control, circuit breake
 exponential backoff, GPU monitoring, resource predictions, and alerts.
 """
 
+import gc
 import sys
 import time
 from pathlib import Path
@@ -31,6 +32,19 @@ try:
     )
 except ImportError as e:
     pytest.skip(f"Could not import resource_manager modules: {e}", allow_module_level=True)
+
+
+@pytest.fixture(autouse=True)
+def _shutdown_leaked_enhanced_resource_managers():
+    """Stop EnhancedResourceManager monitoring after each test (prevents post-suite hang)."""
+    yield
+    _erm = EnhancedResourceManager
+    for obj in gc.get_objects():
+        try:
+            if type(obj) is _erm and getattr(obj, "running", False):
+                obj.shutdown()
+        except (ReferenceError, TypeError, RuntimeError):
+            pass
 
 
 class TestGPUMonitor:
@@ -485,12 +499,11 @@ class TestEnhancedResourceManager:
         thread = manager.monitoring_thread
         assert thread.is_alive()
 
-        # Stop manager
-        manager.running = False
-        time.sleep(0.2)
+        manager.shutdown()
 
-        # Thread should stop (daemon thread, but we check running flag)
         assert manager.running is False
+        if thread is not None:
+            assert not thread.is_alive()
 
     def test_alert_history_limiting(self):
         """Test alert history is limited."""

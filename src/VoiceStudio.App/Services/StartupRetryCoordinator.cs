@@ -121,6 +121,7 @@ public sealed class StartupRetryCoordinator
             BackendStartFailureCategory.PortCollision => " Retry will not help. Close the conflicting app or change the port.",
             BackendStartFailureCategory.RuntimeMissing => " Retry will not help. Install the Python runtime.",
             BackendStartFailureCategory.InvalidAppRoot => " Retry will not help. Reinstall the application.",
+            BackendStartFailureCategory.BaselineDepsFailure => " Retry will not help. Fix the Python environment (missing baseline packages).",
             BackendStartFailureCategory.SpawnFailure => " Retry may help. Check logs in %LOCALAPPDATA%\\VoiceStudio\\crashes\\.",
             _ => " Retry may help."
         };

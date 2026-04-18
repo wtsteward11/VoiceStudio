@@ -27,7 +27,7 @@ namespace VoiceStudio.App.Services
     /// <inheritdoc />
     public async Task<List<EffectChain>> GetEffectChainsAsync(string projectId, CancellationToken cancellationToken = default)
     {
-      var result = await _pipeline.GetAsync<List<EffectChain>>($"/api/effects/chains/{Uri.EscapeDataString(projectId)}", cancellationToken);
+      var result = await _pipeline.GetAsync<List<EffectChain>>($"/api/effects/chains?project_id={Uri.EscapeDataString(projectId)}", cancellationToken);
       return result ?? new List<EffectChain>();
     }
 

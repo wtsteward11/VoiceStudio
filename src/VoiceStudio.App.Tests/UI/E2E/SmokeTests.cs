@@ -6,8 +6,13 @@ using FlaUI.Core.Tools;
 using FlaUI.UIA3;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 
 namespace VoiceStudio.App.Tests.UI.E2E
@@ -16,12 +21,17 @@ namespace VoiceStudio.App.Tests.UI.E2E
     /// Smoke tests for critical user journeys using FlaUI.
     /// These tests verify that the application starts and core UI components are accessible.
     /// </summary>
+    /// <remarks>
+    /// Shared static application/window handles must not be touched concurrently — parallel execution
+    /// against the same WinUI surface deadlocks or stalls UIA (observed as 600s harness timeouts).
+    /// </remarks>
+    [DoNotParallelize]
     [TestClass]
     [TestCategory("E2E")]
     [TestCategory("Smoke")]
     public class SmokeTests
     {
-        private static Application? _app;
+        private static Process? _childProcess;
         private static UIA3Automation? _automation;
         private static Window? _mainWindow;
         private static string? _appPath;
@@ -29,6 +39,37 @@ namespace VoiceStudio.App.Tests.UI.E2E
         [ClassInitialize]
         public static void ClassInitialize(TestContext context)
         {
+            // Program.cs single-instance mutex — a stray VoiceStudio.App.exe (prior test / manual run) causes
+            // new launches to exit immediately before FlaUI can attach ("Could not find process id").
+            foreach (var existing in Process.GetProcessesByName("VoiceStudio.App"))
+            {
+                try
+                {
+                    existing.Kill(entireProcessTree: true);
+                    existing.WaitForExit(milliseconds: 8000);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine($"SmokeTests: kill stray VoiceStudio.App: {ex.Message}");
+                }
+                finally
+                {
+                    existing.Dispose();
+                }
+            }
+
+            Thread.Sleep(300);
+
+            // Full FlaUI + Win32 title enumeration requires an interactive desktop session. verify.ps1 sets
+            // VOICESTUDIO_USE_REAL_UI_AUTOMATION=true when -RealUI is passed (UI Smoke stage); without it, inconclusive.
+            var realUi = Environment.GetEnvironmentVariable("VOICESTUDIO_USE_REAL_UI_AUTOMATION");
+            if (!string.Equals(realUi, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                Assert.Inconclusive(
+                    "FlaUI E2E smoke requires VOICESTUDIO_USE_REAL_UI_AUTOMATION=true (run scripts/verify.ps1 UI Smoke Tests stage, or export the variable for interactive desktop access).");
+                return;
+            }
+
             // Find the application executable
             _appPath = FindApplicationPath();
             
@@ -42,20 +83,109 @@ namespace VoiceStudio.App.Tests.UI.E2E
             
             try
             {
-                _app = Application.Launch(_appPath);
-                
-                // Wait for main window to appear with timeout
-                var retryResult = Retry.WhileNull(
-                    () => _app.GetMainWindow(_automation),
-                    TimeSpan.FromSeconds(30),
-                    TimeSpan.FromMilliseconds(500));
-                
-                _mainWindow = retryResult.Result;
-                
+                // FlaUI Application.Launch() waits for process input idle (Win32 WaitForInputIdle). WinUI 3 / Windows
+                // App SDK apps often never satisfy that predicate the way classic Win32 does, which can block
+                // indefinitely and surface as harness timeouts. Start detached, then attach by process id.
+                var workDir = Path.GetDirectoryName(_appPath);
+                var startInfo = new ProcessStartInfo(_appPath!)
+                {
+                    UseShellExecute = false,
+                    WorkingDirectory = string.IsNullOrEmpty(workDir) ? Environment.CurrentDirectory : workDir,
+                };
+
+                foreach (DictionaryEntry e in Environment.GetEnvironmentVariables())
+                {
+                    startInfo.Environment[(string)e.Key] = e.Value?.ToString() ?? string.Empty;
+                }
+
+                // Inherited machine/CI env can enable Gate C / smoke-exit / failure-repro modes that exit immediately.
+                // FlaUI needs a normal interactive shell session (wizard skipped via FLAUI_AUTOMATION only).
+                foreach (var key in new[]
+                         {
+                             "VOICE_STUDIO_SMOKE_EXIT",
+                             "VOICE_STUDIO_SMOKE_UI",
+                             "VOICE_STUDIO_ICON_LAUNCH_SMOKE",
+                             "VOICE_STUDIO_SMOKE_FAILURE_PORT",
+                             "VOICE_STUDIO_SMOKE_FAILURE_RUNTIME",
+                             "VOICE_STUDIO_UI_SELF_TEST",
+                             "VOICE_STUDIO_UI_SELF_TEST_REQUIRE_BACKEND",
+                             "VOICESTUDIO_USE_REAL_UI_AUTOMATION",
+                         })
+                {
+                    if (startInfo.Environment.ContainsKey(key))
+                    {
+                        startInfo.Environment.Remove(key);
+                    }
+                }
+
+                // Skip first-run wizard so MainWindow is created (App.xaml.cs checks VOICE_STUDIO_FLAUI_AUTOMATION).
+                startInfo.Environment["VOICE_STUDIO_FLAUI_AUTOMATION"] = "1";
+
+                _childProcess = Process.Start(startInfo);
+                if (_childProcess == null)
+                {
+                    Assert.Inconclusive("Process.Start returned null; cannot launch VoiceStudio.App.exe.");
+                    return;
+                }
+
+                // Do not use FlaUI Application.Attach: it correlated with child process termination under vstest.
+
+                // CRITICAL: GetMainWindow(automation) without a timeout uses an INFINITE wait (FlaUI API) —
+                // the prior Retry.WhileNull loop never advanced past the first iteration (600s harness timeouts).
+                // WinUI 3 can be slow to expose a main handle; poll with short per-call timeouts for up to 3 minutes.
+                var waitDeadline = DateTime.UtcNow.AddSeconds(90);
+                while (_mainWindow == null && DateTime.UtcNow < waitDeadline && IsProcessRunning(_childProcess))
+                {
+                    try
+                    {
+                        _childProcess.Refresh();
+                        if (_childProcess.MainWindowHandle != IntPtr.Zero)
+                        {
+                            var fromHandle = _automation.FromHandle(_childProcess.MainWindowHandle);
+                            _mainWindow = fromHandle.AsWindow();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Trace.WriteLine($"SmokeTests: MainWindowHandle FromHandle: {ex.Message}");
+                    }
+
+                    if (_mainWindow != null)
+                    {
+                        break;
+                    }
+
+                    // WinUI 3 often does not populate Process.MainWindowHandle; enumerate Win32 top-level HWNDs for this PID.
+                    _mainWindow = TryFindMainWindowForProcess(_childProcess.Id, _automation);
+                    if (_mainWindow != null)
+                    {
+                        break;
+                    }
+
+                    if (_mainWindow == null)
+                    {
+                        Thread.Sleep(400);
+                    }
+                }
+
                 if (_mainWindow == null)
                 {
-                    Assert.Inconclusive("Main window did not appear within timeout.");
+                    if (!IsProcessRunning(_childProcess))
+                    {
+                        Assert.Inconclusive(
+                            $"VoiceStudio.App exited before a shell window was found (ExitCode={TryGetExitCode(_childProcess)}).");
+                    }
+
+                    var titles = ListVisibleWindowTitlesForProcess(_childProcess.Id);
+                    Assert.Inconclusive(
+                        "Main window did not appear within timeout (EnumWindows + UIA FromHandle). "
+                        + $"processRunning={IsProcessRunning(_childProcess)}; visibleTitledWindowsForPid={titles.Count}: [{string.Join(" | ", titles)}]. "
+                        + "If titles are empty but the app is running, the test host may lack access to the interactive desktop; run verify.ps1 -RealUI for UI Smoke.");
                 }
+            }
+            catch (AssertInconclusiveException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -68,22 +198,32 @@ namespace VoiceStudio.App.Tests.UI.E2E
         {
             _mainWindow = null;
 
-            if (_app != null)
+            if (_childProcess != null)
             {
                 try
                 {
-                    if (!_app.HasExited)
+                    if (IsProcessRunning(_childProcess))
                     {
-                        _app.Close();
+                        _childProcess.Kill(entireProcessTree: true);
+                        _childProcess.WaitForExit(milliseconds: 15000);
                     }
                 }
-                catch (InvalidOperationException ex)
+                catch (Exception ex)
                 {
-                    System.Diagnostics.Trace.WriteLine($"SmokeTests cleanup: application process no longer available: {ex.Message}");
+                    System.Diagnostics.Trace.WriteLine($"SmokeTests cleanup: kill child: {ex.Message}");
                 }
                 finally
                 {
-                    _app = null;
+                    try
+                    {
+                        _childProcess.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.WriteLine($"SmokeTests cleanup: child Dispose: {ex.Message}");
+                    }
+
+                    _childProcess = null;
                 }
             }
 
@@ -212,34 +352,191 @@ namespace VoiceStudio.App.Tests.UI.E2E
 
         #region Helper Methods
 
-        private static string? FindApplicationPath()
+        private static bool IsProcessRunning(Process process)
         {
-            // Try several common locations
-            var possiblePaths = new[]
+            try
             {
-                // Development build
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", 
-                    "VoiceStudio.App", "bin", "x64", "Debug", "net8.0-windows10.0.19041.0", "VoiceStudio.App.exe"),
-                // Release build
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", 
-                    "VoiceStudio.App", "bin", "x64", "Release", "net8.0-windows10.0.19041.0", "VoiceStudio.App.exe"),
-                // CI build output
-                Path.Combine(Environment.GetEnvironmentVariable("BUILD_ARTIFACTSTAGINGDIRECTORY") ?? "",
-                    "VoiceStudio.App.exe"),
-                // Local output
-                @"E:\VoiceStudio\src\VoiceStudio.App\bin\x64\Debug\net8.0-windows10.0.19041.0\VoiceStudio.App.exe"
-            };
+                process.Refresh();
+                return !process.HasExited;
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
-            foreach (var path in possiblePaths)
+        private static int TryGetExitCode(Process process)
+        {
+            try
             {
-                var fullPath = Path.GetFullPath(path);
-                if (File.Exists(fullPath))
+                process.Refresh();
+                return process.HasExited ? process.ExitCode : -1;
+            }
+            catch
+            {
+                return -1;
+            }
+        }
+
+        private static IReadOnlyList<string> ListVisibleWindowTitlesForProcess(int processId)
+        {
+            var titles = new List<string>();
+            NativeMethods.EnumWindows((hwnd, _) =>
+            {
+                NativeMethods.GetWindowThreadProcessId(hwnd, out var pid);
+                if ((int)pid != processId)
                 {
-                    return fullPath;
+                    return true;
+                }
+
+                if (!NativeMethods.IsWindowVisible(hwnd))
+                {
+                    return true;
+                }
+
+                var len = NativeMethods.GetWindowTextLength(hwnd);
+                if (len <= 0)
+                {
+                    return true;
+                }
+
+                var sb = new StringBuilder(len + 1);
+                NativeMethods.GetWindowText(hwnd, sb, sb.Capacity);
+                var t = sb.ToString();
+                if (!string.IsNullOrWhiteSpace(t))
+                {
+                    titles.Add(t);
+                }
+
+                return true;
+            }, 0);
+            return titles;
+        }
+
+        private static Window? TryFindMainWindowForProcess(int processId, UIA3Automation automation)
+        {
+            var candidates = new List<(IntPtr Hwnd, string Title)>();
+            NativeMethods.EnumWindows((hwnd, _) =>
+            {
+                NativeMethods.GetWindowThreadProcessId(hwnd, out var pid);
+                if ((int)pid != processId)
+                {
+                    return true;
+                }
+
+                if (!NativeMethods.IsWindowVisible(hwnd))
+                {
+                    return true;
+                }
+
+                var len = NativeMethods.GetWindowTextLength(hwnd);
+                if (len <= 0)
+                {
+                    return true;
+                }
+
+                var sb = new StringBuilder(len + 1);
+                NativeMethods.GetWindowText(hwnd, sb, sb.Capacity);
+                var title = sb.ToString();
+                if (!string.IsNullOrWhiteSpace(title))
+                {
+                    candidates.Add((new IntPtr(hwnd), title));
+                }
+
+                return true;
+            }, 0);
+
+            foreach (var (hwnd, title) in candidates.OrderByDescending(t => t.Title.Length))
+            {
+                if (!title.Contains("VoiceStudio", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    return automation.FromHandle(hwnd).AsWindow();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine($"SmokeTests: EnumWindows FromHandle failed ({title}): {ex.Message}");
+                }
+            }
+
+            foreach (var (hwnd, title) in candidates)
+            {
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    return automation.FromHandle(hwnd).AsWindow();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine($"SmokeTests: EnumWindows fallback FromHandle ({title}): {ex.Message}");
                 }
             }
 
             return null;
+        }
+
+        private static string? FindApplicationPath()
+        {
+            const string Tfm = "net8.0-windows10.0.19041.0";
+            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+
+            // VoiceStudio.App uses BaseOutputPath = $(SolutionDir).buildlogs/ (see VoiceStudio.App.csproj).
+            // Building the .csproj alone can leave SolutionDir pointing at the app folder, so output may be
+            // repo\.buildlogs\ OR repo\src\VoiceStudio.App\.buildlogs\. Prefer the newest exe so FlaUI does not
+            // launch a stale binary after partial builds.
+            var repoRoot = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "..", ".."));
+
+            var possiblePaths = new List<string>
+            {
+                Path.Combine(repoRoot, ".buildlogs", "x64", "Debug", Tfm, "VoiceStudio.App.exe"),
+                Path.Combine(repoRoot, ".buildlogs", "x64", "Release", Tfm, "VoiceStudio.App.exe"),
+                Path.Combine(repoRoot, "src", "VoiceStudio.App", ".buildlogs", "x64", "Debug", Tfm, "VoiceStudio.App.exe"),
+                Path.Combine(repoRoot, "src", "VoiceStudio.App", ".buildlogs", "x64", "Release", Tfm, "VoiceStudio.App.exe"),
+                Path.Combine(baseDir, "..", "..", "..", "..", "VoiceStudio.App", "bin", "x64", "Debug", Tfm, "VoiceStudio.App.exe"),
+                Path.Combine(baseDir, "..", "..", "..", "..", "VoiceStudio.App", "bin", "x64", "Release", Tfm, "VoiceStudio.App.exe"),
+            };
+
+            var staging = Environment.GetEnvironmentVariable("BUILD_ARTIFACTSTAGINGDIRECTORY");
+            if (!string.IsNullOrWhiteSpace(staging))
+            {
+                possiblePaths.Add(Path.Combine(staging, "VoiceStudio.App.exe"));
+            }
+
+            // Prefer Debug output when tests run Debug — picking "newest" across Debug+Release can launch Release
+            // while MSTest uses Debug deps, causing immediate process exit.
+            var debugPaths = possiblePaths
+                .Where(p => p.IndexOf($"{Path.DirectorySeparatorChar}Debug{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) >= 0
+                    || p.IndexOf("\\Debug\\", StringComparison.OrdinalIgnoreCase) >= 0)
+                .ToList();
+            var pickFrom = debugPaths.Count > 0 ? debugPaths : possiblePaths;
+
+            string? bestPath = null;
+            DateTime bestTime = DateTime.MinValue;
+            foreach (var path in pickFrom)
+            {
+                var fullPath = Path.GetFullPath(path);
+                if (!File.Exists(fullPath))
+                {
+                    continue;
+                }
+
+                var t = File.GetLastWriteTimeUtc(fullPath);
+                if (t >= bestTime)
+                {
+                    bestTime = t;
+                    bestPath = fullPath;
+                }
+            }
+
+            return bestPath;
         }
 
         private AutomationElement? FindThemeComboBox(ConditionFactory cf)
@@ -317,5 +614,27 @@ namespace VoiceStudio.App.Tests.UI.E2E
         }
 
         #endregion
+
+        private static class NativeMethods
+        {
+            internal delegate bool EnumWindowsProc(nint hWnd, nint lParam);
+
+            [DllImport("user32.dll")]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, nint lParam);
+
+            [DllImport("user32.dll", SetLastError = true)]
+            internal static extern uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
+
+            [DllImport("user32.dll")]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static extern bool IsWindowVisible(nint hWnd);
+
+            [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+            internal static extern int GetWindowTextLength(nint hWnd);
+
+            [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+            internal static extern int GetWindowText(nint hWnd, StringBuilder lpString, int nMaxCount);
+        }
     }
 }

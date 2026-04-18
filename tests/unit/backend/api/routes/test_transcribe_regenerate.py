@@ -95,7 +95,10 @@ class TestRegenerateSegmentRoute:
 
         with (
             patch.object(transcribe, "get_transcription_repository", return_value=repo),
-            patch("backend.api.routes.jobs.create_job", create_job_mock),
+            patch(
+                "backend.services.canonical_job_lifecycle.create_job",
+                create_job_mock,
+            ),
             patch(
                 "backend.services.transcript_segment_regeneration.run_transcript_segment_regeneration_job",
                 _noop_background,

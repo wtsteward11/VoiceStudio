@@ -505,16 +505,31 @@ def register_all_routes(app: FastAPI) -> None:
 
     @app.get("/health")
     def health():
-        """Basic health check endpoint."""
-        from backend.api.startup_flags import get_engines_ready
+        """Basic health check endpoint with runtime authority diagnostics."""
+        import sys
+
+        from backend.api.startup_flags import (
+            get_baseline_deps_failures,
+            get_baseline_deps_valid,
+            get_engines_ready,
+        )
         from backend.settings import config
 
-        return {
-            "status": "ok",
+        baseline_valid = get_baseline_deps_valid()
+        status = "ok" if baseline_valid else "degraded"
+
+        result: dict = {
+            "status": status,
             "version": "1.0",
             "portable_mode": config.portable_mode,
             "engines_ready": get_engines_ready(),
+            "baseline_deps_valid": baseline_valid,
+            "python_executable": sys.executable,
+            "python_version": sys.version.split()[0],
         }
+        if not baseline_valid:
+            result["baseline_deps_failures"] = get_baseline_deps_failures()
+        return result
 
     @app.get("/api/health")
     def api_health():

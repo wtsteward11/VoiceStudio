@@ -1,0 +1,1108 @@
+{
+  "timestamp_utc": "2026-04-18T03:22:53.133327+00:00",
+  "repo_root": "E:\\VoiceStudio",
+  "mode": "manifest_scan_plus_full_router",
+  "manifests": [
+    {
+      "engine_id": "aeneas",
+      "type": "audio",
+      "subtype": "alignment",
+      "manifest_path": "engines\\audio\\aeneas\\engine.manifest.json",
+      "entry_point": "app.core.engines.aeneas_engine.AeneasEngine"
+    },
+    {
+      "engine_id": "bark",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\bark\\engine.manifest.json",
+      "entry_point": "app.core.engines.bark_engine.BarkEngine"
+    },
+    {
+      "engine_id": "chatterbox",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\chatterbox\\engine.manifest.json",
+      "entry_point": "app.core.engines.chatterbox_engine.ChatterboxEngine"
+    },
+    {
+      "engine_id": "coqui_tts",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\coqui_tts\\engine.manifest.json",
+      "entry_point": "app.core.engines.tts.coqui_engine.CoquiTTSEngine"
+    },
+    {
+      "engine_id": "espeak_ng",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\espeak_ng\\engine.manifest.json",
+      "entry_point": "app.core.engines.espeak_ng_engine.ESpeakNGEngine"
+    },
+    {
+      "engine_id": "f5_tts",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\f5_tts\\engine.manifest.json",
+      "entry_point": "app.core.engines.f5_tts_engine.F5TTSEngine"
+    },
+    {
+      "engine_id": "festival",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\festival\\engine.manifest.json",
+      "entry_point": "app.core.engines.festival_flite_engine.FestivalFliteEngine"
+    },
+    {
+      "engine_id": "fish_speech",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\fish_speech\\engine.manifest.json",
+      "entry_point": "app.core.engines.fish_speech:FishSpeechEngine"
+    },
+    {
+      "engine_id": "gpt_sovits",
+      "type": "audio",
+      "subtype": "vc",
+      "manifest_path": "engines\\audio\\gpt_sovits\\engine.manifest.json",
+      "entry_point": "app.core.engines.gpt_sovits_engine.GPTSovitsEngine"
+    },
+    {
+      "engine_id": "higgs_audio",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\higgs_audio\\engine.manifest.json",
+      "entry_point": "app.core.engines.higgs_audio_engine.HiggsAudioEngine"
+    },
+    {
+      "engine_id": "lyrebird",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\lyrebird\\engine.manifest.json",
+      "entry_point": "app.core.engines.lyrebird_engine.LyrebirdEngine"
+    },
+    {
+      "engine_id": "mars5",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\mars5\\engine.manifest.json",
+      "entry_point": "app.core.engines.mars5:MARS5Engine"
+    },
+    {
+      "engine_id": "marytts",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\marytts\\engine.manifest.json",
+      "entry_point": "app.core.engines.marytts_engine.MaryTTSEngine"
+    },
+    {
+      "engine_id": "mockingbird",
+      "type": "audio",
+      "subtype": "vc",
+      "manifest_path": "engines\\audio\\mockingbird\\engine.manifest.json",
+      "entry_point": "app.core.engines.mockingbird_engine.MockingBirdEngine"
+    },
+    {
+      "engine_id": "openai_tts",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\openai_tts\\engine.manifest.json",
+      "entry_point": "app.core.engines.openai_tts_engine.OpenAITTSEngine"
+    },
+    {
+      "engine_id": "openvoice",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\openvoice\\engine.manifest.json",
+      "entry_point": "app.core.engines.openvoice_engine.OpenVoiceEngine"
+    },
+    {
+      "engine_id": "openvoice_v2",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\openvoice_v2\\engine.manifest.json",
+      "entry_point": "app.core.engines.openvoice_v2:OpenVoiceV2Engine"
+    },
+    {
+      "engine_id": "parakeet",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\parakeet\\engine.manifest.json",
+      "entry_point": "app.core.engines.parakeet_engine.ParakeetEngine"
+    },
+    {
+      "engine_id": "parler_tts",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\parler_tts\\engine.manifest.json",
+      "entry_point": "app.core.engines.parler_tts:ParlerTTSEngine"
+    },
+    {
+      "engine_id": "piper",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\piper\\engine.manifest.json",
+      "entry_point": "app.core.engines.piper_engine.PiperEngine"
+    },
+    {
+      "engine_id": "rhvoice",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\rhvoice\\engine.manifest.json",
+      "entry_point": "app.core.engines.rhvoice_engine.RHVoiceEngine"
+    },
+    {
+      "engine_id": "rvc",
+      "type": "audio",
+      "subtype": "voice_conversion",
+      "manifest_path": "engines\\audio\\rvc\\engine.manifest.json",
+      "entry_point": "app.core.engines.rvc_engine.RVCEngine"
+    },
+    {
+      "engine_id": "rvc_v2",
+      "type": "audio",
+      "subtype": "voice_conversion",
+      "manifest_path": "engines\\audio\\rvc_v2\\engine.manifest.json",
+      "entry_point": "app.core.engines.rvc_engine:RVCEngine"
+    },
+    {
+      "engine_id": "gemini_live",
+      "type": "audio",
+      "subtype": "s2s",
+      "manifest_path": "engines\\audio\\s2s\\gemini_live\\engine.manifest.json",
+      "entry_point": "app.core.engines.gemini_live_engine:GeminiLiveProvider"
+    },
+    {
+      "engine_id": "openai_realtime",
+      "type": "audio",
+      "subtype": "s2s",
+      "manifest_path": "engines\\audio\\s2s\\openai_realtime\\engine.manifest.json",
+      "entry_point": "app.core.engines.openai_realtime_engine:OpenAIRealtimeProvider"
+    },
+    {
+      "engine_id": "silero",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\silero\\engine.manifest.json",
+      "entry_point": "app.core.engines.silero_engine.SileroEngine"
+    },
+    {
+      "engine_id": "so_vits_svc",
+      "type": "audio",
+      "subtype": "voice_conversion",
+      "manifest_path": "engines\\audio\\so_vits_svc\\engine.manifest.json",
+      "entry_point": "app.core.engines.sovits_svc_engine.SoVITSSVCEngine"
+    },
+    {
+      "engine_id": "sovits_svc",
+      "type": "audio",
+      "subtype": "voice_conversion",
+      "manifest_path": "engines\\audio\\sovits\\engine.manifest.json",
+      "entry_point": "app.core.engines.sovits_svc_engine.SoVITSSVCEngine"
+    },
+    {
+      "engine_id": "speaker_encoder",
+      "type": "audio",
+      "subtype": "embedding",
+      "manifest_path": "engines\\audio\\speaker_encoder\\engine.manifest.json",
+      "entry_point": "app.core.engines.speaker_encoder_engine.SpeakerEncoderEngine"
+    },
+    {
+      "engine_id": "styletts2",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\styletts2\\engine.manifest.json",
+      "entry_point": "app.core.engines.tts.styletts2_engine.StyleTTS2Engine"
+    },
+    {
+      "engine_id": "tacotron2",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\tacotron2\\engine.manifest.json",
+      "entry_point": "app.core.engines.tacotron2_engine:Tacotron2Engine"
+    },
+    {
+      "engine_id": "tortoise",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\tortoise\\engine.manifest.json",
+      "entry_point": "app.core.engines.tortoise_engine.TortoiseEngine"
+    },
+    {
+      "engine_id": "voice_ai",
+      "type": "audio",
+      "subtype": "vc",
+      "manifest_path": "engines\\audio\\voice_ai\\engine.manifest.json",
+      "entry_point": "app.core.engines.voice_ai_engine.VoiceAIEngine"
+    },
+    {
+      "engine_id": "vosk",
+      "type": "audio",
+      "subtype": "stt",
+      "manifest_path": "engines\\audio\\vosk\\engine.manifest.json",
+      "entry_point": "app.core.engines.vosk_engine.VoskEngine"
+    },
+    {
+      "engine_id": "voxcpm",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\voxcpm\\engine.manifest.json",
+      "entry_point": "app.core.engines.voxcpm_engine.VoxCPMEngine"
+    },
+    {
+      "engine_id": "whisper",
+      "type": "audio",
+      "subtype": "stt",
+      "manifest_path": "engines\\audio\\whisper\\engine.manifest.json",
+      "entry_point": "app.core.engines.whisper_engine.WhisperEngine"
+    },
+    {
+      "engine_id": "whisper_cpp",
+      "type": "audio",
+      "subtype": "stt",
+      "manifest_path": "engines\\audio\\whisper_cpp\\engine.manifest.json",
+      "entry_point": "app.core.engines.whisper_cpp_engine.WhisperCPPEngine"
+    },
+    {
+      "engine_id": "whisper_ui",
+      "type": "audio",
+      "subtype": "stt",
+      "manifest_path": "engines\\audio\\whisper_ui\\engine.manifest.json",
+      "entry_point": "app.core.engines.whisper_ui_engine.WhisperUIEngine"
+    },
+    {
+      "engine_id": "whisperx",
+      "type": "audio",
+      "subtype": "stt",
+      "manifest_path": "engines\\audio\\whisperx\\engine.manifest.json",
+      "entry_point": "app.core.engines.whisperx_engine.WhisperXEngine"
+    },
+    {
+      "engine_id": "xtts_v2",
+      "type": "audio",
+      "subtype": "tts",
+      "manifest_path": "engines\\audio\\xtts_v2\\engine.manifest.json",
+      "entry_point": "app.core.engines.xtts_engine.XTTSEngine"
+    },
+    {
+      "engine_id": "automatic1111",
+      "type": "image",
+      "subtype": "generation",
+      "manifest_path": "engines\\image\\automatic1111\\engine.manifest.json",
+      "entry_point": "app.core.engines.automatic1111_engine.Automatic1111Engine"
+    },
+    {
+      "engine_id": "comfyui",
+      "type": "image",
+      "subtype": "generation",
+      "manifest_path": "engines\\image\\comfyui\\engine.manifest.json",
+      "entry_point": "app.core.engines.comfyui_engine.ComfyUIEngine"
+    },
+    {
+      "engine_id": "fastsd_cpu",
+      "type": "image",
+      "subtype": "generation",
+      "manifest_path": "engines\\image\\fastsd_cpu\\engine.manifest.json",
+      "entry_point": "app.core.engines.fastsd_cpu_engine.FastSDCPUEngine"
+    },
+    {
+      "engine_id": "fooocus",
+      "type": "image",
+      "subtype": "generation",
+      "manifest_path": "engines\\image\\fooocus\\engine.manifest.json",
+      "entry_point": "app.core.engines.fooocus_engine.FooocusEngine"
+    },
+    {
+      "engine_id": "invokeai",
+      "type": "image",
+      "subtype": "generation",
+      "manifest_path": "engines\\image\\invokeai\\engine.manifest.json",
+      "entry_point": "app.core.engines.invokeai_engine.InvokeAIEngine"
+    },
+    {
+      "engine_id": "localai",
+      "type": "image",
+      "subtype": "generation",
+      "manifest_path": "engines\\image\\localai\\engine.manifest.json",
+      "entry_point": "app.core.engines.localai_engine.LocalAIEngine"
+    },
+    {
+      "engine_id": "openjourney",
+      "type": "image",
+      "subtype": "generation",
+      "manifest_path": "engines\\image\\openjourney\\engine.manifest.json",
+      "entry_point": "app.core.engines.openjourney_engine.OpenJourneyEngine"
+    },
+    {
+      "engine_id": "realistic_vision",
+      "type": "image",
+      "subtype": "generation",
+      "manifest_path": "engines\\image\\realistic_vision\\engine.manifest.json",
+      "entry_point": "app.core.engines.realistic_vision_engine.RealisticVisionEngine"
+    },
+    {
+      "engine_id": "sd_cpu",
+      "type": "image",
+      "subtype": "generation",
+      "manifest_path": "engines\\image\\sd_cpu\\engine.manifest.json",
+      "entry_point": "app.core.engines.sd_cpu_engine.SDCPUEngine"
+    },
+    {
+      "engine_id": "sdnext",
+      "type": "image",
+      "subtype": "generation",
+      "manifest_path": "engines\\image\\sdnext\\engine.manifest.json",
+      "entry_point": "app.core.engines.sdnext_engine.SDNextEngine"
+    },
+    {
+      "engine_id": "sdxl",
+      "type": "image",
+      "subtype": "generation",
+      "manifest_path": "engines\\image\\sdxl\\engine.manifest.json",
+      "entry_point": "app.core.engines.sdxl_engine.SDXLEngine"
+    },
+    {
+      "engine_id": "sdxl_comfy",
+      "type": "image",
+      "subtype": "generation",
+      "manifest_path": "engines\\image\\sdxl_comfy\\engine.manifest.json",
+      "entry_point": "app.core.engines.sdxl_comfy_engine.SDXLComfyEngine"
+    },
+    {
+      "engine_id": "realesrgan",
+      "type": "image",
+      "subtype": "upscaling",
+      "manifest_path": "engines\\image\\upscalers\\realesrgan\\engine.manifest.json",
+      "entry_point": "app.core.engines.realesrgan_engine.RealESRGANEngine"
+    },
+    {
+      "engine_id": "localai_llm",
+      "type": "llm",
+      "subtype": "chat",
+      "manifest_path": "engines\\llm\\localai\\engine.manifest.json",
+      "entry_point": "app.core.engines.llm_local_adapter:LocalAILLMProvider"
+    },
+    {
+      "engine_id": "ollama_llm",
+      "type": "llm",
+      "subtype": "chat",
+      "manifest_path": "engines\\llm\\ollama\\engine.manifest.json",
+      "entry_point": "app.core.engines.llm_local_adapter:OllamaLLMProvider"
+    },
+    {
+      "engine_id": "openai_chat",
+      "type": "llm",
+      "subtype": "chat",
+      "manifest_path": "engines\\llm\\openai_chat\\engine.manifest.json",
+      "entry_point": "app.core.engines.llm_openai_adapter:OpenAILLMProvider"
+    },
+    {
+      "engine_id": "deepfacelab",
+      "type": "video",
+      "subtype": "face_swap",
+      "manifest_path": "engines\\video\\deepfacelab\\engine.manifest.json",
+      "entry_point": "app.core.engines.deepfacelab_engine.DeepFaceLabEngine"
+    },
+    {
+      "engine_id": "deforum",
+      "type": "video",
+      "subtype": "generation",
+      "manifest_path": "engines\\video\\deforum\\engine.manifest.json",
+      "entry_point": "app.core.engines.deforum_engine.DeforumEngine"
+    },
+    {
+      "engine_id": "ffmpeg_ai",
+      "type": "video",
+      "subtype": "utility",
+      "manifest_path": "engines\\video\\ffmpeg_ai\\engine.manifest.json",
+      "entry_point": "app.core.engines.ffmpeg_ai_engine.FFmpegAIEngine"
+    },
+    {
+      "engine_id": "fomm",
+      "type": "video",
+      "subtype": "avatar",
+      "manifest_path": "engines\\video\\fomm\\engine.manifest.json",
+      "entry_point": "app.core.engines.fomm_engine.FOMMEngine"
+    },
+    {
+      "engine_id": "moviepy",
+      "type": "video",
+      "subtype": "editing",
+      "manifest_path": "engines\\video\\moviepy\\engine.manifest.json",
+      "entry_point": "app.core.engines.moviepy_engine.MoviePyEngine"
+    },
+    {
+      "engine_id": "sadtalker",
+      "type": "video",
+      "subtype": "avatar",
+      "manifest_path": "engines\\video\\sadtalker\\engine.manifest.json",
+      "entry_point": "app.core.engines.sadtalker_engine.SadTalkerEngine"
+    },
+    {
+      "engine_id": "svd",
+      "type": "video",
+      "subtype": "generation",
+      "manifest_path": "engines\\video\\svd\\engine.manifest.json",
+      "entry_point": "app.core.engines.svd_engine.SVDEngine"
+    },
+    {
+      "engine_id": "video_creator",
+      "type": "video",
+      "subtype": "generation",
+      "manifest_path": "engines\\video\\video_creator\\engine.manifest.json",
+      "entry_point": "app.core.engines.video_creator_engine.VideoCreatorEngine"
+    }
+  ],
+  "router": {
+    "load_all_engines_error": null,
+    "engine_router_list_engines": [
+      "aeneas",
+      "bark",
+      "chatterbox",
+      "espeak_ng",
+      "f5_tts",
+      "festival",
+      "fish_speech",
+      "gpt_sovits",
+      "higgs_audio",
+      "lyrebird",
+      "mars5",
+      "marytts",
+      "mockingbird",
+      "openai_tts",
+      "openvoice",
+      "openvoice_v2",
+      "parakeet",
+      "parler_tts",
+      "piper",
+      "rhvoice",
+      "rvc",
+      "rvc_v2",
+      "gemini_live",
+      "openai_realtime",
+      "silero",
+      "sovits_svc",
+      "so_vits_svc",
+      "speaker_encoder",
+      "tacotron2",
+      "tortoise",
+      "voice_ai",
+      "vosk",
+      "voxcpm",
+      "whisper",
+      "whisperx",
+      "whisper_cpp",
+      "whisper_ui",
+      "xtts_v2",
+      "automatic1111",
+      "comfyui",
+      "fastsd_cpu",
+      "fooocus",
+      "invokeai",
+      "localai",
+      "openjourney",
+      "realistic_vision",
+      "sdnext",
+      "sdxl",
+      "sdxl_comfy",
+      "sd_cpu",
+      "realesrgan",
+      "localai_llm",
+      "ollama_llm",
+      "openai_chat",
+      "deepfacelab",
+      "deforum",
+      "ffmpeg_ai",
+      "fomm",
+      "moviepy",
+      "sadtalker",
+      "svd",
+      "video_creator"
+    ],
+    "engines": {
+      "aeneas": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "AeneasEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "automatic1111": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "Automatic1111Engine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "bark": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "BarkEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "chatterbox": {
+        "registered": true,
+        "instantiable": false,
+        "instance_type": null,
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "comfyui": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "ComfyUIEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "deepfacelab": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "DeepFaceLabEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "deforum": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "DeforumEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "espeak_ng": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "ESpeakNGEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "f5_tts": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "F5TTSEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "fastsd_cpu": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "FastSDCPUEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "festival": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "FestivalFliteEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "ffmpeg_ai": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "FFmpegAIEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "fish_speech": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "FishSpeechEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "fomm": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "FOMMEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "fooocus": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "FooocusEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "gemini_live": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "GeminiLiveProvider",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "gpt_sovits": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "GPTSovitsEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "higgs_audio": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "HiggsAudioEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "invokeai": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "InvokeAIEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "localai": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "LocalAIEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "localai_llm": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "LocalAILLMProvider",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "lyrebird": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "LyrebirdEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "mars5": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "MARS5Engine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "marytts": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "MaryTTSEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "mockingbird": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "MockingBirdEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "moviepy": {
+        "registered": true,
+        "instantiable": false,
+        "instance_type": null,
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "ollama_llm": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "OllamaLLMProvider",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "openai_chat": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "OpenAILLMProvider",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "openai_realtime": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "OpenAIRealtimeProvider",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "openai_tts": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "OpenAITTSEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "openjourney": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "OpenJourneyEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "openvoice": {
+        "registered": true,
+        "instantiable": false,
+        "instance_type": null,
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "openvoice_v2": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "OpenVoiceV2Engine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "parakeet": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "ParakeetEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "parler_tts": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "ParlerTTSEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "piper": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "PiperEngine",
+        "preflight_assets": {
+          "ok": true,
+          "paths": [
+            "E:\\VoiceStudio\\models\\piper\\en_US-amy-medium.onnx",
+            "E:\\VoiceStudio\\models\\piper\\en_US-amy-medium.onnx.json"
+          ],
+          "downloaded": false,
+          "message": "Piper voice ready: en_US-amy-medium"
+        }
+      },
+      "realesrgan": {
+        "registered": true,
+        "instantiable": false,
+        "instance_type": null,
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "realistic_vision": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "RealisticVisionEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "rhvoice": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "RHVoiceEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "rvc": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "RVCEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "rvc_v2": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "RVCEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "sadtalker": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "SadTalkerEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "sd_cpu": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "SDCPUEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "sdnext": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "SDNextEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "sdxl": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "SDXLEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "sdxl_comfy": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "SDXLComfyEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "silero": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "SileroEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "so_vits_svc": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "SoVITSSVCEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "sovits_svc": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "SoVITSSVCEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "speaker_encoder": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "SpeakerEncoderEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "svd": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "SVDEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "tacotron2": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "Tacotron2Engine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "tortoise": {
+        "registered": true,
+        "instantiable": false,
+        "instance_type": null,
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "video_creator": {
+        "registered": true,
+        "instantiable": false,
+        "instance_type": null,
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "voice_ai": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "VoiceAIEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "vosk": {
+        "registered": true,
+        "instantiable": false,
+        "instance_type": null,
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "voxcpm": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "VoxCPMEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "whisper": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "WhisperEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "whisper_cpp": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "WhisperCPPEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "whisper_ui": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "WhisperUIEngine",
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "whisperx": {
+        "registered": true,
+        "instantiable": false,
+        "instance_type": null,
+        "preflight_assets": {
+          "ok": null,
+          "reason": "no ensure_* in probe (runtime-only)"
+        }
+      },
+      "xtts_v2": {
+        "registered": true,
+        "instantiable": true,
+        "instance_type": "XTTSEngine",
+        "preflight_assets": {
+          "ok": true,
+          "paths": [
+            "E:\\VoiceStudio\\models\\xtts\\tts\\tts_models--multilingual--multi-dataset--xtts_v2\\config.json",
+            "E:\\VoiceStudio\\models\\xtts\\tts\\tts_models--multilingual--multi-dataset--xtts_v2\\hash.md5",
+            "E:\\VoiceStudio\\models\\xtts\\tts\\tts_models--multilingual--multi-dataset--xtts_v2\\model.pth",
+            "E:\\VoiceStudio\\models\\xtts\\tts\\tts_models--multilingual--multi-dataset--xtts_v2\\speakers_xtts.pth",
+            "E:\\VoiceStudio\\models\\xtts\\tts\\tts_models--multilingual--multi-dataset--xtts_v2\\vocab.json"
+          ],
+          "downloaded": false,
+          "message": "XTTS assets ready at E:\\VoiceStudio\\models\\xtts",
+          "assets_present": true,
+          "deferred_download": false,
+          "base_dir": "E:\\VoiceStudio\\models\\xtts",
+          "cache_dir": "E:\\VoiceStudio\\models\\xtts\\cache",
+          "dependencies": {
+            "ok": true,
+            "versions": {
+              "coqui-tts": "0.27.2",
+              "torch": "2.2.2+cu121",
+              "torchaudio": "2.2.2+cu121"
+            },
+            "message": "XTTS dependencies ready"
+          }
+        }
+      }
+    }
+  }
+}

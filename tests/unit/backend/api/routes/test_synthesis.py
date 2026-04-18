@@ -65,6 +65,7 @@ def test_post_synthesize_delegates_to_service(
         quality_score=0.88,
         quality_metrics=None,
         ssml_handling=None,
+        routed_engine="piper",
     )
     payload = {
         "engine": "piper",

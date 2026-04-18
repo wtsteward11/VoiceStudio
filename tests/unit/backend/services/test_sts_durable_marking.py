@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from backend.core.audio.conversion import ConversionResult
@@ -118,12 +117,21 @@ def test_marking_endpoint_returns_transformed_status() -> None:
     def fake_get(_aid: str):
         return artifact
 
-    with patch(
-        "backend.services.audio_registry_service.get_registry",
-    ) as gr:
+    with (
+        patch(
+            "backend.services.audio_registry_service.get_registry",
+        ) as gr,
+        patch(
+            "backend.services.trust_audit_service.get_trust_audit_service",
+        ) as gtas,
+    ):
         reg = MagicMock()
         reg.get.side_effect = fake_get
         gr.return_value = reg
+
+        tas = MagicMock()
+        tas.record_marking_read = AsyncMock()
+        gtas.return_value = tas
 
         client = TestClient(app)
         r = client.get("/api/audio/x1/marking")
@@ -132,14 +140,17 @@ def test_marking_endpoint_returns_transformed_status() -> None:
         assert data["is_transformed"] is True
         assert data["transformation_type"] == "speech_to_speech"
         assert data["source_reference_id"] == "src1"
+        tas.record_marking_read.assert_awaited_once()
 
 
 def test_marking_endpoint_returns_not_transformed_for_plain_artifact() -> None:
     from backend.api.main import app
     from backend.services.audio_artifacts.models import AudioArtifact
 
+    # Distinct id avoids collision with other tests / dev DB rows using "plain".
+    audio_id = "plain-no-transform"
     artifact = AudioArtifact(
-        audio_id="plain",
+        audio_id=audio_id,
         path="/tmp/p.wav",
         ext="wav",
         duration_sec=1.0,
@@ -148,17 +159,150 @@ def test_marking_endpoint_returns_not_transformed_for_plain_artifact() -> None:
         metadata={"source": "abc"},
     )
 
-    with patch(
-        "backend.services.audio_registry_service.get_registry",
-    ) as gr:
+    with (
+        patch(
+            "backend.services.audio_registry_service.get_registry",
+        ) as gr,
+        patch(
+            "backend.services.trust_audit_service.get_trust_audit_service",
+        ) as gtas,
+    ):
         reg = MagicMock()
         reg.get.return_value = artifact
         gr.return_value = reg
 
+        tas = MagicMock()
+        tas.record_marking_read = AsyncMock()
+        gtas.return_value = tas
+
         client = TestClient(app)
-        r = client.get("/api/audio/plain/marking")
+        r = client.get(f"/api/audio/{audio_id}/marking")
         assert r.status_code == 200
         assert r.json()["is_transformed"] is False
+        tas.record_marking_read.assert_awaited_once()
+
+
+def test_marking_endpoint_source_field_alone_does_not_imply_transformed() -> None:
+    """metadata['source'] is lineage reference; it must not set is_transformed."""
+    from backend.api.main import app
+    from backend.services.audio_artifacts.models import AudioArtifact
+
+    aid = "marking-source-only-1"
+    artifact = AudioArtifact(
+        audio_id=aid,
+        path="/tmp/s.wav",
+        ext="wav",
+        duration_sec=1.0,
+        created_at="2020-01-01",
+        created_by="t",
+        metadata={"source": "src-ref-123"},
+    )
+
+    with (
+        patch("backend.services.audio_registry_service.get_registry") as gr,
+        patch(
+            "backend.services.trust_audit_service.get_trust_audit_service",
+        ) as gtas,
+    ):
+        reg = MagicMock()
+        reg.get.return_value = artifact
+        gr.return_value = reg
+        tas = MagicMock()
+        tas.record_marking_read = AsyncMock()
+        gtas.return_value = tas
+
+        client = TestClient(app)
+        r = client.get(f"/api/audio/{aid}/marking")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["is_transformed"] is False
+        assert data["source_reference_id"] == "src-ref-123"
+        tas.record_marking_read.assert_awaited_once()
+
+
+def test_marking_endpoint_watermark_alone_does_not_imply_transformed() -> None:
+    """Watermark flags are orthogonal to is_transformed unless metadata says so."""
+    from backend.api.main import app
+    from backend.api.routes import audio as audio_routes
+    from backend.services.audio_artifacts.models import AudioArtifact
+
+    aid = "marking-wm-only-1"
+    artifact = AudioArtifact(
+        audio_id=aid,
+        path="/tmp/w.wav",
+        ext="wav",
+        duration_sec=1.0,
+        created_at="2020-01-01",
+        created_by="t",
+        metadata={"watermark_applied": True, "watermark_method": "lsb"},
+    )
+
+    with (
+        patch("backend.services.audio_registry_service.get_registry") as gr,
+        patch(
+            "backend.services.trust_audit_service.get_trust_audit_service",
+        ) as gtas,
+        patch.object(audio_routes, "_verify_watermark_on_artifact", return_value=False),
+    ):
+        reg = MagicMock()
+        reg.get.return_value = artifact
+        gr.return_value = reg
+        tas = MagicMock()
+        tas.record_marking_read = AsyncMock()
+        gtas.return_value = tas
+
+        client = TestClient(app)
+        r = client.get(f"/api/audio/{aid}/marking")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["is_transformed"] is False
+        assert data["watermark_applied"] is True
+        assert data["watermark_method"] == "lsb"
+        assert data["watermark_verified"] is False
+        tas.record_marking_read.assert_awaited_once()
+
+
+def test_marking_endpoint_is_transformed_derived_from_canonical_metadata_only() -> None:
+    """Handler reads top-level metadata['is_transformed'], not nested model_provenance only."""
+    from backend.api.main import app
+    from backend.services.audio_artifacts.models import AudioArtifact
+
+    aid = "marking-canonical-1"
+    artifact = AudioArtifact(
+        audio_id=aid,
+        path="/tmp/c.wav",
+        ext="wav",
+        duration_sec=1.0,
+        created_at="2020-01-01",
+        created_by="t",
+        metadata={
+            "is_transformed": True,
+            "transformation_type": "speech_to_speech",
+            "source": "src1",
+            "model_provenance": {"is_transformed": True},
+        },
+    )
+
+    with (
+        patch("backend.services.audio_registry_service.get_registry") as gr,
+        patch(
+            "backend.services.trust_audit_service.get_trust_audit_service",
+        ) as gtas,
+    ):
+        reg = MagicMock()
+        reg.get.return_value = artifact
+        gr.return_value = reg
+        tas = MagicMock()
+        tas.record_marking_read = AsyncMock()
+        gtas.return_value = tas
+
+        client = TestClient(app)
+        r = client.get(f"/api/audio/{aid}/marking")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["is_transformed"] is True
+        assert data["transformation_type"] == "speech_to_speech"
+        tas.record_marking_read.assert_awaited_once()
 
 
 def test_export_response_includes_transformed_headers(tmp_path: Path) -> None:

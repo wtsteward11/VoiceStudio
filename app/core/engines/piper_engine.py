@@ -324,9 +324,14 @@ class PiperEngine(EngineProtocol):
         if not self.model_path or not os.path.isfile(self.model_path):
             logger.warning("PiperVoice requires model_path to an existing .onnx file")
             return None
-        download_dir = Path(self.model_path).parent
+        sibling_config = Path(self.model_path).with_suffix(
+            Path(self.model_path).suffix + ".json"
+        )
+        load_kwargs: dict = {}
+        if sibling_config.is_file():
+            load_kwargs["config_path"] = str(sibling_config)
         try:
-            voice = PiperVoice.load(self.model_path, download_dir=download_dir)
+            voice = PiperVoice.load(self.model_path, **load_kwargs)
         except Exception as e:
             logger.warning("PiperVoice.load failed: %s", e)
             return None

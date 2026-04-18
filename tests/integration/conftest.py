@@ -290,13 +290,20 @@ def test_client(client):
 
 
 @pytest.fixture(autouse=True)
-def setup_test_environment():
+def setup_test_environment(request):
     """Setup test environment before each test."""
     # Store original environment
     original_env = os.environ.copy()
 
     # Set test-specific environment variables
-    os.environ["VOICESTUDIO_TEST_MODE"] = "1"
+    if request.node.get_closest_marker("real_xtts") or request.node.get_closest_marker(
+        "real_piper"
+    ):
+        # Real engine proofs must not run under stub-like VOICESTUDIO_TEST_MODE (see
+        # tests/integration/test_synthesis_xtts_real.py and test_synthesis_piper_real.py).
+        os.environ.pop("VOICESTUDIO_TEST_MODE", None)
+    else:
+        os.environ["VOICESTUDIO_TEST_MODE"] = "1"
     os.environ["VOICESTUDIO_DISABLE_TELEMETRY"] = "1"
 
     yield

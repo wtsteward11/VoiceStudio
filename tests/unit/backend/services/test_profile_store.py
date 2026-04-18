@@ -4,10 +4,20 @@ Unit tests for ProfileStore (Phase 21.3).
 Tests persistent voice profile storage.
 """
 
+import asyncio
 import shutil
 import tempfile
+from pathlib import Path
 
 import pytest
+
+from backend.infrastructure.adapters.database import (
+    close_database_adapter,
+    get_database_adapter,
+    reset_database_adapter_singleton,
+)
+from backend.infrastructure.migrations.initial_schema import run_migrations
+from backend.project.tracks.track_store import reset_track_store
 
 
 class TestProfileStore:
@@ -153,33 +163,47 @@ class TestProfileStore:
 
 
 class TestTrackStore:
-    """Tests for TrackStore."""
+    """Tests for TrackStore (SQLite-backed; requires connected DatabaseAdapter)."""
 
-    @pytest.fixture
-    def temp_dir(self):
-        """Create a temporary directory for test storage."""
-        path = tempfile.mkdtemp()
-        yield path
-        shutil.rmtree(path, ignore_errors=True)
+    def setup_method(self) -> None:
+        self._temp_db_dir = tempfile.mkdtemp()
 
-    def test_import(self):
+        async def _setup() -> None:
+            await close_database_adapter()
+            reset_database_adapter_singleton()
+            reset_track_store()
+            dbp = f"sqlite:///{Path(self._temp_db_dir) / 'profile_store_track_test.db'}"
+            await run_migrations(db_path=dbp)
+            db = get_database_adapter(dbp)
+            await db.connect()
+
+        asyncio.run(_setup())
+
+    def teardown_method(self) -> None:
+        reset_track_store()
+        asyncio.run(close_database_adapter())
+        reset_database_adapter_singleton()
+        asyncio.set_event_loop(asyncio.new_event_loop())
+        shutil.rmtree(self._temp_db_dir, ignore_errors=True)
+
+    def test_import(self) -> None:
         """Test that TrackStore can be imported."""
         from backend.services.track_store import TrackStore
 
         assert TrackStore is not None
 
-    def test_create_store(self, temp_dir):
+    def test_create_store(self) -> None:
         """Test creating a track store."""
         from backend.services.track_store import TrackStore
 
-        store = TrackStore(projects_dir=temp_dir)
+        store = TrackStore(projects_dir=self._temp_db_dir)
         assert store is not None
 
-    def test_save_track(self, temp_dir):
+    def test_save_track(self) -> None:
         """Test saving a track."""
         from backend.services.track_store import TrackStore
 
-        store = TrackStore(projects_dir=temp_dir)
+        store = TrackStore(projects_dir=self._temp_db_dir)
 
         track = {
             "name": "Voice Track 1",
@@ -191,11 +215,11 @@ class TestTrackStore:
 
         assert track_id is not None
 
-    def test_get_track(self, temp_dir):
+    def test_get_track(self) -> None:
         """Test retrieving a track."""
         from backend.services.track_store import TrackStore
 
-        store = TrackStore(projects_dir=temp_dir)
+        store = TrackStore(projects_dir=self._temp_db_dir)
 
         track = {"name": "Test Track", "type": "audio"}
         track_id = store.save_track("project-1", track)
@@ -205,11 +229,11 @@ class TestTrackStore:
         assert retrieved is not None
         assert retrieved["name"] == "Test Track"
 
-    def test_list_tracks(self, temp_dir):
+    def test_list_tracks(self) -> None:
         """Test listing tracks for a project."""
         from backend.services.track_store import TrackStore
 
-        store = TrackStore(projects_dir=temp_dir)
+        store = TrackStore(projects_dir=self._temp_db_dir)
 
         store.save_track("project-1", {"name": "Track 1", "track_number": 1})
         store.save_track("project-1", {"name": "Track 2", "track_number": 2})
@@ -218,11 +242,11 @@ class TestTrackStore:
 
         assert len(tracks) == 2
 
-    def test_delete_track(self, temp_dir):
+    def test_delete_track(self) -> None:
         """Test deleting a track."""
         from backend.services.track_store import TrackStore
 
-        store = TrackStore(projects_dir=temp_dir)
+        store = TrackStore(projects_dir=self._temp_db_dir)
 
         track_id = store.save_track("project-1", {"name": "To Delete"})
 
@@ -230,6 +254,36 @@ class TestTrackStore:
 
         assert result is True
         assert store.get_track("project-1", track_id) is None
+
+    def test_disconnected_adapter_save_raises(self) -> None:
+        """Regression: TrackStore requires a connected global DatabaseAdapter."""
+        from backend.services.track_store import TrackStore
+
+        async def _leave_disconnected() -> None:
+            await close_database_adapter()
+            reset_database_adapter_singleton()
+            reset_track_store()
+            _ = get_database_adapter(
+                f"sqlite:///{Path(self._temp_db_dir) / 'disconnected.db'}",
+            )
+
+        asyncio.run(_leave_disconnected())
+        store = TrackStore(projects_dir=self._temp_db_dir)
+        with pytest.raises(RuntimeError, match="Database not connected"):
+            store.save_track("project-1", {"name": "x"})
+
+    def test_connected_store_round_trips(self) -> None:
+        """Regression: connected adapter supports save → get → delete → miss."""
+        from backend.services.track_store import TrackStore
+
+        store = TrackStore(projects_dir=self._temp_db_dir)
+        pid = "project-roundtrip"
+        tid = store.save_track(pid, {"name": "RoundTrip", "type": "audio"})
+        got = store.get_track(pid, tid)
+        assert got is not None
+        assert got["name"] == "RoundTrip"
+        assert store.delete_track(pid, tid) is True
+        assert store.get_track(pid, tid) is None
 
 
 class TestArtifactRefCounter:

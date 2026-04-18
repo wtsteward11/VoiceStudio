@@ -46,7 +46,11 @@ namespace VoiceStudio.Core.Models
     /// </summary>
     [JsonPropertyName("emotion_preset_apply_failure_message")]
     public string? EmotionPresetApplyFailureMessage { get; set; }
-  }
+  
+    /// <summary>Normalized engine id that produced this response (Slice 10 parity).</summary>
+    [JsonPropertyName("routed_engine")]
+    public string RoutedEngine { get; set; } = string.Empty;
+}
 
   public class VoiceAnalysisResponse
   {

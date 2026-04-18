@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import os
-import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -452,7 +451,7 @@ async def _perform_synthesis_with_retry(
     max_retries: int = 2,
 ) -> tuple[Any, Exception | None]:
     """
-    Perform synthesis with circuit breaker, retries, and utility TTS fallback.
+    Perform synthesis with circuit breaker and retries (no automatic utility TTS substitution).
 
     Args:
         engine: The engine instance to use
@@ -536,97 +535,7 @@ async def _perform_synthesis_with_retry(
                 continue
             break
 
-    # Try fallback to utility TTS if all main engine attempts failed
-    if result is None and synthesis_error is not None:
-        result = await _try_utility_tts_fallback(
-            text_to_synthesize, language, synthesis_error
-        )
-        if result is not None:
-            return result, None  # Fallback succeeded (result is dict)
-
     return result, synthesis_error
-
-
-async def _try_utility_tts_fallback(
-    text: str,
-    language: str,
-    original_error: Exception,
-) -> dict[str, Any] | None:
-    """
-    Try gTTS and pyttsx3 as fallback TTS when main engine fails.
-
-    Returns artifact info via create_audio_artifact_from_wav_array (no sf.write in routes).
-
-    Returns:
-        {"audio_id": ..., "cached_path": ..., "duration": ...} on success, None on failure
-    """
-    try:
-        from backend.tts.tts_utils import synthesize_with_utility
-
-        logger.warning("Main engine failed, trying utility TTS fallback: %s", original_error)
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
-            fallback_mp3 = tmp_mp3.name
-        try:
-            synthesize_with_utility(
-                text,
-                utility="gtts",
-                language=language or "en",
-                output_path=fallback_mp3,
-            )
-            try:
-                import soundfile as sf
-
-                audio, sr = sf.read(fallback_mp3)
-                duration = len(audio) / float(sr) if sr else 0.0
-                aid, cached_path, _ = create_audio_artifact_from_wav_array(
-                    audio, sr, created_by="gtts_fallback"
-                )
-                logger.info("Fallback to gTTS successful")
-                return {"audio_id": aid, "cached_path": cached_path, "duration": duration}
-            except ImportError:
-                aid, cached_path, _ = create_audio_artifact_from_file(
-                    fallback_mp3, created_by="gtts_fallback", delete_source=False
-                )
-                duration = 0.0
-                logger.info("Fallback to gTTS successful (MP3 format)")
-                return {"audio_id": aid, "cached_path": cached_path, "duration": duration}
-        except Exception as gtts_error:
-            logger.warning("gTTS fallback failed: %s", gtts_error)
-        finally:
-            try:
-                os.unlink(fallback_mp3)
-            # ALLOWED: bare except - best effort, failure acceptable
-            except OSError:
-                pass
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav:
-            fallback_wav = tmp_wav.name
-        try:
-            synthesize_with_utility(
-                text,
-                utility="pyttsx3",
-                output_path=fallback_wav,
-            )
-            aid, cached_path, _ = create_audio_artifact_from_file(
-                fallback_wav, created_by="pyttsx3_fallback", delete_source=True
-            )
-            duration = 0.0
-            logger.info("Fallback to pyttsx3 successful")
-            return {"audio_id": aid, "cached_path": cached_path, "duration": duration}
-        except Exception as pyttsx3_error:
-            logger.warning("pyttsx3 fallback also failed: %s", pyttsx3_error)
-            return None
-        finally:
-            try:
-                if os.path.exists(fallback_wav):
-                    os.unlink(fallback_wav)
-            # ALLOWED: bare except - best effort, failure acceptable
-            except OSError:
-                pass
-    except ImportError:
-        logger.debug("TTS utilities not available for fallback")
-        return None
 
 
 def _extract_quality_metrics(

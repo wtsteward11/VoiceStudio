@@ -40,6 +40,11 @@ if (Test-Path -LiteralPath $summaryPath) {
     Remove-Item -LiteralPath $summaryPath -Force -ErrorAction SilentlyContinue
 }
 
+# Single-instance mutex (Program.cs): a stray VoiceStudio.App would exit Main() before App.xaml.cs
+# runs, so no failure_smoke_summary.json is ever written. Mirror verify.ps1 PostStageCleanup.
+Get-Process -Name 'VoiceStudio.App' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 400
+
 $psi = [System.Diagnostics.ProcessStartInfo]::new()
 $psi.UseShellExecute = $false
 $psi.FileName = $ExePath
@@ -55,6 +60,18 @@ $psi.Environment['VOICE_STUDIO_SMOKE_FAILURE_PORT'] = '1'
 $psi.Environment['VOICESTUDIO_API_HOST'] = '127.0.0.1'
 $psi.Environment['VOICESTUDIO_API_PORT'] = "$port"
 [void]$psi.Environment.Remove('VOICESTUDIO_BACKEND_URL')
+# Isolate this harness from UI/exit smoke env so App.xaml.cs OnLaunched takes the backend
+# failure-path (failure_smoke_summary.json), not Gate C ui-smoke early return.
+foreach ($k in @(
+        'VOICE_STUDIO_SMOKE_UI',
+        'VOICE_STUDIO_SMOKE_EXIT',
+        'VOICE_STUDIO_UI_SELF_TEST',
+        'VOICE_STUDIO_UI_SELF_TEST_REQUIRE_BACKEND',
+        'VOICE_STUDIO_ICON_LAUNCH_SMOKE',
+        'VOICE_STUDIO_ICON_LAUNCH_SMOKE_OUT'
+    )) {
+    [void]$psi.Environment.Remove($k)
+}
 
 $proc = [System.Diagnostics.Process]::Start($psi)
 if ($null -eq $proc) {

@@ -11,7 +11,8 @@ public enum BackendStartFailureCategory
     RuntimeMissing,
     InvalidAppRoot,
     HealthTimeout,
-    SpawnFailure
+    SpawnFailure,
+    BaselineDepsFailure
 }
 
 /// <summary>

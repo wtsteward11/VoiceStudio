@@ -1,492 +1,137 @@
 """
 Unit Tests for Library API Route
-Tests library management endpoints comprehensively.
+
+Tests library management endpoints against the real DB-backed
+repository layer (BaseRepository + aiosqlite).
 """
-
-"""
-NOTE: This test module has been skipped because it tests mock
-attributes that don't exist in the actual implementation.
-These tests need refactoring to match the real API.
-"""
-import pytest
-
-pytest.skip(
-    "Tests mock non-existent module attributes - needs test refactoring",
-    allow_module_level=True,
-)
-
-
-import sys
-import uuid
-from datetime import datetime
-from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-project_root = Path(__file__).parent.parent.parent.parent.parent
-sys.path.insert(0, str(project_root))
+from backend.api.routes.library import router
 
-# Import the route module
-try:
-    from backend.api.routes import library
-except ImportError:
-    pytest.skip("Could not import library route module", allow_module_level=True)
+
+def _make_client() -> TestClient:
+    app = FastAPI()
+    app.include_router(router)
+    return TestClient(app, raise_server_exceptions=False)
 
 
 class TestLibraryRouteImports:
-    """Test library route module can be imported."""
-
-    def test_library_module_imports(self):
-        """Test library module can be imported."""
-        assert library is not None, "Failed to import library module"
-        assert hasattr(library, "router"), "library module missing router"
+    """Verify the library route module loads and exposes a router."""
 
     def test_router_exists(self):
-        """Test router exists and is configured."""
-        assert library.router is not None, "Router should exist"
-        if hasattr(library.router, "prefix"):
-            pass  # Router configuration is valid
+        from backend.api.routes import library
+
+        assert library.router is not None
 
     def test_router_has_routes(self):
-        """Test router has registered routes."""
-        if hasattr(library.router, "routes"):
-            routes = [route.path for route in library.router.routes]
-            assert len(routes) > 0, "Router should have routes registered"
+        from backend.api.routes import library
+
+        routes = [r.path for r in library.router.routes if hasattr(r, "path")]
+        assert len(routes) > 0
 
 
 class TestLibraryFoldersEndpoints:
-    """Test library folder endpoints."""
+    """Test GET /api/library/folders against the real DB."""
 
-    def test_get_folders_empty(self):
-        """Test listing folders when empty."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
+    def test_get_folders_returns_200(self):
+        client = _make_client()
+        r = client.get("/api/library/folders")
+        assert r.status_code == 200
 
-        library._asset_folders.clear()
+    def test_get_folders_response_shape(self):
+        """Response must be an object with a 'folders' array (FoldersResponse)."""
+        client = _make_client()
+        r = client.get("/api/library/folders")
+        data = r.json()
+        assert isinstance(data, dict), "Response must be an object, not a raw array"
+        assert "folders" in data, "Response must contain 'folders' key"
+        assert isinstance(data["folders"], list)
 
-        response = client.get("/api/library/folders")
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 0
-
-    def test_get_folders_with_data(self):
-        """Test listing folders with data."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._asset_folders.clear()
-
-        folder_id = f"folder-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow()
-        library._asset_folders[folder_id] = {
-            "id": folder_id,
-            "name": "Test Folder",
-            "parent_id": None,
-            "path": "/test",
-            "created": now,
-            "modified": now,
-            "asset_count": 0,
-        }
-
-        response = client.get("/api/library/folders")
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 1
-        assert data[0]["name"] == "Test Folder"
-
-    def test_get_folders_filtered_by_parent(self):
-        """Test listing folders filtered by parent_id."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._asset_folders.clear()
-
-        parent_id = f"parent-{uuid.uuid4().hex[:8]}"
-        child_id = f"child-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow()
-
-        library._asset_folders[parent_id] = {
-            "id": parent_id,
-            "name": "Parent",
-            "parent_id": None,
-            "path": "/parent",
-            "created": now,
-            "modified": now,
-            "asset_count": 0,
-        }
-
-        library._asset_folders[child_id] = {
-            "id": child_id,
-            "name": "Child",
-            "parent_id": parent_id,
-            "path": "/parent/child",
-            "created": now,
-            "modified": now,
-            "asset_count": 0,
-        }
-
-        response = client.get(f"/api/library/folders?parent_id={parent_id}")
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 1
-        assert data[0]["parent_id"] == parent_id
-
-    def test_create_folder_success(self):
-        """Test successful folder creation."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._asset_folders.clear()
-
-        folder_data = {
-            "name": "New Folder",
-            "parent_id": None,
-            "path": "/new_folder",
-        }
-
-        response = client.post("/api/library/folders", json=folder_data)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["name"] == "New Folder"
-        assert "id" in data
-
-    def test_create_folder_with_parent(self):
-        """Test creating folder with parent."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._asset_folders.clear()
-
-        # Create parent first
-        parent_id = f"parent-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow()
-        library._asset_folders[parent_id] = {
-            "id": parent_id,
-            "name": "Parent",
-            "parent_id": None,
-            "path": "/parent",
-            "created": now,
-            "modified": now,
-            "asset_count": 0,
-        }
-
-        folder_data = {
-            "name": "Child Folder",
-            "parent_id": parent_id,
-            "path": "/parent/child",
-        }
-
-        response = client.post("/api/library/folders", json=folder_data)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["parent_id"] == parent_id
+    def test_get_folders_with_parent_id(self):
+        client = _make_client()
+        r = client.get("/api/library/folders?parent_id=nonexistent")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["folders"] == []
 
 
 class TestLibraryAssetsEndpoints:
-    """Test library asset endpoints."""
+    """Test GET /api/library/assets against the real DB."""
 
-    def test_search_assets_empty(self):
-        """Test searching assets when empty."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
+    def test_search_assets_returns_200(self):
+        client = _make_client()
+        r = client.get("/api/library/assets")
+        assert r.status_code == 200
 
-        library._assets.clear()
-
-        response = client.get("/api/library/assets")
-        assert response.status_code == 200
-        data = response.json()
+    def test_search_assets_response_shape(self):
+        """Response must be AssetSearchResponse with assets/total/limit/offset."""
+        client = _make_client()
+        r = client.get("/api/library/assets?limit=5")
+        data = r.json()
+        assert isinstance(data, dict)
         assert "assets" in data
-        assert len(data["assets"]) == 0
+        assert "total" in data
+        assert "limit" in data
+        assert "offset" in data
+        assert isinstance(data["assets"], list)
+        assert data["limit"] == 5
+        assert data["offset"] == 0
 
     def test_search_assets_with_query(self):
-        """Test searching assets with query."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
+        client = _make_client()
+        r = client.get("/api/library/assets?query=nonexistent_xyz_query")
+        assert r.status_code == 200
+        data = r.json()
+        assert isinstance(data["assets"], list)
 
-        library._assets.clear()
+    def test_search_assets_with_asset_type_filter(self):
+        client = _make_client()
+        r = client.get("/api/library/assets?asset_type=audio&limit=5")
+        assert r.status_code == 200
+        data = r.json()
+        for asset in data["assets"]:
+            assert asset["type"] == "audio"
 
-        asset_id = f"asset-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow()
-        library._assets[asset_id] = {
-            "id": asset_id,
-            "name": "Test Audio",
-            "type": "audio",
-            "path": "/test/audio.wav",
-            "created": now,
-            "modified": now,
-            "size": 1024,
-        }
-
-        response = client.get("/api/library/assets?query=Test")
-        assert response.status_code == 200
-        data = response.json()
-        assert "assets" in data
-
-    def test_search_assets_filtered_by_type(self):
-        """Test searching assets filtered by type."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._assets.clear()
-
-        asset_id1 = f"asset-{uuid.uuid4().hex[:8]}"
-        asset_id2 = f"asset-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow()
-
-        library._assets[asset_id1] = {
-            "id": asset_id1,
-            "name": "Audio File",
-            "type": "audio",
-            "path": "/audio.wav",
-            "created": now,
-            "modified": now,
-            "size": 1024,
-        }
-
-        library._assets[asset_id2] = {
-            "id": asset_id2,
-            "name": "Voice Profile",
-            "type": "voice_profile",
-            "path": "/profile.json",
-            "created": now,
-            "modified": now,
-            "size": 512,
-        }
-
-        response = client.get("/api/library/assets?asset_type=audio")
-        assert response.status_code == 200
-        data = response.json()
-        assert "assets" in data
-
-    def test_search_assets_filtered_by_tags(self):
-        """Test searching assets filtered by tags."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._assets.clear()
-
-        response = client.get("/api/library/assets?tags=important")
-        assert response.status_code == 200
-        data = response.json()
-        assert "assets" in data
-
-    def test_search_assets_with_limit(self):
-        """Test searching assets with limit."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._assets.clear()
-
-        response = client.get("/api/library/assets?limit=10")
-        assert response.status_code == 200
-        data = response.json()
-        assert "limit" in data
-        assert data["limit"] == 10
-
-    def test_get_asset_success(self):
-        """Test successful asset retrieval."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._assets.clear()
-
-        asset_id = f"asset-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow()
-        library._assets[asset_id] = {
-            "id": asset_id,
-            "name": "Test Asset",
-            "type": "audio",
-            "path": "/test/asset.wav",
-            "created": now,
-            "modified": now,
-            "size": 1024,
-        }
-
-        response = client.get(f"/api/library/assets/{asset_id}")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["id"] == asset_id
-        assert data["name"] == "Test Asset"
-
-    def test_get_asset_not_found(self):
-        """Test getting non-existent asset."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._assets.clear()
-
-        response = client.get("/api/library/assets/nonexistent")
-        assert response.status_code == 404
-
-    def test_create_asset_success(self):
-        """Test successful asset creation."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._assets.clear()
-
-        asset_data = {
-            "name": "New Asset",
-            "type": "audio",
-            "path": "/new/asset.wav",
-            "size": 2048,
-        }
-
-        response = client.post("/api/library/assets", json=asset_data)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["name"] == "New Asset"
-        assert "id" in data
-
-    def test_create_asset_with_folder(self):
-        """Test creating asset with folder_id."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._assets.clear()
-        library._asset_folders.clear()
-
-        # Create folder first
-        folder_id = f"folder-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow()
-        library._asset_folders[folder_id] = {
-            "id": folder_id,
-            "name": "Test Folder",
-            "parent_id": None,
-            "path": "/test",
-            "created": now,
-            "modified": now,
-            "asset_count": 0,
-        }
-
-        asset_data = {
-            "name": "Folder Asset",
-            "type": "audio",
-            "path": "/test/asset.wav",
-            "folder_id": folder_id,
-            "size": 1024,
-        }
-
-        response = client.post("/api/library/assets", json=asset_data)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["folder_id"] == folder_id
-
-    def test_update_asset_success(self):
-        """Test successful asset update."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._assets.clear()
-
-        # Create asset first
-        asset_id = f"asset-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow()
-        library._assets[asset_id] = {
-            "id": asset_id,
-            "name": "Original Name",
-            "type": "audio",
-            "path": "/original.wav",
-            "created": now,
-            "modified": now,
-            "size": 1024,
-        }
-
-        update_data = {
-            "name": "Updated Name",
-            "tags": ["updated", "test"],
-        }
-
-        response = client.put(f"/api/library/assets/{asset_id}", json=update_data)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["name"] == "Updated Name"
-
-    def test_update_asset_not_found(self):
-        """Test updating non-existent asset."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._assets.clear()
-
-        update_data = {"name": "Updated Name"}
-
-        response = client.put("/api/library/assets/nonexistent", json=update_data)
-        assert response.status_code == 404
-
-    def test_delete_asset_success(self):
-        """Test successful asset deletion."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._assets.clear()
-
-        asset_id = f"asset-{uuid.uuid4().hex[:8]}"
-        now = datetime.utcnow()
-        library._assets[asset_id] = {
-            "id": asset_id,
-            "name": "To Delete",
-            "type": "audio",
-            "path": "/delete.wav",
-            "created": now,
-            "modified": now,
-            "size": 1024,
-        }
-
-        response = client.delete(f"/api/library/assets/{asset_id}")
-        assert response.status_code == 200
-
-        # Verify asset is deleted
-        get_response = client.get(f"/api/library/assets/{asset_id}")
-        assert get_response.status_code == 404
-
-    def test_delete_asset_not_found(self):
-        """Test deleting non-existent asset."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
-
-        library._assets.clear()
-
-        response = client.delete("/api/library/assets/nonexistent")
-        assert response.status_code == 404
+    def test_search_assets_honest_empty_state(self):
+        """When no assets match, total should be 0 and assets should be empty."""
+        client = _make_client()
+        r = client.get(
+            "/api/library/assets?query=__absolutely_no_match_ever__&limit=10"
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["total"] == 0
+        assert data["assets"] == []
 
 
-class TestLibraryAssetTypesEndpoint:
-    """Test library asset types endpoint."""
+class TestLibraryTypesEndpoint:
+    """Test GET /api/library/types."""
 
-    def test_get_asset_types_success(self):
-        """Test successful asset types retrieval."""
-        app = FastAPI()
-        app.include_router(library.router)
-        client = TestClient(app)
+    def test_get_types_returns_200(self):
+        client = _make_client()
+        r = client.get("/api/library/types")
+        assert r.status_code == 200
 
-        response = client.get("/api/library/types")
-        assert response.status_code == 200
-        data = response.json()
+    def test_get_types_response_shape(self):
+        client = _make_client()
+        r = client.get("/api/library/types")
+        data = r.json()
         assert "types" in data
         assert isinstance(data["types"], list)
-        assert "audio" in data["types"]
+        assert len(data["types"]) > 0
+        first = data["types"][0]
+        assert "id" in first
+        assert "name" in first
+
+    def test_get_types_includes_audio(self):
+        client = _make_client()
+        r = client.get("/api/library/types")
+        data = r.json()
+        type_ids = [t["id"] for t in data["types"]]
+        assert "audio" in type_ids
 
 
 if __name__ == "__main__":

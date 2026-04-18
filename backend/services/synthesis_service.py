@@ -41,6 +41,27 @@ def _is_voice_studio_stub_test_mode() -> bool:
     return v in ("1", "true", "yes", "stub")
 
 
+def _synthesis_engine_output_path() -> str:
+    """Reserve a unique WAV path for engine output.
+
+    Must not pre-create the file: ``tempfile.NamedTemporaryFile`` leaves a 0-byte
+    file on disk, and ``os.path.exists`` would then claim output exists even when
+    the engine never wrote audio — leading to empty artifacts and HTTP 200 with
+    zero-length bodies on ``GET /api/audio/file/{id}``.
+    """
+    return os.path.join(tempfile.gettempdir(), f"vs_synth_{uuid.uuid4().hex}.wav")
+
+
+def _synth_output_file_ready(path: str | None) -> bool:
+    """True when *path* is a regular file with non-zero size (engine actually wrote bytes)."""
+    if not path or not os.path.isfile(path):
+        return False
+    try:
+        return os.path.getsize(path) > 0
+    except OSError:
+        return False
+
+
 # Quality optimization
 HAS_QUALITY_OPTIMIZATION = False
 try:
@@ -55,23 +76,14 @@ except Exception as e:
 
 
 def _get_log_context(**kwargs: Any) -> dict[str, Any]:
-    """Build structured logging context with correlation ID."""
-    try:
-        from backend.api.middleware.correlation_id import (
-            get_correlation_id,
-            get_span_id,
-            get_trace_id,
-        )
+    """Build ``extra=`` payload for structured logging.
 
-        context = {
-            "correlation_id": get_correlation_id() or "no-correlation-id",
-            "trace_id": get_trace_id() or "N/A",
-            "span_id": get_span_id() or "N/A",
-        }
-    except ImportError:
-        context = {}
-    context.update(kwargs)
-    return context
+    Do **not** put ``correlation_id`` / ``trace_id`` / ``span_id`` here: the global
+    ``LogRecord`` factory (``correlation_id.py``) already sets them on every record.
+    Passing the same keys in ``extra`` causes ``KeyError: Attempt to overwrite
+    'correlation_id' in LogRecord`` on synthesis (and any other path using this helper).
+    """
+    return dict(kwargs)
 
 
 async def _resolve_profile_audio(
@@ -138,81 +150,6 @@ async def _resolve_profile_audio(
         )
 
     return profile_audio_path
-
-
-async def _try_utility_tts_fallback(
-    text: str,
-    language: str,
-    original_error: Exception,
-) -> dict[str, Any] | None:
-    """Try gTTS and pyttsx3 as fallback TTS when main engine fails."""
-    try:
-        from backend.tts.tts_utils import synthesize_with_utility
-
-        logger.warning("Main engine failed, trying utility TTS fallback: %s", original_error)
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
-            fallback_mp3 = tmp_mp3.name
-        try:
-            synthesize_with_utility(
-                text,
-                utility="gtts",
-                language=language or "en",
-                output_path=fallback_mp3,
-            )
-            try:
-                import soundfile as sf
-
-                audio, sr = sf.read(fallback_mp3)
-                duration = len(audio) / float(sr) if sr else 0.0
-                aid, cached_path, _ = create_audio_artifact_from_wav_array(
-                    audio, sr, created_by="gtts_fallback"
-                )
-                logger.info("Fallback to gTTS successful")
-                return {"audio_id": aid, "cached_path": cached_path, "duration": duration}
-            except ImportError:
-                aid, cached_path, _ = create_audio_artifact_from_file(
-                    fallback_mp3, created_by="gtts_fallback", delete_source=False
-                )
-                duration = 0.0
-                logger.info("Fallback to gTTS successful (MP3 format)")
-                return {"audio_id": aid, "cached_path": cached_path, "duration": duration}
-        except Exception as gtts_error:
-            logger.warning("gTTS fallback failed: %s", gtts_error)
-        finally:
-            try:
-                os.unlink(fallback_mp3)
-            # ALLOWED: bare except - best effort, failure acceptable
-            except OSError:
-                pass
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav:
-            fallback_wav = tmp_wav.name
-        try:
-            synthesize_with_utility(
-                text,
-                utility="pyttsx3",
-                output_path=fallback_wav,
-            )
-            aid, cached_path, _ = create_audio_artifact_from_file(
-                fallback_wav, created_by="pyttsx3_fallback", delete_source=True
-            )
-            duration = 0.0
-            logger.info("Fallback to pyttsx3 successful")
-            return {"audio_id": aid, "cached_path": cached_path, "duration": duration}
-        except Exception as pyttsx3_error:
-            logger.warning("pyttsx3 fallback also failed: %s", pyttsx3_error)
-            return None
-        finally:
-            try:
-                if os.path.exists(fallback_wav):
-                    os.unlink(fallback_wav)
-            # ALLOWED: bare except - best effort, failure acceptable
-            except OSError:
-                pass
-    except ImportError:
-        logger.debug("TTS utilities not available for fallback")
-        return None
 
 
 def _extract_quality_metrics(
@@ -410,6 +347,7 @@ class SynthesisService:
                         quality_score=0.0,
                         quality_metrics=None,
                         ssml_handling=None,
+                        routed_engine="stub",
                     )
 
                 ensure_tts_assets(engine_id)
@@ -426,40 +364,19 @@ class SynthesisService:
                         valid_engines = []
 
                 if valid_engines and engine_id not in valid_engines:
-                    from backend.services.engine_priority import resolve_engine_priority
-
-                    fallback_chain, _fb_source = resolve_engine_priority("tts")
-
-                    original_engine_id = engine_id
-                    for fallback_engine in fallback_chain:
-                        if fallback_engine in valid_engines:
-                            engine_id = fallback_engine
-                            logger.info(
-                                "Engine '%s' not available, falling back to '%s'",
-                                original_engine_id,
-                                fallback_engine,
-                                extra=_get_log_context(
-                                    operation="synthesis",
-                                    original_engine=original_engine_id,
-                                    fallback_engine=fallback_engine,
-                                    profile_id=req.profile_id,
-                                ),
-                            )
-                            break
-                    else:
-                        engines_str = (
-                            ", ".join(valid_engines)
-                            if valid_engines
-                            else "none (engines not loaded)"
-                        )
-                        raise InvalidEngineException(
-                            engine=requested_engine,
-                            available_engines=(
-                                engines_str.split(", ")
-                                if engines_str != "none (engines not loaded)"
-                                else []
-                            ),
-                        )
+                    engines_str = (
+                        ", ".join(valid_engines)
+                        if valid_engines
+                        else "none (engines not loaded)"
+                    )
+                    raise InvalidEngineException(
+                        engine=requested_engine,
+                        available_engines=(
+                            engines_str.split(", ")
+                            if engines_str != "none (engines not loaded)"
+                            else []
+                        ),
+                    )
                 elif not valid_engines:
                     logger.warning(
                         "No engines available - engine router not initialized"
@@ -531,8 +448,7 @@ class SynthesisService:
                                 "No speakable text remains after SSML processing.",
                             )
 
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                            output_path = tmp.name
+                        output_path = _synthesis_engine_output_path()
                         calculate_quality = True
 
                         quality_preset = None
@@ -636,13 +552,8 @@ class SynthesisService:
                                     engine_breaker.record_failure()
                                     error_msg = str(e).lower()
                                     if attempt == max_retries:
-                                        result = await _try_utility_tts_fallback(
-                                            text_to_synthesize,
-                                            req.language or "en",
-                                            e,
-                                        )
-                                        if isinstance(result, dict) and "audio_id" in result:
-                                            break
+                                        synthesis_error = e
+                                        break
                                     if "cuda" in error_msg or "gpu" in error_msg or "device" in error_msg:
                                         if attempt < max_retries:
                                             logger.warning(
@@ -678,22 +589,6 @@ class SynthesisService:
                                         continue
                                     break
 
-                            if result is None and synthesis_error is not None:
-                                result = await _try_utility_tts_fallback(
-                                    text_to_synthesize,
-                                    req.language or "en",
-                                    synthesis_error,
-                                )
-                                if isinstance(result, dict) and "audio_id" in result:
-                                    return VoiceSynthesizeResponse(
-                                        audio_id=result["audio_id"],
-                                        audio_url=f"/api/voice/audio/{result['audio_id']}",
-                                        duration=result.get("duration", 0.0),
-                                        quality_score=0.0,
-                                        quality_metrics=None,
-                                        ssml_handling=ssml_handling,
-                                    )
-
                             if isinstance(result, dict) and "audio_id" in result:
                                 return VoiceSynthesizeResponse(
                                     audio_id=result["audio_id"],
@@ -702,9 +597,12 @@ class SynthesisService:
                                     quality_score=0.0,
                                     quality_metrics=None,
                                     ssml_handling=ssml_handling,
+                                    routed_engine=str(
+                                        result.get("routed_engine") or engine_id
+                                    ),
                                 )
 
-                            file_written_early = output_path and os.path.exists(output_path)
+                            file_written_early = _synth_output_file_ready(output_path)
                             if result is None and not file_written_early:
                                 if synthesis_error:
                                     error_msg = str(synthesis_error)
@@ -742,7 +640,7 @@ class SynthesisService:
                             else:
                                 audio = result
 
-                            file_written = os.path.exists(output_path)
+                            file_written = _synth_output_file_ready(output_path)
                             if audio is None and not file_written:
                                 raise ServiceError(
                                     500,
@@ -755,7 +653,7 @@ class SynthesisService:
 
                             audio_id = f"synth_{req.profile_id}_{uuid.uuid4().hex[:8]}"
 
-                            if os.path.exists(output_path):
+                            if _synth_output_file_ready(output_path):
                                 create_audio_artifact_from_file(
                                     output_path,
                                     created_by=engine_id,
@@ -769,6 +667,7 @@ class SynthesisService:
                                     quality_score=quality_score,
                                     quality_metrics=detailed_metrics,
                                     ssml_handling=ssml_handling,
+                                    routed_engine=engine_id,
                                 )
                             raise ServiceError(
                                 500,
@@ -1338,6 +1237,7 @@ class SynthesisService:
                 duration=duration,
                 quality_score=0.85,
                 quality_metrics=quality_metrics,
+                routed_engine=str(engine),
             )
         finally:
             if os.path.exists(output_path):
@@ -1464,6 +1364,7 @@ class SynthesisService:
                 duration=duration,
                 quality_score=0.85,
                 quality_metrics=quality_metrics_obj,
+                routed_engine="openvoice",
             )
         finally:
             if os.path.exists(output_path):

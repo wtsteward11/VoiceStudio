@@ -21,6 +21,7 @@ Flags:
   --skip-runtime-proof-staleness — omit the staleness row entirely.
   --enforce-backend-smoke — `backend_smoke_freshness` fails the run if
     PROOF_BACKEND_SMOKE_*.json is missing, older than 72 hours, or status=FAIL (GAP-069 slice 3).
+    PASS staleness age prefers JSON timestamp_utc over file mtime (GAP-069 slice 4).
     Latest proof with status=BLOCKED never fails (prerequisites absent; not a regression).
   --skip-backend-smoke-staleness — omit the backend smoke freshness row entirely.
 
@@ -29,6 +30,7 @@ Always-on advisory (GAP-015 slice 3): `slo_baseline_freshness` scans for
 never fails the run.
 """
 
+from __future__ import annotations
 
 import io
 import json
@@ -176,14 +178,45 @@ def _slo_baseline_freshness_result(project_root: Path) -> dict:
     }
 
 
+def _try_parse_iso_timestamp_utc(ts_raw: str) -> datetime | None:
+    """Parse ISO timestamp to UTC, or None if invalid."""
+    try:
+        s = ts_raw.strip()
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt
+    except ValueError:
+        return None
+
+
+def _parse_smoke_proof_time_utc(data: dict, latest: Path) -> tuple[datetime, str]:
+    """
+    GAP-069 slice 4: Prefer JSON timestamp_utc for age; fall back to file mtime if absent/unparseable.
+    Returns (instant_in_utc, age_source) where age_source is 'timestamp_utc' or 'mtime'.
+    """
+    ts_raw = data.get("timestamp_utc")
+    if ts_raw:
+        parsed = _try_parse_iso_timestamp_utc(str(ts_raw))
+        if parsed is not None:
+            return parsed, "timestamp_utc"
+    mtime = datetime.fromtimestamp(latest.stat().st_mtime, tz=timezone.utc)
+    return mtime, "mtime"
+
+
 def _backend_smoke_freshness_result(project_root: Path, *, enforce: bool = False) -> dict:
     """
-    GAP-069 slice 3: Report freshness of PROOF_BACKEND_SMOKE_*.json artifacts.
+    GAP-069 slice 3–4: Report freshness of PROOF_BACKEND_SMOKE_*.json artifacts.
 
     When enforce=False (default): advisory only for missing/stale/FAIL; passed=True unless
     enforce path would fail (we still set passed True for advisory mode for the row).
     When enforce=True: missing, stale (>72h), status=FAIL, or parse error fails the run.
     status=BLOCKED always passes (honest prerequisite gap; not a product regression).
+    For PASS (and age display on BLOCKED/FAIL), proof age uses timestamp_utc when valid (slice 4).
     """
     start_time = datetime.now()
     ver_dir = project_root / "docs" / "reports" / "verification"
@@ -212,8 +245,9 @@ def _backend_smoke_freshness_result(project_root: Path, *, enforce: bool = False
     if not files:
         duration = (datetime.now() - start_time).total_seconds()
         msg = (
-            "STATUS=MISSING: no PROOF_BACKEND_SMOKE_*.json under docs/reports/verification "
-            "(optional; generate via python scripts/ci/run_backend_smoke.py or verify.ps1 -BackendSmoke). "
+            "STATUS=MISSING: no PROOF_BACKEND_SMOKE_*.json under docs/reports/verification. "
+            "Run: python scripts/ci/run_backend_smoke.py OR .\\scripts\\verify.ps1 -BackendSmoke. "
+            "Full verify.ps1 auto-runs smoke before Gate/Ledger unless -SkipSmoke is set. "
         )
         if enforce:
             msg += "Enforce mode: this is a hard failure."
@@ -263,12 +297,13 @@ def _backend_smoke_freshness_result(project_root: Path, *, enforce: bool = False
         }
 
     status = data.get("status")
-    mtime = datetime.fromtimestamp(latest.stat().st_mtime, tz=timezone.utc)
-    age_hours = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600.0
+    proof_time, age_source = _parse_smoke_proof_time_utc(data, latest)
+    age_hours = (datetime.now(timezone.utc) - proof_time).total_seconds() / 3600.0
 
     if status == "BLOCKED":
         msg = (
             f"STATUS=BLOCKED: latest_file={latest.name} age_hours={age_hours:.2f} "
+            f"age_source={age_source} "
             "(prerequisites absent when smoke ran; advisory only; never fails enforce mode)"
         )
         return {
@@ -284,6 +319,7 @@ def _backend_smoke_freshness_result(project_root: Path, *, enforce: bool = False
     if status == "FAIL":
         msg = (
             f"STATUS=FAIL: latest_file={latest.name} age_hours={age_hours:.2f} "
+            f"age_source={age_source} "
             f"(failure_reason={data.get('failure_reason')!r})"
         )
         if enforce:
@@ -318,6 +354,7 @@ def _backend_smoke_freshness_result(project_root: Path, *, enforce: bool = False
             "duration_seconds": round(duration, 2),
             "output_sample": (
                 f"STATUS={st}: latest_file={latest.name} age_hours={age_hours:.2f} "
+                f"age_source={age_source} "
                 f"(policy_window_hours=72; {tail})"
             ),
             "enforce": enforce,

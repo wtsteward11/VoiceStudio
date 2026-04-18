@@ -1,0 +1,13 @@
+Slice 10 — engine readiness probe (fast manifest scan)
+
+Command (repo root, .venv):
+  python scripts/engine_readiness_probe.py
+
+Output:
+  docs/reports/verification/slice10/engine_readiness_probe.json
+
+Optional full router load (slow; may pull heavy imports):
+  set VOICESTUDIO_ENGINE_PROBE_FULL=1
+  python scripts/engine_readiness_probe.py
+
+Recorded: 2026-04-17 — fast probe executed in automation; full router probe not run in CI (operator-only).

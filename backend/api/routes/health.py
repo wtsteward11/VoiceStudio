@@ -886,6 +886,56 @@ def preflight_check() -> dict[str, Any]:
             "status_code": 500,
         }
 
+    # Piper TTS preflight (onnx voice assets; no auto-download in preflight)
+    try:
+        from backend.ml.models.model_preflight import PreflightError as PreflightErrPi
+        from backend.ml.models.model_preflight import ensure_piper
+
+        checks["piper"] = ensure_piper(auto_download=False)
+    except PreflightErrPi as exc:
+        detail = exc.detail
+        message = None
+        if isinstance(detail, dict):
+            msg = detail.get("message")
+            if isinstance(msg, str):
+                message = msg
+        checks["piper"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": message or str(detail),
+            "status_code": exc.status_code,
+        }
+        if isinstance(detail, dict):
+            for key, value in detail.items():
+                if key != "message":
+                    checks["piper"][key] = value
+    except Exception as e:
+        checks["piper"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": f"{type(e).__name__}: {e}",
+            "status_code": 500,
+        }
+
+    _NO_PUBLIC_PREFLIGHT = (
+        "chatterbox",
+        "tortoise",
+        "bark",
+        "fish_speech",
+        "higgs_audio",
+        "gpt_sovits",
+        "openvoice",
+        "whisper",
+        "whisper_cpp",
+        "vosk",
+        "parakeet",
+    )
+    for _eid in _NO_PUBLIC_PREFLIGHT:
+        checks[_eid] = {
+            "ok": None,
+            "reason": "no public ensure_* preflight API; runtime-only (use engine router + synthesis probe)",
+        }
+
     # Native tool discovery (report-only; hardening handled in
     # dedicated task)
     ffmpeg_env = os.getenv("VOICESTUDIO_FFMPEG_PATH")
@@ -900,7 +950,11 @@ def preflight_check() -> dict[str, Any]:
         ),
     }
 
-    overall_ok = all(v.get("ok", False) for v in checks.values() if isinstance(v, dict))
+    overall_ok = all(
+        bool(v["ok"])
+        for v in checks.values()
+        if isinstance(v, dict) and isinstance(v.get("ok"), bool)
+    )
     return {
         "ok": overall_ok,
         "timestamp": datetime.utcnow().isoformat(),

@@ -2,13 +2,40 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
+import os
+import sys
 import time
 from typing import Any
 
 from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
+
+BASELINE_DEPS: list[tuple[str, str]] = [
+    ("aiosqlite", "Database persistence"),
+    ("fastapi", "HTTP framework"),
+    ("pydantic", "Data validation"),
+    ("uvicorn", "ASGI server"),
+]
+
+
+def validate_baseline_deps() -> tuple[bool, list[dict[str, str]]]:
+    """Validate that all baseline dependencies are importable.
+
+    Returns (all_valid, failures) where failures is a list of
+    {"name": ..., "purpose": ..., "error": ...} dicts.
+    """
+    failures: list[dict[str, str]] = []
+    for module_name, purpose in BASELINE_DEPS:
+        try:
+            importlib.import_module(module_name)
+        except ModuleNotFoundError as exc:
+            failures.append(
+                {"name": module_name, "purpose": purpose, "error": str(exc)}
+            )
+    return (len(failures) == 0, failures)
 
 # Lazy plugin import
 _load_all_plugins = None
@@ -157,6 +184,28 @@ async def on_startup_prepare(app: FastAPI) -> None:
     work runs in `on_startup_heavy`.
     """
     from .route_registry import register_all_routes
+    from .startup_flags import set_baseline_deps_result
+
+    # --- Startup diagnostics: interpreter and environment truth ---
+    logger.info(
+        "Backend startup: python=%s version=%s cwd=%s",
+        sys.executable,
+        sys.version.split()[0],
+        os.getcwd(),
+    )
+
+    # --- Baseline dependency validation (fail-fast for missing critical packages) ---
+    baseline_valid, baseline_failures = validate_baseline_deps()
+    set_baseline_deps_result(baseline_valid, baseline_failures)
+    if baseline_valid:
+        logger.info("Baseline dependency validation: PASS")
+    else:
+        failed_names = ", ".join(f["name"] for f in baseline_failures)
+        logger.error(
+            "Baseline dependency validation: FAIL (%s) — backend will start "
+            "but affected subsystems are unavailable. Fix the Python environment.",
+            failed_names,
+        )
 
     app_config: Any = None
     try:
@@ -183,91 +232,95 @@ async def on_startup_prepare(app: FastAPI) -> None:
     logger.info("[STARTUP-TIMING] temp_init=%.3fs", time.perf_counter() - _t_phase)
 
     # Initialize database and run migrations (Phase 1 - Backend-Frontend Integration)
+    # Guarded: only attempt if baseline deps (aiosqlite) validated
     _t_phase = time.perf_counter()
-    try:
-        # Create database connection for migrations
-        import aiosqlite
-
-        from backend.data.migrations import (
-            MigrationRunner,
-            get_all_migrations,
+    if not baseline_valid:
+        logger.error(
+            "Skipping database initialization — baseline dependency validation failed"
         )
-        from backend.data.repository_base import ConnectionConfig
+    else:
+        try:
+            import aiosqlite
 
-        config = ConnectionConfig()
-        db_path = config.sqlite_path
+            from backend.data.migrations import (
+                MigrationRunner,
+                get_all_migrations,
+            )
+            from backend.data.repository_base import ConnectionConfig
 
-        # Ensure data directory exists
-        from pathlib import Path
+            config = ConnectionConfig()
+            db_path = config.sqlite_path
 
-        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+            from pathlib import Path
 
-        async with aiosqlite.connect(db_path) as connection:
-            connection.row_factory = aiosqlite.Row
+            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
-            # Initialize and run migrations
-            runner = MigrationRunner(connection)
-            await runner.initialize()
+            async with aiosqlite.connect(db_path) as connection:
+                connection.row_factory = aiosqlite.Row
 
-            # Register all migrations
-            for migration_class in get_all_migrations():
-                runner.register_class(migration_class)
+                runner = MigrationRunner(connection)
+                await runner.initialize()
 
-            # Run pending migrations
-            results = await runner.migrate()
+                for migration_class in get_all_migrations():
+                    runner.register_class(migration_class)
 
-            if results:
-                logger.info(f"Applied {len(results)} database migration(s)")
-                for result in results:
-                    logger.info(f"  - v{result.version}: {result.name} ({result.status.value})")
-            else:
-                status = runner.get_status()
-                logger.info(
-                    f"Database ready: {status['applied_count']} migration(s) applied, 0 pending"
+                results = await runner.migrate()
+
+                if results:
+                    logger.info(f"Applied {len(results)} database migration(s)")
+                    for result in results:
+                        logger.info(f"  - v{result.version}: {result.name} ({result.status.value})")
+                else:
+                    status = runner.get_status()
+                    logger.info(
+                        f"Database ready: {status['applied_count']} migration(s) applied, 0 pending"
+                    )
+
+            # Durable job queue: reconcile orphaned running/paused rows after migrations
+            try:
+                from backend.data.repositories.job_repository import (
+                    JobRepository,
+                    get_job_repository,
+                )
+                from backend.services.job_queue_recovery import (
+                    reconcile_job_history_after_restart,
                 )
 
-        # Durable job queue: reconcile orphaned running/paused rows after migrations
-        try:
-            from backend.data.repositories.job_repository import (
-                JobRepository,
-                get_job_repository,
-            )
-            from backend.services.job_queue_recovery import (
-                reconcile_job_history_after_restart,
-            )
+                repo = get_job_repository()
+                if isinstance(repo, JobRepository):
+                    recovered = await reconcile_job_history_after_restart(repo)
+                    if recovered:
+                        logger.info(
+                            "Job queue recovery: marked %s job(s) failed after backend restart",
+                            recovered,
+                        )
+            except Exception as rec_err:
+                logger.warning("Job queue recovery skipped: %s", rec_err, exc_info=True)
 
-            repo = get_job_repository()
-            if isinstance(repo, JobRepository):
-                recovered = await reconcile_job_history_after_restart(repo)
-                if recovered:
-                    logger.info(
-                        "Job queue recovery: marked %s job(s) failed after backend restart",
-                        recovered,
-                    )
-        except Exception as rec_err:
-            logger.warning("Job queue recovery skipped: %s", rec_err, exc_info=True)
-
-        # Task 2.3: Run infrastructure repository migrations and connect adapter
-        from backend.infrastructure.migrations.initial_schema import (
-            run_migrations as run_infra_migrations,
-        )
-
-        await run_infra_migrations()
-
-        # Connect DatabaseAdapter for repository layer (same path as migrations)
-        try:
-            from backend.infrastructure.adapters.database import (
-                get_database_adapter,
+            from backend.infrastructure.migrations.initial_schema import (
+                run_migrations as run_infra_migrations,
             )
 
-            db = get_database_adapter(connection_string=config.connection_string)
-            if not db._connected:
-                await db.connect()
-        except Exception as db_err:
-            logger.debug("Repository layer DB connect (optional): %s", db_err)
-    except Exception as e:
-        logger.error(f"Failed to initialize database: {e}", exc_info=True)
-        # Don't fail startup - fall back to in-memory if database unavailable
+            await run_infra_migrations()
+
+            try:
+                from backend.infrastructure.adapters.database import (
+                    get_database_adapter,
+                )
+
+                db = get_database_adapter(connection_string=config.connection_string)
+                if not db._connected:
+                    await db.connect()
+            except Exception as db_err:
+                logger.debug("Repository layer DB connect (optional): %s", db_err)
+        except ModuleNotFoundError as e:
+            logger.error(
+                "Baseline dependency missing during database init: %s — "
+                "this indicates the Python environment is misconfigured.",
+                e,
+            )
+        except Exception as e:
+            logger.error(f"Database infrastructure error: {e}", exc_info=True)
     logger.info("[STARTUP-TIMING] db_migrate=%.3fs", time.perf_counter() - _t_phase)
 
     # Initialize security services (Gap Analysis Fix - Phase 2)

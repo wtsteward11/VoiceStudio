@@ -15,7 +15,8 @@
 | Gate | Command | Result |
 | ---- | --------- | ------ |
 | Unit (no utility in error path) | `python -m pytest tests/unit/backend/services/test_synthesis_no_silent_fallback.py -q` | **1 passed** |
-| Live HTTP markers (invalid engine) | `dotnet test ... --filter FullyQualifiedName~EngineFailureTruthfulnessLiveBackendTests` | See session log |
+| Live HTTP markers (invalid engine) | `dotnet test ... --filter FullyQualifiedName~EngineFailureTruthfulnessLiveBackendTests` (`VOICESTUDIO_REAL_XTTS_HTTP_BASE=http://127.0.0.1:8030`) | **Passed: 1** |
+| Verification | `python scripts/run_verification.py` | **Overall: PASS**; **completion_guard PASS** (commits `4db6a234`+ on `main`) |
 
 ## Changelog
 

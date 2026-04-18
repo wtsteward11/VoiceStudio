@@ -1,0 +1,9 @@
+Slice 9 XTTS playback proof — primary GET /api/audio/file/{audio_id}.
+timestamp_utc: 2026-04-18T00:28:59Z
+backend_base: http://127.0.0.1:8020
+profile_id: 8007fb59-4337-4500-a02b-43f50e3aab5c
+audio_id: synth_8007fb59-4337-4500-a02b-43f50e3aab5c_3da706b5
+content_type: audio/wav
+wav_bytes: 918092
+duration_s: 19.126
+pcm_peak_abs: 32766

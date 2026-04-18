@@ -102,6 +102,262 @@ namespace VoiceStudio.App.Tests.ViewModels
       return max;
     }
 
+    /// <summary>
+    /// Parses RIFF/WAVE chunks for PCM layout (fmt + data). Little-endian per WAV spec.
+    /// </summary>
+    private static void GetWavPcmLayout(
+      byte[] wav,
+      out int channels,
+      out int sampleRate,
+      out int bitsPerSample,
+      out int pcmStart,
+      out int pcmLength)
+    {
+      channels = 0;
+      sampleRate = 0;
+      bitsPerSample = 16;
+      pcmStart = 0;
+      pcmLength = 0;
+      if (wav.Length < 12)
+      {
+        throw new InvalidOperationException("WAV too short for RIFF header.");
+      }
+
+      var pos = 12;
+      while (pos + 8 <= wav.Length)
+      {
+        var id = Encoding.ASCII.GetString(wav, pos, 4);
+        var size = wav[pos + 4] | (wav[pos + 5] << 8) | (wav[pos + 6] << 16) | (wav[pos + 7] << 24);
+        pos += 8;
+        if (id.Equals("fmt ", StringComparison.Ordinal) && size >= 16 && pos + 16 <= wav.Length)
+        {
+          channels = wav[pos + 2] | (wav[pos + 3] << 8);
+          sampleRate = wav[pos + 4] | (wav[pos + 5] << 8) | (wav[pos + 6] << 16) | (wav[pos + 7] << 24);
+          bitsPerSample = wav[pos + 14] | (wav[pos + 15] << 8);
+        }
+        else if (id.Equals("data", StringComparison.Ordinal))
+        {
+          pcmStart = pos;
+          pcmLength = size;
+          return;
+        }
+
+        pos += size;
+        if (size % 2 == 1)
+        {
+          pos++;
+        }
+      }
+
+      throw new InvalidOperationException("Could not locate fmt and/or data chunks.");
+    }
+
+    /// <summary>
+    /// Slice 9 stream proof: XTTS → <see cref="IVoiceSynthesisService.GetAudioStreamAsync"/> → non-silent PCM16 WAV
+    /// (RIFF/fmt/data, duration, peak) and writes <c>docs/reports/verification/slice9/slice9_csharp_stream.wav</c>.
+    /// No audio output device required. On XTTS unavailable, <see cref="Assert.Fail"/> (preflight should gate).
+    /// </summary>
+    [TestMethod]
+    public async Task Synthesize_PrimaryFileRoute_LiveBackend_StreamPlayable()
+    {
+      var stub = Environment.GetEnvironmentVariable("VOICESTUDIO_TEST_MODE");
+      if (!string.IsNullOrEmpty(stub) &&
+          stub.Equals("stub", StringComparison.OrdinalIgnoreCase))
+      {
+        Assert.Inconclusive(
+          "Set VOICESTUDIO_TEST_MODE unset (not stub) on the backend process for real XTTS proof.");
+      }
+
+      using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+      try
+      {
+        using var health = await probe.GetAsync(new Uri(new Uri(BackendBase), "/api/health"), CancellationToken.None).ConfigureAwait(false);
+        if (!health.IsSuccessStatusCode)
+        {
+          Assert.Inconclusive($"Backend /api/health returned {(int)health.StatusCode}; start backend first.");
+        }
+      }
+      catch (Exception ex)
+      {
+        Assert.Inconclusive($"Live backend not reachable at {BackendBase}: {ex.Message}");
+        return;
+      }
+
+      var coordinator = new RequestCoordinator();
+      var config = new BackendClientConfig
+      {
+        BaseUrl = BackendBase,
+        WebSocketUrl = string.Empty,
+        RequestTimeout = TimeSpan.FromMinutes(15),
+      };
+      using var backend = new BackendClient(config, correlationProvider: null, requestCoordinator: coordinator);
+      var profilesClient = new ProfilesClient(backend, coordinator);
+      var emotionClient = new EmotionControlClient(backend, coordinator);
+      var synthService = new VoiceSynthesisService(backend, emotionClient);
+
+      VoiceProfile profile;
+      try
+      {
+        profile = await profilesClient.CreateProfileAsync(
+          "csharp-slice9-stream-playable",
+          language: "en",
+          cancellationToken: CancellationToken.None).ConfigureAwait(false);
+      }
+      catch (Exception ex)
+      {
+        Assert.Inconclusive($"Profile creation failed: {ex.Message}");
+        return;
+      }
+
+      Assert.IsFalse(string.IsNullOrEmpty(profile.Id), "Profile id missing.");
+
+      var fixtureWav = Path.Combine(FindRepoRoot(), "tests", "fixtures", "audio", "test_440hz_2s.wav");
+      if (!File.Exists(fixtureWav))
+      {
+        Assert.Inconclusive($"Fixture WAV not found at {fixtureWav}");
+      }
+
+      using (var bindHttp = new HttpClient { BaseAddress = new Uri(BackendBase), Timeout = TimeSpan.FromMinutes(2) })
+      {
+        var bindBody = JsonSerializer.Serialize(
+          new Dictionary<string, object?>
+          {
+            ["reference_audio_path"] = fixtureWav,
+            ["auto_enhance"] = false,
+            ["select_optimal_segments"] = false,
+          });
+        using var bindContent = new StringContent(
+          bindBody,
+          Encoding.UTF8,
+          MediaTypeHeaderValue.Parse("application/json"));
+        using var bindResp = await bindHttp
+          .PostAsync($"/api/profiles/{Uri.EscapeDataString(profile.Id)}/preprocess-reference", bindContent, CancellationToken.None)
+          .ConfigureAwait(false);
+        if (!bindResp.IsSuccessStatusCode)
+        {
+          var err = await bindResp.Content.ReadAsStringAsync(CancellationToken.None).ConfigureAwait(false);
+          Assert.Inconclusive($"Reference bind preprocess failed: {(int)bindResp.StatusCode} {err}");
+        }
+      }
+
+      using (var consentHttp = new HttpClient { BaseAddress = new Uri(BackendBase), Timeout = TimeSpan.FromMinutes(2) })
+      {
+        var consentReq = JsonSerializer.Serialize(
+          new Dictionary<string, string>
+          {
+            ["voice_id"] = profile.Id,
+            ["grantor_id"] = "local",
+            ["grantor_name"] = "csharp-slice9-stream",
+            ["consent_type"] = "voice_usage",
+          });
+        using var reqContent = new StringContent(
+          consentReq,
+          Encoding.UTF8,
+          MediaTypeHeaderValue.Parse("application/json"));
+        using var consentResp = await consentHttp
+          .PostAsync("/api/consent/request", reqContent, CancellationToken.None)
+          .ConfigureAwait(false);
+        if (!consentResp.IsSuccessStatusCode)
+        {
+          var err = await consentResp.Content.ReadAsStringAsync(CancellationToken.None).ConfigureAwait(false);
+          Assert.Inconclusive($"Consent request failed: {(int)consentResp.StatusCode} {err}");
+        }
+
+        using var doc = JsonDocument.Parse(
+          await consentResp.Content.ReadAsStringAsync(CancellationToken.None).ConfigureAwait(false));
+        if (!doc.RootElement.TryGetProperty("consent_id", out var cidEl))
+        {
+          Assert.Inconclusive("Consent response missing consent_id.");
+        }
+
+        var consentId = cidEl.GetString();
+        if (string.IsNullOrEmpty(consentId))
+        {
+          Assert.Inconclusive("Consent response consent_id empty.");
+        }
+
+        using var grantResp = await consentHttp
+          .PostAsync($"/api/consent/grant/{Uri.EscapeDataString(consentId)}", null, CancellationToken.None)
+          .ConfigureAwait(false);
+        if (!grantResp.IsSuccessStatusCode)
+        {
+          var err = await grantResp.Content.ReadAsStringAsync(CancellationToken.None).ConfigureAwait(false);
+          Assert.Inconclusive($"Consent grant failed: {(int)grantResp.StatusCode} {err}");
+        }
+      }
+
+      VoiceSynthesisResponse response;
+      try
+      {
+        response = await synthService.SynthesizeVoiceAsync(
+          new VoiceSynthesisRequest
+          {
+            ProfileId = profile.Id,
+            Engine = "xtts_v2",
+            Text = "VoiceStudio slice nine playback artifact audition proof.",
+            Language = "en",
+          },
+          CancellationToken.None).ConfigureAwait(false);
+      }
+      catch (BackendException ex) when (ex.StatusCode == 403)
+      {
+        Assert.Inconclusive(
+          "Synthesis returned 403 (consent/voice policy). Ensure POST /api/profiles default owner_user_id is local for first-party profiles.");
+        return;
+      }
+      catch (BackendException ex) when (LiveXttsBackendTestGuards.IsLiveXttsEngineUnavailable(ex))
+      {
+        Assert.Fail(
+          "Live XTTS engine not initialized or unavailable; run /api/health/preflight with xtts_v2.ok before this proof: "
+          + ex.Message);
+        throw new InvalidOperationException("Assert.Fail must throw.");
+      }
+
+      Assert.IsFalse(string.IsNullOrEmpty(response.AudioId), "AudioId missing.");
+
+      await using var audioStream = await synthService.GetAudioStreamAsync(
+        response.AudioId,
+        CancellationToken.None).ConfigureAwait(false);
+      using var ms = new MemoryStream();
+      await audioStream.CopyToAsync(ms, CancellationToken.None).ConfigureAwait(false);
+      var bytes = ms.ToArray();
+      Assert.IsTrue(
+        bytes.Length > 1024,
+        $"WAV too small ({bytes.Length} bytes) for audio_id={response.AudioId}.");
+      CollectionAssert.AreEqual(
+        new byte[] { 0x52, 0x49, 0x46, 0x46 },
+        new[] { bytes[0], bytes[1], bytes[2], bytes[3] },
+        "Not a RIFF container");
+      CollectionAssert.AreEqual(
+        new byte[] { 0x57, 0x41, 0x56, 0x45 },
+        new[] { bytes[8], bytes[9], bytes[10], bytes[11] },
+        "Not WAVE");
+
+      GetWavPcmLayout(bytes, out var channels, out var sampleRate, out var bitsPerSample, out var pcmStart, out var pcmLen);
+      Assert.IsTrue(channels is 1 or 2, $"Unexpected channel count: {channels}");
+      Assert.IsTrue(sampleRate >= 16000, $"Unexpected sample rate: {sampleRate}");
+      Assert.AreEqual(16, bitsPerSample, "Expected 16-bit PCM for peak check.");
+
+      var durationSec = pcmLen / (double)(channels * (bitsPerSample / 8)) / sampleRate;
+      Assert.IsTrue(durationSec >= 0.5, $"Duration too short ({durationSec:F3}s).");
+
+      var peak = MaxAbsPcm16Le(bytes, pcmStart);
+      Assert.IsTrue(
+        peak >= 1000,
+        $"PCM looks like silence or too quiet (peak={peak}); expected real synthesis.");
+
+      var outPath = Path.Combine(
+        FindRepoRoot(),
+        "docs",
+        "reports",
+        "verification",
+        "slice9",
+        "slice9_csharp_stream.wav");
+      Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+      await File.WriteAllBytesAsync(outPath, bytes, CancellationToken.None).ConfigureAwait(false);
+      Assert.IsTrue(File.Exists(outPath) && new FileInfo(outPath).Length == bytes.Length, "Failed to write slice9_csharp_stream.wav.");
+    }
+
     [TestMethod]
     public async Task Synthesize_ThenPlayback_LiveBackend_PlayableNonSilentWav()
     {

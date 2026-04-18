@@ -1,8 +1,25 @@
 # PROOF — Slice 9 Playback / Artifact Audition Truth (XTTS)
 
-**Status:** Runtime proof (automation + optional operator desktop)  
+**Status:** **Closed — XTTS runtime proof (PASS, no skip)**  
 **Date:** 2026-04-17  
 **Scope:** **XTTS-generated artifact only** — proves the primary audition seam (synthesis → `GET /api/audio/file/{id}` → client stream → NAudio playback). **Not** “all engines” or generic synthesis workflows.
+
+---
+
+## Runtime evidence (healthy backend)
+
+**Backend:** `scripts/backend/start_backend.ps1 -Port 8020 -CoquiTosAgreed` (`.venv` uvicorn).  
+**Base URL for tests:** `VOICESTUDIO_REAL_XTTS_HTTP_BASE=http://127.0.0.1:8020`
+
+**Preflight (truthful XTTS probe):** `GET /api/health/preflight` → `checks.xtts_v2`:
+
+- `ok`: **true**
+- `assets_present`: **true**
+- `message`: `XTTS assets ready at E:\VoiceStudio\models\xtts`
+- `dependencies.ok`: **true** (coqui-tts / torch / torchaudio reported)
+- Note: `downloaded` may be **false** when assets already exist on disk (`ensure_xtts(auto_download=False)` — no download in proof session).
+
+**Ready:** `GET /api/health/ready` → **200**
 
 ---
 
@@ -21,51 +38,66 @@
 
 **Slice 9 automation proves steps 1, 4–7** on the **service + HTTP + file playback** path (no ViewModel/dispatcher). ViewModel steps 2–3 and 8 remain covered by product code and Slice 8/operator posture where applicable.
 
+**Split tests (C#):**
+
+- `Synthesize_PrimaryFileRoute_LiveBackend_StreamPlayable` — RIFF/fmt/data, duration, PCM peak ≥ 1000, writes `slice9_csharp_stream.wav` (no audio device required).
+- `Synthesize_ThenPlayback_LiveBackend_PlayableNonSilentWav` — same pipeline + `AudioPlayerService.PlayFileAsync` to completion (`AudioDeviceGuard` — desktop session with wave-out).
+
 ---
 
 ## 2. Evidence — Python (`real_xtts`)
 
 **Test file:** `tests/integration/test_synthesis_xtts_real.py`  
-**Markers:** `@pytest.mark.real_xtts` (includes Slice 9 primary-file route test)
+**Markers:** `@pytest.mark.real_xtts`
 
 **Command:**
 
 ```powershell
-python -m pytest tests/integration/test_synthesis_xtts_real.py -v -m real_xtts --tb=short
+$env:VOICESTUDIO_REAL_XTTS_HTTP_BASE = "http://127.0.0.1:8020"
+python -m pytest tests/integration/test_synthesis_xtts_real.py -q -m real_xtts --tb=short
 ```
 
-**Expected:** `test_real_xtts_synthesize_returns_audible_wav` **PASSED**; `test_real_xtts_primary_audio_file_route_slice9_content_type` **PASSED** (or both **SKIPPED** when live backend / Coqui / cache gates apply).
+**Recorded run (2026-04-17):** **2 passed**, **0 skipped**, **0 failed** (~81.6s). Artifacts written:
 
-**Recorded run (2026-04-17, local):** `2 skipped` — synthesis **500** with `xtts_v2` not available / failed to initialize; `_skip_if_synthesis_engine_unavailable` in `test_synthesis_xtts_real.py` (exit **0**). When XTTS is healthy, both tests **PASSED** and write `slice8/` + `slice9/` artifacts.
+- `docs/reports/verification/slice9/slice9_output.wav` (918,092 bytes)
+- `docs/reports/verification/slice9/slice9_backend_log_snippet.txt` (345 bytes)
 
 ---
 
-## 3. Evidence — C# live backend (`PlaybackAuditionLiveBackendTests`)
+## 3. Evidence — C# live backend
 
 **Test class:** `src/VoiceStudio.App.Tests/ViewModels/PlaybackAuditionLiveBackendTests.cs`  
-**Base URL:** `VOICESTUDIO_REAL_XTTS_HTTP_BASE` (default `http://127.0.0.1:8000`)
+**Base URL:** `VOICESTUDIO_REAL_XTTS_HTTP_BASE` (see above)
 
-**Command:**
+**Stream + PCM proof (no playback device required):**
 
 ```powershell
-dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --filter "FullyQualifiedName~PlaybackAuditionLiveBackendTests"
+$env:VOICESTUDIO_REAL_XTTS_HTTP_BASE = "http://127.0.0.1:8020"
+dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 `
+  --filter "FullyQualifiedName~PlaybackAuditionLiveBackendTests.Synthesize_PrimaryFileRoute_LiveBackend_StreamPlayable"
 ```
 
-**Expected:** **Passed** with audio device, or **Inconclusive** when no wave-out device (headless) — WAV validity still proven by stream assertions before play.
+**Recorded run (2026-04-17):** **Passed: 1**, Failed: 0, Skipped: 0 (~51s). Artifact: `docs/reports/verification/slice9/slice9_csharp_stream.wav` (1,045,068 bytes).
 
-**Recorded run (2026-04-17, local):** **Skipped** (MSTest) when `LiveXttsBackendTestGuards` detects engine-unavailable **500** (same machine as pytest). With working XTTS + audio device: **Passed** — `PlayFileAsync` → completion within 30s, `IsPlaying == false` after.
+**NAudio playback completion:**
+
+```powershell
+$env:VOICESTUDIO_REAL_XTTS_HTTP_BASE = "http://127.0.0.1:8020"
+dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 `
+  --filter "FullyQualifiedName~PlaybackAuditionLiveBackendTests.Synthesize_ThenPlayback_LiveBackend_PlayableNonSilentWav"
+```
+
+**Recorded run (2026-04-17):** **Passed: 1**, Failed: 0, Skipped: 0 (~69s).
 
 ---
 
 ## 4. Regression gates
 
-| Gate | Command | Result |
-| ---- | ------- | ------ |
-| Slice 8 regression | `dotnet test ... --filter "FullyQualifiedName~RealSynthesisXttsLiveBackendTests"` | **PASS** (2026-04-17: 0 failed, 1 skipped — XTTS unavailable on host) |
-| New playback class | `dotnet test ... --filter "FullyQualifiedName~PlaybackAuditionLiveBackendTests"` | **PASS** (0 failed, 1 skipped — same) |
-| Combined filter | `...~PlaybackAuditionLiveBackendTests|...~RealSynthesisXttsLiveBackendTests` | **PASS** (0 failed, 2 skipped) |
-| Verification script | `python scripts/run_verification.py` | **PASS** (overall; advisories only for stale proofs) |
-| Build | `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` | **0 errors** (warnings pre-existing in app projects) |
+| Gate | Command | Result (2026-04-17) |
+| ---- | ------- | ------------------- |
+| Slice 8 XTTS | `dotnet test ... --filter "FullyQualifiedName~RealSynthesisXttsLiveBackendTests"` | **PASS** (1 passed, 0 skipped) |
+| Verification script | `python scripts/run_verification.py` | **PASS** (overall; advisories only for stale unrelated proofs) |
+| Build | `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` | **0 errors** |
 
 ---
 
@@ -75,13 +107,13 @@ dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:P
 2. `GET /api/audio/file/{audio_id}` → RIFF WAV bytes (same route `BackendClient` uses first).  
 3. C#: `GetAudioStreamAsync` → temp `.wav` → `AudioPlayerService.PlayFileAsync` → `PlaybackCompleted` / `IsPlaying == false`.
 
-**Optional artifacts:** `docs/reports/verification/slice9/` — `slice9_output.wav`, `slice9_backend_log_snippet.txt` when generated by tests or operator.
+**Inspect-able artifacts:** `docs/reports/verification/slice9/` — `slice9_output.wav`, `slice9_csharp_stream.wav`, `slice9_backend_log_snippet.txt`.
 
 ---
 
 ## 6. Closure phrasing (governance)
 
-- **Correct:** “Playback path **proven using XTTS-generated artifact** (primary `/api/audio/file/` retrieval + client stream + NAudio).”  
+- **Correct:** “Playback path **proven using XTTS-generated artifact** (primary `/api/audio/file/` retrieval + client stream + NAudio) on a host where `/api/health/preflight` reports `xtts_v2.ok`.”  
 - **Incorrect:** “All engines’ playback proven,” “all synthesis workflows proven.”
 
 ---
@@ -91,3 +123,4 @@ dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:P
 | Date | Change |
 | ---- | ------ |
 | 2026-04-17 | Initial proof doc for Slice 9 bounded playback/audition truth. |
+| 2026-04-17 | **Runtime closure:** healthy backend :8020; pytest `real_xtts` 2/2 PASS; C# stream + playback PASS; artifacts under `slice9/`; regression gates PASS. |

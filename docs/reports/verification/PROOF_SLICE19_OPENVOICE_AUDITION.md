@@ -15,7 +15,8 @@
 ## Evidence (automated)
 
 - **Unit:** `tests/unit/backend/services/test_model_preflight.py` — `ensure_openvoice` venv-missing, import-fail, and success-with-layout cases.  
-- **Implementation:** `ensure_openvoice` + `checks["openvoice"]` wiring in `backend/api/routes/health.py`; mirror in `backend/ml/models/model_preflight.py` and `backend/services/model_preflight.py`; `scripts/engine_readiness_probe.py` `openvoice` branch.
+- **Implementation:** `ensure_openvoice` + `checks["openvoice"]` wiring in `backend/api/routes/health.py`; mirror in `backend/ml/models/model_preflight.py` and `backend/services/model_preflight.py`; `scripts/engine_readiness_probe.py` `openvoice` branch.  
+- **Regression bar (post-Slice-19 commit):** `python scripts/run_verification.py` **PASS** (`.buildlogs/verification/last_run.json`); `.\scripts\verify.ps1 -Quick` **VERIFICATION PASSED** — [`artifacts/verify/20260420_205102/verification_report.md`](../../../artifacts/verify/20260420_205102/verification_report.md).
 
 ## Explicit non-claims
 

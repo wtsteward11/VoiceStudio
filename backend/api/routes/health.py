@@ -1072,12 +1072,42 @@ def preflight_check() -> dict[str, Any]:
             "status_code": 500,
         }
 
+    # OpenVoice preflight (venv_advanced_tts subprocess — see ensure_openvoice / Slice 19)
+    try:
+        from backend.ml.models.model_preflight import PreflightError as PreflightErrOv
+        from backend.ml.models.model_preflight import ensure_openvoice
+
+        checks["openvoice"] = ensure_openvoice(auto_download=False)
+    except PreflightErrOv as exc:
+        detail = exc.detail
+        message = None
+        if isinstance(detail, dict):
+            msg = detail.get("message")
+            if isinstance(msg, str):
+                message = msg
+        checks["openvoice"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": message or str(detail),
+            "status_code": exc.status_code,
+        }
+        if isinstance(detail, dict):
+            for key, value in detail.items():
+                if key != "message":
+                    checks["openvoice"][key] = value
+    except Exception as e:
+        checks["openvoice"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": f"{type(e).__name__}: {e}",
+            "status_code": 500,
+        }
+
     _NO_PUBLIC_PREFLIGHT = (
         "bark",
         "fish_speech",
         "higgs_audio",
         "gpt_sovits",
-        "openvoice",
         "whisper",
         "whisper_cpp",
         "vosk",

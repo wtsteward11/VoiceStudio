@@ -53,6 +53,11 @@ def test_run_preflight_aggregates_results(monkeypatch):
     )
     monkeypatch.setattr(
         model_preflight,
+        "ensure_openvoice",
+        lambda auto_download: {"ok": True, "engine": "openvoice"},
+    )
+    monkeypatch.setattr(
+        model_preflight,
         "ensure_whisper_cpp",
         lambda auto_download: {"ok": False, "message": "missing"},
     )
@@ -76,6 +81,7 @@ def test_run_preflight_aggregates_results(monkeypatch):
         "silero",
         "chatterbox",
         "tortoise",
+        "openvoice",
         "whisper_cpp",
         "faster_whisper",
         "gpt_sovits",
@@ -282,3 +288,83 @@ def test_ensure_tortoise_ok_when_dummy_weight_present(monkeypatch, tmp_path):
     assert out["ok"] is True
     assert str(tmodels) in (out.get("paths") or [""])[0]
     assert out.get("python_exe") == str(fake_py)
+
+
+def test_ensure_openvoice_venv_advanced_tts_not_created(monkeypatch):
+    """Missing venv_advanced_tts yields explicit PreflightError for OpenVoice (Slice 19)."""
+
+    class _Mgr:
+        def is_venv_created(self, _fam):
+            return False
+
+        def get_python_executable(self, _fam):
+            return "unused"
+
+    def _fake_get_venv_manager():
+        return _Mgr()
+
+    monkeypatch.setattr(
+        "app.core.runtime.venv_family_manager.get_venv_manager",
+        _fake_get_venv_manager,
+    )
+
+    with pytest.raises(model_preflight.PreflightError) as exc:
+        model_preflight.ensure_openvoice(auto_download=False)
+
+    detail = exc.value.detail
+    assert isinstance(detail, dict)
+    assert detail.get("reason") == "venv_advanced_tts_not_created"
+    assert "venv_advanced_tts" in detail.get("message", "")
+
+
+def test_ensure_openvoice_import_fail(monkeypatch, tmp_path):
+    fake_py = tmp_path / "python.exe"
+    fake_py.write_text("")
+
+    monkeypatch.setattr(
+        model_preflight,
+        "_require_venv_advanced_tts_python_exe",
+        lambda **_: fake_py,
+    )
+    monkeypatch.setattr(
+        model_preflight,
+        "_subprocess_openvoice_import_ok",
+        lambda _p: "ModuleNotFoundError: No module named 'openvoice'",
+    )
+
+    with pytest.raises(model_preflight.PreflightError) as exc:
+        model_preflight.ensure_openvoice(auto_download=False)
+
+    assert exc.value.status_code == 503
+    detail = exc.value.detail
+    assert isinstance(detail, dict)
+    assert "openvoice" in detail.get("message", "").lower()
+
+
+def test_ensure_openvoice_ok_when_checkpoint_layout_present(monkeypatch, tmp_path):
+    """Green path: import probe passes and both asset trees have config+checkpoint."""
+    fake_py = tmp_path / "python.exe"
+    fake_py.write_text("")
+
+    monkeypatch.setattr(
+        model_preflight,
+        "_require_venv_advanced_tts_python_exe",
+        lambda **_: fake_py,
+    )
+    monkeypatch.setattr(model_preflight, "_subprocess_openvoice_import_ok", lambda _p: None)
+
+    root = tmp_path / "models"
+    base = root / "openvoice" / "base_speakers" / "EN"
+    conv = root / "openvoice" / "converter"
+    base.mkdir(parents=True)
+    conv.mkdir(parents=True)
+    (base / "config.json").write_text("{}", encoding="utf-8")
+    (base / "checkpoint.pth").write_bytes(b"x")
+    (conv / "config.json").write_text("{}", encoding="utf-8")
+    (conv / "checkpoint.pth").write_bytes(b"y")
+    monkeypatch.setenv("VOICESTUDIO_MODELS_PATH", str(root))
+
+    out = model_preflight.ensure_openvoice(auto_download=False)
+    assert out["ok"] is True
+    assert out.get("python_exe") == str(fake_py)
+    assert "openvoice" in out.get("message", "").lower()

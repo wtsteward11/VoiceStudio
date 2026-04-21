@@ -428,15 +428,15 @@ CHATTERBOX_REPO_ID = "ResembleAI/chatterbox"
 CHATTERBOX_PROBE_FILE = "ve.safetensors"
 
 
-def _require_venv_advanced_tts_python_exe() -> Path:
-    """Resolve ``venv_advanced_tts`` ``python.exe`` (authoritative Chatterbox runtime)."""
+def _require_venv_advanced_tts_python_exe(*, consumer: str = "Chatterbox") -> Path:
+    """Resolve ``venv_advanced_tts`` ``python.exe`` (Chatterbox / OpenVoice per manifests)."""
     try:
         from app.core.runtime.venv_family_manager import VenvFamily, get_venv_manager
     except ImportError as e:
         raise _fail(
             {
                 "message": (
-                    "Chatterbox preflight: venv family manager unavailable "
+                    f"{consumer} preflight: venv family manager unavailable "
                     f"({type(e).__name__}: {e})."
                 ),
                 "ok": False,
@@ -450,10 +450,11 @@ def _require_venv_advanced_tts_python_exe() -> Path:
         raise _fail(
             {
                 "message": (
-                    "Chatterbox requires the venv_advanced_tts virtual environment "
-                    "(engines/audio/chatterbox/engine.manifest.json). Create it with "
+                    f"{consumer} requires the venv_advanced_tts virtual environment "
+                    "(engines/audio/chatterbox/engine.manifest.json or "
+                    "engines/audio/openvoice/engine.manifest.json). Create it with "
                     "scripts/engines/create_engine_venv.py for the Advanced TTS family, "
-                    "then pip install chatterbox-tts into that venv."
+                    "then install the engine stack into that venv."
                 ),
                 "ok": False,
                 "reason": "venv_advanced_tts_not_created",
@@ -899,6 +900,118 @@ def ensure_tortoise(auto_download: bool = True) -> dict[str, object]:
     }
 
 
+def _subprocess_openvoice_import_ok(python_exe: Path, timeout: float = 90.0) -> str | None:
+    """Return ``None`` if OpenVoice API imports in ``python_exe``; else an error string."""
+    cmd = [
+        str(python_exe),
+        "-c",
+        "from openvoice.api import BaseSpeakerTTS, ToneColorConverter; print('openvoice_import_ok')",
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return "openvoice import probe: timeout"
+    except OSError as e:
+        return f"openvoice import probe: {e}"
+    if proc.returncode == 0:
+        return None
+    err = (proc.stderr or proc.stdout or "").strip() or f"exit_code={proc.returncode}"
+    return err
+
+
+def _openvoice_models_root() -> Path:
+    """Resolve OpenVoice checkpoint root (``VOICESTUDIO_MODELS_PATH`` or ProgramData layout)."""
+    model_cache_dir = os.getenv("VOICESTUDIO_MODELS_PATH")
+    if not model_cache_dir:
+        model_cache_dir = os.path.join(
+            os.getenv("PROGRAMDATA", "C:\\ProgramData"),
+            "VoiceStudio",
+            "models",
+        )
+    return Path(model_cache_dir)
+
+
+def _openvoice_has_checkpoints(asset_root: Path) -> bool:
+    """True when a ``config.json`` has a sibling checkpoint file OpenVoice loaders expect."""
+    if not asset_root.is_dir():
+        return False
+    for cfg in asset_root.rglob("config.json"):
+        if not cfg.is_file():
+            continue
+        parent = cfg.parent
+        for name in ("checkpoint.pth", "checkpoint.ckpt", "model.pth"):
+            if (parent / name).is_file():
+                return True
+    return False
+
+
+def ensure_openvoice(auto_download: bool = True) -> dict[str, object]:
+    """
+    Ensure OpenVoice is importable from ``venv_advanced_tts`` and local checkpoints exist.
+
+    ``engines/audio/openvoice/engine.manifest.json`` declares ``venv_family: venv_advanced_tts``.
+    Preflight probes imports **in that interpreter**, not the FastAPI worker.
+
+    ``auto_download`` is accepted for API symmetry with other ``ensure_*`` functions but is
+    **not used**: OpenVoice weights are operator-supplied under ``<models>/openvoice/`` — no
+    silent download (bounded slice 19; ``no-fallbacks`` alignment).
+    """
+    _ = auto_download
+    python_exe = _require_venv_advanced_tts_python_exe(consumer="OpenVoice")
+
+    import_err = _subprocess_openvoice_import_ok(python_exe)
+    if import_err is not None:
+        raise _fail(
+            {
+                "message": (
+                    f"OpenVoice import failed in venv_advanced_tts ({python_exe}): {import_err}. "
+                    "Install the OpenVoice stack into that venv (see MyShell-OpenVoice docs)."
+                ),
+                "ok": False,
+                "python_exe": str(python_exe),
+            },
+            status_code=503,
+        )
+
+    root = _openvoice_models_root()
+    base_speakers = root / "openvoice" / "base_speakers"
+    converter = root / "openvoice" / "converter"
+
+    missing_parts: list[str] = []
+    if not _openvoice_has_checkpoints(base_speakers):
+        missing_parts.append(
+            f"base_speaker tree incomplete under {base_speakers} "
+            "(need config.json + checkpoint.pth next to it, or nested layout discoverable by rglob)."
+        )
+    if not _openvoice_has_checkpoints(converter):
+        missing_parts.append(
+            f"tone-color converter tree incomplete under {converter} (same checkpoint rule)."
+        )
+    if missing_parts:
+        raise _fail(
+            {
+                "message": " ".join(missing_parts),
+                "ok": False,
+                "paths": [str(base_speakers), str(converter)],
+            },
+            status_code=424,
+        )
+
+    return {
+        "ok": True,
+        "paths": [str(base_speakers), str(converter)],
+        "downloaded": False,
+        "message": f"OpenVoice ready (python={python_exe}, models under {root / 'openvoice'})",
+        "python_exe": str(python_exe),
+    }
+
+
 def ensure_whisper_cpp(auto_download: bool = True) -> dict[str, object]:
     """
     Ensure whisper.cpp GGUF model exists.
@@ -1053,6 +1166,7 @@ def run_preflight(auto_download: bool = True) -> dict[str, object]:
         "silero": ensure_silero,
         "chatterbox": ensure_chatterbox,
         "tortoise": ensure_tortoise,
+        "openvoice": ensure_openvoice,
         "whisper_cpp": ensure_whisper_cpp,
         "faster_whisper": ensure_faster_whisper,
         "gpt_sovits": ensure_sovits,

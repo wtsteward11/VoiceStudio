@@ -917,9 +917,162 @@ def preflight_check() -> dict[str, Any]:
             "status_code": 500,
         }
 
+    # eSpeak NG TTS preflight (local ``espeak-ng`` / configured executable)
+    try:
+        from backend.ml.models.model_preflight import PreflightError as PreflightErrEs
+        from backend.ml.models.model_preflight import ensure_espeak_ng
+
+        checks["espeak_ng"] = ensure_espeak_ng(auto_download=False)
+    except PreflightErrEs as exc:
+        detail = exc.detail
+        message = None
+        if isinstance(detail, dict):
+            msg = detail.get("message")
+            if isinstance(msg, str):
+                message = msg
+        checks["espeak_ng"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": message or str(detail),
+            "status_code": exc.status_code,
+        }
+        if isinstance(detail, dict):
+            for key, value in detail.items():
+                if key != "message":
+                    checks["espeak_ng"][key] = value
+    except Exception as e:
+        checks["espeak_ng"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": f"{type(e).__name__}: {e}",
+            "status_code": 500,
+        }
+
+    # RHVoice TTS preflight (local ``rhvoice-say`` / ``rhvoice-cli`` / configured executable)
+    try:
+        from backend.ml.models.model_preflight import PreflightError as PreflightErrRh
+        from backend.ml.models.model_preflight import ensure_rhvoice
+
+        checks["rhvoice"] = ensure_rhvoice(auto_download=False)
+    except PreflightErrRh as exc:
+        detail = exc.detail
+        message = None
+        if isinstance(detail, dict):
+            msg = detail.get("message")
+            if isinstance(msg, str):
+                message = msg
+        checks["rhvoice"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": message or str(detail),
+            "status_code": exc.status_code,
+        }
+        if isinstance(detail, dict):
+            for key, value in detail.items():
+                if key != "message":
+                    checks["rhvoice"][key] = value
+    except Exception as e:
+        checks["rhvoice"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": f"{type(e).__name__}: {e}",
+            "status_code": 500,
+        }
+
+    # Silero TTS preflight (torch.hub snakers4/silero-models; no auto-download in preflight)
+    try:
+        from backend.ml.models.model_preflight import PreflightError as PreflightErrSi
+        from backend.ml.models.model_preflight import ensure_silero
+
+        checks["silero"] = ensure_silero(auto_download=False)
+    except PreflightErrSi as exc:
+        detail = exc.detail
+        message = None
+        if isinstance(detail, dict):
+            msg = detail.get("message")
+            if isinstance(msg, str):
+                message = msg
+        checks["silero"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": message or str(detail),
+            "status_code": exc.status_code,
+        }
+        if isinstance(detail, dict):
+            for key, value in detail.items():
+                if key != "message":
+                    checks["silero"][key] = value
+    except Exception as e:
+        checks["silero"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": f"{type(e).__name__}: {e}",
+            "status_code": 500,
+        }
+
+    # Chatterbox TTS preflight (chatterbox-tts + Hugging Face repo ResembleAI/chatterbox)
+    try:
+        from backend.ml.models.model_preflight import PreflightError as PreflightErrCb
+        from backend.ml.models.model_preflight import ensure_chatterbox
+
+        checks["chatterbox"] = ensure_chatterbox(auto_download=False)
+    except PreflightErrCb as exc:
+        detail = exc.detail
+        message = None
+        if isinstance(detail, dict):
+            msg = detail.get("message")
+            if isinstance(msg, str):
+                message = msg
+        checks["chatterbox"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": message or str(detail),
+            "status_code": exc.status_code,
+        }
+        if isinstance(detail, dict):
+            for key, value in detail.items():
+                if key != "message":
+                    checks["chatterbox"][key] = value
+    except Exception as e:
+        checks["chatterbox"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": f"{type(e).__name__}: {e}",
+            "status_code": 500,
+        }
+
+    # Tortoise TTS preflight (venv_tortoise subprocess — see ensure_tortoise / ADR-052)
+    try:
+        from backend.ml.models.model_preflight import PreflightError as PreflightErrTo
+        from backend.ml.models.model_preflight import ensure_tortoise
+
+        checks["tortoise"] = ensure_tortoise(auto_download=False)
+    except PreflightErrTo as exc:
+        detail = exc.detail
+        message = None
+        if isinstance(detail, dict):
+            msg = detail.get("message")
+            if isinstance(msg, str):
+                message = msg
+        checks["tortoise"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": message or str(detail),
+            "status_code": exc.status_code,
+        }
+        if isinstance(detail, dict):
+            for key, value in detail.items():
+                if key != "message":
+                    checks["tortoise"][key] = value
+    except Exception as e:
+        checks["tortoise"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": f"{type(e).__name__}: {e}",
+            "status_code": 500,
+        }
+
     _NO_PUBLIC_PREFLIGHT = (
-        "chatterbox",
-        "tortoise",
         "bark",
         "fish_speech",
         "higgs_audio",

@@ -71,6 +71,7 @@ class TestVenvFamilyManagerInstance:
         return VenvFamilyManager(
             venvs_root=tmp_path / "venvs",
             requirements_root=tmp_path / "requirements",
+            advanced_tts_venv_path=tmp_path / "runtime" / "venvs" / "torch26",
         )
 
     def test_get_family_for_engine(self, manager):
@@ -84,6 +85,11 @@ class TestVenvFamilyManagerInstance:
         """Test getting venv path for family."""
         path = manager.get_venv_path(VenvFamily.CORE_TTS)
         assert path.name == "venv_core_tts"
+
+    def test_get_venv_path_advanced_tts_matches_provision_torch26(self, manager):
+        """ADVANCED_TTS resolves to the same tree as create_engine_venv family torch26."""
+        path = manager.get_venv_path(VenvFamily.ADVANCED_TTS)
+        assert path.name == "torch26"
 
     def test_get_python_executable(self, manager):
         """Test getting Python executable path."""

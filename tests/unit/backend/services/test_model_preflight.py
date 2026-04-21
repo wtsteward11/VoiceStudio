@@ -1,6 +1,8 @@
+import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -26,6 +28,31 @@ def test_run_preflight_aggregates_results(monkeypatch):
     )
     monkeypatch.setattr(
         model_preflight,
+        "ensure_espeak_ng",
+        lambda auto_download: {"ok": True, "engine": "espeak_ng"},
+    )
+    monkeypatch.setattr(
+        model_preflight,
+        "ensure_rhvoice",
+        lambda auto_download: {"ok": False, "engine": "rhvoice"},
+    )
+    monkeypatch.setattr(
+        model_preflight,
+        "ensure_silero",
+        lambda auto_download: {"ok": True, "engine": "silero"},
+    )
+    monkeypatch.setattr(
+        model_preflight,
+        "ensure_chatterbox",
+        lambda auto_download: {"ok": True, "engine": "chatterbox"},
+    )
+    monkeypatch.setattr(
+        model_preflight,
+        "ensure_tortoise",
+        lambda auto_download: {"ok": True, "engine": "tortoise"},
+    )
+    monkeypatch.setattr(
+        model_preflight,
         "ensure_whisper_cpp",
         lambda auto_download: {"ok": False, "message": "missing"},
     )
@@ -44,6 +71,11 @@ def test_run_preflight_aggregates_results(monkeypatch):
     assert set(result["results"].keys()) == {
         "xtts_v2",
         "piper",
+        "espeak_ng",
+        "rhvoice",
+        "silero",
+        "chatterbox",
+        "tortoise",
         "whisper_cpp",
         "faster_whisper",
         "gpt_sovits",
@@ -104,3 +136,149 @@ def test_ensure_sovits_ok_when_files_exist(tmp_path, monkeypatch):
     result = model_preflight.ensure_sovits(auto_download=False)
     assert result["ok"] is True
     assert str(model_path) in result["paths"]
+
+
+def test_ensure_chatterbox_venv_advanced_tts_not_created(monkeypatch):
+    """Missing venv_advanced_tts yields explicit PreflightError (Slice 17A)."""
+
+    class _Mgr:
+        def is_venv_created(self, _fam):
+            return False
+
+        def get_python_executable(self, _fam):
+            return "unused"
+
+    def _fake_get_venv_manager():
+        return _Mgr()
+
+    monkeypatch.setattr(
+        "app.core.runtime.venv_family_manager.get_venv_manager",
+        _fake_get_venv_manager,
+    )
+
+    with pytest.raises(model_preflight.PreflightError) as exc:
+        model_preflight.ensure_chatterbox(auto_download=False)
+
+    detail = exc.value.detail
+    assert isinstance(detail, dict)
+    assert detail.get("reason") == "venv_advanced_tts_not_created"
+    assert "venv_advanced_tts" in detail.get("message", "")
+
+
+def test_ensure_chatterbox_subprocess_ok(monkeypatch, tmp_path):
+    """Green path: import + HF probe succeed in family venv python (mocked)."""
+    fake_py = tmp_path / "python.exe"
+    fake_py.write_text("")
+
+    monkeypatch.setattr(
+        model_preflight,
+        "_require_venv_advanced_tts_python_exe",
+        lambda: fake_py,
+    )
+
+    def fake_run(cmd, **kwargs):
+        proc = MagicMock()
+        proc.returncode = 0
+        proc.stderr = ""
+        if len(cmd) >= 3 and cmd[1] == "-c" and "chatterbox" in cmd[2]:
+            proc.stdout = "chatterbox_import_ok\n"
+        elif len(cmd) >= 2 and "_chatterbox_hf.py" in str(cmd[1]):
+            proc.stdout = json.dumps(
+                {
+                    "ok": True,
+                    "path": str(tmp_path / "hub" / "ve.safetensors"),
+                    "downloaded": False,
+                }
+            )
+        else:
+            proc.returncode = 1
+            proc.stdout = ""
+        return proc
+
+    monkeypatch.setattr(model_preflight.subprocess, "run", fake_run)
+
+    out = model_preflight.ensure_chatterbox(auto_download=False)
+    assert out["ok"] is True
+    assert out.get("python_exe") == str(fake_py)
+    assert "chatterbox" in out.get("message", "").lower()
+
+
+def test_ensure_tortoise_venv_tortoise_not_created(monkeypatch):
+    """Missing venv_tortoise yields explicit PreflightError (Slice 18B)."""
+
+    class _Mgr:
+        def is_venv_created(self, _fam):
+            return False
+
+        def get_python_executable(self, _fam):
+            return "unused"
+
+    def _fake_get_venv_manager():
+        return _Mgr()
+
+    monkeypatch.setattr(
+        "app.core.runtime.venv_family_manager.get_venv_manager",
+        _fake_get_venv_manager,
+    )
+
+    with pytest.raises(model_preflight.PreflightError) as exc:
+        model_preflight.ensure_tortoise(auto_download=False)
+
+    detail = exc.value.detail
+    assert isinstance(detail, dict)
+    assert detail.get("reason") == "venv_tortoise_not_created"
+    assert "venv_tortoise" in detail.get("message", "")
+
+
+def test_ensure_tortoise_no_cached_weights_raises_when_import_ok(monkeypatch, tmp_path):
+    """Empty tortoise_models with auto_download=False yields 424 (Slice 18B)."""
+    fake_py = tmp_path / "python.exe"
+    fake_py.write_text("")
+
+    monkeypatch.setattr(
+        model_preflight,
+        "_require_venv_tortoise_python_exe",
+        lambda: fake_py,
+    )
+    monkeypatch.setattr(model_preflight, "_subprocess_tortoise_import_ok", lambda _p: None)
+
+    toroot = tmp_path / "tcache"
+    tmodels = toroot / "tortoise_models"
+    tmodels.mkdir(parents=True)
+    monkeypatch.setenv("VOICESTUDIO_MODELS_PATH", str(toroot))
+    monkeypatch.setattr(model_preflight, "_tortoise_has_cached_weights", lambda _p: False)
+
+    with pytest.raises(model_preflight.PreflightError) as exc:
+        model_preflight.ensure_tortoise(auto_download=False)
+
+    assert exc.value.status_code == 424
+    detail = exc.value.detail
+    assert isinstance(detail, dict)
+    assert "tortoise_models" in detail.get("message", "").lower() or "cached" in detail.get(
+        "message",
+        "",
+    ).lower()
+
+
+def test_ensure_tortoise_ok_when_dummy_weight_present(monkeypatch, tmp_path):
+    """Green path: import probe passes; cached weight file present (mocked)."""
+    fake_py = tmp_path / "python.exe"
+    fake_py.write_text("")
+
+    monkeypatch.setattr(
+        model_preflight,
+        "_require_venv_tortoise_python_exe",
+        lambda: fake_py,
+    )
+    monkeypatch.setattr(model_preflight, "_subprocess_tortoise_import_ok", lambda _p: None)
+
+    toroot = tmp_path / "tcache"
+    tmodels = toroot / "tortoise_models"
+    tmodels.mkdir(parents=True)
+    (tmodels / "probe.bin").write_bytes(b"x")
+    monkeypatch.setenv("VOICESTUDIO_MODELS_PATH", str(toroot))
+
+    out = model_preflight.ensure_tortoise(auto_download=False)
+    assert out["ok"] is True
+    assert str(tmodels) in (out.get("paths") or [""])[0]
+    assert out.get("python_exe") == str(fake_py)

@@ -298,9 +298,13 @@ def setup_test_environment(request):
     # Set test-specific environment variables
     if request.node.get_closest_marker("real_xtts") or request.node.get_closest_marker(
         "real_piper"
-    ):
+    ) or request.node.get_closest_marker("real_espeak_ng") or request.node.get_closest_marker(
+        "real_silero"
+    ) or request.node.get_closest_marker("real_rhvoice") or request.node.get_closest_marker(
+        "real_chatterbox"
+    ) or request.node.get_closest_marker("real_tortoise"):
         # Real engine proofs must not run under stub-like VOICESTUDIO_TEST_MODE (see
-        # tests/integration/test_synthesis_xtts_real.py and test_synthesis_piper_real.py).
+        # tests/integration/test_synthesis_*_real.py).
         os.environ.pop("VOICESTUDIO_TEST_MODE", None)
     else:
         os.environ["VOICESTUDIO_TEST_MODE"] = "1"

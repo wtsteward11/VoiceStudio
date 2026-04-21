@@ -5,7 +5,8 @@ Manages multiple Python virtual environments for different engine families.
 Implements TD-015: 8 engine families for complete dependency isolation.
 
 Families:
-- venv_core_tts: XTTS, Silero, Tortoise, OpenAI TTS, Fish Speech, Mars5, Parler TTS
+- venv_core_tts: XTTS, Silero, OpenAI TTS, Fish Speech, Mars5, Parler TTS
+- venv_tortoise: Tortoise TTS (isolated stack; Slice 18B — incompatible transformers pin vs Coqui/XTTS)
 - venv_advanced_tts: Chatterbox, F5-TTS, OpenVoice, GPT-SoVITS, Bark
 - venv_fast_tts: Piper, Parakeet, eSpeak-NG, Festival, MaryTTS, RHVoice (CPU-friendly)
 - venv_stt: Whisper, Whisper.cpp, Vosk, Aeneas
@@ -28,6 +29,13 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# GAP-062: ``scripts/engines/create_engine_venv.py`` provisions Chatterbox under
+# ``runtime/venvs/torch26`` (family key ``torch26``). Runtime must resolve
+# ``VenvFamily.ADVANCED_TTS`` to that same tree so preflight matches provisioning.
+ADVANCED_TTS_PROVISION_DIRNAME = "torch26"
+# Slice 18B: tortoise-tts pins transformers incompatible with Coqui/XTTS in core venv.
+TORTOISE_TTS_PROVISION_DIRNAME = "tortoise"
+
 
 class VenvFamily(Enum):
     """Virtual environment family identifiers."""
@@ -35,6 +43,7 @@ class VenvFamily(Enum):
     # Audio TTS families
     CORE_TTS = "venv_core_tts"
     ADVANCED_TTS = "venv_advanced_tts"
+    TORTOISE = "venv_tortoise"
     FAST_TTS = "venv_fast_tts"
 
     # Speech-to-text
@@ -74,7 +83,6 @@ FAMILY_CONFIGS: dict[VenvFamily, FamilyConfig] = {
         engines=[
             "xtts_v2",
             "silero",
-            "tortoise",
             "openai_tts",
             "fish_speech",
             "mars5",
@@ -93,6 +101,15 @@ FAMILY_CONFIGS: dict[VenvFamily, FamilyConfig] = {
         engines=["chatterbox", "f5_tts", "openvoice", "gpt_sovits", "bark"],
         gpu_required=True,
         estimated_size_gb=10.0,
+    ),
+    VenvFamily.TORTOISE: FamilyConfig(
+        family=VenvFamily.TORTOISE,
+        requirements_file="requirements-tortoise.txt",
+        python_version="3.11",
+        description="Tortoise TTS isolated stack (Slice 18B; transformers pin vs Coqui XTTS)",
+        engines=["tortoise"],
+        gpu_required=True,
+        estimated_size_gb=6.0,
     ),
     VenvFamily.FAST_TTS: FamilyConfig(
         family=VenvFamily.FAST_TTS,
@@ -191,6 +208,8 @@ class VenvFamilyManager:
         self,
         venvs_root: Path | None = None,
         requirements_root: Path | None = None,
+        advanced_tts_venv_path: Path | None = None,
+        tortoise_venv_path: Path | None = None,
     ):
         """
         Initialize venv family manager.
@@ -198,10 +217,15 @@ class VenvFamilyManager:
         Args:
             venvs_root: Root directory for venvs (default: project_root/.venvs)
             requirements_root: Root directory for requirements files (default: project_root/config/venv_families)
+            advanced_tts_venv_path: Optional override for ``ADVANCED_TTS`` on-disk venv (tests / tooling).
+                When omitted, uses ``project_root/runtime/venvs/{ADVANCED_TTS_PROVISION_DIRNAME}`` (``create_engine_venv``).
+            tortoise_venv_path: Optional override for ``TORTOISE`` isolated venv (tests / tooling).
         """
         self.project_root = Path(__file__).parent.parent.parent.parent
         self.venvs_root = venvs_root or self.project_root / ".venvs"
         self.requirements_root = requirements_root or self.project_root / "config" / "venv_families"
+        self._advanced_tts_venv_path_override = advanced_tts_venv_path
+        self._tortoise_venv_path_override = tortoise_venv_path
 
         # Ensure directories exist
         self.venvs_root.mkdir(parents=True, exist_ok=True)
@@ -226,6 +250,14 @@ class VenvFamilyManager:
 
     def get_venv_path(self, family: VenvFamily) -> Path:
         """Get the path to a family's venv."""
+        if family == VenvFamily.ADVANCED_TTS:
+            if self._advanced_tts_venv_path_override is not None:
+                return self._advanced_tts_venv_path_override
+            return self.project_root / "runtime" / "venvs" / ADVANCED_TTS_PROVISION_DIRNAME
+        if family == VenvFamily.TORTOISE:
+            if self._tortoise_venv_path_override is not None:
+                return self._tortoise_venv_path_override
+            return self.project_root / "runtime" / "venvs" / TORTOISE_TTS_PROVISION_DIRNAME
         return self.venvs_root / family.value
 
     def get_python_executable(self, family: VenvFamily) -> Path:

@@ -28,8 +28,11 @@ Venv Families:
 # under ``runtime/venvs/<family>/`` (see ``VENV_FAMILIES`` below).
 # At **runtime**, ``app/core/runtime/venv_family_manager.py`` uses a different
 # enum namespace: ``venv_core_tts``, ``venv_advanced_tts``, ``venv_stt``, etc.
-# Those are **not** renamed here; operators should treat the two as different
-# lifecycle surfaces (CLI provisioning vs in-app ``VenvFamilyManager``).
+# **Slice 17B:** ``VenvFamily.ADVANCED_TTS`` resolves to ``runtime/venvs/torch26`` (same tree
+# as family key ``torch26`` here) — see ``ADVANCED_TTS_PROVISION_DIRNAME`` in
+# ``app/core/runtime/venv_family_manager.py``.
+# **Slice 18B:** ``VenvFamily.TORTOISE`` resolves to ``runtime/venvs/tortoise`` (family key
+# ``tortoise`` here) — see ``TORTOISE_TTS_PROVISION_DIRNAME`` in ``venv_family_manager.py``.
 # Do not assume ``torch24`` string equals ``venv_core_tts`` without reading both files.
 # -----------------------------------------------------------------------------
 
@@ -38,6 +41,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import platform
 import shutil
 import subprocess
@@ -85,13 +89,28 @@ VENV_FAMILIES: dict[str, VenvFamily] = {
         name="torch26",
         description="PyTorch 2.6.x for Chatterbox and newer models",
         python_version="3.10",
+        # Order matters: numpy/torch before chatterbox-tts (pkuseg build needs numpy).
         requirements=[
+            "numpy>=2.0",
             "torch>=2.6.0",
             "torchaudio>=2.6.0",
-            "numpy>=2.0",
             "chatterbox-tts>=0.1.0",
         ],
         engines=["chatterbox"],
+    ),
+    "tortoise": VenvFamily(
+        name="tortoise",
+        description="Tortoise TTS isolated stack (Slice 18B; incompatible transformers pin vs Coqui XTTS)",
+        python_version="3.10",
+        requirements=[
+            "numpy>=1.24.0",
+            "torch>=2.2.2",
+            "torchaudio>=2.2.2",
+            "scipy>=1.10.0",
+            "soundfile>=0.12.0",
+            "tortoise-tts>=2.0.0",
+        ],
+        engines=["tortoise"],
     ),
     "cpu_only": VenvFamily(
         name="cpu_only",
@@ -150,7 +169,18 @@ for family_name, family in VENV_FAMILIES.items():
 
 
 def get_python_executable() -> str:
-    """Get the appropriate Python executable."""
+    """Get the appropriate Python executable for ``python -m venv`` and pip installs."""
+    override = os.environ.get("VOICESTUDIO_ENGINE_VENV_PYTHON")
+    if override:
+        return override
+
+    if platform.system() == "Windows":
+        local = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Python"
+        for ver in ("Python311", "Python310", "Python312"):
+            candidate = local / ver / "python.exe"
+            if candidate.exists():
+                return str(candidate)
+
     if platform.system() == "Windows":
         return "python"
     return "python3.10"
@@ -214,10 +244,24 @@ def create_venv(family: VenvFamily, force: bool = False) -> bool:
         requirements_file.write_text("\n".join(family.requirements))
 
         try:
-            subprocess.run(
-                [str(pip), "install", "-r", str(requirements_file)],
-                check=True,
-            )
+            if family.name in ("torch26", "tortoise") and len(family.requirements) >= 2:
+                # Staged install: numpy/torch stack first so chatterbox-tts / tortoise-tts
+                # transitive builds run with numpy available in the build environment.
+                base_file = venv_path / f"requirements-{family.name}-base.txt"
+                base_file.write_text("\n".join(family.requirements[:-1]))
+                subprocess.run(
+                    [str(pip), "install", "-r", str(base_file)],
+                    check=True,
+                )
+                subprocess.run(
+                    [str(pip), "install", family.requirements[-1]],
+                    check=True,
+                )
+            else:
+                subprocess.run(
+                    [str(pip), "install", "-r", str(requirements_file)],
+                    check=True,
+                )
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to install requirements: {e}")
             return False

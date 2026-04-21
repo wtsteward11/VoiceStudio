@@ -24,9 +24,12 @@ and auto-download is disabled or fails.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import shutil
+import subprocess
+import tempfile
 from importlib import metadata
 from pathlib import Path
 
@@ -257,6 +260,645 @@ def ensure_piper(auto_download: bool = True) -> dict[str, object]:
     }
 
 
+
+def ensure_espeak_ng(auto_download: bool = True) -> dict[str, object]:
+    """
+    Ensure eSpeak NG CLI is available (manifest default: ``espeak-ng`` on PATH).
+    """
+    del auto_download
+    cfg = get_engine_config_service()
+    engine_cfg = cfg.get_engine_config("espeak_ng") or {}
+    params = engine_cfg.get("parameters", {}) if isinstance(engine_cfg, dict) else {}
+    configured = params.get("executable_path") if isinstance(params, dict) else None
+    candidates: list[str | None] = [
+        configured,
+        shutil.which("espeak-ng"),
+        shutil.which("espeak"),
+    ]
+    exe = next((c for c in candidates if c and Path(c).exists()), None)
+    if not exe:
+        raise _fail(
+            {
+                "message": (
+                    "eSpeak NG executable not found. Install eSpeak NG and ensure "
+                    "`espeak-ng` is on PATH, or set engine parameters.executable_path."
+                ),
+                "ok": False,
+            },
+            status_code=503,
+        )
+    return {
+        "ok": True,
+        "paths": [exe],
+        "downloaded": False,
+        "message": f"eSpeak NG ready: {exe}",
+    }
+
+
+def ensure_rhvoice(auto_download: bool = True) -> dict[str, object]:
+    """
+    Ensure RHVoice CLI is available.
+
+    Manifest default name is ``rhvoice-client``; the engine implementation prefers
+    ``rhvoice-say`` / ``rhvoice-cli`` (see ``RHVoiceEngine._find_executable``).
+    """
+    del auto_download
+    cfg = get_engine_config_service()
+    engine_cfg = cfg.get_engine_config("rhvoice") or {}
+    params = engine_cfg.get("parameters", {}) if isinstance(engine_cfg, dict) else {}
+    configured = params.get("executable_path") if isinstance(params, dict) else None
+    candidates: list[str | None] = [
+        configured,
+        shutil.which("rhvoice-client"),
+        shutil.which("rhvoice-say"),
+        shutil.which("rhvoice-cli"),
+        shutil.which("RHVoice-test"),
+    ]
+    exe = next((c for c in candidates if c and Path(c).exists()), None)
+    if not exe:
+        raise _fail(
+            {
+                "message": (
+                    "RHVoice CLI not found. Stock Windows does not ship RHVoice; "
+                    "install a supported RHVoice binary externally (see RHVoice project), "
+                    "then set engine_configs.rhvoice.parameters.executable_path in "
+                    "backend/config/engine_config.json to the full path of rhvoice-say, "
+                    "rhvoice-cli, or rhvoice-client, or place one of those names on PATH."
+                ),
+                "ok": False,
+            },
+            status_code=503,
+        )
+    return {
+        "ok": True,
+        "paths": [exe],
+        "downloaded": False,
+        "message": f"RHVoice ready: {exe}",
+    }
+
+
+def ensure_silero(auto_download: bool = True) -> dict[str, object]:
+    """
+    Ensure Silero TTS can load via ``torch.hub`` (``snakers4/silero-models``).
+
+    Hub ``silero_tts`` expects **speaker** IDs from the upstream model (e.g. ``v3_en``,
+    ``v4_ru``, ``aidar_v2``) — not the legacy ``silero_tts_{model_id}`` pattern. Defaults:
+    ``language=en``, ``speaker=v3_en`` unless overridden in engine config parameters.
+
+    When ``auto_download=False`` (preflight / probe), a **cached** hub checkout must
+    already exist under ``torch.hub.get_dir()`` — no silent network fetch.
+    """
+    try:
+        import torch
+    except ImportError:
+        raise _fail(
+            {
+                "message": "PyTorch (torch) not installed. Silero requires torch>=1.9.",
+                "ok": False,
+            },
+            status_code=503,
+        )
+
+    cfg = get_engine_config_service()
+    engine_cfg = cfg.get_engine_config("silero") or {}
+    params = engine_cfg.get("parameters", {}) if isinstance(engine_cfg, dict) else {}
+    model_id = str(params.get("model_id") or "v4")
+    language = str(params.get("language") or "en")
+    # snakers4/silero-models master: speaker must be a hub-supported ID (see silero_tts())
+    speaker = str(params.get("speaker") or "v3_en")
+
+    hub_root = Path(torch.hub.get_dir())
+    hub_cached = any(hub_root.glob("snakers4_silero-models*"))
+
+    downloaded = False
+    if not hub_cached and not auto_download:
+        raise _fail(
+            {
+                "message": (
+                    "Silero: torch.hub repo snakers4/silero-models is not cached under "
+                    f"{hub_root}. Preflight uses auto_download=False (no automatic hub fetch). "
+                    "Warm the cache once with network access (run ensure_silero(auto_download=True) "
+                    "or a successful Silero synthesis), then re-run preflight."
+                ),
+                "ok": False,
+                "hub_dir": str(hub_root),
+            },
+            status_code=503,
+        )
+    if not hub_cached and auto_download:
+        downloaded = True
+
+    try:
+        model, _example_text = torch.hub.load(
+            repo_or_dir="snakers4/silero-models",
+            model="silero_tts",
+            language=language,
+            speaker=speaker,
+            trust_repo=True,
+        )
+        del model
+        if torch.cuda.is_available():
+            try:
+                torch.cuda.empty_cache()
+            except Exception as ex:
+                logger.debug(
+                    "torch.cuda.empty_cache after Silero hub load: %s",
+                    ex,
+                )
+    except Exception as e:
+        raise _fail(
+            {
+                "message": f"Silero torch.hub.load failed: {type(e).__name__}: {e}",
+                "ok": False,
+            },
+            status_code=503,
+        )
+
+    return {
+        "ok": True,
+        "paths": [str(hub_root)],
+        "downloaded": downloaded,
+        "message": f"Silero TTS ready (language={language}, speaker={speaker})",
+        "model_id": model_id,
+        "language": language,
+    }
+
+
+CHATTERBOX_REPO_ID = "ResembleAI/chatterbox"
+CHATTERBOX_PROBE_FILE = "ve.safetensors"
+
+
+def _require_venv_advanced_tts_python_exe() -> Path:
+    """Resolve ``venv_advanced_tts`` ``python.exe`` (authoritative Chatterbox runtime)."""
+    try:
+        from app.core.runtime.venv_family_manager import VenvFamily, get_venv_manager
+    except ImportError as e:
+        raise _fail(
+            {
+                "message": (
+                    "Chatterbox preflight: venv family manager unavailable "
+                    f"({type(e).__name__}: {e})."
+                ),
+                "ok": False,
+            },
+            status_code=503,
+        ) from e
+
+    mgr = get_venv_manager()
+    fam = VenvFamily.ADVANCED_TTS
+    if not mgr.is_venv_created(fam):
+        raise _fail(
+            {
+                "message": (
+                    "Chatterbox requires the venv_advanced_tts virtual environment "
+                    "(engines/audio/chatterbox/engine.manifest.json). Create it with "
+                    "scripts/engines/create_engine_venv.py for the Advanced TTS family, "
+                    "then pip install chatterbox-tts into that venv."
+                ),
+                "ok": False,
+                "reason": "venv_advanced_tts_not_created",
+            },
+            status_code=503,
+        )
+    return Path(mgr.get_python_executable(fam))
+
+
+def _subprocess_chatterbox_import_ok(python_exe: Path, timeout: float = 90.0) -> str | None:
+    """Return ``None`` if ``chatterbox.tts`` imports in ``python_exe``; else an error string."""
+    cmd = [
+        str(python_exe),
+        "-c",
+        "from chatterbox.tts import ChatterboxTTS; print('chatterbox_import_ok')",
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return "chatterbox import probe: timeout"
+    except OSError as e:
+        return f"chatterbox import probe: {e}"
+    if proc.returncode == 0:
+        return None
+    err = (proc.stderr or proc.stdout or "").strip() or f"exit_code={proc.returncode}"
+    return err
+
+
+_CHATTERBOX_HF_SUBPROCESS_TAIL = """
+def main():
+    try:
+        from huggingface_hub import hf_hub_download
+    except ImportError as e:
+        print(json.dumps({"ok": False, "error": "import", "detail": repr(e)}))
+        sys.exit(1)
+    downloaded = False
+    if not AUTO:
+        try:
+            local_path = hf_hub_download(repo_id=REPO, filename=FN, local_files_only=True)
+        except Exception as e:
+            print(json.dumps({"ok": False, "error": "hf", "detail": type(e).__name__ + ": " + str(e)}))
+            sys.exit(1)
+    else:
+        had_local = False
+        try:
+            hf_hub_download(repo_id=REPO, filename=FN, local_files_only=True)
+            had_local = True
+        except Exception:
+            had_local = False
+        try:
+            local_path = hf_hub_download(repo_id=REPO, filename=FN)
+            downloaded = not had_local
+        except Exception as e:
+            print(json.dumps({"ok": False, "error": "hf", "detail": type(e).__name__ + ": " + str(e)}))
+            sys.exit(1)
+    print(json.dumps({"ok": True, "path": str(local_path), "downloaded": downloaded}))
+
+
+main()
+"""
+
+
+def _chatterbox_hf_subprocess_script(auto_download: bool) -> str:
+    """Run inside ``venv_advanced_tts`` so HF cache paths match that interpreter."""
+    ad = "True" if auto_download else "False"
+    return (
+        "import json\nimport sys\nAUTO = "
+        + ad
+        + "\nREPO = "
+        + json.dumps(CHATTERBOX_REPO_ID)
+        + "\nFN = "
+        + json.dumps(CHATTERBOX_PROBE_FILE)
+        + "\n"
+        + _CHATTERBOX_HF_SUBPROCESS_TAIL
+    )
+
+
+def _subprocess_chatterbox_hf_hub(
+    python_exe: Path,
+    auto_download: bool,
+    *,
+    timeout: float = 180.0,
+) -> tuple[str, bool, str | None]:
+    """Returns ``(local_path_str, downloaded, error_or_none)``."""
+    script_body = _chatterbox_hf_subprocess_script(auto_download)
+    fd, tpath = tempfile.mkstemp(suffix="_chatterbox_hf.py", text=True)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(script_body)
+        run_env = os.environ.copy()
+        run_env.setdefault("HF_ENDPOINT", "https://huggingface.co")
+        proc = subprocess.run(
+            [str(python_exe), tpath],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+            env=run_env,
+        )
+    finally:
+        try:
+            os.unlink(tpath)
+        except OSError as ex:
+            logger.debug("chatterbox HF temp script cleanup: %s", ex)
+
+    if proc.returncode != 0:
+        tail = (proc.stderr or proc.stdout or "").strip()
+        return "", False, tail or f"exit_code={proc.returncode}"
+
+    out = (proc.stdout or "").strip().splitlines()
+    if not out:
+        return "", False, "chatterbox HF probe: empty stdout"
+    try:
+        payload = json.loads(out[-1])
+    except json.JSONDecodeError as e:
+        return "", False, f"chatterbox HF probe: invalid json ({e}): {out[-1]!r}"
+
+    if not payload.get("ok"):
+        detail = payload.get("detail") or payload.get("error") or payload
+        return "", False, str(detail)
+
+    return str(payload["path"]), bool(payload.get("downloaded")), None
+
+
+def _require_venv_tortoise_python_exe() -> Path:
+    """Resolve ``venv_tortoise`` ``python.exe`` (authoritative Tortoise runtime; Slice 18B)."""
+    try:
+        from app.core.runtime.venv_family_manager import VenvFamily, get_venv_manager
+    except ImportError as e:
+        raise _fail(
+            {
+                "message": (
+                    "Tortoise preflight: venv family manager unavailable "
+                    f"({type(e).__name__}: {e})."
+                ),
+                "ok": False,
+            },
+            status_code=503,
+        ) from e
+
+    mgr = get_venv_manager()
+    fam = VenvFamily.TORTOISE
+    if not mgr.is_venv_created(fam):
+        raise _fail(
+            {
+                "message": (
+                    "Tortoise requires the venv_tortoise virtual environment "
+                    "(engines/audio/tortoise/engine.manifest.json). Create it with "
+                    "scripts/engines/create_engine_venv.py --family tortoise "
+                    "then verify the interpreter can import tortoise.api.TextToSpeech."
+                ),
+                "ok": False,
+                "reason": "venv_tortoise_not_created",
+            },
+            status_code=503,
+        )
+    return Path(mgr.get_python_executable(fam))
+
+
+def _subprocess_tortoise_import_ok(python_exe: Path, timeout: float = 120.0) -> str | None:
+    """Return ``None`` if ``tortoise.api.TextToSpeech`` imports in ``python_exe``; else an error string."""
+    cmd = [
+        str(python_exe),
+        "-c",
+        "from tortoise.api import TextToSpeech; print('tortoise_import_ok')",
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return "tortoise import probe: timeout"
+    except OSError as e:
+        return f"tortoise import probe: {e}"
+    if proc.returncode == 0:
+        return None
+    err = (proc.stderr or proc.stdout or "").strip() or f"exit_code={proc.returncode}"
+    return err
+
+
+_TORTOISE_WARM_SUBPROCESS_BODY = """
+import json
+import sys
+from pathlib import Path
+
+MODELS = Path(sys.argv[1])
+AUTO = sys.argv[2] == "1"
+
+
+def _has_weights() -> bool:
+    return MODELS.is_dir() and any(p.is_file() for p in MODELS.rglob("*"))
+
+
+def main() -> None:
+    if not _has_weights() and not AUTO:
+        print(json.dumps({"ok": False, "error": "no_cache", "models_dir": str(MODELS)}))
+        sys.exit(1)
+    if not _has_weights() and AUTO:
+        import torch
+        from tortoise.api import TextToSpeech
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        tts = TextToSpeech(device=device, models_dir=str(MODELS), kv_cache=True)
+        del tts
+        if torch.cuda.is_available():
+            try:
+                torch.cuda.empty_cache()
+            except Exception as e:
+                print(
+                    json.dumps({"warn": "cuda_empty_cache", "detail": repr(e)}),
+                    file=sys.stderr,
+                )
+        print(json.dumps({"ok": True, "downloaded": True, "models_dir": str(MODELS)}))
+        return
+    print(json.dumps({"ok": True, "downloaded": False, "models_dir": str(MODELS)}))
+
+
+main()
+"""
+
+
+def _subprocess_tortoise_models_ready(
+    python_exe: Path,
+    models_dir: Path,
+    auto_download: bool,
+    *,
+    timeout: float = 600.0,
+) -> tuple[bool, str | None]:
+    """Run Tortoise weight/cache validation in the family venv. Returns (downloaded, error_or_none)."""
+    fd, tpath = tempfile.mkstemp(suffix="_tortoise_warm.py", text=True)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(_TORTOISE_WARM_SUBPROCESS_BODY)
+        proc = subprocess.run(
+            [str(python_exe), tpath, str(models_dir), "1" if auto_download else "0"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    finally:
+        try:
+            os.unlink(tpath)
+        except OSError as ex:
+            logger.debug("tortoise warm temp script cleanup: %s", ex)
+
+    if proc.returncode != 0:
+        tail = (proc.stderr or proc.stdout or "").strip()
+        return False, tail or f"exit_code={proc.returncode}"
+
+    out = (proc.stdout or "").strip().splitlines()
+    if not out:
+        return False, "tortoise models probe: empty stdout"
+    try:
+        payload = json.loads(out[-1])
+    except json.JSONDecodeError as e:
+        return False, f"tortoise models probe: invalid json ({e}): {out[-1]!r}"
+
+    if not payload.get("ok"):
+        detail = payload.get("detail") or payload.get("error") or payload
+        return False, str(detail)
+
+    return bool(payload.get("downloaded")), None
+
+
+def ensure_chatterbox(auto_download: bool = True) -> dict[str, object]:
+    """
+    Ensure Chatterbox TTS can resolve weights from Hugging Face repo ``ResembleAI/chatterbox``.
+
+    Preflight runs **in the ``venv_advanced_tts`` interpreter** (import + ``hf_hub_download``),
+    not the FastAPI worker venv, so ``checks.chatterbox`` matches the manifest runtime.
+
+    When ``auto_download=False``, a cached copy of the probe file must exist — no silent fetch.
+    """
+    python_exe = _require_venv_advanced_tts_python_exe()
+
+    import_err = _subprocess_chatterbox_import_ok(python_exe)
+    if import_err is not None:
+        raise _fail(
+            {
+                "message": (
+                    f"chatterbox-tts import failed in venv_advanced_tts ({python_exe}): {import_err}. "
+                    "Install chatterbox-tts and dependencies into that venv."
+                ),
+                "ok": False,
+                "python_exe": str(python_exe),
+            },
+            status_code=503,
+        )
+
+    local_path, downloaded, hf_err = _subprocess_chatterbox_hf_hub(
+        python_exe,
+        auto_download,
+    )
+    repo_id = CHATTERBOX_REPO_ID
+    probe_file = CHATTERBOX_PROBE_FILE
+    if hf_err is not None:
+        if not auto_download:
+            raise _fail(
+                {
+                    "message": (
+                        f"Chatterbox: no usable Hugging Face cache for {repo_id} ({probe_file}) "
+                        f"in venv_advanced_tts. Preflight uses auto_download=False (no automatic download). "
+                        f"Warm the cache once with network access. Detail: {hf_err}"
+                    ),
+                    "ok": False,
+                    "repo_id": repo_id,
+                    "python_exe": str(python_exe),
+                },
+                status_code=503,
+            )
+        raise _fail(
+            {
+                "message": (
+                    f"Chatterbox: hf_hub_download failed for {repo_id}/{probe_file} "
+                    f"in venv_advanced_tts: {hf_err}"
+                ),
+                "ok": False,
+                "repo_id": repo_id,
+                "python_exe": str(python_exe),
+            },
+            status_code=503,
+        )
+
+    cache_dir = str(Path(local_path).parent)
+
+    return {
+        "ok": True,
+        "paths": [cache_dir],
+        "downloaded": downloaded,
+        "message": f"Chatterbox TTS ready (repo={repo_id}, python={python_exe})",
+        "repo_id": repo_id,
+        "python_exe": str(python_exe),
+    }
+
+
+def _tortoise_models_dir() -> Path:
+    """Match Tortoise cache layout (``tortoise_models`` under the tortoise model root)."""
+    model_cache_dir = os.getenv("VOICESTUDIO_MODELS_PATH")
+    if not model_cache_dir:
+        model_cache_dir = os.path.join(
+            os.getenv("PROGRAMDATA", "C:\\ProgramData"),
+            "VoiceStudio",
+            "models",
+            "tortoise",
+        )
+    base = Path(model_cache_dir)
+    _ensure_dir(base)
+    out = base / "tortoise_models"
+    _ensure_dir(out)
+    return out
+
+
+def _tortoise_has_cached_weights(models_dir: Path) -> bool:
+    if not models_dir.is_dir():
+        return False
+    return any(p.is_file() for p in models_dir.rglob("*"))
+
+
+def ensure_tortoise(auto_download: bool = True) -> dict[str, object]:
+    """
+    Ensure Tortoise TTS is usable from the **dedicated ``venv_tortoise`` interpreter** (Slice 18B).
+
+    Preflight runs import and optional ``TextToSpeech`` warm/download **in that subprocess**,
+    not in the FastAPI worker — ``tortoise-tts`` must never be installed into the backend ``.venv``.
+
+    When ``auto_download=False`` (health preflight / probe), at least one cached weight file
+    must exist under ``<tortoise cache>/tortoise_models`` — no silent network fetch.
+    When ``auto_download=True``, an empty cache triggers ``TextToSpeech`` construction in the
+    Tortoise venv so weights may download (operator warm-up path).
+    """
+    python_exe = _require_venv_tortoise_python_exe()
+
+    import_err = _subprocess_tortoise_import_ok(python_exe)
+    if import_err is not None:
+        raise _fail(
+            {
+                "message": (
+                    f"tortoise-tts import failed in venv_tortoise ({python_exe}): {import_err}. "
+                    "Install tortoise-tts and its stack into runtime/venvs/tortoise (see ADR-052)."
+                ),
+                "ok": False,
+                "python_exe": str(python_exe),
+            },
+            status_code=503,
+        )
+
+    tortoise_models_dir = _tortoise_models_dir()
+    has_weights = _tortoise_has_cached_weights(tortoise_models_dir)
+
+    if not has_weights and not auto_download:
+        raise _fail(
+            {
+                "message": (
+                    f"Tortoise: no cached weights under {tortoise_models_dir}. "
+                    "Preflight uses auto_download=False (no automatic download). "
+                    "Warm once with network access: ensure_tortoise(auto_download=True) "
+                    "or a successful Tortoise synthesis in the isolated venv, then re-run preflight."
+                ),
+                "ok": False,
+                "models_dir": str(tortoise_models_dir),
+                "python_exe": str(python_exe),
+            },
+            status_code=424,
+        )
+
+    downloaded = False
+    if not has_weights and auto_download:
+        downloaded, warm_err = _subprocess_tortoise_models_ready(
+            python_exe,
+            tortoise_models_dir,
+            True,
+        )
+        if warm_err is not None:
+            raise _fail(
+                {
+                    "message": (
+                        f"Tortoise TextToSpeech init/download failed in venv_tortoise: {warm_err}"
+                    ),
+                    "ok": False,
+                    "models_dir": str(tortoise_models_dir),
+                    "python_exe": str(python_exe),
+                },
+                status_code=503,
+            )
+
+    return {
+        "ok": True,
+        "paths": [str(tortoise_models_dir)],
+        "downloaded": downloaded,
+        "message": f"Tortoise TTS ready (models_dir={tortoise_models_dir}, python={python_exe})",
+        "python_exe": str(python_exe),
+    }
+
+
 def ensure_whisper_cpp(auto_download: bool = True) -> dict[str, object]:
     """
     Ensure whisper.cpp GGUF model exists.
@@ -406,6 +1048,11 @@ def run_preflight(auto_download: bool = True) -> dict[str, object]:
     checks = {
         "xtts_v2": ensure_xtts,
         "piper": ensure_piper,
+        "espeak_ng": ensure_espeak_ng,
+        "rhvoice": ensure_rhvoice,
+        "silero": ensure_silero,
+        "chatterbox": ensure_chatterbox,
+        "tortoise": ensure_tortoise,
         "whisper_cpp": ensure_whisper_cpp,
         "faster_whisper": ensure_faster_whisper,
         "gpt_sovits": ensure_sovits,

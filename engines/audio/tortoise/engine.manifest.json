@@ -4,7 +4,7 @@
   "type": "audio",
   "subtype": "tts",
   "version": "1.0",
-  "venv_family": "venv_core_tts",
+  "venv_family": "venv_tortoise",
   "description": "Tortoise TTS for ultra-realistic high-quality voice synthesis (optimized for quality over speed)",
   "author": "Tortoise TTS Team",
   "license": "Apache-2.0",
@@ -36,7 +36,7 @@
     "vram_min_gb": 6,
     "ram_min_gb": 16
   },
-  "entry_point": "app.core.engines.tortoise_engine.TortoiseEngine",
+  "entry_point": "app.core.engines.tortoise_subprocess_engine.TortoiseSubprocessEngine",
   "config_schema": {
     "device": {
       "type": "string",

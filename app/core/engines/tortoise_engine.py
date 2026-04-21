@@ -2,6 +2,9 @@
 Tortoise TTS Engine for VoiceStudio
 Tortoise TTS integration for ultra-realistic HQ voice synthesis
 
+**Slice 18B:** API synthesis routes through ``TortoiseSubprocessEngine`` (isolated ``venv_tortoise``).
+This module remains for benchmarks and tooling that run *inside* the Tortoise venv.
+
 Compatible with:
 - Python 3.10+
 - tortoise-tts library

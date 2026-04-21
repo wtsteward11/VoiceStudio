@@ -1,0 +1,8 @@
+Slice 18 real Tortoise live-backend proof (synthesis succeeded).
+timestamp_utc: 2026-04-20T23:43:07Z
+backend_base: http://127.0.0.1:8028
+profile_id: c4fe2390-fec9-4813-a778-122b4141bff5
+audio_id: synth_c4fe2390-fec9-4813-a778-122b4141bff5_8f59a62e
+wav_bytes: 258604
+duration_s: 5.386666666666667
+pcm_peak_abs: 17766

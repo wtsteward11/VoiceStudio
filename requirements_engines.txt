@@ -69,8 +69,10 @@ ffmpeg-python==0.2.0  # Audio/video conversion
 coqui-tts==0.27.2  # Current release w/ XTTS v2 engine
 coqui-tts-trainer==0.3.1  # Finetuning & dataset manager
 
-# Tortoise TTS - LEGACY (isolate in separate venv if needed)
-# tortoise-tts>=2.4.0  # Use separate venv - conflicts with Torch 2.9 stack
+# Tortoise TTS - LEGACY — NOT co-installable with coqui-tts in the same venv as of 2026-04-20:
+# tortoise-tts 3.x pins transformers==4.31.0; coqui-tts 0.27.x requires transformers>=4.52.1,<4.56.
+# Slice 18A proof: PROOF_SLICE18A_TORTOISE_PROVISIONING.md — use a dedicated venv + subprocess path (ADR) or fork/patch.
+# tortoise-tts>=2.4.0
 
 # Piper TTS - Already have
 piper-tts>=1.0.0

@@ -107,6 +107,7 @@ What becomes easier or more difficult to do because of this change?
 | [ADR-049](ADR-049-mcp-integration-strategy.md) | MCP Integration Strategy | Proposed | 2026-02-21 |
 | [ADR-050](ADR-050-sqlite-project-authority-migrations.md) | SQLite Project Authority and Schema Migrations (No Alembic) | Accepted | 2026-03-28 |
 | [ADR-051](ADR-051-polly-v8-httpclient-resilience.md) | Polly v8 HttpClient Resilience (BackendHttpContext) | Accepted | 2026-04-09 |
+| [ADR-052](ADR-052-tortoise-isolated-venv-subprocess.md) | Tortoise TTS isolated venv + subprocess synthesis (vs Coqui/XTTS transformers pin) | Accepted | 2026-04-18 |
 
 ## Status Legend
 

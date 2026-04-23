@@ -924,7 +924,7 @@ def _openvoice_models_root() -> Path:
     model_cache_dir = os.getenv("VOICESTUDIO_MODELS_PATH")
     if not model_cache_dir:
         model_cache_dir = os.path.join(
-            os.getenv("PROGRAMDATA", "C:\ProgramData"),
+            os.getenv("PROGRAMDATA", r"C:\ProgramData"),
             "VoiceStudio",
             "models",
         )
@@ -1146,6 +1146,15 @@ def ensure_faster_whisper(auto_download: bool = True) -> dict[str, object]:
     }
 
 
+def ensure_whisper(auto_download: bool = True) -> dict[str, object]:
+    """
+    Preflight for engine_id ``whisper`` (faster-whisper; see services mirror).
+
+    Delegates to :func:`ensure_faster_whisper` — no alternate engine fallback.
+    """
+    return ensure_faster_whisper(auto_download=auto_download)
+
+
 def run_preflight(auto_download: bool = True) -> dict[str, object]:
     """
     Run all pre-flight checks. Returns a summary dict.
@@ -1160,6 +1169,7 @@ def run_preflight(auto_download: bool = True) -> dict[str, object]:
         "chatterbox": ensure_chatterbox,
         "tortoise": ensure_tortoise,
         "openvoice": ensure_openvoice,
+        "whisper": ensure_whisper,
         "whisper_cpp": ensure_whisper_cpp,
         "faster_whisper": ensure_faster_whisper,
         "gpt_sovits": ensure_sovits,

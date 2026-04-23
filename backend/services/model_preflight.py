@@ -429,7 +429,7 @@ CHATTERBOX_PROBE_FILE = "ve.safetensors"
 
 
 def _require_venv_advanced_tts_python_exe(*, consumer: str = "Chatterbox") -> Path:
-    """Resolve ``venv_advanced_tts`` ``python.exe`` (Chatterbox / OpenVoice per manifests)."""
+    """Resolve ``venv_advanced_tts`` ``python.exe`` (Chatterbox; OpenVoice uses ``venv_openvoice``)."""
     try:
         from app.core.runtime.venv_family_manager import VenvFamily, get_venv_manager
     except ImportError as e:
@@ -451,8 +451,7 @@ def _require_venv_advanced_tts_python_exe(*, consumer: str = "Chatterbox") -> Pa
             {
                 "message": (
                     f"{consumer} requires the venv_advanced_tts virtual environment "
-                    "(engines/audio/chatterbox/engine.manifest.json or "
-                    "engines/audio/openvoice/engine.manifest.json). Create it with "
+                    "(engines/audio/chatterbox/engine.manifest.json). Create it with "
                     "scripts/engines/create_engine_venv.py for the Advanced TTS family, "
                     "then install the engine stack into that venv."
                 ),
@@ -614,6 +613,42 @@ def _require_venv_tortoise_python_exe() -> Path:
                 ),
                 "ok": False,
                 "reason": "venv_tortoise_not_created",
+            },
+            status_code=503,
+        )
+    return Path(mgr.get_python_executable(fam))
+
+
+def _require_venv_openvoice_python_exe() -> Path:
+    """Resolve ``venv_openvoice`` ``python.exe`` (authoritative OpenVoice runtime; Slice 19F / ADR-054)."""
+    try:
+        from app.core.runtime.venv_family_manager import VenvFamily, get_venv_manager
+    except ImportError as e:
+        raise _fail(
+            {
+                "message": (
+                    "OpenVoice preflight: venv family manager unavailable "
+                    f"({type(e).__name__}: {e})."
+                ),
+                "ok": False,
+            },
+            status_code=503,
+        ) from e
+
+    mgr = get_venv_manager()
+    fam = VenvFamily.OPENVOICE
+    if not mgr.is_venv_created(fam):
+        raise _fail(
+            {
+                "message": (
+                    "OpenVoice requires the venv_openvoice virtual environment "
+                    "(engines/audio/openvoice/engine.manifest.json). Create it with "
+                    "scripts/engines/create_engine_venv.py --family openvoice, install "
+                    "config/venv_families/requirements-openvoice.txt into that venv, then "
+                    "see docs/design/VOICESTUDIO_BOUNDED_SLICE19F_OPENVOICE_ISOLATED_VENV.md."
+                ),
+                "ok": False,
+                "reason": "venv_openvoice_not_created",
             },
             status_code=503,
         )
@@ -953,9 +988,9 @@ def _openvoice_has_checkpoints(asset_root: Path) -> bool:
 
 def ensure_openvoice(auto_download: bool = True) -> dict[str, object]:
     """
-    Ensure OpenVoice is importable from ``venv_advanced_tts`` and local checkpoints exist.
+    Ensure OpenVoice is importable from ``venv_openvoice`` and local checkpoints exist.
 
-    ``engines/audio/openvoice/engine.manifest.json`` declares ``venv_family: venv_advanced_tts``.
+    ``engines/audio/openvoice/engine.manifest.json`` declares ``venv_family: venv_openvoice``.
     Preflight probes imports **in that interpreter**, not the FastAPI worker.
 
     ``auto_download`` is accepted for API symmetry with other ``ensure_*`` functions but is
@@ -963,15 +998,16 @@ def ensure_openvoice(auto_download: bool = True) -> dict[str, object]:
     silent download (bounded slice 19; ``no-fallbacks`` alignment).
     """
     _ = auto_download
-    python_exe = _require_venv_advanced_tts_python_exe(consumer="OpenVoice")
+    python_exe = _require_venv_openvoice_python_exe()
 
     import_err = _subprocess_openvoice_import_ok(python_exe)
     if import_err is not None:
         raise _fail(
             {
                 "message": (
-                    f"OpenVoice import failed in venv_advanced_tts ({python_exe}): {import_err}. "
-                    "Install the OpenVoice stack into that venv (see MyShell-OpenVoice docs)."
+                    f"OpenVoice import failed in venv_openvoice ({python_exe}): {import_err}. "
+                    "Install the OpenVoice stack into runtime/venvs/openvoice (see "
+                    "docs/design/VOICESTUDIO_BOUNDED_SLICE19F_OPENVOICE_ISOLATED_VENV.md)."
                 ),
                 "ok": False,
                 "python_exe": str(python_exe),
@@ -1153,6 +1189,16 @@ def ensure_faster_whisper(auto_download: bool = True) -> dict[str, object]:
     }
 
 
+def ensure_whisper(auto_download: bool = True) -> dict[str, object]:
+    """
+    Preflight for engine_id ``whisper`` (``engines/audio/whisper/engine.manifest.json``).
+
+    Runtime uses **faster-whisper**; this is the public ``checks.whisper`` entry and
+    delegates to :func:`ensure_faster_whisper` (no alternate engine fallback).
+    """
+    return ensure_faster_whisper(auto_download=auto_download)
+
+
 def run_preflight(auto_download: bool = True) -> dict[str, object]:
     """
     Run all pre-flight checks. Returns a summary dict.
@@ -1167,6 +1213,7 @@ def run_preflight(auto_download: bool = True) -> dict[str, object]:
         "chatterbox": ensure_chatterbox,
         "tortoise": ensure_tortoise,
         "openvoice": ensure_openvoice,
+        "whisper": ensure_whisper,
         "whisper_cpp": ensure_whisper_cpp,
         "faster_whisper": ensure_faster_whisper,
         "gpt_sovits": ensure_sovits,

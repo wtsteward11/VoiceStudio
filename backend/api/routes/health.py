@@ -1072,10 +1072,10 @@ def preflight_check() -> dict[str, Any]:
             "status_code": 500,
         }
 
-    # OpenVoice preflight (venv_advanced_tts subprocess — see ensure_openvoice / Slice 19)
+    # OpenVoice preflight (venv_openvoice subprocess — see ensure_openvoice / Slice 19F / ADR-054)
     try:
-        from backend.ml.models.model_preflight import PreflightError as PreflightErrOv
-        from backend.ml.models.model_preflight import ensure_openvoice
+        from backend.services.model_preflight import PreflightError as PreflightErrOv
+        from backend.services.model_preflight import ensure_openvoice
 
         checks["openvoice"] = ensure_openvoice(auto_download=False)
     except PreflightErrOv as exc:
@@ -1103,12 +1103,42 @@ def preflight_check() -> dict[str, Any]:
             "status_code": 500,
         }
 
+    # Whisper STT preflight (engine_id ``whisper`` — faster-whisper; see ensure_whisper / Slice 20)
+    try:
+        from backend.services.model_preflight import PreflightError as PreflightErrWsp
+        from backend.services.model_preflight import ensure_whisper
+
+        checks["whisper"] = ensure_whisper(auto_download=False)
+    except PreflightErrWsp as exc:
+        detail = exc.detail
+        message = None
+        if isinstance(detail, dict):
+            msg = detail.get("message")
+            if isinstance(msg, str):
+                message = msg
+        checks["whisper"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": message or str(detail),
+            "status_code": exc.status_code,
+        }
+        if isinstance(detail, dict):
+            for key, value in detail.items():
+                if key != "message":
+                    checks["whisper"][key] = value
+    except Exception as e:
+        checks["whisper"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": f"{type(e).__name__}: {e}",
+            "status_code": 500,
+        }
+
     _NO_PUBLIC_PREFLIGHT = (
         "bark",
         "fish_speech",
         "higgs_audio",
         "gpt_sovits",
-        "whisper",
         "whisper_cpp",
         "vosk",
         "parakeet",

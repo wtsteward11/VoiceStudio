@@ -68,6 +68,11 @@ def test_run_preflight_aggregates_results(monkeypatch):
     )
     monkeypatch.setattr(
         model_preflight,
+        "ensure_whisper",
+        lambda auto_download: {"ok": True, "engine": "whisper"},
+    )
+    monkeypatch.setattr(
+        model_preflight,
         "ensure_faster_whisper",
         lambda auto_download: {"ok": True, "engine": "faster_whisper"},
     )
@@ -82,12 +87,29 @@ def test_run_preflight_aggregates_results(monkeypatch):
         "chatterbox",
         "tortoise",
         "openvoice",
+        "whisper",
         "whisper_cpp",
         "faster_whisper",
         "gpt_sovits",
     }
     assert result["results"]["xtts_v2"]["engine"] == "xtts"
+    assert result["results"]["whisper"]["engine"] == "whisper"
     assert result["results"]["whisper_cpp"]["ok"] is False
+
+
+def test_ensure_whisper_delegates_to_ensure_faster_whisper(monkeypatch):
+    """engine_id ``whisper`` preflight must use faster-whisper (no alternate engine)."""
+
+    called: dict[str, object] = {}
+
+    def _fake_faster(*, auto_download: bool) -> dict[str, object]:
+        called["auto_download"] = auto_download
+        return {"ok": True, "engine": "faster_whisper_delegation"}
+
+    monkeypatch.setattr(model_preflight, "ensure_faster_whisper", _fake_faster)
+    out = model_preflight.ensure_whisper(auto_download=False)
+    assert out["engine"] == "faster_whisper_delegation"
+    assert called["auto_download"] is False
 
 
 def test_ensure_sovits_missing_files_raises(tmp_path, monkeypatch):
@@ -290,8 +312,8 @@ def test_ensure_tortoise_ok_when_dummy_weight_present(monkeypatch, tmp_path):
     assert out.get("python_exe") == str(fake_py)
 
 
-def test_ensure_openvoice_venv_advanced_tts_not_created(monkeypatch):
-    """Missing venv_advanced_tts yields explicit PreflightError for OpenVoice (Slice 19)."""
+def test_ensure_openvoice_venv_openvoice_not_created(monkeypatch):
+    """Missing venv_openvoice yields explicit PreflightError for OpenVoice (Slice 19F)."""
 
     class _Mgr:
         def is_venv_created(self, _fam):
@@ -313,8 +335,8 @@ def test_ensure_openvoice_venv_advanced_tts_not_created(monkeypatch):
 
     detail = exc.value.detail
     assert isinstance(detail, dict)
-    assert detail.get("reason") == "venv_advanced_tts_not_created"
-    assert "venv_advanced_tts" in detail.get("message", "")
+    assert detail.get("reason") == "venv_openvoice_not_created"
+    assert "venv_openvoice" in detail.get("message", "")
 
 
 def test_ensure_openvoice_import_fail(monkeypatch, tmp_path):
@@ -323,8 +345,8 @@ def test_ensure_openvoice_import_fail(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         model_preflight,
-        "_require_venv_advanced_tts_python_exe",
-        lambda **_: fake_py,
+        "_require_venv_openvoice_python_exe",
+        lambda: fake_py,
     )
     monkeypatch.setattr(
         model_preflight,
@@ -348,8 +370,8 @@ def test_ensure_openvoice_ok_when_checkpoint_layout_present(monkeypatch, tmp_pat
 
     monkeypatch.setattr(
         model_preflight,
-        "_require_venv_advanced_tts_python_exe",
-        lambda **_: fake_py,
+        "_require_venv_openvoice_python_exe",
+        lambda: fake_py,
     )
     monkeypatch.setattr(model_preflight, "_subprocess_openvoice_import_ok", lambda _p: None)
 

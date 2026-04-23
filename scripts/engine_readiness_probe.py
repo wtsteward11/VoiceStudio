@@ -181,12 +181,32 @@ def _router_probe_full(root: Path) -> dict[str, object]:
                             "status_code": ex.status_code,
                         }
             elif eid == "openvoice":
-                from backend.ml.models.model_preflight import PreflightError as _PfeOv
-                from backend.ml.models.model_preflight import ensure_openvoice
+                from backend.services.model_preflight import PreflightError as _PfeOv
+                from backend.services.model_preflight import ensure_openvoice
 
                 try:
                     entry["preflight_assets"] = ensure_openvoice(auto_download=False)
                 except _PfeOv as ex:
+                    detail = ex.detail
+                    if isinstance(detail, dict):
+                        entry["preflight_assets"] = {
+                            "ok": detail.get("ok", False),
+                            "message": detail.get("message", str(detail)),
+                            "status_code": ex.status_code,
+                        }
+                    else:
+                        entry["preflight_assets"] = {
+                            "ok": False,
+                            "message": str(detail),
+                            "status_code": ex.status_code,
+                        }
+            elif eid == "whisper":
+                from backend.services.model_preflight import PreflightError as _PfeWsp
+                from backend.services.model_preflight import ensure_whisper
+
+                try:
+                    entry["preflight_assets"] = ensure_whisper(auto_download=False)
+                except _PfeWsp as ex:
                     detail = ex.detail
                     if isinstance(detail, dict):
                         entry["preflight_assets"] = {

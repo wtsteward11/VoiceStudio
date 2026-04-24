@@ -119,6 +119,7 @@ EXEMPT_FILES = [
     "backend/services/engine_service.py",  # Engine service wraps engines
     "backend/services/llm_function_calling.py",  # LLM function calling service
     "backend/services/model_preflight.py",  # Preflight service uses engine paths
+    "backend/services/model_preflight_subprocess.py",  # Subprocess HF/tortoise probes (split from model_preflight)
 ]
 
 

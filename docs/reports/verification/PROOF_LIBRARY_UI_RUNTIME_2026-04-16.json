@@ -1,0 +1,67 @@
+{
+  "schema": "VoiceStudio.library_ui_runtime_proof.v1",
+  "capture_timestamp_utc": "2026-04-16T12:01:30.362425+00:00",
+  "slice": "Slice 4 -- Library / SQLite Baseline Truth Recovery",
+  "diagnosis": {
+    "root_cause": "Backend server was started with wrong Python environment (venv/ instead of .venv/), which lacked aiosqlite. The lifecycle.py startup swallowed the ModuleNotFoundError, then route handlers crashed with unhandled ImportError manifesting as HTTP 500.",
+    "secondary_issue": "GET /api/library/folders returned a raw JSON array, but the C# LibraryClient expects a wrapper object {folders: [...]} (LibraryFoldersResponse)."
+  },
+  "fixes": [
+    "Added FoldersResponse Pydantic model wrapping the folders list",
+    "Changed GET /folders response_model from list[LibraryFolder] to FoldersResponse",
+    "Added sqlite3.OperationalError guard to GET /folders (was only on /assets)",
+    "Confirmed aiosqlite>=0.19.0 in requirements chain (root -> backend -r ../requirements.txt)"
+  ],
+  "verification": {
+    "backend_api": {
+      "health": {
+        "status": 200,
+        "body": "ok"
+      },
+      "library_folders": {
+        "status": 200,
+        "response_shape": "{folders: [...]}",
+        "count": 0
+      },
+      "library_assets": {
+        "status": 200,
+        "response_shape": "{assets: [...], total, limit, offset}",
+        "total": 283
+      },
+      "library_types": {
+        "status": 200,
+        "types_count": 9
+      }
+    },
+    "python_tests": {
+      "test_file": "tests/unit/backend/api/routes/test_library.py",
+      "tests_count": 13,
+      "all_pass": true,
+      "module_skip_removed": true
+    },
+    "csharp_tests": {
+      "library_live_backend": {
+        "test_file": "src/VoiceStudio.App.Tests/ViewModels/LibraryRuntimeLiveBackendTests.cs",
+        "result": "PASS",
+        "total_assets_matched": true,
+        "show_empty_state_correct": true
+      },
+      "profiles_seam_regression": {
+        "test_count": 9,
+        "all_pass": true
+      },
+      "profiles_live_backend_regression": {
+        "result": "PASS"
+      }
+    },
+    "build": {
+      "errors": 0,
+      "new_warnings": 0
+    }
+  },
+  "artifacts": [
+    "docs/reports/verification/PROOF_LIBRARY_RUNTIME_API_2026-04-16.json",
+    "docs/reports/verification/PROOF_LIBRARY_UI_RUNTIME_2026-04-16.json"
+  ],
+  "verdict": "ALL_PASS"
+}

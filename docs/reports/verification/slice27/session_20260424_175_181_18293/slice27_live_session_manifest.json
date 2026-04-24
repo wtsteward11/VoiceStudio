@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "base_url": "http://127.0.0.1:18293",
+  "port": 18293,
+  "preflight_artifact": "docs/reports/verification/slice27/session_20260424_175_181_18293/slice27_preflight_task175_176_18293.json",
+  "pytest_log": "docs/reports/verification/slice27/session_20260424_175_181_18293/slice27_pytest_real_whisper_cpp_task177.log.txt",
+  "session_meta": null,
+  "transcript_response": "docs/reports/verification/slice27/session_20260424_175_181_18293/slice27_transcribe_response.json",
+  "outcome": "pass",
+  "blocked_reason_code": null,
+  "recorded_utc": "2026-04-24T19:53:50+00:00",
+  "notes": "Tasks 175-181: Uvicorn Python 3.11 on 18293; /health 200 before pytest; green checks.whisper_cpp.ok; pytest Python 3.9.13 same VOICESTUDIO_REAL_XTTS_HTTP_BASE; VOICESTUDIO_SLICE27_ARTIFACT_DIR session subfolder; 1 passed 0 skipped."
+}

@@ -1,0 +1,8 @@
+Slice 17 real Chatterbox live-backend proof (synthesis succeeded).
+timestamp_utc: 2026-04-20T14:44:08Z
+backend_base: http://127.0.0.1:8027
+profile_id: b5c2d8f3-938e-499a-a81b-bc20c26d385b
+audio_id: synth_b5c2d8f3-938e-499a-a81b-bc20c26d385b_5561dc26
+wav_bytes: 522320
+duration_s: 5.44
+pcm_peak_abs: 23632

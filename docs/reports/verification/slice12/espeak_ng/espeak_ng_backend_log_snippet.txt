@@ -1,0 +1,8 @@
+Slice 12 real eSpeak NG live-backend proof (synthesis succeeded).
+timestamp_utc: 2026-04-19T15:28:14Z
+backend_base: http://127.0.0.1:8002
+profile_id: 3266d41d-e77d-4549-af8d-a13a202e700c
+audio_id: synth_3266d41d-e77d-4549-af8d-a13a202e700c_ddb508b1
+wav_bytes: 161788
+duration_s: 3.6676643990929705
+pcm_peak_abs: 31129

@@ -110,12 +110,12 @@ This document links each gate's acceptance criteria to the proof artifacts store
 | `%LOCALAPPDATA%\VoiceStudio\crashes\` | UI smoke and crash artifacts |
 | `docs/reports/verification/` | Verification reports |
 | `docs/reports/packaging/` | Installer lifecycle reports |
-| `Recovery Plan/QUALITY_LEDGER.md` | Issue tracking with proofs |
+| `docs/archive/Recovery_Plan/QUALITY_LEDGER.md` | Issue tracking with proofs |
 
 ---
 
 ## References
 
-- Quality Ledger: `Recovery Plan/QUALITY_LEDGER.md`
+- Quality Ledger: `docs/archive/Recovery_Plan/QUALITY_LEDGER.md`
 - Production Build Plan: `docs/governance/VoiceStudio_Production_Build_Plan.md`
 - STATE.md Proof Index: `.cursor/STATE.md`

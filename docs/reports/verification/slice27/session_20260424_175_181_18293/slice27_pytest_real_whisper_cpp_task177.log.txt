@@ -1,0 +1,32 @@
+[1m============================= test session starts =============================[0m
+platform win32 -- Python 3.9.13, pytest-8.4.2, pluggy-1.6.0
+Using --randomly-seed=12345
+rootdir: E:\VoiceStudio
+configfile: pytest.ini
+plugins: typeguard-4.4.4, allure-pytest-2.15.3, anyio-4.12.1, asyncio-1.2.0, cov-7.0.0, html-4.2.0, metadata-3.1.1, mock-3.15.1, randomly-4.0.1, timeout-2.4.0, xdist-3.8.0
+asyncio: mode=auto, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+2026-04-24 14:53:07,962 - httpx - INFO - HTTP Request: GET http://127.0.0.1:18293/health "HTTP/1.1 200 OK"
+2026-04-24 14:53:22,948 - httpx - INFO - HTTP Request: GET http://127.0.0.1:18293/api/health/preflight "HTTP/1.1 200 OK"
+2026-04-24 14:53:36,955 - httpx - INFO - HTTP Request: GET http://127.0.0.1:18293/api/health/preflight "HTTP/1.1 200 OK"
+2026-04-24 14:53:36,982 - httpx - INFO - HTTP Request: POST http://127.0.0.1:18293/api/library/assets/upload "HTTP/1.1 201 Created"
+2026-04-24 14:53:50,581 - httpx - INFO - HTTP Request: POST http://127.0.0.1:18293/api/transcribe/ "HTTP/1.1 200 OK"
+tests\integration\test_transcribe_whisper_cpp_real.py [32m.[0m[33m                  [100%][0m
+
+[33m============================== warnings summary ===============================[0m
+tests/integration/test_transcribe_whisper_cpp_real.py::test_live_transcribe_whisper_cpp_fixture
+  E:\VoiceStudio\backend\api\v3\models.py:79: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class StandardResponse(BaseModel, Generic[T]):
+
+tests/integration/test_transcribe_whisper_cpp_real.py::test_live_transcribe_whisper_cpp_fixture
+  E:\VoiceStudio\backend\api\v3\projects.py:42: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class ProjectInfo(BaseModel):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================ slowest 10 durations =============================
+42.67s call     tests/integration/test_transcribe_whisper_cpp_real.py::test_live_transcribe_whisper_cpp_fixture
+0.25s teardown tests/integration/test_transcribe_whisper_cpp_real.py::test_live_transcribe_whisper_cpp_fixture
+
+(1 durations < 0.005s hidden.  Use -vv to show these durations.)
+[33m======================= [32m1 passed[0m, [33m[1m2 warnings[0m[33m in 44.43s[0m[33m ========================[0m

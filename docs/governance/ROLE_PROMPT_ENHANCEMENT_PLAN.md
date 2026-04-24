@@ -107,7 +107,7 @@ quality through numbers, not adjectives.
 > Status is dynamic. Always read these files at the start of every session:
 
 1. **`.cursor/STATE.md`** — Current phase, active task, blockers, next 3 steps
-2. **`Recovery Plan/QUALITY_LEDGER.md`** — Open issues assigned to your role
+2. **`docs/archive/Recovery_Plan/QUALITY_LEDGER.md`** — Open issues assigned to your role
 3. **Gate status** — Run `python scripts/run_verification.py` or read 
    `.buildlogs/verification/last_run.json`
 
@@ -117,7 +117,7 @@ quality through numbers, not adjectives.
 cat .cursor/STATE.md
 
 # 2. Check your assigned issues
-grep -i "Role 5\|Engine" "Recovery Plan/QUALITY_LEDGER.md"
+grep -i "Role 5\|Engine" "docs/archive/Recovery_Plan/QUALITY_LEDGER.md"
 
 # 3. Verify gate status
 python scripts/run_verification.py --quiet
@@ -190,7 +190,7 @@ These changes should be applied to **all prompts** as a structural upgrade patte
 2. Gate status from last verification run
 
 ### Tier 2 — Read When Relevant (~5K tokens)
-3. `Recovery Plan/QUALITY_LEDGER.md` — Scan for your assigned items only
+3. `docs/archive/Recovery_Plan/QUALITY_LEDGER.md` — Scan for your assigned items only
 4. Relevant `.cursor/rules/**/*.mdc` for your current task domain
 
 ### Tier 3 — Reference As Needed (large files, read sections)
@@ -238,7 +238,7 @@ async def synthesize(self, text: str, voice_id: str) -> AudioResult:
 
 ## Cold Start Checklist (run these first)
 1. `cat .cursor/STATE.md` — check current phase
-2. `grep "Role 5\|Engine\|Gate E" "Recovery Plan/QUALITY_LEDGER.md"` — your issues
+2. `grep "Role 5\|Engine\|Gate E" "docs/archive/Recovery_Plan/QUALITY_LEDGER.md"` — your issues
 3. `python scripts/run_verification.py --quiet` — gate status
 4. `ls engines/*/engine.manifest.json | wc -l` — engine count
 

@@ -1,0 +1,52 @@
+{
+  "proof_type": "RUNTIME_AUTHORITY_SLICE_5",
+  "timestamp_utc": "2026-04-16T22:51:16.717920Z",
+  "health_response": {
+    "status": "ok",
+    "version": "1.0",
+    "portable_mode": false,
+    "engines_ready": true,
+    "baseline_deps_valid": true,
+    "python_executable": "E:\\VoiceStudio\\.venv\\Scripts\\python.exe",
+    "python_version": "3.11.9"
+  },
+  "interpreter_path": "E:\\VoiceStudio\\.venv\\Scripts\\python.exe",
+  "python_version": "3.11.9",
+  "baseline_deps_valid": true,
+  "test_results": {
+    "python_baseline_deps": {
+      "file": "tests/unit/backend/api/test_baseline_deps.py",
+      "count": 5,
+      "result": "PASS"
+    },
+    "python_health_baseline": {
+      "file": "tests/unit/backend/api/routes/test_health_baseline.py",
+      "count": 5,
+      "result": "PASS"
+    },
+    "python_library_regression": {
+      "file": "tests/unit/backend/api/routes/test_library.py",
+      "count": 13,
+      "result": "PASS"
+    },
+    "csharp_interpreter_priority": {
+      "test": "DebugBuild_InterpreterPriority_DotVenvBeforeVenv",
+      "result": "PASS"
+    },
+    "csharp_profiles_seam": {
+      "test": "ProfilesViewModelSeamTests",
+      "count": 9,
+      "result": "PASS"
+    }
+  },
+  "build_result": "dotnet build 0 errors",
+  "changes": {
+    "BackendProcessManager.cs": "Debug-mode .venv priority, baseline_deps_valid in startup_decision.json (v3), BaselineDepsFailure event",
+    "lifecycle.py": "validate_baseline_deps(), startup diagnostics log, DB block guarded by baseline validation, ModuleNotFoundError separation",
+    "route_registry.py": "/health includes baseline_deps_valid, python_executable, python_version; status degraded when baseline fails",
+    "startup_flags.py": "baseline_deps_valid/failures state management",
+    "start_backend.ps1": "Default VenvDir changed from venv to .venv",
+    "BackendStartFailedEventArgs.cs": "Added BaselineDepsFailure category",
+    "StartupRetryCoordinator.cs": "BaselineDepsFailure no-retry explanation"
+  }
+}

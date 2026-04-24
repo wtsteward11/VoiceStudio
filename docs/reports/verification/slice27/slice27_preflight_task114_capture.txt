@@ -1,0 +1,6 @@
+Task 114 preflight capture
+git_head: bbc2a0501f71a8478bad086c1e79cdb168b777b8
+method: FastAPI TestClient (same patches as tests/unit/backend/api/routes/test_health.py)
+reason: Dedicated Uvicorn on 127.0.0.1:8017 was not kept running in this environment;
+in-process capture still proves current health.preflight_check publishes checks.whisper_cpp.
+written: E:/VoiceStudio/docs/reports/verification/slice27/slice27_preflight_task114.json

@@ -12,7 +12,7 @@
 - **Project**: VoiceStudio Quantum+ — native Windows AI voice studio (WinUI 3 + FastAPI + 44 manifest-driven engines).
 - **Phase**: Post-Phase-5; all gates B–H **GREEN** (100%). Quality Ledger 33/33 DONE.
 - **Key metrics**: 164+ API endpoints, 6 core panels, 44 engine manifests, Gate C UI smoke and Gate H installer lifecycle validated.
-- **Source of truth**: Gate status → [Recovery Plan/QUALITY_LEDGER.md](../../Recovery%20Plan/QUALITY_LEDGER.md); session state → [.cursor/STATE.md](../../.cursor/STATE.md).
+- **Source of truth**: Gate status → [docs/archive/Recovery_Plan/QUALITY_LEDGER.md](../archive/Recovery_Plan/QUALITY_LEDGER.md); session state → [.cursor/STATE.md](../../.cursor/STATE.md).
 
 ---
 

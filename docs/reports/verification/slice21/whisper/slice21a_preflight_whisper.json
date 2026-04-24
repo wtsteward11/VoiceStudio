@@ -1,0 +1,18 @@
+{
+  "session": "Slice21A_runtime_proof",
+  "date_utc": "2026-04-22T20:35:00Z",
+  "backend_base": "http://127.0.0.1:8066",
+  "get": "/api/health/preflight",
+  "http_status": 200,
+  "checks_whisper": {
+    "ok": true,
+    "paths": [
+      "e:\\VoiceStudio\\models\\whisper"
+    ],
+    "downloaded": false,
+    "message": "faster-whisper importable; cache at e:\\VoiceStudio\\models\\whisper (models cached)",
+    "cache_dir": "e:\\VoiceStudio\\models\\whisper",
+    "models_cached": true
+  },
+  "note": "Sub-object of full preflight JSON captured while Uvicorn (current repo) was listening on 127.0.0.1:8066; top-level preflight `ok` was true for this session. Full preflight response is large; whisper block is the Slice 20/21 gate for this proof."
+}

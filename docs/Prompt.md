@@ -7,7 +7,7 @@ MISSION
 - Do NOT simplify the UI or remove panels to “make it work.” Maintain the DAW-grade layout.
 
 AUTHORITATIVE SOURCES (follow precedence)
-1) Recovery Plan/QUALITY_LEDGER.md (status + proofs are canonical)
+1) docs/archive/Recovery_Plan/QUALITY_LEDGER.md (status + proofs are canonical)
 2) openmemory.md + UI invariants docs (layout/contracts are non-negotiable)
 3) COMPLETE_UI_DESIGN_EMBEDDED.md (UI source of truth spec)
 4) Drift/Conflict logs and testing status docs: treat as conflicts to reconcile with evidence

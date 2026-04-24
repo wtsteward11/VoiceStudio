@@ -1,0 +1,148 @@
+Collecting myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23
+  Cloning https://github.com/myshell-ai/OpenVoice.git (to revision 74a1d147b17a8c3092dd5430504bd83ef6c7eb23) to c:\users\tyler\appdata\local\temp\pip-install-ts6odr5z\myshell-openvoice_174b460a01de4f3ead1de3a98bdf81d9
+  Running command git clone --filter=blob:none --quiet https://github.com/myshell-ai/OpenVoice.git 'C:\Users\Tyler\AppData\Local\Temp\pip-install-ts6odr5z\myshell-openvoice_174b460a01de4f3ead1de3a98bdf81d9'
+  Running command git rev-parse -q --verify 'sha^74a1d147b17a8c3092dd5430504bd83ef6c7eb23'
+  Running command git fetch -q https://github.com/myshell-ai/OpenVoice.git 74a1d147b17a8c3092dd5430504bd83ef6c7eb23
+  Resolved https://github.com/myshell-ai/OpenVoice.git to commit 74a1d147b17a8c3092dd5430504bd83ef6c7eb23
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Collecting librosa==0.9.1 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached librosa-0.9.1-py3-none-any.whl.metadata (6.9 kB)
+Collecting faster-whisper==0.9.0 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached faster_whisper-0.9.0-py3-none-any.whl.metadata (11 kB)
+Collecting pydub==0.25.1 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached pydub-0.25.1-py2.py3-none-any.whl.metadata (1.4 kB)
+Collecting wavmark==0.0.3 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached wavmark-0.0.3-py3-none-any.whl.metadata (5.0 kB)
+Collecting numpy==1.22.0 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached numpy-1.22.0.zip (11.3 MB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Collecting eng_to_ipa==0.0.2 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached eng_to_ipa-0.0.2-py3-none-any.whl
+Collecting inflect==7.0.0 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached inflect-7.0.0-py3-none-any.whl.metadata (21 kB)
+Collecting unidecode==1.3.7 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached Unidecode-1.3.7-py3-none-any.whl.metadata (13 kB)
+Collecting whisper-timestamped==1.14.2 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached whisper_timestamped-1.14.2-py3-none-any.whl.metadata (1.2 kB)
+Collecting pypinyin==0.50.0 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached pypinyin-0.50.0-py2.py3-none-any.whl.metadata (12 kB)
+Collecting cn2an==0.5.22 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached cn2an-0.5.22-py3-none-any.whl.metadata (10 kB)
+Collecting jieba==0.42.1 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached jieba-0.42.1-py3-none-any.whl
+Collecting gradio==3.48.0 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached gradio-3.48.0-py3-none-any.whl.metadata (17 kB)
+Collecting langid==1.1.6 (from myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached langid-1.1.6-py3-none-any.whl
+Requirement already satisfied: setuptools>=47.3.1 in e:\voicestudio\runtime\venvs\openvoice\lib\site-packages (from cn2an==0.5.22->myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23) (65.5.0)
+Collecting proces>=0.1.3 (from cn2an==0.5.22->myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached proces-0.1.7-py3-none-any.whl.metadata (3.3 kB)
+Collecting av==10.* (from faster-whisper==0.9.0->myshell-openvoice@ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23)
+  Using cached av-10.0.0.tar.gz (2.4 MB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'error'
+  error: subprocess-exited-with-error
+  
+  Getting requirements to build wheel did not run successfully.
+  exit code: 1
+  
+  [73 lines of output]
+  Compiling av\buffer.pyx because it changed.
+  [1/1] Cythonizing av\buffer.pyx
+  Compiling av\bytesource.pyx because it changed.
+  [1/1] Cythonizing av\bytesource.pyx
+  Compiling av\descriptor.pyx because it changed.
+  [1/1] Cythonizing av\descriptor.pyx
+  Compiling av\dictionary.pyx because it changed.
+  [1/1] Cythonizing av\dictionary.pyx
+  Compiling av\enum.pyx because it changed.
+  [1/1] Cythonizing av\enum.pyx
+  warning: av\enum.pyx:321:4: __nonzero__ was removed in Python 3; use __bool__ instead
+  Compiling av\error.pyx because it changed.
+  [1/1] Cythonizing av\error.pyx
+  Compiling av\format.pyx because it changed.
+  [1/1] Cythonizing av\format.pyx
+  Compiling av\frame.pyx because it changed.
+  [1/1] Cythonizing av\frame.pyx
+  Compiling av\logging.pyx because it changed.
+  [1/1] Cythonizing av\logging.pyx
+  performance hint: av\logging.pyx:232:0: Exception check on 'log_callback' will always require the GIL to be acquired.
+  Possible solutions:
+          1. Declare 'log_callback' as 'noexcept' if you control the definition and you're sure you don't want the function to raise exceptions.
+          2. Use an 'int' return type on 'log_callback' to allow an error code to be returned.
+  
+  Error compiling Cython file:
+  ------------------------------------------------------------
+  ...
+  cdef const char *log_context_name(void *ptr) nogil:
+      cdef log_context *obj = <log_context*>ptr
+      return obj.name
+  
+  cdef lib.AVClass log_class
+  log_class.item_name = log_context_name
+                        ^
+  ------------------------------------------------------------
+  av\logging.pyx:216:22: Cannot assign type 'const char *(void *) except? NULL nogil' to 'const char *(*)(void *) noexcept nogil'. Exception values are incompatible. Suggest adding 'noexcept' to the type of 'log_context_name'.
+  
+  Error compiling Cython file:
+  ------------------------------------------------------------
+  ...
+  
+  # Start the magic!
+  # We allow the user to fully disable the logging system as it will not play
+  # nicely with subinterpreters due to FFmpeg-created threads.
+  if os.environ.get('PYAV_LOGGING') != 'off':
+      lib.av_log_set_callback(log_callback)
+                              ^
+  ------------------------------------------------------------
+  av\logging.pyx:351:28: Cannot assign type 'void (void *, int, const char *, va_list) except * nogil' to 'av_log_callback' (alias of 'void (*)(void *, int, const char *, va_list) noexcept nogil'). Exception values are incompatible. Suggest adding 'noexcept' to the type of 'log_callback'.
+  Traceback (most recent call last):
+    File "E:\VoiceStudio\runtime\venvs\openvoice\Lib\site-packages\pip\_vendor\pyproject_hooks\_in_process\_in_process.py", line 353, in <module>
+      main()
+    File "E:\VoiceStudio\runtime\venvs\openvoice\Lib\site-packages\pip\_vendor\pyproject_hooks\_in_process\_in_process.py", line 335, in main
+      json_out['return_val'] = hook(**hook_input['kwargs'])
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "E:\VoiceStudio\runtime\venvs\openvoice\Lib\site-packages\pip\_vendor\pyproject_hooks\_in_process\_in_process.py", line 118, in get_requires_for_build_wheel
+      return hook(config_settings)
+             ^^^^^^^^^^^^^^^^^^^^^
+    File "C:\Users\Tyler\AppData\Local\Temp\pip-build-env-ytuwww_6\overlay\Lib\site-packages\setuptools\build_meta.py", line 333, in get_requires_for_build_wheel
+      return self._get_build_requires(config_settings, requirements=[])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "C:\Users\Tyler\AppData\Local\Temp\pip-build-env-ytuwww_6\overlay\Lib\site-packages\setuptools\build_meta.py", line 301, in _get_build_requires
+      self.run_setup()
+    File "C:\Users\Tyler\AppData\Local\Temp\pip-build-env-ytuwww_6\overlay\Lib\site-packages\setuptools\build_meta.py", line 520, in run_setup
+      super().run_setup(setup_script=setup_script)
+    File "C:\Users\Tyler\AppData\Local\Temp\pip-build-env-ytuwww_6\overlay\Lib\site-packages\setuptools\build_meta.py", line 317, in run_setup
+      exec(code, locals())
+    File "<string>", line 157, in <module>
+    File "C:\Users\Tyler\AppData\Local\Temp\pip-build-env-ytuwww_6\overlay\Lib\site-packages\Cython\Build\Dependencies.py", line 1153, in cythonize
+      cythonize_one(*args)
+    File "C:\Users\Tyler\AppData\Local\Temp\pip-build-env-ytuwww_6\overlay\Lib\site-packages\Cython\Build\Dependencies.py", line 1297, in cythonize_one
+      raise CompileError(None, pyx_file)
+  Cython.Compiler.Errors.CompileError: av\logging.pyx
+  [end of output]
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+error: subprocess-exited-with-error
+
+Getting requirements to build wheel did not run successfully.
+exit code: 1
+
+See above for output.
+
+note: This error originates from a subprocess, and is likely not a problem with pip.
+
+[notice] A new release of pip is available: 24.0 -> 26.0.1
+[notice] To update, run: E:\VoiceStudio\runtime\venvs\openvoice\Scripts\python.exe -m pip install --upgrade pip

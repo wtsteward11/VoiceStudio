@@ -27,7 +27,7 @@
 
 | Criterion | Status | Evidence |
 |-----------|--------|----------|
-| **All gates GREEN** | ✅ PASS | Gates B–H 100%; [Recovery Plan/QUALITY_LEDGER.md](../Recovery%20Plan/QUALITY_LEDGER.md) |
+| **All gates GREEN** | ✅ PASS | Gates B–H 100%; [QUALITY_LEDGER.md](archive/Recovery_Plan/QUALITY_LEDGER.md) |
 | **Installer validated** | ✅ PASS | Gate H lifecycle 7/7 PASS; [GATE_H_LIFECYCLE_PROOF_2026-01-27.md](reports/packaging/GATE_H_LIFECYCLE_PROOF_2026-01-27.md) |
 | **UI smoke test** | ✅ PASS | 21 Gate C runs; 11 nav steps, 0 binding failures; [GATE_C_H_RELEASE_ENGINEER_REPORT_2026-01-27.md](reports/packaging/GATE_C_H_RELEASE_ENGINEER_REPORT_2026-01-27.md) |
 | **Engine baseline proof** | ✅ PASS | XTTS baseline + strict-SLO; MOS > 3.5, similarity > 0.7; [TASK-0013](tasks/TASK-0013.md) |

@@ -1,0 +1,27 @@
+{
+  "schema": "voicestudio.slice27_whisper_cpp_session.v1",
+  "outcome": "pass",
+  "recorded_utc": "2026-04-24T19:53:50.582325+00:00",
+  "base_url": "http://127.0.0.1:18293",
+  "audio_id": "c4b190b0-9e9e-4115-bd4f-00e5a9882587",
+  "transcribe_response": {
+    "id": "78bcf69b-7a24-4827-9ac4-d62dd7fc7ac3",
+    "audio_id": "c4b190b0-9e9e-4115-bd4f-00e5a9882587",
+    "text": "This is a voice studio open voice reference proof clip for voice cloning.",
+    "language": "en",
+    "duration": 0.0,
+    "segments": [
+      {
+        "id": "1c23cbf7-f5fb-42bf-a045-6425083622c5",
+        "text": "This is a voice studio open voice reference proof clip for voice cloning.",
+        "start": 0.0,
+        "end": 4.8,
+        "words": null,
+        "speaker": null
+      }
+    ],
+    "word_timestamps": [],
+    "created": "2026-04-24T19:53:50.472713",
+    "engine": "whisper_cpp"
+  }
+}

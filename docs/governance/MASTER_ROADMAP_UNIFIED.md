@@ -107,7 +107,7 @@ This document is the **historical single source** for Quantum+ phase/milestone n
 | Gate E (Engine Integration) | ✓ GREEN (4/4) | Baseline proof, SLO-6 met |
 | Gate F (UI Compliance) | ✓ GREEN (6/6) | UI_COMPLIANCE_AUDIT, PANEL_FUNCTIONALITY_TESTS |
 | Gate G (Comprehensive QA) | ✓ GREEN (3/3) | ACCESSIBILITY_TESTING_REPORT, PERFORMANCE_TESTING_REPORT, SECURITY_AUDIT_REPORT |
-| Quality Ledger | ✓ 33/33 DONE | Recovery Plan/QUALITY_LEDGER.md |
+| Quality Ledger | ✓ 33/33 DONE | docs/archive/Recovery_Plan/QUALITY_LEDGER.md |
 
 ---
 
@@ -269,7 +269,7 @@ All gates B-H are **GREEN** (100%):
 | G | Comprehensive QA | GREEN (3/3) | Accessibility, Performance, Security |
 | H | Packaging & Installer | GREEN (1/1) | Installer lifecycle 7/7 PASS |
 
-**Source**: [Recovery Plan/QUALITY_LEDGER.md](../../Recovery Plan/QUALITY_LEDGER.md)
+**Source**: [docs/archive/Recovery_Plan/QUALITY_LEDGER.md](../archive/Recovery_Plan/QUALITY_LEDGER.md)
 
 ### Role System
 
@@ -315,7 +315,7 @@ See [TECH_DEBT_REGISTER.md](TECH_DEBT_REGISTER.md) for complete list. Summary:
 
 ## References
 
-- **Gate Status**: [Recovery Plan/QUALITY_LEDGER.md](../../Recovery Plan/QUALITY_LEDGER.md)
+- **Gate Status**: [docs/archive/Recovery_Plan/QUALITY_LEDGER.md](../archive/Recovery_Plan/QUALITY_LEDGER.md)
 - **Session State**: [.cursor/STATE.md](../../.cursor/STATE.md)
 - **Production Readiness**: [PRODUCTION_READINESS.md](../PRODUCTION_READINESS.md)
 - **Tech Debt**: [TECH_DEBT_REGISTER.md](TECH_DEBT_REGISTER.md)

@@ -3,7 +3,7 @@
 **Purpose:** Map claims and capabilities to canonical sources and proof artifacts. Ledger-driven; no "complete" without evidence.
 
 **Last Updated:** 2026-01-30  
-**Related:** [ON_TRACK_STATE.md](ON_TRACK_STATE.md), [Recovery Plan/QUALITY_LEDGER.md](../../Recovery%20Plan/QUALITY_LEDGER.md)
+**Related:** [ON_TRACK_STATE.md](ON_TRACK_STATE.md), [docs/archive/Recovery_Plan/QUALITY_LEDGER.md](../archive/Recovery_Plan/QUALITY_LEDGER.md)
 
 ---
 
@@ -48,4 +48,4 @@
 
 - [ON_TRACK_STATE.md](ON_TRACK_STATE.md) — Canonical sources and precedence
 - [CANONICAL_REGISTRY.md](CANONICAL_REGISTRY.md) — Document registry
-- [Recovery Plan/QUALITY_LEDGER.md](../../Recovery%20Plan/QUALITY_LEDGER.md) — Full ledger
+- [docs/archive/Recovery_Plan/QUALITY_LEDGER.md](../archive/Recovery_Plan/QUALITY_LEDGER.md) — Full ledger

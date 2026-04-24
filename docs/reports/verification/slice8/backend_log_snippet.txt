@@ -1,12 +1,8 @@
-Slice 8 real XTTS runtime proof (2026-04-17).
-
-Backend: uvicorn with E:\VoiceStudio\.venv\Scripts\python.exe, PYTHONPATH=E:\VoiceStudio, VOICESTUDIO_TEST_MODE unset.
-Base URL for opt-in tests: http://127.0.0.1:8010 (VOICESTUDIO_REAL_XTTS_HTTP_BASE). Health: engines_ready=true, python_executable=.venv.
-
-Python: pytest -m real_xtts tests/integration/test_synthesis_xtts_real.py PASS (WAV written here as slice8_output.wav).
-
-C#: dotnet test --filter FullyQualifiedName~RealSynthesisXttsLiveBackendTests PASS with same VOICESTUDIO_REAL_XTTS_HTTP_BASE (VoiceSynthesisRequest omits unset prosody floats so Coqui kwargs match minimal HTTP clients).
-
-UI: Pixel screenshot file ui_synthesis_success.png not captured in this headless session; follow UI_PROOF_OPERATOR_SESSION.md on an interactive desktop.
-
-Seam: scripts/backend/start_backend.ps1 now sets PYTHONPATH to repo root and Set-Location to repo root before uvicorn (avoids wrong cwd / system-python fallback).
+Slice 8 real XTTS live-backend proof (synthesis succeeded).
+timestamp_utc: 2026-04-19T15:28:00Z
+backend_base: http://127.0.0.1:8002
+profile_id: 0274d72b-cc82-491b-bb37-6c21b2d7a6a7
+audio_id: synth_0274d72b-cc82-491b-bb37-6c21b2d7a6a7_b4c9ca20
+wav_bytes: 122444
+duration_s: 2.55
+pcm_peak_abs: 32767

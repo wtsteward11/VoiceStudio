@@ -1,0 +1,51 @@
+{
+  "schema": "VoiceStudio.library_api_proof.v1",
+  "capture_timestamp_utc": "2026-04-16T11:53:40.729264+00:00",
+  "environment": {
+    "python_venv": ".venv",
+    "aiosqlite_version": "0.22.1",
+    "server_host": "127.0.0.1:8000"
+  },
+  "endpoints": {
+    "/health": {
+      "status_code": 200,
+      "x_cache": null,
+      "health_status": "ok"
+    },
+    "/api/library/folders": {
+      "status_code": 200,
+      "x_cache": "MISS, HIT",
+      "folders_count": 0,
+      "response_shape": "object_with_folders_array"
+    },
+    "/api/library/assets": {
+      "status_code": 200,
+      "x_cache": "MISS, MISS",
+      "assets_count": 100,
+      "total": 283,
+      "response_shape": "object_with_assets_array_total_limit_offset"
+    },
+    "/api/library/types": {
+      "status_code": 200,
+      "x_cache": "MISS",
+      "types_count": 9,
+      "type_ids": [
+        "audio",
+        "voice_profile",
+        "preset",
+        "template",
+        "effect",
+        "macro",
+        "image",
+        "video",
+        "other"
+      ]
+    }
+  },
+  "diagnosis": {
+    "root_cause": "Server was started with wrong Python environment (venv/ instead of .venv/), which lacked aiosqlite. With correct .venv, all routes return 200.",
+    "code_fix": "Added FoldersResponse wrapper class so GET /folders returns {folders: [...]} matching C# LibraryFoldersResponse. Added sqlite3.OperationalError guard to /folders endpoint (was only on /assets).",
+    "data_truth": "Library database has assets. Routes return truthful data, not infrastructure errors."
+  },
+  "verdict": "ALL_PASS"
+}

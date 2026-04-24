@@ -166,7 +166,7 @@ python -m tools.context.cli.allocate --role debug-agent --task TASK-XXXX
 **Read access**:
 - All logs (`%APPDATA%\VoiceStudio\logs\`, `.buildlogs\`)
 - Issue database (`%APPDATA%\VoiceStudio\issues\`)
-- Quality Ledger (`Recovery Plan/QUALITY_LEDGER.md`)
+- Quality Ledger (`docs/archive/Recovery_Plan/QUALITY_LEDGER.md`)
 - State files (`.cursor/STATE.md`, task briefs)
 - All source code
 
@@ -1035,7 +1035,7 @@ python -m tools.overseer.cli.main ledger gaps
 | Agent Audit | `%APPDATA%\VoiceStudio\logs\agent_audit\` |
 | Backend Logs | `%APPDATA%\VoiceStudio\logs\backend.log` |
 | Build Logs | `.buildlogs\` |
-| Quality Ledger | `Recovery Plan/QUALITY_LEDGER.md` |
+| Quality Ledger | `docs/archive/Recovery_Plan/QUALITY_LEDGER.md` |
 | Task Briefs | `docs/tasks/TASK-XXXX.md` |
 | Debug Reports | `docs/reports/debug/` |
 | Resolution Summaries | `docs/reports/debug/resolutions/` |

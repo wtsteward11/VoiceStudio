@@ -8,7 +8,7 @@ This document is a **single entry point** that stitches together the repo’s ex
 Canonical context / governance:
 
 - **Living progression log:** `docs/governance/overseer/PROJECT_PROGRESSION_LOG.md`
-- **Ledger (source of truth):** `Recovery Plan/QUALITY_LEDGER.md`
+- **Ledger (source of truth):** `docs/archive/Recovery_Plan/QUALITY_LEDGER.md`
 - **Evidence packets (“handoffs”):** `docs/governance/overseer/handoffs/VS-*.md`
 - **ADR (MSIX rejected):** `docs/architecture/ADR_GATE_C_ARTIFACT_CHOICE.md`
 

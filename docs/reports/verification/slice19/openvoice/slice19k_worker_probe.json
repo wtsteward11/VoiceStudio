@@ -1,0 +1,14 @@
+{
+  "text": "Hello from slice nineteen K probe.",
+  "speaker_wav": "e:/VoiceStudio/tests/fixtures/audio/test_440hz_2s.wav",
+  "output_path": "e:/VoiceStudio/docs/reports/verification/slice19/openvoice/slice19k_worker_probe_out.wav",
+  "language": "en",
+  "base_speaker_model": "openvoice/base_speakers/EN",
+  "tone_color_converter_model": "openvoice/converter",
+  "device": "cpu",
+  "gpu": false,
+  "enhance_quality": false,
+  "calculate_quality": false,
+  "enable_style_control": true,
+  "speed": 1.0
+}

@@ -1,0 +1,16 @@
+{
+  "slice": "22",
+  "engine_id": "whisper_cpp",
+  "capture_method": "FastAPI TestClient GET /api/health/preflight (same app stack as Uvicorn; Slice 22 readiness)",
+  "host": "in-process TestClient",
+  "timestamp_utc": "2026-04-23T04:11:04.719510",
+  "http_status": 200,
+  "checks_whisper_cpp": {
+    "ok": false,
+    "downloaded": false,
+    "message": "Whisper.cpp model missing at C:\\ProgramData\\VoiceStudio\\models\\whisper\\whisper-medium.en.gguf. Place the GGUF or enable auto-download.",
+    "status_code": 424
+  },
+  "outcome": "B",
+  "outcome_note": "Boolean preflight is honest: ok is false (never null). First-line blocker = missing GGUF at resolved model_path. Runtime STT transcript proof remains a future bounded slice."
+}

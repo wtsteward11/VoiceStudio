@@ -7,7 +7,7 @@
 **Purpose:** Single source of truth for Overseer role, authority, and procedures
 **Status:** AUTHORITY DOCUMENT - BINDING ON ALL AGENTS
 
-**Operational supersedes:** For live gate status, phase, and task assignment use **`.cursor/STATE.md`**, **`Recovery Plan/QUALITY_LEDGER.md`**, and **`docs/governance/roles/ROLE_0_OVERSEER_GUIDE.md`**. Canonical rules: **`.cursor/rules/*.mdc`** and **`docs/governance/CANONICAL_REGISTRY.md`**.
+**Operational supersedes:** For live gate status, phase, and task assignment use **`.cursor/STATE.md`**, **`docs/archive/Recovery_Plan/QUALITY_LEDGER.md`**, and **`docs/governance/roles/ROLE_0_OVERSEER_GUIDE.md`**. Canonical rules: **`.cursor/rules/*.mdc`** and **`docs/governance/CANONICAL_REGISTRY.md`**.
 
 ---
 
@@ -54,7 +54,7 @@
 
 1. **`.cursor/STATE.md`** — Current phase, active task, Next 3 Steps
 2. **`.cursor/rules/*.mdc`** — Agent rules (source of truth for AI agents)
-3. **`Recovery Plan/QUALITY_LEDGER.md`** — Issue ledger (VS-XXXX)
+3. **`docs/archive/Recovery_Plan/QUALITY_LEDGER.md`** — Issue ledger (VS-XXXX)
 4. **`docs/governance/CANONICAL_REGISTRY.md`** — Document governance registry
 5. **`docs/governance/roles/ROLE_0_OVERSEER_GUIDE.md`** — Overseer operational guide
 6. **`docs/governance/ROLE_GUIDES_INDEX.md`** — Role guides and task-type to role mapping
@@ -155,7 +155,7 @@ VoiceStudio uses an **8-role governance system** (Roles 0–7). Overseer is Role
 
 ### Current Project Status
 
-**Source of truth:** `.cursor/STATE.md` (phase, active task, Next 3 Steps) and `Recovery Plan/QUALITY_LEDGER.md` (open index).
+**Source of truth:** `.cursor/STATE.md` (phase, active task, Next 3 Steps) and `docs/archive/Recovery_Plan/QUALITY_LEDGER.md` (open index).
 
 - **Gates A–H:** Verify with `python scripts/run_verification.py` (gate_status, ledger_validate, completion_guard)
 - **Phase:** Implement (Post Gate D — Gate H); see STATE.md for live phase
@@ -364,7 +364,7 @@ Tool configuration: `tools/overseer/config.yaml`
 ### Primary Operational Documents
 
 - **`.cursor/STATE.md`** — Current phase, active task, Next 3 Steps
-- **`Recovery Plan/QUALITY_LEDGER.md`** — Issue ledger (VS-XXXX)
+- **`docs/archive/Recovery_Plan/QUALITY_LEDGER.md`** — Issue ledger (VS-XXXX)
 - **`docs/governance/DEFINITION_OF_DONE.md`** — Completion criteria
 - **`docs/governance/CANONICAL_REGISTRY.md`** — Document governance registry
 - **`docs/governance/VoiceStudio_Production_Build_Plan.md`** — Gate C/H and packaging (no MSIX)

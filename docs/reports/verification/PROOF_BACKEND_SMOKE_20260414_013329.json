@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "timestamp_utc": "2026-04-14T01:33:06.446939+00:00",
+  "port": 60105,
+  "cold_start_ms": 23155.99999995902,
+  "health_probe_result": true,
+  "engines_ready_value": true,
+  "api_call_result": {
+    "ok": true
+  },
+  "startup_decision_artifact": {
+    "schema_version": 2,
+    "status": "success",
+    "timestamp_utc": "1970-01-01T00:00:00.0000000Z",
+    "decision": "reuse",
+    "health_probe_result": true,
+    "port_occupied": false,
+    "backend_pid": null,
+    "spawn_attempted": false,
+    "reused_existing_backend": true,
+    "conflict_category": null,
+    "timeout_seconds": 120,
+    "elapsed_ms": 0.0,
+    "spawn_elapsed_ms": 0.0,
+    "health_attempts": 0,
+    "healthy_elapsed_ms": 0.0,
+    "last_stderr_lines": [],
+    "python_path_resolved": null
+  },
+  "blocking_reason": null,
+  "failure_reason": null,
+  "environment_hints": []
+}

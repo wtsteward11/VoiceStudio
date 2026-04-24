@@ -1,3 +1,28 @@
+# STATE.md Historical Context Archive
+
+_Archived from `.cursor/STATE.md` on 2026-04-14. Historical phase/task/milestone context below LATEST PROOF INDEX._
+
+### Current Phase (historical)
+
+- **Phase**: v1.1.0 Completion Roadmap v2.0 — CI-Enforced Edition
+- **Master Plan Phase**: Phase F COMPLETE — v1.1.0 Release
+- **Started**: 2026-03-03
+- **Context**: Roadmap v2.0 adopted. 7 ground truth gaps verified. 6 phases with CI-enforced gates. Phases 0, C, A, B, D, E, F complete. v1.1.0 shipped.
+
+## Active Plan
+
+- **Plan**: VoiceStudio Completion Roadmap v2.0 — CI-Enforced Edition
+- **Document**: `docs/governance/VOICESTUDIO_COMPLETION_ROADMAP_V2.md`
+- **Status**: COMPLETE — Phase F (v1.1.0 Release)
+- **Previous Plan**: VoiceStudio 100% Completion Plan — COMPLETE (2026-02-26)
+
+## Active Task
+
+- **ID**: ARCHITECT-HARDENING
+- **Title**: Architect Hardening Plan — Execution Complete
+- **Status**: **COMPLETE** (2026-03-08)
+- **Completed**: All phases. Empty catch violations fixed (5 markers added). verify.ps1 -Quick exits 0. EngineService returns 62 engines; Jobs workflow tests pass; RenameWorkspace_MovesProfileFile passes; mypy 69/110 budget.
+- **Remaining**: None. See DEFERRED_V1_2.md for v1.2 scope.
 
 ## Previous Active Task
 

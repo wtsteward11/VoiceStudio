@@ -116,7 +116,7 @@ Added `RoutedEngine` property on `VoiceSynthesisResponse`:
 2. **Slice 10 governance** — the three behavior changes (no invalid-engine fallback, `routed_engine` echo contract, `_try_utility_tts_fallback` known-non-parity seam).
 3. **Per-engine rows** by domain:
    - **TTS** (proof shape: synth → file route → stream → optional NAudio). `xtts_v2` and `piper` are PASS; `chatterbox`, `tortoise`, `bark`, `openvoice`, `fish_speech`, `gpt_sovits`, `higgs_audio` are `none / ok:null` (no public preflight).
-   - **STT** (`whisper`, `whisper_cpp`, `vosk`, `parakeet`) — `ok:null`, deferred (different proof shape: transcript JSON).
+   - **STT** (`whisper`, `whisper_cpp`, `vosk`) — transcript JSON proof shape; **`parakeet`** is **TTS** (manifest) — matrix §Task 31 (post–Slice 30).
    - **STS** (`sovits_svc` — has `ensure_sovits` preflight; not Slice 10).
 
 The matrix is designed so Slice 11+ adds rows without re-architecting. Discrepancies between manifest / router / config become "row findings", never silently merged.

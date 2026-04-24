@@ -1,0 +1,22 @@
+Task 134 — fresh live Uvicorn + TCP preflight capture (Slice 27 post-132)
+================================================================================
+UTC wall (operator): 2026-04-24 (session aligned with Task 136 pytest log tail).
+
+Base URL (single session): http://127.0.0.1:18082
+VOICESTUDIO_REAL_XTTS_HTTP_BASE: http://127.0.0.1:18082 (same string for preflight + pytest)
+
+Start (repo root, same python as pytest — CPython 3.9 on this host):
+  $p = Start-Process -FilePath python -ArgumentList @(
+    '-m','uvicorn','backend.api.main:app','--host','127.0.0.1','--port','18082'
+  ) -WorkingDirectory 'e:\VoiceStudio' -PassThru -WindowStyle Hidden
+  Start-Sleep -Seconds 35
+
+Preflight capture (Terminal B):
+  Invoke-WebRequest -Uri 'http://127.0.0.1:18082/api/health/preflight' -UseBasicParsing
+  -> docs/reports/verification/slice27/slice27_preflight_task134_live.json
+
+Stop server after capture / pytest:
+  Stop-Process -Id $p.Id -Force
+
+Binding note (from Uvicorn stdout on this host): whisper-cpp-python not installed;
+GGUF still missing per checks.whisper_cpp.message in slice27_preflight_task134_live.json.

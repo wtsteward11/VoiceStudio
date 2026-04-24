@@ -1,0 +1,8 @@
+Slice 19A real OpenVoice live-backend proof (synthesis succeeded).
+timestamp_utc: 2026-04-22T23:32:49Z
+backend_base: http://127.0.0.1:8055
+profile_id: 83de865a-567d-4a4a-88de-63db3a4a2c7b
+audio_id: synth_83de865a-567d-4a4a-88de-63db3a4a2c7b_896f4d17
+wav_bytes: 173612
+duration_s: 3.93578231292517
+pcm_peak_abs: 31130

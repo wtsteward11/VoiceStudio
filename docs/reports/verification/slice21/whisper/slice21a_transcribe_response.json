@@ -1,0 +1,46 @@
+{
+  "upload": {
+    "id": "b605ec76-4f43-4596-9e58-195042e09d5b",
+    "name": "proof",
+    "type": "audio",
+    "path": "C:\\Users\\Tyler\\AppData\\Local\\VoiceStudio\\audio_uploads\\24d66f8b-36f0-48a9-8eda-97a5e29a22ac.wav",
+    "folder_id": null,
+    "tags": [],
+    "metadata": {
+      "original_filename": "proof.wav",
+      "original_path": null,
+      "content_type": "audio/wav",
+      "upload_id": "24d66f8b-36f0-48a9-8eda-97a5e29a22ac",
+      "source": "upload",
+      "converted_to_wav": false,
+      "source_format": "wav",
+      "is_video_source": false
+    },
+    "created": "2026-04-22T20:36:14.531676",
+    "modified": "2026-04-22T20:36:14.531676",
+    "size": 237160,
+    "duration": null,
+    "thumbnail_url": null,
+    "audio_id": "24d66f8b-36f0-48a9-8eda-97a5e29a22ac"
+  },
+  "transcribe": {
+    "id": "fce3171e-46e0-4dfc-8cea-2aef19574318",
+    "audio_id": "24d66f8b-36f0-48a9-8eda-97a5e29a22ac",
+    "text": "This is a voice studio open voice reference proof clip for voice cloning.",
+    "language": "en",
+    "duration": 4.96,
+    "segments": [
+      {
+        "id": "d06b99aa-f06d-460b-82fa-53a78dd4cb54",
+        "text": " This is a voice studio open voice reference proof clip for voice cloning.",
+        "start": 0.0,
+        "end": 4.96,
+        "words": null,
+        "speaker": null
+      }
+    ],
+    "word_timestamps": [],
+    "created": "2026-04-23T01:36:15.282074",
+    "engine": "whisper"
+  }
+}

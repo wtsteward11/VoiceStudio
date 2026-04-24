@@ -1,0 +1,17 @@
+{
+  "schema": "voicestudio.slice27_session_meta.v2",
+  "recorded_utc": "2026-04-24T15:47:17+00:00",
+  "base_url": "http://127.0.0.1:18082",
+  "stage": "preflight_whisper_cpp",
+  "blocked_reason_code": "preflight_not_green",
+  "outcome": "skipped",
+  "skip_reason": "Preflight checks.whisper_cpp.ok is not true — see ensure_whisper_cpp / GGUF / binding or CLI (Slice 22).",
+  "preflight_http_status": 200,
+  "extra": {
+    "checks_whisper_cpp": {
+      "ok": false,
+      "message": "Whisper.cpp model missing at C:\\ProgramData\\VoiceStudio\\models\\whisper\\whisper-medium.en.gguf. Place the GGUF or enable auto-download."
+    },
+    "archaeology_note": "Frozen Task 134–136 session record per PROOF §27 Task 137; canonical PASS authority is slice27_live_session_manifest.json + slice27_preflight_task143_green.json + slice27_transcribe_response.json (Tasks 143–148)."
+  }
+}

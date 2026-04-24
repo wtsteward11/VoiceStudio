@@ -10,7 +10,7 @@
 
 | Item | Location / Command |
 |------|--------------------|
-| **Quality Ledger** | [Recovery Plan/QUALITY_LEDGER.md](../../Recovery%20Plan/QUALITY_LEDGER.md) |
+| **Quality Ledger** | [docs/archive/Recovery_Plan/QUALITY_LEDGER.md](../archive/Recovery_Plan/QUALITY_LEDGER.md) |
 | **Gate status** | `python scripts/run_verification.py` |
 | **Gate status (with build)** | `python scripts/run_verification.py --build` |
 | **Ledger validate** | `python -m tools.overseer.cli.main ledger validate` |

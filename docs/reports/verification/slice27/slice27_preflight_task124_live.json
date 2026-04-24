@@ -1,0 +1,188 @@
+{
+  "checks": {
+    "audio_registry_dir": {
+      "ok": true,
+      "path": "C:\\Users\\Tyler\\AppData\\Roaming\\VoiceStudio\\data"
+    },
+    "bark": {
+      "ok": null,
+      "reason": "no public ensure_* preflight API; runtime-only (use engine router + synthesis probe)"
+    },
+    "cache_root": {
+      "ok": true,
+      "path": "C:\\ProgramData\\VoiceStudio\\models\\cache"
+    },
+    "chatterbox": {
+      "downloaded": false,
+      "message": "Chatterbox: no usable Hugging Face cache for ResembleAI/chatterbox (ve.safetensors) in venv_advanced_tts. Preflight uses auto_download=False (no automatic download). Warm the cache once with network access. Detail: {\"ok\": false, \"error\": \"hf\", \"detail\": \"LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.\"}",
+      "ok": false,
+      "python_exe": "E:\\VoiceStudio\\runtime\\venvs\\torch26\\Scripts\\python.exe",
+      "repo_id": "ResembleAI/chatterbox",
+      "status_code": 503
+    },
+    "engine_config": {
+      "consistent_with_model_root": false,
+      "expected_model_root": "C:\\ProgramData\\VoiceStudio\\models",
+      "model_paths.base": "E:\\\\VoiceStudio\\\\models",
+      "ok": true
+    },
+    "espeak_ng": {
+      "downloaded": false,
+      "message": "eSpeak NG ready: C:\\Program Files\\eSpeak NG\\espeak-ng.EXE",
+      "ok": true,
+      "paths": [
+        "C:\\Program Files\\eSpeak NG\\espeak-ng.EXE"
+      ]
+    },
+    "ffmpeg": {
+      "message": "ffmpeg found",
+      "ok": true,
+      "path": "C:\\Users\\Tyler\\scoop\\apps\\ffmpeg-shared\\current\\bin\\ffmpeg.EXE"
+    },
+    "fish_speech": {
+      "ok": null,
+      "reason": "no public ensure_* preflight API; runtime-only (use engine router + synthesis probe)"
+    },
+    "gpt_sovits": {
+      "ok": null,
+      "reason": "no public ensure_* preflight API; runtime-only (use engine router + synthesis probe)"
+    },
+    "higgs_audio": {
+      "ok": null,
+      "reason": "no public ensure_* preflight API; runtime-only (use engine router + synthesis probe)"
+    },
+    "jobs_root": {
+      "ok": true,
+      "path": "C:\\Users\\Tyler\\AppData\\Roaming\\VoiceStudio\\jobs"
+    },
+    "model_root": {
+      "ok": true,
+      "path": "C:\\ProgramData\\VoiceStudio\\models"
+    },
+    "openvoice": {
+      "downloaded": false,
+      "message": "base_speaker tree incomplete under C:\\ProgramData\\VoiceStudio\\models\\openvoice\\base_speakers (need config.json + checkpoint.pth next to it, or nested layout discoverable by rglob). tone-color converter tree incomplete under C:\\ProgramData\\VoiceStudio\\models\\openvoice\\converter (same checkpoint rule).",
+      "ok": false,
+      "paths": [
+        "C:\\ProgramData\\VoiceStudio\\models\\openvoice\\base_speakers",
+        "C:\\ProgramData\\VoiceStudio\\models\\openvoice\\converter"
+      ],
+      "status_code": 424
+    },
+    "parakeet": {
+      "downloaded": false,
+      "first_blocker": "paddle_missing",
+      "message": "paddlepaddle not installed (required for Parakeet TTS).",
+      "ok": false,
+      "status_code": 503
+    },
+    "piper": {
+      "downloaded": false,
+      "message": "Piper voice ready: en_US-amy-medium",
+      "ok": true,
+      "paths": [
+        "E:\\VoiceStudio\\models\\piper\\en_US-amy-medium.onnx",
+        "E:\\VoiceStudio\\models\\piper\\en_US-amy-medium.onnx.json"
+      ]
+    },
+    "projects_root": {
+      "ok": true,
+      "path": "C:\\Users\\Tyler\\.voicestudio\\projects"
+    },
+    "rhvoice": {
+      "downloaded": false,
+      "message": "RHVoice CLI not found. Stock Windows does not ship RHVoice; install a supported RHVoice binary externally (see RHVoice project), then set engine_configs.rhvoice.parameters.executable_path in backend/config/engine_config.json to the full path of rhvoice-say, rhvoice-cli, or rhvoice-client, or place one of those names on PATH.",
+      "ok": false,
+      "status_code": 503
+    },
+    "silero": {
+      "downloaded": false,
+      "hub_dir": "C:\\ProgramData\\VoiceStudio\\models\\torch\\hub",
+      "message": "Silero: torch.hub repo snakers4/silero-models is not cached under C:\\ProgramData\\VoiceStudio\\models\\torch\\hub. Preflight uses auto_download=False (no automatic hub fetch). Warm the cache once with network access (run ensure_silero(auto_download=True) or a successful Silero synthesis), then re-run preflight.",
+      "ok": false,
+      "status_code": 503
+    },
+    "sovits_svc": {
+      "allow_passthrough": false,
+      "downloaded": false,
+      "inference_command_configured": false,
+      "inference_workdir": null,
+      "message": "So-VITS checkpoints present",
+      "ok": true,
+      "paths": [
+        "E:\\VoiceStudio\\models\\checkpoints\\Lain_SVC4\\model.pth",
+        "E:\\VoiceStudio\\models\\checkpoints\\Lain_SVC4\\config.json"
+      ]
+    },
+    "tortoise": {
+      "downloaded": false,
+      "message": "Tortoise: no cached weights under C:\\ProgramData\\VoiceStudio\\models\\tortoise_models. Preflight uses auto_download=False (no automatic download). Warm once with network access: ensure_tortoise(auto_download=True) or a successful Tortoise synthesis in the isolated venv, then re-run preflight.",
+      "models_dir": "C:\\ProgramData\\VoiceStudio\\models\\tortoise_models",
+      "ok": false,
+      "python_exe": "E:\\VoiceStudio\\runtime\\venvs\\tortoise\\Scripts\\python.exe",
+      "status_code": 424
+    },
+    "vosk": {
+      "downloaded": false,
+      "first_blocker": "import_vosk",
+      "message": "vosk package not installed. Install: pip install vosk>=0.3.45",
+      "ok": false,
+      "status_code": 503
+    },
+    "whisper": {
+      "cache_dir": "C:\\ProgramData\\VoiceStudio\\models\\whisper",
+      "downloaded": false,
+      "message": "faster-whisper importable; cache at C:\\ProgramData\\VoiceStudio\\models\\whisper (models cached)",
+      "models_cached": true,
+      "ok": true,
+      "paths": [
+        "C:\\ProgramData\\VoiceStudio\\models\\whisper"
+      ]
+    },
+    "whisper_cpp": {
+      "downloaded": false,
+      "message": "Whisper.cpp model missing at C:\\ProgramData\\VoiceStudio\\models\\whisper\\whisper-medium.en.gguf. Place the GGUF or enable auto-download.",
+      "ok": false,
+      "status_code": 424
+    },
+    "xtts_v2": {
+      "assets_present": true,
+      "base_dir": "E:\\VoiceStudio\\models\\xtts",
+      "cache_dir": "E:\\VoiceStudio\\models\\xtts\\cache",
+      "deferred_download": false,
+      "dependencies": {
+        "message": "XTTS dependencies ready",
+        "ok": true,
+        "versions": {
+          "coqui-tts": "0.25.3",
+          "torch": "2.8.0",
+          "torchaudio": "2.8.0"
+        }
+      },
+      "downloaded": false,
+      "message": "XTTS assets ready at E:\\VoiceStudio\\models\\xtts",
+      "ok": true,
+      "paths": [
+        "E:\\VoiceStudio\\models\\xtts\\tts\\tts_models--multilingual--multi-dataset--xtts_v2\\config.json",
+        "E:\\VoiceStudio\\models\\xtts\\tts\\tts_models--multilingual--multi-dataset--xtts_v2\\hash.md5",
+        "E:\\VoiceStudio\\models\\xtts\\tts\\tts_models--multilingual--multi-dataset--xtts_v2\\model.pth",
+        "E:\\VoiceStudio\\models\\xtts\\tts\\tts_models--multilingual--multi-dataset--xtts_v2\\speakers_xtts.pth",
+        "E:\\VoiceStudio\\models\\xtts\\tts\\tts_models--multilingual--multi-dataset--xtts_v2\\vocab.json"
+      ]
+    }
+  },
+  "env": {
+    "HF_DATASETS_CACHE": "C:\\VoiceStudio\\models\\.hf\\datasets",
+    "HF_HOME": "C:\\VoiceStudio\\models\\.hf",
+    "HUGGINGFACE_HUB_CACHE": "C:\\VoiceStudio\\models\\.hf\\hub",
+    "TORCH_HOME": "C:\\ProgramData\\VoiceStudio\\models\\torch",
+    "TRANSFORMERS_CACHE": "C:\\VoiceStudio\\models\\.hf\\transformers",
+    "TTS_HOME": "C:\\ProgramData\\VoiceStudio\\models\\xtts",
+    "VOICESTUDIO_CACHE_DIR": null,
+    "VOICESTUDIO_JOBS_DIR": null,
+    "VOICESTUDIO_MODELS_PATH": "C:\\ProgramData\\VoiceStudio\\models",
+    "VOICESTUDIO_PROJECTS_DIR": null
+  },
+  "ok": false,
+  "timestamp": "2026-04-24T05:01:22.387982"
+}

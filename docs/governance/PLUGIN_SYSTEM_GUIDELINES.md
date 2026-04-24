@@ -308,7 +308,7 @@ All plugin system logs must include:
 | Free-only policy | `.cursor/rules/core/free-only.mdc` |
 | Compatibility matrix | `config/compatibility_matrix.yml` |
 | Risk register | `docs/governance/RISK_REGISTER.md` |
-| Quality Ledger | `Recovery Plan/QUALITY_LEDGER.md` |
+| Quality Ledger | `docs/archive/Recovery_Plan/QUALITY_LEDGER.md` |
 | Design tokens | `src/VoiceStudio.App/Resources/DesignTokens.xaml` |
 
 ---

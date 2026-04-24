@@ -15,7 +15,7 @@
 ## What this slice does not close
 
 - **Matrix** “full STT runtime PASS” (e.g. **`pytest -m real_whisper`** + C# transcript / HTTP proof) — **out of scope** for **20**; track as **Slice 20+** or **20D**-style live lane when added.
-- **`whisper_cpp`**, **vosk**, **parakeet** — still **`ok: null`** in `_NO_PUBLIC_PREFLIGHT` until a separate bounded contract.
+- **`whisper_cpp`**, **vosk**, **parakeet** — **Superseded for preflight wiring** by Slices **22** / **26** / **28** (boolean `checks.*`). This bullet reflected **Slice 20**-era `_NO_PUBLIC_PREFLIGHT` only; do not treat as current truth for those ids.
 
 ## Evidence (automated)
 

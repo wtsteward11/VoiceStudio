@@ -1,0 +1,11 @@
+{
+  "session": "Slice19B",
+  "backend_base": "http://127.0.0.1:8032",
+  "checks_openvoice": {
+    "ok": false,
+    "downloaded": false,
+    "message": "OpenVoice import failed in venv_advanced_tts (E:\\VoiceStudio\\runtime\\venvs\\torch26\\Scripts\\python.exe): Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nModuleNotFoundError: No module named 'openvoice'. Install the OpenVoice stack into that venv (see MyShell-OpenVoice docs).",
+    "status_code": 503,
+    "python_exe": "E:\\VoiceStudio\\runtime\\venvs\\torch26\\Scripts\\python.exe"
+  }
+}

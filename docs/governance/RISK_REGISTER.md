@@ -67,6 +67,6 @@ This register should be reviewed:
 
 ## References
 
-- Quality Ledger: `Recovery Plan/QUALITY_LEDGER.md`
+- Quality Ledger: `docs/archive/Recovery_Plan/QUALITY_LEDGER.md`
 - Tech Debt Register: `docs/governance/TECH_DEBT_REGISTER.md`
 - Production Build Plan: `docs/governance/VoiceStudio_Production_Build_Plan.md`

@@ -1,0 +1,44 @@
+Slice 27 — Task 124 live dedicated-port preflight (TCP process)
+================================================================
+
+Single session with Tasks 125 + 129 (same base URL).
+
+Git
+---
+HEAD: bbc2a0501f71a8478bad086c1e79cdb168b777b8
+Branch: main (local clone may be ahead of origin)
+
+Dedicated port
+--------------
+http://127.0.0.1:18079  (8079 refused bind in this environment; any unused port is fine.)
+
+Capture (Task 124)
+------------------
+Start (repo root):
+
+  python -m uvicorn backend.api.main:app --host 127.0.0.1 --port 18079
+
+While running:
+
+  GET http://127.0.0.1:18079/health
+  GET http://127.0.0.1:18079/api/health/preflight  ->  slice27_preflight_task124_live.json
+
+Contract: checks.whisper_cpp is a JSON object; ok is a boolean (false here = GGUF/readiness red, not missing-key P0).
+
+Task 125 (opt-in guard, same session)
+-------------------------------------
+  set VOICESTUDIO_LIVE_PREFLIGHT_BASE_URL=http://127.0.0.1:18079
+  python -m pytest tests/integration/test_whisper_cpp_live_preflight_http.py -m live_whisper_cpp_preflight -q --no-cov
+
+Outcome: 1 passed, exit 0.
+
+Task 129 (real_whisper_cpp, same base URL)
+------------------------------------------
+  set VOICESTUDIO_REAL_XTTS_HTTP_BASE=http://127.0.0.1:18079
+  set VOICESTUDIO_SLICE27_ARTIFACT_DIR=<repo>\docs\reports\verification\slice27
+  python -m pytest tests/integration/test_transcribe_whisper_cpp_real.py -m real_whisper_cpp -q --no-cov
+
+Outcome: 1 skipped, exit 0 — preflight_whisper_cpp / blocked_reason_code preflight_not_green
+(checks.whisper_cpp.ok false: GGUF missing on host). Session meta: slice27_session_meta.json
+
+Matrix: whisper_cpp runtime transcript column remains pending (no non-skip PASS; no slice27_transcribe_response.json).

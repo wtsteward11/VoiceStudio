@@ -426,7 +426,7 @@ patterns = store.get_top_patterns(limit=10, time_window_hours=24)
 
 ### Quality Ledger Integration
 
-**Location**: `Recovery Plan/QUALITY_LEDGER.md`
+**Location**: `docs/archive/Recovery_Plan/QUALITY_LEDGER.md`
 
 **Integration**:
 ```bash

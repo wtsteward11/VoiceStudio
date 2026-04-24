@@ -1,0 +1,8 @@
+Slice 15 real Silero live-backend proof (synthesis succeeded).
+timestamp_utc: 2026-04-19T15:19:23Z
+backend_base: http://127.0.0.1:8002
+profile_id: b01254ef-a400-4f28-91c3-63a70a1e92de
+audio_id: synth_b01254ef-a400-4f28-91c3-63a70a1e92de_2842036b
+wav_bytes: 177044
+duration_s: 3.6875
+pcm_peak_abs: 31129

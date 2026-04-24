@@ -10,7 +10,7 @@ VoiceStudio's AI agents require context from multiple sources to make informed d
 - Session state (`.cursor/STATE.md`)
 - Task briefs (`docs/tasks/TASK-*.md`)
 - Project rules (`.cursor/rules/**/*.mdc`)
-- Quality ledger (`Recovery Plan/QUALITY_LEDGER.md`)
+- Quality ledger (`docs/archive/Recovery_Plan/QUALITY_LEDGER.md`)
 - Git history and diffs
 - OpenMemory (persistent facts across sessions)
 - Audit logs (`.buildlogs/audit/`)
@@ -155,7 +155,7 @@ class ContextAllocator:
 | StateAdapter | SESSION STATE | `.cursor/STATE.md` | ✅ |
 | TaskAdapter | TASK BRIEFS | `docs/tasks/TASK-*.md` | ✅ |
 | RulesAdapter | PROJECT RULES | `.cursor/rules/**/*.mdc` | ✅ |
-| LedgerAdapter | QUALITY LEDGER | `Recovery Plan/QUALITY_LEDGER.md` | ✅ |
+| LedgerAdapter | QUALITY LEDGER | `docs/archive/Recovery_Plan/QUALITY_LEDGER.md` | ✅ |
 | MemoryAdapter | OPENMEMORY | OpenMemory MCP | ✅ |
 | GitAdapter | GIT HISTORY | git diff, git log | ✅ |
 | IssuesAdapter | ISSUE SYSTEM | `tools/overseer/issues/` | ✅ |

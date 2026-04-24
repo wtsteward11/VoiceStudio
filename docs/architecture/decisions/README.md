@@ -108,6 +108,9 @@ What becomes easier or more difficult to do because of this change?
 | [ADR-050](ADR-050-sqlite-project-authority-migrations.md) | SQLite Project Authority and Schema Migrations (No Alembic) | Accepted | 2026-03-28 |
 | [ADR-051](ADR-051-polly-v8-httpclient-resilience.md) | Polly v8 HttpClient Resilience (BackendHttpContext) | Accepted | 2026-04-09 |
 | [ADR-052](ADR-052-tortoise-isolated-venv-subprocess.md) | Tortoise TTS isolated venv + subprocess synthesis (vs Coqui/XTTS transformers pin) | Accepted | 2026-04-18 |
+| [ADR-053](ADR-053-openvoice-advanced-tts-packaging-surface.md) | OpenVoice packaging constraints; **OpenVoice interpreter** superseded in part by **ADR-054** (`venv_openvoice`) | Accepted | 2026-04-20 |
+| [ADR-054](ADR-054-openvoice-isolated-venv-proposal.md) | OpenVoice isolated venv + subprocess runtime (Slice 19F — ADR-052 class) | Accepted | 2026-04-21 |
+| [ADR-055](ADR-055-myshell-openvoice-vendored-patches.md) | MyShell OpenVoice vendored + patched for Windows (Strategy B; no mandatory PyAV) | Accepted | 2026-04-22 |
 
 ## Status Legend
 

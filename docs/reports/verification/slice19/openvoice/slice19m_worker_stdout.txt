@@ -1,0 +1,10 @@
+Loaded checkpoint 'e:\VoiceStudio\models\openvoice/base_speakers/EN/checkpoint.pth'
+missing/unexpected keys: [] []
+Loaded checkpoint 'e:\VoiceStudio\models\openvoice/converter/checkpoint.pth'
+missing/unexpected keys: [] []
+OpenVoice version: v1
+[(0.0, 5.3760625)]
+after vad: dur = 5.375963718820862
+ > Text splitted to sentences.
+Short test for nineteen m.
+ > ===========================

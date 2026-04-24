@@ -1,8 +1,8 @@
 Slice 10 real Piper live-backend proof (synthesis succeeded).
-timestamp_utc: 2026-04-18T02:41:53Z
-backend_base: http://127.0.0.1:8020
-profile_id: 3ddfd7c9-c98b-41c0-8148-cb6b2ee8332c
-audio_id: synth_3ddfd7c9-c98b-41c0-8148-cb6b2ee8332c_eb0f7dc3
-wav_bytes: 187948
-duration_s: 4.260861678004535
+timestamp_utc: 2026-04-19T15:28:07Z
+backend_base: http://127.0.0.1:8002
+profile_id: 64504892-2650-4145-9d5d-e28bdb5e41aa
+audio_id: synth_64504892-2650-4145-9d5d-e28bdb5e41aa_9c98730b
+wav_bytes: 189484
+duration_s: 4.295691609977324
 pcm_peak_abs: 31129

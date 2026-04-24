@@ -1,0 +1,13 @@
+{
+  "session": "Slice19F",
+  "note": "Task 8 gate — expected red until operator provisions runtime/venvs/openvoice + checkpoints; no real_openvoice until checks.openvoice.ok is true.",
+  "backend_base": "http://127.0.0.1:8033",
+  "checks_openvoice": {
+    "ok": false,
+    "downloaded": false,
+    "message": "OpenVoice preflight: venv_openvoice virtual environment not created at expected path (see VOICESTUDIO_BOUNDED_SLICE19F_OPENVOICE_ISOLATED_VENV.md). Run: python scripts/engines/create_engine_venv.py --family openvoice",
+    "status_code": 503,
+    "python_exe": null,
+    "reason": "venv_openvoice_not_created"
+  }
+}

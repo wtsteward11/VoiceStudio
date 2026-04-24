@@ -1,0 +1,43 @@
+Engine router not available
+INFO ModelCache initialized: max_models=3, max_memory_mb=2048.0, default_ttl=None, dynamic_limits=True, pressure_threshold=85.0%, low_memory_threshold=70.0%
+INFO QualityMetricsCache initialized: max_size=500, default_ttl=3600.0, statistics=True
+WARNING resemblyzer not available. Voice similarity will be limited.
+WARNING speechbrain not available (ModuleNotFoundError). Some quality metrics will be limited.
+WARNING Audio libraries not fully installed: No module named 'pyloudnorm'
+WARNING noisereduce not installed. Artifact removal will be limited.
+WARNING pyloudnorm not installed. Install with: pip install pyloudnorm
+WARNING noisereduce not installed. Install with: pip install noisereduce
+WARNING noisereduce not available. Advanced denoising will be limited.
+WARNING pyloudnorm not available. LUFS normalization will be limited.
+WARNING Failed to load engine router: 'NoneType' object has no attribute '__dict__'
+WARNING pyloudnorm not installed. Install with: pip install pyloudnorm
+WARNING resemblyzer not available. Voice similarity will be limited.
+WARNING speechbrain not available (ModuleNotFoundError). Some quality metrics will be limited.
+WARNING pyloudnorm not installed. Install with: pip install pyloudnorm
+WARNING pyloudnorm not installed. Install with: pip install pyloudnorm
+WARNING noisereduce not installed. Install with: pip install noisereduce
+WARNING pyloudnorm not installed. Install with: pip install pyloudnorm
+WARNING pyloudnorm not installed. Install with: pip install pyloudnorm
+WARNING noisereduce not installed. Install with: pip install noisereduce
+WARNING resemblyzer not installed. Install with: pip install resemblyzer
+WARNING speechbrain not available. Install with: pip install speechbrain (Note: requires compatible torchaudio version)
+INFO OpenVoiceEngine initialized (device: cpu)
+E:\VoiceStudio\runtime\venvs\openvoice\Lib\site-packages\torch\nn\utils\weight_norm.py:144: FutureWarning: `torch.nn.utils.weight_norm` is deprecated in favor of `torch.nn.utils.parametrizations.weight_norm`.
+  WeightNorm.apply(module, name, dim)
+INFO Base speaker TTS loaded
+INFO HTTP Request: HEAD https://huggingface.co/M4869/WavMark/resolve/main/step59000_snr39.99_pesq4.35_BERP_none0.30_mean1.81_std1.81.model.pkl "HTTP/1.1 302 Found"
+INFO Tone color converter loaded
+INFO OpenVoice engine initialized successfully
+WARNING Please install onnxruntime to use more efficiently silero VAD
+E:\VoiceStudio\runtime\venvs\openvoice\Lib\site-packages\torch\functional.py:681: UserWarning: stft with return_complex=False is deprecated. In a future pytorch release, stft will return complex tensors for all inputs, and return_complex=False will raise an error.
+Note: you can still call torch.view_as_real on the complex output to recover the old return format. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\aten\src\ATen\native\SpectralOps.cpp:879.)
+  return _VF.stft(  # type: ignore[attr-defined]
+ERROR Base TTS synthesis failed: 'charmap' codec can't encode characters in position 0-2: character maps to <undefined>
+ERROR openvoice_worker_synthesize failed
+Traceback (most recent call last):
+  File "E:\VoiceStudio\app\cli\openvoice_worker_synthesize.py", line 84, in main
+    run_from_request_path(req)
+  File "E:\VoiceStudio\app\cli\openvoice_worker_synthesize.py", line 67, in run_from_request_path
+    raise RuntimeError(
+RuntimeError: OpenVoice worker did not produce a valid WAV at C:\Users\Tyler\AppData\Local\Temp\vs_slice19m_worker_out.wav (result=None)
+RuntimeError: OpenVoice worker did not produce a valid WAV at C:\Users\Tyler\AppData\Local\Temp\vs_slice19m_worker_out.wav (result=None)

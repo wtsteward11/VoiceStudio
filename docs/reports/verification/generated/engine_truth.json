@@ -1,0 +1,646 @@
+{
+  "schema": "voicestudio.engine_truth.v1",
+  "generated_utc": "2026-04-24T21:23:23.417455+00:00",
+  "engines": [
+    {
+      "engine_id": "aeneas",
+      "name": "Aeneas",
+      "type": "audio",
+      "subtype": "alignment",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\aeneas\\engine.manifest.json",
+      "entry_point": "app.core.engines.aeneas_engine.AeneasEngine"
+    },
+    {
+      "engine_id": "bark",
+      "name": "Bark TTS",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\bark\\engine.manifest.json",
+      "entry_point": "app.core.engines.bark_engine.BarkEngine"
+    },
+    {
+      "engine_id": "chatterbox",
+      "name": "Chatterbox TTS",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\chatterbox\\engine.manifest.json",
+      "entry_point": "app.core.engines.chatterbox_torch26_engine.ChatterboxTorch26Engine"
+    },
+    {
+      "engine_id": "coqui_tts",
+      "name": "Coqui TTS",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": null,
+      "implementation_status": null,
+      "manifest_path": "engines\\audio\\coqui_tts\\engine.manifest.json",
+      "entry_point": "app.core.engines.tts.coqui_engine.CoquiTTSEngine"
+    },
+    {
+      "engine_id": "espeak_ng",
+      "name": "eSpeak NG",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\espeak_ng\\engine.manifest.json",
+      "entry_point": "app.core.engines.espeak_ng_engine.ESpeakNGEngine"
+    },
+    {
+      "engine_id": "f5_tts",
+      "name": "F5-TTS",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\f5_tts\\engine.manifest.json",
+      "entry_point": "app.core.engines.f5_tts_engine.F5TTSEngine"
+    },
+    {
+      "engine_id": "festival",
+      "name": "Festival / Flite",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\festival\\engine.manifest.json",
+      "entry_point": "app.core.engines.festival_flite_engine.FestivalFliteEngine"
+    },
+    {
+      "engine_id": "fish_speech",
+      "name": "Fish Speech",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "experimental",
+      "implementation_status": "placeholder",
+      "manifest_path": "engines\\audio\\fish_speech\\engine.manifest.json",
+      "entry_point": "app.core.engines.fish_speech:FishSpeechEngine"
+    },
+    {
+      "engine_id": "gpt_sovits",
+      "name": "GPT-SoVITS",
+      "type": "audio",
+      "subtype": "vc",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\gpt_sovits\\engine.manifest.json",
+      "entry_point": "app.core.engines.gpt_sovits_engine.GPTSovitsEngine"
+    },
+    {
+      "engine_id": "higgs_audio",
+      "name": "Higgs Audio",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "experimental",
+      "implementation_status": "placeholder",
+      "manifest_path": "engines\\audio\\higgs_audio\\engine.manifest.json",
+      "entry_point": "app.core.engines.higgs_audio_engine.HiggsAudioEngine"
+    },
+    {
+      "engine_id": "lyrebird",
+      "name": "Lyrebird (Descript)",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "experimental",
+      "implementation_status": "placeholder",
+      "manifest_path": "engines\\audio\\lyrebird\\engine.manifest.json",
+      "entry_point": "app.core.engines.lyrebird_engine.LyrebirdEngine"
+    },
+    {
+      "engine_id": "mars5",
+      "name": "MARS5",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "experimental",
+      "implementation_status": "placeholder",
+      "manifest_path": "engines\\audio\\mars5\\engine.manifest.json",
+      "entry_point": "app.core.engines.mars5:MARS5Engine"
+    },
+    {
+      "engine_id": "marytts",
+      "name": "MaryTTS",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\marytts\\engine.manifest.json",
+      "entry_point": "app.core.engines.marytts_engine.MaryTTSEngine"
+    },
+    {
+      "engine_id": "mockingbird",
+      "name": "MockingBird Clone",
+      "type": "audio",
+      "subtype": "vc",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\mockingbird\\engine.manifest.json",
+      "entry_point": "app.core.engines.mockingbird_engine.MockingBirdEngine"
+    },
+    {
+      "engine_id": "openai_tts",
+      "name": "OpenAI TTS",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\openai_tts\\engine.manifest.json",
+      "entry_point": "app.core.engines.openai_tts_engine.OpenAITTSEngine"
+    },
+    {
+      "engine_id": "openvoice",
+      "name": "OpenVoice",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\openvoice\\engine.manifest.json",
+      "entry_point": "app.core.engines.openvoice_subprocess_engine.OpenVoiceSubprocessEngine"
+    },
+    {
+      "engine_id": "openvoice_v2",
+      "name": "OpenVoice V2",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "experimental",
+      "implementation_status": "placeholder",
+      "manifest_path": "engines\\audio\\openvoice_v2\\engine.manifest.json",
+      "entry_point": "app.core.engines.openvoice_v2:OpenVoiceV2Engine"
+    },
+    {
+      "engine_id": "parakeet",
+      "name": "Parakeet",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\parakeet\\engine.manifest.json",
+      "entry_point": "app.core.engines.parakeet_engine.ParakeetEngine"
+    },
+    {
+      "engine_id": "parler_tts",
+      "name": "Parler TTS",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "experimental",
+      "implementation_status": "placeholder",
+      "manifest_path": "engines\\audio\\parler_tts\\engine.manifest.json",
+      "entry_point": "app.core.engines.parler_tts:ParlerTTSEngine"
+    },
+    {
+      "engine_id": "piper",
+      "name": "Piper TTS",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier1_supported",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\piper\\engine.manifest.json",
+      "entry_point": "app.core.engines.piper_engine.PiperEngine"
+    },
+    {
+      "engine_id": "rhvoice",
+      "name": "RHVoice",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\rhvoice\\engine.manifest.json",
+      "entry_point": "app.core.engines.rhvoice_engine.RHVoiceEngine"
+    },
+    {
+      "engine_id": "rvc",
+      "name": "RVC (Retrieval-based Voice Conversion)",
+      "type": "audio",
+      "subtype": "voice_conversion",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\rvc\\engine.manifest.json",
+      "entry_point": "app.core.engines.rvc_engine.RVCEngine"
+    },
+    {
+      "engine_id": "rvc_v2",
+      "name": "RVC v2 (Enhanced Voice Conversion)",
+      "type": "audio",
+      "subtype": "voice_conversion",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\rvc_v2\\engine.manifest.json",
+      "entry_point": "app.core.engines.rvc_engine:RVCEngine"
+    },
+    {
+      "engine_id": "gemini_live",
+      "name": "Gemini Live",
+      "type": "audio",
+      "subtype": "s2s",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\s2s\\gemini_live\\engine.manifest.json",
+      "entry_point": "app.core.engines.gemini_live_engine:GeminiLiveProvider"
+    },
+    {
+      "engine_id": "openai_realtime",
+      "name": "OpenAI Realtime",
+      "type": "audio",
+      "subtype": "s2s",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\s2s\\openai_realtime\\engine.manifest.json",
+      "entry_point": "app.core.engines.openai_realtime_engine:OpenAIRealtimeProvider"
+    },
+    {
+      "engine_id": "silero",
+      "name": "Silero Models",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier1_supported",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\silero\\engine.manifest.json",
+      "entry_point": "app.core.engines.silero_engine.SileroEngine"
+    },
+    {
+      "engine_id": "so_vits_svc",
+      "name": "So-VITS-SVC",
+      "type": "audio",
+      "subtype": "voice_conversion",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\so_vits_svc\\engine.manifest.json",
+      "entry_point": "app.core.engines.sovits_svc_engine.SoVITSSVCEngine"
+    },
+    {
+      "engine_id": "sovits_svc",
+      "name": "So-VITS-SVC 4.0",
+      "type": "audio",
+      "subtype": "voice_conversion",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\sovits\\engine.manifest.json",
+      "entry_point": "app.core.engines.sovits_svc_engine.SoVITSSVCEngine"
+    },
+    {
+      "engine_id": "speaker_encoder",
+      "name": "Speaker Encoder",
+      "type": "audio",
+      "subtype": "embedding",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\speaker_encoder\\engine.manifest.json",
+      "entry_point": "app.core.engines.speaker_encoder_engine.SpeakerEncoderEngine"
+    },
+    {
+      "engine_id": "styletts2",
+      "name": "StyleTTS 2",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": null,
+      "implementation_status": null,
+      "manifest_path": "engines\\audio\\styletts2\\engine.manifest.json",
+      "entry_point": "app.core.engines.tts.styletts2_engine.StyleTTS2Engine"
+    },
+    {
+      "engine_id": "tacotron2",
+      "name": "Tacotron 2",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\tacotron2\\engine.manifest.json",
+      "entry_point": "app.core.engines.tacotron2_engine:Tacotron2Engine"
+    },
+    {
+      "engine_id": "tortoise",
+      "name": "Tortoise TTS",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\tortoise\\engine.manifest.json",
+      "entry_point": "app.core.engines.tortoise_subprocess_engine.TortoiseSubprocessEngine"
+    },
+    {
+      "engine_id": "voice_ai",
+      "name": "Voice.ai",
+      "type": "audio",
+      "subtype": "vc",
+      "support_tier": "experimental",
+      "implementation_status": "placeholder",
+      "manifest_path": "engines\\audio\\voice_ai\\engine.manifest.json",
+      "entry_point": "app.core.engines.voice_ai_engine.VoiceAIEngine"
+    },
+    {
+      "engine_id": "vosk",
+      "name": "Vosk STT",
+      "type": "audio",
+      "subtype": "stt",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\vosk\\engine.manifest.json",
+      "entry_point": "app.core.engines.vosk_engine.VoskEngine"
+    },
+    {
+      "engine_id": "voxcpm",
+      "name": "VoxCPM",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "experimental",
+      "implementation_status": "placeholder",
+      "manifest_path": "engines\\audio\\voxcpm\\engine.manifest.json",
+      "entry_point": "app.core.engines.voxcpm_engine.VoxCPMEngine"
+    },
+    {
+      "engine_id": "whisper",
+      "name": "Whisper STT",
+      "type": "audio",
+      "subtype": "stt",
+      "support_tier": "tier1_supported",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\whisper\\engine.manifest.json",
+      "entry_point": "app.core.engines.whisper_engine.WhisperEngine"
+    },
+    {
+      "engine_id": "whisper_cpp",
+      "name": "whisper.cpp",
+      "type": "audio",
+      "subtype": "stt",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\whisper_cpp\\engine.manifest.json",
+      "entry_point": "app.core.engines.whisper_cpp_engine.WhisperCPPEngine"
+    },
+    {
+      "engine_id": "whisper_ui",
+      "name": "Whisper UI",
+      "type": "audio",
+      "subtype": "stt",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\audio\\whisper_ui\\engine.manifest.json",
+      "entry_point": "app.core.engines.whisper_ui_engine.WhisperUIEngine"
+    },
+    {
+      "engine_id": "whisperx",
+      "name": "WhisperX STT",
+      "type": "audio",
+      "subtype": "stt",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\whisperx\\engine.manifest.json",
+      "entry_point": "app.core.engines.whisperx_engine.WhisperXEngine"
+    },
+    {
+      "engine_id": "xtts_v2",
+      "name": "XTTS v2",
+      "type": "audio",
+      "subtype": "tts",
+      "support_tier": "tier1_supported",
+      "implementation_status": "full",
+      "manifest_path": "engines\\audio\\xtts_v2\\engine.manifest.json",
+      "entry_point": "app.core.engines.xtts_engine.XTTSEngine"
+    },
+    {
+      "engine_id": "automatic1111",
+      "name": "AUTOMATIC1111 WebUI",
+      "type": "image",
+      "subtype": "generation",
+      "support_tier": "experimental",
+      "implementation_status": "external",
+      "manifest_path": "engines\\image\\automatic1111\\engine.manifest.json",
+      "entry_point": "app.core.engines.automatic1111_engine.Automatic1111Engine"
+    },
+    {
+      "engine_id": "comfyui",
+      "name": "ComfyUI",
+      "type": "image",
+      "subtype": "generation",
+      "support_tier": "experimental",
+      "implementation_status": "external",
+      "manifest_path": "engines\\image\\comfyui\\engine.manifest.json",
+      "entry_point": "app.core.engines.comfyui_engine.ComfyUIEngine"
+    },
+    {
+      "engine_id": "fastsd_cpu",
+      "name": "FastSD CPU",
+      "type": "image",
+      "subtype": "generation",
+      "support_tier": "experimental",
+      "implementation_status": "placeholder",
+      "manifest_path": "engines\\image\\fastsd_cpu\\engine.manifest.json",
+      "entry_point": "app.core.engines.fastsd_cpu_engine.FastSDCPUEngine"
+    },
+    {
+      "engine_id": "fooocus",
+      "name": "Fooocus",
+      "type": "image",
+      "subtype": "generation",
+      "support_tier": "experimental",
+      "implementation_status": "external",
+      "manifest_path": "engines\\image\\fooocus\\engine.manifest.json",
+      "entry_point": "app.core.engines.fooocus_engine.FooocusEngine"
+    },
+    {
+      "engine_id": "invokeai",
+      "name": "InvokeAI",
+      "type": "image",
+      "subtype": "generation",
+      "support_tier": "experimental",
+      "implementation_status": "external",
+      "manifest_path": "engines\\image\\invokeai\\engine.manifest.json",
+      "entry_point": "app.core.engines.invokeai_engine.InvokeAIEngine"
+    },
+    {
+      "engine_id": "localai",
+      "name": "LocalAI",
+      "type": "image",
+      "subtype": "generation",
+      "support_tier": "experimental",
+      "implementation_status": "external",
+      "manifest_path": "engines\\image\\localai\\engine.manifest.json",
+      "entry_point": "app.core.engines.localai_engine.LocalAIEngine"
+    },
+    {
+      "engine_id": "openjourney",
+      "name": "OpenJourney",
+      "type": "image",
+      "subtype": "generation",
+      "support_tier": "experimental",
+      "implementation_status": "placeholder",
+      "manifest_path": "engines\\image\\openjourney\\engine.manifest.json",
+      "entry_point": "app.core.engines.openjourney_engine.OpenJourneyEngine"
+    },
+    {
+      "engine_id": "realistic_vision",
+      "name": "Realistic Vision",
+      "type": "image",
+      "subtype": "generation",
+      "support_tier": "experimental",
+      "implementation_status": "placeholder",
+      "manifest_path": "engines\\image\\realistic_vision\\engine.manifest.json",
+      "entry_point": "app.core.engines.realistic_vision_engine.RealisticVisionEngine"
+    },
+    {
+      "engine_id": "sd_cpu",
+      "name": "Stable Diffusion CPU-only",
+      "type": "image",
+      "subtype": "generation",
+      "support_tier": "experimental",
+      "implementation_status": "placeholder",
+      "manifest_path": "engines\\image\\sd_cpu\\engine.manifest.json",
+      "entry_point": "app.core.engines.sd_cpu_engine.SDCPUEngine"
+    },
+    {
+      "engine_id": "sdnext",
+      "name": "SD.Next",
+      "type": "image",
+      "subtype": "generation",
+      "support_tier": "experimental",
+      "implementation_status": "external",
+      "manifest_path": "engines\\image\\sdnext\\engine.manifest.json",
+      "entry_point": "app.core.engines.sdnext_engine.SDNextEngine"
+    },
+    {
+      "engine_id": "sdxl",
+      "name": "Stable Diffusion XL",
+      "type": "image",
+      "subtype": "generation",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\image\\sdxl\\engine.manifest.json",
+      "entry_point": "app.core.engines.sdxl_engine.SDXLEngine"
+    },
+    {
+      "engine_id": "sdxl_comfy",
+      "name": "SDXL ComfyUI",
+      "type": "image",
+      "subtype": "generation",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\image\\sdxl_comfy\\engine.manifest.json",
+      "entry_point": "app.core.engines.sdxl_comfy_engine.SDXLComfyEngine"
+    },
+    {
+      "engine_id": "realesrgan",
+      "name": "Real-ESRGAN",
+      "type": "image",
+      "subtype": "upscaling",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\image\\upscalers\\realesrgan\\engine.manifest.json",
+      "entry_point": "app.core.engines.realesrgan_engine.RealESRGANEngine"
+    },
+    {
+      "engine_id": "localai_llm",
+      "name": "LocalAI LLM",
+      "type": "llm",
+      "subtype": "chat",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\llm\\localai\\engine.manifest.json",
+      "entry_point": "app.core.engines.llm_local_adapter:LocalAILLMProvider"
+    },
+    {
+      "engine_id": "ollama_llm",
+      "name": "Ollama LLM",
+      "type": "llm",
+      "subtype": "chat",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "basic",
+      "manifest_path": "engines\\llm\\ollama\\engine.manifest.json",
+      "entry_point": "app.core.engines.llm_local_adapter:OllamaLLMProvider"
+    },
+    {
+      "engine_id": "openai_chat",
+      "name": "OpenAI Chat",
+      "type": "llm",
+      "subtype": "chat",
+      "support_tier": "tier2_best_effort",
+      "implementation_status": "full",
+      "manifest_path": "engines\\llm\\openai_chat\\engine.manifest.json",
+      "entry_point": "app.core.engines.llm_openai_adapter:OpenAILLMProvider"
+    },
+    {
+      "engine_id": "deepfacelab",
+      "name": "DeepFaceLab",
+      "type": "video",
+      "subtype": "face_swap",
+      "support_tier": "experimental",
+      "implementation_status": "external",
+      "manifest_path": "engines\\video\\deepfacelab\\engine.manifest.json",
+      "entry_point": "app.core.engines.deepfacelab_engine.DeepFaceLabEngine"
+    },
+    {
+      "engine_id": "deforum",
+      "name": "Deforum",
+      "type": "video",
+      "subtype": "generation",
+      "support_tier": "experimental",
+      "implementation_status": "external",
+      "manifest_path": "engines\\video\\deforum\\engine.manifest.json",
+      "entry_point": "app.core.engines.deforum_engine.DeforumEngine"
+    },
+    {
+      "engine_id": "ffmpeg_ai",
+      "name": "FFmpeg with AI Plugins",
+      "type": "video",
+      "subtype": "utility",
+      "support_tier": "experimental",
+      "implementation_status": "external",
+      "manifest_path": "engines\\video\\ffmpeg_ai\\engine.manifest.json",
+      "entry_point": "app.core.engines.ffmpeg_ai_engine.FFmpegAIEngine"
+    },
+    {
+      "engine_id": "fomm",
+      "name": "First Order Motion Model",
+      "type": "video",
+      "subtype": "avatar",
+      "support_tier": "experimental",
+      "implementation_status": "external",
+      "manifest_path": "engines\\video\\fomm\\engine.manifest.json",
+      "entry_point": "app.core.engines.fomm_engine.FOMMEngine"
+    },
+    {
+      "engine_id": "moviepy",
+      "name": "MoviePy",
+      "type": "video",
+      "subtype": "editing",
+      "support_tier": "experimental",
+      "implementation_status": "external",
+      "manifest_path": "engines\\video\\moviepy\\engine.manifest.json",
+      "entry_point": "app.core.engines.moviepy_engine.MoviePyEngine"
+    },
+    {
+      "engine_id": "sadtalker",
+      "name": "SadTalker",
+      "type": "video",
+      "subtype": "avatar",
+      "support_tier": "experimental",
+      "implementation_status": "external",
+      "manifest_path": "engines\\video\\sadtalker\\engine.manifest.json",
+      "entry_point": "app.core.engines.sadtalker_engine.SadTalkerEngine"
+    },
+    {
+      "engine_id": "svd",
+      "name": "Stable Video Diffusion",
+      "type": "video",
+      "subtype": "generation",
+      "support_tier": "experimental",
+      "implementation_status": "external",
+      "manifest_path": "engines\\video\\svd\\engine.manifest.json",
+      "entry_point": "app.core.engines.svd_engine.SVDEngine"
+    },
+    {
+      "engine_id": "video_creator",
+      "name": "Video Creator",
+      "type": "video",
+      "subtype": "generation",
+      "support_tier": "experimental",
+      "implementation_status": "placeholder",
+      "manifest_path": "engines\\video\\video_creator\\engine.manifest.json",
+      "entry_point": "app.core.engines.video_creator_engine.VideoCreatorEngine"
+    }
+  ]
+}

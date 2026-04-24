@@ -2,9 +2,9 @@
 
 **Purpose:** Classify **modified + untracked** paths so merge work does not drag random junk (bulk product/docs buckets **landed** in Tasks **210–217**; residual tree is **small**). **Slice 27** runtime transcript is **closed** (**Tasks 175–181**); this doc stays the **merge-hygiene** inventory.
 
-**Captured:** `main` ahead of `origin/main` by **25** commits; snapshot from `git status -sb` on **2026-04-24** (refresh after **Tasks 218–220** — STATE + DAY0 control-plane; tip hash = `git rev-parse --short HEAD`).
+**Captured:** `main` ahead of `origin/main` by **26** commits (**Tasks 226–231** residual merge-hygiene commit on **2026-04-24**; was **25** before that commit); tip short hash from `git rev-parse --short HEAD`. Working tree: **clean** for merge-hygiene clusters — run `git status -sb` to confirm.
 
-**Last dispositions pass:** **2026-04-24** (Tasks **218–219** — control-plane truth: **Captured** / residual clusters; **Tasks 200–209** prior execution unchanged in substance).
+**Last dispositions pass:** **2026-04-24** (Tasks **226–231** — residual policy + tracked `generated/` engine truth; **Tasks 218–219** prior control-plane refresh unchanged in substance).
 
 **RHVoice CLI check (Tasks 216 / 209):** On this host, **`Get-Command rhvoice-cli`** returns **no** resolvable binary (not on **PATH**). **`engines/audio/rhvoice/engine.manifest.json`** was reset to **HEAD** for the product commit batch — **no** manifest churn without proof.
 
@@ -12,13 +12,14 @@
 
 | Cluster | Action taken | Notes |
 | --- | --- | --- |
-| **Tasks 218–220 — control-plane refresh** | **Landed** | **STATE** Truth Sync + **Current Blocker** + **Next 3 Steps** skimmer (**Tasks 218/222/225**); **DAY0** **Captured** = **`main` ahead 25** + residual clusters; governance-only commit (`.cursor/STATE.md` + this file — `git log -1 --oneline`). **No** `latest_verify_artifact` bump (**Task 224**). |
+| **Tasks 226–231 — residual merge hygiene** | **Landed** | **`.vscode/settings.json`**, **`openmemory.md`**: **reverted to `HEAD`** (no machine-specific merge). **`docs/reports/verification/generated/`**: **tracked** `README.md` + `engine_truth.json` + `engine_truth_v2.json` (regen via `python scripts/generate_engine_truth.py --schema all`); **`stt_hardening_regress_summary.json`** **gitignored** (local STT pack; schema test skips if absent). **`.gitignore`**: `runtime/venvs/`, `runtime/vendor/`, `tools/whispercpp/` (local-only); STT summary ignore path. **No** `latest_verify_artifact` bump (**Task 235**). **No** `engines/audio/rhvoice/` edits (**Task 234**). |
+| **Tasks 218–220 — control-plane refresh** | **Landed** | **STATE** Truth Sync + **Current Blocker** + **Next 3 Steps** skimmer (**Tasks 218/222/225**); **DAY0** **Captured** + residual clusters; governance-only commit. **No** `latest_verify_artifact` bump (**Task 224**). |
 | **Tasks 210–217 — git commits** | **Landed** | **`b2cb21e9`** — governance-only (STATE, DAY0, CANONICAL_REGISTRY, `.gitignore`, overseer prompts, ENGINE_PARITY baseline in that batch). **`8b87ccc3`** — ENGINE_PARITY Slice 22 skimmer clarity (**Task 213**). **`220f6556`** — docs/proof/slice trees + ADR-053–056 + bounded design contracts (**Task 214** docs lane). **`ea81972a`** — app/backend/tests/scripts + `tools/overseer/data/engine_truth_overrides.json` + engine harnesses (**Task 214** product lane). **`144be99a`** — DAY0 execution log refresh (**Task 215**). |
 | **`backend/data/stores/effect_chains/*.json` (untracked UUID files)** | **Deleted** from working tree (**22** files) | Ephemeral store dumps per Dispositions; **tracked** fixture JSON under the same directory **left unchanged** (`git ls-files` set preserved). |
 | **`processed/`** | **`.gitignore`** — added `processed/` at repo root | Ephemeral outputs; stays local-only. |
 | **Product / proof** | **Committed** in **220f6556** + **ea81972a** per bounded lanes above | **`runtime/venvs/`**, **`runtime/vendor/`**, **`tools/whispercpp/`** remain **local/untracked** — not merged in this batch. |
 | **`engines/audio/rhvoice/`** | **No edits** in **ea81972a** (manifest at **HEAD**) | **Tasks 209 / 216 / 223** — **frozen** until CLI or `executable_path` proof; **not** the next merge lane. |
-| **Residual local-only (post-210–217)** | **Policy** | **Modified:** `.vscode/settings.json`, `openmemory.md` — typically **do not merge** (developer machine). **Untracked:** `docs/reports/verification/generated/` — align with `generate_engine_truth.py` / ignore policy; **`runtime/venvs/`**, **`runtime/vendor/`**, **`tools/whispercpp/`** — **defer** (no full venv/vendor blobs on `main` without ADR). |
+| **Residual local-only (post-210–217)** | **Resolved (Tasks 226–231)** | **`.vscode/settings.json`**, **`openmemory.md`**: **reverted to `HEAD`**. **`generated/`**: tracked canonical JSON + README; STT summary ignored. **`runtime/venvs/`**, **`runtime/vendor/`**, **`tools/whispercpp/`**: **`.gitignore`** (local-only; ADR if ever tracking vendor). |
 
 ## Commit bucket manifest (Tasks 201)
 
@@ -76,15 +77,15 @@ Representative **modified** prefixes from `git status` (group by bounded slice i
 | `src/VoiceStudio.App.Tests/**` (live backend, playback) | Product | **Commit with** backend route + engine slice | C# filters align to Python `real_*` lanes. |
 | `backend/data/stores/effect_chains/*.json` (untracked UUIDs) | Local junk | **Executed (Tasks 200+):** deleted untracked dumps | Tracked fixture JSON in same dir preserved. |
 | `processed/` | Local junk | **Executed (Tasks 200+):** **`processed/`** in root **`.gitignore`** | Ephemeral; stays local-only. |
-| `runtime/venvs/`, `runtime/vendor/` | Local / machine | **Defer / do not merge** unless ADR + shrink policy | Document path overrides; avoid committing full venvs. |
-| `tools/whispercpp/` | Vendor / optional | **Split:** small shim **commit** if policy allows; large binaries **defer** with ADR | Align with Slice 22 / 27 proof paths. |
-| `tools/overseer/data/engine_truth_overrides.json`, `docs/reports/verification/generated/*` | Governance | **Commit only** when overrides or manifests changed + `generate_engine_truth.py` run | Run `test_engine_truth_verify_artifact_alignment.py`. |
-| `openmemory.md`, `.vscode/settings.json`, `AGENTS.md` | Mixed | **Review** — commit with governance if doc-only; else product batch | No secrets. |
+| `runtime/venvs/`, `runtime/vendor/` | Local / machine | **Gitignored (Tasks 228)** — do not merge venv/vendor trees; ADR + narrow scope if a subtree must be tracked later | See root **`.gitignore`**. |
+| `tools/whispercpp/` | Local tool cache | **Gitignored (Tasks 229)** — same family as `tools/whispercpp184/`; not a vendored subtree | Binaries stay out of `main` unless ADR + provenance. |
+| `tools/overseer/data/engine_truth_overrides.json`, `docs/reports/verification/generated/*` | Governance | **`README.md` + `engine_truth.json` + `engine_truth_v2.json` tracked**; regen after override/manifest changes; **`stt_hardening_regress_summary.json`** local-only (ignored) | Run `test_engine_truth_verify_artifact_alignment.py`. |
+| `openmemory.md`, `.vscode/settings.json` | Local / machine | **Tasks 226:** **reverted to `HEAD`** — do not merge machine-specific editor state | `openmemory.md` remains in index at **HEAD**; `.gitignore` still lists it for untracked hygiene on fresh clones. |
 
 ## Untracked hotspots (explicit)
 
 - **`backend/data/stores/effect_chains/*.json`** — treat as **local junk** unless a feature explicitly commits fixture chains; delete or exclude from PR.
-- **`docs/reports/verification/generated/`** — may contain **regenerated** truth JSON; align with `generate_engine_truth.py` policy; do not hand-edit.
+- **`docs/reports/verification/generated/`** — **`engine_truth*.json` + `README.md` are tracked** (Tasks 227); **`stt_hardening_regress_summary.json`** is **local-only** (gitignored); see [generated/README.md](generated/README.md).
 - **Slice proof trees** (`docs/reports/verification/slice27/`, `slice19/`, etc.) — **proof/governance**; commit when tied to a closed proof row, not ad hoc.
 
 ## Next commits (numbered stack — **Task 192**)

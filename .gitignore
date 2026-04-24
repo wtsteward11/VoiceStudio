@@ -191,6 +191,15 @@ docs/reports/items_*_*.plan.md
 .cache/
 .voicestudio_uvicorn_pid.txt
 tools/whispercpp184/
+# Local whisper.cpp download / unpack (merge hygiene Tasks 226–229); not vendored in-repo
+tools/whispercpp/
+
+# Runtime sandboxes: full venvs and downloaded vendor trees stay local-only (ADR required to track blobs)
+runtime/venvs/
+runtime/vendor/
+
+# STT hardening pack summary (local run artifact; tests skip if absent — see generated/README.md)
+docs/reports/verification/generated/stt_hardening_regress_summary.json
 
 # Ephemeral processing output (local machine; Day-0 merge hygiene — Tasks 200+)
 processed/

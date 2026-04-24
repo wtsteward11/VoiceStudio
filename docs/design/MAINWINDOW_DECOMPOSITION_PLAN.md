@@ -1,7 +1,7 @@
 # MainWindow Decomposition Plan
 
 **Status:** Living  
-**Last Updated:** 2026-03-15  
+**Last Updated:** 2026-04-24  
 **Related:** Transport Coherence Wave 2 Task 9, MainWindow god-object reduction
 
 ## Overview
@@ -25,9 +25,13 @@ MainWindow.xaml.cs is ~2450 lines across multiple partials. This plan identifies
 - **Transport Shortcut Orchestration:** `TransportShortcutCoordinator` (Transport Coherence Wave 4 Phase 1) — Space/S/Ctrl+R via IGlobalTransportOrchestrator
 - **Import Workflow:** `IImportWorkflowService` + `ImportWorkflowService` (Transport Coherence Wave 4 Phase 2) — picker, upload, AssetAddedEvent, SetCurrentPlayable, toast
 
-## Next Slice: Navigation-Shell Behavior
+## Current bounded slice (GAP-008 Slice 1 — landed 2026-04-24)
 
-**Target:** Extract panel switching, nav buttons, `OpenPanelByIdAsync` into a dedicated coordinator or service.
+**Loaded shell bootstrap orchestration** moved to `MainWindowShellLoadedBootstrap.RunAsync` with `MainWindowLoadedBootstrapHooks` (see [VOICESTUDIO_BOUNDED_GAP008_SLICE01_MAINWINDOW_LOADED_BOOTSTRAP.md](VOICESTUDIO_BOUNDED_GAP008_SLICE01_MAINWINDOW_LOADED_BOOTSTRAP.md)). DEBUG diagnostics, `TransportShortcutCoordinator` attach, and `RunPanelInitWhenReadyAsync` remain in `MainWindow` for the next extraction.
+
+## Next Slice: Navigation-Shell Behavior (after Slice 1)
+
+**Target:** Extract panel switching, nav buttons, `OpenPanelByIdAsync` into a dedicated coordinator or service. **ShellNavigationCoordinator** already exists; this slice focuses on remaining navigation glue in `MainWindow`.
 
 ### Future Slices (Not Yet Scoped)
 
@@ -40,5 +44,6 @@ MainWindow.xaml.cs is ~2450 lines across multiple partials. This plan identifies
 
 ## Changelog
 
+- 2026-04-24: **GAP-008 Slice 1** — Loaded-time bootstrap block (ErrorDialogService root through title bar init) extracted to `MainWindowShellLoadedBootstrap`; seam tests `Gap008Slice1Tests`. Prior “Next Slice: Navigation-Shell” line referred to coordinator work already partially done; **navigation-shell polish** is the next chartered slice **after** this bootstrap cut (see bounded brief).
 - 2026-03-16: Transport Wave 4 complete. Marked Status Bar, Transport Shortcut, Import Workflow as done. Next slice = Navigation-Shell Behavior.
 - 2026-03-15: Initial plan; next slice = Status Bar Orchestration (Transport Coherence Wave 2 Task 9).

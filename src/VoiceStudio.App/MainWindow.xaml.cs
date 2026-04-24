@@ -331,52 +331,53 @@ namespace VoiceStudio.App
             {
                 contentFE.Loaded += async (s, e) =>
                 {
-                    // Initialize canonical XamlRoot for dialogs (prevents "XamlRoot must be explicitly set for unparented popup")
-                    ErrorDialogService.Root = contentFE.XamlRoot;
-
-                    WireNotificationCenter();
-                    WireJumpListShell();
-                    WireTaskbarProgressShell();
-                    TryDispatchPendingJumpListActivation();
-                    TryDispatchPendingFileActivation();
-
-                    _statusBarCoordinator?.StartBackendHealthMonitoring();
-
-                    this.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-                    {
-                        _recentProjectsService?.EnsureRecentDataLoaded();
-                        PopulateRecentProjectsMenu();
-                    });
-
-                    _sessionLifecycle.AttachRecoveryHandlers(this, contentFE);
-
-                    // Initialize theme service with root element
-                    try
-                    {
-                        var themeService = AppServices.TryGetThemeService();
-                        if (themeService != null)
+                    await MainWindowShellLoadedBootstrap.RunAsync(
+                        contentFE,
+                        new MainWindowLoadedBootstrapHooks
                         {
-                            await themeService.InitializeAsync(contentFE);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[Theme] Failed to initialize: {ex.Message}");
-                    }
-
-                    // GAP-065: rehydrate user shortcut customizations (Loaded-only; ADR-047).
-                    try
-                    {
-                        await _keyboardShortcutService.InitializeAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[Shortcuts] Failed to load customizations: {ex.Message}");
-                    }
-
-                    // GAP-010: Mica/Desktop Acrylic + custom title bar (Loaded-only; ADR-047).
-                    ApplyMicaBackdrop();
-                    InitializeCustomTitleBar();
+                            SetErrorDialogRoot = root => { ErrorDialogService.Root = root; },
+                            WireNotificationCenter = WireNotificationCenter,
+                            WireJumpListShell = WireJumpListShell,
+                            WireTaskbarProgressShell = WireTaskbarProgressShell,
+                            TryDispatchPendingJumpListActivation = TryDispatchPendingJumpListActivation,
+                            TryDispatchPendingFileActivation = TryDispatchPendingFileActivation,
+                            StartBackendHealthMonitoring = () => _statusBarCoordinator?.StartBackendHealthMonitoring(),
+                            EnqueueRecentProjectsMenuRefresh = () =>
+                                this.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                                {
+                                    _recentProjectsService?.EnsureRecentDataLoaded();
+                                    PopulateRecentProjectsMenu();
+                                }),
+                            AttachSessionRecoveryHandlers = () => _sessionLifecycle.AttachRecoveryHandlers(this, contentFE),
+                            InitializeThemeAsync = async () =>
+                            {
+                                try
+                                {
+                                    var themeService = AppServices.TryGetThemeService();
+                                    if (themeService != null)
+                                    {
+                                        await themeService.InitializeAsync(contentFE);
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"[Theme] Failed to initialize: {ex.Message}");
+                                }
+                            },
+                            InitializeKeyboardShortcutsAsync = async () =>
+                            {
+                                try
+                                {
+                                    await _keyboardShortcutService.InitializeAsync();
+                                }
+                                catch (Exception ex)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"[Shortcuts] Failed to load customizations: {ex.Message}");
+                                }
+                            },
+                            ApplyMicaBackdrop = ApplyMicaBackdrop,
+                            InitializeCustomTitleBar = InitializeCustomTitleBar,
+                        }).ConfigureAwait(true);
 
 #if DEBUG
                     // Log visual tree info after loaded (DEBUG only - avoid production file I/O)

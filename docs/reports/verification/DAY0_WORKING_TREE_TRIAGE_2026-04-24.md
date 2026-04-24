@@ -2,7 +2,7 @@
 
 **Purpose:** Classify **modified + untracked** paths so merge work does not drag random junk (bulk product/docs buckets **landed** in Tasks **210–217**; residual tree is **small**). **Slice 27** runtime transcript is **closed** (**Tasks 175–181**); this doc stays the **merge-hygiene** inventory.
 
-**Captured:** `main` ahead of `origin/main` by **26** commits (**Tasks 226–231** residual merge-hygiene commit on **2026-04-24**; was **25** before that commit); tip short hash from `git rev-parse --short HEAD`. Working tree: **clean** for merge-hygiene clusters — run `git status -sb` to confirm.
+**Captured:** `main` ahead of `origin/main` by **27** commits (**Tasks 236–243** governance closure on **2026-04-24** includes **Tasks 226–231** residual hygiene below); tip short hash from `git rev-parse --short HEAD`. Working tree: **clean** — run `git status -sb` to confirm after your next local edits.
 
 **Last dispositions pass:** **2026-04-24** (Tasks **226–231** — residual policy + tracked `generated/` engine truth; **Tasks 218–219** prior control-plane refresh unchanged in substance).
 
@@ -20,6 +20,40 @@
 | **Product / proof** | **Committed** in **220f6556** + **ea81972a** per bounded lanes above | **`runtime/venvs/`**, **`runtime/vendor/`**, **`tools/whispercpp/`** remain **local/untracked** — not merged in this batch. |
 | **`engines/audio/rhvoice/`** | **No edits** in **ea81972a** (manifest at **HEAD**) | **Tasks 209 / 216 / 223** — **frozen** until CLI or `executable_path` proof; **not** the next merge lane. |
 | **Residual local-only (post-210–217)** | **Resolved (Tasks 226–231)** | **`.vscode/settings.json`**, **`openmemory.md`**: **reverted to `HEAD`**. **`generated/`**: tracked canonical JSON + README; STT summary ignored. **`runtime/venvs/`**, **`runtime/vendor/`**, **`tools/whispercpp/`**: **`.gitignore`** (local-only; ADR if ever tracking vendor). |
+| **Tasks 236–242 — merge-hygiene closure polish** | **Landed** | Clean-tree proof (§ below); **Task 237** downstream **`whisper_cpp`** audit — matrix + overrides + **`engine_truth*.json`** all **PASS** aligned to **Tasks 175–181** (no stale transcript **pending**); **slice27/README.md** authority vs reruns wording; **generated/** strategic policy paragraph; **STATE** clean-merge-state line; truth-lock + `run_verification.py` **PASS**. **No** verify bar bump. |
+
+## Clean working tree proof (Task 236)
+
+Re-run from repo root before merge; values below are an **auditable snapshot** captured **2026-04-24** after landing **Tasks 236–243**. **`git rev-parse --short HEAD`** must match **`git log -1 --oneline`** (tip); the block below omits the tip line so this section stays stable across doc-only amends — use **`git log --oneline -n 8`** when you need the full stack including tip.
+
+```text
+$ git status -sb
+## main...origin/main [ahead 27]
+
+$ git log --oneline -n 7 --skip=1 HEAD
+3a2c8e31 chore(repo): residual merge hygiene (Tasks 226-231)
+c032d902 docs(governance): STATE Truth Sync and DAY0 capture (Tasks 218-220)
+144be99a docs(verification): refresh DAY0 capture and execution log (Task 215)
+ea81972a feat(platform): STT router preflight registry OpenVoice subprocess and engine live harnesses (Task 214)
+220f6556 docs(day0): bounded slice PROOF archives design contracts and verification trees (Task 214)
+8b87ccc3 docs(verification): clarify whisper_cpp Slice 22 batch-time vs Slice 27 PASS (Task 213)
+b2cb21e9 docs(governance): day-0 merge hygiene state and registry sync (Tasks 210-217)
+```
+
+**Interpretation:** working tree **clean** (no staged/unstaged paths in `git status -sb` beyond branch aheadness). Remaining **merge gate** is **integration** (`origin/main` / PR / rebase), not unclassified local junk.
+
+### Downstream `whisper_cpp` PASS audit (Task 237)
+
+| Surface | `whisper_cpp` transcript / runtime truth | Checked |
+| --- | --- | --- |
+| [ENGINE_PARITY_MATRIX.md](ENGINE_PARITY_MATRIX.md) | STT row cites **Slice 27 Tasks 175–181** runtime transcript **PASS**; Slice 22 = readiness only | OK |
+| [tools/overseer/data/engine_truth_overrides.json](../../../tools/overseer/data/engine_truth_overrides.json) | `runtime_proof_status: pass`, `first_blocker: null` | OK |
+| [generated/engine_truth_v2.json](generated/engine_truth_v2.json) | `runtime_proof_status: pass`, `matrix_status` aligned | OK |
+| [generated/engine_truth.json](generated/engine_truth.json) | v1 manifest projection (no stale pending field for this engine) | OK |
+
+## Next lane after merge-hygiene (Task 243)
+
+**Recommended default:** **push / review / rebase / integrate** with `origin/main` — merge-hygiene control plane is **complete** for this wave. **RHVoice:** remain **frozen** until a real **`rhvoice-cli`** (or documented **`executable_path`**) exists; **do not** promote RHVoice as the next primary lane without that binary. After integration, pick the next **product** lane from [PROFESSIONAL_GAP_TRACKER.md](../../design/PROFESSIONAL_GAP_TRACKER.md) / roadmap — not another governance-only sweep unless a new seam opens.
 
 ## Commit bucket manifest (Tasks 201)
 

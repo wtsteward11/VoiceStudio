@@ -2,11 +2,15 @@
 
 Do not hand-edit files in this directory; regenerate after manifest or override changes.
 
-## Git tracking policy (Tasks 226–227)
+## Git tracking policy (Tasks 226–227, strategic note Task 240)
 
-**Tracked in git (canonical for clones and CI):** this `README.md`, `engine_truth.json`, and `engine_truth_v2.json`. Regenerate with `python scripts/generate_engine_truth.py --schema all` after manifest or `engine_truth_overrides.json` changes; commit the resulting JSON in the **same** change-set as override/matrix updates when those rows move.
+**Strategic intent (long-term, not a temporary hack):** `engine_truth.json` and `engine_truth_v2.json` are **committed** so **fresh clones and CI** always have the same inputs as [`test_engine_truth_verify_artifact_alignment.py`](../../../../tests/unit/scripts/test_engine_truth_verify_artifact_alignment.py) (reads `engine_truth_v2.json` directly; default pytest order runs it **before** `test_generate_engine_truth.py`). Treat these files as **regenerated contract artifacts** — never hand-edit; regenerate after manifest or override changes.
 
-**Local-only (optional):** `stt_hardening_regress_summary.json` — produced by `.\scripts\stt_hardening_regress.ps1`. [`test_stt_hardening_regress_summary_schema.py`](../../../../tests/unit/scripts/test_stt_hardening_regress_summary_schema.py) **skips** when the file is absent; do not expect a green STT-pack schema test on a bare clone until that script has been run once.
+**Why `stt_hardening_regress_summary.json` is not tracked:** it is the **output of an optional local/CI script** (`.\scripts\stt_hardening_regress.ps1`), large and churny, and guarded by a schema test that **skips** when the file is missing. Pack totals there are **not** interchangeable with a single **Slice 27** transcript PASS (see [slice27/README.md](../slice27/README.md) STT pack callout).
+
+**Tracked in git:** this `README.md`, `engine_truth.json`, and `engine_truth_v2.json`. Regenerate with `python scripts/generate_engine_truth.py --schema all` after manifest or `engine_truth_overrides.json` changes; commit the resulting JSON in the **same** change-set as override/matrix updates when those rows move.
+
+**Local-only (optional):** `stt_hardening_regress_summary.json` — listed in repo-root `.gitignore`; produced by `.\scripts\stt_hardening_regress.ps1`. [`test_stt_hardening_regress_summary_schema.py`](../../../../tests/unit/scripts/test_stt_hardening_regress_summary_schema.py) **skips** when the file is absent.
 
 | File | Schema | Producer |
 | --- | --- | --- |

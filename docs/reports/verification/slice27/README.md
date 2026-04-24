@@ -4,7 +4,14 @@
 
 **Closure (2026-04-24):** **Tasks 175–181** recorded **runtime transcript PASS** + §8 — see [PROOF_SLICE27_WHISPER_CPP_TRANSCRIPT.md](../PROOF_SLICE27_WHISPER_CPP_TRANSCRIPT.md). This README remains the **canonical re-run / regression** checklist; follow **§1–§6** before any **new** PASS claim.
 
-This file is the **single canonical operator checklist** for **Task 38** (runtime transcript PASS). Do not flip [ENGINE_PARITY_MATRIX.md](../ENGINE_PARITY_MATRIX.md) **`whisper_cpp`** runtime line to **PASS** until every **PASS gate** below is satisfied on the **host you are proving** (matrix already **PASS** for the **175–181** authority session — do not regress prose without a new live session).
+## Project authority vs future operator reruns (Tasks 238)
+
+| Layer | Meaning |
+| --- | --- |
+| **Project authority (closed)** | **Tasks 175–181** already satisfied **runtime transcript PASS** + §8 for **`whisper_cpp`** on **`http://127.0.0.1:18293`**. [ENGINE_PARITY_MATRIX.md](../ENGINE_PARITY_MATRIX.md), [PROOF §27](../PROOF_SLICE27_WHISPER_CPP_TRANSCRIPT.md), [`engine_truth_overrides.json`](../../../../tools/overseer/data/engine_truth_overrides.json), and [`engine_truth_v2.json`](../generated/engine_truth_v2.json) reflect that **PASS**. The lane is **closed** in repo truth — a failed or skipped **rerun** on another host **does not** reopen it. |
+| **Future operator reruns** | To claim a **new** authoritative PASS (or to supersede **175–181**), an operator must complete **§1–§6** on **that** host, then run the **§8** mechanical checklist **on that host’s evidence**. Until then: document **blocked** / **skip** in PROOF §27 and session meta; **do not** flip matrix / overrides / verify bar / generated v2 to pretend a rerun succeeded. |
+
+This file is the **single canonical operator checklist** for **Task 38** (runtime transcript PASS). Use the table above so a **blocked rerun** is never read as “Slice 27 reopened.”
 
 ## STT hardening regression pack (`scripts/stt_hardening_regress.ps1`)
 

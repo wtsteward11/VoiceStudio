@@ -5,15 +5,13 @@ from typing import Any
 
 from tools.context.core.models import AllocationContext, SourceResult
 from tools.context.sources.base import BaseSourceAdapter
-from tools.overseer.ledger_parser import LedgerParser
-
-DEFAULT_LEDGER_PATH = Path("Recovery Plan/QUALITY_LEDGER.md")
+from tools.overseer.ledger_parser import LEDGER_DEFAULT_PATH, LedgerParser
 
 
 class LedgerSourceAdapter(BaseSourceAdapter):
     """Load Quality Ledger entries for context bundles."""
 
-    def __init__(self, ledger_path: Path = DEFAULT_LEDGER_PATH, include_done: bool = False, offline: bool = True):
+    def __init__(self, ledger_path: Path = LEDGER_DEFAULT_PATH, include_done: bool = False, offline: bool = True):
         super().__init__(source_name="ledger", priority=70, offline=offline)
         self._ledger_path = ledger_path
         self._include_done = include_done

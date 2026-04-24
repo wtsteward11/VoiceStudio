@@ -8,6 +8,8 @@ Engines covered:
 - XTTS (Coqui TTS XTTS-v2 model)
 - Piper (rhasspy/piper-voices, voice-specific .onnx + .json)
 - Whisper.cpp (GGUF model)
+- Vosk STT (package + on-disk model tree)
+- Parakeet TTS (Paddle stack + checkpoints layout)
 - So-VITS-SVC (manual checkpoints/config)
 
 All functions return a dict with:
@@ -69,6 +71,53 @@ def _ensure_dir(path: Path) -> None:
 def _fail(detail: object, status_code: int = 503) -> PreflightError:
     """Create a PreflightError (service-layer exception)."""
     return PreflightError(detail=detail, status_code=status_code)
+
+
+def _voice_studio_repo_root() -> Path:
+    """Repository root (parent of ``backend``)."""
+    return Path(__file__).resolve().parents[2]
+
+
+def _resolve_whisper_cpp_executable_path(raw: str | None) -> Path:
+    """Resolve ``executable_path`` from engine config (absolute or repo-relative)."""
+    default = _voice_studio_repo_root() / "tools" / "whispercpp" / "whisper-cli.exe"
+    if not raw:
+        return default
+    p = Path(raw)
+    if p.is_absolute():
+        return p
+    return _voice_studio_repo_root() / p
+
+
+def _whisper_cpp_python_binding_available() -> bool:
+    try:
+        import whisper_cpp
+    except ImportError:
+        return False
+    return True
+
+
+def _probe_whisper_cpp_cli(exe: Path) -> tuple[bool, str]:
+    """Non-shell probe: whisper.cpp builds typically print usage for ``-h`` / ``--help``."""
+    if not exe.is_file():
+        return False, f"binary not found at {exe}"
+    for args in ([str(exe), "-h"], [str(exe), "--help"]):
+        try:
+            proc = subprocess.run(
+                args,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+            if proc.returncode == 0 or len(out) >= 12:
+                return True, ""
+        except subprocess.TimeoutExpired:
+            return False, f"whisper.cpp CLI timed out ({args!r})"
+        except OSError as exc:
+            return False, f"whisper.cpp CLI failed to start: {exc}"
+    return False, "whisper.cpp CLI did not respond to -h or --help"
 
 
 def _get_pkg_version(package_name: str) -> str | None:
@@ -1050,16 +1099,25 @@ def ensure_openvoice(auto_download: bool = True) -> dict[str, object]:
 
 def ensure_whisper_cpp(auto_download: bool = True) -> dict[str, object]:
     """
-    Ensure whisper.cpp GGUF model exists.
+    Ensure whisper.cpp model weights exist and at least one execution surface is available.
+
+    Readiness (Slice 22): on-disk weights (default ``ggml-medium.en.bin`` under the whisper
+    models directory) **and** (Python ``whisper_cpp`` import **or** whisper.cpp CLI at resolved
+    ``executable_path`` / manifest default under ``tools/whispercpp/``). Some third-party files
+    named ``*.gguf`` are not loadable by upstream ``whisper-cli``; the default auto-download uses
+    the MIT-licensed ``ggerganov/whisper.cpp`` ``ggml-medium.en.bin`` artifact.
+
+    Health preflight uses ``auto_download=False`` (no silent HF pull each request).
     """
     cfg = get_engine_config_service()
-    engine_cfg = cfg.get_engine_config("whisper_cpp")
+    engine_cfg = cfg.get_engine_config("whisper_cpp") or {}
+    params = engine_cfg.get("parameters", {}) if isinstance(engine_cfg, dict) else {}
     model_path = Path(
-        engine_cfg.get("parameters", {}).get("model_path")
+        params.get("model_path")
         or os.path.join(
             str(get_models_path()),
             "whisper",
-            "whisper-medium.en.gguf",
+            "ggml-medium.en.bin",
         )
     )
     _ensure_dir(model_path.parent)
@@ -1068,7 +1126,8 @@ def ensure_whisper_cpp(auto_download: bool = True) -> dict[str, object]:
     if not model_path.exists():
         if not auto_download:
             raise _fail(
-                f"Whisper.cpp model missing at {model_path}. Place the GGUF or enable auto-download.",
+                f"Whisper.cpp model missing at {model_path}. "
+                "Place compatible whisper.cpp weights (see engine manifest) or enable auto-download.",
                 status_code=424,
             )
         if not HAS_HF:
@@ -1076,30 +1135,203 @@ def ensure_whisper_cpp(auto_download: bool = True) -> dict[str, object]:
                 "huggingface_hub required for Whisper.cpp auto-download. Install: pip install huggingface_hub",
                 status_code=503,
             )
-        logger.info(f"Whisper.cpp preflight: downloading GGUF to {model_path}")
-        # TheBloke/whisper-medium.en-GGUF returns 404; use OllmOne/whisper-medium-GGUF
+        logger.info("Whisper.cpp preflight: downloading ggml-medium.en.bin to %s", model_path)
         downloaded_path = hf_hub_download(
-            repo_id="OllmOne/whisper-medium-GGUF",
-            filename="model-q4k.gguf",
+            repo_id="ggerganov/whisper.cpp",
+            filename="ggml-medium.en.bin",
             local_dir=str(model_path.parent),
             local_dir_use_symlinks=False,
         )
-        # Rename to expected filename if needed
         src = Path(downloaded_path)
         if src != model_path and src.exists():
             shutil.move(str(src), str(model_path))
         downloaded = True
         try:
             from backend.services.usage_stats import record_model_downloaded
+
             record_model_downloaded()
         except Exception as e:
             logger.debug("Usage stats record_model_downloaded skip: %s", e)
 
+    exe_raw = params.get("executable_path") if isinstance(params, dict) else None
+    exe_raw_str = exe_raw if isinstance(exe_raw, str) and exe_raw.strip() else None
+    exe_path = _resolve_whisper_cpp_executable_path(exe_raw_str)
+
+    binding_ok = _whisper_cpp_python_binding_available()
+    binary_ok = False
+    binary_detail = ""
+    if exe_path.is_file():
+        binary_ok, binary_detail = _probe_whisper_cpp_cli(exe_path)
+
+    if not binding_ok and not binary_ok:
+        msg_parts = [
+            "Whisper.cpp has no execution surface: install whisper-cpp-python in this venv,",
+            "or place a working whisper.cpp CLI (see engines/audio/whisper_cpp/engine.manifest.json",
+            f"default tools/whispercpp/whisper-cli.exe). Model weights present at {model_path}.",
+        ]
+        if exe_path.is_file() or exe_raw_str:
+            msg_parts.append(f"CLI probe: {binary_detail or 'failed'} (path: {exe_path}).")
+        else:
+            msg_parts.append(f"Default CLI path not found: {exe_path}.")
+        if not binding_ok:
+            msg_parts.append("`import whisper_cpp` failed.")
+        raise _fail(
+            {
+                "message": " ".join(msg_parts),
+                "ok": False,
+                "model_path": str(model_path),
+                "python_binding": binding_ok,
+                "executable": str(exe_path),
+            },
+            status_code=503,
+        )
+
+    surfaces: list[str] = []
+    if binding_ok:
+        surfaces.append("whisper_cpp_python")
+    if binary_ok:
+        surfaces.append(f"cli:{exe_path}")
+
+    paths: list[str] = [str(model_path)]
+    if binary_ok:
+        paths.append(str(exe_path))
+
     return {
         "ok": True,
-        "paths": [str(model_path)],
+        "paths": paths,
         "downloaded": downloaded,
-        "message": "Whisper.cpp model ready",
+        "message": f"Whisper.cpp ready ({', '.join(surfaces)})",
+        "execution_surfaces": surfaces,
+        "python_binding": binding_ok,
+        "executable": str(exe_path) if binary_ok else None,
+    }
+
+
+def ensure_vosk(auto_download: bool = True) -> dict[str, object]:
+    """
+    Readiness for engine_id ``vosk`` (Vosk STT): ``vosk`` import + on-disk model directory.
+
+    Model resolution: ``parameters.model_path`` / ``parameters.model_name`` from engine config,
+    else ``VOICESTUDIO_VOSK_MODEL_PATH``, else ``<models>/vosk/<model_name>`` with default
+    ``vosk-model-en-us-0.22``. No silent download: operator must lay down models
+    (see https://alphacephei.com/vosk/models).
+    """
+    try:
+        from vosk import Model
+    except ImportError:
+        raise _fail(
+            {
+                "message": "vosk package not installed. Install: pip install vosk>=0.3.45",
+                "ok": False,
+                "first_blocker": "import_vosk",
+            },
+            status_code=503,
+        )
+
+    cfg = get_engine_config_service()
+    engine_cfg = cfg.get_engine_config("vosk") or {}
+    params = (engine_cfg.get("parameters", {}) if isinstance(engine_cfg, dict) else {}) or {}
+    default_name = str(
+        params.get("model_name")
+        or os.environ.get("VOICESTUDIO_VOSK_MODEL_NAME", "vosk-model-en-us-0.22")
+    )
+    raw_path = params.get("model_path") or os.environ.get("VOICESTUDIO_VOSK_MODEL_PATH")
+    if isinstance(raw_path, str) and raw_path.strip():
+        model_dir = Path(raw_path.strip()).expanduser()
+    else:
+        model_dir = Path(get_models_path()) / "vosk" / default_name
+    _ensure_dir(model_dir.parent)
+
+    if not model_dir.is_dir():
+        raise _fail(
+            {
+                "message": (
+                    f"Vosk model directory missing: {model_dir}. "
+                    "Download a model from alphacephei.com/vosk/models into that path."
+                ),
+                "ok": False,
+                "first_blocker": "model_dir_missing",
+                "model_dir": str(model_dir),
+            },
+            status_code=424,
+        )
+    if not any(model_dir.iterdir()):
+        raise _fail(
+            {
+                "message": f"Vosk model directory is empty: {model_dir}",
+                "ok": False,
+                "first_blocker": "model_dir_empty",
+                "model_dir": str(model_dir),
+            },
+            status_code=424,
+        )
+    try:
+        Model(str(model_dir))
+    except Exception as e:
+        raise _fail(
+            {
+                "message": f"{type(e).__name__}: {e}",
+                "ok": False,
+                "first_blocker": "model_load_failed",
+                "model_dir": str(model_dir),
+            },
+            status_code=500,
+        )
+
+    return {
+        "ok": True,
+        "paths": [str(model_dir)],
+        "downloaded": False,
+        "message": f"Vosk ready (model_dir={model_dir})",
+    }
+
+
+def ensure_parakeet(auto_download: bool = True) -> dict[str, object]:
+    """
+    Readiness for engine_id ``parakeet`` (PaddleSpeech Parakeet TTS).
+
+    Verifies ``paddlepaddle`` and ``paddlespeech`` imports and a non-empty checkpoints
+    directory under ``<models>/parakeet/checkpoints``. No silent weight download.
+    """
+    try:
+        import paddle
+    except ImportError:
+        raise _fail(
+            {
+                "message": "paddlepaddle not installed (required for Parakeet TTS).",
+                "ok": False,
+                "first_blocker": "paddle_missing",
+            },
+            status_code=503,
+        )
+    try:
+        import paddlespeech
+    except ImportError:
+        raise _fail(
+            {
+                "message": "paddlespeech not installed (required for Parakeet TTS).",
+                "ok": False,
+                "first_blocker": "paddlespeech_missing",
+            },
+            status_code=503,
+        )
+
+    root = Path(get_models_path()) / "parakeet" / "checkpoints"
+    _ensure_dir(root.parent)
+    if not root.is_dir() or not any(root.iterdir()):
+        raise _fail(
+            {
+                "message": f"Parakeet checkpoints directory missing or empty: {root}",
+                "ok": False,
+                "first_blocker": "checkpoints_missing",
+            },
+            status_code=424,
+        )
+    return {
+        "ok": True,
+        "paths": [str(root)],
+        "downloaded": False,
+        "message": f"Parakeet ready (checkpoints at {root})",
     }
 
 
@@ -1216,6 +1448,8 @@ def run_preflight(auto_download: bool = True) -> dict[str, object]:
         "whisper": ensure_whisper,
         "whisper_cpp": ensure_whisper_cpp,
         "faster_whisper": ensure_faster_whisper,
+        "vosk": ensure_vosk,
+        "parakeet": ensure_parakeet,
         "gpt_sovits": ensure_sovits,
     }
 

@@ -140,5 +140,17 @@ class TestOpenVoiceEngineOptimization:
                 pytest.skip("openvoice dependencies not installed")
 
 
+class TestOpenVoiceSeExtractorUnpack:
+    """myshell ``get_se`` returns ``(embedding, audio_name)`` — engine must unpack."""
+
+    def test_unpack_tuple_returns_first_element(self) -> None:
+        sentinel = object()
+        assert openvoice_engine._unpack_se_extractor_result((sentinel, "audio_x")) is sentinel
+
+    def test_unpack_non_tuple_passthrough(self) -> None:
+        sentinel = object()
+        assert openvoice_engine._unpack_se_extractor_result(sentinel) is sentinel
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

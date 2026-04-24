@@ -75,9 +75,10 @@ class ProgressSourceAdapter(BaseSourceAdapter):
         """Check if progress sources are available."""
         try:
             # Check if ledger file exists
-            ledger_path = Path("docs/governance/QUALITY_LEDGER.md")
+            from tools.overseer.ledger_parser import LEDGER_DEFAULT_PATH
+
             state_path = Path(".cursor/STATE.md")
-            return ledger_path.exists() or state_path.exists()
+            return LEDGER_DEFAULT_PATH.exists() or state_path.exists()
         except Exception:
             return False
 

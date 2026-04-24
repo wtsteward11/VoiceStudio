@@ -1,0 +1,217 @@
+{
+  "defaults": {
+    "latest_verify_artifact": "artifacts/verify/20260424_145514/verification_report.md"
+  },
+  "engines": {
+    "whisper": {
+      "engine_kind": "stt",
+      "readiness_status": "boolean_preflight",
+      "runtime_proof_status": "pass",
+      "first_blocker": null,
+      "latest_proof_doc": "docs/reports/verification/PROOF_SLICE21_WHISPER_LIVE_TRANSCRIPT.md",
+      "authority_module": "backend.services.model_preflight:ensure_whisper",
+      "matrix_status": "STT runtime transcript PASS (Slice 21A)",
+      "notes": "faster-whisper stack; router normalizes faster_whisper to whisper (ADR-056)"
+    },
+    "whisper_cpp": {
+      "engine_kind": "stt",
+      "readiness_status": "boolean_preflight",
+      "runtime_proof_status": "pass",
+      "first_blocker": null,
+      "latest_proof_doc": "docs/reports/verification/PROOF_SLICE27_WHISPER_CPP_TRANSCRIPT.md",
+      "authority_module": "backend.services.model_preflight:ensure_whisper_cpp",
+      "matrix_status": "STT runtime transcript PASS (Slice 27 Tasks 175-181; 18293 session)",
+      "notes": "Tasks 175-181: listening backend + green preflight + real_whisper_cpp 1/0; session_20260424_175_181_18293; ggml-medium.en.bin + whisper-cli 1.8.4"
+    },
+    "vosk": {
+      "engine_kind": "stt",
+      "readiness_status": "boolean_preflight",
+      "runtime_proof_status": "readiness_only",
+      "first_blocker": null,
+      "latest_proof_doc": "docs/reports/verification/PROOF_SLICE26_VOSK_READINESS.md",
+      "authority_module": "backend.services.model_preflight:ensure_vosk",
+      "matrix_status": "readiness-only until real_vosk slice",
+      "notes": "Task 36 posture"
+    },
+    "parakeet": {
+      "engine_kind": "tts",
+      "readiness_status": "boolean_preflight",
+      "runtime_proof_status": "readiness_only",
+      "first_blocker": null,
+      "latest_proof_doc": "docs/reports/verification/PROOF_SLICE28_PARAKEET_READINESS.md",
+      "authority_module": "backend.services.model_preflight:ensure_parakeet",
+      "matrix_status": "PaddleSpeech TTS; not STT (Task 31)",
+      "notes": "Manifest subtype tts"
+    },
+    "xtts_v2": {
+      "engine_kind": "tts",
+      "readiness_status": "boolean_preflight",
+      "runtime_proof_status": "pass",
+      "first_blocker": null,
+      "latest_proof_doc": "docs/reports/verification/PROOF_SLICE9_PLAYBACK_AUDITION.md",
+      "authority_module": "backend.services.model_preflight:ensure_xtts",
+      "matrix_status": "TTS synth/retrieval/playback PASS (Slice 9)",
+      "notes": "Matrix TTS row closed; XTTS-only bounded proof"
+    },
+    "piper": {
+      "engine_kind": "tts",
+      "readiness_status": "boolean_preflight",
+      "runtime_proof_status": "pass",
+      "first_blocker": null,
+      "latest_proof_doc": "docs/reports/verification/PROOF_SLICE10_PIPER_AUDITION.md",
+      "authority_module": "backend.services.model_preflight:ensure_piper",
+      "matrix_status": "TTS PASS (Slice 10)",
+      "notes": "Non-XTTS bounded closure"
+    },
+    "espeak_ng": {
+      "engine_kind": "tts",
+      "readiness_status": "boolean_preflight",
+      "runtime_proof_status": "pass",
+      "first_blocker": null,
+      "latest_proof_doc": "docs/reports/verification/PROOF_SLICE12_ESPEAK_NG_AUDITION.md",
+      "authority_module": "backend.services.model_preflight:ensure_espeak_ng",
+      "matrix_status": "TTS PASS (Slice 12)",
+      "notes": "GPL-3.0 manifest; operator due diligence"
+    },
+    "silero": {
+      "engine_kind": "tts",
+      "readiness_status": "boolean_preflight",
+      "runtime_proof_status": "pass",
+      "first_blocker": null,
+      "latest_proof_doc": "docs/reports/verification/PROOF_SLICE15_SILERO_AUDITION.md",
+      "authority_module": "backend.services.model_preflight:ensure_silero",
+      "matrix_status": "TTS PASS (Slice 15)",
+      "notes": "torch.hub snakers4/silero-models; preflight auto_download=False"
+    },
+    "chatterbox": {
+      "engine_kind": "tts",
+      "readiness_status": "boolean_preflight",
+      "runtime_proof_status": "pass",
+      "first_blocker": null,
+      "latest_proof_doc": "docs/reports/verification/PROOF_SLICE17_CHATTERBOX_AUDITION.md",
+      "authority_module": "backend.services.model_preflight:ensure_chatterbox",
+      "matrix_status": "TTS PASS Slice 17D",
+      "notes": "Dedicated port + VOICESTUDIO_REAL_XTTS_HTTP_BASE; Model B worker"
+    },
+    "tortoise": {
+      "engine_kind": "tts",
+      "readiness_status": "boolean_preflight",
+      "runtime_proof_status": "pass",
+      "first_blocker": null,
+      "latest_proof_doc": "docs/reports/verification/PROOF_SLICE18_TORTOISE_AUDITION.md",
+      "authority_module": "backend.services.model_preflight:ensure_tortoise",
+      "matrix_status": "TTS PASS Slice 18D",
+      "notes": "venv_tortoise + ADR-052; isolated from backend .venv"
+    },
+    "openvoice": {
+      "engine_kind": "tts",
+      "readiness_status": "boolean_preflight",
+      "runtime_proof_status": "pass",
+      "first_blocker": null,
+      "latest_proof_doc": "docs/reports/verification/PROOF_SLICE19_OPENVOICE_AUDITION.md",
+      "authority_module": "backend.services.model_preflight:ensure_openvoice",
+      "matrix_status": "PASS §19M (2026-04-22)",
+      "notes": "venv_openvoice + Strategy B vendored stack ADR-054/055"
+    },
+    "rhvoice": {
+      "engine_kind": "tts",
+      "readiness_status": "boolean_preflight",
+      "runtime_proof_status": "pending",
+      "first_blocker": "external_RHVoice_CLI_or_executable_path_not_on_typical_Windows_host",
+      "latest_proof_doc": "docs/reports/verification/PROOF_SLICE14_RHVOICE_AUDITION.md",
+      "authority_module": "backend.services.model_preflight:ensure_rhvoice",
+      "matrix_status": "pending runtime PASS; Slice 16 contract frozen",
+      "notes": "RHVoice freeze (Tasks 36–37): no new implementation; matrix PASS only after real_rhvoice + C# lines"
+    },
+    "bark": {
+      "engine_kind": "tts",
+      "readiness_status": "preflight_not_boolean",
+      "runtime_proof_status": "pending",
+      "first_blocker": "bounded_real_proof_blocked_matrix_slice12_hf_suno_bark_404",
+      "latest_proof_doc": "docs/reports/verification/ENGINE_PARITY_MATRIX.md",
+      "authority_module": null,
+      "matrix_status": "TTS row none; Slice 12 blocked HF weight fetch",
+      "notes": "Task 48 v2 curation; checks.bark ok null in matrix"
+    },
+    "fish_speech": {
+      "engine_kind": "tts",
+      "readiness_status": "preflight_not_boolean",
+      "runtime_proof_status": "pending",
+      "first_blocker": "no_bounded_matrix_synthesis_or_transcript_proof",
+      "latest_proof_doc": "docs/reports/verification/ENGINE_PARITY_MATRIX.md",
+      "authority_module": null,
+      "matrix_status": "TTS optional; matrix none",
+      "notes": "Task 48 v2 curation"
+    },
+    "gpt_sovits": {
+      "engine_kind": "vc",
+      "readiness_status": "preflight_not_boolean",
+      "runtime_proof_status": "pending",
+      "first_blocker": "training_heavy_no_bounded_matrix_proof",
+      "latest_proof_doc": "docs/reports/verification/ENGINE_PARITY_MATRIX.md",
+      "authority_module": "backend.services.model_preflight:ensure_sovits",
+      "matrix_status": "So-VITS vc manifest; training-heavy; matrix none",
+      "notes": "Task 61: engine_kind matches manifest subtype vc (not TTS product row)"
+    },
+    "higgs_audio": {
+      "engine_kind": "tts",
+      "readiness_status": "preflight_not_boolean",
+      "runtime_proof_status": "pending",
+      "first_blocker": "no_bounded_matrix_proof",
+      "latest_proof_doc": "docs/reports/verification/ENGINE_PARITY_MATRIX.md",
+      "authority_module": null,
+      "matrix_status": "TTS optional; matrix none",
+      "notes": "Task 48 v2 curation"
+    },
+    "whisper_ui": {
+      "engine_kind": "stt",
+      "readiness_status": "preflight_not_boolean",
+      "runtime_proof_status": "pending",
+      "first_blocker": "no_matrix_bounded_STT_transcript_proof_row",
+      "latest_proof_doc": "docs/reports/verification/ENGINE_PARITY_MATRIX.md",
+      "authority_module": null,
+      "matrix_status": "STT not in matrix table; harness not claimed",
+      "notes": "Task 48 v2 curation"
+    },
+    "whisperx": {
+      "engine_kind": "stt",
+      "readiness_status": "preflight_not_boolean",
+      "runtime_proof_status": "pending",
+      "first_blocker": "no_matrix_bounded_STT_transcript_proof_row",
+      "latest_proof_doc": "docs/reports/verification/ENGINE_PARITY_MATRIX.md",
+      "authority_module": null,
+      "matrix_status": "STT not in matrix table; harness not claimed",
+      "notes": "Task 48 v2 curation"
+    },
+    "openvoice_v2": {
+      "engine_kind": "tts",
+      "readiness_status": "preflight_not_boolean",
+      "runtime_proof_status": "pending",
+      "first_blocker": "distinct_from_openvoice_v1_matrix_PASS_no_bounded_slice",
+      "latest_proof_doc": "docs/reports/verification/ENGINE_PARITY_MATRIX.md",
+      "authority_module": null,
+      "matrix_status": "not in TTS matrix table; do not conflate with openvoice",
+      "notes": "Task 48 v2 curation"
+    },
+    "rvc": {
+      "engine_kind": "sts",
+      "readiness_status": "preflight_not_boolean",
+      "runtime_proof_status": "pending",
+      "first_blocker": "no_matrix_STS_bounded_proof_row",
+      "latest_proof_doc": "docs/reports/verification/ENGINE_PARITY_MATRIX.md",
+      "authority_module": null,
+      "matrix_status": "STS table lists sovits_svc only; rvc not matrix-scoped",
+      "notes": "Task 48 v2 curation; manifest subtype voice_conversion"
+    },
+    "rvc_v2": {
+      "engine_kind": "sts",
+      "readiness_status": "preflight_not_boolean",
+      "runtime_proof_status": "pending",
+      "first_blocker": "no_matrix_STS_bounded_proof_row",
+      "latest_proof_doc": "docs/reports/verification/ENGINE_PARITY_MATRIX.md",
+      "authority_module": null,
+      "matrix_status": "STS not matrix-scoped for rvc_v2",
+      "notes": "Task 48 v2 curation"
+    }
+  }
+}

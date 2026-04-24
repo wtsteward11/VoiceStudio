@@ -282,4 +282,58 @@ internal static class LivePreflightGuards
         $"checks.tortoise.ok is not true (install tortoise-tts + torch + warm tortoise_models cache). {msg}".Trim());
     }
   }
+
+  /// <summary>
+  /// Requires <c>GET /api/health/preflight</c> → <c>checks.openvoice.ok == true</c>.
+  /// Use the same <paramref name="backendBase"/> as <see cref="VoiceStudio.App.Services.BackendClientConfig.BaseUrl"/>.
+  /// </summary>
+  public static async Task AssertOpenVoicePreflightOkAsync(
+    HttpClient probe,
+    string backendBase,
+    CancellationToken cancellationToken = default)
+  {
+    ArgumentNullException.ThrowIfNull(probe);
+    if (string.IsNullOrWhiteSpace(backendBase))
+    {
+      throw new ArgumentException("backendBase is required.", nameof(backendBase));
+    }
+
+    var baseUri = new Uri(backendBase.TrimEnd('/') + "/", UriKind.Absolute);
+    using var resp = await probe
+      .GetAsync(new Uri(baseUri, "/api/health/preflight"), cancellationToken)
+      .ConfigureAwait(false);
+    if (!resp.IsSuccessStatusCode)
+    {
+      Assert.Inconclusive(
+        $"GET /api/health/preflight returned {(int)resp.StatusCode} at {backendBase}; cannot prove openvoice.");
+      return;
+    }
+
+    var json = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+    using var doc = JsonDocument.Parse(json);
+    if (!doc.RootElement.TryGetProperty("checks", out var checks))
+    {
+      Assert.Inconclusive("Preflight JSON missing \"checks\"; cannot gate openvoice proof.");
+      return;
+    }
+
+    if (!checks.TryGetProperty("openvoice", out var ovEl))
+    {
+      Assert.Inconclusive(
+        "Preflight missing checks.openvoice; use repo backend with current health routes.");
+      return;
+    }
+
+    if (!ovEl.TryGetProperty("ok", out var okEl) || okEl.ValueKind != JsonValueKind.True)
+    {
+      var msg = "";
+      if (ovEl.TryGetProperty("message", out var msgEl) && msgEl.ValueKind == JsonValueKind.String)
+      {
+        msg = msgEl.GetString() ?? "";
+      }
+
+      Assert.Inconclusive(
+        $"checks.openvoice.ok is not true (venv_openvoice runtime/venvs/openvoice + OpenVoice checkpoints under models/openvoice). {msg}".Trim());
+    }
+  }
 }

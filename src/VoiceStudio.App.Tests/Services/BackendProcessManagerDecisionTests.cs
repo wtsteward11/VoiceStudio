@@ -35,7 +35,22 @@ public class BackendProcessManagerDecisionTests
         }
     }
 
-    private static async Task WaitForHealthAsync(string baseUrl, int timeoutSeconds = 30)
+    /// <summary>Reserves a free loopback TCP port (bind-then-release) to avoid collisions with dev servers.</summary>
+    private static int ReserveFreeLoopbackPort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            return ((IPEndPoint)listener.LocalEndpoint).Port;
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    private static async Task WaitForHealthAsync(string baseUrl, int timeoutSeconds = 60)
     {
         using var client = new HttpClient { BaseAddress = new Uri(baseUrl) };
         var sw = Stopwatch.StartNew();
@@ -111,7 +126,7 @@ public class BackendProcessManagerDecisionTests
     [TestMethod]
     public async Task EnsureBackendRunningAsync_WhenHealthyBackendExists_WritesReuseDecision()
     {
-        const int port = 8015;
+        var port = ReserveFreeLoopbackPort();
         File.Delete(DecisionArtifactPath);
 
         var oldPortEnv = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT");
@@ -155,7 +170,7 @@ public class BackendProcessManagerDecisionTests
     [TestMethod]
     public async Task EnsureBackendRunningAsync_WhenBackendMissing_WritesSpawnDecision()
     {
-        const int port = 8016;
+        var port = ReserveFreeLoopbackPort();
         File.Delete(DecisionArtifactPath);
 
         var oldPortEnv = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT");
@@ -219,19 +234,21 @@ public class BackendProcessManagerDecisionTests
     [TestMethod]
     public async Task EnsureBackendRunningAsync_WhenPortHeldByNonHttpListener_WritesPortCollisionDecision()
     {
-        const int port = 8017;
         File.Delete(DecisionArtifactPath);
 
         var oldPortEnv = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT");
         var oldAppRootEnv = Environment.GetEnvironmentVariable("VOICESTUDIO_APP_ROOT");
-        Environment.SetEnvironmentVariable("VOICESTUDIO_API_PORT", port.ToString());
         Environment.SetEnvironmentVariable("VOICESTUDIO_APP_ROOT", RepoRoot);
 
         TcpListener? listener = null;
+        int port;
         try
         {
-            listener = new TcpListener(IPAddress.Loopback, port);
+            // Bind to an ephemeral port to avoid collisions with dev servers or other tests on fixed ports.
+            listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
+            port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            Environment.SetEnvironmentVariable("VOICESTUDIO_API_PORT", port.ToString());
 
             using var manager = new BackendProcessManager($"http://127.0.0.1:{port}");
             var started = await manager.EnsureBackendRunningAsync();
@@ -261,7 +278,7 @@ public class BackendProcessManagerDecisionTests
     [TestMethod]
     public async Task EnsureBackendRunningAsync_SecondCall_ReusesWithoutSecondSpawn()
     {
-        const int port = 8018;
+        var port = ReserveFreeLoopbackPort();
         File.Delete(DecisionArtifactPath);
 
         var oldPortEnv = Environment.GetEnvironmentVariable("VOICESTUDIO_API_PORT");

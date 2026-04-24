@@ -54,7 +54,9 @@ class ContextEnricher:
 
         # Load ledger path
         if ledger_path is None:
-            ledger_path = self._repo_root / "Recovery Plan" / "QUALITY_LEDGER.md"
+            ledger_path = (
+                self._repo_root / "docs" / "archive" / "Recovery_Plan" / "QUALITY_LEDGER.md"
+            )
         self._ledger_path = ledger_path
         self._ledger_cache: dict[str, dict[str, Any]] = {}
         self._ledger_loaded = False

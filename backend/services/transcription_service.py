@@ -22,8 +22,8 @@ from backend.core.circuit_breaker import get_engine_breaker
 from backend.core.exceptions import ServiceError
 from backend.data.repositories.transcription_repository import get_transcription_repository
 from backend.ml.models.engine_service import get_engine_service
-from backend.ml.models.model_preflight import PreflightError, ensure_whisper_cpp
 from backend.security.path_validator import PathValidationError, get_path_validator
+from backend.services.model_preflight import PreflightError, ensure_whisper_cpp
 
 logger = logging.getLogger(__name__)
 
@@ -251,7 +251,7 @@ async def transcribe_audio(
             (
                 "Transcription engine 'whisper_cpp' is not available. "
                 "Install with: pip install whisper-cpp-python. "
-                "Ensure GGUF model exists (ensure_whisper_cpp preflight)."
+                "Ensure whisper.cpp model weights exist (ensure_whisper_cpp preflight)."
             ),
         )
     if not stt_engine and request.engine == "whisper":

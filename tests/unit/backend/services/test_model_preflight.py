@@ -1,5 +1,6 @@
 import json
 import sys
+import types
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -76,6 +77,16 @@ def test_run_preflight_aggregates_results(monkeypatch):
         "ensure_faster_whisper",
         lambda auto_download: {"ok": True, "engine": "faster_whisper"},
     )
+    monkeypatch.setattr(
+        model_preflight,
+        "ensure_vosk",
+        lambda auto_download: {"ok": True, "engine": "vosk"},
+    )
+    monkeypatch.setattr(
+        model_preflight,
+        "ensure_parakeet",
+        lambda auto_download: {"ok": True, "engine": "parakeet"},
+    )
 
     result = model_preflight.run_preflight(auto_download=False)
     assert set(result["results"].keys()) == {
@@ -90,6 +101,8 @@ def test_run_preflight_aggregates_results(monkeypatch):
         "whisper",
         "whisper_cpp",
         "faster_whisper",
+        "vosk",
+        "parakeet",
         "gpt_sovits",
     }
     assert result["results"]["xtts_v2"]["engine"] == "xtts"
@@ -110,6 +123,69 @@ def test_ensure_whisper_delegates_to_ensure_faster_whisper(monkeypatch):
     out = model_preflight.ensure_whisper(auto_download=False)
     assert out["engine"] == "faster_whisper_delegation"
     assert called["auto_download"] is False
+
+
+def test_ensure_whisper_cpp_ok_with_python_binding_only(tmp_path, monkeypatch):
+    """GGUF on disk + mocked Python binding satisfies Slice 22 readiness (no CLI required)."""
+    gguf = tmp_path / "w.gguf"
+    gguf.write_bytes(b"gguf")
+
+    def _fake_config_service():
+        return SimpleNamespace(
+            get_engine_config=lambda _e: {
+                "parameters": {
+                    "model_path": str(gguf),
+                }
+            }
+        )
+
+    monkeypatch.setattr(model_preflight, "get_engine_config_service", _fake_config_service)
+    monkeypatch.setattr(model_preflight, "_whisper_cpp_python_binding_available", lambda: True)
+    monkeypatch.setattr(model_preflight, "_probe_whisper_cpp_cli", lambda _p: (False, "skipped"))
+
+    out = model_preflight.ensure_whisper_cpp(auto_download=False)
+    assert out["ok"] is True
+    assert str(gguf) in out["paths"]
+    assert "whisper_cpp_python" in out.get("execution_surfaces", [])
+
+
+def test_ensure_whisper_cpp_raises_without_model_or_surface(tmp_path, monkeypatch):
+    """Missing GGUF with auto_download=False raises; present GGUF but no surface also raises."""
+    missing = tmp_path / "missing.gguf"
+
+    def _fake_config_missing():
+        return SimpleNamespace(
+            get_engine_config=lambda _e: {
+                "parameters": {"model_path": str(missing)},
+            }
+        )
+
+    monkeypatch.setattr(model_preflight, "get_engine_config_service", _fake_config_missing)
+    with pytest.raises(model_preflight.PreflightError) as exc:
+        model_preflight.ensure_whisper_cpp(auto_download=False)
+    d0 = exc.value.detail
+    assert isinstance(d0, str) and ("missing" in d0.lower() or "gguf" in d0.lower())
+
+    gguf = tmp_path / "ok.gguf"
+    gguf.write_bytes(b"x")
+
+    def _fake_config_ok():
+        return SimpleNamespace(
+            get_engine_config=lambda _e: {
+                "parameters": {"model_path": str(gguf)},
+            }
+        )
+
+    monkeypatch.setattr(model_preflight, "get_engine_config_service", _fake_config_ok)
+    monkeypatch.setattr(model_preflight, "_whisper_cpp_python_binding_available", lambda: False)
+    monkeypatch.setattr(model_preflight, "_probe_whisper_cpp_cli", lambda _p: (False, "probe failed"))
+
+    with pytest.raises(model_preflight.PreflightError) as exc2:
+        model_preflight.ensure_whisper_cpp(auto_download=False)
+    detail = exc2.value.detail
+    assert isinstance(detail, dict)
+    assert detail.get("ok") is False
+    assert "execution surface" in detail.get("message", "").lower()
 
 
 def test_ensure_sovits_missing_files_raises(tmp_path, monkeypatch):
@@ -390,3 +466,39 @@ def test_ensure_openvoice_ok_when_checkpoint_layout_present(monkeypatch, tmp_pat
     assert out["ok"] is True
     assert out.get("python_exe") == str(fake_py)
     assert "openvoice" in out.get("message", "").lower()
+
+
+def test_ensure_vosk_ok_with_mock_model(tmp_path, monkeypatch):
+    """Vosk readiness: import + Model() on a temp model directory."""
+    model_dir = tmp_path / "vosk-model-en-us-0.22"
+    model_dir.mkdir()
+    (model_dir / "README").write_text("stub", encoding="utf-8")
+
+    class _FakeModel:
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+    fake_vosk = types.ModuleType("vosk")
+    fake_vosk.Model = _FakeModel  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "vosk", fake_vosk)
+
+    def _fake_cfg():
+        return SimpleNamespace(
+            get_engine_config=lambda _e: {"parameters": {"model_path": str(model_dir)}},
+        )
+
+    monkeypatch.setattr(model_preflight, "get_engine_config_service", _fake_cfg)
+    out = model_preflight.ensure_vosk(auto_download=False)
+    assert out["ok"] is True
+    assert str(model_dir) in out["paths"][0]
+
+
+def test_ensure_parakeet_raises_without_checkpoints(tmp_path, monkeypatch):
+    monkeypatch.setattr(model_preflight, "get_models_path", lambda: str(tmp_path))
+    fake_pd = types.ModuleType("paddle")
+    fake_ps = types.ModuleType("paddlespeech")
+    monkeypatch.setitem(sys.modules, "paddle", fake_pd)
+    monkeypatch.setitem(sys.modules, "paddlespeech", fake_ps)
+    with pytest.raises(model_preflight.PreflightError) as exc:
+        model_preflight.ensure_parakeet(auto_download=False)
+    assert exc.value.status_code == 424

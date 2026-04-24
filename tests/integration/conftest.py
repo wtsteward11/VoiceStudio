@@ -302,7 +302,9 @@ def setup_test_environment(request):
         "real_silero"
     ) or request.node.get_closest_marker("real_rhvoice") or request.node.get_closest_marker(
         "real_chatterbox"
-    ) or request.node.get_closest_marker("real_tortoise"):
+    ) or request.node.get_closest_marker("real_tortoise") or request.node.get_closest_marker(
+        "real_openvoice"
+    ):
         # Real engine proofs must not run under stub-like VOICESTUDIO_TEST_MODE (see
         # tests/integration/test_synthesis_*_real.py).
         os.environ.pop("VOICESTUDIO_TEST_MODE", None)

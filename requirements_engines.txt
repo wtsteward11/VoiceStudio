@@ -77,8 +77,10 @@ coqui-tts-trainer==0.3.1  # Finetuning & dataset manager
 # Piper TTS - Already have
 piper-tts>=1.0.0
 
-# OpenVoice (MyShell) - install from GitHub (PyPI name: myshell-openvoice; provides `import openvoice`)
-# Repo has no stable PyPI release/tag; pin commit for deterministic installs.
+# OpenVoice (MyShell) — **Slice 19F:** provision **`runtime/venvs/openvoice`** only; use
+# `config/venv_families/requirements-openvoice.txt` + `scripts/engines/create_engine_venv.py --family openvoice`.
+# Do **not** install OpenVoice into backend `.venv` or shared `torch26` for VoiceStudio preflight/synthesis.
+# Pin below remains the authoritative Git commit for supply-chain docs / ADR-044 cross-reference.
 myshell-openvoice @ git+https://github.com/myshell-ai/OpenVoice.git@74a1d147b17a8c3092dd5430504bd83ef6c7eb23
 
 # F5-TTS

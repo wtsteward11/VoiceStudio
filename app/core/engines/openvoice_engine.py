@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 from collections import OrderedDict
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
@@ -200,6 +201,32 @@ except ImportError:
 
 # Import base protocol from canonical source
 from .base import EngineProtocol
+
+
+def _unpack_se_extractor_result(se_out: Any) -> Any:
+    """myshell ``se_extractor.get_se`` returns ``(embedding, audio_name)`` in v1."""
+    if isinstance(se_out, tuple) and len(se_out) >= 1:
+        return se_out[0]
+    return se_out
+
+
+def _openvoice_base_tts_language_label(iso: str) -> str:
+    """Map ISO-ish codes to myshell **OpenVoice** ``BaseSpeakerTTS.tts`` language names.
+
+    Vendored ``api.BaseSpeakerTTS.tts`` only supports ``English`` and ``Chinese``;
+    all other requests map to **English** with a warning.
+    """
+    s = (iso or "en").strip().lower().replace("-", "_")
+    if s in ("en", "english", "en_us", "en_uk", "en_au"):
+        return "English"
+    if s in ("zh", "chinese", "cmn", "zh_cn", "cn", "yue", "wuu"):
+        return "Chinese"
+    logger.warning(
+        "BaseSpeakerTTS (OpenVoice v1) supports only English/Chinese; "
+        "using English for language=%r",
+        iso,
+    )
+    return "English"
 
 
 class OpenVoiceEngine(EngineProtocol):
@@ -436,8 +463,12 @@ class OpenVoiceEngine(EngineProtocol):
             if speaker_embedding is None:
                 try:
                     with torch.inference_mode():  # Faster inference
-                        speaker_embedding = se_extractor.get_se(
-                            reference_audio_path, self.tone_color_converter, vad=True
+                        speaker_embedding = _unpack_se_extractor_result(
+                            se_extractor.get_se(
+                                reference_audio_path,
+                                self.tone_color_converter,
+                                vad=True,
+                            )
                         )
                     # Cache embedding
                     if self._enable_caching:
@@ -446,28 +477,48 @@ class OpenVoiceEngine(EngineProtocol):
                     logger.error(f"Failed to extract speaker embedding: {e}")
                     return None
 
-            # Synthesize with base speaker
+            # Synthesize with base speaker (myshell BaseSpeakerTTS: tts(text, output_path, speaker, ...))
+            base_tmp: str | None = None
             try:
-                # Generate base audio with inference mode
-                with torch.inference_mode():  # Faster inference
-                    base_audio = self.base_speaker_tts.tts(
-                        text, language=language, speed=kwargs.get("speed", 1.0)
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                    base_tmp = tmp.name
+                with torch.inference_mode():
+                    self.base_speaker_tts.tts(
+                        text,
+                        base_tmp,
+                        "default",
+                        language=_openvoice_base_tts_language_label(language),
+                        speed=kwargs.get("speed", 1.0),
                     )
             except Exception as e:
-                logger.error(f"Base TTS synthesis failed: {e}")
+                logger.error("Base TTS synthesis failed: %s", e)
+                if base_tmp and os.path.isfile(base_tmp):
+                    try:
+                        os.unlink(base_tmp)
+                    except OSError as unlink_e:
+                        logger.debug("Could not remove base TTS temp WAV: %s", unlink_e)
                 return None
 
-            # Convert tone color with inference mode
             try:
-                with torch.inference_mode():  # Faster inference
+                with torch.inference_mode():
                     audio = self.tone_color_converter.convert(
-                        audio_src_path=base_audio if isinstance(base_audio, str) else None,
-                        src_se=speaker_embedding,
-                        tgt_se=speaker_embedding,
-                        output_path=output_path if output_path else None,
+                        base_tmp,
+                        speaker_embedding,
+                        speaker_embedding,
+                        str(output_path) if output_path else None,
                     )
+            except Exception as e:
+                logger.error("Tone color conversion failed: %s", e)
+                return None
+            finally:
+                if base_tmp and os.path.isfile(base_tmp):
+                    try:
+                        os.unlink(base_tmp)
+                    except OSError as e2:
+                        logger.debug("Could not remove base TTS temp WAV: %s", e2)
 
-                # If output_path provided, audio is saved to file
+            # If output_path provided, audio is saved to file
+            try:
                 if output_path:
                     # Load saved audio
                     import soundfile as sf
@@ -515,26 +566,24 @@ class OpenVoiceEngine(EngineProtocol):
                             sf.write(output_path, enhanced_audio, sample_rate)
                             return None, quality_metrics
                         return enhanced_audio, quality_metrics
-                    else:
-                        if output_path:
-                            import soundfile as sf
+                    if output_path:
+                        import soundfile as sf
 
-                            sf.write(output_path, audio, sample_rate)
-                            return None
-                        return audio
+                        sf.write(output_path, audio, sample_rate)
+                        return None
+                    return audio
 
                 # Save to file if requested
                 if output_path:
                     import soundfile as sf
 
                     sf.write(output_path, audio, sample_rate)
-                    logger.info(f"Audio saved to: {output_path}")
+                    logger.info("Audio saved to: %s", output_path)
                     return None
 
                 return np.asarray(audio)
-
             except Exception as e:
-                logger.error(f"Tone color conversion failed: {e}")
+                logger.error("OpenVoice post-conversion processing failed: %s", e)
                 return None
 
         except Exception as e:
@@ -710,8 +759,10 @@ class OpenVoiceEngine(EngineProtocol):
 
         try:
             # Extract speaker embedding (language-agnostic)
-            speaker_embedding = se_extractor.get_se(
-                str(speaker_wav), self.tone_color_converter, vad=True
+            speaker_embedding = _unpack_se_extractor_result(
+                se_extractor.get_se(
+                    str(speaker_wav), self.tone_color_converter, vad=True
+                )
             )
 
             # Get or load target language base speaker model
@@ -723,17 +774,31 @@ class OpenVoiceEngine(EngineProtocol):
                 )
                 target_base_model = self.base_speaker_tts
 
-            # Synthesize with target language base
-            base_audio = target_base_model.tts(
-                text, language=target_language, speed=kwargs.get("speed", 1.0)
-            )
-
-            # Convert tone color (base_audio can be string path or array)
-            cloned_audio = self.tone_color_converter.convert(
-                audio_src_path=base_audio if isinstance(base_audio, str) else None,
-                src_se=speaker_embedding,
-                tgt_se=speaker_embedding,
-            )
+            # Synthesize with target language base (write to temp WAV; tts requires path + speaker)
+            base_tmp: str | None = None
+            try:
+                fd, base_tmp = tempfile.mkstemp(suffix=".wav")
+                os.close(fd)
+                with torch.inference_mode():
+                    target_base_model.tts(
+                        text,
+                        base_tmp,
+                        "default",
+                        language=_openvoice_base_tts_language_label(target_language),
+                        speed=kwargs.get("speed", 1.0),
+                    )
+                cloned_audio = self.tone_color_converter.convert(
+                    base_tmp,
+                    speaker_embedding,
+                    speaker_embedding,
+                    None,
+                )
+            finally:
+                if base_tmp and os.path.isfile(base_tmp):
+                    try:
+                        os.unlink(base_tmp)
+                    except OSError as e:
+                        logger.debug("Could not remove cross-lingual base temp WAV: %s", e)
 
             # Process audio
             if isinstance(cloned_audio, str):
@@ -807,8 +872,10 @@ class OpenVoiceEngine(EngineProtocol):
 
         # Pre-extract speaker embedding (once)
         try:
-            speaker_embedding = se_extractor.get_se(
-                str(speaker_wav), self.tone_color_converter, vad=True
+            speaker_embedding = _unpack_se_extractor_result(
+                se_extractor.get_se(
+                    str(speaker_wav), self.tone_color_converter, vad=True
+                )
             )
         except Exception as e:
             logger.error(f"Failed to extract speaker embedding: {e}")
@@ -819,17 +886,23 @@ class OpenVoiceEngine(EngineProtocol):
         overlap_samples = int(self.DEFAULT_SAMPLE_RATE * 0.1)  # 100ms overlap
 
         for chunk_text in chunks:
+            base_tmp: str | None = None
             try:
-                # Synthesize chunk
-                base_audio = self.base_speaker_tts.tts(
-                    chunk_text, language=language, speed=kwargs.get("speed", 1.0)
-                )
-
-                # Convert tone color
+                fd, base_tmp = tempfile.mkstemp(suffix=".wav")
+                os.close(fd)
+                with torch.inference_mode():
+                    self.base_speaker_tts.tts(
+                        chunk_text,
+                        base_tmp,
+                        "default",
+                        language=_openvoice_base_tts_language_label(language),
+                        speed=kwargs.get("speed", 1.0),
+                    )
                 chunk_audio = self.tone_color_converter.convert(
-                    audio_src_path=base_audio if isinstance(base_audio, str) else None,
-                    src_se=speaker_embedding,
-                    tgt_se=speaker_embedding,
+                    base_tmp,
+                    speaker_embedding,
+                    speaker_embedding,
+                    None,
                 )
 
                 # Load audio if path
@@ -897,6 +970,12 @@ class OpenVoiceEngine(EngineProtocol):
             except Exception as e:
                 logger.error(f"Stream synthesis chunk failed: {e}")
                 continue
+            finally:
+                if base_tmp and os.path.isfile(base_tmp):
+                    try:
+                        os.unlink(base_tmp)
+                    except OSError as e:
+                        logger.debug("Could not remove streaming base temp WAV: %s", e)
 
     def _split_text_with_overlap(self, text: str, chunk_size: int, overlap: int) -> list[str]:
         """Split text into chunks with overlap."""

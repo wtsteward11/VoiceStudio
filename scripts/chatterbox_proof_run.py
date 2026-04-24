@@ -38,7 +38,8 @@ def main():
     proof_data["checks"]["python_env"] = {
         "executable": sys.executable,
         "version": sys.version,
-        "pass": "venv_advanced_tts" in sys.executable,
+        "pass": ("venv_advanced_tts" in sys.executable)
+        or ("torch26" in sys.executable.replace("\\", "/")),
     }
     print(f"    Executable: {sys.executable}")
     print(f"    Pass: {proof_data['checks']['python_env']['pass']}")

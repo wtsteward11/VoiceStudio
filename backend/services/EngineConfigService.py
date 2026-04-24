@@ -68,6 +68,7 @@ class EngineConfigService:
                 if unified and unified.engines:
                     self.config = self._load_from_unified_config(unified)
                     logger.info("Loaded engine configuration from UnifiedConfigService")
+                    self._merge_whisper_cpp_from_committed_engine_json_if_missing()
                     return
             except Exception as e:
                 logger.debug(f"UnifiedConfigService not available, falling back to JSON: {e}")
@@ -86,6 +87,33 @@ class EngineConfigService:
             logger.info(f"Configuration file not found, creating default: {self.config_path}")
             self.config = self._get_default_config()
             self.save()
+
+        self._merge_whisper_cpp_from_committed_engine_json_if_missing()
+
+    def _merge_whisper_cpp_from_committed_engine_json_if_missing(self) -> None:
+        """Unified YAML often omits ``whisper_cpp``; keep runtime aligned with ``engine_config.json``."""
+        engine_cfgs = self.config.get("engine_configs")
+        if not isinstance(engine_cfgs, dict):
+            return
+        existing = engine_cfgs.get("whisper_cpp")
+        if isinstance(existing, dict) and existing:
+            return
+        template_path = Path(__file__).resolve().parents[1] / "config" / "engine_config.json"
+        if not template_path.is_file():
+            return
+        try:
+            with open(template_path, encoding="utf-8") as handle:
+                disk = json.load(handle)
+        except Exception as exc:
+            logger.debug("whisper_cpp template merge skipped (read error): %s", exc)
+            return
+        disk_engines = disk.get("engine_configs")
+        if not isinstance(disk_engines, dict):
+            return
+        whisper = disk_engines.get("whisper_cpp")
+        if isinstance(whisper, dict) and whisper:
+            engine_cfgs["whisper_cpp"] = whisper.copy()
+            logger.info("Merged whisper_cpp parameters from %s (UnifiedConfig had no entry)", template_path)
 
     def _load_from_unified_config(self, unified) -> dict[str, Any]:
         """Transform UnifiedConfigService.engines to legacy config format."""

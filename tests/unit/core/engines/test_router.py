@@ -191,6 +191,19 @@ class TestEngineRouterIdleTimeout:
         # Engine should be cleaned up
         assert "test_engine" not in engine_router._engines
 
+    def test_unregister_keeps_engine_id_in_list_engines(
+        self, engine_router, mock_engine_class
+    ):
+        """Instance unload must not drop the engine id from ``list_engines`` (Slice 12)."""
+        engine_router.register_engine("unload_me", mock_engine_class)
+        engine_router.get_engine("unload_me", device="cpu", gpu=False)
+        assert "unload_me" in engine_router._engines
+        engine_router.unregister_engine("unload_me")
+        assert "unload_me" not in engine_router._engines
+        ids = engine_router.list_engines()
+        assert "unload_me" in ids
+        assert "unload_me" in engine_router._engine_types
+
 
 class TestEngineRouterMemoryMonitoring:
     """Test memory threshold monitoring."""

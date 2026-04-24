@@ -38,8 +38,13 @@
   "config_schema": {
     "executable_path": {
       "type": "string",
-      "default": "tools\\whispercpp\\whisper.exe",
-      "description": "Path to whisper.cpp executable"
+      "default": "tools\\whispercpp\\whisper-cli.exe",
+      "description": "Path to whisper.cpp executable (whisper-cli preferred; repo-relative allowed)"
+    },
+    "model_path": {
+      "type": "string",
+      "default": "",
+      "description": "Path to whisper.cpp model weights (.bin / compatible format for bundled whisper-cli)"
     },
     "model": {
       "type": "string",
@@ -105,7 +110,7 @@
       "timeout_seconds": 300
     }
   },
-  "implementation_status": "full",
-  "support_tier": "tier1_supported",
-  "implementation_notes": "Fully implemented audio engine."
+  "implementation_status": "basic",
+  "support_tier": "tier2_best_effort",
+  "implementation_notes": "Readiness boolean preflight (Slice 22: ensure_whisper_cpp + checks.whisper_cpp). Runtime uses whisper.cpp binding or CLI only — no substitution into engine whisper (faster-whisper), Slice 23. Matrix runtime transcript PASS and tier-1 support claim deferred until bounded live proof."
 }

@@ -189,7 +189,9 @@ class OverseerMonitor:
         self.checklist_path = project_root / "docs/governance/MASTER_TASK_CHECKLIST.md"
         self.progress_dir = project_root / "docs/governance/progress"
         self.reviews_dir = project_root / "docs/governance/reviews"
-        self.ledger_path = project_root / "Recovery Plan/QUALITY_LEDGER.md"
+        self.ledger_path = (
+            project_root / "docs" / "archive" / "Recovery_Plan" / "QUALITY_LEDGER.md"
+        )
 
         # Create directories if needed
         self.progress_dir.mkdir(parents=True, exist_ok=True)
@@ -268,8 +270,8 @@ class OverseerMonitor:
         if governance_dir.exists():
             self.observer.schedule(FileHandler(), str(governance_dir), recursive=True)
 
-        # Watch Recovery Plan directory
-        recovery_dir = self.project_root / "Recovery Plan"
+        # Watch archived Recovery Plan directory (canonical QUALITY_LEDGER)
+        recovery_dir = self.project_root / "docs" / "archive" / "Recovery_Plan"
         if recovery_dir.exists():
             self.observer.schedule(FileHandler(), str(recovery_dir), recursive=False)
 
@@ -594,9 +596,9 @@ def main():
     else:
         project_root = Path(__file__).parent.parent
         # Verify it looks like the project root
-        if not (project_root / "Recovery Plan").exists():
+        if not (project_root / "VoiceStudio.sln").exists():
             project_root = Path(__file__).parent
-            if not (project_root / "Recovery Plan").exists():
+            if not (project_root / "VoiceStudio.sln").exists():
                 print(f"Error: Cannot find project root from {Path(__file__)}")
                 return 1
 

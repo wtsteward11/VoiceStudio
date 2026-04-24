@@ -7,7 +7,8 @@ Implements TD-015: 8 engine families for complete dependency isolation.
 Families:
 - venv_core_tts: XTTS, Silero, OpenAI TTS, Fish Speech, Mars5, Parler TTS
 - venv_tortoise: Tortoise TTS (isolated stack; Slice 18B — incompatible transformers pin vs Coqui/XTTS)
-- venv_advanced_tts: Chatterbox, F5-TTS, OpenVoice, GPT-SoVITS, Bark
+- venv_advanced_tts: Chatterbox, F5-TTS, GPT-SoVITS, Bark
+- venv_openvoice: OpenVoice (Slice 19F — isolated from torch26 / Chatterbox stack)
 - venv_fast_tts: Piper, Parakeet, eSpeak-NG, Festival, MaryTTS, RHVoice (CPU-friendly)
 - venv_stt: Whisper, Whisper.cpp, Vosk, Aeneas
 - venv_voice_conversion: RVC, So-VITS-SVC, Mockingbird, Speaker Encoder
@@ -35,6 +36,8 @@ logger = logging.getLogger(__name__)
 ADVANCED_TTS_PROVISION_DIRNAME = "torch26"
 # Slice 18B: tortoise-tts pins transformers incompatible with Coqui/XTTS in core venv.
 TORTOISE_TTS_PROVISION_DIRNAME = "tortoise"
+# Slice 19F: OpenVoice isolated venv (myshell-openvoice / PyAV chain; ADR-054).
+OPENVOICE_PROVISION_DIRNAME = "openvoice"
 
 
 class VenvFamily(Enum):
@@ -44,6 +47,7 @@ class VenvFamily(Enum):
     CORE_TTS = "venv_core_tts"
     ADVANCED_TTS = "venv_advanced_tts"
     TORTOISE = "venv_tortoise"
+    OPENVOICE = "venv_openvoice"
     FAST_TTS = "venv_fast_tts"
 
     # Speech-to-text
@@ -98,7 +102,7 @@ FAMILY_CONFIGS: dict[VenvFamily, FamilyConfig] = {
         requirements_file="requirements-advanced-tts.txt",
         python_version="3.11",
         description="Advanced TTS with latest models (torch 2.6+, SM 120 compatible)",
-        engines=["chatterbox", "f5_tts", "openvoice", "gpt_sovits", "bark"],
+        engines=["chatterbox", "f5_tts", "gpt_sovits", "bark"],
         gpu_required=True,
         estimated_size_gb=10.0,
     ),
@@ -110,6 +114,15 @@ FAMILY_CONFIGS: dict[VenvFamily, FamilyConfig] = {
         engines=["tortoise"],
         gpu_required=True,
         estimated_size_gb=6.0,
+    ),
+    VenvFamily.OPENVOICE: FamilyConfig(
+        family=VenvFamily.OPENVOICE,
+        requirements_file="requirements-openvoice.txt",
+        python_version="3.11",
+        description="OpenVoice isolated stack (Slice 19F; decoupled from Chatterbox torch26)",
+        engines=["openvoice"],
+        gpu_required=True,
+        estimated_size_gb=8.0,
     ),
     VenvFamily.FAST_TTS: FamilyConfig(
         family=VenvFamily.FAST_TTS,
@@ -210,6 +223,7 @@ class VenvFamilyManager:
         requirements_root: Path | None = None,
         advanced_tts_venv_path: Path | None = None,
         tortoise_venv_path: Path | None = None,
+        openvoice_venv_path: Path | None = None,
     ):
         """
         Initialize venv family manager.
@@ -220,12 +234,14 @@ class VenvFamilyManager:
             advanced_tts_venv_path: Optional override for ``ADVANCED_TTS`` on-disk venv (tests / tooling).
                 When omitted, uses ``project_root/runtime/venvs/{ADVANCED_TTS_PROVISION_DIRNAME}`` (``create_engine_venv``).
             tortoise_venv_path: Optional override for ``TORTOISE`` isolated venv (tests / tooling).
+            openvoice_venv_path: Optional override for ``OPENVOICE`` isolated venv (tests / tooling).
         """
         self.project_root = Path(__file__).parent.parent.parent.parent
         self.venvs_root = venvs_root or self.project_root / ".venvs"
         self.requirements_root = requirements_root or self.project_root / "config" / "venv_families"
         self._advanced_tts_venv_path_override = advanced_tts_venv_path
         self._tortoise_venv_path_override = tortoise_venv_path
+        self._openvoice_venv_path_override = openvoice_venv_path
 
         # Ensure directories exist
         self.venvs_root.mkdir(parents=True, exist_ok=True)
@@ -258,6 +274,10 @@ class VenvFamilyManager:
             if self._tortoise_venv_path_override is not None:
                 return self._tortoise_venv_path_override
             return self.project_root / "runtime" / "venvs" / TORTOISE_TTS_PROVISION_DIRNAME
+        if family == VenvFamily.OPENVOICE:
+            if self._openvoice_venv_path_override is not None:
+                return self._openvoice_venv_path_override
+            return self.project_root / "runtime" / "venvs" / OPENVOICE_PROVISION_DIRNAME
         return self.venvs_root / family.value
 
     def get_python_executable(self, family: VenvFamily) -> Path:

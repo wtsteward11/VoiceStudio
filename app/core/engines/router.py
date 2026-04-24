@@ -68,6 +68,17 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Legacy config / API tokens that do not match manifest engine_id (Slice 24).
+_STT_ENGINE_ID_ALIASES: dict[str, str] = {
+    "faster_whisper": "whisper",
+}
+
+
+def normalize_engine_request_id(engine_id: str) -> str:
+    """Map deprecated or alternate engine ids to the manifest router id."""
+    key = (engine_id or "").strip()
+    return _STT_ENGINE_ID_ALIASES.get(key, key)
+
 
 # ==============================================================================
 # A/B Testing Data Classes
@@ -182,6 +193,8 @@ class EngineRouter:
         Returns:
             Engine instance or None if not found
         """
+        name = normalize_engine_request_id(name)
+
         # Clean up idle engines and check memory before getting new one
         self._cleanup_idle_engines()
 
@@ -200,7 +213,25 @@ class EngineRouter:
                 # Track memory before engine creation
                 memory_before = self._get_memory_usage_mb()
 
-                engine = self._engine_types[name](**kwargs)
+                merged_kwargs = dict(kwargs)
+                # RHVoice / whisper_cpp: apply engine_config.json parameters so preflight and
+                # runtime share one source of truth (Slice 16 RHVoice; Slice 27 whisper_cpp).
+                if name in ("rhvoice", "whisper_cpp"):
+                    try:
+                        from backend.services.EngineConfigService import get_engine_config_service
+
+                        ecs = get_engine_config_service()
+                        manifest = self._manifests.get(name)
+                        cfg_kwargs = ecs.get_engine_init_kwargs(name, manifest)
+                        merged_kwargs = {**cfg_kwargs, **kwargs}
+                    except Exception as e:
+                        logger.debug(
+                            "Engine %s: init kwargs not merged from engine_config.json: %s",
+                            name,
+                            e,
+                        )
+
+                engine = self._engine_types[name](**merged_kwargs)
                 engine.initialize()
 
                 # Track memory after engine creation
@@ -306,8 +337,9 @@ class EngineRouter:
                 del self._engine_memory_usage[name]
             if name in self._engine_gpu_memory_usage:
                 del self._engine_gpu_memory_usage[name]
-        if name in self._engine_types:
-            del self._engine_types[name]
+        # Do NOT remove ``name`` from ``_engine_types``: memory/idle unload must drop only the
+        # runtime instance so ``list_engines()`` and synthesis validation still see the engine id
+        # and ``get_engine`` can re-instantiate (Slice 12 eSpeak NG second-call regression).
 
     def cleanup_all(self) -> None:
         """Cleanup all engine instances."""
@@ -1196,6 +1228,10 @@ class EngineRouter:
         if not current_stats:
             return None
 
+        # STT: never load-balance across engines (no silent substitution; Slice 24).
+        if task_type == "stt":
+            return None
+
         # Get fallback chain as alternatives
         alternatives = self._get_fallback_chain(task_type)
         if current_engine_id in alternatives:
@@ -1242,6 +1278,12 @@ class EngineRouter:
 
     def _get_fallback_chain(self, task_type: str) -> list[str]:
         """Get fallback chain for a task type (GAP-053: user settings → YAML → defaults)."""
+        # STT: exactly one engine — configured default only. YAML multi-engine lists are
+        # ignored here so orchestration cannot silently substitute STT engines (Slice 24).
+        if task_type == "stt":
+            default_id = self._get_default_engine_id("stt") or "whisper_cpp"
+            return [normalize_engine_request_id(default_id)]
+
         try:
             from backend.api.routes.settings import load_settings
 
@@ -1269,7 +1311,6 @@ class EngineRouter:
 
         defaults = {
             "tts": ["xtts_v2", "openvoice", "piper", "espeak"],
-            "stt": ["whisper_cpp", "faster_whisper", "vosk"],
             "rvc": ["rvc_v2", "sovits_svc", "ddsp"],
         }
         return defaults.get(task_type, [])
@@ -1309,20 +1350,40 @@ class EngineRouter:
         return None
 
     def select_engine_with_fallback(
-        self, task_type: str = "tts", **kwargs: Any
+        self,
+        task_type: str = "tts",
+        *,
+        explicit_engine_id: str | None = None,
+        **kwargs: Any,
     ) -> tuple[EngineProtocol | None, list[str]]:
         """
-        Select engine with automatic fallback chain.
+        Select engine with automatic fallback chain (TTS/RVC only).
 
-        Tries each engine in the fallback chain until one works.
+        For STT, the chain is always a single configured default unless
+        ``explicit_engine_id`` is set — then only that id is attempted (fail-closed).
 
         Args:
             task_type: Task type
-            **kwargs: Additional arguments for select_engine
+            explicit_engine_id: When set, only this manifest engine id is resolved
+                (aliases normalized); no substitution on failure.
+            **kwargs: Reserved for future selection hints
 
         Returns:
             Tuple of (engine instance, list of attempted engines)
         """
+        if explicit_engine_id is not None:
+            resolved = normalize_engine_request_id(explicit_engine_id)
+            attempted: list[str] = [resolved]
+            try:
+                engine = self.get_engine(resolved)
+                if engine and engine.is_initialized():
+                    logger.info("Using explicitly requested engine '%s'", resolved)
+                    return engine, attempted
+            except Exception as e:
+                logger.debug("Explicit engine '%s' failed: %s", resolved, e)
+            logger.warning("Explicit engine '%s' unavailable or not initialized", resolved)
+            return None, attempted
+
         fallback_chain = self._get_fallback_chain(task_type)
         attempted = []
 

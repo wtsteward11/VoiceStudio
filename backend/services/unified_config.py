@@ -573,10 +573,11 @@ class UnifiedConfigService:
         Returns:
             Engine ID for the language, or default engine if not mapped
         """
-        # Check language mapping
-        engine = self.engines.routing_policy.language_mapping.get(language)
-        if engine:
-            return engine
+        # Language mapping keys are TTS routing targets only (YAML is TTS-focused).
+        if task_type == "tts":
+            engine = self.engines.routing_policy.language_mapping.get(language)
+            if engine:
+                return engine
 
         # Fall back to default for task type
         return self.engines.defaults.get(task_type, "xtts_v2")

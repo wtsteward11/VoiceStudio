@@ -130,7 +130,9 @@ def collect_quality_ledger(evidence_dir: Path) -> dict:
     """Extract Quality Ledger status."""
     print("Collecting Quality Ledger status...")
 
-    ledger_path = get_project_root() / "Recovery Plan" / "QUALITY_LEDGER.md"
+    ledger_path = (
+        get_project_root() / "docs" / "archive" / "Recovery_Plan" / "QUALITY_LEDGER.md"
+    )
     evidence = {
         "open_p0": 0,
         "open_p1": 0,

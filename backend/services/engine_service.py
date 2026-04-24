@@ -20,7 +20,6 @@ from typing import Any, Union, cast
 import numpy as np
 
 from backend.adapters.engine_adapter import EngineAdapter
-
 from backend.services.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
@@ -329,8 +328,6 @@ class EngineService(IEngineService):
         "chatterbox": ["xtts_v2", "bark", "piper"],
         "bark": ["xtts_v2", "chatterbox", "piper"],
         "piper": ["xtts_v2", "chatterbox", "bark"],
-        "whisper": ["faster_whisper"],
-        "faster_whisper": ["whisper"],
     }
 
     def __init__(self) -> None:

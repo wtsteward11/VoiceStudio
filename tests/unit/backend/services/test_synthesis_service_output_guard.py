@@ -5,8 +5,8 @@ from __future__ import annotations
 import tempfile
 
 from backend.services.synthesis_service import (
-    _synthesis_engine_output_path,
     _synth_output_file_ready,
+    _synthesis_engine_output_path,
 )
 
 

@@ -74,6 +74,17 @@ def _get_cache_key(model_id: str, language: str, device: str) -> str:
     return f"silero::{model_id}::{language}::{device}"
 
 
+# ``torch.hub.load(..., speaker=...)`` selects which checkpoint package (e.g. ``v3_en``).
+# ``TTSModelMultiAcc_v3.apply_tts(speaker=...)`` expects per-model voice IDs (e.g. ``en_0``, ``aidar``).
+_HUB_LOAD_TO_APPLY_TTS_SPEAKER: dict[str, str] = {
+    "v3_en": "en_0",
+    "v4_ru": "aidar",
+    "v3_de": "bernd_ungerer",
+    "v3_es": "es_0",
+    "v3_fr": "fr_0",
+}
+
+
 def _get_cached_model(model_id: str, language: str, device: str) -> Any:
     """Get cached model if available."""
     # Try general model cache first
@@ -209,7 +220,7 @@ class SileroEngine(EngineProtocol):
         model_id: str = "v4",
         language: str = "en",
         device: str | None = None,
-        gpu: bool = True,
+        gpu: bool = False,
         lazy_load: bool = True,
         batch_size: int = 4,
         enable_caching: bool = True,
@@ -221,12 +232,31 @@ class SileroEngine(EngineProtocol):
             model_id: Silero model version ('v3', 'v4', 'v5')
             language: Default language code
             device: Device to use ('cuda', 'cpu', or None for auto)
-            gpu: Whether to use GPU if available
+            gpu: Whether to use GPU if available (default False: Silero hub JIT/package
+                 models are CPU-first; set True only on GPUs supported by the installed PyTorch build)
             lazy_load: If True, defer model loading until first use
             batch_size: Batch size for batch synthesis operations
             enable_caching: If True, enable model caching
         """
         super().__init__(device=device, gpu=gpu)
+
+        # If base picked CUDA, ensure this PyTorch build actually supports the GPU architecture.
+        # A tiny cuda tensor can succeed while torch.package TTS kernels cannot (e.g. sm_120 on older torch).
+        if self.device == "cuda":
+            try:
+                cap = torch.cuda.get_device_capability(0)
+                arch = f"sm_{cap[0]}{cap[1]}"
+                supported = torch.cuda.get_arch_list()
+                if supported and arch not in supported:
+                    logger.warning(
+                        "Silero: GPU architecture %s is not in PyTorch arch list %s; using CPU.",
+                        arch,
+                        supported,
+                    )
+                    self.device = "cpu"
+            except Exception as ex:
+                logger.warning("Silero: CUDA capability check failed (%s); using CPU.", ex)
+                self.device = "cpu"
 
         self.model_id = model_id
         self.default_language = language
@@ -236,10 +266,27 @@ class SileroEngine(EngineProtocol):
         self.lazy_load = lazy_load
         self.batch_size = batch_size
         self._caching_enabled = enable_caching
+        self._hub_load_speaker: str | None = None
 
         # Override device if GPU requested and available
         if gpu and torch.cuda.is_available() and self.device == "cpu":
             self.device = "cuda"
+
+    def _torch_hub_speaker_for_load(self) -> str:
+        """
+        Speaker ID for ``torch.hub.load(..., model='silero_tts')`` on snakers4/silero-models.
+
+        Current hub models expose string IDs such as ``v3_en``, ``v4_ru`` — not ``silero_tts_v4``.
+        """
+        lang = (self.default_language or "en").lower().strip()
+        hub_by_lang = {
+            "en": "v3_en",
+            "ru": "v4_ru",
+            "de": "v3_de",
+            "es": "v3_es",
+            "fr": "v3_fr",
+        }
+        return hub_by_lang.get(lang, "v3_en")
 
     def _load_model(self) -> bool:
         """Load model with caching support."""
@@ -249,6 +296,7 @@ class SileroEngine(EngineProtocol):
             if cached_model is not None:
                 logger.debug(f"Using cached model: {self.model_id} ({self.default_language})")
                 self.model = cached_model
+                self._hub_load_speaker = self._torch_hub_speaker_for_load()
                 if hasattr(cached_model, "sample_rate"):
                     self.sample_rate = cached_model.sample_rate
                 elif hasattr(cached_model, "config") and hasattr(
@@ -259,16 +307,12 @@ class SileroEngine(EngineProtocol):
                 return True
 
         # Load model
-        logger.info(f"Loading Silero TTS model v{self.model_id} on {self.device}")
+        logger.info(f"Loading Silero TTS model {self.model_id} on {self.device}")
 
-        # Try importing silero_tts
         try:
             import silero_tts
         except ImportError:
-            logger.error("silero_tts not installed. Install with: pip install silero-tts")
-            logger.error("Or use torch.hub: pip install torch")
-            self._initialized = False
-            return False
+            silero_tts = None  # optional; torch.hub path below is sufficient
 
         try:
             # Load model using torch.hub (Silero's recommended method)
@@ -276,11 +320,20 @@ class SileroEngine(EngineProtocol):
                 repo_or_dir="snakers4/silero-models",
                 model="silero_tts",
                 language=self.default_language,
-                speaker=f"silero_tts_{self.model_id}",
+                speaker=self._torch_hub_speaker_for_load(),
+                trust_repo=True,
             )
 
-            self.model = model.to(self.device)
-            self.model.eval()
+            # torch.package TTS models may implement ``.to()`` in-place and return ``None``
+            # (standard ``nn.Module.to`` returns self). Keep the original reference.
+            moved = model.to(self.device)
+            self.model = model if moved is None else moved
+            # torch.package TTS wrappers may omit ``nn.Module.eval``; inference uses ``torch.inference_mode`` in synthesize.
+            eval_fn = getattr(self.model, "eval", None)
+            if callable(eval_fn):
+                eval_fn()
+
+            self._hub_load_speaker = self._torch_hub_speaker_for_load()
 
             # Get sample rate from model
             if hasattr(model, "sample_rate"):
@@ -300,8 +353,10 @@ class SileroEngine(EngineProtocol):
             logger.error(f"Failed to load Silero model via torch.hub: {e}")
             logger.info("Trying alternative loading method...")
 
-            # Alternative: Try direct model loading
+            # Alternative: Try direct model loading (optional package)
             try:
+                if silero_tts is None:
+                    raise ImportError("silero_tts not installed")
                 from silero_tts import tts
 
                 self.model = tts
@@ -450,7 +505,9 @@ class SileroEngine(EngineProtocol):
                     enhanced_audio, quality_metrics = audio
                     if output_path:
                         sf.write(output_path, enhanced_audio, self.sample_rate)
-                        return None, quality_metrics
+                        # File handoff: synthesis_service treats ``None`` + on-disk WAV as success.
+                        # Do not return ``(None, metrics)`` — the service unpacks tuples as ``(audio, _)``.
+                        return None
                     return enhanced_audio, quality_metrics
                 else:
                     if output_path:
@@ -470,28 +527,10 @@ class SileroEngine(EngineProtocol):
             logger.error(f"Silero TTS synthesis failed: {e}")
             return None
 
-    def _get_default_speaker(self, language: str) -> str:
-        """Get default speaker ID for a language."""
-        # Silero default speakers by language
-        default_speakers = {
-            "en": "en_0",
-            "ru": "ru_0",
-            "de": "de_0",
-            "es": "es_0",
-            "fr": "fr_0",
-            "it": "it_0",
-            "pt": "pt_0",
-            "pl": "pl_0",
-            "tr": "tr_0",
-            "uk": "uk_0",
-            "cs": "cs_0",
-            "ar": "ar_0",
-            "zh": "zh_0",
-            "ja": "ja_0",
-            "ko": "ko_0",
-            "hi": "hi_0",
-        }
-        return default_speakers.get(language, "en_0")
+    def _get_default_speaker(self, _language: str) -> str:
+        """Default ``apply_tts`` speaker for the loaded hub checkpoint (not the hub load ID)."""
+        hub = self._hub_load_speaker or self._torch_hub_speaker_for_load()
+        return _HUB_LOAD_TO_APPLY_TTS_SPEAKER.get(hub, "en_0")
 
     def _process_audio_quality(
         self,
@@ -714,7 +753,7 @@ def create_silero_engine(
     model_id: str = "v4",
     language: str = "en",
     device: str | None = None,
-    gpu: bool = True,
+    gpu: bool = False,
 ) -> SileroEngine:
     """Factory function to create a Silero TTS engine instance."""
     return SileroEngine(model_id=model_id, language=language, device=device, gpu=gpu)

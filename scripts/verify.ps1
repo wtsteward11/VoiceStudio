@@ -6,14 +6,18 @@
     1. Clean Build (C#)
     2. Python Quality (ruff, mypy)
     2.5 Quick Critical Gates (Quick mode only: golden-loop, route-alignment, contract-drift)
-    3. C# Unit Tests (11 first-class shards with per-shard timeouts):
+    3. C# Unit Tests (14 first-class shards with per-shard timeouts):
        - C# Unit Tests - ViewModels Seam A-D
        - C# Unit Tests - ViewModels Seam E-H
        - C# Unit Tests - ViewModels Seam I-L
        - C# Unit Tests - ViewModels Seam M
        - C# Unit Tests - ViewModels Seam N-Z
        - C# Unit Tests - ViewModels Lifecycle
-       - C# Unit Tests - ViewModels Legacy
+       - C# Unit Tests - ViewModels Legacy (excludes LiveBackend — see next shard)
+       - C# Unit Tests - ViewModels LiveBackend RealSynthesis
+       - C# Unit Tests - ViewModels LiveBackend Playback
+       - C# Unit Tests - ViewModels LiveBackend Other
+       - C# Unit Tests - Services
        - C# Unit Tests - CommandsGateways
        - C# Unit Tests - UIPanels
        - C# Unit Tests - Other
@@ -28,7 +32,7 @@
     8.8 Runtime-Missing Failure Smoke
     9. Gate/Ledger Validation
     
-    -OnlyStage "C# Unit Tests" runs all 11 shards (selector alias). -OnlyStage "C# Unit Tests - ViewModels Seam A-D" runs one shard.
+    -OnlyStage "C# Unit Tests" runs all 14 shards (selector alias). -OnlyStage "C# Unit Tests - ViewModels Seam A-D" runs one shard.
     
     Exit code 0 only if ALL stages pass. No exceptions.
     
@@ -112,11 +116,11 @@ param(
     [switch]$BackendSmoke,
     [switch]$EnforceBackendSmoke,
     [switch]$SkipSmoke,
-    [ValidateSet("", "Clean Build", "Python Quality", "Quick Critical Gates", "C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other", "Python Unit Tests", "Contract Tests", "Security Tests", "Backend Integration", "UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke", "Backend Smoke Auto-Probe", "Gate/Ledger Validation")]
+    [ValidateSet("", "Clean Build", "Python Quality", "Quick Critical Gates", "C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - ViewModels LiveBackend RealSynthesis", "C# Unit Tests - ViewModels LiveBackend Playback", "C# Unit Tests - ViewModels LiveBackend Other", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other", "Python Unit Tests", "Contract Tests", "Security Tests", "Backend Integration", "UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke", "Backend Smoke Auto-Probe", "Gate/Ledger Validation")]
     [string]$OnlyStage = "",
-    [ValidateSet("", "Clean Build", "Python Quality", "Quick Critical Gates", "C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other", "Python Unit Tests", "Contract Tests", "Security Tests", "Backend Integration", "UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke", "Backend Smoke Auto-Probe", "Gate/Ledger Validation")]
+    [ValidateSet("", "Clean Build", "Python Quality", "Quick Critical Gates", "C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - ViewModels LiveBackend RealSynthesis", "C# Unit Tests - ViewModels LiveBackend Playback", "C# Unit Tests - ViewModels LiveBackend Other", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other", "Python Unit Tests", "Contract Tests", "Security Tests", "Backend Integration", "UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke", "Backend Smoke Auto-Probe", "Gate/Ledger Validation")]
     [string]$ResumeFrom = "",
-    [ValidateSet("", "Clean Build", "Python Quality", "Quick Critical Gates", "C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other", "Python Unit Tests", "Contract Tests", "Security Tests", "Backend Integration", "UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke", "Backend Smoke Auto-Probe", "Gate/Ledger Validation")]
+    [ValidateSet("", "Clean Build", "Python Quality", "Quick Critical Gates", "C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - ViewModels LiveBackend RealSynthesis", "C# Unit Tests - ViewModels LiveBackend Playback", "C# Unit Tests - ViewModels LiveBackend Other", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other", "Python Unit Tests", "Contract Tests", "Security Tests", "Backend Integration", "UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke", "Backend Smoke Auto-Probe", "Gate/Ledger Validation")]
     [string]$StopAfterStage = ""
 )
 
@@ -342,7 +346,12 @@ $Stage3ShardTimeouts = @{
     "C# Unit Tests - ViewModels Seam M" = 180
     "C# Unit Tests - ViewModels Seam N-Z" = 180
     "C# Unit Tests - ViewModels Lifecycle" = 180
-    "C# Unit Tests - ViewModels Legacy" = 180
+    # Legacy: non-seam ViewModels unit tests only (LiveBackend split to dedicated shard).
+    "C# Unit Tests - ViewModels Legacy" = 240
+    # LiveBackend split into 3 shards (single shard exceeded 600s wall on full harness).
+    "C# Unit Tests - ViewModels LiveBackend RealSynthesis" = 420
+    "C# Unit Tests - ViewModels LiveBackend Playback" = 420
+    "C# Unit Tests - ViewModels LiveBackend Other" = 420
     # Services: blame-hang uses 5m; outer stage timeout must exceed worst-case VSTest teardown + dump
     # or the harness kills the job while diagnostics still run (false TIMED_OUT). See verify artifact audits.
     "C# Unit Tests - Services" = 540
@@ -477,6 +486,9 @@ if ($ResumeFrom) {
         "C# Unit Tests - ViewModels Seam N-Z",
         "C# Unit Tests - ViewModels Lifecycle",
         "C# Unit Tests - ViewModels Legacy",
+        "C# Unit Tests - ViewModels LiveBackend RealSynthesis",
+        "C# Unit Tests - ViewModels LiveBackend Playback",
+        "C# Unit Tests - ViewModels LiveBackend Other",
         "C# Unit Tests - Services",
         "C# Unit Tests - CommandsGateways",
         "C# Unit Tests - UIPanels",
@@ -1315,7 +1327,7 @@ function Test-OnlyStagePrerequisites {
     $exePath = Join-Path $buildDir "VoiceStudio.App.exe"
     $testProject = Join-Path $RootDir "src\VoiceStudio.App.Tests\VoiceStudio.App.Tests.csproj"
     $stagesNeedingExe = @("UI Smoke Tests", "UI Self-Test", "Icon-Launch Smoke", "Failure-Path Smoke", "Runtime-Missing Failure Smoke")
-    $stagesNeedingBuild = @("C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other") + $stagesNeedingExe
+    $stagesNeedingBuild = @("C# Unit Tests", "C# Unit Tests - ViewModels Seam A-D", "C# Unit Tests - ViewModels Seam E-H", "C# Unit Tests - ViewModels Seam I-L", "C# Unit Tests - ViewModels Seam M", "C# Unit Tests - ViewModels Seam N-Z", "C# Unit Tests - ViewModels Lifecycle", "C# Unit Tests - ViewModels Legacy", "C# Unit Tests - ViewModels LiveBackend RealSynthesis", "C# Unit Tests - ViewModels LiveBackend Playback", "C# Unit Tests - ViewModels LiveBackend Other", "C# Unit Tests - Services", "C# Unit Tests - CommandsGateways", "C# Unit Tests - UIPanels", "C# Unit Tests - Other") + $stagesNeedingExe
     if ($Stage -in $stagesNeedingExe) {
         if (-not (Test-Path $exePath)) {
             Write-Host ""
@@ -1584,7 +1596,10 @@ $Stage3Shards = @(
     @{ Name = "C# Unit Tests - ViewModels Seam M"; Filter = $SeamM }
     @{ Name = "C# Unit Tests - ViewModels Seam N-Z"; Filter = $SeamNZ }
     @{ Name = "C# Unit Tests - ViewModels Lifecycle"; Filter = "TestCategory=Lifecycle&FullyQualifiedName~ViewModels" }
-    @{ Name = "C# Unit Tests - ViewModels Legacy"; Filter = "TestCategory!=UI&TestCategory!=E2E&TestCategory!=Smoke&FullyQualifiedName~VoiceStudio.App.Tests.ViewModels&FullyQualifiedName!~SeamTests&FullyQualifiedName!~StalenessTests&TestCategory!=Lifecycle" }
+    @{ Name = "C# Unit Tests - ViewModels Legacy"; Filter = "TestCategory!=UI&TestCategory!=E2E&TestCategory!=Smoke&TestCategory!=LiveBackend&FullyQualifiedName~VoiceStudio.App.Tests.ViewModels&FullyQualifiedName!~SeamTests&FullyQualifiedName!~StalenessTests&TestCategory!=Lifecycle" }
+    @{ Name = "C# Unit Tests - ViewModels LiveBackend RealSynthesis"; Filter = "TestCategory=LiveBackend&TestCategory!=LiveBackendSlow&TestCategory!=UI&TestCategory!=E2E&TestCategory!=Smoke&FullyQualifiedName~VoiceStudio.App.Tests.ViewModels&FullyQualifiedName~RealSynthesis" }
+    @{ Name = "C# Unit Tests - ViewModels LiveBackend Playback"; Filter = "TestCategory=LiveBackend&TestCategory!=LiveBackendSlow&TestCategory!=UI&TestCategory!=E2E&TestCategory!=Smoke&FullyQualifiedName~VoiceStudio.App.Tests.ViewModels&FullyQualifiedName~PlaybackAudition" }
+    @{ Name = "C# Unit Tests - ViewModels LiveBackend Other"; Filter = "TestCategory=LiveBackend&TestCategory!=LiveBackendSlow&TestCategory!=UI&TestCategory!=E2E&TestCategory!=Smoke&FullyQualifiedName~VoiceStudio.App.Tests.ViewModels&FullyQualifiedName!~RealSynthesis&FullyQualifiedName!~PlaybackAudition" }
     @{ Name = "C# Unit Tests - Services"; Filter = "TestCategory!=UI&TestCategory!=E2E&TestCategory!=Smoke&FullyQualifiedName~VoiceStudio.App.Tests.Services" }
     @{ Name = "C# Unit Tests - CommandsGateways"; Filter = "TestCategory!=UI&TestCategory!=E2E&TestCategory!=Smoke&(FullyQualifiedName~VoiceStudio.App.Tests.Commands|FullyQualifiedName~VoiceStudio.App.Tests.Gateways)" }
     @{ Name = "C# Unit Tests - UIPanels"; Filter = "TestCategory!=UI&TestCategory!=E2E&TestCategory!=Smoke&(FullyQualifiedName~VoiceStudio.App.Tests.UI|FullyQualifiedName~VoiceStudio.App.Tests.Panels)" }
@@ -1605,16 +1620,16 @@ foreach ($shard in $Stage3Shards) {
         $runThisShard = ($OnlyStage -eq "C# Unit Tests") -or ($OnlyStage -eq $shard.Name)
     }
     $shardNum = [array]::IndexOf($Stage3Shards, $shard) + 1
-    # Before Services shard (8): extra cleanup + delay to reduce full-harness hang (Stage 13 non-deterministic)
-    if ($shard.Name -eq "C# Unit Tests - Services" -and $runThisShard) {
+    # Before LiveBackend / Services: extra cleanup + delay to reduce full-harness hang (non-deterministic testhost)
+    if (($shard.Name.StartsWith("C# Unit Tests - ViewModels LiveBackend") -or $shard.Name -eq "C# Unit Tests - Services") -and $runThisShard) {
         Invoke-PostStageCleanup
         Start-Sleep -Seconds 5
     }
     $filterLiteral = $shard.Filter -replace "'", "''"
     $shardTotal = $Stage3Shards.Count
-    # Seam A-D: parallel MSTest workers + per-test DispatcherQueueController caused multi-minute hangs on windows-latest.
+    # Seam A-D + LiveBackend: parallel MSTest workers + DispatcherQueue caused multi-minute hangs on windows-latest.
     $dotnetTestMaxCpuArg = ""
-    if ($shard.Name -eq "C# Unit Tests - ViewModels Seam A-D") {
+    if ($shard.Name -eq "C# Unit Tests - ViewModels Seam A-D" -or $shard.Name.StartsWith("C# Unit Tests - ViewModels LiveBackend")) {
         $dotnetTestMaxCpuArg = " -- RunConfiguration.MaxCpuCount=1"
     }
     $shardPassed = Invoke-Stage -Name $shard.Name -Description "C# unit tests shard $shardNum of $shardTotal" -Skip:(-not $runThisShard) -TimeoutSeconds $Stage3ShardTimeouts[$shard.Name] -ShardNum $shardNum -Action ([scriptblock]::Create(@"

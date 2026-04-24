@@ -33,6 +33,8 @@ Venv Families:
 # ``app/core/runtime/venv_family_manager.py``.
 # **Slice 18B:** ``VenvFamily.TORTOISE`` resolves to ``runtime/venvs/tortoise`` (family key
 # ``tortoise`` here) — see ``TORTOISE_TTS_PROVISION_DIRNAME`` in ``venv_family_manager.py``.
+# **Slice 19F:** ``VenvFamily.OPENVOICE`` resolves to ``runtime/venvs/openvoice`` (family key
+# ``openvoice`` here) — see ``OPENVOICE_PROVISION_DIRNAME`` in ``venv_family_manager.py``.
 # Do not assume ``torch24`` string equals ``venv_core_tts`` without reading both files.
 # -----------------------------------------------------------------------------
 
@@ -57,6 +59,8 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 VENVS_DIR = PROJECT_ROOT / "runtime" / "venvs"
 ENGINES_DIR = PROJECT_ROOT / "engines"
+# Slice 19I / ADR-055: vendored myshell-openvoice (patched; see runtime/vendor/myshell-openvoice).
+OPENVOICE_VENDOR_SRC = PROJECT_ROOT / "runtime" / "vendor" / "myshell-openvoice"
 
 
 @dataclass
@@ -111,6 +115,21 @@ VENV_FAMILIES: dict[str, VenvFamily] = {
             "tortoise-tts>=2.0.0",
         ],
         engines=["tortoise"],
+    ),
+    "openvoice": VenvFamily(
+        name="openvoice",
+        description="OpenVoice isolated stack (Slice 19F; myshell-openvoice decoupled from Chatterbox torch26)",
+        python_version="3.11",
+        requirements=[
+            "numpy>=1.24.0,<2.0",
+            "torch>=2.2.2",
+            "torchaudio>=2.2.2",
+            "soundfile>=0.12.0",
+            "librosa>=0.10.0",
+            # Pinned to upstream 74a1d147, patched in-repo (ADR-055); not stock git+ install.
+            f"-e {OPENVOICE_VENDOR_SRC}",
+        ],
+        engines=["openvoice"],
     ),
     "cpu_only": VenvFamily(
         name="cpu_only",
@@ -244,7 +263,7 @@ def create_venv(family: VenvFamily, force: bool = False) -> bool:
         requirements_file.write_text("\n".join(family.requirements))
 
         try:
-            if family.name in ("torch26", "tortoise") and len(family.requirements) >= 2:
+            if family.name in ("torch26", "tortoise", "openvoice") and len(family.requirements) >= 2:
                 # Staged install: numpy/torch stack first so chatterbox-tts / tortoise-tts
                 # transitive builds run with numpy available in the build environment.
                 base_file = venv_path / f"requirements-{family.name}-base.txt"
@@ -253,8 +272,14 @@ def create_venv(family: VenvFamily, force: bool = False) -> bool:
                     [str(pip), "install", "-r", str(base_file)],
                     check=True,
                 )
+                last_req = family.requirements[-1]
+                if last_req.startswith("-e "):
+                    path_part = last_req[3:].strip()
+                    install_cmd = [str(pip), "install", "-e", path_part]
+                else:
+                    install_cmd = [str(pip), "install", last_req]
                 subprocess.run(
-                    [str(pip), "install", family.requirements[-1]],
+                    install_cmd,
                     check=True,
                 )
             else:

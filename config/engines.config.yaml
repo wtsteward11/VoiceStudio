@@ -44,10 +44,10 @@ routing_policy:
       - openvoice                # Secondary: good zero-shot
       - piper                    # Tertiary: fast, CPU-friendly
       - espeak                   # Last resort: always available
+    # STT: single effective default only. Router ignores multi-engine lists here
+    # (Slice 24 — no silent STT substitution; use defaults.stt).
     stt:
-      - whisper_cpp              # Primary: fast and accurate
-      - faster_whisper           # Secondary: GPU optimized
-      - vosk                     # Tertiary: offline-only
+      - whisper_cpp
     rvc:
       - rvc_v2                   # Primary: latest RVC
       - sovits_svc               # Secondary: SoVITS

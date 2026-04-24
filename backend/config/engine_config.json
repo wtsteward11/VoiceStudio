@@ -44,7 +44,8 @@
         "base": "E:\\\\VoiceStudio\\\\models\\\\whisper"
       },
       "parameters": {
-        "model_path": "E:\\\\VoiceStudio\\\\models\\\\whisper\\\\whisper-medium.en.gguf",
+        "model_path": "E:\\\\VoiceStudio\\\\models\\\\whisper\\\\ggml-medium.en.bin",
+        "executable_path": "tools\\\\whispercpp\\\\whisper-cli.exe",
         "language": "en"
       }
     },
@@ -87,6 +88,16 @@
         "device": "cuda",
         "gpu": true,
         "high_quality": true
+      }
+    },
+    "rhvoice": {
+      "model_paths": {
+        "base": "%PROGRAMDATA%\\\\VoiceStudio\\\\models\\\\rhvoice"
+      },
+      "parameters": {
+        "executable_path": "",
+        "voice": "anna",
+        "language": "ru"
       }
     }
   },

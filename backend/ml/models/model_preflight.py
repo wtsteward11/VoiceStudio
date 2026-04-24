@@ -1008,57 +1008,17 @@ def ensure_openvoice(auto_download: bool = True) -> dict[str, object]:
 
 def ensure_whisper_cpp(auto_download: bool = True) -> dict[str, object]:
     """
-    Ensure whisper.cpp GGUF model exists.
+    Ensure whisper.cpp GGUF + execution surface (delegates to services layer; Slice 22).
+
+    Single source of truth: :func:`backend.services.model_preflight.ensure_whisper_cpp`.
     """
-    cfg = get_engine_config_service()
-    engine_cfg = cfg.get_engine_config("whisper_cpp")
-    model_path = Path(
-        engine_cfg.get("parameters", {}).get("model_path")
-        or os.path.join(
-            str(get_models_path()),
-            "whisper",
-            "whisper-medium.en.gguf",
-        )
-    )
-    _ensure_dir(model_path.parent)
+    from backend.services import model_preflight as _svc_mp
 
-    downloaded = False
-    if not model_path.exists():
-        if not auto_download:
-            raise _fail(
-                f"Whisper.cpp model missing at {model_path}. Place the GGUF or enable auto-download.",
-                status_code=424,
-            )
-        if not HAS_HF:
-            raise _fail(
-                "huggingface_hub required for Whisper.cpp auto-download. Install: pip install huggingface_hub",
-                status_code=503,
-            )
-        logger.info(f"Whisper.cpp preflight: downloading GGUF to {model_path}")
-        # TheBloke/whisper-medium.en-GGUF returns 404; use OllmOne/whisper-medium-GGUF
-        downloaded_path = hf_hub_download(
-            repo_id="OllmOne/whisper-medium-GGUF",
-            filename="model-q4k.gguf",
-            local_dir=str(model_path.parent),
-            local_dir_use_symlinks=False,
-        )
-        # Rename to expected filename if needed
-        src = Path(downloaded_path)
-        if src != model_path and src.exists():
-            shutil.move(str(src), str(model_path))
-        downloaded = True
-        try:
-            from backend.services.usage_stats import record_model_downloaded
-            record_model_downloaded()
-        except Exception as e:
-            logger.debug("Usage stats record_model_downloaded skip: %s", e)
+    try:
+        return _svc_mp.ensure_whisper_cpp(auto_download=auto_download)
+    except _svc_mp.PreflightError as exc:
+        raise PreflightError(detail=exc.detail, status_code=exc.status_code) from exc
 
-    return {
-        "ok": True,
-        "paths": [str(model_path)],
-        "downloaded": downloaded,
-        "message": "Whisper.cpp model ready",
-    }
 
 def ensure_sovits(auto_download: bool = False) -> dict[str, object]:
     """

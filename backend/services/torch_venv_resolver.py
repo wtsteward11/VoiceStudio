@@ -29,6 +29,7 @@ def _torch_relevant_families() -> tuple[Any, ...]:
     return (
         VenvFamily.CORE_TTS,
         VenvFamily.ADVANCED_TTS,
+        VenvFamily.OPENVOICE,
         VenvFamily.STT,
         VenvFamily.VOICE_CONVERSION,
     )

@@ -78,6 +78,9 @@ class RHVoiceEngine(EngineProtocol):
     def __init__(
         self,
         rhvoice_path: str | None = None,
+        executable_path: str | None = None,
+        voice: str | None = None,
+        language: str | None = None,
         device: str | None = None,
         gpu: bool = False,
     ):
@@ -86,12 +89,17 @@ class RHVoiceEngine(EngineProtocol):
 
         Args:
             rhvoice_path: Path to RHVoice executable (auto-detect if None)
+            executable_path: Manifest / engine-config alias for ``rhvoice_path`` (same meaning)
+            voice: Default voice from engine config (optional; synthesis may override)
+            language: Default language from engine config (optional)
             device: Device parameter (not used, kept for protocol compatibility)
             gpu: GPU parameter (not used, kept for protocol compatibility)
         """
         super().__init__(device=device, gpu=gpu)
 
-        self.rhvoice_path = rhvoice_path
+        self.rhvoice_path = rhvoice_path or executable_path
+        self._default_voice = voice
+        self._default_language = language
         self.executable_path: str | None = None
         self.voices: list[str] = []
         self.available_languages: list[str] = []
@@ -111,8 +119,8 @@ class RHVoiceEngine(EngineProtocol):
             if os.path.isfile(exe_path) and os.access(exe_path, os.X_OK):
                 return exe_path
 
-        # Try rhvoice-say or rhvoice-cli
-        for exe_name in [name, "rhvoice-say", "rhvoice-cli", "RHVoice-test"]:
+        # Try common RHVoice CLI names (Linux packages often use rhvoice-client)
+        for exe_name in [name, "rhvoice-client", "rhvoice-say", "rhvoice-cli", "RHVoice-test"]:
             found = shutil.which(exe_name)
             if found:
                 return found
@@ -137,7 +145,7 @@ class RHVoiceEngine(EngineProtocol):
             logger.info("Initializing RHVoice engine")
 
             # Find executable
-            self.executable_path = self._find_executable("rhvoice-say", self.rhvoice_path)
+            self.executable_path = self._find_executable("rhvoice-client", self.rhvoice_path)
             if not self.executable_path:
                 logger.error("RHVoice executable not found. Install RHVoice or set rhvoice_path.")
                 logger.error("Install from: https://github.com/Olga-Yakovleva/RHVoice")
@@ -239,7 +247,7 @@ class RHVoiceEngine(EngineProtocol):
     def synthesize(
         self,
         text: str,
-        language: str = "ru",
+        language: str | None = None,
         voice: str | None = None,
         output_path: str | Path | None = None,
         enhance_quality: bool = False,
@@ -251,7 +259,7 @@ class RHVoiceEngine(EngineProtocol):
 
         Args:
             text: Text to synthesize
-            language: Language code (e.g., 'ru', 'en', 'uk')
+            language: Language code (e.g., 'ru', 'en', 'uk'); defaults to engine config or ``ru``
             voice: Voice name (optional, uses default for language if not specified)
             output_path: Optional path to save output audio
             enhance_quality: If True, apply quality enhancement pipeline
@@ -269,6 +277,8 @@ class RHVoiceEngine(EngineProtocol):
         if not self._initialized and not self.initialize():
             return None
 
+        effective_language = language if language is not None else (self._default_language or "ru")
+
         try:
             # Use reusable temp directory for better performance
             if self._temp_dir and os.path.exists(self._temp_dir):
@@ -282,11 +292,11 @@ class RHVoiceEngine(EngineProtocol):
 
             try:
                 # Select voice
-                selected_voice = voice
+                selected_voice = voice or self._default_voice
                 if not selected_voice:
                     # Find default voice for language
                     for v in self.voices:
-                        if f"({language})" in v:
+                        if f"({effective_language})" in v:
                             selected_voice = v.split("(")[0].strip()
                             break
                     if not selected_voice and self.voices:
@@ -302,7 +312,7 @@ class RHVoiceEngine(EngineProtocol):
                     cmd.extend(["-v", selected_voice])
 
                 # Add language
-                cmd.extend(["-l", language])
+                cmd.extend(["-l", effective_language])
 
                 # Add output file
                 cmd.extend(["-o", tmp_output])

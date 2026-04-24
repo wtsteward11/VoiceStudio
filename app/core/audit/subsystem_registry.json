@@ -183,9 +183,9 @@
       "description": "Engine manifest files"
     },
     {
-      "glob": "Recovery Plan/*",
+      "glob": "docs/archive/Recovery_Plan/*",
       "subsystem": "Governance.Ledger",
-      "description": "Quality Ledger and recovery"
+      "description": "Quality Ledger (archived Recovery Plan)"
     }
   ]
 }

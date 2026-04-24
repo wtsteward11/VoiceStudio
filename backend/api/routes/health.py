@@ -1134,14 +1134,104 @@ def preflight_check() -> dict[str, Any]:
             "status_code": 500,
         }
 
+    # Whisper.cpp STT preflight (engine_id ``whisper_cpp`` — GGUF + CLI or Python binding; Slice 22)
+    try:
+        from backend.services.model_preflight import PreflightError as PreflightErrWcpp
+        from backend.services.model_preflight import ensure_whisper_cpp
+
+        checks["whisper_cpp"] = ensure_whisper_cpp(auto_download=False)
+    except PreflightErrWcpp as exc:
+        detail = exc.detail
+        message = None
+        if isinstance(detail, dict):
+            msg = detail.get("message")
+            if isinstance(msg, str):
+                message = msg
+        checks["whisper_cpp"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": message or str(detail),
+            "status_code": exc.status_code,
+        }
+        if isinstance(detail, dict):
+            for key, value in detail.items():
+                if key != "message":
+                    checks["whisper_cpp"][key] = value
+    except Exception as e:
+        checks["whisper_cpp"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": f"{type(e).__name__}: {e}",
+            "status_code": 500,
+        }
+
+    # Vosk STT preflight (Slice 26 — boolean checks.vosk)
+    try:
+        from backend.services.model_preflight import PreflightError as PreflightErrVosk
+        from backend.services.model_preflight import ensure_vosk
+
+        checks["vosk"] = ensure_vosk(auto_download=False)
+    except PreflightErrVosk as exc:
+        detail = exc.detail
+        message = None
+        if isinstance(detail, dict):
+            msg = detail.get("message")
+            if isinstance(msg, str):
+                message = msg
+        checks["vosk"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": message or str(detail),
+            "status_code": exc.status_code,
+        }
+        if isinstance(detail, dict):
+            for key, value in detail.items():
+                if key != "message":
+                    checks["vosk"][key] = value
+    except Exception as e:
+        checks["vosk"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": f"{type(e).__name__}: {e}",
+            "status_code": 500,
+        }
+
+    # Parakeet TTS preflight (Slice 28 — boolean checks.parakeet)
+    try:
+        from backend.services.model_preflight import PreflightError as PreflightErrPk
+        from backend.services.model_preflight import ensure_parakeet
+
+        checks["parakeet"] = ensure_parakeet(auto_download=False)
+    except PreflightErrPk as exc:
+        detail = exc.detail
+        message = None
+        if isinstance(detail, dict):
+            msg = detail.get("message")
+            if isinstance(msg, str):
+                message = msg
+        checks["parakeet"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": message or str(detail),
+            "status_code": exc.status_code,
+        }
+        if isinstance(detail, dict):
+            for key, value in detail.items():
+                if key != "message":
+                    checks["parakeet"][key] = value
+    except Exception as e:
+        checks["parakeet"] = {
+            "ok": False,
+            "downloaded": False,
+            "message": f"{type(e).__name__}: {e}",
+            "status_code": 500,
+        }
+
     _NO_PUBLIC_PREFLIGHT = (
         "bark",
         "fish_speech",
         "higgs_audio",
         "gpt_sovits",
-        "whisper_cpp",
-        "vosk",
-        "parakeet",
     )
     for _eid in _NO_PUBLIC_PREFLIGHT:
         checks[_eid] = {

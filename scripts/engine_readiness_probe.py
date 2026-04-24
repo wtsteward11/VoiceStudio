@@ -220,6 +220,66 @@ def _router_probe_full(root: Path) -> dict[str, object]:
                             "message": str(detail),
                             "status_code": ex.status_code,
                         }
+            elif eid == "whisper_cpp":
+                from backend.services.model_preflight import PreflightError as _PfeWcpp
+                from backend.services.model_preflight import ensure_whisper_cpp
+
+                try:
+                    entry["preflight_assets"] = ensure_whisper_cpp(auto_download=False)
+                except _PfeWcpp as ex:
+                    detail = ex.detail
+                    if isinstance(detail, dict):
+                        entry["preflight_assets"] = {
+                            "ok": detail.get("ok", False),
+                            "message": detail.get("message", str(detail)),
+                            "status_code": ex.status_code,
+                        }
+                    else:
+                        entry["preflight_assets"] = {
+                            "ok": False,
+                            "message": str(detail),
+                            "status_code": ex.status_code,
+                        }
+            elif eid == "vosk":
+                from backend.services.model_preflight import PreflightError as _PfeVosk
+                from backend.services.model_preflight import ensure_vosk
+
+                try:
+                    entry["preflight_assets"] = ensure_vosk(auto_download=False)
+                except _PfeVosk as ex:
+                    detail = ex.detail
+                    if isinstance(detail, dict):
+                        entry["preflight_assets"] = {
+                            "ok": detail.get("ok", False),
+                            "message": detail.get("message", str(detail)),
+                            "status_code": ex.status_code,
+                        }
+                    else:
+                        entry["preflight_assets"] = {
+                            "ok": False,
+                            "message": str(detail),
+                            "status_code": ex.status_code,
+                        }
+            elif eid == "parakeet":
+                from backend.services.model_preflight import PreflightError as _PfePk
+                from backend.services.model_preflight import ensure_parakeet
+
+                try:
+                    entry["preflight_assets"] = ensure_parakeet(auto_download=False)
+                except _PfePk as ex:
+                    detail = ex.detail
+                    if isinstance(detail, dict):
+                        entry["preflight_assets"] = {
+                            "ok": detail.get("ok", False),
+                            "message": detail.get("message", str(detail)),
+                            "status_code": ex.status_code,
+                        }
+                    else:
+                        entry["preflight_assets"] = {
+                            "ok": False,
+                            "message": str(detail),
+                            "status_code": ex.status_code,
+                        }
             else:
                 entry["preflight_assets"] = {
                     "ok": None,

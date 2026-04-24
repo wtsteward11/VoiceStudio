@@ -181,6 +181,11 @@ class TestDetailedHealth:
         assert response.status_code == 200
         data = response.json()
         assert "status" in data or "checks" in data
+        checks = data.get("checks") or {}
+        wcpp = checks.get("whisper_cpp")
+        assert wcpp is not None, "checks.whisper_cpp must be present"
+        assert wcpp.get("ok") is not None, "Slice 22: checks.whisper_cpp.ok must never be null"
+        assert isinstance(wcpp.get("ok"), bool)
 
 
 # =============================================================================

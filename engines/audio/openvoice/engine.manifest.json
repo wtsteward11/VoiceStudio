@@ -4,7 +4,7 @@
   "type": "audio",
   "subtype": "tts",
   "version": "1.0.0",
-  "venv_family": "venv_advanced_tts",
+  "venv_family": "venv_openvoice",
   "description": "Zero-shot voice cloning with cross-lingual support and granular style control",
   "author": "MyShell AI",
   "license": "Apache-2.0",
@@ -67,7 +67,7 @@
     "vram_min_gb": 2,
     "ram_min_gb": 4
   },
-  "entry_point": "app.core.engines.openvoice_engine.OpenVoiceEngine",
+  "entry_point": "app.core.engines.openvoice_subprocess_engine.OpenVoiceSubprocessEngine",
   "config_schema": {
     "base_speaker_model": {
       "type": "string",

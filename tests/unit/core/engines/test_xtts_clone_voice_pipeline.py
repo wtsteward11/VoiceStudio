@@ -19,7 +19,8 @@ project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from app.core.engines.xtts_engine import TTS as _CoquiTTS, XTTSEngine
+    from app.core.engines.xtts_engine import TTS as _CoquiTTS
+    from app.core.engines.xtts_engine import XTTSEngine
 except ImportError:
     pytest.skip("Could not import XTTSEngine", allow_module_level=True)
 

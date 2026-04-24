@@ -25,6 +25,7 @@ namespace VoiceStudio.App.Tests.ViewModels
   /// </summary>
   [TestClass]
   [TestCategory("LiveBackend")]
+  [TestCategory("LiveBackendSlow")]
   public sealed class RealSynthesisTortoiseLiveBackendTests
   {
     private static string BackendBase

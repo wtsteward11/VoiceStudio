@@ -15,6 +15,7 @@ import os
 import subprocess
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any
 
 # Try importing general model cache
@@ -29,6 +30,9 @@ except ImportError:
     HAS_MODEL_CACHE = False
 
 logger = logging.getLogger(__name__)
+
+# Repository root (``app/core/engines`` → parents[3] == VoiceStudio checkout).
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 # Log cache availability
 if not HAS_MODEL_CACHE:
@@ -164,14 +168,23 @@ class WhisperCPPEngine(EngineProtocol):
                 "VoiceStudio",
                 "models",
             )
-        default_model_path = os.path.join(default_model_root, "whisper", "whisper-medium.en.gguf")
+        default_model_path = os.path.join(default_model_root, "whisper", "ggml-medium.en.bin")
         self.model_path = model_path or os.getenv("WHISPER_CPP_MODEL_PATH") or default_model_path
+
+        raw_exe = kwargs.get("executable_path")
+        self._executable_path_override: str | None = None
+        if isinstance(raw_exe, str) and raw_exe.strip():
+            p = Path(raw_exe.strip())
+            if not p.is_absolute():
+                p = _REPO_ROOT / p
+            if p.is_file():
+                self._executable_path_override = str(p)
 
         # Validate model path early with clear error
         if self.model_path and not os.path.exists(self.model_path):
             logger.error(
                 f"Whisper.cpp model path not found: {self.model_path}. "
-                "Place whisper-medium.en.gguf under the models root "
+                "Place ggml-medium.en.bin (or compatible weights) under the models root "
                 "or set WHISPER_CPP_MODEL_PATH."
             )
         self.language = language
@@ -184,6 +197,7 @@ class WhisperCPPEngine(EngineProtocol):
         self.lazy_load = True
         self.batch_size = 4
         self._caching_enabled = True
+        self._cli_dash_oj_cache: dict[str, bool] = {}
 
     def initialize(self) -> bool:
         """Initialize whisper.cpp model."""
@@ -360,17 +374,41 @@ class WhisperCPPEngine(EngineProtocol):
     def _check_whisper_cpp_binary(self) -> bool:
         """Check if whisper.cpp binary is available."""
         binary_path = self._find_whisper_cpp_binary()
-        if binary_path:
+        if not binary_path:
+            return False
+        for args in ([binary_path, "-h"], [binary_path, "--help"]):
             try:
                 result = subprocess.run(
-                    [binary_path, "--help"],
+                    args,
                     capture_output=True,
-                    timeout=5,
+                    timeout=10,
+                    text=True,
                 )
-                return result.returncode == 0
+                out = ((result.stdout or "") + (result.stderr or "")).strip()
+                if result.returncode == 0 or len(out) >= 12:
+                    return True
             except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-                return False
+                continue
         return False
+
+    def _cli_supports_dash_oj(self, binary_path: str) -> bool:
+        """Detect whisper.cpp builds that use ``-oj`` / ``-of`` instead of legacy ``--output-json``."""
+        cached = self._cli_dash_oj_cache.get(binary_path)
+        if cached is not None:
+            return cached
+        try:
+            proc = subprocess.run(
+                [binary_path, "-h"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            out = (proc.stdout or "") + (proc.stderr or "")
+            ok = "-oj" in out
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+            ok = False
+        self._cli_dash_oj_cache[binary_path] = ok
+        return ok
 
     def _load_model(self) -> bool:
         """Load whisper.cpp model with caching support."""
@@ -394,7 +432,7 @@ class WhisperCPPEngine(EngineProtocol):
             if not os.path.exists(self.model_path):
                 logger.error(
                     f"Model path not found: {self.model_path}. "
-                    f"Run model preflight or download the GGUF manually."
+                    "Run model preflight or download compatible whisper.cpp weights."
                 )
                 return False
 
@@ -491,7 +529,7 @@ class WhisperCPPEngine(EngineProtocol):
                     "language": result.get("language", language or "unknown"),
                 }
             else:
-                # Fallback: try to use whisper.cpp binary if available
+                # whisper.cpp CLI path (no faster-whisper substitution — Slice 23 / no-fallbacks.mdc)
                 if self._check_whisper_cpp_binary():
                     try:
                         # Save audio to temp file
@@ -521,8 +559,7 @@ class WhisperCPPEngine(EngineProtocol):
                             base_no_ext = os.path.splitext(tmp_path)[0]
                             json_output_path = base_no_ext + ".json"
 
-                            binary_base = os.path.basename(binary_path).lower()
-                            if "whisper-cli" in binary_base:
+                            if self._cli_supports_dash_oj(binary_path):
                                 # -oj writes JSON, -of sets base output path (without extension)
                                 cmd.extend(["-oj", "-of", base_no_ext])
                             else:
@@ -612,12 +649,15 @@ class WhisperCPPEngine(EngineProtocol):
                                     f"{result.returncode}): {result.stderr}"
                                 )
                                 # Clean up JSON output file if it exists
-                                json_output_path = tmp_path + ".json"
+                                json_output_path = os.path.splitext(tmp_path)[0] + ".json"
                                 try:
                                     if os.path.exists(json_output_path):
                                         os.unlink(json_output_path)
-                                except Exception:
-                                    ...
+                                except OSError as cleanup_err:
+                                    logger.debug(
+                                        "engine_id=whisper_cpp: json cleanup failed: %s",
+                                        cleanup_err,
+                                    )
                         # Clean up temp file
                         with contextlib.suppress(Exception):
                             os.unlink(tmp_path)
@@ -626,38 +666,20 @@ class WhisperCPPEngine(EngineProtocol):
                         try:
                             if "tmp_path" in locals():
                                 os.unlink(tmp_path)
-                        except Exception:
-                            ...
+                        except OSError as unlink_err:
+                            logger.debug(
+                                "engine_id=whisper_cpp: temp wav cleanup failed: %s",
+                                unlink_err,
+                            )
 
-                # Try to use faster-whisper as fallback
-                try:
-                    from .whisper_engine import WhisperEngine
-
-                    whisper_engine = WhisperEngine()
-                    if whisper_engine.initialize():
-                        whisper_result = whisper_engine.transcribe(audio_data, language=language)
-                        if whisper_result and isinstance(whisper_result, dict):
-                            return {
-                                "text": str(whisper_result.get("text", "")),
-                                "segments": list(whisper_result.get("segments", [])),
-                                "language": str(
-                                    whisper_result.get(
-                                        "language",
-                                        language or "unknown",
-                                    )
-                                ),
-                            }
-                except Exception as e:
-                    logger.debug(f"Whisper fallback failed: {e}")
-
-                # Last resort: return transcription attempt with duration info
-                duration = len(audio_data) / sample_rate if sample_rate > 0 else 0
-                return {
-                    "text": "",
-                    "segments": [],
-                    "language": language or "unknown",
-                    "duration": duration,
-                }
+                logger.error(
+                    "engine_id=whisper_cpp: transcription failed — no Python binding context "
+                    "and whisper.cpp CLI did not return a transcript. "
+                    "Install whisper-cpp-python or configure executable_path per "
+                    "engines/audio/whisper_cpp/engine.manifest.json. "
+                    "Do not use engine 'whisper' (faster-whisper) as a substitute."
+                )
+                return None
 
         except Exception as e:
             logger.error(f"Transcription failed: {e}", exc_info=True)
@@ -692,6 +714,18 @@ class WhisperCPPEngine(EngineProtocol):
         """Find whisper.cpp binary in common locations."""
         import platform
         import shutil
+
+        if self._executable_path_override and os.path.isfile(self._executable_path_override):
+            return self._executable_path_override
+
+        if platform.system() == "Windows":
+            repo_cli_names = ("whisper-cli.exe", "whisper.exe", "main.exe")
+        else:
+            repo_cli_names = ("whisper-cli", "whisper-cpp", "main")
+        for name in repo_cli_names:
+            candidate = _REPO_ROOT / "tools" / "whispercpp" / name
+            if candidate.is_file():
+                return str(candidate)
 
         # Prefer the new upstream CLI binary name (whisper-cli). "main" is deprecated
         # in newer releases and may return a non-zero exit code even for --help.

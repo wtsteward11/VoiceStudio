@@ -693,7 +693,7 @@ async def post_process_pipeline(
                     import numpy as np
 
                     _fourcc_fn = cast(
-                        Callable[..., int], getattr(cv2, "VideoWriter_fourcc")
+                        Callable[..., int], cv2.VideoWriter_fourcc
                     )
                     processed_video_path = video_path
                     stages_applied = []

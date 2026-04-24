@@ -123,14 +123,65 @@ def _xtts_model_hint_missing() -> str | None:
     )
 
 
+def _iter_wav_chunks(wav_bytes: bytes):
+    """Yield (chunk_id, payload) for each top-level chunk in a RIFF/WAVE file."""
+    if len(wav_bytes) < 12 or wav_bytes[:4] != b"RIFF" or wav_bytes[8:12] != b"WAVE":
+        raise AssertionError("Not a RIFF/WAVE container")
+    pos = 12
+    while pos + 8 <= len(wav_bytes):
+        chunk_id = wav_bytes[pos : pos + 4]
+        chunk_size = struct.unpack_from("<I", wav_bytes, pos + 4)[0]
+        payload_start = pos + 8
+        payload_end = payload_start + chunk_size
+        yield chunk_id, wav_bytes[payload_start:payload_end]
+        pos = payload_end
+        if chunk_size % 2 == 1:
+            pos += 1
+
+
+def _wav_duration_and_peak_ieee_float(wav_bytes: bytes) -> tuple[float, int]:
+    """
+    IEEE float WAV (wFormatTag 3), e.g. some engine outputs. ``wave`` stdlib cannot read format 3.
+    Peak is scaled to 16-bit-equivalent (0..32767) for the same assertions as PCM paths.
+    """
+    fmt_payload: bytes | None = None
+    data_payload: bytes | None = None
+    for cid, payload in _iter_wav_chunks(wav_bytes):
+        if cid == b"fmt ":
+            fmt_payload = payload
+        elif cid == b"data":
+            data_payload = payload
+    if fmt_payload is None or data_payload is None:
+        raise AssertionError("WAV missing fmt or data chunk")
+    w_format = struct.unpack_from("<H", fmt_payload, 0)[0]
+    nchan = struct.unpack_from("<H", fmt_payload, 2)[0]
+    rate = struct.unpack_from("<I", fmt_payload, 4)[0]
+    n_block_align = struct.unpack_from("<H", fmt_payload, 12)[0]
+    bits = struct.unpack_from("<H", fmt_payload, 14)[0]
+    if w_format != 3 or bits != 32 or n_block_align != nchan * 4:
+        raise AssertionError(
+            f"Expected IEEE float 32-bit WAV (format=3); got format={w_format} bits={bits} align={n_block_align}"
+        )
+    nframes = len(data_payload) // n_block_align
+    duration = nframes / float(rate) if rate else 0.0
+    nf = len(data_payload) // 4
+    samples = struct.unpack(f"<{nf}f", data_payload[: nf * 4])
+    peak_f = max(abs(x) for x in samples) if samples else 0.0
+    peak_equiv = int(min(peak_f * 32767.0, 2147483647.0))
+    return duration, peak_equiv
+
+
 def _wav_duration_and_peak(wav_bytes: bytes) -> tuple[float, int]:
-    with wave.open(BytesIO(wav_bytes), "rb") as w:
-        nchan = w.getnchannels()
-        sw = w.getsampwidth()
-        nframes = w.getnframes()
-        rate = w.getframerate()
-        frames = w.readframes(nframes)
-        duration = nframes / float(rate) if rate else 0.0
+    try:
+        with wave.open(BytesIO(wav_bytes), "rb") as w:
+            nchan = w.getnchannels()
+            sw = w.getsampwidth()
+            nframes = w.getnframes()
+            rate = w.getframerate()
+            frames = w.readframes(nframes)
+            duration = nframes / float(rate) if rate else 0.0
+    except wave.Error:
+        return _wav_duration_and_peak_ieee_float(wav_bytes)
     if sw != 2:
         raise AssertionError(f"Expected 16-bit WAV, got sample width {sw}")
     n_samples = len(frames) // (2 * nchan)

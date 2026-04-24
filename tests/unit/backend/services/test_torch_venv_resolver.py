@@ -128,4 +128,5 @@ def test_build_effective_payload_all_torch_families_covered(mock_gvm):
         "venv_advanced_tts",
         "venv_stt",
         "venv_voice_conversion",
+        "venv_openvoice",
     }

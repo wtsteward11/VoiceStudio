@@ -8,6 +8,7 @@
 - `.cursor/rules/core/local-first.mdc`
 - `.cursor/rules/core/free-only.mdc`
 - `.cursor/rules/core/anti-drift.mdc`
+- `.cursor/rules/core/no-fallbacks.mdc` — No automatic fallbacks anywhere; fail explicit; user approval 2026-04-17
 - `.cursor/rules/security/api-key-management.mdc`
 - `.cursor/rules/security/secure-coding.mdc`
 - `.cursor/rules/security/mcp-security.mdc`

@@ -57,7 +57,7 @@
     "vram_min_gb": 4,
     "ram_min_gb": 8
   },
-  "entry_point": "app.core.engines.chatterbox_engine.ChatterboxEngine",
+  "entry_point": "app.core.engines.chatterbox_torch26_engine.ChatterboxTorch26Engine",
   "config_schema": {
     "model_name": {
       "type": "string",

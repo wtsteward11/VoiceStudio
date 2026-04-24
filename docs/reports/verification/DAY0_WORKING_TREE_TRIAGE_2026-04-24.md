@@ -1,8 +1,10 @@
 # Day-0 working tree triage (Tasks 182–190; dispositions **191–199**; execution **200–209**)
 
+**Status:** **HISTORICAL** — merge-hygiene wave complete (**Tasks 182–243**); branch integration landed **2026-04-24** (`main` synced with `origin/main` at **`787fca76`**, including pre-push **service size** remediation). Use **`.cursor/STATE.md` ACTIVE WINDOW** for the current product gate; use this document for **inventory archaeology** only.
+
 **Purpose:** Classify **modified + untracked** paths so merge work does not drag random junk (bulk product/docs buckets **landed** in Tasks **210–217**; residual tree is **small**). **Slice 27** runtime transcript is **closed** (**Tasks 175–181**); this doc stays the **merge-hygiene** inventory.
 
-**Captured:** `main` ahead of `origin/main` by **27** commits (**Tasks 236–243** governance closure on **2026-04-24** includes **Tasks 226–231** residual hygiene below); tip short hash from `git rev-parse --short HEAD`. Working tree: **clean** — run `git status -sb` to confirm after your next local edits.
+**Captured (at integration time, 2026-04-24):** `main` **even with** `origin/main` (no `ahead` count); tip **`787fca76`** (`git rev-parse --short HEAD`). Working tree: **clean** — re-run `git status -sb` after local edits to confirm live sync.
 
 **Last dispositions pass:** **2026-04-24** (Tasks **226–231** — residual policy + tracked `generated/` engine truth; **Tasks 218–219** prior control-plane refresh unchanged in substance).
 
@@ -21,26 +23,28 @@
 | **`engines/audio/rhvoice/`** | **No edits** in **ea81972a** (manifest at **HEAD**) | **Tasks 209 / 216 / 223** — **frozen** until CLI or `executable_path` proof; **not** the next merge lane. |
 | **Residual local-only (post-210–217)** | **Resolved (Tasks 226–231)** | **`.vscode/settings.json`**, **`openmemory.md`**: **reverted to `HEAD`**. **`generated/`**: tracked canonical JSON + README; STT summary ignored. **`runtime/venvs/`**, **`runtime/vendor/`**, **`tools/whispercpp/`**: **`.gitignore`** (local-only; ADR if ever tracking vendor). |
 | **Tasks 236–242 — merge-hygiene closure polish** | **Landed** | Clean-tree proof (§ below); **Task 237** downstream **`whisper_cpp`** audit — matrix + overrides + **`engine_truth*.json`** all **PASS** aligned to **Tasks 175–181** (no stale transcript **pending**); **slice27/README.md** authority vs reruns wording; **generated/** strategic policy paragraph; **STATE** clean-merge-state line; truth-lock + `run_verification.py` **PASS**. **No** verify bar bump. |
+| **Tasks 244–252 — branch integration + phase closure** | **Landed** | **`git push origin main`** delivered queued **`main`** commits to **`origin/main`** (first batch ended **`e8528261`**); follow-up **`787fca76`** — `fix(backend): extract model_preflight subprocess probes for size gate` (clears pre-push **Python service size** violation on `backend/services/model_preflight.py`). Local push required **`VOICESTUDIO_ALLOW_REPO_RUNTIME=1`** (repo payload gate: `installer/runtime` non-empty on dev host — **not** merged content). **No** `latest_verify_artifact` bump. **DAY0** → **HISTORICAL**; successor product lane: **GAP-008** (see STATE). |
 
 ## Clean working tree proof (Task 236)
 
-Re-run from repo root before merge; values below are an **auditable snapshot** captured **2026-04-24** after landing **Tasks 236–243**. **`git rev-parse --short HEAD`** must match **`git log -1 --oneline`** (tip); the block below omits the tip line so this section stays stable across doc-only amends — use **`git log --oneline -n 8`** when you need the full stack including tip.
+Re-run from repo root; values below are an **auditable snapshot** captured **2026-04-24** after **Tasks 244–252** integration (**`787fca76`** = tip at capture).
 
 ```text
 $ git status -sb
-## main...origin/main [ahead 27]
+## main...origin/main
 
-$ git log --oneline -n 7 --skip=1 HEAD
+$ git rev-parse --short HEAD
+787fca76
+
+$ git log --oneline -n 5
+787fca76 fix(backend): extract model_preflight subprocess probes for size gate
+e8528261 docs(verification): merge-hygiene closure proof and slice27 clarity (Tasks 236-243)
 3a2c8e31 chore(repo): residual merge hygiene (Tasks 226-231)
 c032d902 docs(governance): STATE Truth Sync and DAY0 capture (Tasks 218-220)
 144be99a docs(verification): refresh DAY0 capture and execution log (Task 215)
-ea81972a feat(platform): STT router preflight registry OpenVoice subprocess and engine live harnesses (Task 214)
-220f6556 docs(day0): bounded slice PROOF archives design contracts and verification trees (Task 214)
-8b87ccc3 docs(verification): clarify whisper_cpp Slice 22 batch-time vs Slice 27 PASS (Task 213)
-b2cb21e9 docs(governance): day-0 merge hygiene state and registry sync (Tasks 210-217)
 ```
 
-**Interpretation:** working tree **clean** (no staged/unstaged paths in `git status -sb` beyond branch aheadness). Remaining **merge gate** is **integration** (`origin/main` / PR / rebase), not unclassified local junk.
+**Interpretation:** working tree **clean**; **`main`** matches **`origin/main`** at this snapshot — merge-hygiene **integration gate satisfied** for this wave.
 
 ### Downstream `whisper_cpp` PASS audit (Task 237)
 
@@ -51,9 +55,13 @@ b2cb21e9 docs(governance): day-0 merge hygiene state and registry sync (Tasks 21
 | [generated/engine_truth_v2.json](generated/engine_truth_v2.json) | `runtime_proof_status: pass`, `matrix_status` aligned | OK |
 | [generated/engine_truth.json](generated/engine_truth.json) | v1 manifest projection (no stale pending field for this engine) | OK |
 
-## Next lane after merge-hygiene (Task 243)
+## Phase closure (Tasks 244–252)
 
-**Recommended default:** **push / review / rebase / integrate** with `origin/main` — merge-hygiene control plane is **complete** for this wave. **RHVoice:** remain **frozen** until a real **`rhvoice-cli`** (or documented **`executable_path`**) exists; **do not** promote RHVoice as the next primary lane without that binary. After integration, pick the next **product** lane from [PROFESSIONAL_GAP_TRACKER.md](../../design/PROFESSIONAL_GAP_TRACKER.md) / roadmap — not another governance-only sweep unless a new seam opens.
+Merge-hygiene **phase ends** here: **`main`** was pushed to **`origin/main`** (integration complete **2026-04-24**); **Slice 27** **`whisper_cpp`** transcript **PASS** (**Tasks 175–181**) remains authoritative; downstream **`whisper_cpp`** surfaces re-audited **PASS** (matrix + overrides + `engine_truth` v1/v2); **`defaults.latest_verify_artifact`** unchanged (**Tasks 175–181** bar **`20260424_145514`**). **RHVoice** stays **operator-hypothetical** only — **not** the default successor lane. **Successor (product):** **GAP-008 — MainWindow decomposition** — see **`.cursor/STATE.md` ACTIVE WINDOW** (single next gate).
+
+## Next lane after merge-hygiene (Task 243) — superseded 2026-04-24
+
+Integration is **done**; this section is **archaeology**. Chosen successor: **GAP-008** (tracker row). **RHVoice** remains **frozen** until **`rhvoice-cli`** on PATH or documented **`executable_path`** — **not** promoted as the implicit next lane.
 
 ## Commit bucket manifest (Tasks 201)
 

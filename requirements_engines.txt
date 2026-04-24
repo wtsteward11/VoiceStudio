@@ -22,7 +22,7 @@ protobuf>=5.28.3  # CVE-2024-7254 fix - required for tensorflow/onnx
 # ============================================================================
 # Python 3.11.9 recommended (3.10.15 minimum)
 # PyTorch 2.2.2+cu121 (required for compatibility with other software)
-torch==2.2.2+cu121  # Must install from: --index-url https://download.pytorch.org/whl/cu121
+torch==2.8.0  # Must install from: --index-url https://download.pytorch.org/whl/cu121
 torchaudio==2.2.2+cu121  # Must match Torch exactly
 transformers==4.55.4  # Stable with XTTS v2 and PyTorch 2.2.2
 huggingface_hub==0.36.0  # Matches Transformers 4.55+ API
@@ -349,7 +349,7 @@ dask>=2025.11.0
 #   pip install --upgrade pip wheel setuptools
 #
 # Step 2: Install PyTorch (CUDA 12.1) - CRITICAL: Must be first
-#   pip install torch==2.2.2+cu121 torchaudio==2.2.2+cu121 --index-url https://download.pytorch.org/whl/cu121
+#   pip install torch==2.8.0 torchaudio==2.2.2+cu121 --index-url https://download.pytorch.org/whl/cu121
 #
 # Step 3: Install this requirements file
 #   pip install -r requirements_engines.txt

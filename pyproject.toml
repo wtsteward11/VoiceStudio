@@ -101,7 +101,7 @@ extras = [
     "asyncpg>=0.29.0",
 ]
 engines = [
-    "torch>=2.1.0",
+    "torch>=2.8.0",
     "TTS>=0.22.0",
     "transformers>=4.36.0",
 ]

@@ -54,6 +54,10 @@ Drive gate completion from A through H with evidence-backed progress and zero dr
 - Gate transitions occur with objective proof
 - Risk register updated with evidence
 
+### Session priority guard (post–Slice 27 closure, RHVoice)
+
+**Slice 27 `whisper_cpp` runtime transcript** is **closed** in proof (**Tasks 175–181**, PROOF §27 + matrix). STATE ACTIVE WINDOW must **not** treat Slice 27 as the **open primary gate** unless you are executing a **documented re-proof** session. **Primary lane (default):** **Day-0 merge hygiene** — dirty-tree triage + clean commits ([DAY0_WORKING_TREE_TRIAGE_2026-04-24.md](../../reports/verification/DAY0_WORKING_TREE_TRIAGE_2026-04-24.md)). **RHVoice** (bounded Slice 14 harness) stays **secondary/frozen** until **`rhvoice-cli`** or documented **`executable_path`** proof exists. Any **reprioritization** (e.g. RHVoice-first) requires **one** coordinated STATE edit to **Active Task**, **Completion gate**, **Current Target**, **Current Blocker**, and **Next 3 Steps** together — and must respect `test_state_next_three_steps_operator_lane` if **Next 3 Steps** vocabulary changes (no partial drift).
+
 ---
 
 ## 2. Scope and Boundaries
@@ -61,7 +65,7 @@ Drive gate completion from A through H with evidence-backed progress and zero dr
 ### What This Role Owns
 
 - Gate status tracking and enforcement
-- Quality Ledger (`Recovery Plan/QUALITY_LEDGER.md`)
+- Quality Ledger (`docs/archive/Recovery_Plan/QUALITY_LEDGER.md`)
 - Phase Gates Evidence Map (`docs/governance/PHASE_GATES_EVIDENCE_MAP.md`)
 - Risk Register (`docs/governance/RISK_REGISTER.md`)
 - Rule compliance monitoring
@@ -290,7 +294,7 @@ All file changes must be logged via the audit system for traceability:
 
 ### Required Tools
 
-- Quality Ledger access (`Recovery Plan/QUALITY_LEDGER.md`)
+- Quality Ledger access (`docs/archive/Recovery_Plan/QUALITY_LEDGER.md`)
 - Git for history and verification
 - PowerShell for proof command execution
 - Cursor for state management
@@ -299,7 +303,7 @@ All file changes must be logged via the audit system for traceability:
 
 | Document | Purpose |
 |----------|---------|
-| `Recovery Plan/QUALITY_LEDGER.md` | Source of truth for all issues |
+| `docs/archive/Recovery_Plan/QUALITY_LEDGER.md` | Source of truth for all issues |
 | `docs/governance/PHASE_GATES_EVIDENCE_MAP.md` | Gate evidence tracking |
 | `docs/governance/RISK_REGISTER.md` | Risk tracking and mitigation |
 | `docs/governance/DEFINITION_OF_DONE.md` | Quality standards |
@@ -316,7 +320,7 @@ Get-Content "docs/governance/PHASE_GATES_EVIDENCE_MAP.md" | Select-String "DONE|
 Test-Path ".buildlogs/proof_runs/$proof_dir/proof_data.json"
 
 # Check ledger for blockers
-Get-Content "Recovery Plan/QUALITY_LEDGER.md" | Select-String "S0 Blocker"
+Get-Content "docs/archive/Recovery_Plan/QUALITY_LEDGER.md" | Select-String "S0 Blocker"
 ```
 
 ### MCP Servers Relevant to Role
@@ -822,7 +826,7 @@ python tools/context/allocate.py --task $currentTask --preamble | Out-String | S
 You are the VoiceStudio Overseer (Role 0).
 Mission: drive Gate C then Gate H with evidence-backed progress and zero drift.
 Non-negotiables: unpackaged EXE + installer only (NO MSIX); no incomplete work; proofs required.
-Canonical sources: Recovery Plan/QUALITY_LEDGER.md, docs/governance/VoiceStudio_Production_Build_Plan.md.
+Canonical sources: docs/archive/Recovery_Plan/QUALITY_LEDGER.md, docs/governance/VoiceStudio_Production_Build_Plan.md.
 Output each time: Gate status + missing evidence, next 3 actions with owners, drift warnings.
 ```
 

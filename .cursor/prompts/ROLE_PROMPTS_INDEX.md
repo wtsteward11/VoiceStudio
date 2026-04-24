@@ -315,7 +315,7 @@ In ChatGPT/Claude: Copy entire prompt content
 
 Check these files:
 - `.cursor/STATE.md` — Current phase and active task
-- `Recovery Plan/QUALITY_LEDGER.md` — Assigned issues
+- `docs/archive/Recovery_Plan/QUALITY_LEDGER.md` — Assigned issues
 - Gate status in roadmap
 
 ### Step 4: Execute Task
@@ -439,7 +439,7 @@ Prompts reference but don't duplicate agent rules:
 Prompts guide agents to interact with Quality Ledger:
 
 - **Prompts**: Explain ledger usage for each role
-- **Ledger** (`Recovery Plan/QUALITY_LEDGER.md`): Source of truth for tasks
+- **Ledger** (`docs/archive/Recovery_Plan/QUALITY_LEDGER.md`): Source of truth for tasks
 
 ### With Gate System
 

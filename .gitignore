@@ -186,3 +186,11 @@ STATE.md
 # Temp/scratch files
 turl.txt
 docs/reports/items_*_*.plan.md
+
+# Local / Overseer Day-0 junk (never commit)
+.cache/
+.voicestudio_uvicorn_pid.txt
+tools/whispercpp184/
+
+# Ephemeral processing output (local machine; Day-0 merge hygiene — Tasks 200+)
+processed/

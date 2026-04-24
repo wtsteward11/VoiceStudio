@@ -2,7 +2,7 @@
 
 > **Purpose**: Get a new Overseer (Role 0) up to speed. Written for someone taking on this role for the first time.  
 > **Author**: Axiom (Advisor)  
-> **Last Updated**: 2026-03-12  
+> **Last Updated**: 2026-04-24  
 > **Related**: [ROLE_0_OVERSEER_GUIDE.md](../roles/ROLE_0_OVERSEER_GUIDE.md), [ROLE_0_OVERSEER_PROMPT.md](../../.cursor/prompts/ROLE_0_OVERSEER_PROMPT.md), [PROJECT_HANDOFF_GUIDE.md](../PROJECT_HANDOFF_GUIDE.md), [OVERSEER_DAILY_GATE_DISCIPLINE.md](OVERSEER_DAILY_GATE_DISCIPLINE.md) (daily proof checklist)
 
 ---
@@ -31,6 +31,8 @@ Do not skip. Read in order.
 | 3 | [`.cursor/rules/workflows/closure-protocol.mdc`](../../.cursor/rules/workflows/closure-protocol.mdc) | What must be done before marking any task complete. |
 | 4 | [`.cursor/rules/workflows/verification-harness.mdc`](../../.cursor/rules/workflows/verification-harness.mdc) | No changes unless `verify.ps1` stays GREEN. |
 | 5 | [ROLE_0_OVERSEER_GUIDE.md](../roles/ROLE_0_OVERSEER_GUIDE.md) | Full role guide. Skim the structure; deep-dive when you need it. |
+
+**Post–Slice 27 (2026-04-24):** **`whisper_cpp`** runtime transcript is **PASS** in [PROOF §27](../../reports/verification/PROOF_SLICE27_WHISPER_CPP_TRANSCRIPT.md) (**Tasks 175–181**). If the working tree is large or messy, read [DAY0_WORKING_TREE_TRIAGE_2026-04-24.md](../../reports/verification/DAY0_WORKING_TREE_TRIAGE_2026-04-24.md) — **merge hygiene** is often the **current** primary risk, not re-closing Slice 27.
 
 ---
 
@@ -69,6 +71,10 @@ python -m tools.overseer.cli.main gate status
 | **ADRs** | `docs/architecture/decisions/ADR-*.md` |
 | **Verification proof** | `.buildlogs/verification/last_run.json` |
 | **Canonical registry** | `docs/governance/CANONICAL_REGISTRY.md` |
+
+### Gate C and Gate H (release spine)
+
+Do not claim Gate C or Gate H closure without the **command + artifact** checklist in [VoiceStudio_Production_Build_Plan.md](../VoiceStudio_Production_Build_Plan.md): **§1** (Gate C publish, UI smoke, `%LOCALAPPDATA%\VoiceStudio\crashes\*`, `.buildlogs\gatec-*`) and **§2** (Gate H installer build, VM lifecycle, upgrade/uninstall logs). Evidence packets live under `docs/governance/overseer/handoffs/VS-*.md` (for example VS-0012 / VS-0003 per that plan).
 
 ---
 
@@ -184,4 +190,4 @@ Welcome to the role. Hold the line.
 
 ---
 
-*Last updated by Axiom (Advisor), 2026-03-12.*
+*Last structural edit: 2026-04-24 (Axiom, Advisor) — Gate C / Gate H release-spine subsection; Quality Ledger canonical path `docs/archive/Recovery_Plan/QUALITY_LEDGER.md`; cross-links to `VoiceStudio_Production_Build_Plan.md`. Prior prose baseline 2026-03-12.*

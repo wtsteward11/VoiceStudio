@@ -182,7 +182,7 @@ See [Cross-Role Escalation Matrix](../../docs/governance/CROSS_ROLE_ESCALATION_M
 7. **`docs/design/VOICESTUDIO_COMPLETE_IMPLEMENTATION_SPEC.md`** — Full implementation spec
 8. **`docs/design/EXECUTION_PLAN.md`** — UI execution plan
 9. **`.cursor/STATE.md`** — Current phase and active task
-10. **`Recovery Plan/QUALITY_LEDGER.md`** — UI-related issues
+10. **`docs/archive/Recovery_Plan/QUALITY_LEDGER.md`** — UI-related issues
 
 ---
 

@@ -75,6 +75,7 @@ namespace VoiceStudio.App
         private bool _recordedShellInteractiveTiming;
         private TransportShortcutCoordinator? _transportShortcutCoordinator;
         private IShellNavigationCoordinator? _shellNavigationCoordinator;
+        private MainWindowNavigationShellBridge _navShellBridge = null!;
         private ISearchOverlayCoordinator? _searchOverlayCoordinator;
         private IProjectWorkflowCoordinator? _projectWorkflowCoordinator;
         private readonly MainWindowSessionLifecycle _sessionLifecycle = new();
@@ -134,28 +135,18 @@ namespace VoiceStudio.App
         /// <summary>
         /// Gets the default region for a panel. Delegates to ShellNavigationCoordinator when available.
         /// </summary>
-        private PanelRegion GetPanelRegion(string panelId)
-        {
-            return _shellNavigationCoordinator?.GetPanelRegion(panelId) ?? PanelRegion.Center;
-        }
+        private PanelRegion GetPanelRegion(string panelId) => _navShellBridge.GetPanelRegion(panelId);
 
         /// <summary>
-        /// Gets the display name for a panel. Delegates to ShellNavigationCoordinator when available.
+        /// Gets the display name for a panel. Delegates through navigation shell bridge.
         /// </summary>
-        private string GetPanelTitle(string panelId)
-        {
-            return _shellNavigationCoordinator?.GetPanelTitle(panelId) ?? panelId;
-        }
+        private string GetPanelTitle(string panelId) => _navShellBridge.GetPanelTitle(panelId);
 
         /// <summary>
-        /// Opens a panel by its canonical registry ID. Delegates to ShellNavigationCoordinator.
+        /// Opens a panel by its canonical registry ID. Delegates through navigation shell bridge.
         /// </summary>
-        private async Task<bool> OpenPanelByIdAsync(string panelId, PanelRegion? overrideRegion = null)
-        {
-            return _shellNavigationCoordinator != null
-                ? await _shellNavigationCoordinator.OpenPanelByIdAsync(panelId, overrideRegion)
-                : false;
-        }
+        private Task<bool> OpenPanelByIdAsync(string panelId, PanelRegion? overrideRegion = null) =>
+            _navShellBridge.OpenPanelByIdAsync(panelId, overrideRegion);
 
         private static void SetPanelHostMeta(Controls.PanelHost? host, string title, string icon)
         {
@@ -201,7 +192,10 @@ namespace VoiceStudio.App
         /// Creates the project workflow coordinator from an explicit dependency bundle.
         /// Zero ServiceProvider/AppServices calls; pure composition seam.
         /// </summary>
-        private IProjectWorkflowCoordinator CreateProjectWorkflowCoordinator(IShellNavigationCoordinator shellNav, WorkflowDependencies deps)
+        private IProjectWorkflowCoordinator CreateProjectWorkflowCoordinator(
+            IShellNavigationCoordinator shellNav,
+            WorkflowDependencies deps,
+            NavButtonActionSink navButtonSink)
         {
             var getTimeline = () => (FindNameOnContent("CenterPanelHost") as Controls.PanelHost)?.HostedPanel is TimelineView tv ? tv.ViewModel : null;
             var getMixer = () => (FindNameOnContent("RightPanelHost") as Controls.PanelHost)?.HostedPanel is EffectsMixerView em ? em.ViewModel : null;
@@ -209,7 +203,7 @@ namespace VoiceStudio.App
                 shellNav,
                 getTimeline,
                 getMixer,
-                SetActiveNavButton,
+                navButtonSink.Forward,
                 deps.Startup,
                 deps.Backend,
                 deps.ProjectsClient,
@@ -246,6 +240,8 @@ namespace VoiceStudio.App
             _commandRouter = AppServices.TryGetCommandRouter();
             profiler.Checkpoint("CommandRouter Retrieved");
 
+            var navButtonSink = new NavButtonActionSink();
+
             // Shell navigation coordination (Premium Reliability Pass Task 9)
             _shellNavigationCoordinator = new ShellNavigationCoordinator(
                 r => r switch
@@ -258,12 +254,19 @@ namespace VoiceStudio.App
                 },
                 FindNameOnContent,
                 id => _legacyPanelRegistry.TryGetValue(id, out var e) ? e.Factory : null,
-                SetActiveNavButton,
+                navButtonSink.Forward,
                 ShowPanelQuickSwitchIndicator,
                 IsGateCSmokeMode,
                 _panelStateService,
                 _commandRouter);
             profiler.Checkpoint("ShellNavigationCoordinator Created");
+
+            _navShellBridge = new MainWindowNavigationShellBridge(
+                _shellNavigationCoordinator!,
+                DispatcherQueue,
+                FindNameOnContent,
+                navButtonSink);
+            profiler.Checkpoint("MainWindowNavigationShellBridge Created");
 
             _searchOverlayCoordinator = new SearchOverlayCoordinator(FindNameOnContent, _shellNavigationCoordinator!);
             profiler.Checkpoint("SearchOverlayCoordinator Created");
@@ -285,7 +288,7 @@ namespace VoiceStudio.App
                 ServiceProvider.TryGetRecentProjectsService(),
                 ServiceProvider.TryGetToastNotificationService(),
                 AppServices.GetService<ILogger<ProjectWorkflowCoordinator>>());
-            _projectWorkflowCoordinator = CreateProjectWorkflowCoordinator(_shellNavigationCoordinator!, workflowDeps);
+            _projectWorkflowCoordinator = CreateProjectWorkflowCoordinator(_shellNavigationCoordinator!, workflowDeps, navButtonSink);
             profiler.Checkpoint("ProjectWorkflowCoordinator Created");
 
             RegisterKeyboardShortcuts();
@@ -477,8 +480,7 @@ namespace VoiceStudio.App
                 var navigationService = ServiceProvider.TryGetNavigationService();
                 if (navigationService != null)
                 {
-                    navigationService.NavigationChanged += OnNavigationChanged;
-                    Debug.WriteLine("[MainWindow] Subscribed to NavigationService.NavigationChanged");
+                    _navShellBridge.AttachNavigationService(navigationService);
                 }
             }
             catch (Exception ex)
@@ -581,92 +583,23 @@ namespace VoiceStudio.App
         #region Navigation Button Click Handlers
 
         /// <summary>
-        /// Executes a navigation command. Delegates to ShellNavigationCoordinator.
+        /// Executes a navigation command. Delegates through <see cref="MainWindowNavigationShellBridge"/>.
         /// </summary>
-        private void ExecuteNavCommand(string commandId, string fallbackPanelId, PanelRegion fallbackRegion, string buttonName)
-        {
-            _ = ExecuteNavCommandAsync(commandId, fallbackPanelId, fallbackRegion, buttonName);
-        }
+        private void ExecuteNavCommand(string commandId, string fallbackPanelId, PanelRegion fallbackRegion, string buttonName) =>
+            _navShellBridge.ExecuteNavCommand(commandId, fallbackPanelId, fallbackRegion, buttonName);
 
         /// <summary>
         /// Async variant for smoke tests and callers that need to wait for panel load.
         /// </summary>
-        private async Task ExecuteNavCommandAsync(string commandId, string fallbackPanelId, PanelRegion fallbackRegion, string buttonName)
-        {
-            if (_shellNavigationCoordinator != null)
-                await _shellNavigationCoordinator.ExecuteNavCommandAsync(commandId, fallbackPanelId, fallbackRegion, buttonName);
-        }
-
-        #endregion Navigation Button Click Handlers
-
-        #region Command-Driven Navigation
+        private Task ExecuteNavCommandAsync(string commandId, string fallbackPanelId, PanelRegion fallbackRegion, string buttonName) =>
+            _navShellBridge.ExecuteNavCommandAsync(commandId, fallbackPanelId, fallbackRegion, buttonName);
 
         /// <summary>
-        /// Handles navigation events from the NavigationService (command-driven navigation).
+        /// Updates rail toggle checked state (partial call sites; implementation on navigation shell bridge).
         /// </summary>
-        private void OnNavigationChanged(object? sender, VoiceStudio.Core.Models.NavigationEventArgs e)
-        {
-            if (string.IsNullOrEmpty(e.NewPanelId))
-            {
-                return;
-            }
+        private void SetActiveNavButton(string activeButtonName) => _navShellBridge.SetActiveNavButton(activeButtonName);
 
-            var panelId = e.NewPanelId.ToLowerInvariant();
-            Debug.WriteLine($"[MainWindow] OnNavigationChanged: {panelId}");
-
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                _ = OnNavigationChangedCoreAsync(panelId, e.NewPanelId);
-            });
-        }
-
-        private async Task OnNavigationChangedCoreAsync(string panelId, string originalPanelId)
-        {
-            try
-            {
-                var canonicalId = _shellNavigationCoordinator?.ResolvePanelIdAlias(panelId) ?? originalPanelId;
-
-                if (await OpenPanelByIdAsync(canonicalId))
-                {
-                    // Nav button state updated via NavigationViewModel bindings
-                }
-                else
-                {
-                    Debug.WriteLine($"[MainWindow] Unknown panel ID in navigation: {panelId}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[MainWindow] Navigation failed: {ex.Message}");
-            }
-        }
-
-        #endregion Command-Driven Navigation
-
-        private void SetActiveNavButton(string activeButtonName)
-        {
-            var navButtons = new[]
-            {
-        FindNameOnContent("NavStudio") as ToggleButton,
-        FindNameOnContent("NavProfiles") as ToggleButton,
-        FindNameOnContent("NavLibrary") as ToggleButton,
-        FindNameOnContent("NavEffects") as ToggleButton,
-        FindNameOnContent("NavTrain") as ToggleButton,
-        FindNameOnContent("NavAnalyze") as ToggleButton,
-        FindNameOnContent("NavSettings") as ToggleButton,
-        FindNameOnContent("NavLogs") as ToggleButton
-      };
-
-            foreach (var navButton in navButtons)
-            {
-                if (navButton == null)
-                {
-                    continue;
-                }
-
-                navButton.IsChecked = string.Equals(navButton.Name, activeButtonName, StringComparison.Ordinal);
-            }
-        }
+        #endregion Navigation Button Click Handlers
 
         #region Panel Preview on Hover (IDEA 20)
 
@@ -2544,6 +2477,8 @@ namespace VoiceStudio.App
             {
                 _panelStateService.WorkspaceProfileChanged -= OnWorkspaceProfileChanged;
             }
+
+            _navShellBridge.DetachNavigationService();
 
             // Startup overlay cleanup
             if (_startupStateService != null)

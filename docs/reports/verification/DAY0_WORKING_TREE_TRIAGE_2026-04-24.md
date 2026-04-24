@@ -2,18 +2,21 @@
 
 **Purpose:** Classify the large **modified + untracked** working tree so merge work does not drag random junk. **Slice 27** runtime transcript is **closed** (**Tasks 175–181**); this doc is **merge hygiene only**.
 
-**Captured:** `main` ahead of `origin/main` by **19** commits; snapshot from `git status -sb` on **2026-04-24** (refresh after material tree work — **Task 207**).
+**Captured:** `main` ahead of `origin/main` by **23** commits; snapshot from `git status -sb` on **2026-04-24** (refresh after **Tasks 210–217** material commits — **Task 215**).
 
 **Last dispositions pass:** **2026-04-24** (Tasks **200–209** — execution: junk removal + `.gitignore` + governance/doc deltas; **not** a full `git commit` of the product stack).
+
+**RHVoice CLI check (Tasks 216 / 209):** On this host, **`Get-Command rhvoice-cli`** returns **no** resolvable binary (not on **PATH**). **`engines/audio/rhvoice/engine.manifest.json`** was reset to **HEAD** for the product commit batch — **no** manifest churn without proof.
 
 ## Execution log (Tasks 200+)
 
 | Cluster | Action taken | Notes |
 | --- | --- | --- |
+| **Tasks 210–217 — git commits** | **Landed** | **`b2cb21e9`** — governance-only (STATE, DAY0, CANONICAL_REGISTRY, `.gitignore`, overseer prompts, ENGINE_PARITY baseline in that batch). **`8b87ccc3`** — ENGINE_PARITY Slice 22 skimmer clarity (**Task 213**). **`220f6556`** — docs/proof/slice trees + ADR-053–056 + bounded design contracts (**Task 214** docs lane). **`ea81972a`** — app/backend/tests/scripts + `tools/overseer/data/engine_truth_overrides.json` + engine harnesses (**Task 214** product lane). |
 | **`backend/data/stores/effect_chains/*.json` (untracked UUID files)** | **Deleted** from working tree (**22** files) | Ephemeral store dumps per Dispositions; **tracked** fixture JSON under the same directory **left unchanged** (`git ls-files` set preserved). |
 | **`processed/`** | **`.gitignore`** — added `processed/` at repo root | Ephemeral outputs; stays local-only. |
-| **Product / proof / `runtime/venvs/` / `runtime/vendor/`** | **Deferred** — documented in **Commit bucket manifest** below | No `git add` / commit executed in this pass; owner stages per vertical slice (**Task 201**). |
-| **`engines/audio/rhvoice/`** | **No edits** | **Task 209** — freeze until CLI or `executable_path` proof. |
+| **Product / proof** | **Committed** in **220f6556** + **ea81972a** per bounded lanes above | **`runtime/venvs/`**, **`runtime/vendor/`**, **`tools/whispercpp/`** remain **local/untracked** — not merged in this batch. |
+| **`engines/audio/rhvoice/`** | **No edits** in **ea81972a** (manifest at **HEAD**) | **Tasks 209 / 216** — freeze until CLI or `executable_path` proof. |
 
 ## Commit bucket manifest (Tasks 201)
 

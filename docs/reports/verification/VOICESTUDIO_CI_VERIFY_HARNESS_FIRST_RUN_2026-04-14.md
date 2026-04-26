@@ -274,7 +274,7 @@ gh run download 24379285704 --dir artifacts/ci-harness-download/
 
 | Field | Value |
 | --- | --- |
-| **`main` tip (operator machine / STATE)** | `3c37a542d64b6c6a80e6a99153c84f9b42653758` |
+| **`main` tip (operator machine / STATE)** | `9f0360b70b718977523a947481e36557707a9037` (governance + CI guard commit; includes prior **`3c37a542`** tip work) |
 | **New hosted `workflow_dispatch`?** | **No** — `gh workflow run verify-harness.yml --ref main -f run_full_chain=true` returned **HTTP 403** (PAT lacks permission to create workflow dispatch events). Per § **Dispatch path** above: remove `GITHUB_TOKEN` env override if it shadows a token without **Actions: write**, or run from **Actions** UI. |
 | **Effect on certification** | **None** — last recorded **green** full chain remains **`24484587429`** @ **`24b84bbc`**; [GOV execution row](../../design/GOV_VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_FAILURE_EXECUTION_ROW.md) **Status: Closed** aligned with body. |
 | **New automation** | [`tests/ci/test_requires_audio_device_guard_discipline.py`](../../tests/ci/test_requires_audio_device_guard_discipline.py) (pytest) — enforces **`AudioDeviceGuard.`** alongside device-category / real `AudioPlayerService` playback calls in `src/VoiceStudio.App.Tests`. |

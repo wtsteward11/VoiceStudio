@@ -53,10 +53,6 @@ namespace VoiceStudio.App
         private MenuFlyoutItem? _keyboardShortcutsMenuItem;
         private MenuFlyoutItem? _manageWorkspacesMenuItem;
 
-        // Workspace splitter drag state (WinUI 3 has no built-in GridSplitter)
-        private enum SplitterKind { None, Vertical1, Vertical2, Horizontal }
-        private SplitterKind _activeSplitter;
-
         private GlobalTransportControl? _globalTransport;
         private StatusBarCoordinator? _statusBarCoordinator;
         private bool _recordedShellInteractiveTiming;
@@ -99,14 +95,7 @@ namespace VoiceStudio.App
             _projectWorkflowCoordinator;
 
         private Debouncer? _layoutSaveDebouncer;
-        private double _splitterStartX;
-        private double _splitterStartY;
-        private double _splitterStartLeft;
-        private double _splitterStartCenter;
-        private double _splitterStartRight;
-        private double _splitterStartTop;
-        private double _splitterStartBottom;
-        private const double MinStarValue = 0.5;
+        private readonly MainWindowWorkspaceSplitterShellBridge _workspaceSplitterShellBridge;
 
         /// <summary>
         /// Gets the unified panel registry from DI container.
@@ -248,6 +237,9 @@ namespace VoiceStudio.App
             profiler.Checkpoint("PanelStateService Retrieved");
 
             _layoutSaveDebouncer = new Debouncer(() => SaveWorkspaceLayout(), 2000);
+            _workspaceSplitterShellBridge = new MainWindowWorkspaceSplitterShellBridge(
+                FindNameOnContent,
+                () => _layoutSaveDebouncer?.Invoke());
 
             _recentProjectsService = ServiceProvider.GetRecentProjectsService();
             profiler.Checkpoint("RecentProjectsService Retrieved");

@@ -464,122 +464,14 @@ namespace VoiceStudio.App
 
         #region Workspace Splitter Handlers
 
-        private void WorkspaceSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement splitter)
-                return;
+        private void WorkspaceSplitter_PointerPressed(object sender, PointerRoutedEventArgs e) =>
+            _workspaceSplitterShellBridge.OnPointerPressed(sender, e);
 
-            var workspaceGrid = FindNameOnContent("WorkspaceGrid") as Grid;
-            var leftCol = FindNameOnContent("LeftColumn") as ColumnDefinition;
-            var centerCol = FindNameOnContent("CenterColumn") as ColumnDefinition;
-            var rightCol = FindNameOnContent("RightColumn") as ColumnDefinition;
-            var topRow = FindNameOnContent("TopRow") as RowDefinition;
-            var bottomRow = FindNameOnContent("BottomRow") as RowDefinition;
-            if (workspaceGrid == null || leftCol == null || centerCol == null || rightCol == null || topRow == null || bottomRow == null)
-                return;
+        private void WorkspaceSplitter_PointerMoved(object sender, PointerRoutedEventArgs e) =>
+            _workspaceSplitterShellBridge.OnPointerMoved(sender, e);
 
-            var pt = e.GetCurrentPoint(workspaceGrid);
-            _splitterStartX = pt.Position.X;
-            _splitterStartY = pt.Position.Y;
-            _splitterStartLeft = leftCol.Width.IsStar ? leftCol.Width.Value : 20;
-            _splitterStartCenter = centerCol.Width.IsStar ? centerCol.Width.Value : 55;
-            _splitterStartRight = rightCol.Width.IsStar ? rightCol.Width.Value : 25;
-            _splitterStartTop = topRow.Height.IsStar ? topRow.Height.Value : 4;
-            _splitterStartBottom = bottomRow.Height.IsStar ? bottomRow.Height.Value : 1;
-
-            var name = splitter.Name;
-            if (string.Equals(name, "VerticalSplitter1", StringComparison.Ordinal))
-                _activeSplitter = SplitterKind.Vertical1;
-            else if (string.Equals(name, "VerticalSplitter2", StringComparison.Ordinal))
-                _activeSplitter = SplitterKind.Vertical2;
-            else if (string.Equals(name, "HorizontalSplitter", StringComparison.Ordinal))
-                _activeSplitter = SplitterKind.Horizontal;
-            else
-                _activeSplitter = SplitterKind.None;
-
-            if (_activeSplitter != SplitterKind.None)
-            {
-                splitter.CapturePointer(e.Pointer);
-                e.Handled = true;
-            }
-        }
-
-        private void WorkspaceSplitter_PointerMoved(object sender, PointerRoutedEventArgs e)
-        {
-            if (_activeSplitter == SplitterKind.None)
-                return;
-
-            var workspaceGrid = FindNameOnContent("WorkspaceGrid") as Grid;
-            var leftCol = FindNameOnContent("LeftColumn") as ColumnDefinition;
-            var centerCol = FindNameOnContent("CenterColumn") as ColumnDefinition;
-            var rightCol = FindNameOnContent("RightColumn") as ColumnDefinition;
-            var topRow = FindNameOnContent("TopRow") as RowDefinition;
-            var bottomRow = FindNameOnContent("BottomRow") as RowDefinition;
-            if (workspaceGrid == null || leftCol == null || centerCol == null || rightCol == null || topRow == null || bottomRow == null)
-                return;
-
-            var pt = e.GetCurrentPoint(workspaceGrid);
-            var deltaX = pt.Position.X - _splitterStartX;
-            var deltaY = pt.Position.Y - _splitterStartY;
-
-            // Scale: ~100px drag ≈ 1 star unit
-            var scale = 100.0;
-            var dStar = deltaX / scale;
-            var dStarV = deltaY / scale;
-
-            if (_activeSplitter == SplitterKind.Vertical1)
-            {
-                var newLeft = Math.Max(MinStarValue, Math.Min(_splitterStartLeft + _splitterStartCenter - MinStarValue, _splitterStartLeft + dStar));
-                var newCenter = _splitterStartLeft + _splitterStartCenter - newLeft;
-                if (newCenter >= MinStarValue)
-                {
-                    leftCol.Width = new GridLength(newLeft, GridUnitType.Star);
-                    centerCol.Width = new GridLength(newCenter, GridUnitType.Star);
-                    _splitterStartX = pt.Position.X;
-                    _splitterStartLeft = newLeft;
-                    _splitterStartCenter = newCenter;
-                }
-            }
-            else if (_activeSplitter == SplitterKind.Vertical2)
-            {
-                var newCenter = Math.Max(MinStarValue, Math.Min(_splitterStartCenter + _splitterStartRight - MinStarValue, _splitterStartCenter + dStar));
-                var newRight = _splitterStartCenter + _splitterStartRight - newCenter;
-                if (newRight >= MinStarValue)
-                {
-                    centerCol.Width = new GridLength(newCenter, GridUnitType.Star);
-                    rightCol.Width = new GridLength(newRight, GridUnitType.Star);
-                    _splitterStartX = pt.Position.X;
-                    _splitterStartCenter = newCenter;
-                    _splitterStartRight = newRight;
-                }
-            }
-            else if (_activeSplitter == SplitterKind.Horizontal)
-            {
-                var newTop = Math.Max(MinStarValue, Math.Min(_splitterStartTop + _splitterStartBottom - MinStarValue, _splitterStartTop + dStarV));
-                var newBottom = _splitterStartTop + _splitterStartBottom - newTop;
-                if (newBottom >= MinStarValue)
-                {
-                    topRow.Height = new GridLength(newTop, GridUnitType.Star);
-                    bottomRow.Height = new GridLength(newBottom, GridUnitType.Star);
-                    _splitterStartY = pt.Position.Y;
-                    _splitterStartTop = newTop;
-                    _splitterStartBottom = newBottom;
-                }
-            }
-
-            e.Handled = true;
-        }
-
-        private void WorkspaceSplitter_PointerReleased(object sender, PointerRoutedEventArgs e)
-        {
-            if (sender is FrameworkElement splitter && _activeSplitter != SplitterKind.None)
-            {
-                splitter.ReleasePointerCapture(e.Pointer);
-                _activeSplitter = SplitterKind.None;
-                e.Handled = true;
-                _layoutSaveDebouncer?.Invoke();
-            }
-        }
+        private void WorkspaceSplitter_PointerReleased(object sender, PointerRoutedEventArgs e) =>
+            _workspaceSplitterShellBridge.OnPointerReleased(sender, e);
 
         #endregion
     }

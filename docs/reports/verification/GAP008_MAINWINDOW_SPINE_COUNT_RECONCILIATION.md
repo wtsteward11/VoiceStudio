@@ -167,3 +167,9 @@ After **Task 419**, `scripts/Run-Gap008MainWindowRegressionTests.ps1` does that 
 **Delta:** **`Gap008Slice33Tests`** (**2** methods) + **`MainWindowWorkspaceSplitterShellBridgeTests`** (**3** methods) = **+5** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).
 
 **Arithmetic:** **242** (post–Slice 32 green) **+ 5** = **247** listed / passed on a green run (TRX **`gap008_spine_20260426_152834.trx`**; Tasks **149–158** — 2026-04-26). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **247** / **247** with the extended `effectiveFilter`.
+
+## Spine size after Slice 34 (menu bar build shell)
+
+**Delta:** **`Gap008Slice34Tests`** (**3** methods) + **`MainWindowMenuBarShellBridgeTests`** (**5** methods) = **+8** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).
+
+**Arithmetic:** **247** (post–Slice 33 green) **+ 8** = **255** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260426_154959.trx`**; Tasks **159–168** — 2026-04-26). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **255** / **255** with the extended `effectiveFilter`.

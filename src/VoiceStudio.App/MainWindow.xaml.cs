@@ -96,6 +96,7 @@ namespace VoiceStudio.App
 
         private Debouncer? _layoutSaveDebouncer;
         private readonly MainWindowWorkspaceSplitterShellBridge _workspaceSplitterShellBridge;
+        private readonly MainWindowMenuBarShellBridge _menuBarShellBridge;
 
         /// <summary>
         /// Gets the unified panel registry from DI container.
@@ -465,7 +466,39 @@ namespace VoiceStudio.App
             _manageWorkspacesMenuItem.Click += ManageWorkspaces_Click;
             profiler.Checkpoint("Menu Items Created");
 
-            InitializeMenuBar();
+            _menuBarShellBridge = new MainWindowMenuBarShellBridge(
+                () => FindInContent<ContentControl>("MenuBarHost"),
+                UnifiedPanelRegistry,
+                new MainWindowMenuBarShellWire
+                {
+                    RecentProjectsSubMenu = _recentProjectsSubMenu,
+                    CommandRouter = _commandRouter,
+                    ToggleMiniTimelineMenuItem = _toggleMiniTimelineMenuItem,
+                    CustomizeToolbarMenuItem = _customizeToolbarMenuItem,
+                    ManageWorkspacesMenuItem = _manageWorkspacesMenuItem,
+                    CheckForUpdatesMenuItem = _checkForUpdatesMenuItem,
+                    KeyboardShortcutsMenuItem = _keyboardShortcutsMenuItem
+                },
+                new MainWindowMenuBarCommandCallbacks
+                {
+                    NewProject = CreateNewProject,
+                    OpenProject = OpenProject,
+                    SaveProject = SaveProject,
+                    ImportAudioFile = ImportAudioFile,
+                    CloseWindow = () => Close(),
+                    ExecuteUndo = ExecuteUndo,
+                    ExecuteRedo = ExecuteRedo,
+                    ShowGlobalSearch = ShowGlobalSearch,
+                    ExecuteNavCommand = ExecuteNavCommand,
+                    OpenPanelByIdAsync = OpenPanelByIdAsync,
+                    OpenDocumentationFolder = OpenDocumentationFolder,
+                    ShowAboutDialog = ShowAboutDialog,
+                    TogglePlayback = TogglePlayback,
+                    StopPlayback = StopPlayback,
+                    ToggleRecording = ToggleRecording,
+                    GetShowExperimentalPanels = GetShowExperimentalPanels
+                });
+            _menuBarShellBridge.InitializeMenuBar();
             profiler.Checkpoint("Menu Bar Initialized");
 
             // Enable keyboard navigation - will attach in MainWindow_Activated handler

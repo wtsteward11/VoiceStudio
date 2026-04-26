@@ -77,7 +77,21 @@
 
 **Consequence:** **Tasks 6–10** of the RHVoice execution lane (install → PATH proof → green preflight → non-skipped `pytest -m real_rhvoice` + C# live tests → WAV artifacts → **ENGINE_PARITY_MATRIX** PASS) are **not claimed as completed** in this session — doing so would be false. **Task 9** proof tables for a green matrix row are **N/A on Path B**. **Task 10** matrix flip for `rhvoice` remains **forbidden** until a **Path A** host produces real PASS evidence.
 
-**Task 11 / STATE:** Primary control-plane lane repointed to **Type B git reconcile** (commit/push or discard) per [`.cursor/STATE.md`](../../.cursor/STATE.md) ACTIVE WINDOW **2026-04-26** update. Re-run Path A proof chain on a host where **Task 5** is **Path A** before editing matrix to PASS.
+**Task 11 / STATE:** Primary control-plane lane repointed to **Type B git reconcile** (commit/push or discard) per [`.cursor/STATE.md`](../../../.cursor/STATE.md) ACTIVE WINDOW **2026-04-26** update. Re-run Path A proof chain on a host where **Task 5** is **Path A** before editing matrix to PASS.
+
+### Tasks 14–18 — Post–control-plane fork (Path A vs lane repoint; 2026-04-25)
+
+**Fork decision:** **Option B** (deliberate lane repoint) — this session re-ran **Task 14** on the same Windows dev host; **Path B** confirmed again.
+
+| Task | Outcome | Evidence |
+| --- | --- | --- |
+| **14** | **Path B** — no RHVoice CLI on PATH | PowerShell: `where.exe rhvoice-say` / `where.exe rhvoice-cli` → **exit code 1**, no resolved paths (same as § Task 5 Path B). No new **Mode B** `parameters.executable_path` to a real binary in this session. `git rev-parse HEAD` at proof edit: **`2a130e60050bfa2a755cdb7687e6dd0c4cb352ee`**. |
+| **15** | **N/A (blocked)** — cannot assert `checks.rhvoice.ok == true` | Per plan stop-rule: do not treat HTTP 200 with `ok: false` as success. **Frozen verbatim** `checks.rhvoice` object remains **§ Path 1 attempt** above (`"ok": false`, …). |
+| **16** | **N/A (blocked)** — no non-skipped PASS claimed | `real_rhvoice` / C# RhVoice live tests remain **skipped** until Path A + green preflight; **not** re-run here as PASS evidence. |
+| **17** | **N/A (blocked)** — no new WAVs | [slice14/rhvoice/README.md](slice14/rhvoice/README.md) — absent WAVs per README; no fabricated artifacts. |
+| **18** | **Matrix row not flipped** | [ENGINE_PARITY_MATRIX.md](ENGINE_PARITY_MATRIX.md) **`rhvoice`** remains **pending**; chronology row added **2026-04-25** documenting this fork. **No** `ENGINE_PARITY_MATRIX` PASS for `rhvoice` until Path A completes Tasks 15–17 for real. |
+
+**Option B (Tasks 19–21):** Primary execution lane repointed in [`.cursor/STATE.md`](../../../.cursor/STATE.md) ACTIVE WINDOW to **GOV — CI verify-harness first failure** execution row — see STATE **2026-04-25** update. **Slice 22 gate:** no new `VOICESTUDIO_BOUNDED_GAP008_SLICE22_*.md` opened (lane is CI harness, not GAP-008 Slice 22).
 
 ## Python — `real_rhvoice`
 

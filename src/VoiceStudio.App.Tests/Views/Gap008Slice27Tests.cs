@@ -37,13 +37,17 @@ public sealed class Gap008Slice27Tests
     private static string PanelRegionFocusBridgePath =>
         Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "MainWindowPanelRegionFocusShellBridge.cs");
 
+    private static string KeyboardShortcutRegistrationBridgePath =>
+        Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "MainWindowKeyboardShortcutRegistrationShellBridge.cs");
+
     [TestMethod]
     public void MainWindow_delegates_panel_region_focus_and_cycling_to_slice27_bridge()
     {
-        var text = File.ReadAllText(MainWindowPath);
-        StringAssert.Contains(text, "_panelRegionFocusShellBridge");
-        StringAssert.Contains(text, "_panelRegionFocusShellBridge.CyclePanelNext");
-        StringAssert.Contains(text, "_panelRegionFocusShellBridge.FocusPanelRegion");
+        var mw = File.ReadAllText(MainWindowPath);
+        StringAssert.Contains(mw, "_panelRegionFocusShellBridge");
+        var reg = File.ReadAllText(KeyboardShortcutRegistrationBridgePath);
+        StringAssert.Contains(reg, "deps.PanelRegionFocus.CyclePanelNext");
+        StringAssert.Contains(reg, "deps.PanelRegionFocus.FocusPanelRegion");
     }
 
     [TestMethod]

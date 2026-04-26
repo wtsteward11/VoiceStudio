@@ -34,6 +34,9 @@ public sealed class Gap008Slice8Tests
     private static string MainWindowPath =>
         Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "MainWindow.xaml.cs");
 
+    private static string KeyboardShortcutRegistrationBridgePath =>
+        Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "MainWindowKeyboardShortcutRegistrationShellBridge.cs");
+
     private static string CommandPaletteBridgePath =>
         Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "MainWindowCommandPaletteShellBridge.cs");
 
@@ -48,9 +51,12 @@ public sealed class Gap008Slice8Tests
     [TestMethod]
     public void MainWindow_nav_commandpalette_still_targets_ShowCommandPalette()
     {
-        var text = File.ReadAllText(MainWindowPath);
-        StringAssert.Contains(text, "nav.commandpalette");
-        StringAssert.Contains(text, "() => ShowCommandPalette()");
+        var mw = File.ReadAllText(MainWindowPath);
+        StringAssert.Contains(mw, "ShowCommandPalette");
+        StringAssert.Contains(mw, "_keyboardShortcutRegistrationShellBridge.Register");
+        var reg = File.ReadAllText(KeyboardShortcutRegistrationBridgePath);
+        StringAssert.Contains(reg, "nav.commandpalette");
+        StringAssert.Contains(reg, "deps.ShowCommandPalette");
     }
 
     [TestMethod]

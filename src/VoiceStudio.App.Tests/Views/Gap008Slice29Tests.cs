@@ -34,6 +34,9 @@ public sealed class Gap008Slice29Tests
     private static string MainWindowPath =>
         Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "MainWindow.xaml.cs");
 
+    private static string KeyboardShortcutRegistrationBridgePath =>
+        Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "MainWindowKeyboardShortcutRegistrationShellBridge.cs");
+
     [TestMethod]
     public void MainWindow_delegates_ExecuteUndo_and_ExecuteRedo_to_Slice_29_bridge()
     {
@@ -59,15 +62,18 @@ public sealed class Gap008Slice29Tests
     [TestMethod]
     public void RegisterKeyboardShortcuts_routes_edit_undo_redo_through_Slice_29_bridge()
     {
-        var text = File.ReadAllText(MainWindowPath);
-        var regIdx = text.IndexOf("void RegisterKeyboardShortcuts", StringComparison.Ordinal);
-        Assert.IsTrue(regIdx >= 0, "RegisterKeyboardShortcuts expected.");
-        var sliceBlock = text.Substring(regIdx, Math.Min(3000, text.Length - regIdx));
+        var mw = File.ReadAllText(MainWindowPath);
+        StringAssert.Contains(mw, "_editUndoRedoShellBridge.ExecuteUndo");
+        StringAssert.Contains(mw, "_editUndoRedoShellBridge.ExecuteRedo");
+        var reg = File.ReadAllText(KeyboardShortcutRegistrationBridgePath);
+        var regIdx = reg.IndexOf("public void Register", StringComparison.Ordinal);
+        Assert.IsTrue(regIdx >= 0, "Registration bridge Register expected.");
+        var sliceBlock = reg.Substring(regIdx, Math.Min(4000, reg.Length - regIdx));
         var editUndoKeyIdx = sliceBlock.IndexOf("\"edit.undo\"", StringComparison.Ordinal);
         var editRedoKeyIdx = sliceBlock.IndexOf("\"edit.redo\"", StringComparison.Ordinal);
-        Assert.IsTrue(editUndoKeyIdx >= 0, "edit.undo registration expected inside RegisterKeyboardShortcuts.");
-        Assert.IsTrue(editRedoKeyIdx >= 0, "edit.redo registration expected inside RegisterKeyboardShortcuts.");
-        StringAssert.Contains(sliceBlock, "_editUndoRedoShellBridge.ExecuteUndo");
-        StringAssert.Contains(sliceBlock, "_editUndoRedoShellBridge.ExecuteRedo");
+        Assert.IsTrue(editUndoKeyIdx >= 0, "edit.undo registration expected in registration bridge.");
+        Assert.IsTrue(editRedoKeyIdx >= 0, "edit.redo registration expected in registration bridge.");
+        StringAssert.Contains(sliceBlock, "deps.ExecuteUndo");
+        StringAssert.Contains(sliceBlock, "deps.ExecuteRedo");
     }
 }

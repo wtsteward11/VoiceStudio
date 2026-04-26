@@ -63,6 +63,7 @@ namespace VoiceStudio.App
         private readonly MainWindowToolbarCustomizationShellBridge _toolbarCustomizationShellBridge;
         private readonly MainWindowCommandPaletteShellBridge _commandPaletteShellBridge;
         private readonly MainWindowToolCatalogShellBridge _toolCatalogShellBridge;
+        private readonly MainWindowToolCatalogPanelHostChromeShellBridge _toolCatalogPanelHostChromeShellBridge;
         private readonly MainWindowToolbarCommandShellBridge _toolbarCommandShellBridge;
         private readonly MainWindowJumpListTaskbarProgressShellBridge _jumpListTaskbarProgressShellBridge;
         private readonly MainWindowStartupWelcomeActivationShellBridge _startupWelcomeActivationShellBridge;
@@ -85,6 +86,7 @@ namespace VoiceStudio.App
         private readonly MainWindowProjectWorkflowBridge _projectWorkflowCommandBridge;
         private readonly MainWindowRecentProjectsMutationBridge _recentProjectsMutationBridge;
         private readonly MainWindowRecentProjectsMenuPopulationShellBridge _recentProjectsMenuPopulationBridge;
+        private readonly MainWindowKeyboardShortcutRegistrationShellBridge _keyboardShortcutRegistrationShellBridge;
         private readonly MainWindowPanelPreviewShellBridge _panelPreviewShellBridge;
         private readonly MainWindowPanelQuickSwitchShellBridge _panelQuickSwitchShellBridge;
         private readonly MainWindowPanelRegionFocusShellBridge _panelRegionFocusShellBridge;
@@ -338,13 +340,14 @@ namespace VoiceStudio.App
             _toolbarCommandShellBridge.WireImportAudioHandler(ImportAudioFile);
             profiler.Checkpoint("MainWindowToolbarCommandShellBridge Wired");
 
+            _toolCatalogPanelHostChromeShellBridge = new MainWindowToolCatalogPanelHostChromeShellBridge();
             _toolCatalogShellBridge = new MainWindowToolCatalogShellBridge(
                 () => this.Content?.XamlRoot,
                 new ToolCatalogShellLauncher(),
                 () => ServiceProvider.TryGetToastNotificationService());
             _toolCatalogShellBridge.WireToolCatalogHandlers(
                 (panelId, region) => OpenPanelByIdAsync(panelId, region),
-                ApplyToolCatalogPanelHostChrome);
+                (r, t, i) => _toolCatalogPanelHostChromeShellBridge.Apply(r, t, i, FindNameOnContent));
             profiler.Checkpoint("MainWindowToolCatalogShellBridge Wired");
 
             _jumpListTaskbarProgressShellBridge = new MainWindowJumpListTaskbarProgressShellBridge(
@@ -449,7 +452,51 @@ namespace VoiceStudio.App
                 () => _recentProjectsMutationBridge.ClearRecentProjectsAsync());
             profiler.Checkpoint("MainWindowRecentProjectsMenuPopulationShellBridge Created");
 
-            RegisterKeyboardShortcuts();
+            _keyboardShortcutRegistrationShellBridge = new MainWindowKeyboardShortcutRegistrationShellBridge();
+            _keyboardShortcutRegistrationShellBridge.Register(
+                _keyboardShortcutService,
+                new MainWindowKeyboardShortcutRegistrationDependencies(
+                    CreateNewProject,
+                    OpenProject,
+                    SaveProject,
+                    ImportAudioFile,
+                    () =>
+                    {
+                        _editUndoRedoShellBridge.ExecuteUndo(
+                            () => ServiceProvider.GetUndoRedoService(),
+                            (ex, ctx) => ServiceProvider.TryGetErrorLoggingService()?.LogError(ex, ctx));
+                    },
+                    () =>
+                    {
+                        _editUndoRedoShellBridge.ExecuteRedo(
+                            () => ServiceProvider.GetUndoRedoService(),
+                            (ex, ctx) => ServiceProvider.TryGetErrorLoggingService()?.LogError(ex, ctx));
+                    },
+                    ShowCommandPalette,
+                    () => { _ = ShowToolCatalogAsync(); },
+                    () => _searchOverlayShellBridge.Show(),
+                    () => FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
+                    _globalTransportShellBridge,
+                    _panelRegionFocusShellBridge,
+                    () =>
+                    {
+                        if (_keyboardShortcutsMenuItem != null)
+                        {
+                            KeyboardShortcutsMenuItem_Click(_keyboardShortcutsMenuItem, new RoutedEventArgs());
+                        }
+                    },
+                    () =>
+                    {
+                        RegisterPanelQuickSwitchShortcut(1, PanelRegion.Left, 0, "Profiles");
+                        RegisterPanelQuickSwitchShortcut(2, PanelRegion.Left, 1, "Library");
+                        RegisterPanelQuickSwitchShortcut(3, PanelRegion.Left, 2, "Training");
+                        RegisterPanelQuickSwitchShortcut(4, PanelRegion.Center, 0, "Timeline");
+                        RegisterPanelQuickSwitchShortcut(5, PanelRegion.Center, 1, "VoiceSynthesis");
+                        RegisterPanelQuickSwitchShortcut(6, PanelRegion.Center, 2, "TextSpeechEditor");
+                        RegisterPanelQuickSwitchShortcut(7, PanelRegion.Right, 0, "EffectsMixer");
+                        RegisterPanelQuickSwitchShortcut(8, PanelRegion.Right, 1, "Analyzer");
+                        RegisterPanelQuickSwitchShortcut(9, PanelRegion.Right, 2, "QualityControl");
+                    }));
             profiler.Checkpoint("Keyboard Shortcuts Registered");
 
             // Menu items (not in XAML during Phase 0)
@@ -983,200 +1030,6 @@ namespace VoiceStudio.App
             }
         }
 
-        private void RegisterKeyboardShortcuts()
-        {
-            // File operations
-            _keyboardShortcutService.RegisterShortcut(
-                "file.new",
-                VirtualKey.N,
-                VirtualKeyModifiers.Control,
-                () => CreateNewProject(),
-                "New Project");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "file.open",
-                VirtualKey.O,
-                VirtualKeyModifiers.Control,
-                () => OpenProject(),
-                "Open Project");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "file.save",
-                VirtualKey.S,
-                VirtualKeyModifiers.Control,
-                () => SaveProject(),
-                "Save Project");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "file.import",
-                VirtualKey.I,
-                VirtualKeyModifiers.Control,
-                () => ImportAudioFile(),
-                "Import Audio");
-
-            // Playback shortcuts: registered by TransportShortcutCoordinator in Loaded (Wave 4 Phase 1)
-
-            // Edit operations
-            _keyboardShortcutService.RegisterShortcut(
-                "edit.undo",
-                VirtualKey.Z,
-                VirtualKeyModifiers.Control,
-                () =>
-                {
-                    _editUndoRedoShellBridge.ExecuteUndo(
-                        () => ServiceProvider.GetUndoRedoService(),
-                        (ex, ctx) => ServiceProvider.TryGetErrorLoggingService()?.LogError(ex, ctx));
-                },
-                "Undo");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "edit.redo",
-                VirtualKey.Y,
-                VirtualKeyModifiers.Control,
-                () =>
-                {
-                    _editUndoRedoShellBridge.ExecuteRedo(
-                        () => ServiceProvider.GetUndoRedoService(),
-                        (ex, ctx) => ServiceProvider.TryGetErrorLoggingService()?.LogError(ex, ctx));
-                },
-                "Redo");
-
-            // Navigation
-            _keyboardShortcutService.RegisterShortcut(
-                "nav.commandpalette",
-                VirtualKey.P,
-                VirtualKeyModifiers.Control,
-                () => ShowCommandPalette(),
-                "Command Palette");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "nav.toolcatalog",
-                VirtualKey.T,
-                VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift,
-                () => { _ = ShowToolCatalogAsync(); },
-                "Tool Catalog");
-
-            // Global Search (IDEA 5)
-            _keyboardShortcutService.RegisterShortcut(
-                "nav.globalsearch",
-                VirtualKey.K,
-                VirtualKeyModifiers.Control,
-                () => _searchOverlayShellBridge.Show(),
-                "Global Search");
-
-            // Zoom
-            _keyboardShortcutService.RegisterShortcut(
-                "zoom.in",
-                VirtualKey.Add,
-                VirtualKeyModifiers.Control,
-                () => _globalTransportShellBridge.ZoomIn(
-                    () => FindNameOnContent("CenterPanelHost") as Controls.PanelHost),
-                "Zoom In");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "zoom.out",
-                VirtualKey.Subtract,
-                VirtualKeyModifiers.Control,
-                () => _globalTransportShellBridge.ZoomOut(
-                    () => FindNameOnContent("CenterPanelHost") as Controls.PanelHost),
-                "Zoom Out");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "zoom.reset",
-                VirtualKey.Number0,
-                VirtualKeyModifiers.Control,
-                () => _globalTransportShellBridge.ResetZoom(
-                    () => FindNameOnContent("CenterPanelHost") as Controls.PanelHost),
-                "Reset Zoom");
-
-            // Help - Phase 5.2.7: Fixed to use F1 (standard help key) + Shift+/ for ? key
-            _keyboardShortcutService.RegisterShortcut(
-                "help.shortcuts",
-                VirtualKey.F1,
-                VirtualKeyModifiers.Shift,
-                () =>
-                {
-                    if (_keyboardShortcutsMenuItem != null)
-                    {
-                        KeyboardShortcutsMenuItem_Click(_keyboardShortcutsMenuItem, new RoutedEventArgs());
-                    }
-                },
-                "Keyboard Shortcuts");
-
-            // Also register Shift+/ (?) for help on US keyboards
-            _keyboardShortcutService.RegisterShortcut(
-                "help.shortcuts.alt",
-                (VirtualKey)191, // Forward slash key
-                VirtualKeyModifiers.Shift,
-                () =>
-                {
-                    if (_keyboardShortcutsMenuItem != null)
-                    {
-                        KeyboardShortcutsMenuItem_Click(_keyboardShortcutsMenuItem, new RoutedEventArgs());
-                    }
-                },
-                "Keyboard Shortcuts (?)");
-
-            // Panel Quick-Switch (IDEA 1): Ctrl+1-9 for direct panel switching
-            // Left PanelHost: Ctrl+1-3
-            RegisterPanelQuickSwitchShortcut(1, PanelRegion.Left, 0, "Profiles");
-            RegisterPanelQuickSwitchShortcut(2, PanelRegion.Left, 1, "Library");
-            RegisterPanelQuickSwitchShortcut(3, PanelRegion.Left, 2, "Training");
-
-            // Center PanelHost: Ctrl+4-6
-            RegisterPanelQuickSwitchShortcut(4, PanelRegion.Center, 0, "Timeline");
-            RegisterPanelQuickSwitchShortcut(5, PanelRegion.Center, 1, "VoiceSynthesis");
-            RegisterPanelQuickSwitchShortcut(6, PanelRegion.Center, 2, "TextSpeechEditor");
-
-            // Right PanelHost: Ctrl+7-9
-            RegisterPanelQuickSwitchShortcut(7, PanelRegion.Right, 0, "EffectsMixer");
-            RegisterPanelQuickSwitchShortcut(8, PanelRegion.Right, 1, "Analyzer");
-            RegisterPanelQuickSwitchShortcut(9, PanelRegion.Right, 2, "QualityControl");
-
-            // Slice 27 — MainWindowPanelRegionFocusShellBridge: panel region cycling and direct focus
-            _keyboardShortcutService.RegisterShortcut(
-                "panel.cycleNext",
-                VirtualKey.Tab,
-                VirtualKeyModifiers.Control,
-                _panelRegionFocusShellBridge.CyclePanelNext,
-                "Cycle to Next Panel");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "panel.cyclePrevious",
-                VirtualKey.Tab,
-                VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift,
-                _panelRegionFocusShellBridge.CyclePanelPrevious,
-                "Cycle to Previous Panel");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "panel.focusLeft",
-                VirtualKey.Number1,
-                VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu,
-                () => _panelRegionFocusShellBridge.FocusPanelRegion(PanelRegion.Left),
-                "Focus Left Panel");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "panel.focusCenter",
-                VirtualKey.Number2,
-                VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu,
-                () => _panelRegionFocusShellBridge.FocusPanelRegion(PanelRegion.Center),
-                "Focus Center Panel");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "panel.focusRight",
-                VirtualKey.Number3,
-                VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu,
-                () => _panelRegionFocusShellBridge.FocusPanelRegion(PanelRegion.Right),
-                "Focus Right Panel");
-
-            _keyboardShortcutService.RegisterShortcut(
-                "panel.focusBottom",
-                VirtualKey.Number4,
-                VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu,
-                () => _panelRegionFocusShellBridge.FocusPanelRegion(PanelRegion.Bottom),
-                "Focus Bottom Panel");
-        }
-
         /// <summary>
         /// Registers a panel quick-switch shortcut (IDEA 1).
         /// </summary>
@@ -1291,28 +1144,6 @@ namespace VoiceStudio.App
         private async Task ShowToolCatalogAsync()
         {
             await _toolCatalogShellBridge.RunShowAsync().ConfigureAwait(true);
-        }
-
-        private void ApplyToolCatalogPanelHostChrome(PanelRegion region, string title, string? icon)
-        {
-            var host = region switch
-            {
-                PanelRegion.Left => FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
-                PanelRegion.Center => FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
-                PanelRegion.Right => FindNameOnContent("RightPanelHost") as Controls.PanelHost,
-                PanelRegion.Bottom => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
-                _ => null
-            };
-            if (host == null)
-            {
-                return;
-            }
-
-            host.PanelTitle = title;
-            if (!string.IsNullOrEmpty(icon))
-            {
-                host.PanelIcon = icon;
-            }
         }
 
         private void ShowGlobalSearch() => _searchOverlayShellBridge.Show();

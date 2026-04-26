@@ -37,6 +37,9 @@ public sealed class Gap008Slice10Tests
     private static string ToolCatalogBridgePath =>
         Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "MainWindowToolCatalogShellBridge.cs");
 
+    private static string KeyboardShortcutRegistrationBridgePath =>
+        Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "MainWindowKeyboardShortcutRegistrationShellBridge.cs");
+
     [TestMethod]
     public void MainWindow_ShowToolCatalogAsync_delegates_to_tool_catalog_bridge()
     {
@@ -48,9 +51,12 @@ public sealed class Gap008Slice10Tests
     [TestMethod]
     public void MainWindow_nav_toolcatalog_still_targets_ShowToolCatalogAsync()
     {
-        var text = File.ReadAllText(MainWindowPath);
-        StringAssert.Contains(text, "nav.toolcatalog");
-        StringAssert.Contains(text, "() => { _ = ShowToolCatalogAsync(); }");
+        var mw = File.ReadAllText(MainWindowPath);
+        StringAssert.Contains(mw, "() => { _ = ShowToolCatalogAsync(); }");
+        StringAssert.Contains(mw, "_keyboardShortcutRegistrationShellBridge.Register");
+        var reg = File.ReadAllText(KeyboardShortcutRegistrationBridgePath);
+        StringAssert.Contains(reg, "nav.toolcatalog");
+        StringAssert.Contains(reg, "deps.ShowToolCatalog");
     }
 
     [TestMethod]

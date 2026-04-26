@@ -173,3 +173,15 @@ After **Task 419**, `scripts/Run-Gap008MainWindowRegressionTests.ps1` does that 
 **Delta:** **`Gap008Slice34Tests`** (**3** methods) + **`MainWindowMenuBarShellBridgeTests`** (**5** methods) = **+8** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).
 
 **Arithmetic:** **247** (post–Slice 33 green) **+ 8** = **255** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260426_154959.trx`**; Tasks **159–168** — 2026-04-26). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **255** / **255** with the extended `effectiveFilter`.
+
+## Spine size after Slice 35 (tool catalog panel host chrome shell)
+
+**Delta:** **`Gap008Slice35Tests`** (**3** methods) + **`MainWindowToolCatalogPanelHostChromeShellBridgeTests`** (**4** methods) = **+7** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).
+
+**Arithmetic:** **255** (post–Slice 34 green) **+ 7** = **262** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260426_161143.trx`**; Tasks **169–178** — 2026-04-26). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **262** / **262** with the extended `effectiveFilter`.
+
+## Spine size after Slice 36 (keyboard shortcut registration shell)
+
+**Delta:** **`Gap008Slice36Tests`** (**3** methods) + **`MainWindowKeyboardShortcutRegistrationShellBridgeTests`** (**3** methods) = **+6** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt). Prior-slice pins (**`Gap008Slice8Tests`**, **`Gap008Slice10Tests`**, **`Gap008Slice27Tests`**, **`Gap008Slice29Tests`**, **`Gap008Slice30Tests`**) updated to assert against **`MainWindowKeyboardShortcutRegistrationShellBridge`** where **`RegisterKeyboardShortcuts`** body moved.
+
+**Arithmetic:** **262** (post–Slice 35 green) **+ 6** = **268** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260426_173120.trx`**; Tasks **179–188** — 2026-04-26). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **268** / **268** with the extended `effectiveFilter`.

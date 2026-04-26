@@ -34,6 +34,9 @@ public sealed class Gap008Slice30Tests
     private static string MainWindowPath =>
         Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "MainWindow.xaml.cs");
 
+    private static string KeyboardShortcutRegistrationBridgePath =>
+        Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "MainWindowKeyboardShortcutRegistrationShellBridge.cs");
+
     [TestMethod]
     public void MainWindow_delegates_TogglePlayback_Stop_ToggleRecording_to_Slice_30_bridge()
     {
@@ -60,15 +63,15 @@ public sealed class Gap008Slice30Tests
     [TestMethod]
     public void RegisterKeyboardShortcuts_routes_zoom_through_Slice_30_bridge()
     {
-        var text = File.ReadAllText(MainWindowPath);
-        var regIdx = text.IndexOf("void RegisterKeyboardShortcuts", StringComparison.Ordinal);
-        Assert.IsTrue(regIdx >= 0, "RegisterKeyboardShortcuts expected.");
-        var sliceBlock = text.Substring(regIdx, Math.Min(8000, text.Length - regIdx));
+        var reg = File.ReadAllText(KeyboardShortcutRegistrationBridgePath);
+        var regIdx = reg.IndexOf("public void Register", StringComparison.Ordinal);
+        Assert.IsTrue(regIdx >= 0, "Registration bridge Register expected.");
+        var sliceBlock = reg.Substring(regIdx, Math.Min(8000, reg.Length - regIdx));
         var zIn = sliceBlock.IndexOf("\"zoom.in\"", StringComparison.Ordinal);
         Assert.IsTrue(zIn >= 0, "zoom.in expected.");
-        StringAssert.Contains(sliceBlock, "_globalTransportShellBridge.ZoomIn");
-        StringAssert.Contains(sliceBlock, "_globalTransportShellBridge.ZoomOut");
-        StringAssert.Contains(sliceBlock, "_globalTransportShellBridge.ResetZoom");
+        StringAssert.Contains(sliceBlock, "deps.GlobalTransport.ZoomIn");
+        StringAssert.Contains(sliceBlock, "deps.GlobalTransport.ZoomOut");
+        StringAssert.Contains(sliceBlock, "deps.GlobalTransport.ResetZoom");
     }
 
     [TestMethod]

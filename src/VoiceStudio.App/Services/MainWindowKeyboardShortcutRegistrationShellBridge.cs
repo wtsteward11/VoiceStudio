@@ -120,8 +120,6 @@ public sealed class MainWindowKeyboardShortcutRegistrationShellBridge
             deps.TriggerHelpKeyboardShortcutsFromShortcut,
             "Keyboard Shortcuts (?)");
 
-        deps.RegisterPanelQuickSwitchGroup();
-
         keyboardShortcutService.RegisterShortcut(
             "panel.cycleNext",
             VirtualKey.Tab,
@@ -184,8 +182,7 @@ public sealed class MainWindowKeyboardShortcutRegistrationDependencies
         Func<PanelHost?> getCenterPanelHost,
         MainWindowGlobalTransportShellBridge globalTransport,
         MainWindowPanelRegionFocusShellBridge panelRegionFocus,
-        Action triggerHelpKeyboardShortcutsFromShortcut,
-        Action registerPanelQuickSwitchGroup)
+        Action triggerHelpKeyboardShortcutsFromShortcut)
     {
         CreateNewProject = createNewProject ?? throw new ArgumentNullException(nameof(createNewProject));
         OpenProject = openProject ?? throw new ArgumentNullException(nameof(openProject));
@@ -201,8 +198,6 @@ public sealed class MainWindowKeyboardShortcutRegistrationDependencies
         PanelRegionFocus = panelRegionFocus ?? throw new ArgumentNullException(nameof(panelRegionFocus));
         TriggerHelpKeyboardShortcutsFromShortcut = triggerHelpKeyboardShortcutsFromShortcut
             ?? throw new ArgumentNullException(nameof(triggerHelpKeyboardShortcutsFromShortcut));
-        RegisterPanelQuickSwitchGroup = registerPanelQuickSwitchGroup
-            ?? throw new ArgumentNullException(nameof(registerPanelQuickSwitchGroup));
     }
 
     public Action CreateNewProject { get; }
@@ -218,5 +213,4 @@ public sealed class MainWindowKeyboardShortcutRegistrationDependencies
     public MainWindowGlobalTransportShellBridge GlobalTransport { get; }
     public MainWindowPanelRegionFocusShellBridge PanelRegionFocus { get; }
     public Action TriggerHelpKeyboardShortcutsFromShortcut { get; }
-    public Action RegisterPanelQuickSwitchGroup { get; }
 }

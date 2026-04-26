@@ -87,6 +87,7 @@ namespace VoiceStudio.App
         private readonly MainWindowRecentProjectsMutationBridge _recentProjectsMutationBridge;
         private readonly MainWindowRecentProjectsMenuPopulationShellBridge _recentProjectsMenuPopulationBridge;
         private readonly MainWindowKeyboardShortcutRegistrationShellBridge _keyboardShortcutRegistrationShellBridge;
+        private readonly MainWindowPanelQuickSwitchShortcutRegistrationShellBridge _panelQuickSwitchShortcutRegistrationShellBridge;
         private readonly MainWindowPanelPreviewShellBridge _panelPreviewShellBridge;
         private readonly MainWindowPanelQuickSwitchShellBridge _panelQuickSwitchShellBridge;
         private readonly MainWindowPanelRegionFocusShellBridge _panelRegionFocusShellBridge;
@@ -484,19 +485,12 @@ namespace VoiceStudio.App
                         {
                             KeyboardShortcutsMenuItem_Click(_keyboardShortcutsMenuItem, new RoutedEventArgs());
                         }
-                    },
-                    () =>
-                    {
-                        RegisterPanelQuickSwitchShortcut(1, PanelRegion.Left, 0, "Profiles");
-                        RegisterPanelQuickSwitchShortcut(2, PanelRegion.Left, 1, "Library");
-                        RegisterPanelQuickSwitchShortcut(3, PanelRegion.Left, 2, "Training");
-                        RegisterPanelQuickSwitchShortcut(4, PanelRegion.Center, 0, "Timeline");
-                        RegisterPanelQuickSwitchShortcut(5, PanelRegion.Center, 1, "VoiceSynthesis");
-                        RegisterPanelQuickSwitchShortcut(6, PanelRegion.Center, 2, "TextSpeechEditor");
-                        RegisterPanelQuickSwitchShortcut(7, PanelRegion.Right, 0, "EffectsMixer");
-                        RegisterPanelQuickSwitchShortcut(8, PanelRegion.Right, 1, "Analyzer");
-                        RegisterPanelQuickSwitchShortcut(9, PanelRegion.Right, 2, "QualityControl");
                     }));
+            _panelQuickSwitchShortcutRegistrationShellBridge = new MainWindowPanelQuickSwitchShortcutRegistrationShellBridge();
+            _panelQuickSwitchShortcutRegistrationShellBridge.RegisterAll(
+                _keyboardShortcutService,
+                GetPanelTitle,
+                (panelId, region) => OpenPanelByIdAsync(panelId, region));
             profiler.Checkpoint("Keyboard Shortcuts Registered");
 
             // Menu items (not in XAML during Phase 0)
@@ -1028,34 +1022,6 @@ namespace VoiceStudio.App
             {
                 return false;
             }
-        }
-
-        /// <summary>
-        /// Registers a panel quick-switch shortcut (IDEA 1).
-        /// </summary>
-        private void RegisterPanelQuickSwitchShortcut(int number, PanelRegion region, int unused, string panelId)
-        {
-            VirtualKey key = number switch
-            {
-                1 => VirtualKey.Number1,
-                2 => VirtualKey.Number2,
-                3 => VirtualKey.Number3,
-                4 => VirtualKey.Number4,
-                5 => VirtualKey.Number5,
-                6 => VirtualKey.Number6,
-                7 => VirtualKey.Number7,
-                8 => VirtualKey.Number8,
-                9 => VirtualKey.Number9,
-                _ => VirtualKey.Number1
-            };
-
-            var title = GetPanelTitle(panelId);
-            _keyboardShortcutService.RegisterShortcut(
-                $"nav.panel.{number}",
-                key,
-                VirtualKeyModifiers.Control,
-                () => { _ = OpenPanelByIdAsync(panelId, region); },
-                $"Switch to {title}");
         }
 
         /// <summary>

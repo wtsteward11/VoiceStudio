@@ -25,6 +25,7 @@ public sealed class MainWindowLifetimeCleanupCoreChannels
     public required Action SetDisposed { get; init; }
     public required Action DisposeClockTimer { get; init; }
     public required Action DisposePreviewHideTimer { get; init; }
+    public required Action DisposeQuickSwitchHideTimer { get; init; }
     public required Action CancelDebouncerAndSaveWorkspace { get; init; }
     public required Action UnsubscribeContentKeyDown { get; init; }
     public required Action UnsubscribeWindowActivated { get; init; }
@@ -61,6 +62,7 @@ public sealed class MainWindowLifetimeCleanupShellBridge
         ArgumentNullException.ThrowIfNull(core.SetDisposed);
         ArgumentNullException.ThrowIfNull(core.DisposeClockTimer);
         ArgumentNullException.ThrowIfNull(core.DisposePreviewHideTimer);
+        ArgumentNullException.ThrowIfNull(core.DisposeQuickSwitchHideTimer);
         ArgumentNullException.ThrowIfNull(core.CancelDebouncerAndSaveWorkspace);
         ArgumentNullException.ThrowIfNull(core.UnsubscribeContentKeyDown);
         ArgumentNullException.ThrowIfNull(core.UnsubscribeWindowActivated);
@@ -96,6 +98,7 @@ public sealed class MainWindowLifetimeCleanupShellBridge
         CleanupTemporaryAudioFiles();
         _core.DisposeClockTimer();
         _core.DisposePreviewHideTimer();
+        _core.DisposeQuickSwitchHideTimer();
         _core.CancelDebouncerAndSaveWorkspace();
         _core.UnsubscribeContentKeyDown();
         _core.UnsubscribeWindowActivated();

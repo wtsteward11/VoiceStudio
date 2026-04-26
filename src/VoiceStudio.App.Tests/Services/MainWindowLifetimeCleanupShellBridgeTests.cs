@@ -63,6 +63,7 @@ public sealed class MainWindowLifetimeCleanupShellBridgeTests
             SetDisposed = () => { state.Disposed = true; },
             DisposeClockTimer = disposeClock,
             DisposePreviewHideTimer = noop,
+            DisposeQuickSwitchHideTimer = noop,
             CancelDebouncerAndSaveWorkspace = noop,
             UnsubscribeContentKeyDown = noop,
             UnsubscribeWindowActivated = noop,

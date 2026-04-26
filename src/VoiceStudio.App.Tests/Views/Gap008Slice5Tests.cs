@@ -45,19 +45,20 @@ public sealed class Gap008Slice5Tests
     {
         var text = File.ReadAllText(MainWindowPath);
         StringAssert.Contains(text, "_recentProjectsMutationBridge");
-        StringAssert.Contains(text, "await _recentProjectsMutationBridge.PinRecentProjectAsync");
-        StringAssert.Contains(text, "await _recentProjectsMutationBridge.UnpinRecentProjectAsync");
-        StringAssert.Contains(text, "await _recentProjectsMutationBridge.ClearRecentProjectsAsync");
-        StringAssert.Contains(text, "await _recentProjectsMutationBridge.RemoveFromRecentListAsync");
+        // Slice 22: Pin/Unpin/Clear/Remove surface via population-bridge ctor lambdas (no duplicate async void wrappers on MainWindow).
+        StringAssert.Contains(text, "_recentProjectsMutationBridge.PinRecentProjectAsync");
+        StringAssert.Contains(text, "_recentProjectsMutationBridge.UnpinRecentProjectAsync");
+        StringAssert.Contains(text, "_recentProjectsMutationBridge.ClearRecentProjectsAsync");
+        StringAssert.Contains(text, "_recentProjectsMutationBridge.RemoveFromRecentListAsync");
     }
 
     [TestMethod]
-    public void MainWindow_still_owns_PopulateRecentProjectsMenu_and_workflow_bridge_Slice4()
+    public void MainWindow_thin_forwards_recent_menu_population_to_slice22_bridge_and_keeps_workflow_bridge_Slice4()
     {
         var text = File.ReadAllText(MainWindowPath);
         StringAssert.Contains(text, "PopulateRecentProjectsMenu");
+        StringAssert.Contains(text, "_recentProjectsMenuPopulationBridge.Populate");
         StringAssert.Contains(text, "_projectWorkflowCommandBridge");
-        StringAssert.Contains(text, "await _projectWorkflowCommandBridge.OpenRecentProjectAsync");
     }
 
     [TestMethod]

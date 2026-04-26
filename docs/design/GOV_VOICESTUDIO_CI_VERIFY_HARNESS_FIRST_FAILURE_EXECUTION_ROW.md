@@ -432,7 +432,7 @@ All stages **PASS** or **honest SKIP** (headless guards for UI Smoke, Failure-Pa
 
 | Field | Value |
 | --- | --- |
-| **Current `main` tip (session)** | `9f0360b70b718977523a947481e36557707a9037` (see `.cursor/STATE.md` **Lane authority**). |
+| **Current `main` tip (session)** | `480391ca0febe318223459ba0adff9739db58fea` (see `.cursor/STATE.md` **Lane authority**). |
 | **Ancestor vs closure SHA** | `24b84bbc` is **ancestor** of current tip — **operational closure stands** until a **new** hosted **`workflow_dispatch`** + **`run_full_chain: true`** records a **red** first stage. |
 | **Operator `gh workflow run` (agent attempt)** | **`gh workflow run verify-harness.yml --ref main -f run_full_chain=true`** → **HTTP 403** `Resource not accessible by personal access token` (PAT cannot create workflow dispatch events). **No new GHA run.** Same failure class as [VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md](../reports/verification/VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md) § **Dispatch path** — clear `GITHUB_TOKEN` env override or use **Actions → Run workflow** with repo **Actions: write**. |
 | **Local bounded proof (Tasks 24–26)** | `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` **0 errors**; `dotnet test` … `--filter "FullyQualifiedName~AudioPlayerServiceTests|FullyQualifiedName~BackendProcessManagerDecisionTests|FullyQualifiedName~PlaybackOperationsHandlerTests"` **33 passed**; `python -m pytest tests/ci/test_requires_audio_device_guard_discipline.py` **PASS**; `python scripts/run_verification.py` **PASS**; `.\scripts\verify.ps1 -Quick` **exit 0**. |

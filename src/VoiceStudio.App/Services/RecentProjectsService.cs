@@ -10,10 +10,24 @@ using VoiceStudio.App.Logging;
 namespace VoiceStudio.App.Services
 {
   /// <summary>
+  /// Narrow mutation surface for <see cref="MainWindowRecentProjectsMutationBridge"/> (GAP-008 Slice 5).
+  /// </summary>
+  public interface IRecentProjectsMutationCommands
+  {
+    Task PinProjectAsync(string projectPath);
+
+    Task UnpinProjectAsync(string projectPath);
+
+    Task RemoveRecentProjectAsync(string projectPath);
+
+    Task ClearRecentProjectsAsync();
+  }
+
+  /// <summary>
   /// Service for managing recent projects history.
   /// Implements IDEA 16: Recent Projects Quick Access.
   /// </summary>
-  public class RecentProjectsService : ObservableObject
+  public class RecentProjectsService : ObservableObject, IRecentProjectsMutationCommands
   {
     private const string SettingsKey = "RecentProjects";
     private const int MaxRecentProjects = 10;

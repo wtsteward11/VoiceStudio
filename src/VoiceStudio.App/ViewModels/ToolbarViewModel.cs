@@ -20,18 +20,21 @@ public partial class ToolbarViewModel : ObservableObject
     private readonly IUnifiedWorkspaceService _workspaceService;
     private readonly IAudioPlayerService _audioPlayerService;
     private readonly IToastNotificationService? _toastNotificationService;
+    private readonly IToolbarShellImportFromToolbar _toolbarShellImport;
 
     public ToolbarViewModel(
         ToolbarConfigurationService toolbarConfigurationService,
         IUnifiedCommandRegistry commandRegistry,
         IUnifiedWorkspaceService workspaceService,
         IAudioPlayerService audioPlayerService,
+        IToolbarShellImportFromToolbar toolbarShellImport,
         IToastNotificationService? toastNotificationService = null)
     {
         _toolbarConfigurationService = toolbarConfigurationService ?? throw new ArgumentNullException(nameof(toolbarConfigurationService));
         _commandRegistry = commandRegistry ?? throw new ArgumentNullException(nameof(commandRegistry));
         _workspaceService = workspaceService ?? throw new ArgumentNullException(nameof(workspaceService));
         _audioPlayerService = audioPlayerService ?? throw new ArgumentNullException(nameof(audioPlayerService));
+        _toolbarShellImport = toolbarShellImport ?? throw new ArgumentNullException(nameof(toolbarShellImport));
         _toastNotificationService = toastNotificationService;
         _toolbarConfigurationService.ConfigurationChanged += (_, _) => ToolbarConfigurationChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -48,12 +51,12 @@ public partial class ToolbarViewModel : ObservableObject
             .ToList();
     }
 
-    public async Task ExecuteToolbarActionAsync(string itemId, Action? importAudioAction = null)
+    public async Task ExecuteToolbarActionAsync(string itemId)
     {
         switch (itemId)
         {
             case "import_audio":
-                importAudioAction?.Invoke();
+                _toolbarShellImport.RequestImportAudio();
                 return;
             case "loop":
                 _audioPlayerService.IsLooping = !_audioPlayerService.IsLooping;

@@ -60,7 +60,11 @@
 
 ## Slice 3 candidate (explicitly NOT slice 2)
 
-- **Loaded tail:** `TransportShortcutCoordinator.Attach` + `RunPanelInitWhenReadyAsync` in `contentFE.Loaded` (after bootstrap `RunAsync`), per Slice 1 brief.
+- **Landed 2026-04-25** — [VOICESTUDIO_BOUNDED_GAP008_SLICE03_MAINWINDOW_LOADED_TAIL.md](VOICESTUDIO_BOUNDED_GAP008_SLICE03_MAINWINDOW_LOADED_TAIL.md): `MainWindowLoadedTailBootstrap` + `Gap008Slice3Tests`.
+
+## Guardrail — `NavButtonActionSink` contract (Tasks 277 / GAP-008)
+
+**`NavButtonActionSink` exists only** to resolve **`ShellNavigationCoordinator`** constructor ordering vs **`MainWindowNavigationShellBridge.SetActiveNavButton`** (rail highlight after navigation commands). It is **not** a general-purpose event bus or pub/sub surface. **No new responsibilities** may be routed through it without a **new bounded slice** and **ADR** if the change alters architectural meaning.
 
 ## Acceptance criteria
 
@@ -86,4 +90,5 @@ python scripts\run_verification.py
 
 ## Changelog
 
+- **2026-04-25 (post–Tasks 269–278):** §Guardrail — **`NavButtonActionSink`** narrow contract (ordering bridge only; not an event bus); Slice 3 Loaded tail **landed** (cross-ref Slice 3 brief).
 - **2026-04-25:** Tasks 261–268 — bounded brief + bridge + seam tests + verification + doc/STATE sync.

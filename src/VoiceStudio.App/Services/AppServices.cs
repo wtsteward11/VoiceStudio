@@ -552,12 +552,15 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<KeyboardShortcutService>();
       services.AddSingleton<IUnifiedKeyboardService>(sp => sp.GetRequiredService<KeyboardShortcutService>());
       services.AddTransient<KeyboardCustomizationViewModel>();
+      services.AddSingleton<MainWindowToolbarCommandShellBridge>();
+      services.AddSingleton<IToolbarShellImportFromToolbar>(sp => sp.GetRequiredService<MainWindowToolbarCommandShellBridge>());
       services.AddSingleton<ToolbarViewModel>(sp =>
           new ToolbarViewModel(
               sp.GetRequiredService<ToolbarConfigurationService>(),
               sp.GetRequiredService<IUnifiedCommandRegistry>(),
               sp.GetRequiredService<IUnifiedWorkspaceService>(),
               sp.GetRequiredService<IAudioPlayerService>(),
+              sp.GetRequiredService<IToolbarShellImportFromToolbar>(),
               _toastOverride));
       services.AddSingleton<IUnifiedCommandRegistry>(sp =>
         new UnifiedCommandRegistry(

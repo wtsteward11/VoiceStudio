@@ -10,7 +10,7 @@
 **Loaded-time shell bootstrap orchestration** — the ordered block that ran inline in [`MainWindow.xaml.cs`](../../src/VoiceStudio.App/MainWindow.xaml.cs) inside `contentFE.Loaded` from **`ErrorDialogService.Root = contentFE.XamlRoot`** through **`InitializeCustomTitleBar()`** (inclusive), **excluding**:
 
 - `#if DEBUG` diagnostics and pointer handler (remain in `MainWindow` — local diagnostic coupling).
-- **`_transportShortcutCoordinator` attach** and **`RunPanelInitWhenReadyAsync`** (deferred to slice 2+ — panel/transport bootstrap; not part of this cut).
+- **`_transportShortcutCoordinator` attach** and **`RunPanelInitWhenReadyAsync`** — [GAP-008 Slice 3](VOICESTUDIO_BOUNDED_GAP008_SLICE03_MAINWINDOW_LOADED_TAIL.md) (`MainWindowLoadedTailBootstrap`); not part of this cut.
 
 **Implementation:** [`MainWindowShellLoadedBootstrap`](../../src/VoiceStudio.App/Services/MainWindowShellLoadedBootstrap.cs) + [`MainWindowLoadedBootstrapHooks`](../../src/VoiceStudio.App/Services/MainWindowShellLoadedBootstrap.cs) — `RunAsync` is **only** legal from **`FrameworkElement.Loaded`** (ADR-047).
 
@@ -18,7 +18,7 @@
 
 - XAML and **window** chrome: `MainWindow.xaml`, title bar, Mica **entrypoints** (`ApplyMicaBackdrop` / `InitializeCustomTitleBar` **methods** stay as partial members; **invocation order** is delegated).
 - Constructor: service fields, coordinator construction, `Activated`, menu/splitter, `StartupState` overlay subscription **before** Loaded.
-- DEBUG-only Loaded tail, transport shortcut attach, `RunPanelInitWhenReadyAsync`.
+- DEBUG-only Loaded tail; post-DEBUG transport attach + `RunPanelInitWhenReadyAsync` trigger ([Slice 3](VOICESTUDIO_BOUNDED_GAP008_SLICE03_MAINWINDOW_LOADED_TAIL.md)).
 - All **private** `Wire*` / `TryDispatch*` **implementations** (hooks call them via delegates constructed in `MainWindow`).
 
 ## What moves out

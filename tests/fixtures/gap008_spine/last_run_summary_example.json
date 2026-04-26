@@ -1,0 +1,12 @@
+{
+  "timestampUtc": "2026-04-25T00:00:00.0000000Z",
+  "filterPath": "E:\\VoiceStudio\\tools\\gap008_mainwindow_regression_filter.txt",
+  "effectiveFilter": "FullyQualifiedName~ExampleTests",
+  "discoveryPath": "E:\\VoiceStudio\\.buildlogs\\gap008_spine\\last_discovery.txt",
+  "listedTestCount": 1,
+  "trxPath": "E:\\VoiceStudio\\.buildlogs\\gap008_spine\\gap008_spine_example.trx",
+  "passed": 1,
+  "failed": 0,
+  "skippedApprox": 0,
+  "dotnetExitCode": 0
+}

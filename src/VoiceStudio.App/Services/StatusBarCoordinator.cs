@@ -22,6 +22,7 @@ public sealed class StatusBarCoordinator
     private IContextManager? _contextManager;
     private StatusBarActivityService? _activityService;
     private GracefulDegradationService? _gracefulDegradation;
+    private IStartupStateService? _startupStateService;
     private bool _subscribed;
 
     /// <summary>
@@ -67,6 +68,17 @@ public sealed class StatusBarCoordinator
         }
 
         UpdateCurrentMedia(_contextManager);
+
+        _startupStateService = AppServices.GetService<IStartupStateService>();
+        if (_startupStateService != null)
+        {
+            _startupStateService.StateChanged += OnStartupStateChanged;
+            if (_startupStateService.IsReady)
+            {
+                _dispatcherQueue.TryEnqueue(() => UpdateActivityIndicators(_activityService));
+            }
+        }
+
         _subscribed = true;
     }
 
@@ -115,6 +127,12 @@ public sealed class StatusBarCoordinator
             _activityService = null;
         }
 
+        if (_startupStateService != null)
+        {
+            _startupStateService.StateChanged -= OnStartupStateChanged;
+            _startupStateService = null;
+        }
+
         _subscribed = false;
     }
 
@@ -151,12 +169,39 @@ public sealed class StatusBarCoordinator
     {
         _dispatcherQueue?.TryEnqueue(() =>
         {
-            UpdateNetworkIndicator(reachable ? NetworkStatus.Connected : NetworkStatus.Disconnected);
+            var network = reachable ? NetworkStatus.Connected : NetworkStatus.Disconnected;
+            var svc = _activityService ?? AppServices.TryGetStatusBarActivityService();
+            ActivityStatusChangedEventArgs status;
+            if (svc != null)
+            {
+                status = new ActivityStatusChangedEventArgs
+                {
+                    ProcessingStatus = svc.ProcessingStatus,
+                    NetworkStatus = network,
+                    EngineStatus = svc.EngineStatus,
+                    ActiveJobCount = svc.ActiveJobCount,
+                    QueuedOperationCount = svc.QueuedOperationCount
+                };
+            }
+            else
+            {
+                status = new ActivityStatusChangedEventArgs
+                {
+                    ProcessingStatus = ProcessingStatus.Idle,
+                    NetworkStatus = network,
+                    EngineStatus = EngineStatus.Ready,
+                    ActiveJobCount = 0,
+                    QueuedOperationCount = 0
+                };
+            }
 
-            var statusText = _findName?.Invoke("StatusText") as Microsoft.UI.Xaml.Controls.TextBlock;
-            if (statusText != null)
-                statusText.Text = reachable ? "Ready" : "Backend offline \u2014 reconnecting\u2026";
+            UpdateActivityIndicators(status);
         });
+    }
+
+    private void OnStartupStateChanged(object? sender, StartupStateChangedEventArgs e)
+    {
+        _dispatcherQueue?.TryEnqueue(() => UpdateActivityIndicators(_activityService));
     }
 
     private void OnDegradedModeChanged(object? sender, bool isDegraded)
@@ -305,12 +350,23 @@ public sealed class StatusBarCoordinator
 
     private void UpdateStatusText(ActivityStatusChangedEventArgs status)
     {
+        ApplyPrimaryStatusText(status);
+    }
+
+    /// <summary>
+    /// Single owner for primary status line: offline, startup gate, then processing-derived copy.
+    /// </summary>
+    private void ApplyPrimaryStatusText(ActivityStatusChangedEventArgs status)
+    {
         var statusText = _findName?.Invoke("StatusText") as Microsoft.UI.Xaml.Controls.TextBlock;
         if (statusText == null)
             return;
 
         if (ErrorPresentationService.IsBackendOffline)
+        {
+            statusText.Text = "Backend offline \u2014 reconnecting\u2026";
             return;
+        }
 
         // Round 5 Task 6: No "Ready" before backend ready (fake-ready audit)
         var startupState = AppServices.GetService<IStartupStateService>();

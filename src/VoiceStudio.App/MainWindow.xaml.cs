@@ -41,15 +41,11 @@ namespace VoiceStudio.App
         private readonly RecentProjectsService? _recentProjectsService;
         private readonly CommandRouter? _commandRouter;
         private IStartupStateService? _startupStateService;
-        private const string ShowWelcomeKey = "ShowWelcomeDialog";
         private bool _disposed;
-        private bool _welcomeDialogShown;
-        private System.Threading.Timer? _clockTimer;
         private PanelPreviewPopup? _panelPreviewPopup;
         private System.Threading.Timer? _previewHideTimer;
         private Popup? _panelQuickSwitchPopup;
         private PanelQuickSwitchIndicator? _panelQuickSwitchIndicator;
-        private NotificationCenterViewModel? _notificationCenterViewModel;
         private DispatcherTimer? _quickSwitchHideTimer;
         private bool _isMiniTimelineVisible;
         private bool GetShowExperimentalPanels()
@@ -76,8 +72,25 @@ namespace VoiceStudio.App
         private TransportShortcutCoordinator? _transportShortcutCoordinator;
         private IShellNavigationCoordinator? _shellNavigationCoordinator;
         private MainWindowNavigationShellBridge _navShellBridge = null!;
-        private ISearchOverlayCoordinator? _searchOverlayCoordinator;
+        private readonly MainWindowSearchOverlayShellBridge _searchOverlayShellBridge;
+        private readonly MainWindowToolbarCustomizationShellBridge _toolbarCustomizationShellBridge;
+        private readonly MainWindowCommandPaletteShellBridge _commandPaletteShellBridge;
+        private readonly MainWindowToolCatalogShellBridge _toolCatalogShellBridge;
+        private readonly MainWindowToolbarCommandShellBridge _toolbarCommandShellBridge;
+        private readonly MainWindowJumpListTaskbarProgressShellBridge _jumpListTaskbarProgressShellBridge;
+        private readonly MainWindowStartupWelcomeActivationShellBridge _startupWelcomeActivationShellBridge;
+        private readonly MainWindowLifetimeCleanupShellBridge _lifetimeCleanupShellBridge;
+        private readonly MainWindowFileActivationShellBridge _fileActivationShellBridge;
+        private readonly MainWindowJumpListDispatchShellBridge _jumpListDispatchShellBridge;
+        private readonly MainWindowNotificationCenterShellBridge _notificationCenterShellBridge;
+        private readonly MainWindowStatusStripClockShellBridge _statusStripClockShellBridge;
+        private readonly MainWindowStatusStripMetricsShellBridge _statusStripMetricsShellBridge;
+        private readonly MainWindowStatusBarCoordinatorShellBridge _statusBarCoordinatorShellBridge;
+        private readonly MainWindowMenuToolActivationShellBridge _menuToolActivationShellBridge;
+        private readonly MainWindowKeyboardShortcutsShellBridge _keyboardShortcutsShellBridge;
         private IProjectWorkflowCoordinator? _projectWorkflowCoordinator;
+        private readonly MainWindowProjectWorkflowBridge _projectWorkflowCommandBridge;
+        private readonly MainWindowRecentProjectsMutationBridge _recentProjectsMutationBridge;
         private readonly MainWindowSessionLifecycle _sessionLifecycle = new();
 
         internal IProjectWorkflowCoordinator? GetProjectWorkflowCoordinatorForSessionLifecycle() =>
@@ -268,8 +281,10 @@ namespace VoiceStudio.App
                 navButtonSink);
             profiler.Checkpoint("MainWindowNavigationShellBridge Created");
 
-            _searchOverlayCoordinator = new SearchOverlayCoordinator(FindNameOnContent, _shellNavigationCoordinator!);
+            var searchOverlayCoordinator = new SearchOverlayCoordinator(FindNameOnContent, _shellNavigationCoordinator!);
             profiler.Checkpoint("SearchOverlayCoordinator Created");
+            _searchOverlayShellBridge = new MainWindowSearchOverlayShellBridge(searchOverlayCoordinator, FindNameOnContent);
+            profiler.Checkpoint("MainWindowSearchOverlayShellBridge Created");
 
             // Initialize Toast Notification Service before coordinator (ToastContainer available after InitializeComponent)
             var toastContainer = FindInContent<StackPanel>("ToastContainer");
@@ -279,6 +294,42 @@ namespace VoiceStudio.App
                 ServiceProvider.RegisterToastNotificationService(toastService);
                 profiler.Checkpoint("ToastNotificationService Initialized");
             }
+
+            _toolbarCustomizationShellBridge = new MainWindowToolbarCustomizationShellBridge(
+                () => this.Content?.XamlRoot,
+                new ToolbarCustomizationDialogLauncher(),
+                () => ServiceProvider.TryGetToastNotificationService());
+            profiler.Checkpoint("MainWindowToolbarCustomizationShellBridge Created");
+
+            _commandPaletteShellBridge = new MainWindowCommandPaletteShellBridge(
+                () => ServiceProvider.GetPanelRegistry(),
+                () => new ThemeManager(),
+                new CommandPaletteShellLauncher(),
+                () => ServiceProvider.TryGetToastNotificationService());
+            profiler.Checkpoint("MainWindowCommandPaletteShellBridge Created");
+
+            _toolbarCommandShellBridge = AppServices.GetRequiredService<MainWindowToolbarCommandShellBridge>();
+            _toolbarCommandShellBridge.WireImportAudioHandler(ImportAudioFile);
+            profiler.Checkpoint("MainWindowToolbarCommandShellBridge Wired");
+
+            _toolCatalogShellBridge = new MainWindowToolCatalogShellBridge(
+                () => this.Content?.XamlRoot,
+                new ToolCatalogShellLauncher(),
+                () => ServiceProvider.TryGetToastNotificationService());
+            _toolCatalogShellBridge.WireToolCatalogHandlers(
+                (panelId, region) => OpenPanelByIdAsync(panelId, region),
+                ApplyToolCatalogPanelHostChrome);
+            profiler.Checkpoint("MainWindowToolCatalogShellBridge Wired");
+
+            _jumpListTaskbarProgressShellBridge = new MainWindowJumpListTaskbarProgressShellBridge(
+                () => WinRT.Interop.WindowNative.GetWindowHandle(this));
+            profiler.Checkpoint("MainWindowJumpListTaskbarProgressShellBridge Created");
+
+            _startupWelcomeActivationShellBridge = new MainWindowStartupWelcomeActivationShellBridge(
+                IsGateCSmokeMode,
+                IsSafeStartupMode,
+                MainWindow_KeyDown);
+            profiler.Checkpoint("StartupWelcomeActivationShellBridge Created");
 
             var workflowDeps = new WorkflowDependencies(
                 ServiceProvider.GetStartupStateService(),
@@ -290,6 +341,51 @@ namespace VoiceStudio.App
                 AppServices.GetService<ILogger<ProjectWorkflowCoordinator>>());
             _projectWorkflowCoordinator = CreateProjectWorkflowCoordinator(_shellNavigationCoordinator!, workflowDeps, navButtonSink);
             profiler.Checkpoint("ProjectWorkflowCoordinator Created");
+            _fileActivationShellBridge = new MainWindowFileActivationShellBridge(
+                () => _projectWorkflowCoordinator,
+                () => ServiceProvider.GetStartupStateService(),
+                () => ServiceProvider.TryGetToastNotificationService(),
+                () => _shellNavigationCoordinator);
+            profiler.Checkpoint("MainWindowFileActivationShellBridge Created");
+            _jumpListDispatchShellBridge = new MainWindowJumpListDispatchShellBridge(
+                () => _projectWorkflowCoordinator,
+                () => ServiceProvider.GetStartupStateService(),
+                () => ServiceProvider.TryGetToastNotificationService());
+            profiler.Checkpoint("MainWindowJumpListDispatchShellBridge Created");
+            _notificationCenterShellBridge = new MainWindowNotificationCenterShellBridge(
+                () => AppServices.GetService<NotificationCenterViewModel>(),
+                () => FindInContent<Button>("NotificationCenterButton"),
+                () => FindInContent<FrameworkElement>("NotificationCenterFlyoutRoot"),
+                () => FindInContent<ListView>("NotificationCenterList"),
+                () => FindInContent<Border>("UnreadBadge"),
+                () => FindInContent<TextBlock>("UnreadBadgeText"),
+                DispatcherQueue);
+            profiler.Checkpoint("MainWindowNotificationCenterShellBridge Created");
+            _statusStripClockShellBridge = new MainWindowStatusStripClockShellBridge(
+                () => FindNameOnContent("ClockText") as TextBlock,
+                DispatcherQueue,
+                () => _disposed);
+            profiler.Checkpoint("MainWindowStatusStripClockShellBridge Created");
+            _statusStripMetricsShellBridge = new MainWindowStatusStripMetricsShellBridge(
+                () => FindNameOnContent("CpuText") as TextBlock,
+                () => FindNameOnContent("GpuText") as TextBlock,
+                () => FindNameOnContent("RamText") as TextBlock,
+                () => FindNameOnContent("LatencyText") as TextBlock,
+                () => ServiceProvider.GetHealthVersionClient(),
+                () => ServiceProvider.GetTelemetryClient());
+            profiler.Checkpoint("MainWindowStatusStripMetricsShellBridge Created");
+            _statusBarCoordinatorShellBridge = new MainWindowStatusBarCoordinatorShellBridge();
+            profiler.Checkpoint("MainWindowStatusBarCoordinatorShellBridge Created");
+            _menuToolActivationShellBridge = new MainWindowMenuToolActivationShellBridge();
+            profiler.Checkpoint("MainWindowMenuToolActivationShellBridge Created");
+            _keyboardShortcutsShellBridge = new MainWindowKeyboardShortcutsShellBridge();
+            profiler.Checkpoint("MainWindowKeyboardShortcutsShellBridge Created");
+            _projectWorkflowCommandBridge = new MainWindowProjectWorkflowBridge(() => _projectWorkflowCoordinator);
+            profiler.Checkpoint("MainWindowProjectWorkflowBridge Created");
+            _recentProjectsMutationBridge = new MainWindowRecentProjectsMutationBridge(
+                () => (IRecentProjectsMutationCommands?)_recentProjectsService,
+                () => (IToastNotificationService?)ServiceProvider.GetToastNotificationService());
+            profiler.Checkpoint("MainWindowRecentProjectsMutationBridge Created");
 
             RegisterKeyboardShortcuts();
             profiler.Checkpoint("Keyboard Shortcuts Registered");
@@ -339,12 +435,13 @@ namespace VoiceStudio.App
                         new MainWindowLoadedBootstrapHooks
                         {
                             SetErrorDialogRoot = root => { ErrorDialogService.Root = root; },
-                            WireNotificationCenter = WireNotificationCenter,
-                            WireJumpListShell = WireJumpListShell,
-                            WireTaskbarProgressShell = WireTaskbarProgressShell,
-                            TryDispatchPendingJumpListActivation = TryDispatchPendingJumpListActivation,
-                            TryDispatchPendingFileActivation = TryDispatchPendingFileActivation,
-                            StartBackendHealthMonitoring = () => _statusBarCoordinator?.StartBackendHealthMonitoring(),
+                            WireNotificationCenter = () => _notificationCenterShellBridge.WireNotificationCenter(),
+                            WireJumpListShell = () => _jumpListTaskbarProgressShellBridge.WireJumpList(),
+                            WireTaskbarProgressShell = () => _jumpListTaskbarProgressShellBridge.WireTaskbarProgress(),
+                            TryDispatchPendingJumpListActivation = () => _jumpListDispatchShellBridge.TryDispatchPendingJumpListActivation(),
+                            TryDispatchPendingFileActivation = () => _fileActivationShellBridge.TryDispatchPendingFileActivation(),
+                            StartBackendHealthMonitoring = () =>
+                                _statusBarCoordinatorShellBridge.StartBackendHealthMonitoring(_statusBarCoordinator),
                             EnqueueRecentProjectsMenuRefresh = () =>
                                 this.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
                                 {
@@ -424,20 +521,30 @@ namespace VoiceStudio.App
                     }),
               true); // handledEventsToo = true
 #endif
-                // Transport shortcut orchestration (Transport Coherence Wave 4 Phase 1)
-                _transportShortcutCoordinator = AppServices.GetService<TransportShortcutCoordinator>();
-                _transportShortcutCoordinator?.Attach(_keyboardShortcutService, OpenRecordingPanelFromTransportShortcut);
-
-                // FIX: Defer panel initialization to the Loaded event.
-                // XamlRoot is guaranteed non-null here; it is still null during the constructor,
-                // so any popup/dialog created during panel init previously threw
-                // COMException "Catastrophic failure — XamlRoot must be explicitly set for unparented popup."
-                // Round 4 Task 1: Defer panel init until BackendReady to avoid backend calls during startup.
-                _ = RunPanelInitWhenReadyAsync(
-                    FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
-                    FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
-                    FindNameOnContent("RightPanelHost") as Controls.PanelHost,
-                    FindNameOnContent("BottomPanelHost") as Controls.PanelHost);
+                // GAP-008 Slice 3: transport attach + panel-init trigger (after shell bootstrap and DEBUG block).
+                MainWindowLoadedTailBootstrap.Run(
+                    new MainWindowLoadedTailHooks
+                    {
+                        RunTransportAttachAndAssign = () =>
+                        {
+                            // Transport shortcut orchestration (Transport Coherence Wave 4 Phase 1)
+                            _transportShortcutCoordinator = AppServices.GetService<TransportShortcutCoordinator>();
+                            _transportShortcutCoordinator?.Attach(_keyboardShortcutService, OpenRecordingPanelFromTransportShortcut);
+                        },
+                        RunPanelInitFireAndForget = () =>
+                        {
+                            // FIX: Defer panel initialization to the Loaded event.
+                            // XamlRoot is guaranteed non-null here; it is still null during the constructor,
+                            // so any popup/dialog created during panel init previously threw
+                            // COMException "Catastrophic failure — XamlRoot must be explicitly set for unparented popup."
+                            // Round 4 Task 1: Defer panel init until BackendReady to avoid backend calls during startup.
+                            _ = RunPanelInitWhenReadyAsync(
+                                FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
+                                FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
+                                FindNameOnContent("RightPanelHost") as Controls.PanelHost,
+                                FindNameOnContent("BottomPanelHost") as Controls.PanelHost);
+                        },
+                    });
                 };
             }
 
@@ -491,8 +598,8 @@ namespace VoiceStudio.App
 
             // Panel initialization deferred to contentFE.Loaded (above) — XamlRoot is null here in the constructor.
 
-            // Start status bar metrics timer
-            StartStatusBarTimer();
+            // Start status bar metrics timer (Slice 18 — MainWindowStatusStripMetricsShellBridge)
+            _statusStripMetricsShellBridge.BeginMetricsTimer();
 
             // Update menu item state for Mini Timeline toggle (IDEA 6)
             UpdateMiniTimelineMenuItem();
@@ -523,16 +630,14 @@ namespace VoiceStudio.App
                 _globalTransport.StopRequested += OnStopRequested;
             }
 
-            // Status bar orchestration (Transport Coherence Wave 3 Task 5)
-            _statusBarCoordinator = AppServices.GetService<StatusBarCoordinator>();
-            if (_statusBarCoordinator != null)
-            {
-                _statusBarCoordinator.Attach(DispatcherQueue, FindNameOnContent);
-                _statusBarCoordinator.Subscribe(
-                    AppServices.GetContextManager(),
-                    AppServices.TryGetStatusBarActivityService(),
-                    AppServices.GetService<GracefulDegradationService>());
-            }
+            // Status bar orchestration (Transport Coherence Wave 3 Task 5) — shell wiring via Slice 19 bridge
+            _statusBarCoordinator = _statusBarCoordinatorShellBridge.ResolveAttachSubscribe(
+                () => AppServices.GetService<StatusBarCoordinator>(),
+                DispatcherQueue,
+                FindNameOnContent,
+                AppServices.GetContextManager(),
+                AppServices.TryGetStatusBarActivityService(),
+                AppServices.GetService<GracefulDegradationService>());
 
             // Recent projects menu: populated on Loaded (low priority) — GAP-067 slice 7 cold-start
 
@@ -552,23 +657,110 @@ namespace VoiceStudio.App
 
             profiler.Checkpoint("Status Bar Coordinated");
 
-            // Start clock timer
-            UpdateClock();
-            _clockTimer = new System.Threading.Timer(_ =>
-            {
-                if (!_disposed)
+            // Start clock timer (1-minute wall clock on ClockText; metrics on MainWindowStatusStripMetricsShellBridge)
+            _statusStripClockShellBridge.BeginClockTimer();
+
+            _lifetimeCleanupShellBridge = new MainWindowLifetimeCleanupShellBridge(
+                new MainWindowClosedPreludeChannels
                 {
-                    this.DispatcherQueue.TryEnqueue(() => UpdateClock());
-                }
-            }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+                    StopStatusBarTimer = () => _statusStripMetricsShellBridge.StopMetricsTimer(),
+                    CancelLayoutSaveDebouncer = () => _layoutSaveDebouncer?.Cancel(),
+                    SaveWorkspaceLayout = SaveWorkspaceLayout,
+                    TryMarkCleanShutdown = () => _sessionLifecycle.TryMarkCleanShutdown(),
+                },
+                new MainWindowLifetimeCleanupCoreChannels
+                {
+                    GetDisposed = () => _disposed,
+                    SetDisposed = () => { _disposed = true; },
+                    DisposeClockTimer = () => _statusStripClockShellBridge.DisposeClockTimer(),
+                    DisposePreviewHideTimer = () =>
+                    {
+                        _previewHideTimer?.Dispose();
+                        _previewHideTimer = null;
+                    },
+                    CancelDebouncerAndSaveWorkspace = () =>
+                    {
+                        _layoutSaveDebouncer?.Cancel();
+                        SaveWorkspaceLayout();
+                    },
+                    UnsubscribeContentKeyDown = () =>
+                    {
+                        if (this.Content is UIElement root)
+                        {
+                            root.KeyDown -= MainWindow_KeyDown;
+                        }
+                    },
+                    UnsubscribeWindowActivated = () => { this.Activated -= MainWindow_Activated; },
+                    UnsubscribeWindowClosed = () => { this.Closed -= MainWindow_Closed; },
+                    UnsubscribeWorkspaceProfileChanged = () =>
+                    {
+                        if (_panelStateService != null)
+                        {
+                            _panelStateService.WorkspaceProfileChanged -= OnWorkspaceProfileChanged;
+                        }
+                    },
+                    DetachNavigationService = () => _navShellBridge.DetachNavigationService(),
+                    UnsubscribeStartupOverlay = () =>
+                    {
+                        if (_startupStateService != null)
+                        {
+                            _startupStateService.StateChanged -= StartupState_StateChanged;
+                            _startupStateService = null;
+                        }
+                    },
+                    DisposeSessionLifecycle = () => _sessionLifecycle.Dispose(),
+                    DetachTransportShortcutsAndClear = () =>
+                    {
+                        _transportShortcutCoordinator?.Detach();
+                        _transportShortcutCoordinator = null;
+                    },
+                    UnsubscribeStatusBarCoordinator = () =>
+                    {
+                        _statusBarCoordinator?.Unsubscribe();
+                        _statusBarCoordinator = null;
+                    },
+                    DisposeJumpListServiceBestEffort = () =>
+                    {
+                        try
+                        {
+                            AppServices.TryGetJumpListService()?.Dispose();
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[MainWindow] JumpListService dispose: {ex.Message}");
+                        }
+                    },
+                    DisposeTaskbarProgressServiceBestEffort = () =>
+                    {
+                        try
+                        {
+                            AppServices.TryGetTaskbarProgressService()?.Dispose();
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[MainWindow] TaskbarProgressService dispose: {ex.Message}");
+                        }
+                    },
+                    CleanupNotificationCenterViewModel = () => _notificationCenterShellBridge.CleanupNotificationCenter(),
+                    CleanupGlobalTransportEvents = () =>
+                    {
+                        if (_globalTransport != null)
+                        {
+                            _globalTransport.PlayRequested -= OnPlayRequested;
+                            _globalTransport.StopRequested -= OnStopRequested;
+                            _globalTransport = null;
+                        }
+                    },
+                    UnsubscribeShellChromeEvents = UnsubscribeShellChromeEvents,
+                });
+            profiler.Checkpoint("LifetimeCleanupShellBridge Created");
 
             if (IsSafeStartupMode())
                 Debug.WriteLine("[Startup] SAFE_STARTUP enabled -- skipping welcome/overlays");
 
+            _searchOverlayShellBridge.EnsureGlobalSearchOverlayCollapsed();
             var globalSearchOverlay = FindNameOnContent("GlobalSearchOverlay") as FrameworkElement;
             var collaborationPanel = FindNameOnContent("CollaborationPanel") as FrameworkElement;
-            if (globalSearchOverlay != null)
-                globalSearchOverlay.Visibility = Visibility.Collapsed;
             if (collaborationPanel != null)
                 collaborationPanel.Visibility = Visibility.Collapsed;
             Debug.WriteLine($"[Startup] GlobalSearchOverlay={globalSearchOverlay?.Visibility ?? Visibility.Collapsed}, CollaborationPanel={collaborationPanel?.Visibility ?? Visibility.Collapsed}");
@@ -846,11 +1038,8 @@ namespace VoiceStudio.App
 
         #endregion Panel Docking (IDEA 14)
 
-        private async void GlobalSearchView_NavigateRequested(object? sender, Views.SearchNavigationEventArgs e)
-        {
-            if (_searchOverlayCoordinator != null)
-                await _searchOverlayCoordinator.HandleNavigateRequestedAsync(e.Result).ConfigureAwait(true);
-        }
+        private async void GlobalSearchView_NavigateRequested(object? sender, Views.SearchNavigationEventArgs e) =>
+            await _searchOverlayShellBridge.OnNavigateRequestedAsync(e).ConfigureAwait(true);
 
         private void StartupState_StateChanged(object? sender, StartupStateChangedEventArgs e)
         {
@@ -935,64 +1124,7 @@ namespace VoiceStudio.App
         {
             try
             {
-                if (IsGateCSmokeMode())
-                {
-                    return;
-                }
-
-                if (this.Content is UIElement root)
-                {
-                    root.KeyDown -= MainWindow_KeyDown;
-                    root.KeyDown += MainWindow_KeyDown;
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "MainWindow.MainWindow_Activated");
-            }
-
-            if (e.WindowActivationState != WindowActivationState.CodeActivated)
-                return;
-
-            if (IsSafeStartupMode())
-            {
-                _welcomeDialogShown = true;
-                return;
-            }
-
-            if (_welcomeDialogShown)
-                return;
-
-            var showWelcome = Helpers.UnpackagedSettingsHelper.GetValue<bool>(ShowWelcomeKey, true);
-
-            try
-            {
-                if (showWelcome && this.Content?.XamlRoot is not null)
-                {
-                    _welcomeDialogShown = true;
-                    var welcomeDialog = new WelcomeView();
-                    welcomeDialog.XamlRoot = this.Content.XamlRoot;
-                    try
-                    {
-                        var showTask = welcomeDialog.ShowAsync();
-                        var timeoutTask = Task.Delay(5000);
-                        var completed = await Task.WhenAny(showTask.AsTask(), timeoutTask);
-                        if (completed == timeoutTask)
-                        {
-                            Debug.WriteLine("[Startup] Welcome dialog ShowAsync timed out after 5s; continuing");
-                            welcomeDialog.Hide();
-                        }
-                        else
-                        {
-                            var result = await showTask;
-                            Helpers.UnpackagedSettingsHelper.SetValue(ShowWelcomeKey, welcomeDialog.ShowOnStartup);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"[Startup] Welcome dialog failed: {ex.Message}");
-                    }
-                }
+                await _startupWelcomeActivationShellBridge.HandleActivatedAsync(this, e).ConfigureAwait(true);
             }
             catch (Exception ex)
             {
@@ -1149,7 +1281,7 @@ namespace VoiceStudio.App
                 "nav.globalsearch",
                 VirtualKey.K,
                 VirtualKeyModifiers.Control,
-                () => ShowGlobalSearch(),
+                () => _searchOverlayShellBridge.Show(),
                 "Global Search");
 
             // Zoom
@@ -1490,59 +1622,27 @@ namespace VoiceStudio.App
 
         #endregion
 
-        private async void CheckForUpdatesMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-        {
-            try
-            {
-                // Create UpdateViewModel with the context and update service
-                var context = ServiceProvider.GetViewModelContext();
-                var updateViewModel = new ViewModels.UpdateViewModel(context, _updateService);
-
-                // Create and show update dialog
-                var updateDialog = new Views.UpdateDialog(updateViewModel);
-                await updateDialog.ShowAsync();
-            }
-            catch (Exception ex)
-            {
-                // Show error if update check fails
-                var errorService = ServiceProvider.GetErrorDialogService();
-                await errorService.ShowErrorAsync(
-                    "Update Check Failed",
-                    $"Unable to check for updates: {ex.Message}",
-                    "OK");
-            }
-        }
+        private async void CheckForUpdatesMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
+            await _menuToolActivationShellBridge
+                .RunCheckForUpdatesAsync(
+                    () => ServiceProvider.GetViewModelContext(),
+                    _updateService,
+                    () => ServiceProvider.GetErrorDialogService())
+                .ConfigureAwait(true);
 
         /// <summary>
         /// Toggles Mini Timeline visibility in BottomPanelHost (IDEA 6).
         /// </summary>
-        private async void ToggleMiniTimelineMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-        {
-            _isMiniTimelineVisible = !_isMiniTimelineVisible;
-
-            var bottomPanelHost = FindNameOnContent("BottomPanelHost") as Controls.PanelHost;
-            if (bottomPanelHost != null)
-            {
-                if (_isMiniTimelineVisible)
-                {
-                    await OpenPanelByIdAsync("MiniTimeline", PanelRegion.Bottom);
-                    SetPanelHostMeta(bottomPanelHost, "Mini Timeline", "🎬");
-                }
-                else
-                {
-                    await OpenPanelByIdAsync("Macro", PanelRegion.Bottom);
-                    SetPanelHostMeta(bottomPanelHost, "Macros", "⚡");
-                }
-            }
-
-            UpdateMiniTimelineMenuItem();
-
-            // Show toast notification
-            var toastService = ServiceProvider.TryGetToastNotificationService();
-            toastService?.ShowSuccess(
-                "Panel Switched",
-                _isMiniTimelineVisible ? "Mini Timeline is now visible" : "Macro View is now visible");
-        }
+        private async void ToggleMiniTimelineMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
+            await _menuToolActivationShellBridge
+                .RunToggleMiniTimelineAsync(
+                    () => _isMiniTimelineVisible,
+                    v => _isMiniTimelineVisible = v,
+                    () => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
+                    (panelId, region) => OpenPanelByIdAsync(panelId, region),
+                    UpdateMiniTimelineMenuItem,
+                    () => ServiceProvider.TryGetToastNotificationService())
+                .ConfigureAwait(true);
 
         /// <summary>
         /// Updates the Mini Timeline menu item text based on current state (IDEA 6).
@@ -1557,186 +1657,71 @@ namespace VoiceStudio.App
             }
         }
 
-        private async void CustomizeToolbarMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-        {
-            try
-            {
-                var dialog = new ToolbarCustomizationDialog();
-                dialog.XamlRoot = this.Content?.XamlRoot;
-                await dialog.ShowAsync();
+        private async void CustomizeToolbarMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
+            await _toolbarCustomizationShellBridge.ShowCustomizationDialogAsync().ConfigureAwait(true);
 
-                // Toolbar will automatically refresh via ConfigurationChanged event
-            }
-            catch (Exception ex)
-            {
-                var toastService = ServiceProvider.TryGetToastNotificationService();
-                toastService?.ShowError(
-                    "Customization Failed",
-                    $"Could not open toolbar customization: {ex.Message}");
-            }
-        }
-
-        private async void KeyboardShortcutsMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-        {
-            try
-            {
-                // Show keyboard shortcuts cheat sheet (IDEA 29) + GAP-065 customize entry
-                var shortcutsView = new Views.KeyboardShortcutsView();
-                var dialog = new ContentDialog
-                {
-                    Title = "Keyboard Shortcuts",
-                    Content = shortcutsView,
-                    PrimaryButtonText = "Customize…",
-                    CloseButtonText = "Close",
-                    DefaultButton = ContentDialogButton.Close,
-                    XamlRoot = this.Content.XamlRoot,
-                    Width = 800,
-                    Height = 600
-                };
-
-                var result = await dialog.ShowAsync();
-                if (result == ContentDialogResult.Primary)
-                {
-                    KeyboardCustomizationViewModel? customizeVm = null;
-                    try
-                    {
-                        customizeVm = AppServices.GetRequiredService<KeyboardCustomizationViewModel>();
-                        customizeVm.RefreshShortcuts();
-                        var customizeView = new Views.Panels.KeyboardCustomizationView
-                        {
-                            DataContext = customizeVm
-                        };
-                        var customizeDialog = new ContentDialog
-                        {
-                            Title = "Customize keyboard shortcuts",
-                            Content = customizeView,
-                            CloseButtonText = "Close",
-                            DefaultButton = ContentDialogButton.Close,
-                            XamlRoot = this.Content.XamlRoot,
-                            MaxWidth = 640
-                        };
-                        await customizeDialog.ShowAsync();
-                    }
-                    finally
-                    {
-                        customizeVm?.Dispose();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Show error if opening documentation fails
-                var toastService = ServiceProvider.GetToastNotificationService();
-                toastService?.ShowToast(
-                    Services.ToastType.Error,
-                    "Failed to Open Documentation",
-                    $"Unable to open keyboard shortcuts documentation: {ex.Message}");
-            }
-        }
+        private async void KeyboardShortcutsMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
+            await _keyboardShortcutsShellBridge
+                .RunKeyboardShortcutsMenuFlowAsync(
+                    () => this.Content?.XamlRoot,
+                    () => AppServices.GetRequiredService<KeyboardCustomizationViewModel>(),
+                    () => ServiceProvider.GetToastNotificationService())
+                .ConfigureAwait(true);
 
         private void ShowCommandPalette()
         {
-            try
-            {
-                var panelRegistry = ServiceProvider.GetPanelRegistry();
-                var commandPaletteService = new CommandPaletteService(
-                    panelRegistry,
-                    new ThemeManager()
-                );
-                commandPaletteService.Show();
-            }
-            catch
-            {
-                // Fallback: Show simple message if CommandPaletteService fails
-                // In production, this would show a proper command palette
-            }
+            _commandPaletteShellBridge.Show();
         }
 
         private async Task ShowToolCatalogAsync()
         {
-            try
-            {
-                var dialog = new Views.Dialogs.ToolCatalogDialog(this.Content.XamlRoot);
-                var result = await dialog.ShowAsync();
-                if (result == ContentDialogResult.Primary && dialog.SelectedDescriptor != null)
-                {
-                    var desc = dialog.SelectedDescriptor;
-                    var region = dialog.SelectedRegion ?? desc.DefaultRegion;
-                    var opened = await OpenPanelByIdAsync(desc.PanelId, region);
-                    if (opened)
-                    {
-                        var host = region switch
-                        {
-                            PanelRegion.Left => FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
-                            PanelRegion.Center => FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
-                            PanelRegion.Right => FindNameOnContent("RightPanelHost") as Controls.PanelHost,
-                            PanelRegion.Bottom => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
-                            _ => null
-                        };
-                        if (host != null)
-                        {
-                            host.PanelTitle = desc.DisplayName;
-                            if (!string.IsNullOrEmpty(desc.Icon))
-                                host.PanelIcon = desc.Icon;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[MainWindow] ToolCatalog failed: {ex.Message}");
-                var toast = ServiceProvider.TryGetToastNotificationService();
-                toast?.ShowError("Tool Catalog", ex.Message);
-            }
+            await _toolCatalogShellBridge.RunShowAsync().ConfigureAwait(true);
         }
 
-        private void ShowGlobalSearch() => _searchOverlayCoordinator?.Show();
-
-        private void GlobalSearchOverlay_Tapped(object _, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+        private void ApplyToolCatalogPanelHostChrome(PanelRegion region, string title, string? icon)
         {
-            var globalSearchOverlay = FindNameOnContent("GlobalSearchOverlay") as FrameworkElement;
-            if (globalSearchOverlay != null && ReferenceEquals(e.OriginalSource, globalSearchOverlay))
-                _searchOverlayCoordinator?.Hide();
+            var host = region switch
+            {
+                PanelRegion.Left => FindNameOnContent("LeftPanelHost") as Controls.PanelHost,
+                PanelRegion.Center => FindNameOnContent("CenterPanelHost") as Controls.PanelHost,
+                PanelRegion.Right => FindNameOnContent("RightPanelHost") as Controls.PanelHost,
+                PanelRegion.Bottom => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
+                _ => null
+            };
+            if (host == null)
+            {
+                return;
+            }
+
+            host.PanelTitle = title;
+            if (!string.IsNullOrEmpty(icon))
+            {
+                host.PanelIcon = icon;
+            }
         }
+
+        private void ShowGlobalSearch() => _searchOverlayShellBridge.Show();
+
+        private void GlobalSearchOverlay_Tapped(object _, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e) =>
+            _searchOverlayShellBridge.OnOverlayTappedForDismiss(e);
 
         // Collaboration Panel Toggle (IDEA 25)
-        private void CollaboratorsToggleButton_Click(object sender, RoutedEventArgs e)
-        {
-            var collaborationPanel = FindNameOnContent("CollaborationPanel") as FrameworkElement;
-            if (collaborationPanel != null)
-            {
-                collaborationPanel.Visibility = collaborationPanel.Visibility == Visibility.Visible
-                  ? Visibility.Collapsed
-                  : Visibility.Visible;
-            }
-        }
+        private void CollaboratorsToggleButton_Click(object sender, RoutedEventArgs e) =>
+            _menuToolActivationShellBridge.ToggleCollaborationPanelVisibility(
+                () => FindNameOnContent("CollaborationPanel") as FrameworkElement);
 
-        private void CollaborationIndicator_CloseRequested(object? sender, EventArgs e)
-        {
-            var collaborationPanel = FindNameOnContent("CollaborationPanel") as FrameworkElement;
-            if (collaborationPanel != null)
-            {
-                collaborationPanel.Visibility = Visibility.Collapsed;
-            }
-        }
+        private void CollaborationIndicator_CloseRequested(object? sender, EventArgs e) =>
+            _menuToolActivationShellBridge.HideCollaborationPanel(
+                () => FindNameOnContent("CollaborationPanel") as FrameworkElement);
 
-        private async void SaveProject()
-        {
-            if (_projectWorkflowCoordinator != null)
-                await _projectWorkflowCoordinator.SaveProjectAsync();
-        }
+        private async void SaveProject() =>
+            await _projectWorkflowCommandBridge.SaveProjectAsync().ConfigureAwait(true);
 
-        private async void CreateNewProject()
-        {
-            if (_projectWorkflowCoordinator != null)
-                await _projectWorkflowCoordinator.CreateNewProjectAsync();
-        }
+        private async void CreateNewProject() =>
+            await _projectWorkflowCommandBridge.CreateNewProjectAsync().ConfigureAwait(true);
 
-        private async void OpenProject()
-        {
-            if (_projectWorkflowCoordinator != null)
-                await _projectWorkflowCoordinator.OpenProjectAsync();
-        }
+        private async void OpenProject() =>
+            await _projectWorkflowCommandBridge.OpenProjectAsync().ConfigureAwait(true);
 
         /// <summary>
         /// Thin wrapper for import workflow. Delegates to IImportWorkflowService (Transport Coherence Wave 4 Phase 2).
@@ -1756,83 +1741,17 @@ namespace VoiceStudio.App
             _ = service.ImportAudioFileAsync(hwnd);
         }
 
-        private async void OpenRecentProject(string projectId, string projectName)
-        {
-            if (_projectWorkflowCoordinator != null)
-                await _projectWorkflowCoordinator.OpenRecentProjectAsync(projectId, projectName);
-        }
+        private async void OpenRecentProject(string projectId, string projectName) =>
+            await _projectWorkflowCommandBridge.OpenRecentProjectAsync(projectId, projectName).ConfigureAwait(true);
 
-        private async void PinRecentProject(string projectId)
-        {
-            try
-            {
-                if (_recentProjectsService != null)
-                {
-                    await _recentProjectsService.PinProjectAsync(projectId);
-                    var toastService = ServiceProvider.GetToastNotificationService();
-                    toastService?.ShowToast(
-                        Services.ToastType.Success,
-                        "Project Pinned",
-                        "Project pinned to Recent Projects menu");
-                }
-            }
-            catch (Exception ex)
-            {
-                var toastService = ServiceProvider.GetToastNotificationService();
-                toastService?.ShowToast(
-                    Services.ToastType.Error,
-                    "Failed to Pin Project",
-                    ex.Message);
-            }
-        }
+        private async void PinRecentProject(string projectId) =>
+            await _recentProjectsMutationBridge.PinRecentProjectAsync(projectId).ConfigureAwait(true);
 
-        private async void UnpinRecentProject(string projectId)
-        {
-            try
-            {
-                if (_recentProjectsService != null)
-                {
-                    await _recentProjectsService.UnpinProjectAsync(projectId);
-                    var toastService = ServiceProvider.GetToastNotificationService();
-                    toastService?.ShowToast(
-                        Services.ToastType.Success,
-                        "Project Unpinned",
-                        "Project removed from pinned list");
-                }
-            }
-            catch (Exception ex)
-            {
-                var toastService = ServiceProvider.GetToastNotificationService();
-                toastService?.ShowToast(
-                    Services.ToastType.Error,
-                    "Failed to Unpin Project",
-                    ex.Message);
-            }
-        }
+        private async void UnpinRecentProject(string projectId) =>
+            await _recentProjectsMutationBridge.UnpinRecentProjectAsync(projectId).ConfigureAwait(true);
 
-        private async void ClearRecentProjects()
-        {
-            try
-            {
-                if (_recentProjectsService != null)
-                {
-                    await _recentProjectsService.ClearRecentProjectsAsync();
-                    var toastService = ServiceProvider.GetToastNotificationService();
-                    toastService?.ShowToast(
-                        Services.ToastType.Success,
-                        "Recent Projects Cleared",
-                        "All recent projects have been cleared");
-                }
-            }
-            catch (Exception ex)
-            {
-                var toastService = ServiceProvider.GetToastNotificationService();
-                toastService?.ShowToast(
-                    Services.ToastType.Error,
-                    "Failed to Clear Recent Projects",
-                    ex.Message);
-            }
-        }
+        private async void ClearRecentProjects() =>
+            await _recentProjectsMutationBridge.ClearRecentProjectsAsync().ConfigureAwait(true);
 
         private void ExecuteUndo()
         {
@@ -2027,12 +1946,7 @@ namespace VoiceStudio.App
                     Tag = project.Path
                 };
                 removeItem.Click += async (_, _) =>
-                {
-                    if (_recentProjectsService != null)
-                    {
-                        await _recentProjectsService.RemoveRecentProjectAsync(project.Path);
-                    }
-                };
+                    await _recentProjectsMutationBridge.RemoveFromRecentListAsync(project.Path).ConfigureAwait(true);
                 subMenu.Items.Add(removeItem);
 
                 _recentProjectsSubMenu!.Items.Add(subMenu);
@@ -2191,10 +2105,7 @@ namespace VoiceStudio.App
 
         private void MainWindow_Closed(object sender, WindowEventArgs e)
         {
-            _statusBarTimer?.Stop();
-            _layoutSaveDebouncer?.Cancel();
-            SaveWorkspaceLayout();
-            _sessionLifecycle.TryMarkCleanShutdown();
+            _lifetimeCleanupShellBridge.OnClosedPrelude();
             Cleanup();
         }
 
@@ -2215,365 +2126,20 @@ namespace VoiceStudio.App
             }
         }
 
-        /// <summary>
-        /// GAP-067 slice 1: wire notification center VM to shell (Loaded-only; ADR-047).
-        /// </summary>
-        /// <summary>
-        /// GAP-067 slice 2: initial taskbar jump list sync (Loaded-only; ADR-047).
-        /// </summary>
-        private void WireJumpListShell()
-        {
-            try
-            {
-                AppServices.TryGetJumpListService()?.ScheduleInitialRebuildAfterDelay(200);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[MainWindow] Jump list shell wire failed: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// GAP-067 slice 3: associate HWND with taskbar progress (<c>ITaskbarList3</c>) — Loaded-only (ADR-047).
-        /// </summary>
-        private void WireTaskbarProgressShell()
-        {
-            try
-            {
-                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-                AppServices.TryGetTaskbarProgressService()?.SetWindowHandle(hwnd);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[MainWindow] Taskbar progress shell wire failed: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// GAP-067 slice 2: consume jump list activation after startup is ready.
-        /// </summary>
-        private void TryDispatchPendingJumpListActivation()
-        {
-            var pending = JumpListActivation.TryConsumePending();
-            if (pending == null)
-            {
-                return;
-            }
-
-            var coordinator = _projectWorkflowCoordinator;
-            if (coordinator == null)
-            {
-                return;
-            }
-
-            var startup = ServiceProvider.GetStartupStateService();
-
-            void Run()
-            {
-                _ = RunJumpListPendingAsync(pending, coordinator);
-            }
-
-            if (startup.IsReady)
-            {
-                Run();
-                return;
-            }
-
-            void Handler(object? s, StartupStateChangedEventArgs e)
-            {
-                if (!startup.IsReady)
-                {
-                    return;
-                }
-
-                startup.StateChanged -= Handler;
-                Run();
-            }
-
-            startup.StateChanged += Handler;
-        }
-
-        private async Task RunJumpListPendingAsync(JumpListPendingAction pending, IProjectWorkflowCoordinator coordinator)
-        {
-            try
-            {
-                switch (pending.Kind)
-                {
-                    case JumpListPendingKind.NewProject:
-                        await coordinator.CreateNewProjectAsync().ConfigureAwait(true);
-                        break;
-                    case JumpListPendingKind.OpenDialog:
-                        await coordinator.OpenProjectAsync().ConfigureAwait(true);
-                        break;
-                    case JumpListPendingKind.OpenProject:
-                        if (!string.IsNullOrWhiteSpace(pending.ProjectPath))
-                        {
-                            var name = System.IO.Path.GetFileNameWithoutExtension(pending.ProjectPath);
-                            await coordinator.OpenRecentProjectAsync(pending.ProjectPath!, name).ConfigureAwait(true);
-                        }
-
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[JumpList] Activation failed: {ex}");
-                ServiceProvider.TryGetToastNotificationService()?.ShowError(ex.Message, "Jump list");
-            }
-        }
-
-        /// <summary>
-        /// GAP-067 slice 4: consume shell file-association argv after startup is ready.
-        /// </summary>
-        private void TryDispatchPendingFileActivation()
-        {
-            var pending = FileActivation.TryConsumePending();
-            if (pending == null)
-                return;
-
-            var coordinator = _projectWorkflowCoordinator;
-            if (coordinator == null)
-                return;
-
-            var startup = ServiceProvider.GetStartupStateService();
-
-            void Run()
-            {
-                _ = RunFileActivationPendingAsync(pending, coordinator);
-            }
-
-            if (startup.IsReady)
-            {
-                Run();
-                return;
-            }
-
-            void Handler(object? s, StartupStateChangedEventArgs e)
-            {
-                if (!startup.IsReady)
-                    return;
-
-                startup.StateChanged -= Handler;
-                Run();
-            }
-
-            startup.StateChanged += Handler;
-        }
-
-        private async Task RunFileActivationPendingAsync(FileActivationPendingAction pending, IProjectWorkflowCoordinator coordinator)
-        {
-            try
-            {
-                switch (pending.Kind)
-                {
-                    case FileActivationKind.OpenProject:
-                        await coordinator.OpenProjectByPathAsync(pending.FilePath).ConfigureAwait(true);
-                        break;
-                    case FileActivationKind.ImportProject:
-                        ServiceProvider.TryGetToastNotificationService()?.ShowInfo(
-                            "Collaboration bundle open from shell is not fully supported yet. Use File > Open, or import from the collaboration workflow.",
-                            "File activation");
-                        await coordinator.OpenProjectAsync().ConfigureAwait(true);
-                        break;
-                    case FileActivationKind.ImportProfile:
-                        ServiceProvider.TryGetToastNotificationService()?.ShowInfo(
-                            "Profile import from a .vprofile file is not available from shell yet. Use the Profiles panel.",
-                            "File activation");
-                        if (_shellNavigationCoordinator != null)
-                            await _shellNavigationCoordinator.OpenPanelByIdAsync("Profiles", PanelRegion.Left).ConfigureAwait(true);
-                        break;
-                    case FileActivationKind.Unknown:
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[FileActivation] Dispatch failed: {ex}");
-                ServiceProvider.TryGetToastNotificationService()?.ShowError(ex.Message, "File activation");
-            }
-        }
-
-        private void WireNotificationCenter()
-        {
-            try
-            {
-                var ncVm = AppServices.GetService<NotificationCenterViewModel>();
-                if (ncVm == null)
-                    return;
-                _notificationCenterViewModel = ncVm;
-                NotificationCenterButton.DataContext = ncVm;
-                NotificationCenterFlyoutRoot.DataContext = ncVm;
-                NotificationCenterList.ItemsSource = ncVm.Notifications;
-                ncVm.PropertyChanged += NotificationCenterViewModel_PropertyChanged;
-                UpdateNotificationCenterBadge();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[MainWindow] Notification center wire failed: {ex.Message}");
-            }
-        }
-
-        private void NotificationCenterViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName is nameof(NotificationCenterViewModel.UnreadCount)
-                or nameof(NotificationCenterViewModel.HasUnread))
-            {
-                UpdateNotificationCenterBadge();
-            }
-        }
-
-        private void UpdateNotificationCenterBadge()
-        {
-            var vm = _notificationCenterViewModel;
-            if (vm == null)
-                return;
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                UnreadBadge.Visibility = vm.HasUnread ? Visibility.Visible : Visibility.Collapsed;
-                UnreadBadgeText.Text = vm.UnreadCount > 99 ? "99+" : vm.UnreadCount.ToString();
-            });
-        }
-
-        private void NotificationCenterMarkAllRead_Click(object sender, RoutedEventArgs e)
-        {
-            if (_notificationCenterViewModel != null)
-                _notificationCenterViewModel.MarkAllReadCommand.Execute(null);
-        }
+        private void NotificationCenterMarkAllRead_Click(object sender, RoutedEventArgs e) =>
+            _notificationCenterShellBridge.OnMarkAllReadClick();
 
         private void NotificationCenterDismissItem_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button b && b.DataContext is AppNotificationItem item && _notificationCenterViewModel != null)
-                _notificationCenterViewModel.DismissItemCommand.Execute(item);
+            if (sender is Button b && b.DataContext is AppNotificationItem item)
+            {
+                _notificationCenterShellBridge.OnDismissItemClick(item);
+            }
         }
 
         private void Cleanup()
         {
-            if (_disposed)
-                return;
-
-            // Clean up temporary audio files (Audit L-2)
-            CleanupTempAudioFiles();
-
-            // Dispose clock timer
-            _clockTimer?.Dispose();
-            _clockTimer = null;
-
-            // Dispose preview timer
-            _previewHideTimer?.Dispose();
-            _previewHideTimer = null;
-
-            _layoutSaveDebouncer?.Cancel();
-            SaveWorkspaceLayout();
-
-            // Unsubscribe from events
-            if (this.Content is UIElement root)
-            {
-                root.KeyDown -= MainWindow_KeyDown;
-            }
-            this.Activated -= MainWindow_Activated;
-            this.Closed -= MainWindow_Closed;
-
-            if (_panelStateService != null)
-            {
-                _panelStateService.WorkspaceProfileChanged -= OnWorkspaceProfileChanged;
-            }
-
-            _navShellBridge.DetachNavigationService();
-
-            // Startup overlay cleanup
-            if (_startupStateService != null)
-            {
-                _startupStateService.StateChanged -= StartupState_StateChanged;
-                _startupStateService = null;
-            }
-
-            // Transport/status event cleanup (Transport Coherence Wave 3 Task 1, 5; Wave 4 Phase 1)
-            _sessionLifecycle.Dispose();
-
-            _transportShortcutCoordinator?.Detach();
-            _transportShortcutCoordinator = null;
-            _statusBarCoordinator?.Unsubscribe();
-            _statusBarCoordinator = null;
-
-            try
-            {
-                AppServices.TryGetJumpListService()?.Dispose();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[MainWindow] JumpListService dispose: {ex.Message}");
-            }
-
-            try
-            {
-                AppServices.TryGetTaskbarProgressService()?.Dispose();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[MainWindow] TaskbarProgressService dispose: {ex.Message}");
-            }
-
-            if (_notificationCenterViewModel != null)
-            {
-                _notificationCenterViewModel.PropertyChanged -= NotificationCenterViewModel_PropertyChanged;
-                _notificationCenterViewModel = null;
-            }
-            if (_globalTransport != null)
-            {
-                _globalTransport.PlayRequested -= OnPlayRequested;
-                _globalTransport.StopRequested -= OnStopRequested;
-                _globalTransport = null;
-            }
-
-            UnsubscribeShellChromeEvents();
-
-            _disposed = true;
-        }
-
-        /// <summary>
-        /// Clean up temporary audio files created during synthesis and recording.
-        /// Audit remediation L-2: Temp files not cleaned up on exit.
-        /// Removes %TEMP%\voicestudio_*.wav and %TEMP%\voicestudio_recording_*.wav files.
-        /// </summary>
-        private static void CleanupTempAudioFiles()
-        {
-            try
-            {
-                var tempDir = System.IO.Path.GetTempPath();
-                var patterns = new[] { "voicestudio_*.wav", "voicestudio_recording_*.wav" };
-
-                int cleaned = 0;
-                foreach (var pattern in patterns)
-                {
-                    foreach (var file in System.IO.Directory.GetFiles(tempDir, pattern))
-                    {
-                        try
-                        {
-                            System.IO.File.Delete(file);
-                            cleaned++;
-                        }
-                        catch (System.IO.IOException)
-                        {
-                            // File in use -- skip, will be cleaned next exit
-                            Debug.WriteLine("[MainWindow] Temp file in use, skipped: " + file);
-                        }
-                        catch (UnauthorizedAccessException)
-                        {
-                            // Permission denied -- skip
-                            Debug.WriteLine("[MainWindow] Temp file access denied, skipped: " + file);
-                        }
-                    }
-                }
-
-                if (cleaned > 0)
-                {
-                    Debug.WriteLine($"[MainWindow] Cleaned up {cleaned} temporary audio file(s)");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[MainWindow] Temp cleanup failed (non-critical): {ex.Message}");
-            }
+            _lifetimeCleanupShellBridge.RunCleanupCore();
         }
 
         ~MainWindow()

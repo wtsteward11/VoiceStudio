@@ -71,6 +71,14 @@
 
 **Regression bar (2026-04-19, same session):** `dotnet build` **0 errors**; `python scripts/run_verification.py` **Overall: PASS**; `.\scripts\verify.ps1 -Quick` **VERIFICATION PASSED** — `artifacts/verify/20260419_141644/verification_report.md`.
 
+### Task 5 — Host capability fork (RHVoice execution plan 2026-04-26)
+
+**Path B (this host — accepted 2026-04-26):** `where.exe rhvoice-say` and `where.exe rhvoice-cli` both return **INFO: Could not find files for the given pattern(s).** — no RHVoice CLI on PATH in the verification environment. This matches the **Path 1 / Mode B** findings above: stock Windows and typical automation hosts do **not** ship a contract-compliant CLI; runtime matrix **PASS** is **not executable here** without an operator-built binary, WSL/Linux with CLI on PATH, or a documented **`parameters.executable_path`** to a real executable.
+
+**Consequence:** **Tasks 6–10** of the RHVoice execution lane (install → PATH proof → green preflight → non-skipped `pytest -m real_rhvoice` + C# live tests → WAV artifacts → **ENGINE_PARITY_MATRIX** PASS) are **not claimed as completed** in this session — doing so would be false. **Task 9** proof tables for a green matrix row are **N/A on Path B**. **Task 10** matrix flip for `rhvoice` remains **forbidden** until a **Path A** host produces real PASS evidence.
+
+**Task 11 / STATE:** Primary control-plane lane repointed to **Type B git reconcile** (commit/push or discard) per [`.cursor/STATE.md`](../../.cursor/STATE.md) ACTIVE WINDOW **2026-04-26** update. Re-run Path A proof chain on a host where **Task 5** is **Path A** before editing matrix to PASS.
+
 ## Python — `real_rhvoice`
 
 **Tests:** `tests/integration/test_synthesis_rhvoice_real.py`

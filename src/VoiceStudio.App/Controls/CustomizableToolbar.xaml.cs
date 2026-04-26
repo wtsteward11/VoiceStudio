@@ -395,11 +395,7 @@ namespace VoiceStudio.App.Controls
       {
         if (_toolbarViewModel != null)
         {
-          await _toolbarViewModel.ExecuteToolbarActionAsync(itemId, () =>
-          {
-            if (App.MainWindowInstance is MainWindow mainWindow)
-              mainWindow.ImportAudioFile();
-          });
+          await _toolbarViewModel.ExecuteToolbarActionAsync(itemId);
           return;
         }
 

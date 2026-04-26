@@ -190,22 +190,12 @@ namespace VoiceStudio.App
             }
         }
 
-        private async void ManageWorkspaces_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-        {
-            try
-            {
-                var xamlRoot = (Content as FrameworkElement)?.XamlRoot;
-                var dialog = new Views.Dialogs.WorkspaceManagerDialog(xamlRoot);
-                await dialog.ShowAsync();
-            }
-            catch (Exception ex)
-            {
-                var toastService = ServiceProvider.TryGetToastNotificationService();
-                toastService?.ShowError(
-                    "Workspace Management",
-                    $"Could not open workspace manager: {ex.Message}");
-            }
-        }
+        private async void ManageWorkspaces_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
+            await _menuToolActivationShellBridge
+                .RunManageWorkspacesAsync(
+                    () => (Content as FrameworkElement)?.XamlRoot,
+                    () => ServiceProvider.TryGetToastNotificationService())
+                .ConfigureAwait(true);
 
         /// <summary>Restore saved layout (one active panel/region). Returns (restored, hadRegions, failedItems).</summary>
         private async Task<(bool restored, bool hadRegions, List<(PanelRegion region, string panelId)> failedItems)> RestorePanelsFromLayoutAsync()

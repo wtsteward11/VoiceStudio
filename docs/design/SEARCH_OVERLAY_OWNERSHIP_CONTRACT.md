@@ -42,13 +42,16 @@
 
 | Responsibility | Location | Reason |
 |----------------|----------|--------|
-| Event subscription | MainWindow Loaded | NavigateRequested += handler |
-| Shortcut/menu wiring | MainWindow | Ctrl+K, Tools > Global Search |
-| Overlay tap handler | MainWindow.GlobalSearchOverlay_Tapped | Thin event routing; delegates coordinator.Hide() |
-| Startup Visibility init | MainWindow constructor | GlobalSearchOverlay.Visibility = Collapsed |
+| Event subscription | MainWindow ctor | `NavigateRequested +=` on `GlobalSearchView` (handler forwards to bridge) |
+| Shortcut/menu wiring | MainWindow | Ctrl+K, Tools > Global Search → thin forward |
+| Overlay tap handler | MainWindow.GlobalSearchOverlay_Tapped | XAML entry point; thin forward to **`MainWindowSearchOverlayShellBridge.OnOverlayTappedForDismiss`** → coordinator **`Hide()`** when tap is on overlay root |
+| Startup overlay collapsed | MainWindow ctor | **`MainWindowSearchOverlayShellBridge.EnsureGlobalSearchOverlayCollapsed()`** → **`TryCollapseGlobalSearchOverlayIfFrameworkElement`** (same **`FindName`** + **`Collapsed`** semantics; non-**`FrameworkElement`** find is a no-op) |
+
+**GAP-008 Slice 6:** Thin routing for show / navigate / dismiss / startup collapse lives in **`MainWindowSearchOverlayShellBridge`**; **`SearchOverlayCoordinator`** remains the implementation of **`ISearchOverlayCoordinator`**.
 
 ---
 
 ## Changelog
 
+- 2026-04-24: Slice 6 — document **`MainWindowSearchOverlayShellBridge`** as shell thin-routing owner; subscription and XAML handler names stay on **`MainWindow`**.
 - 2026-03-21: Initial ownership contract per Architecture Wave Next Slice Plan Task 1C.

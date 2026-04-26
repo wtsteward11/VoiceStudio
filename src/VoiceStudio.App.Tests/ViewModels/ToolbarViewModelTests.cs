@@ -18,6 +18,7 @@ public class ToolbarViewModelTests
     private Mock<IUnifiedWorkspaceService> _workspaceService = null!;
     private Mock<IAudioPlayerService> _audioPlayerService = null!;
     private Mock<IToastNotificationService> _toastService = null!;
+    private Mock<IToolbarShellImportFromToolbar> _toolbarShellImport = null!;
 
     [TestInitialize]
     public void SetUp()
@@ -28,6 +29,7 @@ public class ToolbarViewModelTests
         _audioPlayerService = new Mock<IAudioPlayerService>();
         _audioPlayerService.SetupProperty(x => x.IsLooping, false);
         _toastService = new Mock<IToastNotificationService>();
+        _toolbarShellImport = new Mock<IToolbarShellImportFromToolbar>(MockBehavior.Strict);
     }
 
     [TestMethod]
@@ -45,6 +47,17 @@ public class ToolbarViewModelTests
         _commandRegistry.Verify(
             x => x.ExecuteAsync("playback.play", null, It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [TestMethod]
+    public async Task ExecuteToolbarActionAsync_ImportAudio_requests_shell_import()
+    {
+        _toolbarShellImport.Setup(x => x.RequestImportAudio()).Verifiable();
+        var viewModel = CreateViewModel();
+
+        await viewModel.ExecuteToolbarActionAsync("import_audio");
+
+        _toolbarShellImport.Verify(x => x.RequestImportAudio(), Times.Once);
     }
 
     [TestMethod]
@@ -94,6 +107,7 @@ public class ToolbarViewModelTests
             _commandRegistry.Object,
             _workspaceService.Object,
             _audioPlayerService.Object,
+            _toolbarShellImport.Object,
             _toastService.Object);
     }
 }

@@ -84,6 +84,7 @@ namespace VoiceStudio.App
         private readonly MainWindowEditUndoRedoShellBridge _editUndoRedoShellBridge;
         private readonly MainWindowGlobalTransportShellBridge _globalTransportShellBridge;
         private readonly MainWindowImportWorkflowShellBridge _importWorkflowShellBridge;
+        private readonly MainWindowShellChromeShellBridge _shellChromeShellBridge;
         private IProjectWorkflowCoordinator? _projectWorkflowCoordinator;
         private readonly MainWindowProjectWorkflowBridge _projectWorkflowCommandBridge;
         private readonly MainWindowRecentProjectsMutationBridge _recentProjectsMutationBridge;
@@ -439,6 +440,8 @@ namespace VoiceStudio.App
             profiler.Checkpoint("MainWindowGlobalTransportShellBridge Created");
             _importWorkflowShellBridge = new MainWindowImportWorkflowShellBridge();
             profiler.Checkpoint("MainWindowImportWorkflowShellBridge Created");
+            _shellChromeShellBridge = new MainWindowShellChromeShellBridge(this, RootGrid, AppTitleBar);
+            profiler.Checkpoint("MainWindowShellChromeShellBridge Created");
             _projectWorkflowCommandBridge = new MainWindowProjectWorkflowBridge(() => _projectWorkflowCoordinator);
             profiler.Checkpoint("MainWindowProjectWorkflowBridge Created");
             _recentProjectsMutationBridge = new MainWindowRecentProjectsMutationBridge(

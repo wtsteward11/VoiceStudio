@@ -155,3 +155,9 @@ After **Task 419**, `scripts/Run-Gap008MainWindowRegressionTests.ps1` does that 
 **Delta:** **`Gap008Slice31Tests`** (**2** methods) + **`MainWindowImportWorkflowShellBridgeTests`** (**4** methods) = **+6** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).
 
 **Arithmetic:** **231** (post–Slice 30 green) **+ 6** = **237** listed / passed on a green run (TRX **`gap008_spine_20260426_133328.trx`**; Tasks **124–133** — 2026-04-26). Green coherence fixture updated to **237** / **237** with the extended `effectiveFilter`. **Task 134** (optional WinUI appendix) is **not** a spine gate.
+
+## Spine size after Slice 32 (shell chrome — Mica, title bar, theme)
+
+**Delta:** **`Gap008Slice32Tests`** (**2** methods) + **`MainWindowShellChromeShellBridgeTests`** (**3** methods) = **+5** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).
+
+**Arithmetic:** **237** (post–Slice 31 green) **+ 5** = **242** listed / passed on a green run (TRX **`gap008_spine_20260426_150316.trx`**; Tasks **135–148** Phase B — 2026-04-26). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **242** / **242** with the extended `effectiveFilter`.

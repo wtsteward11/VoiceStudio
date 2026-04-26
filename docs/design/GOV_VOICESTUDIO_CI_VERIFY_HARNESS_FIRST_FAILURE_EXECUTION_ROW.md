@@ -1,8 +1,11 @@
 # GOV — CI verify-harness first GHA signal (execution row)
 
-**Status:** Open (bounded CI-only)  
+**Status:** Closed (bounded CI-only)  
 **Opened:** 2026-04-14  
-**Scope:** Single root cause — **hosted runner pip install SSL failure** before **`verify.ps1`** executes; **not** harness logic drift.
+**Closed:** 2026-04-16 (operational certification — see **§ Row Status: CLOSED** below)  
+**Scope:** Historical bounded row — first hosted **pip SSL** signal through **hosted `workflow_dispatch` + `run_full_chain: true` green** on `windows-latest` (allowed headless SKIPs). Subsequent commits must **re-verify** on tip (new hosted run) if CI behavior changes; do not treat this file’s early “Row stays Open” paragraphs as current without checking the **closure** section.
+
+**Current closure sentence (authoritative):** Hosted **`workflow_dispatch`** with **`run_full_chain: true`** completed **green** on **`windows-latest`** at commit **`24b84bbc`** (GHA **`24484587429`**): all checkpoint + resume stages **PASS** or **honest SKIP** (UI Smoke, Failure-Path Smoke, Runtime-Missing Failure Smoke skipped on headless `GITHUB_ACTIONS` without `-RealUI`); **BucketB_Partial**. Earlier **NAudio `BadDeviceId`** failures on STAGE 13–14 were addressed by **`c5403d35`** (audio/venv guards), not the final closure blocker.
 
 ## Outcome bucket (frozen)
 
@@ -87,10 +90,10 @@ Path-filter **push** after **`be2c10b4`** sandbox fix + workflow comment touch: 
 **Affected tests (STAGE 13 — Services, 6 failures):**
 - `AudioPlayerService.PlayUrlAsync_NormalCompletion_DeletesTempFile`
 - `AudioPlayerService.PlayUrlAsync_StreamingDownload_CreatesPlayableFile`
-- `BackendLifecycleManager.EnsureBackendRunningAsync_WhenHealthyBackendExists_WritesReuseDecision`
-- `BackendLifecycleManager.EnsureBackendRunningAsync_WhenBackendMissing_WritesSpawnDecision`
-- `BackendLifecycleManager.EnsureBackendRunningAsync_WhenPortHeldByNonHttpListener_WritesPortCollisionDecision`
-- `BackendLifecycleManager.EnsureBackendRunningAsync_SecondCall_ReusesWithoutSecondSpawn`
+- `BackendProcessManagerDecisionTests.EnsureBackendRunningAsync_WhenHealthyBackendExists_WritesReuseDecision`
+- `BackendProcessManagerDecisionTests.EnsureBackendRunningAsync_WhenBackendMissing_WritesSpawnDecision`
+- `BackendProcessManagerDecisionTests.EnsureBackendRunningAsync_WhenPortHeldByNonHttpListener_WritesPortCollisionDecision`
+- `BackendProcessManagerDecisionTests.EnsureBackendRunningAsync_SecondCall_ReusesWithoutSecondSpawn`
 
 **Affected tests (STAGE 14 — CommandsGateways, 2 failures):**
 - `PlaybackOperationsHandlerTests.Record_StartsRecording`
@@ -424,3 +427,13 @@ All stages **PASS** or **honest SKIP** (headless guards for UI Smoke, Failure-Pa
 - **Full WinUI proofs:** Available via `verify.ps1 -RealUI` on local or self-hosted runners
 
 **Related:** [EXECUTION_ROW_DISCIPLINE.md](../governance/EXECUTION_ROW_DISCIPLINE.md) §8 · [verify-harness.yml](../../.github/workflows/verify-harness.yml)
+
+## Tip drift / fresh hosted proof (2026-04-26)
+
+| Field | Value |
+| --- | --- |
+| **Current `main` tip (session)** | `3c37a542d64b6c6a80e6a99153c84f9b42653758` (see `.cursor/STATE.md` **Lane authority**). |
+| **Ancestor vs closure SHA** | `24b84bbc` is **ancestor** of current tip — **operational closure stands** until a **new** hosted **`workflow_dispatch`** + **`run_full_chain: true`** records a **red** first stage. |
+| **Operator `gh workflow run` (agent attempt)** | **`gh workflow run verify-harness.yml --ref main -f run_full_chain=true`** → **HTTP 403** `Resource not accessible by personal access token` (PAT cannot create workflow dispatch events). **No new GHA run.** Same failure class as [VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md](../reports/verification/VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_RUN_2026-04-14.md) § **Dispatch path** — clear `GITHUB_TOKEN` env override or use **Actions → Run workflow** with repo **Actions: write**. |
+| **Local bounded proof (Tasks 24–26)** | `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` **0 errors**; `dotnet test` … `--filter "FullyQualifiedName~AudioPlayerServiceTests|FullyQualifiedName~BackendProcessManagerDecisionTests|FullyQualifiedName~PlaybackOperationsHandlerTests"` **33 passed**; `python -m pytest tests/ci/test_requires_audio_device_guard_discipline.py` **PASS**; `python scripts/run_verification.py` **PASS**; `.\scripts\verify.ps1 -Quick` **exit 0**. |
+| **CI guard** | [`tests/ci/test_requires_audio_device_guard_discipline.py`](../../tests/ci/test_requires_audio_device_guard_discipline.py) — fails if `[TestCategory("RequiresAudioDevice")]` or `AudioPlayerService` + `PlayFileAsync`/`PlayUrlAsync` appears without **`AudioDeviceGuard.`** in the same source file. |

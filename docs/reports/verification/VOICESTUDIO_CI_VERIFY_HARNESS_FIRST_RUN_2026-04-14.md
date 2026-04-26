@@ -261,10 +261,23 @@ gh run download 24379285704 --dir artifacts/ci-harness-download/
 | --- | --- |
 | Workflow exists on default branch and is triggerable | **Met** |
 | At least one **GitHub Actions** run recorded with **immutable URL/ID/SHA** (push run `24379285704`) | **Met** |
-| **`workflow_dispatch`** with **`run_full_chain: true`** exercised | **Exercised** — run **`24409873139`** (**`d904757a`**); **Quick Gate success**; **Checkpoint + Resume Chain failure** (C# unit test NAudio `BadDeviceId` on headless runner — 8 tests across STAGE 13–14). **Not yet green.** |
+| **`workflow_dispatch`** with **`run_full_chain: true`** exercised | **Yes** — first observed dispatch **`24409873139`** (**`d904757a`**, red STAGE 13–14 NAudio headless). **Superseded (closure):** **`24484587429`** @ **`24b84bbc`** — **full chain green** (2026-04-16); see **§ Supplement — operational certification** below. |
 | Hosted **Verify Quick Gate** green on **`windows-latest`** (through **STAGE 28** after **`startup_artifact_check`** fix) | **Met** — run **`24407929189`** (**`d5b98e2d`**) |
 | Outcome buckets classified without ambiguity (Run A **`BucketC_InfraRed`**; Run B/C **`BucketB_HarnessRed`**; Run D prerequisite pass — see **Outcome classification rule**) | **Met** |
 | If non-green: exactly **one** bounded CI-only slice opened | **Met** |
+
+## Supplement — operational certification (authoritative closure)
+
+**2026-04-16:** Hosted **`workflow_dispatch`** + **`run_full_chain: true`** — GHA **[`24484587429`](https://github.com/wtsteward11/VoiceStudio/actions/runs/24484587429)** @ commit **`24b84bbc`** — **full chain GREEN** (**BucketB_Partial**: Quick PASS; checkpoint **ALL PASSED**; resume **ALL PASSED** with **3** honest headless SKIPs). This **supersedes** the § **Operational verdict** row that still narrates the **first** dispatch (**`24409873139`**, red STAGE 13–14) for **closure** purposes — that run remains **historical evidence** of the original NAudio headless failure mode.
+
+## 2026-04-26 — Tasks 22–28: tip truth, GOV header alignment, headless guard CI test, local verify, dispatch block
+
+| Field | Value |
+| --- | --- |
+| **`main` tip (operator machine / STATE)** | `3c37a542d64b6c6a80e6a99153c84f9b42653758` |
+| **New hosted `workflow_dispatch`?** | **No** — `gh workflow run verify-harness.yml --ref main -f run_full_chain=true` returned **HTTP 403** (PAT lacks permission to create workflow dispatch events). Per § **Dispatch path** above: remove `GITHUB_TOKEN` env override if it shadows a token without **Actions: write**, or run from **Actions** UI. |
+| **Effect on certification** | **None** — last recorded **green** full chain remains **`24484587429`** @ **`24b84bbc`**; [GOV execution row](../../design/GOV_VOICESTUDIO_CI_VERIFY_HARNESS_FIRST_FAILURE_EXECUTION_ROW.md) **Status: Closed** aligned with body. |
+| **New automation** | [`tests/ci/test_requires_audio_device_guard_discipline.py`](../../tests/ci/test_requires_audio_device_guard_discipline.py) (pytest) — enforces **`AudioDeviceGuard.`** alongside device-category / real `AudioPlayerService` playback calls in `src/VoiceStudio.App.Tests`. |
 
 ---
 

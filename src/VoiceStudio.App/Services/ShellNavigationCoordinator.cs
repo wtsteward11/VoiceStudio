@@ -81,7 +81,7 @@ public sealed class ShellNavigationCoordinator : IShellNavigationCoordinator
     /// <inheritdoc />
     public async Task ExecuteNavCommandAsync(string commandId, string fallbackPanelId, PanelRegion fallbackRegion, string buttonName)
     {
-        if (IsSafeStartupMode())
+        if (MainWindowSmokeStartupModeShellBridge.EvaluateSafeStartup())
         {
             if (await OpenPanelByIdAsync(fallbackPanelId, fallbackRegion))
                 _setActiveNavButton(buttonName);
@@ -172,11 +172,5 @@ public sealed class ShellNavigationCoordinator : IShellNavigationCoordinator
             _showQuickSwitchIndicator(title, region, targetHost);
 
         return true;
-    }
-
-    private static bool IsSafeStartupMode()
-    {
-        var v = Environment.GetEnvironmentVariable("VOICESTUDIO_SAFE_STARTUP");
-        return string.Equals(v, "1", StringComparison.Ordinal) || string.Equals(v, "true", StringComparison.OrdinalIgnoreCase);
     }
 }

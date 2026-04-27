@@ -64,6 +64,7 @@ namespace VoiceStudio.App
         private readonly MainWindowToolCatalogPanelHostChromeShellBridge _toolCatalogPanelHostChromeShellBridge;
         private readonly MainWindowToolbarCommandShellBridge _toolbarCommandShellBridge;
         private readonly MainWindowJumpListTaskbarProgressShellBridge _jumpListTaskbarProgressShellBridge;
+        private readonly MainWindowSmokeStartupModeShellBridge _smokeStartupModeShellBridge;
         private readonly MainWindowStartupWelcomeActivationShellBridge _startupWelcomeActivationShellBridge;
         private readonly MainWindowStartupOverlayShellBridge _startupOverlayShellBridge;
         private readonly MainWindowLifetimeCleanupShellBridge _lifetimeCleanupShellBridge;
@@ -252,6 +253,7 @@ namespace VoiceStudio.App
 
             var navButtonSink = new NavButtonActionSink();
 
+            _smokeStartupModeShellBridge = new MainWindowSmokeStartupModeShellBridge();
             _panelQuickSwitchShellBridge = new MainWindowPanelQuickSwitchShellBridge();
             _panelRegionFocusShellBridge = new MainWindowPanelRegionFocusShellBridge(
                 r => r switch
@@ -262,7 +264,7 @@ namespace VoiceStudio.App
                     PanelRegion.Bottom => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
                     _ => null
                 },
-                IsGateCSmokeMode,
+                _smokeStartupModeShellBridge.IsGateCSmokeMode,
                 (name, region, host) => _panelQuickSwitchShellBridge.ShowPanelQuickSwitchIndicator(name, region, host));
 
             // Shell navigation coordination (Premium Reliability Pass Task 9)
@@ -279,7 +281,7 @@ namespace VoiceStudio.App
                 id => _legacyPanelRegistry.TryGetValue(id, out var e) ? e.Factory : null,
                 navButtonSink.Forward,
                 _panelQuickSwitchShellBridge.ShowPanelQuickSwitchIndicator,
-                IsGateCSmokeMode,
+                _smokeStartupModeShellBridge.IsGateCSmokeMode,
                 _panelStateService,
                 _commandRouter);
             profiler.Checkpoint("ShellNavigationCoordinator Created");
@@ -355,8 +357,8 @@ namespace VoiceStudio.App
             profiler.Checkpoint("MainWindowJumpListTaskbarProgressShellBridge Created");
 
             _startupWelcomeActivationShellBridge = new MainWindowStartupWelcomeActivationShellBridge(
-                IsGateCSmokeMode,
-                IsSafeStartupMode,
+                _smokeStartupModeShellBridge.IsGateCSmokeMode,
+                _smokeStartupModeShellBridge.IsSafeStartupMode,
                 MainWindow_KeyDown);
             profiler.Checkpoint("StartupWelcomeActivationShellBridge Created");
 
@@ -894,7 +896,7 @@ namespace VoiceStudio.App
                 });
             profiler.Checkpoint("LifetimeCleanupShellBridge Created");
 
-            if (IsSafeStartupMode())
+            if (_smokeStartupModeShellBridge.IsSafeStartupMode())
                 Debug.WriteLine("[Startup] SAFE_STARTUP enabled -- skipping welcome/overlays");
 
             _searchOverlayShellBridge.EnsureGlobalSearchOverlayCollapsed();
@@ -971,59 +973,6 @@ namespace VoiceStudio.App
             }
         }
 
-        private static bool IsSafeStartupMode()
-        {
-            var v = Environment.GetEnvironmentVariable("VOICESTUDIO_SAFE_STARTUP");
-            return string.Equals(v, "1", StringComparison.Ordinal) || string.Equals(v, "true", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool IsGateCSmokeMode()
-        {
-            try
-            {
-                static bool IsTruthy(string? value)
-                {
-                    if (string.IsNullOrWhiteSpace(value))
-                    {
-                        return false;
-                    }
-
-                    return value.Equals("1", StringComparison.OrdinalIgnoreCase)
-                        || value.Equals("true", StringComparison.OrdinalIgnoreCase);
-                }
-
-                if (IsTruthy(Environment.GetEnvironmentVariable("VOICE_STUDIO_SMOKE_EXIT"))
-                    || IsTruthy(Environment.GetEnvironmentVariable("VOICE_STUDIO_SMOKE_UI")))
-                {
-                    return true;
-                }
-
-                var raw = Environment.CommandLine ?? string.Empty;
-                if (!string.IsNullOrWhiteSpace(raw)
-                    && (raw.IndexOf("--smoke", StringComparison.OrdinalIgnoreCase) >= 0
-                        || raw.IndexOf("--ui-smoke", StringComparison.OrdinalIgnoreCase) >= 0))
-                {
-                    return true;
-                }
-
-                foreach (var arg in Environment.GetCommandLineArgs())
-                {
-                    if (arg.Equals("--smoke-exit", StringComparison.OrdinalIgnoreCase)
-                        || arg.Equals("--smoke-ui", StringComparison.OrdinalIgnoreCase)
-                        || arg.Equals("--ui-smoke", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
         /// <summary>
         /// Switches to a panel and shows visual feedback (IDEA 1).
         /// </summary>
@@ -1046,7 +995,7 @@ namespace VoiceStudio.App
             // Switch panel content
             targetHost.HostedPanel = panelFactory();
 
-            if (IsGateCSmokeMode())
+            if (_smokeStartupModeShellBridge.IsGateCSmokeMode())
             {
                 // Smoke runs should avoid extra UI animations/popups that can introduce timing flake or stalls.
                 return;

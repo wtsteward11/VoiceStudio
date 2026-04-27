@@ -77,6 +77,7 @@ namespace VoiceStudio.App
         private readonly MainWindowStatusStripMetricsShellBridge _statusStripMetricsShellBridge;
         private readonly MainWindowStatusBarCoordinatorShellBridge _statusBarCoordinatorShellBridge;
         private readonly MainWindowMenuToolActivationShellBridge _menuToolActivationShellBridge;
+        private readonly MainWindowCheckForUpdatesMenuItemShellBridge _checkForUpdatesMenuItemShellBridge;
         private readonly MainWindowKeyboardShortcutsShellBridge _keyboardShortcutsShellBridge;
         private readonly MainWindowKeyboardShortcutsMenuItemShellBridge _keyboardShortcutsMenuItemShellBridge;
         private readonly MainWindowHelpAboutShellBridge _helpAboutShellBridge;
@@ -437,6 +438,12 @@ namespace VoiceStudio.App
             profiler.Checkpoint("MainWindowStatusBarCoordinatorShellBridge Created");
             _menuToolActivationShellBridge = new MainWindowMenuToolActivationShellBridge();
             profiler.Checkpoint("MainWindowMenuToolActivationShellBridge Created");
+            _checkForUpdatesMenuItemShellBridge = new MainWindowCheckForUpdatesMenuItemShellBridge(
+                _menuToolActivationShellBridge,
+                () => ServiceProvider.GetViewModelContext(),
+                _updateService,
+                () => ServiceProvider.GetErrorDialogService());
+            profiler.Checkpoint("MainWindowCheckForUpdatesMenuItemShellBridge Created");
             _keyboardShortcutsShellBridge = new MainWindowKeyboardShortcutsShellBridge();
             profiler.Checkpoint("MainWindowKeyboardShortcutsShellBridge Created");
             _keyboardShortcutsMenuItemShellBridge = new MainWindowKeyboardShortcutsMenuItemShellBridge(
@@ -519,7 +526,7 @@ namespace VoiceStudio.App
             _customizeToolbarMenuItem = new MenuFlyoutItem { Text = "Customize Toolbar..." };
             _customizeToolbarMenuItem.Click += _customizeToolbarMenuItemShellBridge.OnCustomizeToolbarMenuItemClick;
             _checkForUpdatesMenuItem = new MenuFlyoutItem { Text = "Check for Updates..." };
-            _checkForUpdatesMenuItem.Click += CheckForUpdatesMenuItem_Click;
+            _checkForUpdatesMenuItem.Click += _checkForUpdatesMenuItemShellBridge.OnCheckForUpdatesMenuItemClick;
             _keyboardShortcutsMenuItem = new MenuFlyoutItem { Text = "Keyboard Shortcuts" };
             _keyboardShortcutsMenuItem.Click += _keyboardShortcutsMenuItemShellBridge.OnKeyboardShortcutsMenuItemClick;
             _manageWorkspacesMenuItem = new MenuFlyoutItem { Text = "Manage Workspaces..." };
@@ -1014,14 +1021,6 @@ namespace VoiceStudio.App
             // Show visual indicator
             _panelQuickSwitchShellBridge.ShowPanelQuickSwitchIndicator(panelName, region, targetHost);
         }
-
-        private async void CheckForUpdatesMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
-            await _menuToolActivationShellBridge
-                .RunCheckForUpdatesAsync(
-                    () => ServiceProvider.GetViewModelContext(),
-                    _updateService,
-                    () => ServiceProvider.GetErrorDialogService())
-                .ConfigureAwait(true);
 
         /// <summary>
         /// Toggles Mini Timeline visibility in BottomPanelHost (IDEA 6).

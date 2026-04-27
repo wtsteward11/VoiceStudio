@@ -210,6 +210,12 @@ After **Task 419**, `scripts/Run-Gap008MainWindowRegressionTests.ps1` does that 
 
 **Arithmetic:** **311** (post–Slice 41 green) **+ 9** = **320** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260427_094459.trx`**; Task **246** — 2026-04-27). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **320** / **320** with the extended `effectiveFilter`. **`MainWindowToolbarCustomizationShellBridge`** (**Slice 7**) unchanged; **`MainWindow`** **`private async void CustomizeToolbarMenuItem_Click`** **removed**.
 
+## Spine size after Slice 43 (Check for Updates menu item wiring shell)
+
+**Delta:** **`Gap008Slice43Tests`** (**4** methods) + **`MainWindowCheckForUpdatesMenuItemShellBridgeTests`** (**7** methods) = **+11** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt). **`Gap008Slice20Tests`** / **`Gap008Slice21Tests`** pins updated so **`CheckForUpdatesMenuItem_Click`** is **not** expected on **`MainWindow`** (wiring on **`MainWindowCheckForUpdatesMenuItemShellBridge`**; **`Gap008Slice21Tests`** scopes the no-keyboard-coupling assertion to that bridge source file).
+
+**Arithmetic:** **320** (post–Slice 42 green) **+ 11** = **331** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260427_104612.trx`**; 2026-04-27). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **331** / **331** with the extended `effectiveFilter`. **`MainWindowMenuToolActivationShellBridge`** (**Slice 20**) **`RunCheckForUpdatesAsync`** unchanged; **`MainWindow`** **`private async void CheckForUpdatesMenuItem_Click`** **removed**.
+
 ## Spine size after Slice 38 (keyboard shortcut key dispatch shell)
 
 **Delta:** **`Gap008Slice38Tests`** (**3** methods) + **`MainWindowKeyboardShortcutKeyDispatchShellBridgeTests`** (**4** methods) = **+7** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).

@@ -34,6 +34,9 @@ public sealed class Gap008Slice21Tests
     private static string MainWindowPath =>
         Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "MainWindow.xaml.cs");
 
+    private static string CheckForUpdatesMenuItemShellBridgePath =>
+        Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "MainWindowCheckForUpdatesMenuItemShellBridge.cs");
+
     [TestMethod]
     public void MainWindow_declares_keyboard_shortcuts_shell_bridge_field()
     {
@@ -65,12 +68,9 @@ public sealed class Gap008Slice21Tests
     [TestMethod]
     public void MainWindow_CheckForUpdates_does_not_reference_keyboard_shortcuts_bridge()
     {
-        var text = File.ReadAllText(MainWindowPath);
-        var start = text.IndexOf("private async void CheckForUpdatesMenuItem_Click", StringComparison.Ordinal);
-        Assert.IsTrue(start >= 0);
-        var end = text.IndexOf("private async void ToggleMiniTimelineMenuItem_Click", start, StringComparison.Ordinal);
-        Assert.IsTrue(end > start);
-        var block = text[start..end];
-        Assert.IsFalse(block.Contains("_keyboardShortcutsShellBridge", StringComparison.Ordinal));
+        var text = File.ReadAllText(CheckForUpdatesMenuItemShellBridgePath);
+        Assert.IsFalse(
+            text.Contains("_keyboardShortcutsShellBridge", StringComparison.Ordinal),
+            "Check for Updates menu wiring (Slice 43) must not couple to keyboard shortcuts shell.");
     }
 }

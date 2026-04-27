@@ -52,9 +52,10 @@ public sealed class Gap008Slice20Tests
     public void MainWindow_CheckForUpdatesMenuItem_Click_delegates_to_menu_tool_activation_bridge()
     {
         var text = File.ReadAllText(MainWindowPath);
-        StringAssert.Contains(text, "CheckForUpdatesMenuItem_Click");
+        StringAssert.Contains(text, "_checkForUpdatesMenuItemShellBridge");
+        StringAssert.Contains(text, "OnCheckForUpdatesMenuItemClick");
+        StringAssert.Contains(text, "new MainWindowCheckForUpdatesMenuItemShellBridge(");
         StringAssert.Contains(text, "_menuToolActivationShellBridge");
-        StringAssert.Contains(text, "RunCheckForUpdatesAsync");
     }
 
     [TestMethod]

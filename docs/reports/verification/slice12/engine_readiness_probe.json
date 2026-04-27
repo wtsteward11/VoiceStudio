@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-04-20T20:09:10.504335+00:00",
+  "timestamp_utc": "2026-04-27T19:47:22.383719+00:00",
   "repo_root": "E:\\VoiceStudio",
   "mode": "manifest_scan_plus_full_router",
   "manifests": [
@@ -113,7 +113,7 @@
       "type": "audio",
       "subtype": "tts",
       "manifest_path": "engines\\audio\\openvoice\\engine.manifest.json",
-      "entry_point": "app.core.engines.openvoice_engine.OpenVoiceEngine"
+      "entry_point": "app.core.engines.openvoice_subprocess_engine.OpenVoiceSubprocessEngine"
     },
     {
       "engine_id": "openvoice_v2",
@@ -551,14 +551,9 @@
         "instantiable": true,
         "instance_type": "ChatterboxTorch26Engine",
         "preflight_assets": {
-          "ok": true,
-          "paths": [
-            "E:\\VoiceStudio\\models\\hf_cache\\hub\\models--ResembleAI--chatterbox\\snapshots\\05e904af2b5c7f8e482687a9d7336c5c824467d9"
-          ],
-          "downloaded": false,
-          "message": "Chatterbox TTS ready (repo=ResembleAI/chatterbox, python=E:\\VoiceStudio\\runtime\\venvs\\torch26\\Scripts\\python.exe)",
-          "repo_id": "ResembleAI/chatterbox",
-          "python_exe": "E:\\VoiceStudio\\runtime\\venvs\\torch26\\Scripts\\python.exe"
+          "ok": false,
+          "message": "Chatterbox: no usable Hugging Face cache for ResembleAI/chatterbox (ve.safetensors) in venv_advanced_tts. Preflight uses auto_download=False (no automatic download). Warm the cache once with network access. Detail: {\"ok\": false, \"error\": \"hf\", \"detail\": \"LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.\"}",
+          "status_code": 503
         }
       },
       "comfyui": {
@@ -810,11 +805,12 @@
       },
       "openvoice": {
         "registered": true,
-        "instantiable": false,
-        "instance_type": null,
+        "instantiable": true,
+        "instance_type": "OpenVoiceSubprocessEngine",
         "preflight_assets": {
-          "ok": null,
-          "reason": "no ensure_* in probe (runtime-only)"
+          "ok": false,
+          "message": "base_speaker tree incomplete under C:\\ProgramData\\VoiceStudio\\models\\openvoice\\base_speakers (need config.json + checkpoint.pth next to it, or nested layout discoverable by rglob). tone-color converter tree incomplete under C:\\ProgramData\\VoiceStudio\\models\\openvoice\\converter (same checkpoint rule).",
+          "status_code": 424
         }
       },
       "openvoice_v2": {
@@ -831,8 +827,9 @@
         "instantiable": true,
         "instance_type": "ParakeetEngine",
         "preflight_assets": {
-          "ok": null,
-          "reason": "no ensure_* in probe (runtime-only)"
+          "ok": false,
+          "message": "paddlepaddle not installed (required for Parakeet TTS).",
+          "status_code": 503
         }
       },
       "parler_tts": {
@@ -956,7 +953,7 @@
         "preflight_assets": {
           "ok": true,
           "paths": [
-            "E:\\VoiceStudio\\models\\torch\\hub"
+            "C:\\VoiceStudio\\models\\.cache\\torch\\hub"
           ],
           "downloaded": false,
           "message": "Silero TTS ready (language=en, speaker=v3_en)",
@@ -1014,13 +1011,9 @@
         "instantiable": true,
         "instance_type": "TortoiseSubprocessEngine",
         "preflight_assets": {
-          "ok": true,
-          "paths": [
-            "E:\\VoiceStudio\\models\\tortoise_models"
-          ],
-          "downloaded": false,
-          "message": "Tortoise TTS ready (models_dir=E:\\VoiceStudio\\models\\tortoise_models, python=E:\\VoiceStudio\\runtime\\venvs\\tortoise\\Scripts\\python.exe)",
-          "python_exe": "E:\\VoiceStudio\\runtime\\venvs\\tortoise\\Scripts\\python.exe"
+          "ok": false,
+          "message": "Tortoise: no cached weights under C:\\ProgramData\\VoiceStudio\\models\\tortoise\\tortoise_models. Preflight uses auto_download=False (no automatic download). Warm once with network access: ensure_tortoise(auto_download=True) or a successful Tortoise synthesis in the isolated venv, then re-run preflight.",
+          "status_code": 424
         }
       },
       "video_creator": {
@@ -1046,8 +1039,9 @@
         "instantiable": false,
         "instance_type": null,
         "preflight_assets": {
-          "ok": null,
-          "reason": "no ensure_* in probe (runtime-only)"
+          "ok": false,
+          "message": "vosk package not installed. Install: pip install vosk>=0.3.45",
+          "status_code": 503
         }
       },
       "voxcpm": {
@@ -1064,8 +1058,14 @@
         "instantiable": true,
         "instance_type": "WhisperEngine",
         "preflight_assets": {
-          "ok": null,
-          "reason": "no ensure_* in probe (runtime-only)"
+          "ok": true,
+          "paths": [
+            "C:\\ProgramData\\VoiceStudio\\models\\whisper"
+          ],
+          "downloaded": false,
+          "message": "faster-whisper importable; cache at C:\\ProgramData\\VoiceStudio\\models\\whisper (models cached)",
+          "cache_dir": "C:\\ProgramData\\VoiceStudio\\models\\whisper",
+          "models_cached": true
         }
       },
       "whisper_cpp": {
@@ -1073,8 +1073,18 @@
         "instantiable": true,
         "instance_type": "WhisperCPPEngine",
         "preflight_assets": {
-          "ok": null,
-          "reason": "no ensure_* in probe (runtime-only)"
+          "ok": true,
+          "paths": [
+            "E:\\VoiceStudio\\models\\whisper\\ggml-medium.en.bin",
+            "E:\\VoiceStudio\\tools\\whispercpp\\whisper-cli.exe"
+          ],
+          "downloaded": false,
+          "message": "Whisper.cpp ready (cli:E:\\VoiceStudio\\tools\\whispercpp\\whisper-cli.exe)",
+          "execution_surfaces": [
+            "cli:E:\\VoiceStudio\\tools\\whispercpp\\whisper-cli.exe"
+          ],
+          "python_binding": false,
+          "executable": "E:\\VoiceStudio\\tools\\whispercpp\\whisper-cli.exe"
         }
       },
       "whisper_ui": {

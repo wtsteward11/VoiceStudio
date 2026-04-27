@@ -78,7 +78,7 @@ psutil>=5.9.0
 # ============================================================================
 # Utilities & Helpers (FREE_LIBRARIES_INTEGRATION - Worker 3)
 # ============================================================================
-tqdm>=4.66.0
+tqdm>=4.67.3
 cython>=3.0.0
 PyPDF2>=3.0.1  # PDF processing for MCP unlock-pdf integration
 

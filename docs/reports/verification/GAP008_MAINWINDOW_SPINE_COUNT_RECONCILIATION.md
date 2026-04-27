@@ -186,6 +186,12 @@ After **Task 419**, `scripts/Run-Gap008MainWindowRegressionTests.ps1` does that 
 
 **Arithmetic:** **262** (post–Slice 35 green) **+ 6** = **268** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260426_173120.trx`**; Tasks **179–188** — 2026-04-26). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **268** / **268** with the extended `effectiveFilter`.
 
+## Spine size after Slice 38 (keyboard shortcut key dispatch shell)
+
+**Delta:** **`Gap008Slice38Tests`** (**3** methods) + **`MainWindowKeyboardShortcutKeyDispatchShellBridgeTests`** (**4** methods) = **+7** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).
+
+**Arithmetic:** **275** (post–Slice 37 green) **+ 7** = **282** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260426_185722.trx`**; Tasks **201–210** — 2026-04-26). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **282** / **282** with the extended `effectiveFilter`.
+
 ## Spine size after Slice 37 (panel quick-switch shortcut registration shell)
 
 **Delta:** **`Gap008Slice37Tests`** (**3** methods) + **`MainWindowPanelQuickSwitchShortcutRegistrationShellBridgeTests`** (**4** methods) = **+7** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).

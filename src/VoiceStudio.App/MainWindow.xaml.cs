@@ -4,9 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.App.Views;
 using VoiceStudio.App.Services;
-using VoiceStudio.App.Utilities;
 using VoiceStudio.App.ViewModels;
-using Windows.System;
 using Windows.Storage;
 using Windows.Foundation;
 using Windows.UI;
@@ -88,6 +86,7 @@ namespace VoiceStudio.App
         private readonly MainWindowRecentProjectsMenuPopulationShellBridge _recentProjectsMenuPopulationBridge;
         private readonly MainWindowKeyboardShortcutRegistrationShellBridge _keyboardShortcutRegistrationShellBridge;
         private readonly MainWindowPanelQuickSwitchShortcutRegistrationShellBridge _panelQuickSwitchShortcutRegistrationShellBridge;
+        private readonly MainWindowKeyboardShortcutKeyDispatchShellBridge _keyboardShortcutKeyDispatchShellBridge;
         private readonly MainWindowPanelPreviewShellBridge _panelPreviewShellBridge;
         private readonly MainWindowPanelQuickSwitchShellBridge _panelQuickSwitchShellBridge;
         private readonly MainWindowPanelRegionFocusShellBridge _panelRegionFocusShellBridge;
@@ -491,6 +490,7 @@ namespace VoiceStudio.App
                 _keyboardShortcutService,
                 GetPanelTitle,
                 (panelId, region) => OpenPanelByIdAsync(panelId, region));
+            _keyboardShortcutKeyDispatchShellBridge = new MainWindowKeyboardShortcutKeyDispatchShellBridge();
             profiler.Checkpoint("Keyboard Shortcuts Registered");
 
             // Menu items (not in XAML during Phase 0)
@@ -1202,22 +1202,8 @@ namespace VoiceStudio.App
             Cleanup();
         }
 
-        private void MainWindow_KeyDown(object sender, KeyRoutedEventArgs e)
-        {
-            var modifiers = VirtualKeyModifiers.None;
-            if (InputHelper.IsControlPressed())
-                modifiers |= VirtualKeyModifiers.Control;
-            if (InputHelper.IsShiftPressed())
-                modifiers |= VirtualKeyModifiers.Shift;
-            var altState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu);
-            if ((altState & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down)
-                modifiers |= VirtualKeyModifiers.Menu;
-
-            if (_keyboardShortcutService.TryHandleKeyDown(e.Key, modifiers))
-            {
-                e.Handled = true;
-            }
-        }
+        private void MainWindow_KeyDown(object sender, KeyRoutedEventArgs e) =>
+            _keyboardShortcutKeyDispatchShellBridge.TryHandleKeyDown(_keyboardShortcutService, e);
 
         private void NotificationCenterMarkAllRead_Click(object sender, RoutedEventArgs e) =>
             _notificationCenterShellBridge.OnMarkAllReadClick();

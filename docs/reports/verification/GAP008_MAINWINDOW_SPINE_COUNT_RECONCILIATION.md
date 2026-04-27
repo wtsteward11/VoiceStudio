@@ -192,6 +192,12 @@ After **Task 419**, `scripts/Run-Gap008MainWindowRegressionTests.ps1` does that 
 
 **Arithmetic:** **282** (post–Slice 38 green) **+ 11** = **293** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260426_194918.trx`**; Tasks **211–220** — 2026-04-26/27). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **293** / **293** with the extended `effectiveFilter`. **`ShellNavigationCoordinator`** duplicate **`IsSafeStartupMode`** removed in favor of **`MainWindowSmokeStartupModeShellBridge.EvaluateSafeStartup()`**.
 
+## Spine size after Slice 40 (window activated exception logging shell)
+
+**Delta:** **`Gap008Slice40Tests`** (**4** methods) + **`MainWindowWindowActivatedLoggingShellBridgeTests`** (**5** methods) = **+9** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).
+
+**Arithmetic:** **293** (post–Slice 39 green) **+ 9** = **302** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260426_201018.trx`**; Tasks **221–230** — 2026-04-27). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **302** / **302** with the extended `effectiveFilter`. **`MainWindow_Activated`** **try/catch** + **`ErrorLogger.LogWarning`** moved to **`MainWindowWindowActivatedLoggingShellBridge`**; **`MainWindowStartupWelcomeActivationShellBridge.HandleActivatedAsync`** unchanged (**Slice 11**).
+
 ## Spine size after Slice 38 (keyboard shortcut key dispatch shell)
 
 **Delta:** **`Gap008Slice38Tests`** (**3** methods) + **`MainWindowKeyboardShortcutKeyDispatchShellBridgeTests`** (**4** methods) = **+7** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).

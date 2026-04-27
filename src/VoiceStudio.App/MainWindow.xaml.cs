@@ -66,6 +66,7 @@ namespace VoiceStudio.App
         private readonly MainWindowJumpListTaskbarProgressShellBridge _jumpListTaskbarProgressShellBridge;
         private readonly MainWindowSmokeStartupModeShellBridge _smokeStartupModeShellBridge;
         private readonly MainWindowStartupWelcomeActivationShellBridge _startupWelcomeActivationShellBridge;
+        private readonly MainWindowWindowActivatedLoggingShellBridge _windowActivatedLoggingShellBridge;
         private readonly MainWindowStartupOverlayShellBridge _startupOverlayShellBridge;
         private readonly MainWindowLifetimeCleanupShellBridge _lifetimeCleanupShellBridge;
         private readonly MainWindowFileActivationShellBridge _fileActivationShellBridge;
@@ -361,6 +362,9 @@ namespace VoiceStudio.App
                 _smokeStartupModeShellBridge.IsSafeStartupMode,
                 MainWindow_KeyDown);
             profiler.Checkpoint("StartupWelcomeActivationShellBridge Created");
+
+            _windowActivatedLoggingShellBridge = new MainWindowWindowActivatedLoggingShellBridge();
+            profiler.Checkpoint("MainWindowWindowActivatedLoggingShellBridge Created");
 
             _startupOverlayShellBridge = new MainWindowStartupOverlayShellBridge(
                 () => FindInContent<Border>("StartupOverlay"),
@@ -961,17 +965,10 @@ namespace VoiceStudio.App
         private async void StartupRetryButton_Click(object sender, RoutedEventArgs e) =>
             await _startupOverlayShellBridge.OnRetryButtonClickAsync().ConfigureAwait(true);
 
-        private async void MainWindow_Activated(object sender, WindowActivatedEventArgs e)
-        {
-            try
-            {
-                await _startupWelcomeActivationShellBridge.HandleActivatedAsync(this, e).ConfigureAwait(true);
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogWarning($"Activated handler failed: {ex.Message}", "MainWindow.MainWindow_Activated");
-            }
-        }
+        private async void MainWindow_Activated(object sender, WindowActivatedEventArgs e) =>
+            await _windowActivatedLoggingShellBridge
+                .RunActivatedAsync(() => _startupWelcomeActivationShellBridge.HandleActivatedAsync(this, e))
+                .ConfigureAwait(true);
 
         /// <summary>
         /// Switches to a panel and shows visual feedback (IDEA 1).

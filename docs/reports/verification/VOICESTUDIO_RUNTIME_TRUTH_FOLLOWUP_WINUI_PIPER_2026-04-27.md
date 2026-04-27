@@ -172,6 +172,7 @@ This section records **Follow-up B** execution after the initial pass above. **F
 | Blocker | Class | Notes |
 |---------|--------|--------|
 | **In-app** synthesis + **in-app** playback not executed | **Proof-only** | Follow-up B closed **API + file** evidence only; plan’s **A3–A5 / A7** UI path still open for a human pass. |
+| **Follow-up E** — Voice Synthesis UI path not driven | **Proof-only** | No human operator in session; WinAppDriver refused (`127.0.0.1:4723`); **no** `VoiceSynthesisView_*` exercise. |
 | No screenshot | **Proof-only** | Written note + `MainWindowTitle` only. |
 | Optional engines failing to init in full probe | **Environment / dep surface** | Unchanged from initial session; health still **`engines_ready: true`**. |
 
@@ -181,7 +182,7 @@ No **product** blocker was identified for Piper synthesis (post-consent), API he
 
 **PARTIAL**
 
-Rationale: **Follow-up B** adds **stronger** evidence than the initial pass alone: **granted consent** → **`POST /api/voice/synthesize`** with **`routed_engine: piper`** and the **exact phrase** → **169004**-byte **RIFF/WAVE** on disk with **non-trivial RMS**, plus a **second** WinUI launch with **`VoiceStudio Quantum+`** window title. **Follow-up C** (below) did **not** add **in-app** UI synthesis or **in-app** playback attestation in this agent session. **Follow-up D** (below) is **operator-blocked** in this session — **no** new in-app proof. **Still not FULL PASS** under the plan’s strict rule because **in-app** panel navigation, phrase entry, output path from UI, and **in-app playback heard** were **not** operator-attested here. **Not FAIL** — control plane, consent policy, Piper routing, and file shape are consistent with a healthy dev setup.
+Rationale: **Follow-up B** adds **stronger** evidence than the initial pass alone: **granted consent** → **`POST /api/voice/synthesize`** with **`routed_engine: piper`** and the **exact phrase** → **169004**-byte **RIFF/WAVE** on disk with **non-trivial RMS**, plus a **second** WinUI launch with **`VoiceStudio Quantum+`** window title. **Follow-up C** (below) did **not** add **in-app** UI synthesis or **in-app** playback attestation in this agent session. **Follow-up D** and **Follow-up E** (below) are **operator-blocked** in this session — **no** new in-app proof (E adds a **third** WinUI process/title check + backend re-probe only). **Still not FULL PASS** under the plan’s strict rule because **in-app** panel navigation, phrase entry, output path from UI, and **in-app playback heard** were **not** operator-attested here. **Not FAIL** — control plane, consent policy, Piper routing, and file shape are consistent with a healthy dev setup.
 
 ---
 
@@ -294,6 +295,96 @@ No file produced by **in-app** synthesis in this session. **Follow-up B** WAV re
 |------|--------|
 | **`python scripts/run_verification.py`** | **PASS** (overall); `.buildlogs/verification/last_run.json` |
 | **`.\scripts\verify.ps1 -Quick`** | **PASS** (exit **0**); report **`E:\VoiceStudio\artifacts\verify\20260427_165718\verification_report.md`** |
+| **Advisories** | `runtime_proof_staleness`, `slo_baseline_freshness`, `backend_smoke_freshness` (non-failing) |
+
+---
+
+## Follow-up E (human WinUI in-app Piper synthesis + playback, 2026-04-27)
+
+### E0 — Repo state (this session)
+
+| Item | Value |
+|------|--------|
+| **`HEAD`** | `1d72520c733c60965b0a30239575f80d7cba6529` |
+| **`origin/main`** | Not re-fetched in this slice; treat **`HEAD`** as workspace tip for doc-only work. |
+| **Working tree** | User-local dirty files (e.g. **`AGENTS.md`**, **`.vscode/settings.json`**) — **not** staged for this pass (per plan). |
+
+### E1 — Operator / session
+
+| Item | Value |
+|------|--------|
+| **Session** | Cursor agent session, **2026-04-27** local (**≈17:26 −05:00** when doc appended). |
+| **Human operator** | **Not available** for Voice Synthesis panel steps. |
+| **WinAppDriver** | `http://127.0.0.1:4723` — **connection refused** (no listener). |
+
+### E2 — Backend health (probe; UI path not a substitute for proof)
+
+| Item | Value |
+|------|--------|
+| **URL** | `GET http://127.0.0.1:8000/api/health` |
+| **HTTP** | **200** |
+| **`engines_ready`** | **`true`** |
+| **`version_info.git_commit`** | **`b0a1b793`** (running backend; may trail **doc** **`HEAD`** until restart) |
+
+### E3 — WinUI launch
+
+| Item | Value |
+|------|--------|
+| **Exe** | `E:\VoiceStudio\src\VoiceStudio.App\.buildlogs\x64\Debug\net8.0-windows10.0.19041.0\VoiceStudio.App.exe` |
+| **Method** | `Start-Process` (agent) |
+| **PID** | **32852** (example; re-query if process recycling) |
+| **`MainWindowTitle`** | **`VoiceStudio Quantum+`** |
+| **Process `StartTime` (local)** | **2026-04-27 17:25:23** **−05:00** (observed via `Get-Process`) |
+| **Screenshot** | **Not** captured in repo (`artifacts/runtime_truth_e/` not required when using written operator note per plan). |
+
+### E4 — Navigation / engine / profile / consent
+
+| Item | Value |
+|------|--------|
+| **Voice Synthesis panel** | **Not** opened in this session (no human / no UI automation). |
+| **Engine Piper** | **Not** selected in UI. |
+| **Profile `22ebe087-5589-4d35-ab5a-c57049407813`** | **Not** selected in UI. |
+| **Consent** | **N/A** — no in-app synthesis attempt. |
+
+### E5 — Phrase + synthesis (in-app)
+
+| Item | Value |
+|------|--------|
+| **Intended phrase (plan)** | `VoiceStudio runtime truth follow-up using Piper.` |
+| **Entered in `VoiceSynthesisView_TextInput`** | **Not executed** |
+| **`VoiceSynthesisView_SynthesizeButton`** | **Not executed** |
+| **HTTP substitute** | **Not** used for proof class E. |
+
+### E6 — In-app playback
+
+| Item | Value |
+|------|--------|
+| **`VoiceSynthesisView_PlayButton`** | **Not executed** |
+| **Heard** | **Not attested** |
+
+### E7 — Artifact (UI-origin, new)
+
+| Item | Value |
+|------|--------|
+| **New WAV from this follow-up** | **None** located from UI. Prior **Follow-up B** file unchanged: `E:\VoiceStudio\artifacts\runtime_truth_b_piper.wav`. |
+
+### E8 — Blockers
+
+| Blocker | Class |
+|---------|--------|
+| No human + WinAppDriver unavailable | **Proof-only** |
+| In-app Voice Synthesis path not executed | **Proof-only** |
+
+### E9 — Follow-up E verdict
+
+**PARTIAL** (blocked) — same class as **Follow-up D**: **not** **FAIL**; **not** **FULL PASS**. A **human** must run Piper + profile + phrase + **Synthesize** + **Play** and attest **heard** to advance toward **FULL PASS**.
+
+### E10 — Verification gate (post–Follow-up E doc edit)
+
+| Item | Value |
+|------|--------|
+| **`python scripts/run_verification.py`** | **PASS** (overall); **`.buildlogs/verification/last_run.json`** |
+| **`.\scripts\verify.ps1 -Quick`** | **PASS** (exit **0**); report **`E:\VoiceStudio\artifacts\verify\20260427_172645\verification_report.md`** |
 | **Advisories** | `runtime_proof_staleness`, `slo_baseline_freshness`, `backend_smoke_freshness` (non-failing) |
 
 ---

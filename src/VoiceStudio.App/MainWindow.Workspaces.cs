@@ -19,6 +19,18 @@ namespace VoiceStudio.App
     {
         private bool _isResettingToStudio;
 
+        private void TryShowWorkspaceRestoreFailureToast(string title, string message, Action resetAction)
+        {
+            if (WorkspaceRestoreFailureToastSuppressor.ShouldSuppressDuplicate(
+                title, message, DateTime.UtcNow, TimeSpan.FromSeconds(5)))
+            {
+                return;
+            }
+
+            ServiceProvider.TryGetToastNotificationService()?.ShowError(
+                message, title, resetAction, "Reset to Studio");
+        }
+
         private async void ResetToStudioWorkspace()
         {
             if (_panelStateService == null) return;
@@ -82,11 +94,7 @@ namespace VoiceStudio.App
                 if (hadRegions)
                 {
                     var msg = FormatRestoreFailureMessage(failedItems);
-                    var toast = ServiceProvider.TryGetToastNotificationService();
-                    toast?.ShowError(
-                      msg,
-                      "Restore Failed",
-                      () => ResetToStudioWorkspace());
+                    TryShowWorkspaceRestoreFailureToast("Restore Failed", msg, () => ResetToStudioWorkspace());
                 }
                 if (leftPanelHost != null)
                 {
@@ -124,11 +132,7 @@ namespace VoiceStudio.App
             else if (failedItems.Count > 0)
             {
                 var msg = FormatRestoreFailureMessage(failedItems);
-                var toast = ServiceProvider.TryGetToastNotificationService();
-                toast?.ShowError(
-                  msg,
-                  "Partial Restore Failed",
-                  () => ResetToStudioWorkspace());
+                TryShowWorkspaceRestoreFailureToast("Partial Restore Failed", msg, () => ResetToStudioWorkspace());
             }
             SetActiveNavButton("NavStudio");
 
@@ -440,17 +444,15 @@ namespace VoiceStudio.App
                 {
                     var msg = FormatRestoreFailureMessage(failedItems);
                     var title = restored ? "Partial Restore Failed" : "Restore Failed";
-                    var toastService = ServiceProvider.TryGetToastNotificationService();
-                    toastService?.ShowError(msg, title, () => ResetToStudioWorkspace());
+                    TryShowWorkspaceRestoreFailureToast(title, msg, () => ResetToStudioWorkspace());
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[MainWindow] WorkspaceProfileChanged restore failed: {ex.Message}");
-                var toastService = ServiceProvider.TryGetToastNotificationService();
-                toastService?.ShowError(
-                    "Workspace restore failed — reset to Studio?",
+                TryShowWorkspaceRestoreFailureToast(
                     "Restore Failed",
+                    "Workspace restore failed — reset to Studio?",
                     () => ResetToStudioWorkspace());
             }
         }

@@ -360,7 +360,7 @@ namespace VoiceStudio.App.Tests.Services
                 ShowToast(ToastType.Warning, message, title);
             }
 
-            public void ShowError(string message, string? title = null, Action? viewDetailsAction = null)
+            public void ShowError(string message, string? title = null, Action? viewDetailsAction = null, string? actionButtonLabel = null)
             {
                 ShowToast(ToastType.Error, message, title);
             }

@@ -84,18 +84,35 @@ namespace VoiceStudio.App.Services
           $"Failed to create instance of ViewType '{descriptor.ViewType.Name}' for panel '{panelId}'.");
       }
 
-      // Create and assign ViewModel if specified
+      // Create and assign ViewModel if specified. Many views construct their own ViewModel in the ctor
+      // and set DataContext — overwriting with the factory would replace the valid instance and can throw.
       if (descriptor.ViewModelType != null)
       {
-        var viewModel = _viewModelFactory.Create(descriptor.ViewModelType);
-
         if (view is UserControl userControl)
         {
-          userControl.DataContext = viewModel;
+          if (userControl.DataContext != null)
+          {
+            Debug.WriteLine(
+              $"[PanelRegistry] Skipping ViewModelFactory for panel '{panelId}': DataContext already set by view.");
+          }
+          else
+          {
+            var viewModel = _viewModelFactory.Create(descriptor.ViewModelType);
+            userControl.DataContext = viewModel;
+          }
         }
         else if (view is FrameworkElement frameworkElement)
         {
-          frameworkElement.DataContext = viewModel;
+          if (frameworkElement.DataContext != null)
+          {
+            Debug.WriteLine(
+              $"[PanelRegistry] Skipping ViewModelFactory for panel '{panelId}': DataContext already set.");
+          }
+          else
+          {
+            var viewModel = _viewModelFactory.Create(descriptor.ViewModelType);
+            frameworkElement.DataContext = viewModel;
+          }
         }
       }
 

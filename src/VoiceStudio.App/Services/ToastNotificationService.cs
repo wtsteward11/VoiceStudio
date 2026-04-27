@@ -31,7 +31,11 @@ namespace VoiceStudio.App.Services
     void ShowInfo(string message, string? title = null);
     void ShowSuccess(string message, string? title = null);
     void ShowWarning(string message, string? title = null);
-    void ShowError(string message, string? title = null, Action? viewDetailsAction = null);
+    void ShowError(
+      string message,
+      string? title = null,
+      Action? viewDetailsAction = null,
+      string? actionButtonLabel = null);
   }
 
   /// <summary>
@@ -64,14 +68,18 @@ namespace VoiceStudio.App.Services
       ShowToast(ToastType.Success, message, title, AutoDismissSuccessMs);
     }
 
-    public void ShowError(string message, string? title = null, Action? viewDetailsAction = null)
-    {
-      if (AppServices.GetService<GracefulDegradationService>()?.IsDegradedMode == true)
-        return;
-      if (SuppressTransientBackendErrors && LooksLikeTransientBackendError(message, title))
-        return;
-      ShowToast(ToastType.Error, message, title, 0, viewDetailsAction);
-    }
+  public void ShowError(
+    string message,
+    string? title = null,
+    Action? viewDetailsAction = null,
+    string? actionButtonLabel = null)
+  {
+    if (AppServices.GetService<GracefulDegradationService>()?.IsDegradedMode == true)
+      return;
+    if (SuppressTransientBackendErrors && LooksLikeTransientBackendError(message, title))
+      return;
+    ShowToast(ToastType.Error, message, title, 0, viewDetailsAction, false, actionButtonLabel);
+  }
 
     private static bool LooksLikeTransientBackendError(string message, string? title = null)
     {
@@ -122,7 +130,7 @@ namespace VoiceStudio.App.Services
     /// </summary>
     public ToastNotification ShowProgress(string message, string? title = null)
     {
-      return ShowToast(ToastType.Progress, message, title, 0, null, true);
+      return ShowToast(ToastType.Progress, message, title, 0, null, true, null);
     }
 
     public ToastNotification ShowToast(
@@ -131,7 +139,8 @@ namespace VoiceStudio.App.Services
         string? title = null,
         int autoDismissMs = 0,
         Action? action = null,
-        bool isProgress = false)
+        bool isProgress = false,
+        string? actionButtonLabel = null)
     {
       // Error toasts: apply same suppression as ShowError (degraded mode, transient backend errors)
       if (type == ToastType.Error)
@@ -151,6 +160,8 @@ namespace VoiceStudio.App.Services
         IsProgress = isProgress
       };
 
+      var effectiveActionLabel = action != null ? (actionButtonLabel ?? "View Details") : null;
+
       AppServices.TryGetNotificationCenterService()?.AddNotification(
           type: MapNotificationType(type),
           message: message,
@@ -158,7 +169,7 @@ namespace VoiceStudio.App.Services
           priority: MapPriority(type),
           progress: isProgress ? 0d : null,
           progressStatus: isProgress ? "In progress" : null,
-          actionLabel: action != null ? "View Details" : null,
+          actionLabel: effectiveActionLabel,
           action: action);
 
       // Create UI element
@@ -207,9 +218,10 @@ namespace VoiceStudio.App.Services
 
       if (action != null)
       {
+        var label = actionButtonLabel ?? "View Details";
         var button = new Button
         {
-          Content = "View Details",
+          Content = label,
           Margin = new Thickness(0, 8, 0, 0),
           HorizontalAlignment = HorizontalAlignment.Left
         };

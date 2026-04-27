@@ -4,6 +4,7 @@ using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.App.Services;
+using VoiceStudio.App.Diagnostics;
 using VoiceStudio.App.Utilities;
 using System;
 using System.Collections.Concurrent;
@@ -960,6 +961,7 @@ namespace VoiceStudio.App.Controls
         catch (Exception ex)
         {
           System.Diagnostics.Debug.WriteLine($"[PanelHost] Error creating panel {panelId}: {ex.Message}");
+          ExceptionDiagnostics.AppendPanelLoadFailureDiagnosticsFile(panelId, ex);
 #if DEBUG
           try
           {
@@ -973,7 +975,7 @@ namespace VoiceStudio.App.Controls
           if (ErrorPresentationService.IsBackendOffline)
             ShowOfflineOverlayIfApplicable();
           else
-            ShowLoadErrorOverlay($"Failed to create panel: {ex.Message}");
+            ShowLoadErrorOverlay(ExceptionDiagnostics.FormatPanelCreateUserMessage(panelId, ex));
           return null;
         }
 
@@ -1031,6 +1033,7 @@ namespace VoiceStudio.App.Controls
       catch (Exception ex)
       {
         System.Diagnostics.Debug.WriteLine($"[PanelHost] Error loading panel {panelId}: {ex.Message}");
+        ExceptionDiagnostics.AppendPanelLoadFailureDiagnosticsFile(panelId, ex);
 #if DEBUG
         try
         {
@@ -1044,7 +1047,7 @@ namespace VoiceStudio.App.Controls
         if (ErrorPresentationService.IsBackendOffline)
           ShowOfflineOverlayIfApplicable();
         else
-          ShowLoadErrorOverlay($"Failed to load panel: {ex.Message}");
+          ShowLoadErrorOverlay(ExceptionDiagnostics.FormatPanelLoadUserMessage(panelId, ex));
         return null;
       }
       finally

@@ -44,7 +44,8 @@ public sealed class MainWindowCommandPaletteShellBridgeTests
             .Setup(t => t.ShowError(
                 It.Is<string>(s => s.Contains("palette failed", StringComparison.Ordinal)),
                 "Command Palette",
-                It.IsAny<Action?>()))
+                It.IsAny<Action?>(),
+                It.IsAny<string?>()))
             .Verifiable();
         var mockDiag = new Mock<ICommandPaletteShellDiagnostics>(MockBehavior.Strict);
         mockDiag
@@ -74,7 +75,8 @@ public sealed class MainWindowCommandPaletteShellBridgeTests
             t => t.ShowError(
                 It.Is<string>(s => s.Contains("palette failed", StringComparison.Ordinal)),
                 "Command Palette",
-                It.IsAny<Action?>()),
+                It.IsAny<Action?>(),
+                It.IsAny<string?>()),
             Times.Once);
     }
 

@@ -406,7 +406,7 @@ namespace VoiceStudio.App.Tests.Services
         {
         }
 
-        public void ShowError(string message, string? title = null, Action? viewDetailsAction = null)
+        public void ShowError(string message, string? title = null, Action? viewDetailsAction = null, string? actionButtonLabel = null)
         {
             LastErrorCall = (ToastType.Error, message, title);
         }

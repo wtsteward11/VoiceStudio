@@ -231,6 +231,14 @@ namespace VoiceStudio.App.Tests.Services
 
         #endregion
 
+        #region CreatePanel / ViewModel policy
+
+        // Note: CreatePanel skips the ViewModel factory when the view's constructor already set
+        // DataContext (e.g. EffectsMixerView). This is not unit-tested here: Activator.CreateInstance
+        // of WinUI UserControl types requires a running app host; coverage is by code review + manual.
+
+        #endregion
+
         #region Test Helpers
 
         private class TestPanelView : IPanelView

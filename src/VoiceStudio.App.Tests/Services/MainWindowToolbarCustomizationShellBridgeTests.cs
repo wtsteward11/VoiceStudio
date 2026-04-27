@@ -40,7 +40,8 @@ public sealed class MainWindowToolbarCustomizationShellBridgeTests
             .Setup(t => t.ShowError(
                 "Customization Failed",
                 It.Is<string>(s => s.Contains("dialog failed", StringComparison.Ordinal)),
-                It.IsAny<Action?>()))
+                It.IsAny<Action?>(),
+                It.IsAny<string?>()))
             .Verifiable();
         var bridge = new MainWindowToolbarCustomizationShellBridge(
             () => null,
@@ -53,7 +54,8 @@ public sealed class MainWindowToolbarCustomizationShellBridgeTests
             t => t.ShowError(
                 "Customization Failed",
                 It.Is<string>(s => s.Contains("dialog failed", StringComparison.Ordinal)),
-                It.IsAny<Action?>()),
+                It.IsAny<Action?>(),
+                It.IsAny<string?>()),
             Times.Once);
     }
 

@@ -48,7 +48,8 @@ public sealed class MainWindowToolCatalogShellBridgeTests
             .Setup(t => t.ShowError(
                 It.Is<string>(s => s.Contains("XamlRoot", StringComparison.Ordinal)),
                 "Tool Catalog",
-                It.IsAny<Action?>()))
+                It.IsAny<Action?>(),
+                It.IsAny<string?>()))
             .Verifiable();
         var bridge = new MainWindowToolCatalogShellBridge(
             () => null,
@@ -64,7 +65,8 @@ public sealed class MainWindowToolCatalogShellBridgeTests
             t => t.ShowError(
                 It.Is<string>(s => s.Contains("XamlRoot", StringComparison.Ordinal)),
                 "Tool Catalog",
-                It.IsAny<Action?>()),
+                It.IsAny<Action?>(),
+                It.IsAny<string?>()),
             Times.Once);
     }
 
@@ -224,7 +226,8 @@ public sealed class MainWindowToolCatalogShellBridgeTests
             .Setup(t => t.ShowError(
                 It.Is<string>(s => s.Contains("catalog dialog failed", StringComparison.Ordinal)),
                 "Tool Catalog",
-                It.IsAny<Action?>()))
+                It.IsAny<Action?>(),
+                It.IsAny<string?>()))
             .Verifiable();
         var mockDiag = new Mock<IToolCatalogShellDiagnostics>(MockBehavior.Strict);
         mockDiag
@@ -256,7 +259,8 @@ public sealed class MainWindowToolCatalogShellBridgeTests
             t => t.ShowError(
                 It.Is<string>(s => s.Contains("catalog dialog failed", StringComparison.Ordinal)),
                 "Tool Catalog",
-                It.IsAny<Action?>()),
+                It.IsAny<Action?>(),
+                It.IsAny<string?>()),
             Times.Once);
     }
 }

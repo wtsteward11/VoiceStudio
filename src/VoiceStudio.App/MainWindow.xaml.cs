@@ -79,6 +79,7 @@ namespace VoiceStudio.App
         private readonly MainWindowMenuToolActivationShellBridge _menuToolActivationShellBridge;
         private readonly MainWindowCheckForUpdatesMenuItemShellBridge _checkForUpdatesMenuItemShellBridge;
         private readonly MainWindowManageWorkspacesMenuItemShellBridge _manageWorkspacesMenuItemShellBridge;
+        private readonly MainWindowToggleMiniTimelineMenuItemShellBridge _toggleMiniTimelineMenuItemShellBridge;
         private readonly MainWindowKeyboardShortcutsShellBridge _keyboardShortcutsShellBridge;
         private readonly MainWindowKeyboardShortcutsMenuItemShellBridge _keyboardShortcutsMenuItemShellBridge;
         private readonly MainWindowHelpAboutShellBridge _helpAboutShellBridge;
@@ -450,6 +451,15 @@ namespace VoiceStudio.App
                 () => (Content as FrameworkElement)?.XamlRoot,
                 () => ServiceProvider.TryGetToastNotificationService());
             profiler.Checkpoint("MainWindowManageWorkspacesMenuItemShellBridge Created");
+            _toggleMiniTimelineMenuItemShellBridge = new MainWindowToggleMiniTimelineMenuItemShellBridge(
+                _menuToolActivationShellBridge,
+                () => _isMiniTimelineVisible,
+                v => _isMiniTimelineVisible = v,
+                () => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
+                (panelId, region) => OpenPanelByIdAsync(panelId, region),
+                UpdateMiniTimelineMenuItem,
+                () => ServiceProvider.TryGetToastNotificationService());
+            profiler.Checkpoint("MainWindowToggleMiniTimelineMenuItemShellBridge Created");
             _keyboardShortcutsShellBridge = new MainWindowKeyboardShortcutsShellBridge();
             profiler.Checkpoint("MainWindowKeyboardShortcutsShellBridge Created");
             _keyboardShortcutsMenuItemShellBridge = new MainWindowKeyboardShortcutsMenuItemShellBridge(
@@ -528,7 +538,7 @@ namespace VoiceStudio.App
             // Menu items (not in XAML during Phase 0)
             _recentProjectsSubMenu = new MenuFlyoutSubItem { Text = "Recent Projects" };
             _toggleMiniTimelineMenuItem = new MenuFlyoutItem { Text = "Toggle Mini Timeline" };
-            _toggleMiniTimelineMenuItem.Click += ToggleMiniTimelineMenuItem_Click;
+            _toggleMiniTimelineMenuItem.Click += _toggleMiniTimelineMenuItemShellBridge.OnToggleMiniTimelineMenuItemClick;
             _customizeToolbarMenuItem = new MenuFlyoutItem { Text = "Customize Toolbar..." };
             _customizeToolbarMenuItem.Click += _customizeToolbarMenuItemShellBridge.OnCustomizeToolbarMenuItemClick;
             _checkForUpdatesMenuItem = new MenuFlyoutItem { Text = "Check for Updates..." };
@@ -1027,20 +1037,6 @@ namespace VoiceStudio.App
             // Show visual indicator
             _panelQuickSwitchShellBridge.ShowPanelQuickSwitchIndicator(panelName, region, targetHost);
         }
-
-        /// <summary>
-        /// Toggles Mini Timeline visibility in BottomPanelHost (IDEA 6).
-        /// </summary>
-        private async void ToggleMiniTimelineMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
-            await _menuToolActivationShellBridge
-                .RunToggleMiniTimelineAsync(
-                    () => _isMiniTimelineVisible,
-                    v => _isMiniTimelineVisible = v,
-                    () => FindNameOnContent("BottomPanelHost") as Controls.PanelHost,
-                    (panelId, region) => OpenPanelByIdAsync(panelId, region),
-                    UpdateMiniTimelineMenuItem,
-                    () => ServiceProvider.TryGetToastNotificationService())
-                .ConfigureAwait(true);
 
         /// <summary>
         /// Updates the Mini Timeline menu item text based on current state (IDEA 6).

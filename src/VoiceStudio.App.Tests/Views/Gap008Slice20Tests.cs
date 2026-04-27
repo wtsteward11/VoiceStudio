@@ -59,11 +59,13 @@ public sealed class Gap008Slice20Tests
     }
 
     [TestMethod]
-    public void MainWindow_ToggleMiniTimelineMenuItem_Click_delegates_to_menu_tool_activation_bridge()
+    public void MainWindow_toggle_mini_timeline_menu_item_wires_to_toggle_mini_timeline_menu_item_shell_bridge()
     {
-        var text = File.ReadAllText(MainWindowPath);
-        StringAssert.Contains(text, "ToggleMiniTimelineMenuItem_Click");
-        StringAssert.Contains(text, "RunToggleMiniTimelineAsync");
+        var main = File.ReadAllText(MainWindowPath);
+        StringAssert.Contains(main, "_toggleMiniTimelineMenuItemShellBridge");
+        StringAssert.Contains(main, "OnToggleMiniTimelineMenuItemClick");
+        StringAssert.Contains(main, "new MainWindowToggleMiniTimelineMenuItemShellBridge(");
+        StringAssert.Contains(main, "_menuToolActivationShellBridge");
     }
 
     [TestMethod]

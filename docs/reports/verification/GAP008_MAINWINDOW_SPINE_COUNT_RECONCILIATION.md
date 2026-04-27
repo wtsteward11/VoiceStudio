@@ -222,6 +222,12 @@ After **Task 419**, `scripts/Run-Gap008MainWindowRegressionTests.ps1` does that 
 
 **Arithmetic:** **331** (post–Slice 43 green) **+ 10** = **341** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260427_111924.trx`**; 2026-04-27). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **341** / **341** with the extended `effectiveFilter`. **`MainWindowMenuToolActivationShellBridge`** (**Slice 20**) **`RunManageWorkspacesAsync`** unchanged; **`MainWindow.Workspaces`** **`private async void ManageWorkspaces_Click`** **removed**.
 
+## Spine size after Slice 45 (Toggle Mini Timeline menu item wiring shell)
+
+**Delta:** **`Gap008Slice45Tests`** (**4** methods) + **`MainWindowToggleMiniTimelineMenuItemShellBridgeTests`** (**9** methods) = **+13** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt). **`Gap008Slice20Tests`** pin updated so **`ToggleMiniTimelineMenuItem_Click`** is **not** expected on **`MainWindow`** (wiring on **`MainWindowToggleMiniTimelineMenuItemShellBridge`**).
+
+**Arithmetic:** **341** (post–Slice 44 green) **+ 13** = **354** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260427_114544.trx`**; 2026-04-27). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **354** / **354** with the extended `effectiveFilter`. **`MainWindowMenuToolActivationShellBridge`** (**Slice 20**) **`RunToggleMiniTimelineAsync`** unchanged; **`MainWindow`** **`private async void ToggleMiniTimelineMenuItem_Click`** **removed**.
+
 ## Spine size after Slice 38 (keyboard shortcut key dispatch shell)
 
 **Delta:** **`Gap008Slice38Tests`** (**3** methods) + **`MainWindowKeyboardShortcutKeyDispatchShellBridgeTests`** (**4** methods) = **+7** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).

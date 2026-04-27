@@ -77,6 +77,7 @@ namespace VoiceStudio.App
         private readonly MainWindowStatusBarCoordinatorShellBridge _statusBarCoordinatorShellBridge;
         private readonly MainWindowMenuToolActivationShellBridge _menuToolActivationShellBridge;
         private readonly MainWindowKeyboardShortcutsShellBridge _keyboardShortcutsShellBridge;
+        private readonly MainWindowKeyboardShortcutsMenuItemShellBridge _keyboardShortcutsMenuItemShellBridge;
         private readonly MainWindowHelpAboutShellBridge _helpAboutShellBridge;
         private readonly MainWindowEditUndoRedoShellBridge _editUndoRedoShellBridge;
         private readonly MainWindowGlobalTransportShellBridge _globalTransportShellBridge;
@@ -434,6 +435,12 @@ namespace VoiceStudio.App
             profiler.Checkpoint("MainWindowMenuToolActivationShellBridge Created");
             _keyboardShortcutsShellBridge = new MainWindowKeyboardShortcutsShellBridge();
             profiler.Checkpoint("MainWindowKeyboardShortcutsShellBridge Created");
+            _keyboardShortcutsMenuItemShellBridge = new MainWindowKeyboardShortcutsMenuItemShellBridge(
+                _keyboardShortcutsShellBridge,
+                () => this.Content?.XamlRoot,
+                () => AppServices.GetRequiredService<KeyboardCustomizationViewModel>(),
+                () => ServiceProvider.GetToastNotificationService());
+            profiler.Checkpoint("MainWindowKeyboardShortcutsMenuItemShellBridge Created");
             _helpAboutShellBridge = new MainWindowHelpAboutShellBridge();
             profiler.Checkpoint("MainWindowHelpAboutShellBridge Created");
             _editUndoRedoShellBridge = new MainWindowEditUndoRedoShellBridge();
@@ -488,7 +495,9 @@ namespace VoiceStudio.App
                     {
                         if (_keyboardShortcutsMenuItem != null)
                         {
-                            KeyboardShortcutsMenuItem_Click(_keyboardShortcutsMenuItem, new RoutedEventArgs());
+                            _keyboardShortcutsMenuItemShellBridge.OnKeyboardShortcutsMenuItemClick(
+                                _keyboardShortcutsMenuItem,
+                                new RoutedEventArgs());
                         }
                     }));
             _panelQuickSwitchShortcutRegistrationShellBridge = new MainWindowPanelQuickSwitchShortcutRegistrationShellBridge();
@@ -508,7 +517,7 @@ namespace VoiceStudio.App
             _checkForUpdatesMenuItem = new MenuFlyoutItem { Text = "Check for Updates..." };
             _checkForUpdatesMenuItem.Click += CheckForUpdatesMenuItem_Click;
             _keyboardShortcutsMenuItem = new MenuFlyoutItem { Text = "Keyboard Shortcuts" };
-            _keyboardShortcutsMenuItem.Click += KeyboardShortcutsMenuItem_Click;
+            _keyboardShortcutsMenuItem.Click += _keyboardShortcutsMenuItemShellBridge.OnKeyboardShortcutsMenuItemClick;
             _manageWorkspacesMenuItem = new MenuFlyoutItem { Text = "Manage Workspaces..." };
             _manageWorkspacesMenuItem.Click += ManageWorkspaces_Click;
             profiler.Checkpoint("Menu Items Created");
@@ -1039,14 +1048,6 @@ namespace VoiceStudio.App
 
         private async void CustomizeToolbarMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
             await _toolbarCustomizationShellBridge.ShowCustomizationDialogAsync().ConfigureAwait(true);
-
-        private async void KeyboardShortcutsMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
-            await _keyboardShortcutsShellBridge
-                .RunKeyboardShortcutsMenuFlowAsync(
-                    () => this.Content?.XamlRoot,
-                    () => AppServices.GetRequiredService<KeyboardCustomizationViewModel>(),
-                    () => ServiceProvider.GetToastNotificationService())
-                .ConfigureAwait(true);
 
         private void ShowCommandPalette()
         {

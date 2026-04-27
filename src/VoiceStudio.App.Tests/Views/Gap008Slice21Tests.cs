@@ -43,12 +43,12 @@ public sealed class Gap008Slice21Tests
     }
 
     [TestMethod]
-    public void MainWindow_KeyboardShortcutsMenuItem_Click_delegates_to_keyboard_shortcuts_shell_bridge()
+    public void MainWindow_keyboard_shortcuts_menu_item_uses_slice41_bridge_forwarding_slice21_shell()
     {
         var text = File.ReadAllText(MainWindowPath);
-        StringAssert.Contains(text, "KeyboardShortcutsMenuItem_Click");
+        StringAssert.Contains(text, "_keyboardShortcutsMenuItemShellBridge");
+        StringAssert.Contains(text, "OnKeyboardShortcutsMenuItemClick");
         StringAssert.Contains(text, "_keyboardShortcutsShellBridge");
-        StringAssert.Contains(text, "RunKeyboardShortcutsMenuFlowAsync");
     }
 
     [TestMethod]

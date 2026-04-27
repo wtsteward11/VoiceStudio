@@ -34,6 +34,9 @@ public sealed class Gap008Slice20Tests
     private static string MainWindowPath =>
         Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "MainWindow.xaml.cs");
 
+    private static string KeyboardShortcutsMenuItemBridgePath =>
+        Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "MainWindowKeyboardShortcutsMenuItemShellBridge.cs");
+
     private static string WorkspacesPartialPath =>
         Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "MainWindow.Workspaces.cs");
 
@@ -93,16 +96,16 @@ public sealed class Gap008Slice20Tests
     }
 
     [TestMethod]
-    public void MainWindow_KeyboardShortcutsMenuItem_Click_does_not_use_menu_tool_activation_bridge()
+    public void MainWindow_keyboard_shortcuts_menu_item_click_does_not_use_menu_tool_activation_bridge()
     {
-        var text = File.ReadAllText(MainWindowPath);
-        var start = text.IndexOf("private async void KeyboardShortcutsMenuItem_Click", StringComparison.Ordinal);
-        Assert.IsTrue(start >= 0, "Expected KeyboardShortcutsMenuItem_Click handler.");
-        var end = text.IndexOf("private void ShowCommandPalette", start, StringComparison.Ordinal);
-        Assert.IsTrue(end > start, "Expected following ShowCommandPalette method.");
-        var handlerBlock = text[start..end];
+        var main = File.ReadAllText(MainWindowPath);
+        const string clickWire =
+            "_keyboardShortcutsMenuItem.Click += _keyboardShortcutsMenuItemShellBridge.OnKeyboardShortcutsMenuItemClick";
+        StringAssert.Contains(main, clickWire);
+
+        var menuItemBridge = File.ReadAllText(KeyboardShortcutsMenuItemBridgePath);
         Assert.IsFalse(
-            handlerBlock.Contains("_menuToolActivationShellBridge", StringComparison.Ordinal),
-            "Keyboard shortcuts handler must not reference menu/tool activation bridge (Slice 20 seam boundary).");
+            menuItemBridge.Contains("MainWindowMenuToolActivationShellBridge", StringComparison.Ordinal),
+            "Slice 41 menu-item bridge must not reference menu/tool activation bridge (Slice 20 seam boundary).");
     }
 }

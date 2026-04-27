@@ -78,6 +78,7 @@ namespace VoiceStudio.App
         private readonly MainWindowStatusBarCoordinatorShellBridge _statusBarCoordinatorShellBridge;
         private readonly MainWindowMenuToolActivationShellBridge _menuToolActivationShellBridge;
         private readonly MainWindowCheckForUpdatesMenuItemShellBridge _checkForUpdatesMenuItemShellBridge;
+        private readonly MainWindowManageWorkspacesMenuItemShellBridge _manageWorkspacesMenuItemShellBridge;
         private readonly MainWindowKeyboardShortcutsShellBridge _keyboardShortcutsShellBridge;
         private readonly MainWindowKeyboardShortcutsMenuItemShellBridge _keyboardShortcutsMenuItemShellBridge;
         private readonly MainWindowHelpAboutShellBridge _helpAboutShellBridge;
@@ -444,6 +445,11 @@ namespace VoiceStudio.App
                 _updateService,
                 () => ServiceProvider.GetErrorDialogService());
             profiler.Checkpoint("MainWindowCheckForUpdatesMenuItemShellBridge Created");
+            _manageWorkspacesMenuItemShellBridge = new MainWindowManageWorkspacesMenuItemShellBridge(
+                _menuToolActivationShellBridge,
+                () => (Content as FrameworkElement)?.XamlRoot,
+                () => ServiceProvider.TryGetToastNotificationService());
+            profiler.Checkpoint("MainWindowManageWorkspacesMenuItemShellBridge Created");
             _keyboardShortcutsShellBridge = new MainWindowKeyboardShortcutsShellBridge();
             profiler.Checkpoint("MainWindowKeyboardShortcutsShellBridge Created");
             _keyboardShortcutsMenuItemShellBridge = new MainWindowKeyboardShortcutsMenuItemShellBridge(
@@ -530,7 +536,7 @@ namespace VoiceStudio.App
             _keyboardShortcutsMenuItem = new MenuFlyoutItem { Text = "Keyboard Shortcuts" };
             _keyboardShortcutsMenuItem.Click += _keyboardShortcutsMenuItemShellBridge.OnKeyboardShortcutsMenuItemClick;
             _manageWorkspacesMenuItem = new MenuFlyoutItem { Text = "Manage Workspaces..." };
-            _manageWorkspacesMenuItem.Click += ManageWorkspaces_Click;
+            _manageWorkspacesMenuItem.Click += _manageWorkspacesMenuItemShellBridge.OnManageWorkspacesMenuItemClick;
             profiler.Checkpoint("Menu Items Created");
 
             _menuBarShellBridge = new MainWindowMenuBarShellBridge(

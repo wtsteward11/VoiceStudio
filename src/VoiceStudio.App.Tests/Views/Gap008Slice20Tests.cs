@@ -77,12 +77,18 @@ public sealed class Gap008Slice20Tests
     }
 
     [TestMethod]
-    public void MainWindow_Workspaces_ManageWorkspaces_Click_delegates_to_menu_tool_activation_bridge()
+    public void MainWindow_manage_workspaces_menu_item_wires_to_manage_workspaces_menu_item_shell_bridge()
     {
-        var text = File.ReadAllText(WorkspacesPartialPath);
-        StringAssert.Contains(text, "ManageWorkspaces_Click");
-        StringAssert.Contains(text, "_menuToolActivationShellBridge");
-        StringAssert.Contains(text, "RunManageWorkspacesAsync");
+        var main = File.ReadAllText(MainWindowPath);
+        StringAssert.Contains(main, "_manageWorkspacesMenuItemShellBridge");
+        StringAssert.Contains(main, "OnManageWorkspacesMenuItemClick");
+        StringAssert.Contains(main, "new MainWindowManageWorkspacesMenuItemShellBridge(");
+        StringAssert.Contains(main, "_menuToolActivationShellBridge");
+
+        var workspaces = File.ReadAllText(WorkspacesPartialPath);
+        Assert.IsFalse(
+            workspaces.Contains("ManageWorkspaces_Click", StringComparison.Ordinal),
+            "Slice 44: ManageWorkspaces handler must not remain on MainWindow.Workspaces.cs.");
     }
 
     [TestMethod]

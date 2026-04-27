@@ -190,13 +190,6 @@ namespace VoiceStudio.App
             }
         }
 
-        private async void ManageWorkspaces_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
-            await _menuToolActivationShellBridge
-                .RunManageWorkspacesAsync(
-                    () => (Content as FrameworkElement)?.XamlRoot,
-                    () => ServiceProvider.TryGetToastNotificationService())
-                .ConfigureAwait(true);
-
         /// <summary>Restore saved layout (one active panel/region). Returns (restored, hadRegions, failedItems).</summary>
         private async Task<(bool restored, bool hadRegions, List<(PanelRegion region, string panelId)> failedItems)> RestorePanelsFromLayoutAsync()
         {

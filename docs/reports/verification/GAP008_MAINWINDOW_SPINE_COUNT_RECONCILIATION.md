@@ -216,6 +216,12 @@ After **Task 419**, `scripts/Run-Gap008MainWindowRegressionTests.ps1` does that 
 
 **Arithmetic:** **320** (post–Slice 42 green) **+ 11** = **331** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260427_104612.trx`**; 2026-04-27). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **331** / **331** with the extended `effectiveFilter`. **`MainWindowMenuToolActivationShellBridge`** (**Slice 20**) **`RunCheckForUpdatesAsync`** unchanged; **`MainWindow`** **`private async void CheckForUpdatesMenuItem_Click`** **removed**.
 
+## Spine size after Slice 44 (Manage Workspaces menu item wiring shell)
+
+**Delta:** **`Gap008Slice44Tests`** (**4** methods) + **`MainWindowManageWorkspacesMenuItemShellBridgeTests`** (**6** methods) = **+10** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt). **`Gap008Slice20Tests`** pin updated so **`ManageWorkspaces_Click`** is **not** expected on **`MainWindow.Workspaces`** (wiring on **`MainWindowManageWorkspacesMenuItemShellBridge`**).
+
+**Arithmetic:** **331** (post–Slice 43 green) **+ 10** = **341** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260427_111924.trx`**; 2026-04-27). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **341** / **341** with the extended `effectiveFilter`. **`MainWindowMenuToolActivationShellBridge`** (**Slice 20**) **`RunManageWorkspacesAsync`** unchanged; **`MainWindow.Workspaces`** **`private async void ManageWorkspaces_Click`** **removed**.
+
 ## Spine size after Slice 38 (keyboard shortcut key dispatch shell)
 
 **Delta:** **`Gap008Slice38Tests`** (**3** methods) + **`MainWindowKeyboardShortcutKeyDispatchShellBridgeTests`** (**4** methods) = **+7** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).

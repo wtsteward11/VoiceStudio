@@ -59,6 +59,7 @@ namespace VoiceStudio.App
         private MainWindowNavigationShellBridge _navShellBridge = null!;
         private readonly MainWindowSearchOverlayShellBridge _searchOverlayShellBridge;
         private readonly MainWindowToolbarCustomizationShellBridge _toolbarCustomizationShellBridge;
+        private readonly MainWindowCustomizeToolbarMenuItemShellBridge _customizeToolbarMenuItemShellBridge;
         private readonly MainWindowCommandPaletteShellBridge _commandPaletteShellBridge;
         private readonly MainWindowToolCatalogShellBridge _toolCatalogShellBridge;
         private readonly MainWindowToolCatalogPanelHostChromeShellBridge _toolCatalogPanelHostChromeShellBridge;
@@ -333,6 +334,9 @@ namespace VoiceStudio.App
                 () => ServiceProvider.TryGetToastNotificationService());
             profiler.Checkpoint("MainWindowToolbarCustomizationShellBridge Created");
 
+            _customizeToolbarMenuItemShellBridge = new MainWindowCustomizeToolbarMenuItemShellBridge(_toolbarCustomizationShellBridge);
+            profiler.Checkpoint("MainWindowCustomizeToolbarMenuItemShellBridge Created");
+
             _commandPaletteShellBridge = new MainWindowCommandPaletteShellBridge(
                 () => ServiceProvider.GetPanelRegistry(),
                 () => new ThemeManager(),
@@ -513,7 +517,7 @@ namespace VoiceStudio.App
             _toggleMiniTimelineMenuItem = new MenuFlyoutItem { Text = "Toggle Mini Timeline" };
             _toggleMiniTimelineMenuItem.Click += ToggleMiniTimelineMenuItem_Click;
             _customizeToolbarMenuItem = new MenuFlyoutItem { Text = "Customize Toolbar..." };
-            _customizeToolbarMenuItem.Click += CustomizeToolbarMenuItem_Click;
+            _customizeToolbarMenuItem.Click += _customizeToolbarMenuItemShellBridge.OnCustomizeToolbarMenuItemClick;
             _checkForUpdatesMenuItem = new MenuFlyoutItem { Text = "Check for Updates..." };
             _checkForUpdatesMenuItem.Click += CheckForUpdatesMenuItem_Click;
             _keyboardShortcutsMenuItem = new MenuFlyoutItem { Text = "Keyboard Shortcuts" };
@@ -1045,9 +1049,6 @@ namespace VoiceStudio.App
                     : "Show Mini Timeline";
             }
         }
-
-        private async void CustomizeToolbarMenuItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
-            await _toolbarCustomizationShellBridge.ShowCustomizationDialogAsync().ConfigureAwait(true);
 
         private void ShowCommandPalette()
         {

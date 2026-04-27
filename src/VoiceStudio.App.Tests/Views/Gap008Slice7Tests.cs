@@ -37,19 +37,24 @@ public sealed class Gap008Slice7Tests
     private static string ToolbarBridgePath =>
         Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "MainWindowToolbarCustomizationShellBridge.cs");
 
+    private static string CustomizeToolbarMenuItemBridgePath =>
+        Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "MainWindowCustomizeToolbarMenuItemShellBridge.cs");
+
     [TestMethod]
     public void MainWindow_toolbar_customize_handler_delegates_to_toolbar_customization_bridge()
     {
         var text = File.ReadAllText(MainWindowPath);
         StringAssert.Contains(text, "_toolbarCustomizationShellBridge");
-        StringAssert.Contains(text, "_toolbarCustomizationShellBridge.ShowCustomizationDialogAsync");
+        StringAssert.Contains(text, "_customizeToolbarMenuItemShellBridge");
+        var menuBridgeText = File.ReadAllText(CustomizeToolbarMenuItemBridgePath);
+        StringAssert.Contains(menuBridgeText, "ShowCustomizationDialogAsync");
     }
 
     [TestMethod]
-    public void MainWindow_CustomizeToolbar_menu_handler_entry_point_unchanged()
+    public void MainWindow_customize_toolbar_menu_click_attaches_to_menu_item_shell_bridge()
     {
         var text = File.ReadAllText(MainWindowPath);
-        StringAssert.Contains(text, "CustomizeToolbarMenuItem_Click");
+        StringAssert.Contains(text, "_customizeToolbarMenuItem.Click += _customizeToolbarMenuItemShellBridge.OnCustomizeToolbarMenuItemClick");
     }
 
     [TestMethod]

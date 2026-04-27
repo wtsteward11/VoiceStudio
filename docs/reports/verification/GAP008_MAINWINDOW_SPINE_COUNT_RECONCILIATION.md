@@ -204,6 +204,12 @@ After **Task 419**, `scripts/Run-Gap008MainWindowRegressionTests.ps1` does that 
 
 **Arithmetic:** **302** (post–Slice 40 green) **+ 9** = **311** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260426_213036.trx`**; Tasks **231–240** — 2026-04-27). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **311** / **311** with the extended `effectiveFilter`. **`MainWindowKeyboardShortcutsShellBridge`** (**Slice 21**) unchanged; **`MainWindow`** **`private async void KeyboardShortcutsMenuItem_Click`** **removed**.
 
+## Spine size after Slice 42 (customize toolbar menu item wiring shell)
+
+**Delta:** **`Gap008Slice42Tests`** (**4** methods) + **`MainWindowCustomizeToolbarMenuItemShellBridgeTests`** (**5** methods) = **+9** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt). **`Gap008Slice7Tests`** pins updated so **`MainWindow`** no longer exposes **`CustomizeToolbarMenuItem_Click`** (wiring on **`MainWindowCustomizeToolbarMenuItemShellBridge`**).
+
+**Arithmetic:** **311** (post–Slice 41 green) **+ 9** = **320** listed / passed on a green run (TRX **`.buildlogs/gap008_spine/gap008_spine_20260427_094459.trx`**; Task **246** — 2026-04-27). Green coherence fixture [`tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json`](../../tests/fixtures/gap008_spine/last_run_summary_green_listing_matches_trx.json) updated to **320** / **320** with the extended `effectiveFilter`. **`MainWindowToolbarCustomizationShellBridge`** (**Slice 7**) unchanged; **`MainWindow`** **`private async void CustomizeToolbarMenuItem_Click`** **removed**.
+
 ## Spine size after Slice 38 (keyboard shortcut key dispatch shell)
 
 **Delta:** **`Gap008Slice38Tests`** (**3** methods) + **`MainWindowKeyboardShortcutKeyDispatchShellBridgeTests`** (**4** methods) = **+7** tests prepended to the canonical OR filter in [`tools/gap008_mainwindow_regression_filter.txt`](../../tools/gap008_mainwindow_regression_filter.txt).

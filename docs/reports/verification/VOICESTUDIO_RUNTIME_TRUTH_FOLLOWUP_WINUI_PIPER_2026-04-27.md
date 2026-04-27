@@ -181,7 +181,57 @@ No **product** blocker was identified for Piper synthesis (post-consent), API he
 
 **PARTIAL**
 
-Rationale: **Follow-up B** adds **stronger** evidence than the initial pass alone: **granted consent** → **`POST /api/voice/synthesize`** with **`routed_engine: piper`** and the **exact phrase** → **169004**-byte **RIFF/WAVE** on disk with **non-trivial RMS**, plus a **second** WinUI launch with **`VoiceStudio Quantum+`** window title. **Still not FULL PASS** under the plan’s strict rule because **in-app** panel navigation, phrase entry, output path from UI, and **in-app playback heard** were **not** operator-attested here. **Not FAIL** — control plane, consent policy, Piper routing, and file shape are consistent with a healthy dev setup.
+Rationale: **Follow-up B** adds **stronger** evidence than the initial pass alone: **granted consent** → **`POST /api/voice/synthesize`** with **`routed_engine: piper`** and the **exact phrase** → **169004**-byte **RIFF/WAVE** on disk with **non-trivial RMS**, plus a **second** WinUI launch with **`VoiceStudio Quantum+`** window title. **Follow-up C** (below) did **not** add **in-app** UI synthesis or **in-app** playback attestation in this agent session. **Still not FULL PASS** under the plan’s strict rule because **in-app** panel navigation, phrase entry, output path from UI, and **in-app playback heard** were **not** operator-attested here. **Not FAIL** — control plane, consent policy, Piper routing, and file shape are consistent with a healthy dev setup.
+
+---
+
+## Follow-up C (WinUI in-app synthesis + playback, 2026-04-27)
+
+### C1 — Preconditions and automation probe
+
+| Item | Value |
+|------|--------|
+| **Backend** | Not re-checked in this Follow-up C slice; **Follow-up B** assumed still valid for API/consent context. |
+| **WinAppDriver** | `GET http://127.0.0.1:4723/status` — **no response within 2s** (timeout). **UI automation not available** for unattended Follow-up C. |
+| **Human operator** | **Not available** in this Cursor agent session (no interactive WinUI drive). |
+
+### C2 — Intended in-app path (not executed)
+
+Per [AUTOMATION_ID_REGISTRY.md](../../developer/AUTOMATION_ID_REGISTRY.md) § VoiceSynthesisView: navigate to **Voice synthesis**; `VoiceSynthesisView_EngineComboBox` → **Piper**; `VoiceSynthesisView_ProfileComboBox` → profile **`22ebe087-5589-4d35-ab5a-c57049407813`**; consent via UI if required (else disclose **pre-granted** API consent from Follow-up B); `VoiceSynthesisView_TextInput` → **`VoiceStudio runtime truth follow-up using Piper.`**; `VoiceSynthesisView_SynthesizeButton`; capture path / `audio_id`; `VoiceSynthesisView_PlayButton`; operator attests **heard / not heard**.
+
+### C3 — Execution result
+
+| Step | Result |
+|------|--------|
+| **Launch + visible window** | **Not executed** in Follow-up C (no new cold launch this slice). |
+| **Screenshot** | **Not captured**. |
+| **Voice synthesis panel** | **Not opened** via UI. |
+| **Profile / Piper / phrase / Synthesize** | **Not driven** from WinUI. |
+| **Output path / audio id from UI** | **N/A**. |
+| **In-app Play** | **Not executed**; **audio heard** — **not attested**. |
+
+### C4 — Artifact (in-app origin)
+
+No file produced by **in-app** synthesis in this session. **Follow-up B** WAV remains the only validated synthesis artifact (`E:\VoiceStudio\artifacts\runtime_truth_b_piper.wav` — **API** origin, not UI origin).
+
+### C5 — Blockers (Follow-up C)
+
+| Blocker | Class |
+|---------|--------|
+| No human operator + WinAppDriver unavailable | **Proof-only** |
+| In-app path not executed | **Proof-only** |
+
+### C6 — Follow-up C verdict
+
+**PARTIAL** — same class as overall doc: **no** WinUI-originated synthesis, **no** in-app play, **no** operator audio attestation. **Not FAIL** (no product error demonstrated under a driven UI path).
+
+### C7 — Verification gate (after Follow-up C + STATE + registry edits)
+
+| Item | Value |
+|------|--------|
+| **`python scripts/run_verification.py`** | **PASS** (overall); `.buildlogs/verification/last_run.json` |
+| **`.\scripts\verify.ps1 -Quick`** | **PASS** (exit **0**); report **`E:\VoiceStudio\artifacts\verify\20260427_160225\verification_report.md`** |
+| **Advisories** | `runtime_proof_staleness`, `slo_baseline_freshness`, `backend_smoke_freshness` (non-failing) |
 
 ---
 

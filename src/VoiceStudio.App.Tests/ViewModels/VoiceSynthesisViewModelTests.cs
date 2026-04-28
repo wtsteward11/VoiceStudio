@@ -737,6 +737,146 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsFalse(_sut.CanPlayAudio);
     }
 
+    [TestMethod]
+    public async Task SynthesizeAsync_Success_WithAudioIdAndUrl_SetsSynthesisResult()
+    {
+      await RunSuccessfulSynthesisAsync("audio-result-1", "/api/audio/audio-result-1");
+
+      Assert.IsTrue(_sut.HasSynthesisResult);
+      Assert.IsTrue(_sut.CanCopyAudioId);
+      Assert.IsTrue(_sut.CanCopyAudioReference);
+    }
+
+    [TestMethod]
+    public async Task SynthesisResultSummary_AfterSuccess_IncludesAudioIdAndReference()
+    {
+      await RunSuccessfulSynthesisAsync("audio-summary-1", "/api/audio/audio-summary-1");
+
+      StringAssert.Contains(_sut.SynthesisResultSummary, "audio-summary-1");
+      StringAssert.Contains(_sut.SynthesisResultSummary, "/api/audio/audio-summary-1");
+    }
+
+    [TestMethod]
+    public void CopyAudioIdCommand_BeforeSynthesis_IsDisabled()
+    {
+      Assert.IsFalse(_sut.CopyAudioIdCommand.CanExecute(null));
+      Assert.IsFalse(_sut.CanCopyAudioId);
+    }
+
+    [TestMethod]
+    public async Task CopyAudioIdCommand_AfterAudioIdResult_IsEnabled()
+    {
+      await RunSuccessfulSynthesisAsync("copy-id-1", "/api/audio/copy-id-1");
+
+      Assert.IsTrue(_sut.CopyAudioIdCommand.CanExecute(null));
+      Assert.IsTrue(_sut.CanCopyAudioId);
+    }
+
+    [TestMethod]
+    public async Task CopyAudioReferenceCommand_WhenAudioUrlExists_IsEnabled()
+    {
+      await RunSuccessfulSynthesisAsync("copy-ref-1", "/api/audio/copy-ref-1");
+
+      Assert.IsTrue(_sut.CopyAudioReferenceCommand.CanExecute(null));
+      Assert.IsTrue(_sut.CanCopyAudioReference);
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_AudioIdOnlyResult_EnablesCopyIdAndPlay()
+    {
+      await RunSuccessfulSynthesisAsync("audio-id-only-result", string.Empty);
+
+      Assert.IsTrue(_sut.HasSynthesisResult);
+      Assert.IsTrue(_sut.CanCopyAudioId);
+      Assert.IsFalse(_sut.CanCopyAudioReference);
+      Assert.IsTrue(_sut.CanPlayAudio);
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_UrlOnlyResult_EnablesCopyReferenceAndPlay()
+    {
+      await RunSuccessfulSynthesisAsync(string.Empty, "/api/audio/url-only-result");
+
+      Assert.IsTrue(_sut.HasSynthesisResult);
+      Assert.IsFalse(_sut.CanCopyAudioId);
+      Assert.IsTrue(_sut.CanCopyAudioReference);
+      Assert.IsTrue(_sut.CanPlayAudio);
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_ErrorAfterPriorSuccess_ClearsStaleResultAffordances()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .SetupSequence(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new VoiceSynthesisResponse
+          {
+            AudioId = "stale-audio",
+            AudioUrl = "/api/audio/stale-audio",
+            Duration = 1.0,
+            QualityScore = 0.9,
+          })
+          .ThrowsAsync(new HttpRequestException("network fail"));
+
+      await ((IAsyncRelayCommand)_sut.SynthesizeCommand).ExecuteAsync(default);
+      Assert.IsTrue(_sut.HasSynthesisResult);
+
+      await ((IAsyncRelayCommand)_sut.SynthesizeCommand).ExecuteAsync(default);
+
+      Assert.IsTrue(_sut.HasError);
+      Assert.IsFalse(_sut.HasSynthesisResult);
+      Assert.IsFalse(_sut.CanCopyAudioId);
+      Assert.IsFalse(_sut.CanCopyAudioReference);
+      Assert.IsFalse(_sut.OpenOutputLocationCommand.CanExecute(null));
+    }
+
+    [DataTestMethod]
+    [DataRow("https://localhost/api/audio/a1")]
+    [DataRow("http://localhost/api/audio/a1")]
+    [DataRow("/api/audio/a1")]
+    public async Task OpenOutputLocationCommand_ForHttpOrApiReference_IsDisabled(string audioReference)
+    {
+      await RunSuccessfulSynthesisAsync("a1", audioReference);
+
+      Assert.IsFalse(_sut.CanOpenOutputLocation);
+      Assert.IsFalse(_sut.OpenOutputLocationCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task OpenOutputLocationCommand_ForExistingLocalFile_IsEnabled()
+    {
+      var path = Path.GetTempFileName();
+      try
+      {
+        await RunSuccessfulSynthesisAsync("local-file-result", path);
+
+        Assert.IsTrue(_sut.CanOpenOutputLocation);
+        Assert.IsTrue(_sut.OpenOutputLocationCommand.CanExecute(null));
+      }
+      finally
+      {
+        File.Delete(path);
+      }
+    }
+
+    private async Task RunSuccessfulSynthesisAsync(string audioId, string audioUrl)
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new VoiceSynthesisResponse
+          {
+            AudioId = audioId,
+            AudioUrl = audioUrl,
+            Duration = 1.0,
+            QualityScore = 0.9,
+          });
+
+      await ((IAsyncRelayCommand)_sut.SynthesizeCommand).ExecuteAsync(default);
+    }
+
     #endregion
 
     #region Multi-Engine Ensemble Tests

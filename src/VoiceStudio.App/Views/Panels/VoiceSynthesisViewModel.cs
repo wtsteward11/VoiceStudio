@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -200,6 +201,34 @@ namespace VoiceStudio.App.Views.Panels
     /// <summary>Play enabled when workflow state is AudioReady (audio asset exists).</summary>
     public bool CanPlayAudio => WorkflowState == SynthesisWorkflowState.AudioReady && !IsLoading;
 
+    public bool HasSynthesisResult =>
+        WorkflowState == SynthesisWorkflowState.AudioReady &&
+        !IsLoading &&
+        (!string.IsNullOrWhiteSpace(LastSynthesizedAudioId) ||
+         !string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl));
+
+    public string SynthesisResultSummary
+    {
+      get
+      {
+        if (!HasSynthesisResult)
+          return ResourceHelper.GetString("VoiceSynthesis.GeneratedAudioUnavailable", "No generated audio yet.");
+
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(LastSynthesizedAudioId))
+          parts.Add($"Audio ID: {LastSynthesizedAudioId}");
+        if (!string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl))
+          parts.Add($"Reference: {LastSynthesizedAudioUrl}");
+        return string.Join(Environment.NewLine, parts);
+      }
+    }
+
+    public bool CanCopyAudioId => HasSynthesisResult && !string.IsNullOrWhiteSpace(LastSynthesizedAudioId);
+
+    public bool CanCopyAudioReference => HasSynthesisResult && !string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl);
+
+    public bool CanOpenOutputLocation => HasSynthesisResult && TryResolveExistingLocalOutputPath(LastSynthesizedAudioUrl, out _, out _);
+
     [ObservableProperty]
     private TimeSpan lastSynthesizedDuration;
 
@@ -363,6 +392,9 @@ namespace VoiceStudio.App.Views.Panels
 
       CopyLastErrorCommand = new RelayCommand(CopyLastErrorToClipboard, () => !string.IsNullOrEmpty(LastError));
       ClearErrorCommand = new RelayCommand(ClearError, () => HasError);
+      CopyAudioIdCommand = new RelayCommand(CopyAudioIdToClipboard, () => CanCopyAudioId);
+      CopyAudioReferenceCommand = new RelayCommand(CopyAudioReferenceToClipboard, () => CanCopyAudioReference);
+      OpenOutputLocationCommand = new RelayCommand(OpenOutputLocation, () => CanOpenOutputLocation);
 
       OpenProfileConsentCommand = new RelayCommand(
           OpenProfileConsent,
@@ -483,6 +515,9 @@ namespace VoiceStudio.App.Views.Panels
     public IRelayCommand StopAudioCommand { get; }
     public IRelayCommand CopyLastErrorCommand { get; }
     public IRelayCommand ClearErrorCommand { get; }
+    public IRelayCommand CopyAudioIdCommand { get; }
+    public IRelayCommand CopyAudioReferenceCommand { get; }
+    public IRelayCommand OpenOutputLocationCommand { get; }
     public IRelayCommand OpenProfileConsentCommand { get; }
     public EnhancedAsyncRelayCommand RetrySynthesisCommand { get; }
     public IRelayCommand AddToTimelineCommand { get; }
@@ -544,6 +579,14 @@ namespace VoiceStudio.App.Views.Panels
       HasError = false;
       HasQualityMetrics = false;
       ClearConsentState();
+      ResetLastSynthesisOutput();
+    }
+
+    private void ResetLastSynthesisOutput()
+    {
+      LastSynthesizedAudioId = string.Empty;
+      LastSynthesizedAudioUrl = string.Empty;
+      LastSynthesizedDuration = TimeSpan.Zero;
     }
 
     // Quality metrics display properties
@@ -1174,6 +1217,7 @@ namespace VoiceStudio.App.Views.Panels
       SynthesizeCommand.NotifyCanExecuteChanged();
       AddToTimelineCommand.NotifyCanExecuteChanged(); // GAP-B04
       OnPropertyChanged(nameof(CanPlayAudio));
+      RefreshSynthesisResultState();
       PlayAudioCommand.NotifyCanExecuteChanged();
       RetrySynthesisCommand.NotifyCanExecuteChanged();
     }
@@ -1198,7 +1242,19 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnWorkflowStateChanged(SynthesisWorkflowState value)
     {
       OnPropertyChanged(nameof(CanPlayAudio));
+      RefreshSynthesisResultState();
       PlayAudioCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnLastSynthesizedAudioIdChanged(string? value)
+    {
+      RefreshSynthesisResultState();
+      AddToTimelineCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnLastSynthesizedAudioUrlChanged(string? value)
+    {
+      RefreshSynthesisResultState();
     }
 
     partial void OnHasErrorChanged(bool value)
@@ -1244,6 +1300,118 @@ namespace VoiceStudio.App.Views.Panels
       _toastNotificationService?.ShowSuccess(
           ResourceHelper.GetString("VoiceSynthesis.ErrorCopied", "Copied"),
           ResourceHelper.GetString("VoiceSynthesis.ErrorDetailsCopied", "Error details copied to clipboard"));
+    }
+
+    private void CopyAudioIdToClipboard()
+    {
+      CopyTextToClipboard(
+          LastSynthesizedAudioId,
+          ResourceHelper.GetString("VoiceSynthesis.AudioIdCopied", "Copied"),
+          ResourceHelper.GetString("VoiceSynthesis.AudioIdCopiedDetail", "Audio ID copied to clipboard"));
+    }
+
+    private void CopyAudioReferenceToClipboard()
+    {
+      CopyTextToClipboard(
+          LastSynthesizedAudioUrl,
+          ResourceHelper.GetString("VoiceSynthesis.AudioReferenceCopied", "Copied"),
+          ResourceHelper.GetString("VoiceSynthesis.AudioReferenceCopiedDetail", "Audio reference copied to clipboard"));
+    }
+
+    private void CopyTextToClipboard(string? text, string title, string message)
+    {
+      if (string.IsNullOrWhiteSpace(text))
+        return;
+
+      var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+      dataPackage.SetText(text);
+      Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+      _toastNotificationService?.ShowSuccess(title, message);
+    }
+
+    private void OpenOutputLocation()
+    {
+      if (!TryResolveExistingLocalOutputPath(LastSynthesizedAudioUrl, out var localPath, out var isDirectory) ||
+          string.IsNullOrWhiteSpace(localPath))
+      {
+        return;
+      }
+
+      try
+      {
+        Process.Start(new ProcessStartInfo
+        {
+          FileName = "explorer.exe",
+          Arguments = isDirectory ? $"\"{localPath}\"" : $"/select,\"{localPath}\"",
+          UseShellExecute = true
+        });
+      }
+      catch (Exception ex)
+      {
+        _errorLoggingService?.LogError(ex, "VoiceSynthesis.OpenOutputLocation", new Dictionary<string, object>
+        {
+          { "Path", localPath }
+        });
+        _toastNotificationService?.ShowError(
+            ResourceHelper.GetString("VoiceSynthesis.OpenOutputLocationFailed", "Unable to Open Output Location"),
+            ErrorHandler.GetUserFriendlyMessage(ex));
+      }
+    }
+
+    private static bool TryResolveExistingLocalOutputPath(string? reference, out string? localPath, out bool isDirectory)
+    {
+      localPath = null;
+      isDirectory = false;
+
+      if (string.IsNullOrWhiteSpace(reference))
+        return false;
+
+      var candidate = reference.Trim();
+      if (candidate.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) ||
+          candidate.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+          candidate.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+      {
+        return false;
+      }
+
+      if (Uri.TryCreate(candidate, UriKind.Absolute, out var uri))
+      {
+        if (uri.IsFile)
+          candidate = uri.LocalPath;
+        else
+          return false;
+      }
+      else if (!Path.IsPathFullyQualified(candidate))
+      {
+        return false;
+      }
+
+      if (File.Exists(candidate))
+      {
+        localPath = candidate;
+        return true;
+      }
+
+      if (Directory.Exists(candidate))
+      {
+        localPath = candidate;
+        isDirectory = true;
+        return true;
+      }
+
+      return false;
+    }
+
+    private void RefreshSynthesisResultState()
+    {
+      OnPropertyChanged(nameof(HasSynthesisResult));
+      OnPropertyChanged(nameof(SynthesisResultSummary));
+      OnPropertyChanged(nameof(CanCopyAudioId));
+      OnPropertyChanged(nameof(CanCopyAudioReference));
+      OnPropertyChanged(nameof(CanOpenOutputLocation));
+      CopyAudioIdCommand.NotifyCanExecuteChanged();
+      CopyAudioReferenceCommand.NotifyCanExecuteChanged();
+      OpenOutputLocationCommand.NotifyCanExecuteChanged();
     }
 
     private void ClearError()

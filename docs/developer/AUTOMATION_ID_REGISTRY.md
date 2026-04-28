@@ -165,6 +165,11 @@ Primary voice synthesis interface.
 | `VoiceSynthesisView_ConsentInfoBar` | InfoBar | Consent-required recovery (navigate to Profiles, retry) | v1.2.0 |
 | `VoiceSynthesisView_GoToProfileButton` | Button | Open Profiles for voice consent | v1.2.0 |
 | `VoiceSynthesisView_RetryConsentButton` | Button | Retry synthesis after consent is granted | v1.2.0 |
+| `VoiceSynthesisView_GeneratedAudioPanel` | Border | Generated audio result summary and actions | v1.2.0 |
+| `VoiceSynthesisView_GeneratedAudioSummaryText` | TextBlock | Generated audio ID/reference summary | v1.2.0 |
+| `VoiceSynthesisView_CopyAudioIdButton` | Button | Copy generated audio ID | v1.2.0 |
+| `VoiceSynthesisView_CopyAudioReferenceButton` | Button | Copy generated audio URL/path/reference | v1.2.0 |
+| `VoiceSynthesisView_OpenOutputLocationButton` | Button | Open local output file/folder when available | v1.2.0 |
 | `VoiceSynthesisView_ErrorInfoBar` | InfoBar | Error display (hidden while consent callout is primary) | v1.0.0 |
 | `VoiceSynthesisView_LongFormToggle` | CheckBox | Long-form (chunked) synthesis mode | v1.2.0 |
 | `VoiceSynthesisView_LongFormProgressText` | TextBlock | Long-form processing status | v1.2.0 |

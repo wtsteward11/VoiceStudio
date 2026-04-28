@@ -212,6 +212,13 @@ Voice profile management.
 | `ProfilesView_HelpButton` | Button | Show help | v1.0.0 |
 | `ProfilesView_SearchBox` | TextBox | Search profiles | v1.0.0 |
 | `ProfilesView_ProfilesGrid` | DataGrid | Profile list display | v1.0.0 |
+| `ProfilesView_CompatibleEnginesSummary` | TextBlock | Compatible engines summary line | 2026-04-28 |
+| `ProfilesView_CompatibleEnginesList` | ListView | Allowed engine ids for selected profile | 2026-04-28 |
+| `ProfilesView_RemoveEngineButton` | Button | Remove one engine id from compatibility list | 2026-04-28 |
+| `ProfilesView_AddEngineTextBox` | TextBox | Type engine id to add to compatibility list | 2026-04-28 |
+| `ProfilesView_AddEngineButton` | Button | Add typed engine id | 2026-04-28 |
+| `ProfilesView_SaveCompatibleEnginesButton` | Button | Persist compatibility list (`vs:engines:` tags) | 2026-04-28 |
+| `ProfilesView_ClearCompatibleEnginesButton` | Button | Clear all compatible engine restrictions | 2026-04-28 |
 | `ProfilesView_BatchExportButton` | Button | Batch export profiles | v1.0.0 |
 | `ProfilesView_BatchDeleteButton` | Button | Batch delete profiles | v1.0.0 |
 

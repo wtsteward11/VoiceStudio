@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
@@ -388,6 +389,334 @@ namespace VoiceStudio.App.Tests.ViewModels
 
       Assert.AreEqual(1, createCallCount, "CreateAsync should be called exactly once when CreateProfile is invoked concurrently");
     }
+
+    #region Profile engine compatibility editor
+
+    private static ProfilesViewModel CreateEngineEditorViewModel(
+        Mock<IProfilesUseCase>? mockUseCase = null,
+        Mock<IProfilesClient>? mockClient = null)
+    {
+      // When the caller supplies a use-case mock, do not register default UpdateAsync — it would
+      // replace their Callback/Verifies and break tag-capture tests.
+      var useCase = mockUseCase ?? new Mock<IProfilesUseCase>();
+      if (mockUseCase == null)
+      {
+        useCase
+            .Setup(x => x.UpdateAsync(
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<List<string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns((string id, string? name, string? lang, string? emo, List<string>? tags, CancellationToken ct) =>
+                Task.FromResult(new VoiceProfile
+                {
+                  Id = id,
+                  Name = name ?? "Profile",
+                  Language = lang,
+                  Emotion = emo,
+                  Tags = tags?.ToList() ?? new List<string>(),
+                }));
+      }
+
+      mockClient ??= new Mock<IProfilesClient>();
+
+      var audioPlayer = new AudioPlayerService(new System.Net.Http.HttpClient());
+      var multiSelectService = new MultiSelectService();
+      var undoRedoService = new UndoRedoService();
+      var qualityInsights = CreateMockProfileQualityInsightsService();
+      var transferService = CreateMockProfileTransferService();
+      var enhancementService = CreateMockProfileEnhancementService();
+
+      return new ProfilesViewModel(
+          mockClient.Object,
+          useCase.Object,
+          audioPlayer,
+          multiSelectService,
+          qualityInsights,
+          transferService,
+          enhancementService,
+          toastNotificationService: null,
+          undoRedoService: undoRedoService,
+          errorService: null,
+          logService: null,
+          dialogService: null,
+          previewService: null);
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_LoadVsEnginesTag_ReadsIdsAndSummary()
+    {
+      var vm = CreateEngineEditorViewModel();
+      vm.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string> { "vs:engines:piper" },
+      };
+
+      Assert.AreEqual(1, vm.ProfileCompatibleEngineIds.Count);
+      Assert.AreEqual("piper", vm.ProfileCompatibleEngineIds[0]);
+      StringAssert.Contains(vm.CompatibleEnginesSummary, "piper");
+      Assert.IsTrue(vm.HasProfileEngineCompatibilityRestriction);
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_NoVsEnginesTag_ShowsNoRestriction()
+    {
+      var vm = CreateEngineEditorViewModel();
+      vm.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string> { "favorite" },
+      };
+
+      Assert.AreEqual(0, vm.ProfileCompatibleEngineIds.Count);
+      Assert.IsFalse(vm.HasProfileEngineCompatibilityRestriction);
+      Assert.AreEqual("No engine restriction", vm.CompatibleEnginesSummary);
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_LoadDuplicateVsEnginesTags_NormalizesCollection()
+    {
+      var vm = CreateEngineEditorViewModel();
+      vm.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string> { "vs:engines:piper,zeta,piper" },
+      };
+
+      Assert.AreEqual(2, vm.ProfileCompatibleEngineIds.Count);
+      CollectionAssert.AreEquivalent(new[] { "piper", "zeta" }, vm.ProfileCompatibleEngineIds.ToList());
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_AddEngine_UpdatesCollectionAndSummary()
+    {
+      var vm = CreateEngineEditorViewModel();
+      vm.SelectedProfile = new VoiceProfile { Id = "p1", Name = "Narrator", Tags = new List<string>() };
+      vm.AddCompatibleEngineCommand.Execute("xtts");
+
+      Assert.AreEqual(1, vm.ProfileCompatibleEngineIds.Count);
+      Assert.AreEqual("xtts", vm.ProfileCompatibleEngineIds[0]);
+      StringAssert.Contains(vm.CompatibleEnginesSummary, "xtts");
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_AddDuplicateEngineCaseInsensitive_Ignored()
+    {
+      var vm = CreateEngineEditorViewModel();
+      vm.SelectedProfile = new VoiceProfile { Id = "p1", Name = "Narrator", Tags = new List<string>() };
+      vm.AddCompatibleEngineCommand.Execute("piper");
+      vm.AddCompatibleEngineCommand.Execute("PIPER");
+
+      Assert.AreEqual(1, vm.ProfileCompatibleEngineIds.Count);
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_RemoveEngine_UpdatesCollection()
+    {
+      var vm = CreateEngineEditorViewModel();
+      vm.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string> { "vs:engines:piper,xtts" },
+      };
+      vm.RemoveCompatibleEngineCommand.Execute("piper");
+
+      Assert.AreEqual(1, vm.ProfileCompatibleEngineIds.Count);
+      Assert.AreEqual("xtts", vm.ProfileCompatibleEngineIds[0]);
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_Clear_DisablesClearCommandWhenEmpty()
+    {
+      var vm = CreateEngineEditorViewModel();
+      vm.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string> { "vs:engines:piper" },
+      };
+      Assert.IsTrue(vm.ClearCompatibleEnginesCommand.CanExecute(null));
+      vm.ClearCompatibleEnginesCommand.Execute(null);
+      Assert.AreEqual(0, vm.ProfileCompatibleEngineIds.Count);
+      Assert.IsFalse(vm.ClearCompatibleEnginesCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task ProfileEngineCompatibility_SaveWritesSingleNormalizedVsEnginesTag()
+    {
+      List<string>? passedTags = null;
+      var mockUseCase = new Mock<IProfilesUseCase>();
+      mockUseCase
+          .Setup(x => x.UpdateAsync(
+              It.IsAny<string>(),
+              It.IsAny<string?>(),
+              It.IsAny<string?>(),
+              It.IsAny<string?>(),
+              It.IsAny<List<string>?>(),
+              It.IsAny<CancellationToken>()))
+          .Callback<string, string?, string?, string?, List<string>?, CancellationToken>((_, _, _, _, tags, _) =>
+          {
+            passedTags = tags?.ToList();
+          })
+          .Returns((string id, string? name, string? lang, string? emo, List<string>? tags, CancellationToken ct) =>
+              Task.FromResult(new VoiceProfile
+              {
+                Id = id,
+                Name = name ?? "P",
+                Tags = tags?.ToList() ?? new List<string>(),
+              }));
+
+      var vm = CreateEngineEditorViewModel(mockUseCase);
+      vm.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string>(),
+      };
+      vm.AddCompatibleEngineCommand.Execute("zeta");
+      vm.AddCompatibleEngineCommand.Execute("alpha");
+
+      await ((IAsyncRelayCommand)vm.SaveCompatibleEnginesCommand).ExecuteAsync(default).ConfigureAwait(false);
+
+      Assert.IsNotNull(passedTags);
+      Assert.AreEqual(1, passedTags!.Count(t => t.StartsWith("vs:engines:", StringComparison.Ordinal)));
+      Assert.AreEqual("vs:engines:alpha,zeta", passedTags!.First(t => t.StartsWith("vs:engines:", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task ProfileEngineCompatibility_SaveWithNoEngines_RemovesVsEnginesTags()
+    {
+      List<string>? passedTags = null;
+      var mockUseCase = new Mock<IProfilesUseCase>();
+      mockUseCase
+          .Setup(x => x.UpdateAsync(
+              It.IsAny<string>(),
+              It.IsAny<string?>(),
+              It.IsAny<string?>(),
+              It.IsAny<string?>(),
+              It.IsAny<List<string>?>(),
+              It.IsAny<CancellationToken>()))
+          .Callback<string, string?, string?, string?, List<string>?, CancellationToken>((_, _, _, _, tags, _) =>
+          {
+            passedTags = tags?.ToList();
+          })
+          .Returns((string id, string? name, string? lang, string? emo, List<string>? tags, CancellationToken ct) =>
+              Task.FromResult(new VoiceProfile { Id = id, Name = name ?? "P", Tags = tags?.ToList() ?? new List<string>() }));
+
+      var vm = CreateEngineEditorViewModel(mockUseCase);
+      vm.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string> { "vs:engines:piper", "favorite" },
+      };
+      vm.ClearCompatibleEnginesCommand.Execute(null);
+
+      await ((IAsyncRelayCommand)vm.SaveCompatibleEnginesCommand).ExecuteAsync(default).ConfigureAwait(false);
+
+      Assert.IsNotNull(passedTags);
+      Assert.IsFalse(passedTags!.Any(t => t.StartsWith("vs:engines:", StringComparison.Ordinal)));
+      CollectionAssert.Contains(passedTags!, "favorite");
+    }
+
+    [TestMethod]
+    public async Task ProfileEngineCompatibility_SavePreservesUnrelatedTags()
+    {
+      List<string>? passedTags = null;
+      var mockUseCase = new Mock<IProfilesUseCase>();
+      mockUseCase
+          .Setup(x => x.UpdateAsync(
+              It.IsAny<string>(),
+              It.IsAny<string?>(),
+              It.IsAny<string?>(),
+              It.IsAny<string?>(),
+              It.IsAny<List<string>?>(),
+              It.IsAny<CancellationToken>()))
+          .Callback<string, string?, string?, string?, List<string>?, CancellationToken>((_, _, _, _, tags, _) =>
+          {
+            passedTags = tags?.ToList();
+          })
+          .Returns((string id, string? name, string? lang, string? emo, List<string>? tags, CancellationToken ct) =>
+              Task.FromResult(new VoiceProfile { Id = id, Name = name ?? "P", Tags = tags?.ToList() ?? new List<string>() }));
+
+      var vm = CreateEngineEditorViewModel(mockUseCase);
+      vm.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string> { "favorite", "custom:x" },
+      };
+      vm.AddCompatibleEngineCommand.Execute("piper");
+
+      await ((IAsyncRelayCommand)vm.SaveCompatibleEnginesCommand).ExecuteAsync(default).ConfigureAwait(false);
+
+      Assert.IsNotNull(passedTags);
+      CollectionAssert.Contains(passedTags!, "favorite");
+      CollectionAssert.Contains(passedTags!, "custom:x");
+      Assert.AreEqual(1, passedTags!.Count(t => t.StartsWith("vs:engines:", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task ProfileEngineCompatibility_SaveNormalizesMultipleVsEnginesSourceTags()
+    {
+      List<string>? passedTags = null;
+      var mockUseCase = new Mock<IProfilesUseCase>();
+      mockUseCase
+          .Setup(x => x.UpdateAsync(
+              It.IsAny<string>(),
+              It.IsAny<string?>(),
+              It.IsAny<string?>(),
+              It.IsAny<string?>(),
+              It.IsAny<List<string>?>(),
+              It.IsAny<CancellationToken>()))
+          .Callback<string, string?, string?, string?, List<string>?, CancellationToken>((_, _, _, _, tags, _) =>
+          {
+            passedTags = tags?.ToList();
+          })
+          .Returns((string id, string? name, string? lang, string? emo, List<string>? tags, CancellationToken ct) =>
+              Task.FromResult(new VoiceProfile { Id = id, Name = name ?? "P", Tags = tags?.ToList() ?? new List<string>() }));
+
+      var vm = CreateEngineEditorViewModel(mockUseCase);
+      vm.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string> { "vs:engines:old", "vs:engines:stale", "keep" },
+      };
+      vm.ProfileCompatibleEngineIds.Clear();
+      vm.AddCompatibleEngineCommand.Execute("piper");
+      vm.AddCompatibleEngineCommand.Execute("xtts");
+
+      await ((IAsyncRelayCommand)vm.SaveCompatibleEnginesCommand).ExecuteAsync(default).ConfigureAwait(false);
+
+      Assert.IsNotNull(passedTags);
+      Assert.AreEqual(1, passedTags!.Count(t => t.StartsWith("vs:engines:", StringComparison.Ordinal)));
+      CollectionAssert.Contains(passedTags!, "keep");
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_EmptyVsEnginesPayload_LoadsAsUnrestricted()
+    {
+      var vm = CreateEngineEditorViewModel();
+      vm.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string> { "vs:engines:", "favorite" },
+      };
+
+      Assert.AreEqual(0, vm.ProfileCompatibleEngineIds.Count);
+      Assert.IsFalse(vm.HasProfileEngineCompatibilityRestriction);
+    }
+
+    #endregion
 
     private static IProfileQualityInsightsService CreateMockProfileQualityInsightsService()
     {

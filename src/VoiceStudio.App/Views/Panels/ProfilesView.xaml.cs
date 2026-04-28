@@ -445,6 +445,15 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    private void AddEngineButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+      var text = AddEngineTextBox?.Text;
+      if (ViewModel.AddCompatibleEngineCommand.CanExecute(text))
+        ViewModel.AddCompatibleEngineCommand.Execute(text);
+      if (AddEngineTextBox != null)
+        AddEngineTextBox.Text = string.Empty;
+    }
+
     // GAP-B18: BatchExport_Click - Removed, now using Command binding in XAML
     // The export functionality is now handled by ViewModel.ExportSelectedCommand
 

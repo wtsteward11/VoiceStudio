@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -18,6 +19,7 @@ using Windows.Storage.Pickers;
 using Microsoft.UI.Dispatching;
 using VoiceStudio.App.Logging;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.App.Core.Models;
 using VoiceStudio.Core.Events;
 
 namespace VoiceStudio.App.Views.Panels
@@ -217,6 +219,18 @@ namespace VoiceStudio.App.Views.Panels
 
     public bool HasProfiles => FilteredProfiles?.Count > 0;
 
+    private readonly ObservableCollection<string> _profileCompatibleEngineIds = new();
+
+    /// <summary>Editable list of allowed synthesis engine ids (persisted as one <c>vs:engines:</c> tag).</summary>
+    public ObservableCollection<string> ProfileCompatibleEngineIds => _profileCompatibleEngineIds;
+
+    public bool HasProfileEngineCompatibilityRestriction => _profileCompatibleEngineIds.Count > 0;
+
+    public string CompatibleEnginesSummary =>
+        HasProfileEngineCompatibilityRestriction
+            ? string.Join(", ", _profileCompatibleEngineIds)
+            : "No engine restriction";
+
     public bool IsProfileSelected(string profileId) => _multiSelectState?.SelectedIds.Contains(profileId) ?? false;
 
     private readonly IProfilePreviewService? _previewService;
@@ -324,6 +338,8 @@ namespace VoiceStudio.App.Views.Panels
       // Initialize filtered profiles
       FilteredProfiles = new ObservableCollection<VoiceProfile>();
       ClearSelectionCommand = new RelayCommand(ClearSelection);
+
+      _profileCompatibleEngineIds.CollectionChanged += OnProfileCompatibleEngineIdsCollectionChanged;
 
       SetFilterAllCommand = new RelayCommand(() => SetFilterTab("All"));
       SetFilterFavoritesCommand = new RelayCommand(() => SetFilterTab("Favorites"));
@@ -890,13 +906,16 @@ namespace VoiceStudio.App.Views.Panels
         IsLoading = true;
         ErrorMessage = null;
 
-        var tags = ParseTags(tagsText);
+        var baseTags = tagsText != null
+            ? (ParseTags(tagsText) ?? new List<string>())
+            : (profile.Tags?.ToList() ?? new List<string>());
+        var mergedTags = VoiceProfileEngineCompatibilityTags.ReplaceEnginesTag(baseTags, _profileCompatibleEngineIds);
         var updated = await _profilesUseCase.UpdateAsync(
             profile.Id,
             name?.Trim(),
             string.IsNullOrWhiteSpace(language) ? null : language!.Trim(),
             string.IsNullOrWhiteSpace(emotion) ? null : emotion!.Trim(),
-            tags,
+            mergedTags,
             cancellationToken);
 
         ReplaceProfile(updated);
@@ -1278,6 +1297,8 @@ namespace VoiceStudio.App.Views.Panels
 
     partial void OnSelectedProfileChanged(VoiceProfile? value)
     {
+      ReloadProfileCompatibleEngineIds(value);
+
       CanPreview = SelectedProfile != null;
       PreviewProfileCommand.NotifyCanExecuteChanged();
 
@@ -1348,6 +1369,8 @@ namespace VoiceStudio.App.Views.Panels
         QualityBaseline = null;
         HasQualityDegradation = false;
       }
+
+      NotifyProfileCompatibleEngineCommands();
     }
 
     partial void OnIsLoadingChanged(bool value)
@@ -1355,6 +1378,7 @@ namespace VoiceStudio.App.Views.Panels
       CreateProfileFromEmptyStateCommand.NotifyCanExecuteChanged();
       OnPropertyChanged(nameof(ShowEmptyState));
       PreviewProfileCommand.NotifyCanExecuteChanged();
+      NotifyProfileCompatibleEngineCommands();
     }
 
     partial void OnIsPreviewingChanged(bool value)
@@ -2109,6 +2133,95 @@ namespace VoiceStudio.App.Views.Panels
         LoadQualityBaselineCommand.NotifyCanExecuteChanged();
       }
     }
+
+    #region Profile engine compatibility tags
+
+    private void OnProfileCompatibleEngineIdsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+      OnPropertyChanged(nameof(HasProfileEngineCompatibilityRestriction));
+      OnPropertyChanged(nameof(CompatibleEnginesSummary));
+      ClearCompatibleEnginesCommand.NotifyCanExecuteChanged();
+    }
+
+    private void NotifyProfileCompatibleEngineCommands()
+    {
+      AddCompatibleEngineCommand.NotifyCanExecuteChanged();
+      RemoveCompatibleEngineCommand.NotifyCanExecuteChanged();
+      ClearCompatibleEnginesCommand.NotifyCanExecuteChanged();
+      SaveCompatibleEnginesCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ReloadProfileCompatibleEngineIds(VoiceProfile? value)
+    {
+      _profileCompatibleEngineIds.Clear();
+      if (value?.Tags != null)
+      {
+        foreach (var id in VoiceProfileEngineCompatibilityTags.ParseAllowedEngineIds(value.Tags))
+          _profileCompatibleEngineIds.Add(id);
+      }
+      OnPropertyChanged(nameof(HasProfileEngineCompatibilityRestriction));
+      OnPropertyChanged(nameof(CompatibleEnginesSummary));
+    }
+
+    private bool CanMutateCompatibleEngines() => SelectedProfile != null && !IsLoading;
+
+    private bool CanClearCompatibleEngines() => SelectedProfile != null && !IsLoading && _profileCompatibleEngineIds.Count > 0;
+
+    [RelayCommand(CanExecute = nameof(CanMutateCompatibleEngines))]
+    private void AddCompatibleEngine(string? engineId)
+    {
+      if (string.IsNullOrWhiteSpace(engineId))
+        return;
+      var trimmed = engineId.Trim();
+      for (var i = 0; i < _profileCompatibleEngineIds.Count; i++)
+      {
+        if (string.Equals(_profileCompatibleEngineIds[i], trimmed, StringComparison.OrdinalIgnoreCase))
+          return;
+      }
+      _profileCompatibleEngineIds.Add(trimmed);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanMutateCompatibleEngines))]
+    private void RemoveCompatibleEngine(string? engineId)
+    {
+      if (string.IsNullOrWhiteSpace(engineId))
+        return;
+      for (var i = _profileCompatibleEngineIds.Count - 1; i >= 0; i--)
+      {
+        if (string.Equals(_profileCompatibleEngineIds[i], engineId, StringComparison.OrdinalIgnoreCase))
+          _profileCompatibleEngineIds.RemoveAt(i);
+      }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanClearCompatibleEngines))]
+    private void ClearCompatibleEngines()
+    {
+      _profileCompatibleEngineIds.Clear();
+    }
+
+    /// <summary>
+    /// Persists <see cref="_profileCompatibleEngineIds"/> via <see cref="UpdateProfileAsync"/> using current profile tags as base (<c>tagsText: null</c>).
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSaveCompatibleEngines))]
+    private async Task SaveCompatibleEnginesAsync(CancellationToken cancellationToken = default)
+    {
+      var p = SelectedProfile;
+      if (p == null)
+        return;
+
+      await UpdateProfileAsync(
+              p,
+              p.Name,
+              p.Language,
+              p.Emotion,
+              tagsText: null,
+              cancellationToken)
+          .ConfigureAwait(false);
+    }
+
+    private bool CanSaveCompatibleEngines() => SelectedProfile != null && !IsLoading;
+
+    #endregion
 
     #region IPanelStatePersistable Implementation
 

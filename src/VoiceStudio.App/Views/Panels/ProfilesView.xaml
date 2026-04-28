@@ -10,6 +10,7 @@
   - CreateProfileCommand and DeleteProfileCommand are async
 -->
 <UserControl x:Class="VoiceStudio.App.Views.Panels.ProfilesView"
+    x:Name="Root"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -273,6 +274,52 @@
                         <StackPanel Spacing="4">
                             <TextBlock Text="Quality Score" FontSize="11" Foreground="{StaticResource VSQ.Text.SecondaryBrush}" />
                             <ProgressBar Value="{x:Bind ViewModel.SelectedProfile.QualityScore, Mode=OneWay}" Maximum="1.0" Height="6" />
+                        </StackPanel>
+
+                        <!-- Compatible engines (vs:engines: tag) -->
+                        <StackPanel Spacing="4" Margin="0,4,0,0">
+                            <TextBlock Text="Compatible engines"
+                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                       Opacity="0.6"
+                                       Margin="0,12,0,4" />
+                            <TextBlock AutomationProperties.AutomationId="ProfilesView_CompatibleEnginesSummary"
+                                       Text="{x:Bind ViewModel.CompatibleEnginesSummary, Mode=OneWay}"
+                                       TextWrapping="Wrap"
+                                       FontSize="12" />
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.ProfileCompatibleEngineIds, Mode=OneWay}"
+                                          Visibility="{x:Bind ViewModel.HasProfileEngineCompatibilityRestriction, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                          AutomationProperties.AutomationId="ProfilesView_CompatibleEnginesList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,2">
+                                            <TextBlock Text="{x:Bind Mode=OneWay}" VerticalAlignment="Center" FontSize="12" />
+                                            <Button Content="×"
+                                                    FontSize="10"
+                                                    Padding="4,0"
+                                                    Command="{Binding ElementName=Root, Path=ViewModel.RemoveCompatibleEngineCommand}"
+                                                    CommandParameter="{x:Bind Mode=OneWay}"
+                                                    AutomationProperties.AutomationId="ProfilesView_RemoveEngineButton" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,4,0,0">
+                                <TextBox x:Name="AddEngineTextBox"
+                                         AutomationProperties.AutomationId="ProfilesView_AddEngineTextBox"
+                                         PlaceholderText="Engine ID (e.g. piper)"
+                                         Width="140"
+                                         FontSize="12" />
+                                <Button Content="Add"
+                                        AutomationProperties.AutomationId="ProfilesView_AddEngineButton"
+                                        Click="AddEngineButton_Click" />
+                                <Button Content="Save"
+                                        AutomationProperties.AutomationId="ProfilesView_SaveCompatibleEnginesButton"
+                                        Command="{x:Bind ViewModel.SaveCompatibleEnginesCommand}" />
+                                <Button Content="Clear all"
+                                        AutomationProperties.AutomationId="ProfilesView_ClearCompatibleEnginesButton"
+                                        Command="{x:Bind ViewModel.ClearCompatibleEnginesCommand}"
+                                        Visibility="{x:Bind ViewModel.HasProfileEngineCompatibilityRestriction, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            </StackPanel>
                         </StackPanel>
 
                         <!-- Action buttons -->

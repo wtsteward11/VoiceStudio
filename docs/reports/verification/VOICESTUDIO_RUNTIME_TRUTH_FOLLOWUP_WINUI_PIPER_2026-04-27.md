@@ -397,3 +397,23 @@ No file produced by **in-app** synthesis in this session. **Follow-up B** WAV re
 | dotnet | `8.0.420` |
 | Python (.venv) | `3.11.9` (`E:\VoiceStudio\.venv\Scripts\python.exe`) |
 | Backend port | `8000` |
+
+---
+
+## Follow-up F (human WinUI Piper synthesis + playback, 2026-04-27)
+
+| Item | Value |
+|------|--------|
+| **Operator / date** | **Cursor agent session (no human operator)** — **2026-04-27** |
+| **Screenshot / operator note** | **Not applicable** — WinUI Phases 4–6 not executed (no human at machine; agent cannot attest audio or UI) |
+| **Backend health (preflight)** | `GET http://127.0.0.1:8000/api/health` → **200**; `engines_ready` **true**; `version_info.git_commit` **b0a1b793** |
+| **Voice Synthesis UI navigation** | **Not run** |
+| **Engine / profile / consent** | **Not run** (target profile for human follow-up: `22ebe087-5589-4d35-ab5a-c57049407813`) |
+| **Exact phrase** | **Not entered** (intended: `VoiceStudio runtime truth follow-up using Piper.`) |
+| **Synthesis result** | **N/A** |
+| **Output path / audio_id** | **N/A** |
+| **Artifact validation (WAV / RMS)** | **N/A** |
+| **In-app Play** | **N/A** |
+| **Heard-audio attestation** | **N/A** |
+| **Blockers** | **No human operator** for WinUI + audio attestation in this session (proof-only gap, not a product failure classification) |
+| **Verdict** | **N/A (not run)** — **PARTIAL** runtime truth for Piper **unchanged**; **FULL PASS** requires human UI path per section scope rules. |

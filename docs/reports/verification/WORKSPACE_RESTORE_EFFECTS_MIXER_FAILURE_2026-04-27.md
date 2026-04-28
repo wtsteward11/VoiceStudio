@@ -64,6 +64,21 @@
 
 **Not** GAP-008 Slice 46. **Not** a claim of full `verify.ps1` FULL without machine-local run.
 
+## Manual verification after push
+
+| Field | Value |
+|------|--------|
+| **Commit SHA** | `eda493ce9487b72cc43bd97e1f7d113ecd95d834` |
+| **Operator / date** | **Cursor agent session (no human WinUI operator)** — **2026-04-27** (agent log; in-app attestation not performed) |
+| **Backend health** | `GET http://127.0.0.1:8000/api/health` → **200**; `engines_ready` **true**; `version_info.git_commit` **`b0a1b793`** (Python backend process; does not match C# `HEAD` **eda493ce** — expected: hotfix is WinUI-only; backend ref independent) |
+| **App launch (hotfix build)** | `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` → **0 errors**, 5 pre-existing nullable warnings. Expected EXE: `src\VoiceStudio.App\.buildlogs\x64\Debug\net8.0-windows10.0.19041.0\VoiceStudio.App.exe` (path verified on disk). **App not launched in this session** (no human to operate UI / capture PID, title, screenshot). |
+| **EffectsMixer result** | **N/A (deferred)** — requires human to open Right panel / restore workspace and confirm load or root exception in overlay. |
+| **Duplicate toast result** | **N/A (deferred)** — requires human to trigger restore-failure paths within ~5s. |
+| **Reset to Studio button result** | **N/A (deferred)** — requires human to observe restore-failure toast. |
+| **panel_load_failure_diag.txt** | **N/A (deferred)** — not inspected (no new failure forced in this session). |
+| **DataContext spot-check (Library, Voice Synthesis, Profiles)** | **N/A (deferred)** — requires in-app navigation. |
+| **Verdict** | **DEFERRED** — **automation preflight only** (repo clean except allowed dirty files, build green, backend healthy). **Not** **PASS** / **PARTIAL** / **FAIL** for the in-app checklist until a human runs Phases 4–5. |
+
 ## Related
 
 - GAP-008: remains **strategically frozen** for new `MainWindow*ShellBridge` (see `.cursor/STATE.md`).

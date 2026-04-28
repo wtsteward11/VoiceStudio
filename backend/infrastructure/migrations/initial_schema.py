@@ -98,6 +98,15 @@ async def run_migrations(db_path: str | None = None) -> None:
         )
         """,
         "CREATE INDEX IF NOT EXISTS idx_project_tracks_project ON project_tracks(project_id)",
+        """
+        CREATE TABLE IF NOT EXISTS session_timeline (
+            session_id TEXT NOT NULL PRIMARY KEY,
+            updated_at TEXT NOT NULL,
+            timeline_json TEXT NOT NULL,
+            undo_stack_json TEXT NOT NULL,
+            redo_stack_json TEXT NOT NULL
+        )
+        """,
     ]
 
     for stmt in statements:

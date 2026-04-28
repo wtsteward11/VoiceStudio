@@ -222,43 +222,66 @@ class UndoRedoState(BaseModel):
 
 
 # ============================================================================
-# In-memory state (replace with database/service in production)
+# Session timeline persistence (D-001 — SQLite, shared across workers)
 # ============================================================================
 
-_timeline_state: TimelineState | None = None
-_undo_stack: list[TimelineState] = []
-_redo_stack: list[TimelineState] = []
+
+async def _hydrate() -> tuple[TimelineState, list[TimelineState], list[TimelineState]]:
+    """Load timeline + undo/redo stacks from SQLite (or empty defaults)."""
+    from backend.project.timeline.session_repository import (
+        DEFAULT_SESSION_ID,
+        load_session_timeline_raw,
+    )
+
+    raw = await load_session_timeline_raw(DEFAULT_SESSION_ID)
+    if raw is None:
+        return TimelineState(), [], []
+    state = TimelineState.model_validate(raw["timeline"])
+    undo = [TimelineState.model_validate(x) for x in raw["undo"]]
+    redo = [TimelineState.model_validate(x) for x in raw["redo"]]
+    return state, undo, redo
 
 
-def _get_or_create_timeline() -> TimelineState:
-    """Get the current timeline or create a new one."""
-    global _timeline_state
-    if _timeline_state is None:
-        _timeline_state = TimelineState()
-    return _timeline_state
+async def _persist(
+    state: TimelineState,
+    undo_stack: list[TimelineState],
+    redo_stack: list[TimelineState],
+) -> None:
+    """Write timeline + stacks to SQLite."""
+    from backend.project.timeline.session_repository import (
+        DEFAULT_SESSION_ID,
+        save_session_timeline_raw,
+    )
+
+    state.updated_at = datetime.now().isoformat()
+    await save_session_timeline_raw(
+        state.model_dump(mode="json"),
+        [x.model_dump(mode="json") for x in undo_stack],
+        [x.model_dump(mode="json") for x in redo_stack],
+        session_id=DEFAULT_SESSION_ID,
+    )
 
 
-def _save_undo_state() -> None:
-    """Save current state to undo stack."""
-    global _timeline_state, _undo_stack, _redo_stack
-    if _timeline_state:
-        _undo_stack.append(_timeline_state.model_copy(deep=True))
-        _redo_stack.clear()  # Clear redo stack on new action
-        # Limit undo stack size
-        if len(_undo_stack) > 50:
-            _undo_stack.pop(0)
+def _push_undo_before_mutate(
+    current: TimelineState,
+    undo_stack: list[TimelineState],
+    redo_stack: list[TimelineState],
+) -> None:
+    """Snapshot current timeline before a mutating operation."""
+    undo_stack.append(current.model_copy(deep=True))
+    redo_stack.clear()
+    if len(undo_stack) > 50:
+        undo_stack.pop(0)
 
 
-def _update_timeline_duration() -> None:
+def _update_timeline_duration(timeline: TimelineState) -> None:
     """Update timeline duration based on clips."""
-    global _timeline_state
-    if _timeline_state:
-        max_end = 0.0
-        for track in _timeline_state.tracks:
-            for clip in track.clips:
-                if clip.end_time > max_end:
-                    max_end = clip.end_time
-        _timeline_state.duration = max_end
+    max_end = 0.0
+    for track in timeline.tracks:
+        for clip in track.clips:
+            if clip.end_time > max_end:
+                max_end = clip.end_time
+    timeline.duration = max_end
 
 
 async def _render_timeline_audio(timeline: TimelineState, sample_rate: int) -> np.ndarray | None:
@@ -486,7 +509,6 @@ async def _convert_to_format(input_path: str, output_path: str, format: str) -> 
 
     if proc.returncode != 0:
         raise RuntimeError(f"ffmpeg conversion failed: {stderr.decode()}")
-        _timeline_state.updated_at = datetime.now().isoformat()
 
 
 # ============================================================================
@@ -497,7 +519,8 @@ async def _convert_to_format(input_path: str, output_path: str, format: str) -> 
 @router.get("/state", response_model=TimelineState, dependencies=[Depends(require_auth_if_enabled)])
 async def get_timeline_state():
     """Get the current timeline state."""
-    return _get_or_create_timeline()
+    state, _, _ = await _hydrate()
+    return state
 
 
 @router.post(
@@ -505,32 +528,31 @@ async def get_timeline_state():
 )
 async def create_timeline(options: CreateTimelineOptions):
     """Create a new timeline."""
-    global _timeline_state, _undo_stack, _redo_stack
-    _save_undo_state()
+    state, undo, redo = await _hydrate()
+    _push_undo_before_mutate(state, undo, redo)
 
-    _timeline_state = TimelineState(
+    new_state = TimelineState(
         name=options.name or "Untitled Timeline",
         sample_rate=options.sample_rate or 48000,
     )
-    _redo_stack.clear()
-    logger.info(f"Created new timeline: {_timeline_state.name}")
-    return _timeline_state
+    await _persist(new_state, undo, redo)
+    logger.info(f"Created new timeline: {new_state.name}")
+    return new_state
 
 
 @router.post("/tracks", response_model=Track, dependencies=[Depends(require_auth_if_enabled)])
 async def add_track(request: AddTrackRequest):
     """Add a track to the timeline."""
-    global _timeline_state
-    _save_undo_state()
+    state, undo, redo = await _hydrate()
+    _push_undo_before_mutate(state, undo, redo)
 
-    timeline = _get_or_create_timeline()
     track = Track(
-        name=request.name or f"Track {len(timeline.tracks) + 1}",
+        name=request.name or f"Track {len(state.tracks) + 1}",
         type=request.type or "audio",
-        order=len(timeline.tracks),
+        order=len(state.tracks),
     )
-    timeline.tracks.append(track)
-    timeline.updated_at = datetime.now().isoformat()
+    state.tracks.append(track)
+    await _persist(state, undo, redo)
     logger.info(f"Added track: {track.name}")
     return track
 
@@ -542,9 +564,8 @@ async def add_track(request: AddTrackRequest):
 )
 async def update_timeline_track(track_id: str, request: UpdateTimelineTrackRequest):
     """Update mix/rendering fields on an in-memory timeline track (GAP-031)."""
-    global _timeline_state
-    _save_undo_state()
-    timeline = _get_or_create_timeline()
+    timeline, undo, redo = await _hydrate()
+    _push_undo_before_mutate(timeline, undo, redo)
     track = next((t for t in timeline.tracks if t.id == track_id), None)
     if track is None:
         raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
@@ -558,7 +579,7 @@ async def update_timeline_track(track_id: str, request: UpdateTimelineTrackReque
         track.volume = request.volume
     if request.pan is not None:
         track.pan = request.pan
-    timeline.updated_at = datetime.now().isoformat()
+    await _persist(timeline, undo, redo)
     return track
 
 
@@ -569,10 +590,10 @@ async def update_timeline_track(track_id: str, request: UpdateTimelineTrackReque
 )
 async def import_timeline_from_project(body: ImportProjectRequest, track_store: TrackStoreDep):
     """Load persisted project tracks into the timeline mix graph used by export (GAP-031)."""
-    global _timeline_state
     from backend.services.audio_artifacts import AudioRegistry
 
-    _save_undo_state()
+    prior, undo, redo = await _hydrate()
+    _push_undo_before_mutate(prior, undo, redo)
     project_id = body.project_id.strip()
     track_data_list = track_store.list_tracks(project_id)
     tracks: list[Track] = []
@@ -638,7 +659,7 @@ async def import_timeline_from_project(body: ImportProjectRequest, track_store: 
         tracks=tracks,
         updated_at=datetime.now().isoformat(),
     )
-    _timeline_state = timeline
+    await _persist(timeline, undo, redo)
     logger.info(
         "Imported timeline from project %s (%s tracks, duration=%ss)",
         project_id,
@@ -653,10 +674,9 @@ async def import_timeline_from_project(body: ImportProjectRequest, track_store: 
 )
 async def delete_track(request: DeleteRequest):
     """Delete a track from the timeline."""
-    global _timeline_state
-    _save_undo_state()
+    timeline, undo, redo = await _hydrate()
+    _push_undo_before_mutate(timeline, undo, redo)
 
-    timeline = _get_or_create_timeline()
     original_count = len(timeline.tracks)
     timeline.tracks = [t for t in timeline.tracks if t.id != request.id]
 
@@ -667,7 +687,8 @@ async def delete_track(request: DeleteRequest):
     for i, track in enumerate(timeline.tracks):
         track.order = i
 
-    _update_timeline_duration()
+    _update_timeline_duration(timeline)
+    await _persist(timeline, undo, redo)
     logger.info(f"Deleted track: {request.id}")
     return DeleteResponse(success=True, deleted_id=request.id)
 
@@ -675,10 +696,9 @@ async def delete_track(request: DeleteRequest):
 @router.post("/clips", response_model=Clip, dependencies=[Depends(require_auth_if_enabled)])
 async def add_clip(request: AddClipRequest):
     """Add a clip to a track."""
-    global _timeline_state
-    _save_undo_state()
+    timeline, undo, redo = await _hydrate()
+    _push_undo_before_mutate(timeline, undo, redo)
 
-    timeline = _get_or_create_timeline()
     track = next((t for t in timeline.tracks if t.id == request.track_id), None)
     if not track:
         raise HTTPException(status_code=404, detail=f"Track {request.track_id} not found")
@@ -691,7 +711,8 @@ async def add_clip(request: AddClipRequest):
         name=request.name or "Clip",
     )
     track.clips.append(clip)
-    _update_timeline_duration()
+    _update_timeline_duration(timeline)
+    await _persist(timeline, undo, redo)
     logger.info(f"Added clip: {clip.name} to track {track.name}")
     return clip
 
@@ -701,15 +722,15 @@ async def add_clip(request: AddClipRequest):
 )
 async def delete_clip(request: DeleteRequest):
     """Delete a clip from the timeline."""
-    global _timeline_state
-    _save_undo_state()
+    timeline, undo, redo = await _hydrate()
+    _push_undo_before_mutate(timeline, undo, redo)
 
-    timeline = _get_or_create_timeline()
     for track in timeline.tracks:
         original_count = len(track.clips)
         track.clips = [c for c in track.clips if c.id != request.id]
         if len(track.clips) < original_count:
-            _update_timeline_duration()
+            _update_timeline_duration(timeline)
+            await _persist(timeline, undo, redo)
             logger.info(f"Deleted clip: {request.id}")
             return DeleteResponse(success=True, deleted_id=request.id)
 
@@ -721,10 +742,9 @@ async def delete_clip(request: DeleteRequest):
 )
 async def move_clip(clip_id: str, request: MoveClipRequest):
     """Move a clip to a new position or track."""
-    global _timeline_state
-    _save_undo_state()
+    timeline, undo, redo = await _hydrate()
+    _push_undo_before_mutate(timeline, undo, redo)
 
-    timeline = _get_or_create_timeline()
     clip = None
     source_track = None
 
@@ -756,7 +776,8 @@ async def move_clip(clip_id: str, request: MoveClipRequest):
         clip.track_id = request.new_track_id
         target_track.clips.append(clip)
 
-    _update_timeline_duration()
+    _update_timeline_duration(timeline)
+    await _persist(timeline, undo, redo)
     logger.info(f"Moved clip: {clip_id}")
     return clip
 
@@ -766,10 +787,9 @@ async def move_clip(clip_id: str, request: MoveClipRequest):
 )
 async def trim_clip(clip_id: str, request: TrimClipRequest):
     """Trim a clip's start or end time."""
-    global _timeline_state
-    _save_undo_state()
+    timeline, undo, redo = await _hydrate()
+    _push_undo_before_mutate(timeline, undo, redo)
 
-    timeline = _get_or_create_timeline()
     clip = None
 
     for track in timeline.tracks:
@@ -790,7 +810,8 @@ async def trim_clip(clip_id: str, request: TrimClipRequest):
     if request.new_end is not None:
         clip.end_time = request.new_end
 
-    _update_timeline_duration()
+    _update_timeline_duration(timeline)
+    await _persist(timeline, undo, redo)
     logger.info(f"Trimmed clip: {clip_id}")
     return clip
 
@@ -802,10 +823,9 @@ async def trim_clip(clip_id: str, request: TrimClipRequest):
 )
 async def split_clip(clip_id: str, request: SplitClipRequest):
     """Split a clip at a given position."""
-    global _timeline_state
-    _save_undo_state()
+    timeline, undo, redo = await _hydrate()
+    _push_undo_before_mutate(timeline, undo, redo)
 
-    timeline = _get_or_create_timeline()
     clip = None
     track = None
 
@@ -845,6 +865,8 @@ async def split_clip(clip_id: str, request: SplitClipRequest):
     clip_before = clip.model_copy()
 
     track.clips.append(clip_after)
+    _update_timeline_duration(timeline)
+    await _persist(timeline, undo, redo)
     logger.info(f"Split clip: {clip_id} at {request.split_position}")
     return SplitClipResponse(clip_before=clip_before, clip_after=clip_after)
 
@@ -856,10 +878,9 @@ async def split_clip(clip_id: str, request: SplitClipRequest):
 )
 async def set_clip_fade(clip_id: str, request: SetClipFadeRequest):
     """Set linear fade-in/out in seconds (applied at mixdown)."""
-    global _timeline_state
-    _save_undo_state()
+    timeline, undo, redo = await _hydrate()
+    _push_undo_before_mutate(timeline, undo, redo)
 
-    timeline = _get_or_create_timeline()
     clip = None
     for track in timeline.tracks:
         for c in track.clips:
@@ -874,7 +895,7 @@ async def set_clip_fade(clip_id: str, request: SetClipFadeRequest):
 
     clip.fade_in_seconds = max(0.0, float(request.fade_in_seconds))
     clip.fade_out_seconds = max(0.0, float(request.fade_out_seconds))
-    timeline.updated_at = datetime.now().isoformat()
+    await _persist(timeline, undo, redo)
     logger.info(
         "Set fade clip=%s in=%ss out=%ss", clip_id, clip.fade_in_seconds, clip.fade_out_seconds
     )
@@ -884,10 +905,9 @@ async def set_clip_fade(clip_id: str, request: SetClipFadeRequest):
 @router.post("/playhead", dependencies=[Depends(require_auth_if_enabled)])
 async def set_playhead(request: PlayheadRequest):
     """Set the playhead position."""
-    global _timeline_state
-    timeline = _get_or_create_timeline()
+    timeline, undo, redo = await _hydrate()
     timeline.playhead_position = max(0.0, request.Position)
-    timeline.updated_at = datetime.now().isoformat()
+    await _persist(timeline, undo, redo)
     logger.debug(f"Set playhead to: {request.Position}")
     return {"success": True}
 
@@ -895,11 +915,10 @@ async def set_playhead(request: PlayheadRequest):
 @router.post("/loop", dependencies=[Depends(require_auth_if_enabled)])
 async def set_loop(request: LoopRequest):
     """Set the loop region."""
-    global _timeline_state
-    timeline = _get_or_create_timeline()
+    timeline, undo, redo = await _hydrate()
     timeline.loop_start = request.Start
     timeline.loop_end = request.End
-    timeline.updated_at = datetime.now().isoformat()
+    await _persist(timeline, undo, redo)
     logger.debug(f"Set loop: {request.Start} - {request.End}")
     return {"success": True}
 
@@ -964,7 +983,7 @@ async def export_timeline(request: ExportRequest):
                 detail="effect_chain_id is required when apply_effects is true",
             )
 
-    timeline = _get_or_create_timeline()
+    timeline, _, _ = await _hydrate()
     sample_rate = request.sample_rate or timeline.sample_rate
 
     output_path = _resolve_export_path(request.output_path, request.format)
@@ -1038,17 +1057,17 @@ async def export_timeline(request: ExportRequest):
 @router.post("/undo", response_model=UndoResponse, dependencies=[Depends(require_auth_if_enabled)])
 async def undo():
     """Undo the last operation."""
-    global _timeline_state, _undo_stack, _redo_stack
+    state, undo_stack, redo_stack = await _hydrate()
 
-    if not _undo_stack:
+    if not undo_stack:
         return UndoResponse(success=False, operation=None)
 
     # Save current state to redo stack
-    if _timeline_state:
-        _redo_stack.append(_timeline_state.model_copy(deep=True))
+    redo_stack.append(state.model_copy(deep=True))
 
     # Restore previous state
-    _timeline_state = _undo_stack.pop()
+    state = undo_stack.pop()
+    await _persist(state, undo_stack, redo_stack)
     logger.info("Undo performed")
     return UndoResponse(success=True, operation="undo")
 
@@ -1056,17 +1075,17 @@ async def undo():
 @router.post("/redo", response_model=UndoResponse, dependencies=[Depends(require_auth_if_enabled)])
 async def redo():
     """Redo the last undone operation."""
-    global _timeline_state, _undo_stack, _redo_stack
+    state, undo_stack, redo_stack = await _hydrate()
 
-    if not _redo_stack:
+    if not redo_stack:
         return UndoResponse(success=False, operation=None)
 
     # Save current state to undo stack
-    if _timeline_state:
-        _undo_stack.append(_timeline_state.model_copy(deep=True))
+    undo_stack.append(state.model_copy(deep=True))
 
     # Restore redo state
-    _timeline_state = _redo_stack.pop()
+    state = redo_stack.pop()
+    await _persist(state, undo_stack, redo_stack)
     logger.info("Redo performed")
     return UndoResponse(success=True, operation="redo")
 
@@ -1078,9 +1097,10 @@ async def redo():
 )
 async def get_undo_redo_state():
     """Get the current undo/redo state."""
+    _, undo_stack, redo_stack = await _hydrate()
     return UndoRedoState(
-        can_undo=len(_undo_stack) > 0,
-        can_redo=len(_redo_stack) > 0,
-        undo_description="Previous state" if _undo_stack else None,
-        redo_description="Next state" if _redo_stack else None,
+        can_undo=len(undo_stack) > 0,
+        can_redo=len(redo_stack) > 0,
+        undo_description="Previous state" if undo_stack else None,
+        redo_description="Next state" if redo_stack else None,
     )

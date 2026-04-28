@@ -167,7 +167,12 @@ async def require_synthesis_clearance(request: Request) -> None:
             if not has_active:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="No active consent for voice",
+                    detail=(
+                        "Synthesis is blocked: no active consent for this voice profile. "
+                        "If the profile uses reference or third-party/bound audio, create consent "
+                        "via POST /api/consent/request and POST /api/consent/grant/{consent_id}, "
+                        "then pass consent_id in the synthesis request body (see VoiceSynthesizeRequest)."
+                    ),
                 )
 
     # 3. Safety (fail-open when text not present or scanner unavailable)

@@ -60,7 +60,9 @@ async def test_no_active_consent_raises_403(mock_request):
             await require_synthesis_clearance(mock_request)
 
         assert exc_info.value.status_code == 403
-        assert "consent" in exc_info.value.detail.lower()
+        detail = exc_info.value.detail.lower()
+        assert "consent" in detail
+        assert "grant" in detail
 
 
 @pytest.mark.asyncio

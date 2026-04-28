@@ -14,16 +14,38 @@ from backend.api.deps import get_track_store_dep
 
 
 @pytest.fixture(autouse=True)
-def reset_timeline_state():
-    from backend.api.routes import timeline
+def reset_timeline_state(tmp_path):
+    import asyncio
 
-    timeline._timeline_state = None
-    timeline._undo_stack = []
-    timeline._redo_stack = []
+    from backend.infrastructure.adapters.database import (
+        get_database_adapter,
+        reset_database_adapter_singleton,
+    )
+    from backend.project.timeline.session_repository import (
+        DEFAULT_SESSION_ID,
+        delete_session_timeline,
+        ensure_session_timeline_table,
+    )
+
+    reset_database_adapter_singleton()
+    db_path = tmp_path / "timeline_mixdown_unit.db"
+    db = get_database_adapter(connection_string=f"sqlite:///{db_path.resolve().as_posix()}")
+
+    async def setup() -> None:
+        connected = await db.connect()
+        assert connected is True
+        await ensure_session_timeline_table(db)
+        await delete_session_timeline(DEFAULT_SESSION_ID, db=db)
+
+    asyncio.run(setup())
     yield
-    timeline._timeline_state = None
-    timeline._undo_stack = []
-    timeline._redo_stack = []
+
+    async def teardown() -> None:
+        await delete_session_timeline(DEFAULT_SESSION_ID, db=db)
+        await db.disconnect()
+        reset_database_adapter_singleton()
+
+    asyncio.run(teardown())
 
 
 @pytest.fixture

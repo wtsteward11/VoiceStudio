@@ -141,15 +141,18 @@ namespace VoiceStudio.App.Services
     {
       var parsed = await StandardErrorResponseParser.ParseAsync(response, _jsonOptions, CancellationToken.None);
 
-      BackendException exception = (int)response.StatusCode switch
+      var statusCode = (int)response.StatusCode;
+      BackendException exception = statusCode switch
       {
         400 => new BackendValidationException(parsed.Message),
         401 => new BackendAuthenticationException(parsed.Message),
-        403 => new ConsentRequiredException(parsed.Message),
         404 => new BackendNotFoundException(parsed.Message),
         422 => new BackendValidationException(parsed.Message),
-        >= 500 => new BackendServerException(parsed.Message, (int)response.StatusCode),
-        _ => new BackendServerException(parsed.Message, (int)response.StatusCode)
+        >= 500 => new BackendServerException(parsed.Message, statusCode),
+        403 when string.Equals(parsed.ErrorCode, "CONSENT_REQUIRED", StringComparison.OrdinalIgnoreCase)
+          => new ConsentRequiredException(parsed.Message),
+        403 => new BackendException(parsed.Message, 403, parsed.ErrorCode, parsed.IsRetryable),
+        _ => new BackendServerException(parsed.Message, statusCode)
       };
 
       exception.ErrorCode = parsed.ErrorCode;

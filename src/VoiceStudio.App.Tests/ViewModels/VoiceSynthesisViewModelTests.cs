@@ -528,6 +528,29 @@ namespace VoiceStudio.App.Tests.ViewModels
     }
 
     [TestMethod]
+    public async Task SynthesizeAsync_Success_AudioIdOnly_SetsAudioReadyAndCanPlay()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new VoiceSynthesisResponse
+          {
+            AudioId = "audio-by-id-only",
+            AudioUrl = null,
+            Duration = 1.0,
+            QualityScore = 0.9,
+          });
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      Assert.AreEqual(SynthesisWorkflowState.AudioReady, _sut.WorkflowState);
+      Assert.IsTrue(_sut.CanPlayAudio);
+      Assert.AreEqual("audio-by-id-only", _sut.LastSynthesizedAudioId);
+    }
+
+    [TestMethod]
     public async Task PlayAudioCommand_AfterSynthesis_CallsAudioPlayerService()
     {
       _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };

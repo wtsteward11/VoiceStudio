@@ -814,7 +814,8 @@ namespace VoiceStudio.App.Views.Panels
         LastSynthesizedAudioUrl = response.AudioUrl;
         LastSynthesizedAudioId = response.AudioId;
         LastSynthesizedDuration = TimeSpan.FromSeconds(response.Duration);
-        WorkflowState = !string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl)
+        WorkflowState = (!string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl) ||
+                         !string.IsNullOrWhiteSpace(LastSynthesizedAudioId))
             ? SynthesisWorkflowState.AudioReady
             : WorkflowState;
         PlayAudioCommand.NotifyCanExecuteChanged();

@@ -59,6 +59,27 @@ namespace VoiceStudio.App.Tests.Utilities
     }
 
     [TestMethod]
+    public void Translate_ConsentRequiredException_UsesConsentRecoveryCopy()
+    {
+      var ex = new ConsentRequiredException("Voice consent is required.");
+      var info = ActionableErrorTranslator.Translate(ex, ActionableOperationContext.VoiceSynthesize);
+      Assert.IsTrue(
+          info.RecommendedAction?.Contains("consent", StringComparison.OrdinalIgnoreCase) == true,
+          "Consent recovery must mention consent.");
+    }
+
+    [TestMethod]
+    public void Translate_BackendException403_NonConsentCode_DoesNotUseConsentRecoveryCopy()
+    {
+      var ex = new BackendException("Policy denied", 403, "AUTHORIZATION_FAILED", false);
+      var info = ActionableErrorTranslator.Translate(ex, ActionableOperationContext.VoiceSynthesize);
+      Assert.IsFalse(
+          info.RecommendedAction?.Contains("consent", StringComparison.OrdinalIgnoreCase) == true,
+          "Non-consent 403 must not recommend voice-consent recovery.");
+      StringAssert.Contains(info.RecommendedAction ?? "", "permission", StringComparison.OrdinalIgnoreCase);
+    }
+
+    [TestMethod]
     public void BuildSsmlHandlingUserNotice_StrippedWarned_ReturnsWarning()
     {
       var h = new SsmlHandlingDiagnostics

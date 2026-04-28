@@ -9,7 +9,7 @@
 | Area | File |
 |------|------|
 | Exceptions | `src/VoiceStudio.App/Core/Exceptions/BackendException.cs` — `ConsentRequiredException` |
-| HTTP mapping | `src/VoiceStudio.App/Services/BackendClientHttpPipeline.cs` — `403` → `ConsentRequiredException` |
+| HTTP mapping | `src/VoiceStudio.App/Services/BackendClientHttpPipeline.cs` — `403` + `error_code == CONSENT_REQUIRED` → `ConsentRequiredException`; other `403` → `BackendException` (see follow-up below) |
 | Actionable copy | `src/VoiceStudio.App/Utilities/ActionableErrorTranslator.cs` — consent branch |
 | ViewModel | `src/VoiceStudio.App/Views/Panels/VoiceSynthesisViewModel.cs` — `Status.PlayingAudio` before each `PlayFileAsync` path |
 | Tests | `src/VoiceStudio.App.Tests/ViewModels/VoiceSynthesisViewModelTests.cs` — 8 new tests |
@@ -44,3 +44,22 @@
 
 - Runtime follow-up doc: [VOICESTUDIO_RUNTIME_TRUTH_FOLLOWUP_WINUI_PIPER_2026-04-27.md](./VOICESTUDIO_RUNTIME_TRUTH_FOLLOWUP_WINUI_PIPER_2026-04-27.md)  
 - Control plane: [.cursor/STATE.md](../../.cursor/STATE.md) **ACTIVE WINDOW** (GAP-008 freeze unchanged).
+
+## Follow-up correction — 403 consent precision
+
+**Issue:** An initial implementation mapped **every** HTTP **403** to `ConsentRequiredException`, which incorrectly triggered voice-consent recovery copy for authorization/policy denials.
+
+**Rule (current):** `CreateExceptionFromResponseAsync` throws `ConsentRequiredException` **only** when the parsed backend `error_code` equals **`CONSENT_REQUIRED`** (case-insensitive). Any other **403** (including missing `error_code`, or codes such as `AUTHORIZATION_FAILED`) becomes a generic `BackendException` with status **403** and the parsed `error_code` / retryability — so `ActionableErrorTranslator` uses the **authorization/permission** branch (`RecommendedAction` references permissions, not voice consent), unless the exception is actually `ConsentRequiredException`.
+
+**ViewModel:** Successful synthesis sets `SynthesisWorkflowState.AudioReady` when **either** `AudioUrl` **or** `AudioId` is present (ID-only results are playable via stream).
+
+**Tests added:** `BackendClientHttpPipelineTests` (403 + `CONSENT_REQUIRED` / case-insensitive / `AUTHORIZATION_FAILED` / no `error_code`); `ActionableErrorTranslatorTests` (consent copy vs non-consent 403); `VoiceSynthesisViewModelTests` (`SynthesizeAsync_Success_AudioIdOnly_SetsAudioReadyAndCanPlay`).
+
+**Verification (2026-04-27, follow-up run):**
+
+| Command | Result |
+|---------|--------|
+| `dotnet test ... --filter` VoiceSynthesis + BackendClientHttpPipeline + ActionableErrorTranslator | Passed: 96 (E2E UI tests skipped) |
+| `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` | 0 errors |
+| `python scripts/run_verification.py` | Overall: **PASS** → `.buildlogs/verification/last_run.json` |
+| `.\scripts\verify.ps1 -Quick` | **VERIFICATION PASSED** → `artifacts/verify/20260427_224000/verification_report.md` |

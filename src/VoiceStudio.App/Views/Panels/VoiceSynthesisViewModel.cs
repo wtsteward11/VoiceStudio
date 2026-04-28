@@ -353,7 +353,7 @@ namespace VoiceStudio.App.Views.Panels
     private string? ensembleJobId;
 
     /// <summary>Optional allow-list from profile tags: first <c>vs:engines:id1,id2</c> (case-sensitive prefix); ids compared with <see cref="StringComparer.OrdinalIgnoreCase"/>.</summary>
-    public const string VoiceStudioProfileEnginesTagPrefix = "vs:engines:";
+    public const string VoiceStudioProfileEnginesTagPrefix = VoiceStudio.App.Core.Models.VoiceProfileEngineCompatibilityTags.TagPrefix;
 
     [ObservableProperty]
     private ProfileEngineCompatibilityStatus selectedProfileEngineCompatibilityStatus = ProfileEngineCompatibilityStatus.Unknown;
@@ -748,40 +748,6 @@ namespace VoiceStudio.App.Views.Panels
         Emotion = normalized;
     }
 
-    /// <summary>Parses the first <c>vs:engines:</c> tag into engine ids. Returns false if none or empty payload.</summary>
-    private static bool TryParseEnginesAllowList(IReadOnlyList<string>? tags, out HashSet<string>? allowList)
-    {
-      allowList = null;
-      if (tags is null || tags.Count == 0)
-        return false;
-
-      foreach (var raw in tags)
-      {
-        if (string.IsNullOrWhiteSpace(raw))
-          continue;
-        if (!raw.StartsWith(VoiceStudioProfileEnginesTagPrefix, StringComparison.Ordinal))
-          continue;
-
-        var payload = raw.Length > VoiceStudioProfileEnginesTagPrefix.Length
-            ? raw.Substring(VoiceStudioProfileEnginesTagPrefix.Length)
-            : string.Empty;
-        var parts = payload.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (parts.Length == 0)
-          return false;
-
-        allowList = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var p in parts)
-        {
-          if (!string.IsNullOrWhiteSpace(p))
-            allowList.Add(p.Trim());
-        }
-
-        return allowList.Count > 0;
-      }
-
-      return false;
-    }
-
     private bool IsEnsembleEngineSelectionAmbiguousForCompatibility() =>
         UseMultiEngineEnsemble && SelectedEngines.Count == 0;
 
@@ -796,9 +762,9 @@ namespace VoiceStudio.App.Views.Panels
 
     private bool ProfileMatchesCurrentEngineSelection(VoiceProfile profile)
     {
-      if (!TryParseEnginesAllowList(profile.Tags, out var allowOrNull))
+      if (!VoiceStudio.App.Core.Models.VoiceProfileEngineCompatibilityTags.TryParseAllowedEngines(profile.Tags, out var allowOrNull))
         return true;
-      // SAFETY: TryParseEnginesAllowList assigns a non-empty HashSet when returning true
+      // SAFETY: TryParseAllowedEngines assigns a non-empty HashSet when returning true
       var allow = allowOrNull!;
       if (IsEnsembleEngineSelectionAmbiguousForCompatibility())
         return true;
@@ -835,7 +801,7 @@ namespace VoiceStudio.App.Views.Panels
       }
       else
       {
-        known = TryParseEnginesAllowList(SelectedProfile.Tags, out selectedAllow);
+        known = VoiceStudio.App.Core.Models.VoiceProfileEngineCompatibilityTags.TryParseAllowedEngines(SelectedProfile.Tags, out selectedAllow);
       }
 
       if (!known)

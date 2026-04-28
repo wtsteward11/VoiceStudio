@@ -14,7 +14,8 @@ Client-only UX: optional **engine allow-list** encoded on existing `VoiceProfile
 
 ## Files changed
 
-- `src/VoiceStudio.App/Views/Panels/VoiceSynthesisViewModel.cs` — `ProfileEngineCompatibilityStatus`, `TryParseEnginesAllowList`, `RefreshProfileEngineCompatibility`, `CompatibleProfilesForSelectedEngine`, `SelectFirstCompatibleProfileCommand`, extended `CanSynthesize`, `SelectedEngines.CollectionChanged` subscription.
+- `src/VoiceStudio.App/Core/Models/VoiceProfileEngineCompatibilityTags.cs` — shared `vs:engines:` tag parsing (`TryParseAllowedEngines`, optional `BuildEnginesTag` / `ReplaceEnginesTag` for other callers).
+- `src/VoiceStudio.App/Views/Panels/VoiceSynthesisViewModel.cs` — `ProfileEngineCompatibilityStatus`, `RefreshProfileEngineCompatibility`, `CompatibleProfilesForSelectedEngine`, `SelectFirstCompatibleProfileCommand`, extended `CanSynthesize`, `SelectedEngines.CollectionChanged` subscription (allow-list via helper).
 - `src/VoiceStudio.App/Views/Panels/VoiceSynthesisView.xaml` — summary `TextBlock`, optional **Use first compatible profile** button, incompatible-only `InfoBar`, `InverseBooleanToVisibilityConverter` resource for stream toggle; new grid row; `Grid.RowSpan` **11** on overlays.
 - `src/VoiceStudio.App.Tests/ViewModels/VoiceSynthesisViewModelTests.cs` — **`#region Profile engine compatibility`** with **10** scenarios.
 - `docs/developer/AUTOMATION_ID_REGISTRY.md` — `VoiceSynthesisView_ProfileEngineCompatibilitySummary`, `VoiceSynthesisView_SelectFirstCompatibleProfileButton`, `VoiceSynthesisView_ProfileEngineCompatibilityInfoBar`.
@@ -31,6 +32,13 @@ Client-only UX: optional **engine allow-list** encoded on existing `VoiceProfile
 - `dotnet test VoiceStudio.sln -c Debug -p:Platform=x64 --filter "FullyQualifiedName~VoiceSynthesis"` — **154 passed** (**22** skipped UI/E2E patterns).
 - `python scripts/run_verification.py` — **Overall: PASS** (`.buildlogs/verification/last_run.json`).
 - `.\scripts\verify.ps1 -Quick` — **exit 0** — `artifacts/verify/20260428_042020/verification_report.md` (local run used `VOICESTUDIO_ALLOW_REPO_RUNTIME=1` when `installer/runtime` is non-empty).
+
+### Re-verification (2026-04-28, plan closure)
+
+- Parser logic consolidated into `src/VoiceStudio.App/Core/Models/VoiceProfileEngineCompatibilityTags.cs` (internal helper + XML summary); `VoiceSynthesisViewModel` delegates to `TryParseAllowedEngines`.
+- `dotnet test` … `FullyQualifiedName~VoiceSynthesis` — **154 passed**, **22** skipped.
+- `python scripts/run_verification.py` — **Overall: PASS**.
+- `.\scripts\verify.ps1 -Quick` — **exit 0** — `artifacts/verify/20260428_103633/verification_report.md`.
 
 ## Limitations
 

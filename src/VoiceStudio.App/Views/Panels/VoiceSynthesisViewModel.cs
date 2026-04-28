@@ -2568,6 +2568,19 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    private static bool IsSuccessfulTimelinePlacement(GeneratedAudioTimelineKind kind) =>
+        kind == GeneratedAudioTimelineKind.Added ||
+        kind == GeneratedAudioTimelineKind.ExactAppend ||
+        kind == GeneratedAudioTimelineKind.DefaultAtZeroBecauseTrackEmpty;
+
+    private static string BuildTimelineSuccessStatusText(GeneratedAudioTimelineKind kind) =>
+        kind switch
+        {
+          GeneratedAudioTimelineKind.ExactAppend => "Added to timeline — appended after existing clips.",
+          GeneratedAudioTimelineKind.DefaultAtZeroBecauseTrackEmpty => "Added to timeline — start of empty track (0 s).",
+          _ => "Added to timeline",
+        };
+
     /// <summary>
     /// Persist a generated-audio clip on the active project timeline (backend create).
     /// </summary>
@@ -2594,10 +2607,10 @@ namespace VoiceStudio.App.Views.Panels
             .AddGeneratedClipAsync(request, cancellationToken)
             .ConfigureAwait(false);
 
-        if (result.Success && result.Kind == GeneratedAudioTimelineKind.Added)
+        if (result.Success && IsSuccessfulTimelinePlacement(result.Kind))
         {
           IsGeneratedAudioAddedToTimeline = true;
-          GeneratedAudioTimelineStatus = "Added to timeline";
+          GeneratedAudioTimelineStatus = BuildTimelineSuccessStatusText(result.Kind);
           MarkMatchingRecentResultTimeline(
               string.IsNullOrWhiteSpace(request.AudioId) ? null : request.AudioId,
               request.AudioPathOrUrl);
@@ -2605,7 +2618,8 @@ namespace VoiceStudio.App.Views.Panels
               ResourceHelper.GetString("VoiceSynthesis.TimelineAddedTitle", "Timeline"),
               ResourceHelper.GetString("VoiceSynthesis.TimelineAddedBody", "Generated audio was added to the project timeline."));
         }
-        else if (result.Kind == GeneratedAudioTimelineKind.Unavailable)
+        else if (result.Kind == GeneratedAudioTimelineKind.Unavailable
+            || result.Kind == GeneratedAudioTimelineKind.PlacementUnavailable)
         {
           GeneratedAudioTimelineStatus = result.Message
               ?? "Timeline is not available. Select a project and timeline track.";

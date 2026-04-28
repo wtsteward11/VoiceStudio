@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,12 +41,13 @@ public sealed class GeneratedAudioTimelineService : IGeneratedAudioTimelineServi
     if (request == null)
       throw new ArgumentNullException(nameof(request));
 
-    if (string.IsNullOrWhiteSpace(request.AudioId))
+      if (string.IsNullOrWhiteSpace(request.AudioId))
     {
       return new GeneratedAudioTimelineResult(
           false,
           GeneratedAudioTimelineKind.Unavailable,
           "No synthesized audio id is available. Run synthesis first.",
+          null,
           null,
           null,
           null);
@@ -60,6 +62,7 @@ public sealed class GeneratedAudioTimelineService : IGeneratedAudioTimelineServi
           "No active project. Open or create a project, then add to timeline.",
           null,
           null,
+          null,
           null);
     }
 
@@ -70,6 +73,7 @@ public sealed class GeneratedAudioTimelineService : IGeneratedAudioTimelineServi
           false,
           GeneratedAudioTimelineKind.Unavailable,
           "No voice profile is selected. Choose a profile in Voice Synthesis or Profiles, then retry.",
+          null,
           null,
           null,
           null);
@@ -91,6 +95,7 @@ public sealed class GeneratedAudioTimelineService : IGeneratedAudioTimelineServi
             resolve.error ?? "Timeline is not ready for this project.",
             projectId,
             null,
+            null,
             null);
       }
 
@@ -104,10 +109,22 @@ public sealed class GeneratedAudioTimelineService : IGeneratedAudioTimelineServi
             "Could not resolve the target timeline track. Reload the project or create a track.",
             projectId,
             null,
+            null,
             null);
       }
 
-      var startSeconds = ComputeAppendStartSeconds(targetTrack);
+      if (!TryResolvePlacement(targetTrack, out var placementKind, out var startSeconds, out var placementMessage))
+      {
+        return new GeneratedAudioTimelineResult(
+            false,
+            GeneratedAudioTimelineKind.PlacementUnavailable,
+            placementMessage,
+            projectId,
+            targetTrack.Id,
+            null,
+            null);
+      }
+
       var clipName = BuildClipName(request);
 
       var clip = new AudioClip
@@ -130,11 +147,12 @@ public sealed class GeneratedAudioTimelineService : IGeneratedAudioTimelineServi
 
       return new GeneratedAudioTimelineResult(
           true,
-          GeneratedAudioTimelineKind.Added,
+          placementKind,
           null,
           projectId,
           targetTrack.Id,
-          persisted.Id);
+          persisted.Id,
+          startSeconds);
     }
     catch (OperationCanceledException)
     {
@@ -149,15 +167,73 @@ public sealed class GeneratedAudioTimelineService : IGeneratedAudioTimelineServi
           ex.Message,
           projectId,
           null,
+          null,
           null);
     }
   }
 
-  private static double ComputeAppendStartSeconds(AudioTrack track)
+  /// <summary>
+  /// Resolves start time for the new clip. Fail-closed when clip payloads are missing or every existing clip lacks valid timing.
+  /// </summary>
+  private static bool TryResolvePlacement(
+      AudioTrack track,
+      out GeneratedAudioTimelineKind placementKind,
+      out double startSeconds,
+      out string? message)
   {
-    if (track.Clips == null || track.Clips.Count == 0)
-      return 0;
-    return track.Clips.Max(c => c.EndTime);
+    placementKind = GeneratedAudioTimelineKind.DefaultAtZeroBecauseTrackEmpty;
+    startSeconds = 0;
+    message = null;
+
+    if (track.Clips == null)
+    {
+      message =
+          "Timeline clip data is not available for this track (tracks were returned without clip timing). Open the Timeline panel to load clip layout, then retry.";
+      return false;
+    }
+
+    if (track.Clips.Count == 0)
+    {
+      placementKind = GeneratedAudioTimelineKind.DefaultAtZeroBecauseTrackEmpty;
+      startSeconds = 0;
+      return true;
+    }
+
+    var validEnds = new List<double>();
+    foreach (var c in track.Clips)
+    {
+      if (!TryGetValidClipEndSeconds(c, out var end))
+        continue;
+      validEnds.Add(end);
+    }
+
+    if (validEnds.Count > 0)
+    {
+      placementKind = GeneratedAudioTimelineKind.ExactAppend;
+      startSeconds = validEnds.Max();
+      return true;
+    }
+
+    message =
+        "Existing clips on this track do not include valid timing data, so a safe append position cannot be computed. Review clips on the Timeline, then retry.";
+    return false;
+  }
+
+  private static bool TryGetValidClipEndSeconds(AudioClip clip, out double endSeconds)
+  {
+    endSeconds = 0;
+    if (clip == null)
+      return false;
+    if (double.IsNaN(clip.StartTime) || double.IsInfinity(clip.StartTime))
+      return false;
+    if (clip.StartTime < 0)
+      return false;
+    if (clip.Duration <= TimeSpan.Zero)
+      return false;
+    endSeconds = clip.EndTime;
+    if (double.IsNaN(endSeconds) || double.IsInfinity(endSeconds))
+      return false;
+    return true;
   }
 
   private static string BuildClipName(GeneratedAudioTimelineRequest request)

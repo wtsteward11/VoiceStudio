@@ -17,9 +17,16 @@ public interface IGeneratedAudioTimelineService
 /// <summary>Typed outcome for UI — distinguishes missing context from transport/backend failures.</summary>
 public enum GeneratedAudioTimelineKind
 {
+  /// <summary>Legacy success marker; prefer <see cref="ExactAppend"/> or <see cref="DefaultAtZeroBecauseTrackEmpty"/>.</summary>
   Added = 0,
   Unavailable = 1,
   Failed = 2,
+  /// <summary>Clip placed immediately after the latest valid existing clip end on the target track.</summary>
+  ExactAppend = 3,
+  /// <summary>Clip placed at 0 s because the track&apos;s clip list was present and explicitly empty.</summary>
+  DefaultAtZeroBecauseTrackEmpty = 4,
+  /// <summary>Cannot determine a safe start time (e.g. clip payload missing or all existing clips lack valid timing).</summary>
+  PlacementUnavailable = 5,
 }
 
 /// <summary>Inputs required to create a timeline clip with synthesis provenance.</summary>
@@ -44,4 +51,5 @@ public sealed record GeneratedAudioTimelineResult(
     string? Message,
     string? ProjectId,
     string? TrackId,
-    string? ClipId);
+    string? ClipId,
+    double? PlacementStartSeconds = null);

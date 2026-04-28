@@ -79,7 +79,7 @@ namespace VoiceStudio.App.Tests.ViewModels
           .Setup(t => t.AddGeneratedClipAsync(It.IsAny<GeneratedAudioTimelineRequest>(), It.IsAny<CancellationToken>()))
           .ReturnsAsync(new GeneratedAudioTimelineResult(
               true,
-              GeneratedAudioTimelineKind.Added,
+              GeneratedAudioTimelineKind.ExactAppend,
               null,
               "proj-x",
               "tr-x",
@@ -2235,6 +2235,69 @@ namespace VoiceStudio.App.Tests.ViewModels
 
       Assert.IsFalse(_sut.IsGeneratedAudioAddedToTimeline);
       StringAssert.Contains(_sut.GeneratedAudioTimelineStatus, "project");
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_PlacementUnavailable_DoesNotMarkAdded()
+    {
+      _mockTimelineService
+          .Setup(t => t.AddGeneratedClipAsync(It.IsAny<GeneratedAudioTimelineRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioTimelineResult(
+              false,
+              GeneratedAudioTimelineKind.PlacementUnavailable,
+              "Cannot determine a safe start time for this track.",
+              "proj-1",
+              "tr-1",
+              null,
+              null));
+
+      await RunSuccessfulSynthesisAsync("tl-pu", "/api/audio/tl-pu");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+
+      Assert.IsFalse(_sut.IsGeneratedAudioAddedToTimeline);
+      StringAssert.Contains(_sut.GeneratedAudioTimelineStatus, "safe");
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_PlacementUnavailable_PreservesGeneratedResultAndCanPlay()
+    {
+      _mockTimelineService
+          .Setup(t => t.AddGeneratedClipAsync(It.IsAny<GeneratedAudioTimelineRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioTimelineResult(
+              false,
+              GeneratedAudioTimelineKind.PlacementUnavailable,
+              "placement blocked",
+              null,
+              null,
+              null,
+              null));
+
+      await RunSuccessfulSynthesisAsync("tl-pu2", "/api/audio/tl-pu2");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+
+      Assert.AreEqual("tl-pu2", _sut.LastSynthesizedAudioId);
+      Assert.IsTrue(_sut.CanPlayAudio);
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_DefaultEmptyTrack_SetsEmptyTrackStatus()
+    {
+      _mockTimelineService
+          .Setup(t => t.AddGeneratedClipAsync(It.IsAny<GeneratedAudioTimelineRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioTimelineResult(
+              true,
+              GeneratedAudioTimelineKind.DefaultAtZeroBecauseTrackEmpty,
+              null,
+              "proj-x",
+              "tr-x",
+              "clip-z",
+              0));
+
+      await RunSuccessfulSynthesisAsync("tl-e", "/api/audio/tl-e");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+
+      Assert.IsTrue(_sut.IsGeneratedAudioAddedToTimeline);
+      StringAssert.Contains(_sut.GeneratedAudioTimelineStatus, "empty");
     }
 
     [TestMethod]

@@ -141,10 +141,12 @@ namespace VoiceStudio.App.Tests.Services
       var r = await sut.AddGeneratedClipAsync(Request("syn-a1")).ConfigureAwait(false);
 
       Assert.IsTrue(r.Success);
-      Assert.AreEqual(GeneratedAudioTimelineKind.Added, r.Kind);
+      Assert.AreEqual(GeneratedAudioTimelineKind.ExactAppend, r.Kind);
       Assert.AreEqual("proj-1", r.ProjectId);
       Assert.AreEqual("tr-1", r.TrackId);
       Assert.AreEqual("persisted-clip", r.ClipId);
+      Assert.IsTrue(r.PlacementStartSeconds.HasValue);
+      Assert.AreEqual(3.0, r.PlacementStartSeconds!.Value, 0.001);
 
       Assert.IsNotNull(captured);
       Assert.AreEqual("syn-a1", captured!.AudioId);
@@ -181,6 +183,178 @@ namespace VoiceStudio.App.Tests.Services
       Assert.IsFalse(r.Success);
       Assert.AreEqual(GeneratedAudioTimelineKind.Failed, r.Kind);
       StringAssert.Contains(r.Message!, "backend");
+    }
+
+    [TestMethod]
+    public async Task EmptyTrack_InsertsAtZero_DefaultAtZeroKind()
+    {
+      _ctx.Setup(c => c.ActiveProjectId).Returns("proj-1");
+      _ctx.Setup(c => c.ActiveTimelinePrimaryTrackId).Returns((string?)null);
+
+      var track = new AudioTrack
+      {
+        Id = "tr-1",
+        Name = "T1",
+        ProjectId = "proj-1",
+        TrackNumber = 1,
+        Clips = new List<AudioClip>(),
+      };
+
+      _tracks.Setup(t => t.GetTracksAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<AudioTrack> { track });
+
+      AudioClip? captured = null;
+      _clips
+          .Setup(c => c.CreateClipAsync("proj-1", "tr-1", It.IsAny<AudioClip>(), It.IsAny<CancellationToken>()))
+          .Callback<string, string, AudioClip, CancellationToken>((_, _, clip, _) => captured = clip)
+          .ReturnsAsync((string _, string _, AudioClip clip, CancellationToken _) =>
+          {
+            clip.Id = "new-clip";
+            return clip;
+          });
+
+      var sut = CreateSut();
+      var r = await sut.AddGeneratedClipAsync(Request("syn-empty")).ConfigureAwait(false);
+
+      Assert.IsTrue(r.Success);
+      Assert.AreEqual(GeneratedAudioTimelineKind.DefaultAtZeroBecauseTrackEmpty, r.Kind);
+      Assert.IsTrue(r.PlacementStartSeconds.HasValue);
+      Assert.AreEqual(0.0, r.PlacementStartSeconds!.Value, 0.001);
+      Assert.IsNotNull(captured);
+      Assert.AreEqual(0.0, captured!.StartTime, 0.001);
+    }
+
+    [TestMethod]
+    public async Task ClipsNull_ReturnsPlacementUnavailable_NoCreate()
+    {
+      _ctx.Setup(c => c.ActiveProjectId).Returns("proj-1");
+      _ctx.Setup(c => c.ActiveTimelinePrimaryTrackId).Returns((string?)null);
+
+      var track = new AudioTrack
+      {
+        Id = "tr-1",
+        Name = "T1",
+        ProjectId = "proj-1",
+        TrackNumber = 1,
+        Clips = null!, // SAFETY: simulates track payloads without hydrated clip list (service fail-closed path).
+      };
+
+      _tracks.Setup(t => t.GetTracksAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<AudioTrack> { track });
+
+      var sut = CreateSut();
+      var r = await sut.AddGeneratedClipAsync(Request("syn-null")).ConfigureAwait(false);
+
+      Assert.IsFalse(r.Success);
+      Assert.AreEqual(GeneratedAudioTimelineKind.PlacementUnavailable, r.Kind);
+      Assert.IsFalse(string.IsNullOrWhiteSpace(r.Message));
+      StringAssert.Contains(r.Message!, "clip");
+      _clips.Verify(
+          c => c.CreateClipAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AudioClip>(), It.IsAny<CancellationToken>()),
+          Times.Never);
+    }
+
+    [TestMethod]
+    public async Task AllInvalidClips_ReturnsPlacementUnavailable_NoCreate()
+    {
+      _ctx.Setup(c => c.ActiveProjectId).Returns("proj-1");
+      _ctx.Setup(c => c.ActiveTimelinePrimaryTrackId).Returns((string?)null);
+
+      var track = new AudioTrack
+      {
+        Id = "tr-1",
+        Name = "T1",
+        ProjectId = "proj-1",
+        TrackNumber = 1,
+        Clips = new List<AudioClip>
+        {
+          new()
+          {
+            Id = "bad",
+            StartTime = 0,
+            Duration = TimeSpan.Zero,
+            ProfileId = "x",
+            AudioId = "old",
+          },
+          new()
+          {
+            Id = "bad2",
+            StartTime = -1,
+            Duration = TimeSpan.FromSeconds(1),
+            ProfileId = "x",
+            AudioId = "old2",
+          },
+        },
+      };
+
+      _tracks.Setup(t => t.GetTracksAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<AudioTrack> { track });
+
+      var sut = CreateSut();
+      var r = await sut.AddGeneratedClipAsync(Request("syn-inv")).ConfigureAwait(false);
+
+      Assert.IsFalse(r.Success);
+      Assert.AreEqual(GeneratedAudioTimelineKind.PlacementUnavailable, r.Kind);
+      _clips.Verify(
+          c => c.CreateClipAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AudioClip>(), It.IsAny<CancellationToken>()),
+          Times.Never);
+    }
+
+    [TestMethod]
+    public async Task MixedValidAndInvalid_AppendsAtMaxValidEnd()
+    {
+      _ctx.Setup(c => c.ActiveProjectId).Returns("proj-1");
+      _ctx.Setup(c => c.ActiveTimelinePrimaryTrackId).Returns((string?)null);
+
+      var track = new AudioTrack
+      {
+        Id = "tr-1",
+        Name = "T1",
+        ProjectId = "proj-1",
+        TrackNumber = 1,
+        Clips = new List<AudioClip>
+        {
+          new()
+          {
+            Id = "bad",
+            StartTime = 0,
+            Duration = TimeSpan.Zero,
+            ProfileId = "x",
+            AudioId = "old",
+          },
+          new()
+          {
+            Id = "good",
+            StartTime = 2,
+            Duration = TimeSpan.FromSeconds(4),
+            ProfileId = "x",
+            AudioId = "old2",
+          },
+        },
+      };
+
+      _tracks.Setup(t => t.GetTracksAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<AudioTrack> { track });
+
+      AudioClip? captured = null;
+      _clips
+          .Setup(c => c.CreateClipAsync("proj-1", "tr-1", It.IsAny<AudioClip>(), It.IsAny<CancellationToken>()))
+          .Callback<string, string, AudioClip, CancellationToken>((_, _, clip, _) => captured = clip)
+          .ReturnsAsync((string _, string _, AudioClip clip, CancellationToken _) =>
+          {
+            clip.Id = "c-new";
+            return clip;
+          });
+
+      var sut = CreateSut();
+      var r = await sut.AddGeneratedClipAsync(Request("syn-mix")).ConfigureAwait(false);
+
+      Assert.IsTrue(r.Success);
+      Assert.AreEqual(GeneratedAudioTimelineKind.ExactAppend, r.Kind);
+      Assert.IsTrue(r.PlacementStartSeconds.HasValue);
+      Assert.AreEqual(6.0, r.PlacementStartSeconds!.Value, 0.001);
+      Assert.IsNotNull(captured);
+      Assert.AreEqual(6.0, captured!.StartTime, 0.001);
     }
   }
 }

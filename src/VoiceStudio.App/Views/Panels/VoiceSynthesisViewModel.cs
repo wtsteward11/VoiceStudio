@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml.Media;
 using VoiceStudio.Core.Events;
+using VoiceStudio.Core.Exceptions;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -151,10 +152,22 @@ namespace VoiceStudio.App.Views.Panels
     private bool hasError;
 
     [ObservableProperty]
+    private bool isConsentRequired;
+
+    [ObservableProperty]
+    private string? consentRequiredProfileId;
+
+    [ObservableProperty]
+    private string? consentRequiredMessage;
+
+    [ObservableProperty]
     private SynthesisWorkflowState workflowState = SynthesisWorkflowState.Idle;
 
     /// <summary>Copy-friendly error text for clipboard (e.g. "Copy details" affordance).</summary>
     public string? LastError => HasError ? ErrorMessage : null;
+
+    /// <summary>When consent is required, the generic error InfoBar is hidden so the consent callout is the single primary surface.</summary>
+    public bool ShowGenericSynthesisError => HasError && !IsConsentRequired;
 
     [ObservableProperty]
     private QualityMetrics? qualityMetrics;
@@ -351,6 +364,14 @@ namespace VoiceStudio.App.Views.Panels
       CopyLastErrorCommand = new RelayCommand(CopyLastErrorToClipboard, () => !string.IsNullOrEmpty(LastError));
       ClearErrorCommand = new RelayCommand(ClearError, () => HasError);
 
+      OpenProfileConsentCommand = new RelayCommand(
+          OpenProfileConsent,
+          () => IsConsentRequired && !string.IsNullOrEmpty(ConsentRequiredProfileId));
+
+      RetrySynthesisCommand = new EnhancedAsyncRelayCommand(
+          async (ct) => { await SynthesizeAsync(ct).ConfigureAwait(false); },
+          () => IsConsentRequired && CanSynthesize);
+
       // Add to Timeline command (Audit X-6: Synthesis -> Timeline)
       // GAP-B04: Disabled when busy or no synthesis output
       AddToTimelineCommand = new RelayCommand(AddSynthesizedAudioToTimeline,
@@ -462,6 +483,8 @@ namespace VoiceStudio.App.Views.Panels
     public IRelayCommand StopAudioCommand { get; }
     public IRelayCommand CopyLastErrorCommand { get; }
     public IRelayCommand ClearErrorCommand { get; }
+    public IRelayCommand OpenProfileConsentCommand { get; }
+    public EnhancedAsyncRelayCommand RetrySynthesisCommand { get; }
     public IRelayCommand AddToTimelineCommand { get; }
     public EnhancedAsyncRelayCommand StartStreamingCommand { get; }
     public IRelayCommand StopStreamingCommand { get; }
@@ -520,6 +543,7 @@ namespace VoiceStudio.App.Views.Panels
       ErrorMessage = null;
       HasError = false;
       HasQualityMetrics = false;
+      ClearConsentState();
     }
 
     // Quality metrics display properties
@@ -810,6 +834,8 @@ namespace VoiceStudio.App.Views.Panels
           OnPropertyChanged(nameof(RealTimeQualityFeedback));
         }
 
+        ClearConsentState();
+
         // Store audio URL, ID, and duration for playback and timeline
         LastSynthesizedAudioUrl = response.AudioUrl;
         LastSynthesizedAudioId = response.AudioId;
@@ -869,6 +895,37 @@ namespace VoiceStudio.App.Views.Panels
         StatusMessage = ResourceHelper.GetString("Status.SynthesisCancelled", "Synthesis cancelled");
         return;
       }
+      catch (ConsentRequiredException consentEx)
+      {
+        _errorLoggingService?.LogError(consentEx, "VoiceSynthesis.ConsentRequired", new Dictionary<string, object>
+        {
+            { "Engine", SelectedEngine },
+            { "ProfileId", SelectedProfile?.Id ?? "unknown" },
+            { "TextLength", Text?.Length ?? 0 }
+        });
+        var actionable = ActionableErrorTranslator.Translate(consentEx, ActionableOperationContext.VoiceSynthesize);
+        var errorMsg = actionable.PrimaryMessage;
+        ErrorMessage = errorMsg;
+        HasError = true;
+        IsConsentRequired = true;
+        ConsentRequiredProfileId = SelectedProfile?.Id;
+        ConsentRequiredMessage = string.IsNullOrWhiteSpace(actionable.RecommendedAction)
+            ? ResourceHelper.GetString(
+                "VoiceSynthesis.ConsentRequiredDefaultDetail",
+                "Open the profile in Profiles and complete voice consent, then retry.")
+            : actionable.RecommendedAction;
+        WorkflowState = SynthesisWorkflowState.Error;
+        StatusMessage = string.Empty;
+
+        _errorService?.ShowError(consentEx, ResourceHelper.GetString("Timeline.SynthesisFailed", "Failed to synthesize voice"));
+        var toastDetail = string.IsNullOrWhiteSpace(actionable.SecondaryDetail)
+            ? errorMsg
+            : $"{errorMsg}{Environment.NewLine}{actionable.SecondaryDetail}";
+        _toastNotificationService?.ShowError(
+            ResourceHelper.FormatString("VoiceSynthesis.SynthesisFailedDetail", toastDetail),
+            ResourceHelper.GetString("VoiceSynthesis.SynthesisFailed", "Synthesis Failed"));
+        await (_errorDialogService?.ShowErrorAsync(consentEx, ResourceHelper.GetString("Panel.VoiceSynthesis.DisplayName", "Voice Synthesis")) ?? Task.CompletedTask);
+      }
       catch (Exception ex)
       {
         _errorLoggingService?.LogError(ex, "VoiceSynthesis", new Dictionary<string, object>
@@ -881,6 +938,7 @@ namespace VoiceStudio.App.Views.Panels
         var errorMsg = actionable.PrimaryMessage;
         ErrorMessage = errorMsg;
         HasError = true;
+        IsConsentRequired = false;
         WorkflowState = SynthesisWorkflowState.Error;
         StatusMessage = string.Empty;
 
@@ -1019,6 +1077,7 @@ namespace VoiceStudio.App.Views.Panels
 
     partial void OnSelectedProfileChanged(VoiceProfile? value)
     {
+      ClearError();
       OnPropertyChanged(nameof(IsEmotionSupported));
       if (value == null)
       {
@@ -1105,6 +1164,7 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnTextChanged(string value)
     {
       SynthesizeCommand.NotifyCanExecuteChanged();
+      RetrySynthesisCommand.NotifyCanExecuteChanged();
       if (!IsLoading && WorkflowState != SynthesisWorkflowState.Synthesizing)
         UpdateWorkflowStateFromInputs();
     }
@@ -1115,6 +1175,19 @@ namespace VoiceStudio.App.Views.Panels
       AddToTimelineCommand.NotifyCanExecuteChanged(); // GAP-B04
       OnPropertyChanged(nameof(CanPlayAudio));
       PlayAudioCommand.NotifyCanExecuteChanged();
+      RetrySynthesisCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsConsentRequiredChanged(bool value)
+    {
+      OnPropertyChanged(nameof(ShowGenericSynthesisError));
+      OpenProfileConsentCommand.NotifyCanExecuteChanged();
+      RetrySynthesisCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnConsentRequiredProfileIdChanged(string? value)
+    {
+      OpenProfileConsentCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnIsLongFormRunningChanged(bool value)
@@ -1131,6 +1204,7 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnHasErrorChanged(bool value)
     {
       OnPropertyChanged(nameof(LastError));
+      OnPropertyChanged(nameof(ShowGenericSynthesisError));
       CopyLastErrorCommand.NotifyCanExecuteChanged();
       ClearErrorCommand.NotifyCanExecuteChanged();
     }
@@ -1139,6 +1213,24 @@ namespace VoiceStudio.App.Views.Panels
     {
       OnPropertyChanged(nameof(LastError));
       CopyLastErrorCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ClearConsentState()
+    {
+      IsConsentRequired = false;
+      ConsentRequiredProfileId = null;
+      ConsentRequiredMessage = null;
+    }
+
+    private void OpenProfileConsent()
+    {
+      if (_eventAggregator == null || string.IsNullOrEmpty(ConsentRequiredProfileId))
+        return;
+
+      _eventAggregator.Publish(new NavigateToEvent(
+          PanelIds.VoiceSynthesis,
+          PanelIds.Profiles,
+          new Dictionary<string, object> { ["profileId"] = ConsentRequiredProfileId! }));
     }
 
     private void CopyLastErrorToClipboard()
@@ -1158,6 +1250,7 @@ namespace VoiceStudio.App.Views.Panels
     {
       ErrorMessage = null;
       HasError = false;
+      ClearConsentState();
       UpdateWorkflowStateFromInputs();
     }
 

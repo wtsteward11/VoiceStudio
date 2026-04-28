@@ -162,7 +162,10 @@ Primary voice synthesis interface.
 | `VoiceSynthesisView_EnhanceQualityCheckBox` | CheckBox | Quality enhancement toggle | v1.0.0 |
 | `VoiceSynthesisView_MultiEngineCheckBox` | CheckBox | Multi-engine mode toggle | v1.0.0 |
 | `VoiceSynthesisView_AutoApplyCheckBox` | CheckBox | Auto-apply toggle | v1.0.0 |
-| `VoiceSynthesisView_ErrorInfoBar` | InfoBar | Error display | v1.0.0 |
+| `VoiceSynthesisView_ConsentInfoBar` | InfoBar | Consent-required recovery (navigate to Profiles, retry) | v1.2.0 |
+| `VoiceSynthesisView_GoToProfileButton` | Button | Open Profiles for voice consent | v1.2.0 |
+| `VoiceSynthesisView_RetryConsentButton` | Button | Retry synthesis after consent is granted | v1.2.0 |
+| `VoiceSynthesisView_ErrorInfoBar` | InfoBar | Error display (hidden while consent callout is primary) | v1.0.0 |
 | `VoiceSynthesisView_LongFormToggle` | CheckBox | Long-form (chunked) synthesis mode | v1.2.0 |
 | `VoiceSynthesisView_LongFormProgressText` | TextBlock | Long-form processing status | v1.2.0 |
 | `VoiceSynthesisView_AdvancedControlsExpander` | Expander | Advanced synthesis sliders + mode toggles — GAP-067 slice 5 | v1.2.0 |

@@ -595,6 +595,10 @@ namespace VoiceStudio.App.Tests.ViewModels
       await cmd.ExecuteAsync(default);
 
       Assert.IsTrue(_sut.HasError);
+      Assert.IsTrue(_sut.IsConsentRequired);
+      Assert.AreEqual("p1", _sut.ConsentRequiredProfileId);
+      Assert.IsFalse(string.IsNullOrWhiteSpace(_sut.ConsentRequiredMessage));
+      Assert.IsFalse(_sut.ShowGenericSynthesisError, "Generic error bar must stay hidden while consent callout is primary.");
       Assert.IsTrue(
           _sut.ErrorMessage?.Contains("consent", StringComparison.OrdinalIgnoreCase) == true,
           "ErrorMessage should mention consent.");
@@ -625,6 +629,96 @@ namespace VoiceStudio.App.Tests.ViewModels
       _sut.IsLoading = false;
 
       Assert.IsTrue(_sut.CanSynthesize);
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_AuthorizationFailed403_DoesNotSetConsentState()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new BackendException("Policy denied", 403, "AUTHORIZATION_FAILED", false));
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      Assert.IsTrue(_sut.HasError);
+      Assert.IsFalse(_sut.IsConsentRequired);
+      Assert.IsTrue(_sut.ShowGenericSynthesisError);
+    }
+
+    [TestMethod]
+    public void RetrySynthesisCommand_CannotExecute_WhenConsentNotRequired()
+    {
+      Assert.IsFalse(_sut.RetrySynthesisCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public void OpenProfileConsentCommand_CannotExecute_WhenConsentNotRequired()
+    {
+      Assert.IsFalse(_sut.OpenProfileConsentCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public void ClearError_ClearsConsentRequiredState()
+    {
+      _sut.HasError = true;
+      _sut.ErrorMessage = "err";
+      _sut.IsConsentRequired = true;
+      _sut.ConsentRequiredProfileId = "p1";
+      _sut.ConsentRequiredMessage = "detail";
+
+      if (_sut.ClearErrorCommand.CanExecute(null))
+        _sut.ClearErrorCommand.Execute(null);
+
+      Assert.IsFalse(_sut.IsConsentRequired);
+    }
+
+    [TestMethod]
+    public async Task SelectedProfileChanged_ClearsConsentRequiredState_AfterConsentFailure()
+    {
+      _sut.Profiles = new System.Collections.ObjectModel.ObservableCollection<VoiceProfile>
+      {
+        new VoiceProfile { Id = "a", Name = "A" },
+        new VoiceProfile { Id = "b", Name = "B" },
+      };
+      _sut.Text = "Hello";
+      _sut.SelectedProfile = _sut.Profiles[0];
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new ConsentRequiredException("Need consent"));
+      await ((IAsyncRelayCommand)_sut.SynthesizeCommand).ExecuteAsync(default);
+      Assert.IsTrue(_sut.IsConsentRequired);
+
+      _sut.SelectedProfile = _sut.Profiles[1];
+
+      Assert.IsFalse(_sut.IsConsentRequired);
+    }
+
+    [TestMethod]
+    public async Task RetrySynthesis_AfterConsent_Failure_Then_Success_ClearsConsentState()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .SetupSequence(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new ConsentRequiredException("c"))
+          .ReturnsAsync(new VoiceSynthesisResponse
+          {
+            AudioId = "a1",
+            AudioUrl = "/a",
+            Duration = 1.0,
+            QualityScore = 0.9,
+          });
+      var syn = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await syn.ExecuteAsync(default);
+      Assert.IsTrue(_sut.IsConsentRequired);
+      var retry = (IAsyncRelayCommand)_sut.RetrySynthesisCommand;
+      Assert.IsTrue(retry.CanExecute(null));
+      await retry.ExecuteAsync(default);
+      Assert.IsFalse(_sut.IsConsentRequired);
+      Assert.AreEqual(SynthesisWorkflowState.AudioReady, _sut.WorkflowState);
     }
 
     [TestMethod]

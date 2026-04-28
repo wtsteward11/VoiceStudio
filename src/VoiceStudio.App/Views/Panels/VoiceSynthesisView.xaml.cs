@@ -351,6 +351,13 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    private void ConsentInfoBar_Closed(object sender, Microsoft.UI.Xaml.Controls.InfoBarClosedEventArgs e)
+    {
+      var vm = ViewModel;
+      if (vm != null && vm.ClearErrorCommand.CanExecute(null))
+        vm.ClearErrorCommand.Execute(null);
+    }
+
     private void HelpButton_Click(object _, Microsoft.UI.Xaml.RoutedEventArgs __)
     {
       HelpOverlay.Title = "Voice Synthesis Help";

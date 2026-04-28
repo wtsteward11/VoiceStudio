@@ -5,7 +5,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Services;
+using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Tests.Services
@@ -25,8 +27,8 @@ namespace VoiceStudio.App.Tests.Services
       _clips = new Mock<ITimelineClipService>();
     }
 
-    private GeneratedAudioTimelineService CreateSut() =>
-        new(_ctx.Object, _tracks.Object, _clips.Object);
+    private GeneratedAudioTimelineService CreateSut(IEventAggregator? eventAggregator = null) =>
+        new(_ctx.Object, _tracks.Object, _clips.Object, null, eventAggregator);
 
     private static GeneratedAudioTimelineRequest Request(string audioId) =>
         new(
@@ -355,6 +357,123 @@ namespace VoiceStudio.App.Tests.Services
       Assert.AreEqual(6.0, r.PlacementStartSeconds!.Value, 0.001);
       Assert.IsNotNull(captured);
       Assert.AreEqual(6.0, captured!.StartTime, 0.001);
+    }
+
+    [TestMethod]
+    public async Task Success_PublishesGeneratedAudioClipInsertedEvent_WithMetadata()
+    {
+      var bus = new Mock<IEventAggregator>();
+      _ctx.Setup(c => c.ActiveProjectId).Returns("proj-1");
+      _ctx.Setup(c => c.ActiveTimelinePrimaryTrackId).Returns((string?)null);
+
+      var track = new AudioTrack
+      {
+        Id = "tr-1",
+        Name = "T1",
+        ProjectId = "proj-1",
+        TrackNumber = 1,
+        Clips = new List<AudioClip>
+        {
+          new()
+          {
+            Id = "c0",
+            StartTime = 0,
+            Duration = TimeSpan.FromSeconds(3),
+            ProfileId = "x",
+            AudioId = "old",
+          },
+        },
+      };
+
+      _tracks.Setup(t => t.GetTracksAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<AudioTrack> { track });
+
+      _clips
+          .Setup(c => c.CreateClipAsync("proj-1", "tr-1", It.IsAny<AudioClip>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync((string _, string _, AudioClip clip, CancellationToken _) =>
+          {
+            clip.Id = "persisted-clip";
+            return clip;
+          });
+
+      var sut = CreateSut(bus.Object);
+      var r = await sut.AddGeneratedClipAsync(Request("syn-a1")).ConfigureAwait(false);
+
+      Assert.IsTrue(r.Success);
+      bus.Verify(
+          b => b.Publish(It.Is<GeneratedAudioClipInsertedEvent>(e =>
+              e.ProjectId == "proj-1"
+              && e.TrackId == "tr-1"
+              && e.ClipId == "persisted-clip"
+              && e.AudioId == "syn-a1"
+              && e.SourcePanelId == PanelIds.VoiceSynthesis)),
+          Times.Once);
+    }
+
+    [TestMethod]
+    public async Task PlacementUnavailable_DoesNotPublishEvent()
+    {
+      var bus = new Mock<IEventAggregator>();
+      _ctx.Setup(c => c.ActiveProjectId).Returns("proj-1");
+      _ctx.Setup(c => c.ActiveTimelinePrimaryTrackId).Returns((string?)null);
+
+      var track = new AudioTrack
+      {
+        Id = "tr-1",
+        Name = "T1",
+        ProjectId = "proj-1",
+        TrackNumber = 1,
+        Clips = null!, // SAFETY: placement-unavailable path (same as ClipsNull_ReturnsPlacementUnavailable_NoCreate).
+      };
+
+      _tracks.Setup(t => t.GetTracksAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<AudioTrack> { track });
+
+      var sut = CreateSut(bus.Object);
+      var r = await sut.AddGeneratedClipAsync(Request("syn-null")).ConfigureAwait(false);
+
+      Assert.IsFalse(r.Success);
+      bus.Verify(b => b.Publish(It.IsAny<GeneratedAudioClipInsertedEvent>()), Times.Never);
+    }
+
+    [TestMethod]
+    public async Task CreateClipThrows_DoesNotPublishEvent()
+    {
+      var bus = new Mock<IEventAggregator>();
+      _ctx.Setup(c => c.ActiveProjectId).Returns("proj-1");
+      _tracks.Setup(t => t.GetTracksAsync("proj-1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<AudioTrack>
+          {
+            new()
+            {
+              Id = "tr-1",
+              Name = "T1",
+              Clips = new List<AudioClip>(),
+            },
+          });
+
+      _clips
+          .Setup(c => c.CreateClipAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AudioClip>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new InvalidOperationException("backend"));
+
+      var sut = CreateSut(bus.Object);
+      var r = await sut.AddGeneratedClipAsync(Request("a1")).ConfigureAwait(false);
+
+      Assert.IsFalse(r.Success);
+      bus.Verify(b => b.Publish(It.IsAny<GeneratedAudioClipInsertedEvent>()), Times.Never);
+    }
+
+    [TestMethod]
+    public async Task NoActiveProject_DoesNotPublishEvent()
+    {
+      var bus = new Mock<IEventAggregator>();
+      _ctx.Setup(c => c.ActiveProjectId).Returns((string?)null);
+
+      var sut = CreateSut(bus.Object);
+      var r = await sut.AddGeneratedClipAsync(Request("a1")).ConfigureAwait(false);
+
+      Assert.IsFalse(r.Success);
+      bus.Verify(b => b.Publish(It.IsAny<GeneratedAudioClipInsertedEvent>()), Times.Never);
     }
   }
 }

@@ -739,6 +739,41 @@ namespace VoiceStudio.Core.Events
     }
   }
 
+  /// <summary>
+  /// Voice Synthesis persisted a generated-audio clip on the project timeline (service-layer publish).
+  /// Timeline panel refreshes track state when the active project matches.
+  /// </summary>
+  public sealed class GeneratedAudioClipInsertedEvent : PanelEventBase
+  {
+    public string ProjectId { get; }
+    public string TrackId { get; }
+    public string ClipId { get; }
+    public string AudioId { get; }
+    public string? AudioReference { get; }
+    public string? ProfileId { get; }
+    public string? Engine { get; }
+
+    public GeneratedAudioClipInsertedEvent(
+        string sourcePanelId,
+        string projectId,
+        string trackId,
+        string clipId,
+        string audioId,
+        string? audioReference = null,
+        string? profileId = null,
+        string? engine = null)
+      : base(sourcePanelId)
+    {
+      ProjectId = projectId;
+      TrackId = trackId;
+      ClipId = clipId;
+      AudioId = audioId;
+      AudioReference = audioReference;
+      ProfileId = profileId;
+      Engine = engine;
+    }
+  }
+
   #endregion
 
   #region Navigation Events (Panel Workflow Integration)

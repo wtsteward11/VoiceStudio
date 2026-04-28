@@ -43,6 +43,7 @@ namespace VoiceStudio.App.Views.Panels
     private ISubscriptionToken? _backupRestoredToken;
     private ISubscriptionToken? _clipAudioReplacedToken;
     private ISubscriptionToken? _transcriptTruthStateToken;
+    private ISubscriptionToken? _generatedAudioClipInsertedToken;
     private readonly IAudioPlayerService _audioPlayer;
     private readonly ToastNotificationService? _toastNotificationService;
     private readonly UndoRedoService? _undoRedoService;
@@ -504,7 +505,8 @@ namespace VoiceStudio.App.Views.Panels
       IClipTranscriptLinkageService? clipTranscriptLinkageService = null,
       IProjectRepository? projectRepository = null,
       ITimelineUseCase? timelineUseCase = null,
-      IShellProgressPublisher? shellProgressPublisher = null)
+      IShellProgressPublisher? shellProgressPublisher = null,
+      IEventAggregator? eventAggregator = null)
         : base(AppServices.GetViewModelContext())
     {
       _synthesisService = synthesisService ?? throw new ArgumentNullException(nameof(synthesisService));
@@ -521,7 +523,7 @@ namespace VoiceStudio.App.Views.Panels
       _multiSelectState = _multiSelectService.GetState(PanelId);
 
       // Cross-panel services before commands that publish (transport Slice 1: NavigateToEvent from Record).
-      _eventAggregator = AppServices.TryGetEventAggregator();
+      _eventAggregator = eventAggregator ?? AppServices.TryGetEventAggregator();
       _contextManager = AppServices.TryGetContextManager();
 
       // Get optional services using helper (reduces code duplication)
@@ -690,6 +692,8 @@ namespace VoiceStudio.App.Views.Panels
             async evt => await RunOnDispatcherQueueAsync(() => ApplyBackupRestoredAsync(evt, CancellationToken.None)));
         _clipAudioReplacedToken = _eventAggregator.Subscribe<ClipAudioArtifactReplacedEvent>(OnClipAudioArtifactReplaced);
         _transcriptTruthStateToken = _eventAggregator.Subscribe<TranscriptTruthStateChangedEvent>(OnTranscriptTruthStateChanged);
+        _generatedAudioClipInsertedToken = _eventAggregator.Subscribe<GeneratedAudioClipInsertedEvent>(
+            OnGeneratedAudioClipInserted);
       }
 
       IsTimelineLoopEnabled = _audioPlayer.IsLooping;
@@ -1018,6 +1022,8 @@ namespace VoiceStudio.App.Views.Panels
       _clipAudioReplacedToken = null;
       _transcriptTruthStateToken?.Dispose();
       _transcriptTruthStateToken = null;
+      _generatedAudioClipInsertedToken?.Dispose();
+      _generatedAudioClipInsertedToken = null;
       return Task.CompletedTask;
     }
 
@@ -1045,6 +1051,23 @@ namespace VoiceStudio.App.Views.Panels
       {
         await LoadProfilesAsync(cancellationToken);
       }
+    }
+
+    /// <summary>Reloads timeline tracks from backend when Voice Synthesis persists a generated clip on this project.</summary>
+    private void OnGeneratedAudioClipInserted(GeneratedAudioClipInsertedEvent evt)
+    {
+      if (SelectedProject == null ||
+          !string.Equals(SelectedProject.Id, evt.ProjectId, StringComparison.Ordinal))
+        return;
+
+      var ct = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
+      _ = LoadTracksForProject(evt.ProjectId, ct).ContinueWith(t =>
+      {
+        if (t.IsFaulted)
+          _logService?.LogError(
+              t.Exception?.InnerException ?? new Exception("LoadTracksForProject (GeneratedAudioClipInserted) failed"),
+              "OnGeneratedAudioClipInserted");
+      }, TaskScheduler.Default);
     }
 
     /// <summary>GAP-046: sync observable tracks when transcript regen (or undo/redo) replaces clip audio; may arrive off UI thread.</summary>

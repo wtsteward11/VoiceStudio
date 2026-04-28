@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Models;
+using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 
 namespace VoiceStudio.App.Services;
@@ -20,17 +22,20 @@ public sealed class GeneratedAudioTimelineService : IGeneratedAudioTimelineServi
   private readonly ITimelineTrackService _trackService;
   private readonly ITimelineClipService _clipService;
   private readonly IErrorLoggingService? _log;
+  private readonly IEventAggregator? _eventAggregator;
 
   public GeneratedAudioTimelineService(
       IContextManager context,
       ITimelineTrackService trackService,
       ITimelineClipService clipService,
-      IErrorLoggingService? log = null)
+      IErrorLoggingService? log = null,
+      IEventAggregator? eventAggregator = null)
   {
     _context = context ?? throw new ArgumentNullException(nameof(context));
     _trackService = trackService ?? throw new ArgumentNullException(nameof(trackService));
     _clipService = clipService ?? throw new ArgumentNullException(nameof(clipService));
     _log = log;
+    _eventAggregator = eventAggregator;
   }
 
   /// <inheritdoc />
@@ -144,6 +149,16 @@ public sealed class GeneratedAudioTimelineService : IGeneratedAudioTimelineServi
 
       var persisted = await _clipService.CreateClipAsync(projectId, targetTrack.Id, clip, cancellationToken)
           .ConfigureAwait(false);
+
+      _eventAggregator?.Publish(new GeneratedAudioClipInsertedEvent(
+          PanelIds.VoiceSynthesis,
+          projectId,
+          targetTrack.Id,
+          persisted.Id,
+          request.AudioId,
+          audioReference: request.AudioPathOrUrl?.Trim(),
+          profileId: profileId,
+          engine: string.IsNullOrWhiteSpace(request.Engine) ? null : request.Engine.Trim()));
 
       return new GeneratedAudioTimelineResult(
           true,

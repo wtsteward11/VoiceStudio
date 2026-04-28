@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -130,6 +131,7 @@ namespace VoiceStudio.App.Views.Panels
     private const string CustomKeyEmotionPreset = "VoiceSynthesis_EmotionPreset";
     private const string CustomKeySelectedEngine = "VoiceSynthesis_SelectedEngine";
     private const string CustomKeyAdvancedControlsExpanded = "VoiceSynthesis_AdvancedControlsExpanded";
+    private const string CustomKeyRecentResults = "VoiceSynthesis_RecentResults";
 
     [ObservableProperty]
     private ObservableCollection<VoiceProfile> profiles = new();
@@ -2543,6 +2545,19 @@ namespace VoiceStudio.App.Views.Panels
       return tempPath;
     }
 
+    /// <summary>JSON shape for <see cref="CustomKeyRecentResults"/> (panel layout persistence).</summary>
+    private sealed class RecentResultPersistDto
+    {
+      public string? AudioId { get; set; }
+      public string? AudioReference { get; set; }
+      public double DurationSeconds { get; set; }
+      public double QualityScore { get; set; }
+      public string? ProfileId { get; set; }
+      public string? ProfileName { get; set; }
+      public string? Engine { get; set; }
+      public string? CreatedAtUtc { get; set; }
+    }
+
     #region IPanelStatePersistable (GAP-050 state hygiene)
 
     /// <inheritdoc />
@@ -2563,6 +2578,23 @@ namespace VoiceStudio.App.Views.Panels
         if (!string.IsNullOrEmpty(Emotion))
           state.CustomData[CustomKeyEmotionPreset] = Emotion!;
         state.CustomData[CustomKeyAdvancedControlsExpanded] = IsAdvancedSynthesisControlsExpanded;
+
+        if (RecentSynthesisResults.Count > 0)
+        {
+          var dtos = RecentSynthesisResults.Select(r => new RecentResultPersistDto
+          {
+            AudioId = r.AudioId,
+            AudioReference = r.AudioReference,
+            DurationSeconds = r.Duration.TotalSeconds,
+            QualityScore = r.QualityScore,
+            ProfileId = r.ProfileId,
+            ProfileName = r.ProfileName,
+            Engine = r.Engine,
+            CreatedAtUtc = r.CreatedAtLocal.ToUniversalTime()
+                .ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+          }).ToList();
+          state.CustomData[CustomKeyRecentResults] = JsonSerializer.Serialize(dtos);
+        }
 
         return state;
       }
@@ -2614,6 +2646,8 @@ namespace VoiceStudio.App.Views.Panels
             _pendingRestoreHasEmotionKey = true;
             _pendingRestoreEmotionRaw = CoerceCustomStateString(emoObj);
           }
+          if (state.CustomData.TryGetValue(CustomKeyRecentResults, out var recentObj))
+            RestoreRecentResultsFromCustomData(recentObj);
         }
 
         TryCompletePendingPanelRestore();
@@ -2626,12 +2660,83 @@ namespace VoiceStudio.App.Views.Panels
       return Task.CompletedTask;
     }
 
+    private void RestoreRecentResultsFromCustomData(object? value)
+    {
+      try
+      {
+        var json = CoerceCustomStateString(value);
+        if (string.IsNullOrWhiteSpace(json))
+          return;
+
+        var dtos = JsonSerializer.Deserialize<List<RecentResultPersistDto>>(json);
+        if (dtos == null)
+          return;
+
+        RecentSynthesisResults.Clear();
+        var count = 0;
+        foreach (var dto in dtos)
+        {
+          if (count >= MaxRecentSynthesisResults)
+            break;
+          if (string.IsNullOrWhiteSpace(dto.AudioId) && string.IsNullOrWhiteSpace(dto.AudioReference))
+            continue;
+
+          DateTime createdLocal;
+          if (!string.IsNullOrWhiteSpace(dto.CreatedAtUtc) &&
+              DateTime.TryParse(
+                  dto.CreatedAtUtc,
+                  System.Globalization.CultureInfo.InvariantCulture,
+                  System.Globalization.DateTimeStyles.RoundtripKind,
+                  out var parsed))
+            createdLocal = parsed.ToLocalTime();
+          else
+            createdLocal = DateTime.Now;
+
+          RecentSynthesisResults.Add(new VoiceSynthesisRecentResult
+          {
+            AudioId = string.IsNullOrWhiteSpace(dto.AudioId) ? null : dto.AudioId,
+            AudioReference = string.IsNullOrWhiteSpace(dto.AudioReference) ? null : dto.AudioReference,
+            Duration = TimeSpan.FromSeconds(Math.Max(0, dto.DurationSeconds)),
+            QualityScore = dto.QualityScore,
+            ProfileId = dto.ProfileId,
+            ProfileName = dto.ProfileName,
+            Engine = dto.Engine,
+            CreatedAtLocal = createdLocal,
+          });
+          count++;
+        }
+
+        OnPropertyChanged(nameof(HasRecentSynthesisResults));
+        RestoreRecentResultCommand.NotifyCanExecuteChanged();
+      }
+      catch (JsonException ex)
+      {
+        System.Diagnostics.Debug.WriteLine(
+            $"VoiceSynthesisViewModel.RestoreRecentResults: malformed JSON ignored: {ex.Message}");
+      }
+      catch (Exception ex)
+      {
+        System.Diagnostics.Debug.WriteLine(
+            $"VoiceSynthesisViewModel.RestoreRecentResults: unexpected error: {ex.Message}");
+      }
+    }
+
     private static string? CoerceCustomStateString(object? value)
     {
       if (value == null)
         return null;
       if (value is string s)
         return s;
+      if (value is System.Text.Json.JsonElement je)
+      {
+        if (je.ValueKind is System.Text.Json.JsonValueKind.String or System.Text.Json.JsonValueKind.Null)
+        {
+          if (je.ValueKind == System.Text.Json.JsonValueKind.Null)
+            return null;
+          return je.GetString();
+        }
+        return je.GetRawText();
+      }
       return Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
     }
 

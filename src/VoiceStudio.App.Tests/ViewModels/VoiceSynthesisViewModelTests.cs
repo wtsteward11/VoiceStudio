@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
@@ -1141,6 +1142,203 @@ namespace VoiceStudio.App.Tests.ViewModels
     public void RestoreCommand_DisabledForNull()
     {
       Assert.IsFalse(_sut.RestoreRecentResultCommand.CanExecute(null));
+    }
+
+    #endregion
+
+    #region Recent results persistence tests
+
+    private const string RecentResultsCustomKey = "VoiceSynthesis_RecentResults";
+
+    private static PanelStateData BuildRecentResultsPanelState(
+        params (string? audioId, string? audioRef, double dur, string? engine)[] items)
+    {
+      var list = new List<Dictionary<string, object?>>();
+      var utc = DateTime.UtcNow.ToString("O");
+      foreach (var i in items)
+      {
+        list.Add(new Dictionary<string, object?>
+        {
+          ["AudioId"] = i.audioId,
+          ["AudioReference"] = i.audioRef,
+          ["DurationSeconds"] = i.dur,
+          ["QualityScore"] = 0.9,
+          ["ProfileId"] = "p1",
+          ["ProfileName"] = "P",
+          ["Engine"] = i.engine,
+          ["CreatedAtUtc"] = utc,
+        });
+      }
+      return new PanelStateData
+      {
+        PanelId = PanelIds.VoiceSynthesis,
+        CustomData = new Dictionary<string, object>
+        {
+          [RecentResultsCustomKey] = JsonSerializer.Serialize(list),
+        },
+      };
+    }
+
+    private static PanelStateData BuildRecentResultsPanelStateRawJson(string json)
+    {
+      return new PanelStateData
+      {
+        PanelId = PanelIds.VoiceSynthesis,
+        CustomData = new Dictionary<string, object>
+        {
+          [RecentResultsCustomKey] = json,
+        },
+      };
+    }
+
+    [TestMethod]
+    public async Task GetCurrentState_PersistsRecentResults_WhenPresent()
+    {
+      await RunSuccessfulSynthesisAsync("persist-1", "/api/audio/persist-1");
+      var state = _sut.GetCurrentState();
+      Assert.IsNotNull(state);
+      Assert.IsNotNull(state!.CustomData);
+      Assert.IsTrue(state.CustomData.ContainsKey(RecentResultsCustomKey));
+      var json = state.CustomData[RecentResultsCustomKey] as string;
+      Assert.IsFalse(string.IsNullOrEmpty(json));
+      Assert.IsTrue(json!.Contains("persist-1", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void GetCurrentState_OmitsRecentResults_WhenEmpty()
+    {
+      var state = _sut.GetCurrentState();
+      Assert.IsNotNull(state);
+      Assert.IsNotNull(state!.CustomData);
+      Assert.IsFalse(state.CustomData.ContainsKey(RecentResultsCustomKey));
+    }
+
+    [TestMethod]
+    public async Task RestoreStateAsync_RestoresPersistedRecentResults()
+    {
+      var panelState = BuildRecentResultsPanelState(
+          ("a", "/api/a", 1.0, "xtts"),
+          ("b", "/api/b", 2.0, "piper"));
+      await _sut.RestoreStateAsync(panelState, default);
+
+      Assert.AreEqual(2, _sut.RecentSynthesisResults.Count);
+      Assert.AreEqual("a", _sut.RecentSynthesisResults[0].AudioId);
+      Assert.AreEqual("b", _sut.RecentSynthesisResults[1].AudioId);
+    }
+
+    [TestMethod]
+    public async Task RestoreStateAsync_CapsRestoredResultsToFive()
+    {
+      var panelState = BuildRecentResultsPanelState(
+          ("0", "/api/0", 0, "a"),
+          ("1", "/api/1", 0, "a"),
+          ("2", "/api/2", 0, "a"),
+          ("3", "/api/3", 0, "a"),
+          ("4", "/api/4", 0, "a"),
+          ("5", "/api/5", 0, "a"),
+          ("6", "/api/6", 0, "a"));
+      await _sut.RestoreStateAsync(panelState, default);
+
+      Assert.AreEqual(5, _sut.RecentSynthesisResults.Count);
+      Assert.AreEqual("0", _sut.RecentSynthesisResults[0].AudioId);
+    }
+
+    [TestMethod]
+    public async Task RestoreStateAsync_SkipsInvalidRows_NoAudioIdOrReference()
+    {
+      var list = new List<Dictionary<string, object?>>
+      {
+        new()
+        {
+          ["AudioId"] = "",
+          ["AudioReference"] = null,
+          ["DurationSeconds"] = 0.0,
+          ["QualityScore"] = 0.0,
+        },
+        new()
+        {
+          ["AudioId"] = "ok",
+          ["AudioReference"] = "/ref/ok",
+          ["DurationSeconds"] = 1.0,
+          ["QualityScore"] = 0.5,
+          ["ProfileId"] = "p1",
+          ["ProfileName"] = "P",
+          ["Engine"] = "e",
+          ["CreatedAtUtc"] = DateTime.UtcNow.ToString("O"),
+        },
+      };
+      var raw = JsonSerializer.Serialize(list);
+      await _sut.RestoreStateAsync(BuildRecentResultsPanelStateRawJson(raw), default);
+
+      Assert.AreEqual(1, _sut.RecentSynthesisResults.Count);
+      Assert.AreEqual("ok", _sut.RecentSynthesisResults[0].AudioId);
+    }
+
+    [TestMethod]
+    public async Task RestoreStateAsync_MalformedJson_DoesNotThrow()
+    {
+      var panelState = BuildRecentResultsPanelStateRawJson("not valid json {{{");
+      await _sut.RestoreStateAsync(panelState, default);
+      Assert.AreEqual(0, _sut.RecentSynthesisResults.Count);
+    }
+
+    [TestMethod]
+    public async Task RestoreStateAsync_MissingRecentResultsKey_DoesNotThrow()
+    {
+      var panelState = new PanelStateData
+      {
+        PanelId = PanelIds.VoiceSynthesis,
+        CustomData = new Dictionary<string, object> { { "OtherKey", 1 } },
+      };
+      await _sut.RestoreStateAsync(panelState, default);
+      Assert.AreEqual(0, _sut.RecentSynthesisResults.Count);
+    }
+
+    [TestMethod]
+    public async Task RestoredRecentResult_CanBeRestoredAsActive()
+    {
+      await _sut.RestoreStateAsync(
+          BuildRecentResultsPanelState(
+              ("rid", "/api/rid", 1, "xtts"),
+              ("other", "/api/o", 1, "xtts")),
+          default);
+      var pick = _sut.RecentSynthesisResults[1];
+      _sut.RestoreRecentResultCommand.Execute(pick);
+
+      Assert.AreEqual("other", _sut.LastSynthesizedAudioId);
+    }
+
+    [TestMethod]
+    public async Task RestoredRecentResult_SetsAudioReadyAndCanPlay_FromPersistence()
+    {
+      await _sut.RestoreStateAsync(
+          BuildRecentResultsPanelState(
+              ("ra", "/api/ra", 1, "xtts")),
+          default);
+      _sut.WorkflowState = SynthesisWorkflowState.Idle;
+
+      _sut.RestoreRecentResultCommand.Execute(_sut.RecentSynthesisResults[0]);
+
+      Assert.AreEqual(SynthesisWorkflowState.AudioReady, _sut.WorkflowState);
+      Assert.IsTrue(_sut.CanPlayAudio);
+    }
+
+    [TestMethod]
+    public async Task PlaybackErrorState_NotPersisted()
+    {
+      await RunSuccessfulSynthesisAsync("pe-err", "/api/pe-err");
+      _sut.PlaybackErrorMessage = "E";
+      _sut.IsPlaybackError = true;
+
+      var state = _sut.GetCurrentState();
+      var json = state?.CustomData?[RecentResultsCustomKey] as string;
+      Assert.IsFalse(string.IsNullOrEmpty(json));
+      using var doc = JsonDocument.Parse(json!);
+      var el0 = doc.RootElement[0];
+      Assert.IsFalse(el0.TryGetProperty("IsPlaybackError", out _));
+      Assert.IsFalse(el0.TryGetProperty("isPlaybackError", out _));
+      Assert.IsTrue(el0.TryGetProperty("AudioId", out var aid));
+      Assert.AreEqual("pe-err", aid.GetString());
     }
 
     #endregion

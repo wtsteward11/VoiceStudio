@@ -52,7 +52,15 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockLibraryService = new Mock<IGeneratedAudioLibraryService>();
       _mockLibraryService
           .Setup(s => s.SaveAsync(It.IsAny<GeneratedAudioSaveRequest>(), It.IsAny<CancellationToken>()))
-          .ReturnsAsync(new GeneratedAudioSaveResult(true, null));
+          .ReturnsAsync(new GeneratedAudioSaveResult(
+              true,
+              null,
+              GeneratedAudioSaveKind.LibraryBacked,
+              null,
+              null,
+              null,
+              null,
+              null));
 
       // Setup default mock behavior
       _mockProfilesClient
@@ -1922,6 +1930,51 @@ namespace VoiceStudio.App.Tests.ViewModels
 
       Assert.IsTrue(_sut.IsGeneratedAudioSaved);
       StringAssert.Contains(_sut.GeneratedAudioSaveStatus, "Saved", StringComparison.OrdinalIgnoreCase);
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_EventNotified_StatusDoesNotClaimProjectLibrary()
+    {
+      _mockLibraryService
+          .Setup(s => s.SaveAsync(It.IsAny<GeneratedAudioSaveRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioSaveResult(
+              true,
+              null,
+              GeneratedAudioSaveKind.EventNotified,
+              null,
+              null,
+              null,
+              "Library notified; project-backed save requires a local generated audio file.",
+              null));
+
+      await RunSuccessfulSynthesisAsync("ev1", "/api/audio/ev1");
+      await _sut.AddGeneratedAudioToLibraryCommand.ExecuteAsync(default);
+
+      Assert.IsTrue(_sut.IsGeneratedAudioSaved);
+      StringAssert.Contains(_sut.GeneratedAudioSaveStatus, "Library", StringComparison.OrdinalIgnoreCase);
+      Assert.IsFalse(
+          _sut.GeneratedAudioSaveStatus.Contains("project library", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_ProjectBacked_StatusMentionsProjectLibrary()
+    {
+      _mockLibraryService
+          .Setup(s => s.SaveAsync(It.IsAny<GeneratedAudioSaveRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioSaveResult(
+              true,
+              null,
+              GeneratedAudioSaveKind.ProjectBacked,
+              "a1",
+              "play1",
+              "proj1",
+              null,
+              @"C:\temp\f.wav"));
+
+      await RunSuccessfulSynthesisAsync("pb1", "/api/audio/pb1");
+      await _sut.AddGeneratedAudioToLibraryCommand.ExecuteAsync(default);
+
+      StringAssert.Contains(_sut.GeneratedAudioSaveStatus, "project", StringComparison.OrdinalIgnoreCase);
     }
 
     [TestMethod]

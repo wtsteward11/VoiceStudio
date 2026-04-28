@@ -2402,11 +2402,36 @@ namespace VoiceStudio.App.Views.Panels
       if (result.Success)
       {
         IsGeneratedAudioSaved = true;
-        GeneratedAudioSaveStatus = "Saved to library";
+        GeneratedAudioSaveStatus = result.SaveKind switch
+        {
+          GeneratedAudioSaveKind.ProjectBacked => "Saved to project library",
+          GeneratedAudioSaveKind.LibraryBacked =>
+              string.IsNullOrWhiteSpace(result.Message)
+                  ? "Saved to library"
+                  : $"Saved to library — {result.Message}",
+          GeneratedAudioSaveKind.EventNotified =>
+              string.IsNullOrWhiteSpace(result.Message)
+                  ? "Library notified"
+                  : result.Message,
+          _ => string.IsNullOrWhiteSpace(result.Message) ? "Saved to library" : result.Message!,
+        };
         MarkMatchingRecentResultSaved(
             string.IsNullOrWhiteSpace(request.AudioId) ? null : request.AudioId,
             request.AudioReference);
-        _toastNotificationService?.ShowSuccess("Library", "Audio saved to library");
+        var toastBody = result.SaveKind switch
+        {
+          GeneratedAudioSaveKind.ProjectBacked => "Audio saved to project library",
+          GeneratedAudioSaveKind.LibraryBacked =>
+              string.IsNullOrWhiteSpace(result.Message)
+                  ? "Audio saved to library"
+                  : result.Message!,
+          GeneratedAudioSaveKind.EventNotified =>
+              string.IsNullOrWhiteSpace(result.Message)
+                  ? "Library notified (upload a local file for full library copy)"
+                  : result.Message!,
+          _ => "Audio saved to library",
+        };
+        _toastNotificationService?.ShowSuccess("Library", toastBody);
       }
       else
       {

@@ -405,7 +405,6 @@ namespace VoiceStudio.App.Services
 
       // Event aggregator for cross-panel synchronization (Phase 4)
       services.AddSingleton<IEventAggregator, EventAggregator>();
-      services.AddSingleton<IGeneratedAudioLibraryService, GeneratedAudioLibraryService>();
 
       // Throttled event publisher for high-frequency events (Premium Reliability Pass Task 7)
       services.AddSingleton<ThrottledEventPublisher>(sp => new ThrottledEventPublisher(
@@ -420,6 +419,13 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<IContextManager>(sp => new ContextManager(
           sp.GetRequiredService<IEventAggregator>(),
           sp.GetService<AppStateStore>()));
+
+      services.AddSingleton<IGeneratedAudioLibraryService>(sp => new GeneratedAudioLibraryService(
+          sp.GetRequiredService<IEventAggregator>(),
+          sp.GetRequiredService<ILibraryClient>(),
+          sp.GetRequiredService<IContextManager>(),
+          sp.GetRequiredService<IProjectAudioClient>(),
+          sp.GetService<IErrorLoggingService>()));
 
       // GAP-014: Legacy ILayoutService/IWorkspaceService (LayoutService/WorkspaceService) removed from DI.
       // Runtime workspace authority is PanelStateService (IUnifiedWorkspaceService) + MainWindow orchestration.

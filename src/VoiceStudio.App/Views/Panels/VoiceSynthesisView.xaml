@@ -430,6 +430,19 @@
                   IsEnabled="{x:Bind ViewModel.CanOpenOutputLocation, Mode=OneWay}"
                   ToolTipService.ToolTip="Open the local output file or folder"/>
         </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+          <Button Content="Add to Library"
+                  AutomationProperties.AutomationId="VoiceSynthesisView_AddGeneratedAudioToLibraryButton"
+                  Command="{x:Bind ViewModel.AddGeneratedAudioToLibraryCommand}"
+                  IsEnabled="{x:Bind ViewModel.CanAddGeneratedAudioToLibrary, Mode=OneWay}"
+                  ToolTipService.ToolTip="Register this clip with the library workflow"/>
+          <TextBlock AutomationProperties.AutomationId="VoiceSynthesisView_GeneratedAudioSaveStatus"
+                     Text="{x:Bind ViewModel.GeneratedAudioSaveStatus, Mode=OneWay}"
+                     FontSize="11"
+                     Opacity="0.85"
+                     Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                     VerticalAlignment="Center"/>
+        </StackPanel>
       </StackPanel>
     </Border>
 
@@ -476,6 +489,12 @@
                   <TextBlock Text="{x:Bind CreatedAtLabel, Mode=OneWay}"
                              FontSize="11"
                              Foreground="{StaticResource VSQ.Text.TertiaryBrush}"/>
+                  <TextBlock Text="Saved to library"
+                             FontSize="10"
+                             Opacity="0.75"
+                             Foreground="{StaticResource VSQ.Accent.CyanBrush}"
+                             AutomationProperties.AutomationId="VoiceSynthesisView_RecentResultSavedBadge"
+                             Visibility="{x:Bind IsSavedToLibrary, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal"

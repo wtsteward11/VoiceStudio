@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -48,9 +50,9 @@ namespace VoiceStudio.App.Views.Panels
   }
 
   /// <summary>
-  /// In-memory entry for the Voice Synthesis recent-results mini-list (not persisted; max 5 in VM).
+  /// In-memory entry for the Voice Synthesis recent-results mini-list (max 5 in VM; optional panel persistence).
   /// </summary>
-  public sealed class VoiceSynthesisRecentResult
+  public sealed class VoiceSynthesisRecentResult : INotifyPropertyChanged
   {
     public string? AudioId { get; init; }
     public string? AudioReference { get; init; }
@@ -60,6 +62,43 @@ namespace VoiceStudio.App.Views.Panels
     public string? ProfileName { get; init; }
     public string? Engine { get; init; }
     public DateTime CreatedAtLocal { get; init; }
+
+    private bool _isSavedToLibrary;
+
+    /// <summary>True when this output was successfully registered with the library workflow for this session.</summary>
+    public bool IsSavedToLibrary
+    {
+      get => _isSavedToLibrary;
+      set
+      {
+        if (_isSavedToLibrary == value)
+          return;
+        _isSavedToLibrary = value;
+        OnPropertyChanged();
+      }
+    }
+
+    private DateTime? _savedAtLocal;
+
+    /// <summary>Local time when <see cref="IsSavedToLibrary"/> was set true, if applicable.</summary>
+    public DateTime? SavedAtLocal
+    {
+      get => _savedAtLocal;
+      set
+      {
+        if (_savedAtLocal == value)
+          return;
+        _savedAtLocal = value;
+        OnPropertyChanged();
+      }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+      PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
     public string Summary
     {
@@ -113,6 +152,7 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IErrorLoggingService? _errorLoggingService;
     private readonly IErrorDialogService? _errorDialogService;
     private readonly IToastNotificationService? _toastNotificationService;
+    private readonly IGeneratedAudioLibraryService? _generatedAudioLibraryService;
     private readonly IErrorPresentationService? _errorService;
     private readonly string _backendBaseUrl;
     private StreamingAudioPlayer? _streamingPlayer;
@@ -318,6 +358,22 @@ namespace VoiceStudio.App.Views.Panels
 
     public bool CanOpenOutputLocation => HasSynthesisResult && TryResolveExistingLocalOutputPath(LastSynthesizedAudioUrl, out _, out _);
 
+    /// <summary>True after the active generated clip was successfully sent to the library workflow.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanAddGeneratedAudioToLibrary))]
+    private bool isGeneratedAudioSaved;
+
+    /// <summary>Short status for the generated-audio panel (saved / failed / empty).</summary>
+    [ObservableProperty]
+    private string generatedAudioSaveStatus = string.Empty;
+
+    /// <summary>True when user can add the current synthesis output to the library (service present, result exists, not busy, not already saved).</summary>
+    public bool CanAddGeneratedAudioToLibrary =>
+        _generatedAudioLibraryService != null &&
+        HasSynthesisResult &&
+        !IsLoading &&
+        !IsGeneratedAudioSaved;
+
     [ObservableProperty]
     private TimeSpan lastSynthesizedDuration;
 
@@ -444,8 +500,11 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private double temperature = 0.35;
 
-    /// <summary>Optional <paramref name="toastNotificationService"/> enables unit tests to capture toasts without WinUI.</summary>
-    public VoiceSynthesisViewModel(IVoiceSynthesisService voiceSynthesisService, IEnginesClient enginesClient, IQualityPipelineService qualityPipelineService, IEnsembleService ensembleService, ITextAnalysisService textAnalysisService, IQualityHistoryService qualityHistoryService, IProfilesClient profilesClient, IAudioPlayerService audioPlayer, IToastNotificationService? toastNotificationService = null)
+    /// <summary>
+    /// Voice Synthesis panel VM. Optional <paramref name="toastNotificationService"/> and
+    /// <paramref name="generatedAudioLibraryService"/> enable unit tests without full app DI.
+    /// </summary>
+    public VoiceSynthesisViewModel(IVoiceSynthesisService voiceSynthesisService, IEnginesClient enginesClient, IQualityPipelineService qualityPipelineService, IEnsembleService ensembleService, ITextAnalysisService textAnalysisService, IQualityHistoryService qualityHistoryService, IProfilesClient profilesClient, IAudioPlayerService audioPlayer, IToastNotificationService? toastNotificationService = null, IGeneratedAudioLibraryService? generatedAudioLibraryService = null)
         : base(AppServices.GetViewModelContext())
     {
       _voiceSynthesisService = voiceSynthesisService ?? throw new ArgumentNullException(nameof(voiceSynthesisService));
@@ -503,6 +562,8 @@ namespace VoiceStudio.App.Views.Panels
           _toastNotificationService = null;
         }
       }
+
+      _generatedAudioLibraryService = generatedAudioLibraryService ?? AppServices.GetService<IGeneratedAudioLibraryService>();
 
       // EventAggregator for ProfileSelectedEvent (subscription in OnActivatedAsync per lifecycle rule)
       _eventAggregator = AppServices.TryGetEventAggregator();
@@ -570,6 +631,12 @@ namespace VoiceStudio.App.Views.Panels
       // GAP-B04: Disabled when busy or no synthesis output
       AddToTimelineCommand = new RelayCommand(AddSynthesizedAudioToTimeline,
           () => !string.IsNullOrEmpty(LastSynthesizedAudioId) && !IsLoading);
+
+      AddGeneratedAudioToLibraryCommand = new EnhancedAsyncRelayCommand(async (ct) =>
+      {
+        using var profiler = PerformanceProfiler.Start("Command: AddGeneratedAudioToLibrary", PerformanceBudgets.CommandExecutionMs);
+        await AddGeneratedAudioToLibraryAsync(ct);
+      }, () => CanAddGeneratedAudioToLibrary);
 
       // Streaming synthesis commands
       StartStreamingCommand = new EnhancedAsyncRelayCommand(async (ct) =>
@@ -713,6 +780,7 @@ namespace VoiceStudio.App.Views.Panels
     public IRelayCommand OpenProfileConsentCommand { get; }
     public EnhancedAsyncRelayCommand RetrySynthesisCommand { get; }
     public IRelayCommand AddToTimelineCommand { get; }
+    public EnhancedAsyncRelayCommand AddGeneratedAudioToLibraryCommand { get; }
     public EnhancedAsyncRelayCommand StartStreamingCommand { get; }
     public IRelayCommand StopStreamingCommand { get; }
 
@@ -998,6 +1066,8 @@ namespace VoiceStudio.App.Views.Panels
       LastSynthesizedAudioId = string.Empty;
       LastSynthesizedAudioUrl = string.Empty;
       LastSynthesizedDuration = TimeSpan.Zero;
+      IsGeneratedAudioSaved = false;
+      GeneratedAudioSaveStatus = string.Empty;
     }
 
     // Quality metrics display properties
@@ -1840,6 +1910,18 @@ namespace VoiceStudio.App.Views.Panels
       CopyAudioReferenceCommand.NotifyCanExecuteChanged();
       OpenOutputLocationCommand.NotifyCanExecuteChanged();
       RefreshPlaybackErrorCommandState();
+      RefreshLibraryOutputState();
+    }
+
+    private void RefreshLibraryOutputState()
+    {
+      OnPropertyChanged(nameof(CanAddGeneratedAudioToLibrary));
+      AddGeneratedAudioToLibraryCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsGeneratedAudioSavedChanged(bool value)
+    {
+      AddGeneratedAudioToLibraryCommand.NotifyCanExecuteChanged();
     }
 
     private void ClearPlaybackError()
@@ -1936,6 +2018,10 @@ namespace VoiceStudio.App.Views.Panels
       LastSynthesizedAudioUrl = item.AudioReference ?? string.Empty;
       LastSynthesizedDuration = item.Duration;
       WorkflowState = SynthesisWorkflowState.AudioReady;
+      IsGeneratedAudioSaved = item.IsSavedToLibrary;
+      GeneratedAudioSaveStatus = item.IsSavedToLibrary
+          ? "Previously saved to library"
+          : string.Empty;
       ClearPlaybackError();
       RefreshSynthesisResultState();
       PlayAudioCommand.NotifyCanExecuteChanged();
@@ -2277,6 +2363,76 @@ namespace VoiceStudio.App.Views.Panels
         _errorLoggingService?.LogError(ex, "StopAudio");
         ErrorMessage = $"Failed to stop playback: {ErrorHandler.GetUserFriendlyMessage(ex)}";
         HasError = true;
+      }
+    }
+
+    /// <summary>
+    /// Register the active synthesized asset with the library workflow (<see cref="IGeneratedAudioLibraryService"/>).
+    /// </summary>
+    private async Task AddGeneratedAudioToLibraryAsync(CancellationToken cancellationToken)
+    {
+      if (_generatedAudioLibraryService == null || !CanAddGeneratedAudioToLibrary)
+        return;
+
+      var request = new GeneratedAudioSaveRequest(
+          PanelId,
+          LastSynthesizedAudioId ?? string.Empty,
+          LastSynthesizedAudioUrl,
+          LastSynthesizedDuration,
+          SelectedProfile?.Id,
+          SelectedProfile?.Name,
+          SelectedEngine,
+          DateTime.Now);
+
+      GeneratedAudioSaveResult result;
+      try
+      {
+        result = await _generatedAudioLibraryService.SaveAsync(request, cancellationToken).ConfigureAwait(false);
+      }
+      catch (OperationCanceledException)
+      {
+        return;
+      }
+      catch (Exception ex)
+      {
+        _errorLoggingService?.LogError(ex, "VoiceSynthesis.AddToLibrary");
+        result = new GeneratedAudioSaveResult(false, ex.Message);
+      }
+
+      if (result.Success)
+      {
+        IsGeneratedAudioSaved = true;
+        GeneratedAudioSaveStatus = "Saved to library";
+        MarkMatchingRecentResultSaved(
+            string.IsNullOrWhiteSpace(request.AudioId) ? null : request.AudioId,
+            request.AudioReference);
+        _toastNotificationService?.ShowSuccess("Library", "Audio saved to library");
+      }
+      else
+      {
+        GeneratedAudioSaveStatus = string.IsNullOrWhiteSpace(result.ErrorMessage)
+            ? "Save failed"
+            : $"Save failed — {result.ErrorMessage}";
+        _toastNotificationService?.ShowWarning("Library", result.ErrorMessage ?? "Save failed");
+      }
+    }
+
+    /// <summary>Marks the matching recent-results row as saved (same audio id or reference as active output).</summary>
+    private void MarkMatchingRecentResultSaved(string? audioId, string? audioReference)
+    {
+      var now = DateTime.Now;
+      foreach (var row in RecentSynthesisResults)
+      {
+        var idMatch = !string.IsNullOrWhiteSpace(audioId) &&
+                      string.Equals(row.AudioId, audioId, StringComparison.Ordinal);
+        var refMatch = !string.IsNullOrWhiteSpace(audioReference) &&
+                       string.Equals(row.AudioReference, audioReference, StringComparison.Ordinal);
+        if (idMatch || refMatch)
+        {
+          row.IsSavedToLibrary = true;
+          row.SavedAtLocal = now;
+          break;
+        }
       }
     }
 
@@ -2904,6 +3060,8 @@ namespace VoiceStudio.App.Views.Panels
       public string? ProfileName { get; set; }
       public string? Engine { get; set; }
       public string? CreatedAtUtc { get; set; }
+      public bool IsSavedToLibrary { get; set; }
+      public string? SavedAtUtc { get; set; }
     }
 
     #region IPanelStatePersistable (GAP-050 state hygiene)
@@ -2939,6 +3097,9 @@ namespace VoiceStudio.App.Views.Panels
             ProfileName = r.ProfileName,
             Engine = r.Engine,
             CreatedAtUtc = r.CreatedAtLocal.ToUniversalTime()
+                .ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            IsSavedToLibrary = r.IsSavedToLibrary,
+            SavedAtUtc = r.SavedAtLocal?.ToUniversalTime()
                 .ToString("O", System.Globalization.CultureInfo.InvariantCulture),
           }).ToList();
           state.CustomData[CustomKeyRecentResults] = JsonSerializer.Serialize(dtos);
@@ -3051,6 +3212,15 @@ namespace VoiceStudio.App.Views.Panels
             Engine = dto.Engine,
             CreatedAtLocal = createdLocal,
           });
+          var added = RecentSynthesisResults[RecentSynthesisResults.Count - 1];
+          added.IsSavedToLibrary = dto.IsSavedToLibrary;
+          if (!string.IsNullOrWhiteSpace(dto.SavedAtUtc) &&
+              DateTime.TryParse(
+                  dto.SavedAtUtc,
+                  System.Globalization.CultureInfo.InvariantCulture,
+                  System.Globalization.DateTimeStyles.RoundtripKind,
+                  out var savedUtc))
+            added.SavedAtLocal = savedUtc.ToLocalTime();
           count++;
         }
 

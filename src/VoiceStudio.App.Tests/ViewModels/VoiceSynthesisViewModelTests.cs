@@ -34,6 +34,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     private Mock<IProfilesClient> _mockProfilesClient = null!;
     private Mock<IAudioPlayerService> _mockAudioPlayer = null!;
     private Mock<IToastNotificationService> _mockToast = null!;
+    private Mock<IGeneratedAudioLibraryService> _mockLibraryService = null!;
     private VoiceSynthesisViewModel _sut = null!;
 
     [TestInitialize]
@@ -48,6 +49,10 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockProfilesClient = new Mock<IProfilesClient>();
       _mockAudioPlayer = new Mock<IAudioPlayerService>();
       _mockToast = new Mock<IToastNotificationService>();
+      _mockLibraryService = new Mock<IGeneratedAudioLibraryService>();
+      _mockLibraryService
+          .Setup(s => s.SaveAsync(It.IsAny<GeneratedAudioSaveRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioSaveResult(true, null));
 
       // Setup default mock behavior
       _mockProfilesClient
@@ -69,7 +74,8 @@ namespace VoiceStudio.App.Tests.ViewModels
           _mockQualityHistoryService.Object,
           _mockProfilesClient.Object,
           _mockAudioPlayer.Object,
-          _mockToast.Object
+          _mockToast.Object,
+          _mockLibraryService.Object
       );
     }
 
@@ -1843,6 +1849,240 @@ namespace VoiceStudio.App.Tests.ViewModels
       _sut.SelectedEngines.Clear();
 
       Assert.IsFalse(_sut.IsEngineSelected("xtts_v2"));
+    }
+
+    #endregion
+
+    #region Library output tests
+
+    [TestMethod]
+    public void LibraryOutput_CanAdd_IsFalse_BeforeSynthesis()
+    {
+      Assert.IsFalse(_sut.CanAddGeneratedAudioToLibrary);
+      Assert.IsFalse(_sut.AddGeneratedAudioToLibraryCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_CanAdd_IsTrue_AfterSynthesis_WithAudioId()
+    {
+      await RunSuccessfulSynthesisAsync("lib-id-1", "/api/audio/lib-id-1");
+
+      Assert.IsTrue(_sut.CanAddGeneratedAudioToLibrary);
+      Assert.IsTrue(_sut.AddGeneratedAudioToLibraryCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_CanAdd_IsTrue_AfterSynthesis_WithAudioReferenceOnly()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new VoiceSynthesisResponse
+          {
+            AudioId = string.Empty,
+            AudioUrl = "/api/audio/ref-only",
+            Duration = 1.0,
+            QualityScore = 0.8,
+          });
+
+      await ((IAsyncRelayCommand)_sut.SynthesizeCommand).ExecuteAsync(default);
+
+      Assert.IsTrue(_sut.HasSynthesisResult);
+      Assert.IsTrue(_sut.CanAddGeneratedAudioToLibrary);
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_SaveAsync_ReceivesExpectedMetadata()
+    {
+      await RunSuccessfulSynthesisAsync("meta-id", "/api/audio/meta-id");
+      _sut.SelectedEngine = "piper";
+
+      await _sut.AddGeneratedAudioToLibraryCommand.ExecuteAsync(default);
+
+      _mockLibraryService.Verify(
+          s => s.SaveAsync(
+              It.Is<GeneratedAudioSaveRequest>(r =>
+                  r.SourcePanelId == PanelIds.VoiceSynthesis &&
+                  r.AudioId == "meta-id" &&
+                  r.AudioReference == "/api/audio/meta-id" &&
+                  r.Engine == "piper" &&
+                  r.ProfileId == "p1" &&
+                  r.ProfileName == "P"),
+              It.IsAny<CancellationToken>()),
+          Times.Once);
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_SaveSuccess_SetsSavedState()
+    {
+      await RunSuccessfulSynthesisAsync("saved-1", "/api/audio/saved-1");
+
+      await _sut.AddGeneratedAudioToLibraryCommand.ExecuteAsync(default);
+
+      Assert.IsTrue(_sut.IsGeneratedAudioSaved);
+      StringAssert.Contains(_sut.GeneratedAudioSaveStatus, "Saved", StringComparison.OrdinalIgnoreCase);
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_SecondSynthesis_ResetsUnsaved()
+    {
+      await RunSuccessfulSynthesisAsync("first", "/api/audio/first");
+      await _sut.AddGeneratedAudioToLibraryCommand.ExecuteAsync(default);
+      Assert.IsTrue(_sut.IsGeneratedAudioSaved);
+
+      await RunSuccessfulSynthesisAsync("second", "/api/audio/second");
+
+      Assert.IsFalse(_sut.IsGeneratedAudioSaved);
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_SaveFailure_DoesNotMarkSaved()
+    {
+      _mockLibraryService
+          .Setup(s => s.SaveAsync(It.IsAny<GeneratedAudioSaveRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioSaveResult(false, "svc error"));
+
+      await RunSuccessfulSynthesisAsync("fail-id", "/api/audio/fail-id");
+      await _sut.AddGeneratedAudioToLibraryCommand.ExecuteAsync(default);
+
+      Assert.IsFalse(_sut.IsGeneratedAudioSaved);
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_SaveFailure_PreservesAudioAndPlayCapability()
+    {
+      _mockLibraryService
+          .Setup(s => s.SaveAsync(It.IsAny<GeneratedAudioSaveRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioSaveResult(false, "svc error"));
+
+      await RunSuccessfulSynthesisAsync("preserve-id", "/api/audio/preserve-id");
+      var idBefore = _sut.LastSynthesizedAudioId;
+
+      await _sut.AddGeneratedAudioToLibraryCommand.ExecuteAsync(default);
+
+      Assert.AreEqual(idBefore, _sut.LastSynthesizedAudioId);
+      Assert.IsTrue(_sut.CanPlayAudio);
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_SaveSuccess_MarksMatchingRecentResult()
+    {
+      await RunSuccessfulSynthesisAsync("recent-mark", "/api/audio/recent-mark");
+      Assert.AreEqual(1, _sut.RecentSynthesisResults.Count);
+
+      await _sut.AddGeneratedAudioToLibraryCommand.ExecuteAsync(default);
+
+      Assert.IsTrue(_sut.RecentSynthesisResults[0].IsSavedToLibrary);
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_RestoreSavedRecent_RestoresVmSavedState()
+    {
+      await RunSuccessfulSynthesisAsync("restore-saved", "/api/audio/rs");
+      await _sut.AddGeneratedAudioToLibraryCommand.ExecuteAsync(default);
+      await RunSuccessfulSynthesisAsync("other", "/api/audio/other");
+
+      var savedRow = _sut.RecentSynthesisResults.First(r => r.AudioId == "restore-saved");
+      _sut.RestoreRecentResultCommand.Execute(savedRow);
+
+      Assert.IsTrue(_sut.IsGeneratedAudioSaved);
+      StringAssert.Contains(_sut.GeneratedAudioSaveStatus, "Previously", StringComparison.OrdinalIgnoreCase);
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_Persistence_RoundTripsSavedFlag()
+    {
+      await RunSuccessfulSynthesisAsync("persist-saved", "/api/audio/ps");
+      await _sut.AddGeneratedAudioToLibraryCommand.ExecuteAsync(default);
+
+      var state = _sut.GetCurrentState();
+      Assert.IsNotNull(state?.CustomData);
+      var json = state!.CustomData![RecentResultsCustomKey] as string;
+      Assert.IsFalse(string.IsNullOrEmpty(json));
+      StringAssert.Contains(json!, "persist-saved");
+      StringAssert.Contains(json!, "IsSavedToLibrary");
+
+      var sut2 = new VoiceSynthesisViewModel(
+          _mockVoiceSynthesisService.Object,
+          _mockEnginesClient.Object,
+          _mockQualityPipelineService.Object,
+          _mockEnsembleService.Object,
+          _mockTextAnalysisService.Object,
+          _mockQualityHistoryService.Object,
+          _mockProfilesClient.Object,
+          _mockAudioPlayer.Object,
+          _mockToast.Object,
+          _mockLibraryService.Object);
+      await sut2.RestoreStateAsync(state!, default);
+
+      Assert.IsTrue(sut2.RecentSynthesisResults[0].IsSavedToLibrary);
+      sut2.Dispose();
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_ConsentFailure_DoesNotEnableAddToLibrary()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new ConsentRequiredException("need consent"));
+
+      await ((IAsyncRelayCommand)_sut.SynthesizeCommand).ExecuteAsync(default);
+
+      Assert.IsFalse(_sut.HasSynthesisResult);
+      Assert.IsFalse(_sut.CanAddGeneratedAudioToLibrary);
+    }
+
+    [TestMethod]
+    public void LibraryOutput_UsesMocksOnly_NoRealBackendOrAudioDevice()
+    {
+      Assert.IsNotNull(_mockLibraryService);
+      Assert.IsNotNull(_mockVoiceSynthesisService);
+    }
+
+    [TestMethod]
+    public async Task LibraryOutput_WithoutLibraryService_CannotAdd()
+    {
+      var vm = new VoiceSynthesisViewModel(
+          _mockVoiceSynthesisService.Object,
+          _mockEnginesClient.Object,
+          _mockQualityPipelineService.Object,
+          _mockEnsembleService.Object,
+          _mockTextAnalysisService.Object,
+          _mockQualityHistoryService.Object,
+          _mockProfilesClient.Object,
+          _mockAudioPlayer.Object,
+          _mockToast.Object,
+          generatedAudioLibraryService: null);
+      try
+      {
+        await RunSuccessfulSynthesisOn(vm, "no-lib", "/api/audio/no-lib");
+
+        Assert.IsFalse(vm.CanAddGeneratedAudioToLibrary);
+      }
+      finally
+      {
+        vm.Dispose();
+      }
+    }
+
+    private async Task RunSuccessfulSynthesisOn(VoiceSynthesisViewModel vm, string audioId, string audioUrl)
+    {
+      vm.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      vm.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new VoiceSynthesisResponse
+          {
+            AudioId = audioId,
+            AudioUrl = audioUrl,
+            Duration = 1.0,
+            QualityScore = 0.9,
+          });
+
+      await ((IAsyncRelayCommand)vm.SynthesizeCommand).ExecuteAsync(default);
     }
 
     #endregion

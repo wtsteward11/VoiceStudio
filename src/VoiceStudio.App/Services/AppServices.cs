@@ -405,6 +405,7 @@ namespace VoiceStudio.App.Services
 
       // Event aggregator for cross-panel synchronization (Phase 4)
       services.AddSingleton<IEventAggregator, EventAggregator>();
+      services.AddSingleton<IGeneratedAudioLibraryService, GeneratedAudioLibraryService>();
 
       // Throttled event publisher for high-frequency events (Premium Reliability Pass Task 7)
       services.AddSingleton<ThrottledEventPublisher>(sp => new ThrottledEventPublisher(

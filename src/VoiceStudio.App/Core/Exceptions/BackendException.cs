@@ -165,6 +165,22 @@ namespace VoiceStudio.Core.Exceptions
   }
 
   /// <summary>
+  /// Thrown when the backend requires voice/profile consent before synthesis or related operations (HTTP 403).
+  /// </summary>
+  public class ConsentRequiredException : BackendException
+  {
+    public ConsentRequiredException(string message)
+        : base(message, 403, "CONSENT_REQUIRED", isRetryable: false)
+    {
+    }
+
+    public ConsentRequiredException(string message, Exception innerException)
+        : base(message, 403, innerException, "CONSENT_REQUIRED", isRetryable: false)
+    {
+    }
+  }
+
+  /// <summary>
   /// Exception thrown when a resource is not found.
   /// </summary>
   public class BackendNotFoundException : BackendException

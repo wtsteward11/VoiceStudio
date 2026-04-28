@@ -1383,6 +1383,8 @@ namespace VoiceStudio.App.Views.Panels
           var tempPath = Path.Combine(Path.GetTempPath(), $"voicestudio_{System.Guid.NewGuid()}.wav");
           await File.WriteAllBytesAsync(tempPath, audioBytes, cancellationToken);
 
+          StatusMessage = ResourceHelper.GetString("Status.PlayingAudio", "Playing audio...");
+
           // Play audio file
           await _audioPlayer.PlayFileAsync(tempPath, () =>
           {
@@ -1404,6 +1406,8 @@ namespace VoiceStudio.App.Views.Panels
             await audioStream.CopyToAsync(fileStream, cancellationToken);
           }
 
+          StatusMessage = ResourceHelper.GetString("Status.PlayingAudio", "Playing audio...");
+
           // Play audio file
           await _audioPlayer.PlayFileAsync(tempPath, () =>
           {
@@ -1421,8 +1425,6 @@ namespace VoiceStudio.App.Views.Panels
         {
           throw new InvalidOperationException("No audio source available (neither audio ID nor URL)");
         }
-
-        StatusMessage = ResourceHelper.GetString("Status.PlayingAudio", "Playing audio...");
       }
       catch (OperationCanceledException)
       {

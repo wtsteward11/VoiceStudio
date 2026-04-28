@@ -145,6 +145,7 @@ namespace VoiceStudio.App.Services
       {
         400 => new BackendValidationException(parsed.Message),
         401 => new BackendAuthenticationException(parsed.Message),
+        403 => new ConsentRequiredException(parsed.Message),
         404 => new BackendNotFoundException(parsed.Message),
         422 => new BackendValidationException(parsed.Message),
         >= 500 => new BackendServerException(parsed.Message, (int)response.StatusCode),

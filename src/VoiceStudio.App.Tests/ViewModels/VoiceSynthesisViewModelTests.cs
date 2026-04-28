@@ -2,6 +2,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -9,6 +10,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Views.Panels;
+using VoiceStudio.Core.Exceptions;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
@@ -472,6 +474,150 @@ namespace VoiceStudio.App.Tests.ViewModels
 
       _mockToast.Verify(x => x.ShowWarning(It.IsAny<string>(), It.IsAny<string?>()), Times.Once);
       _mockToast.Verify(x => x.ShowSuccess(It.IsAny<string>(), It.IsAny<string?>()), Times.Once);
+    }
+
+    [TestMethod]
+    public void PlayAudio_BeforeSynthesis_IsDisabled()
+    {
+      Assert.IsFalse(_sut.CanPlayAudio);
+      Assert.AreNotEqual(SynthesisWorkflowState.AudioReady, _sut.WorkflowState);
+    }
+
+    [TestMethod]
+    public async Task PlayAudio_AfterSuccessfulSynthesis_IsEnabled()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new VoiceSynthesisResponse
+          {
+            AudioId = "a1",
+            AudioUrl = "/api/audio/a1",
+            Duration = 1.0,
+            QualityScore = 0.9,
+          });
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      Assert.IsTrue(_sut.CanPlayAudio);
+      Assert.AreEqual(SynthesisWorkflowState.AudioReady, _sut.WorkflowState);
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_Success_StoresAudioIdAndUrl()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new VoiceSynthesisResponse
+          {
+            AudioId = "a1",
+            AudioUrl = "/api/audio/a1",
+            Duration = 1.0,
+            QualityScore = 0.9,
+          });
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      Assert.AreEqual("a1", _sut.LastSynthesizedAudioId);
+      Assert.IsFalse(string.IsNullOrEmpty(_sut.LastSynthesizedAudioUrl));
+    }
+
+    [TestMethod]
+    public async Task PlayAudioCommand_AfterSynthesis_CallsAudioPlayerService()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new VoiceSynthesisResponse
+          {
+            AudioId = "a1",
+            AudioUrl = "/api/audio/a1",
+            Duration = 1.0,
+            QualityScore = 0.9,
+          });
+      _mockVoiceSynthesisService
+          .Setup(x => x.GetAudioStreamAsync("a1", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new MemoryStream(new byte[] { 1, 2, 3, 4 }));
+      _mockAudioPlayer
+          .Setup(x => x.PlayFileAsync(It.IsAny<string>(), It.IsAny<Action?>()))
+          .Returns(Task.CompletedTask);
+
+      var syn = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await syn.ExecuteAsync(default);
+
+      var play = (IAsyncRelayCommand)_sut.PlayAudioCommand;
+      await play.ExecuteAsync(default);
+
+      _mockAudioPlayer.Verify(
+          x => x.PlayFileAsync(It.IsAny<string>(), It.IsAny<Action?>()),
+          Times.Once);
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_ConsentRequiredError_ProducesActionableMessage()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new ConsentRequiredException("Consent required for this voice profile."));
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      Assert.IsTrue(_sut.HasError);
+      Assert.IsTrue(
+          _sut.ErrorMessage?.Contains("consent", StringComparison.OrdinalIgnoreCase) == true,
+          "ErrorMessage should mention consent.");
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_GenericException_SurfacesNonEmptyErrorMessage()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new HttpRequestException("Network error"));
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      Assert.IsTrue(_sut.HasError);
+      Assert.IsFalse(string.IsNullOrWhiteSpace(_sut.ErrorMessage));
+    }
+
+    [TestMethod]
+    public void CanSynthesize_WithPiperEngineAndValidProfile_ReturnsTrue()
+    {
+      _sut.SelectedEngine = "piper";
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "non-empty";
+      _sut.IsLoading = false;
+
+      Assert.IsTrue(_sut.CanSynthesize);
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_WhenNotConsented_DoesNotEnablePlay()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new ConsentRequiredException("Consent required"));
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      Assert.AreNotEqual(SynthesisWorkflowState.AudioReady, _sut.WorkflowState);
+      Assert.IsFalse(_sut.CanPlayAudio);
     }
 
     #endregion

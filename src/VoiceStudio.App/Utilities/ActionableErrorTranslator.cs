@@ -374,6 +374,24 @@ namespace VoiceStudio.App.Utilities
         };
       }
 
+      if (bex is ConsentRequiredException || code == "CONSENT_REQUIRED")
+      {
+        return new ActionableErrorInfo
+        {
+          Title = TitleFor(context, ActionableErrorClass.ValidationInput),
+          PrimaryMessage = string.IsNullOrWhiteSpace(bex.Message)
+              ? "Consent required for this voice profile. Grant consent in Profile settings."
+              : bex.Message,
+          SecondaryDetail = string.IsNullOrWhiteSpace(bex.RecoverySuggestion) ? null : bex.RecoverySuggestion,
+          RecommendedAction = string.IsNullOrWhiteSpace(bex.RecoverySuggestion)
+              ? "Open the profile, complete voice consent, then retry."
+              : bex.RecoverySuggestion!,
+          Severity = ActionableErrorSeverity.Error,
+          Class = ActionableErrorClass.ValidationInput,
+          IsRetryable = false
+        };
+      }
+
       if (status == 403 || code == "AUTHORIZATION_FAILED")
       {
         return new ActionableErrorInfo

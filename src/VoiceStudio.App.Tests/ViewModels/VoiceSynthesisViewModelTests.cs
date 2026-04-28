@@ -192,6 +192,210 @@ namespace VoiceStudio.App.Tests.ViewModels
 
     #endregion
 
+    #region Profile engine compatibility
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_KnownCompatible_AllowsSynthesize()
+    {
+      _sut.IsLoading = false;
+      _sut.IsLongFormRunning = false;
+      _sut.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string> { "vs:engines:xtts" }
+      };
+      _sut.SelectedEngine = "xtts";
+      _sut.Text = "Hello";
+
+      Assert.IsTrue(_sut.IsProfileEngineCompatibilityKnown);
+      Assert.IsTrue(_sut.IsSelectedProfileEngineCompatible);
+      Assert.AreEqual(ProfileEngineCompatibilityStatus.Compatible, _sut.SelectedProfileEngineCompatibilityStatus);
+      Assert.IsTrue(_sut.CanSynthesize);
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_KnownIncompatible_BlocksSynthesize()
+    {
+      _sut.IsLoading = false;
+      _sut.IsLongFormRunning = false;
+      _sut.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string> { "vs:engines:piper" }
+      };
+      _sut.SelectedEngine = "xtts";
+      _sut.Text = "Hello";
+
+      Assert.IsTrue(_sut.IsProfileEngineCompatibilityKnown);
+      Assert.IsFalse(_sut.IsSelectedProfileEngineCompatible);
+      Assert.AreEqual(ProfileEngineCompatibilityStatus.Incompatible, _sut.SelectedProfileEngineCompatibilityStatus);
+      Assert.IsFalse(_sut.CanSynthesize);
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_IncompatibleMessage_ContainsProfileNameAndEngine()
+    {
+      _sut.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string> { "vs:engines:piper" }
+      };
+      _sut.SelectedEngine = "xtts";
+
+      StringAssert.Contains(_sut.ProfileEngineCompatibilityMessage, "Narrator");
+      StringAssert.Contains(_sut.ProfileEngineCompatibilityMessage, "xtts");
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_EngineChange_RecomputesAndAllowsSynthesize()
+    {
+      _sut.IsLoading = false;
+      _sut.IsLongFormRunning = false;
+      _sut.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Narrator",
+        Tags = new List<string> { "vs:engines:piper" }
+      };
+      _sut.SelectedEngine = "xtts";
+      _sut.Text = "Hello";
+      Assert.IsFalse(_sut.CanSynthesize);
+
+      _sut.SelectedEngine = "piper";
+
+      Assert.IsTrue(_sut.IsSelectedProfileEngineCompatible);
+      Assert.IsTrue(_sut.CanSynthesize);
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_ProfileChange_Recomputes()
+    {
+      _sut.IsLoading = false;
+      _sut.SelectedEngine = "xtts";
+      _sut.Text = "Hello";
+
+      _sut.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "A",
+        Tags = new List<string> { "vs:engines:piper" }
+      };
+      Assert.IsFalse(_sut.IsSelectedProfileEngineCompatible);
+
+      _sut.SelectedProfile = new VoiceProfile
+      {
+        Id = "p2",
+        Name = "B",
+        Tags = new List<string> { "vs:engines:xtts" }
+      };
+      Assert.IsTrue(_sut.IsSelectedProfileEngineCompatible);
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_UnknownTag_DoesNotBlockSynthesize()
+    {
+      _sut.IsLoading = false;
+      _sut.IsLongFormRunning = false;
+      _sut.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "Plain",
+        Tags = new List<string> { "audiobook" }
+      };
+      _sut.SelectedEngine = "anything";
+      _sut.Text = "Hello";
+
+      Assert.IsFalse(_sut.IsProfileEngineCompatibilityKnown);
+      Assert.IsTrue(_sut.IsSelectedProfileEngineCompatible);
+      Assert.IsTrue(_sut.CanSynthesize);
+    }
+
+    [TestMethod]
+    public async Task ProfileEngineCompatibility_DoesNotClearRecentResults_WhenBecomingIncompatible()
+    {
+      await RunSuccessfulSynthesisAsync("keep-recent", "/api/audio/keep-recent");
+      Assert.IsFalse(string.IsNullOrEmpty(_sut.LastSynthesizedAudioId));
+      var recentCount = _sut.RecentSynthesisResults.Count;
+
+      _sut.SelectedProfile = new VoiceProfile
+      {
+        Id = "p2",
+        Name = "Restricted",
+        Tags = new List<string> { "vs:engines:piper" }
+      };
+      _sut.SelectedEngine = "xtts";
+
+      Assert.AreEqual("keep-recent", _sut.LastSynthesizedAudioId);
+      Assert.AreEqual(recentCount, _sut.RecentSynthesisResults.Count);
+    }
+
+    [TestMethod]
+    public async Task ProfileEngineCompatibility_ConsentRequired_RemainsIndependentOfCompatibility()
+    {
+      _sut.SelectedProfile = new VoiceProfile
+      {
+        Id = "p1",
+        Name = "NeedsConsent",
+        Tags = new List<string> { "vs:engines:xtts" }
+      };
+      _sut.SelectedEngine = "xtts";
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new ConsentRequiredException("Consent required for this voice profile."));
+
+      await ((IAsyncRelayCommand)_sut.SynthesizeCommand).ExecuteAsync(default);
+
+      Assert.IsTrue(_sut.IsConsentRequired);
+      Assert.IsTrue(_sut.IsProfileEngineCompatibilityKnown);
+      Assert.IsTrue(_sut.IsSelectedProfileEngineCompatible);
+
+      _sut.SelectedEngine = "piper";
+
+      Assert.IsTrue(_sut.IsConsentRequired);
+      Assert.IsTrue(_sut.IsProfileEngineCompatibilityKnown);
+      Assert.IsFalse(_sut.IsSelectedProfileEngineCompatible);
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_SelectFirstCompatible_SelectsFirstMatchingInProfilesOrder()
+    {
+      _sut.Profiles.Clear();
+      var bad = new VoiceProfile { Id = "a", Name = "Bad", Tags = new List<string> { "vs:engines:piper" } };
+      var good = new VoiceProfile { Id = "b", Name = "Good", Tags = new List<string> { "vs:engines:xtts" } };
+      _sut.Profiles.Add(bad);
+      _sut.Profiles.Add(good);
+
+      _sut.SelectedEngine = "xtts";
+      _sut.SelectedProfile = bad;
+      _sut.Text = "Hello";
+
+      Assert.IsTrue(_sut.SelectFirstCompatibleProfileCommand.CanExecute(null));
+      _sut.SelectFirstCompatibleProfileCommand.Execute(null);
+
+      Assert.AreSame(good, _sut.SelectedProfile);
+    }
+
+    [TestMethod]
+    public void ProfileEngineCompatibility_NoCompatibleProfiles_CommandCannotExecute()
+    {
+      _sut.Profiles.Clear();
+      _sut.Profiles.Add(new VoiceProfile { Id = "a", Name = "A", Tags = new List<string> { "vs:engines:piper" } });
+      _sut.Profiles.Add(new VoiceProfile { Id = "b", Name = "B", Tags = new List<string> { "vs:engines:piper" } });
+
+      _sut.SelectedEngine = "xtts";
+      _sut.SelectedProfile = _sut.Profiles[0];
+      _sut.Text = "Hello";
+
+      Assert.IsFalse(_sut.HasCompatibleProfilesForSelectedEngine);
+      Assert.IsFalse(_sut.SelectFirstCompatibleProfileCommand.CanExecute(null));
+    }
+
+    #endregion
+
     #region IsEmotionSupported Tests
 
     [TestMethod]

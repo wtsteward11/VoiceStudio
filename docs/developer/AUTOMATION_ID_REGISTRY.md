@@ -152,6 +152,9 @@ Primary voice synthesis interface.
 | `VoiceSynthesisView_EngineComboBox` | ComboBox | Engine selector | v1.0.0 |
 | `VoiceSynthesisView_LanguageComboBox` | ComboBox | Language selector | v1.0.0 |
 | `VoiceSynthesisView_EmotionComboBox` | ComboBox | Emotion selector | v1.0.0 |
+| `VoiceSynthesisView_ProfileEngineCompatibilitySummary` | TextBlock | Profile/engine compatibility summary (neutral line) | v1.2.0 |
+| `VoiceSynthesisView_SelectFirstCompatibleProfileButton` | Button | Select first profile compatible with current engine selection | v1.2.0 |
+| `VoiceSynthesisView_ProfileEngineCompatibilityInfoBar` | InfoBar | Known incompatible profile vs. engine callout | v1.2.0 |
 | `VoiceSynthesisView_TextInput` | TextBox | Text input for synthesis | v1.0.0 |
 | `VoiceSynthesisView_SynthesizeButton` | Button | Trigger synthesis | v1.0.0 |
 | `VoiceSynthesisView_PlayButton` | Button | Play synthesized audio | v1.0.0 |

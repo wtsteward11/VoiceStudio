@@ -28,8 +28,10 @@
         Drop="VoiceSynthesisPanel_Drop">
     <Grid.Resources>
       <converters:BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+      <converters:InverseBooleanToVisibilityConverter x:Key="BoolToVisibilityInverseConverter" />
     </Grid.Resources>
     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="*"/>
@@ -119,8 +121,35 @@
       </StackPanel>
     </StackPanel>
     
-    <!-- Row 2: Text Input -->
-    <TextBox x:Name="TextInput" Grid.Row="2"
+    <!-- Row 2: Profile / engine compatibility (optional vs:engines: tag on profile) -->
+    <StackPanel Grid.Row="2" Spacing="6" Margin="0,0,0,12">
+      <TextBlock FontSize="12"
+                 Opacity="0.85"
+                 Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                 TextWrapping="WrapWholeWords"
+                 Text="{x:Bind ViewModel.ProfileEngineCompatibilityMessage, Mode=OneWay}"
+                 AutomationProperties.AutomationId="VoiceSynthesisView_ProfileEngineCompatibilitySummary" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Content="Use first compatible profile"
+                AutomationProperties.AutomationId="VoiceSynthesisView_SelectFirstCompatibleProfileButton"
+                Command="{x:Bind ViewModel.SelectFirstCompatibleProfileCommand}" />
+        <TextBlock VerticalAlignment="Center"
+                   FontSize="12"
+                   Opacity="0.7"
+                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                   Text="No compatible profiles for this engine."
+                   Visibility="{x:Bind ViewModel.ShowNoCompatibleProfilesHint, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+      </StackPanel>
+      <InfoBar AutomationProperties.AutomationId="VoiceSynthesisView_ProfileEngineCompatibilityInfoBar"
+               IsClosable="False"
+               IsOpen="{x:Bind ViewModel.IsProfileEngineCompatibilityInfoBarOpen, Mode=OneWay}"
+               Severity="{x:Bind ViewModel.ProfileEngineCompatibilityInfoBarSeverity, Mode=OneWay}"
+               Title="Engine compatibility"
+               Message="{x:Bind ViewModel.ProfileEngineCompatibilityMessage, Mode=OneWay}" />
+    </StackPanel>
+    
+    <!-- Row 3: Text Input -->
+    <TextBox x:Name="TextInput" Grid.Row="3"
              AutomationProperties.AutomationId="VoiceSynthesisView_TextInput"
              Text="{x:Bind ViewModel.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
              PlaceholderText="Enter text to synthesize..."
@@ -129,8 +158,8 @@
              ScrollViewer.VerticalScrollBarVisibility="Auto"
              Margin="0,0,0,12"/>
     
-    <!-- Row 3: Voice Controls (GAP-067 slice 5: primary tuning + Expander for advanced) -->
-    <Grid Grid.Row="3" Margin="0,0,0,8">
+    <!-- Row 4: Voice Controls (GAP-067 slice 5: primary tuning + Expander for advanced) -->
+    <Grid Grid.Row="4" Margin="0,0,0,8">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
@@ -276,8 +305,8 @@
                  Visibility="{x:Bind ViewModel.IsLongFormRunning, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
     </Grid>
     
-    <!-- Row 4: Actions -->
-    <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+    <!-- Row 5: Actions -->
+    <StackPanel Grid.Row="5" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
       <Button Style="{StaticResource AccentButtonStyle}"
               AutomationProperties.AutomationId="VoiceSynthesisView_SynthesizeButton"
               Command="{x:Bind ViewModel.SynthesizeCommand}"
@@ -346,8 +375,8 @@
                  VerticalAlignment="Center" Opacity="0.7" Margin="8,0,0,0"/>
     </StackPanel>
     
-    <!-- Row 5: Generated audio result -->
-    <Border Grid.Row="5"
+    <!-- Row 6: Generated audio result -->
+    <Border Grid.Row="6"
             AutomationProperties.AutomationId="VoiceSynthesisView_GeneratedAudioPanel"
             Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
             CornerRadius="{StaticResource VSQ.CornerRadius.Panel}"
@@ -387,8 +416,8 @@
       </StackPanel>
     </Border>
 
-    <!-- Row 6: Recent generated audio (in-memory, last 5) -->
-    <Border Grid.Row="6"
+    <!-- Row 7: Recent generated audio (in-memory, last 5) -->
+    <Border Grid.Row="7"
             Padding="12,8"
             Margin="0,0,0,8"
             Visibility="{x:Bind ViewModel.HasRecentSynthesisResults, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -455,8 +484,8 @@
       </StackPanel>
     </Border>
 
-    <!-- Row 7: Consent required (recoverable) -->
-    <InfoBar Grid.Row="7"
+    <!-- Row 8: Consent required (recoverable) -->
+    <InfoBar Grid.Row="8"
              AutomationProperties.AutomationId="VoiceSynthesisView_ConsentInfoBar"
              IsOpen="{x:Bind ViewModel.IsConsentRequired, Mode=OneWay}"
              Severity="Warning"
@@ -479,8 +508,8 @@
       </InfoBar.Content>
     </InfoBar>
     
-    <!-- Row 8: Playback error (generated audio exists but playback failed) -->
-    <InfoBar Grid.Row="8"
+    <!-- Row 9: Playback error (generated audio exists but playback failed) -->
+    <InfoBar Grid.Row="9"
              AutomationProperties.AutomationId="VoiceSynthesisView_PlaybackErrorInfoBar"
              IsOpen="{x:Bind ViewModel.ShowPlaybackError, Mode=OneWay}"
              Severity="Error"
@@ -503,8 +532,8 @@
       </InfoBar.Content>
     </InfoBar>
     
-    <!-- Row 9: Error/Status InfoBar (hidden while consent callout is primary) -->
-    <InfoBar Grid.Row="9"
+    <!-- Row 10: Error/Status InfoBar (hidden while consent callout is primary) -->
+    <InfoBar Grid.Row="10"
              AutomationProperties.AutomationId="VoiceSynthesisView_ErrorInfoBar"
              IsOpen="{x:Bind ViewModel.ShowGenericSynthesisError, Mode=OneWay}"
              Severity="Error"
@@ -521,10 +550,10 @@
     </InfoBar>
     
     <!-- Help Overlay -->
-    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed" d:Visibility="Collapsed" Grid.RowSpan="10"/>
+    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed" d:Visibility="Collapsed" Grid.RowSpan="11"/>
     
     <!-- Loading Overlay -->
-    <Grid Grid.RowSpan="10" 
+    <Grid Grid.RowSpan="11" 
           Background="{ThemeResource SystemControlBackgroundAltMediumHighBrush}"
           Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
           d:Visibility="Collapsed">

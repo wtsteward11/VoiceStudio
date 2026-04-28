@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -10,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Exceptions;
@@ -35,6 +37,14 @@ namespace VoiceStudio.App.Views.Panels
     Synthesizing,
     AudioReady,
     Error
+  }
+
+  /// <summary>Profile vs. selected engine(s) allow-list state when <c>vs:engines:</c> tag is present.</summary>
+  public enum ProfileEngineCompatibilityStatus
+  {
+    Unknown,
+    Compatible,
+    Incompatible
   }
 
   /// <summary>
@@ -342,6 +352,32 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private string? ensembleJobId;
 
+    /// <summary>Optional allow-list from profile tags: first <c>vs:engines:id1,id2</c> (case-sensitive prefix); ids compared with <see cref="StringComparer.OrdinalIgnoreCase"/>.</summary>
+    public const string VoiceStudioProfileEnginesTagPrefix = "vs:engines:";
+
+    [ObservableProperty]
+    private ProfileEngineCompatibilityStatus selectedProfileEngineCompatibilityStatus = ProfileEngineCompatibilityStatus.Unknown;
+
+    [ObservableProperty]
+    private bool isProfileEngineCompatibilityKnown;
+
+    [ObservableProperty]
+    private bool isSelectedProfileEngineCompatible = true;
+
+    [ObservableProperty]
+    private string profileEngineCompatibilityMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool hasCompatibleProfilesForSelectedEngine;
+
+    [ObservableProperty]
+    private bool showNoCompatibleProfilesHint;
+
+    /// <summary>Profiles in <see cref="Profiles"/> order that satisfy <see cref="ProfileMatchesCurrentEngineSelection"/> for the current engine UI state.</summary>
+    public ObservableCollection<VoiceProfile> CompatibleProfilesForSelectedEngine { get; } = new();
+
+    private readonly NotifyCollectionChangedEventHandler _selectedEnginesCollectionChangedHandler;
+
     // Engine-Specific Quality Pipelines (IDEA 58)
     [ObservableProperty]
     private ObservableCollection<QualityPipeline> availablePipelines = new();
@@ -553,6 +589,18 @@ namespace VoiceStudio.App.Views.Panels
         await ComparePipelineAsync(ct);
       }, () => CanPlayAudio && !string.IsNullOrEmpty(LastSynthesizedAudioId) && !string.IsNullOrEmpty(SelectedPipelinePreset) && !IsPreviewingPipeline);
 
+      SelectFirstCompatibleProfileCommand = new RelayCommand(
+          () =>
+          {
+            var first = CompatibleProfilesForSelectedEngine.FirstOrDefault();
+            if (first != null)
+              SelectedProfile = first;
+          },
+          () => HasCompatibleProfilesForSelectedEngine);
+
+      _selectedEnginesCollectionChangedHandler = (_, _) => RefreshProfileEngineCompatibility();
+      SelectedEngines.CollectionChanged += _selectedEnginesCollectionChangedHandler;
+
       // Multi-Engine Ensemble commands (IDEA 55)
       CreateEnsembleCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -616,6 +664,8 @@ namespace VoiceStudio.App.Views.Panels
       };
       _audioPlayer.IsPlayingChanged += _isPlayingChangedHandler;
       _audioPlayer.PlaybackCompleted += _playbackCompletedHandler;
+
+      RefreshProfileEngineCompatibility();
     }
 
     public EnhancedAsyncRelayCommand SynthesizeCommand { get; }
@@ -652,11 +702,23 @@ namespace VoiceStudio.App.Views.Panels
     public EnhancedAsyncRelayCommand PreviewPipelineCommand { get; }
     public EnhancedAsyncRelayCommand ComparePipelineCommand { get; }
 
+    public RelayCommand SelectFirstCompatibleProfileCommand { get; }
+
     public bool CanSynthesize =>
         SelectedProfile != null &&
         !string.IsNullOrWhiteSpace(Text) &&
         !IsLoading &&
-        !IsLongFormRunning;
+        !IsLongFormRunning &&
+        (!IsProfileEngineCompatibilityKnown || IsSelectedProfileEngineCompatible);
+
+    /// <summary>Shown when the profile/engine compatibility InfoBar should appear (known incompatible only).</summary>
+    public bool IsProfileEngineCompatibilityInfoBarOpen =>
+        IsProfileEngineCompatibilityKnown && !IsSelectedProfileEngineCompatible;
+
+    public InfoBarSeverity ProfileEngineCompatibilityInfoBarSeverity =>
+        SelectedProfileEngineCompatibilityStatus == ProfileEngineCompatibilityStatus.Incompatible
+            ? InfoBarSeverity.Warning
+            : InfoBarSeverity.Informational;
 
     /// <summary>GAP-050: Preset prosody is applied post-synthesis for any engine once a profile is selected.</summary>
     public bool IsEmotionSupported => SelectedProfile != null;
@@ -684,6 +746,144 @@ namespace VoiceStudio.App.Views.Panels
       var normalized = NormalizeCanonicalEmotionPreset(value);
       if (!string.Equals(normalized, value, StringComparison.Ordinal))
         Emotion = normalized;
+    }
+
+    /// <summary>Parses the first <c>vs:engines:</c> tag into engine ids. Returns false if none or empty payload.</summary>
+    private static bool TryParseEnginesAllowList(IReadOnlyList<string>? tags, out HashSet<string>? allowList)
+    {
+      allowList = null;
+      if (tags is null || tags.Count == 0)
+        return false;
+
+      foreach (var raw in tags)
+      {
+        if (string.IsNullOrWhiteSpace(raw))
+          continue;
+        if (!raw.StartsWith(VoiceStudioProfileEnginesTagPrefix, StringComparison.Ordinal))
+          continue;
+
+        var payload = raw.Length > VoiceStudioProfileEnginesTagPrefix.Length
+            ? raw.Substring(VoiceStudioProfileEnginesTagPrefix.Length)
+            : string.Empty;
+        var parts = payload.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+          return false;
+
+        allowList = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in parts)
+        {
+          if (!string.IsNullOrWhiteSpace(p))
+            allowList.Add(p.Trim());
+        }
+
+        return allowList.Count > 0;
+      }
+
+      return false;
+    }
+
+    private bool IsEnsembleEngineSelectionAmbiguousForCompatibility() =>
+        UseMultiEngineEnsemble && SelectedEngines.Count == 0;
+
+    private string GetEngineSelectionSummaryLabel()
+    {
+      if (UseMultiEngineEnsemble && SelectedEngines.Count > 0)
+        return string.Join(", ", SelectedEngines);
+      if (!string.IsNullOrWhiteSpace(SelectedEngine))
+        return SelectedEngine;
+      return "—";
+    }
+
+    private bool ProfileMatchesCurrentEngineSelection(VoiceProfile profile)
+    {
+      if (!TryParseEnginesAllowList(profile.Tags, out var allowOrNull))
+        return true;
+      // SAFETY: TryParseEnginesAllowList assigns a non-empty HashSet when returning true
+      var allow = allowOrNull!;
+      if (IsEnsembleEngineSelectionAmbiguousForCompatibility())
+        return true;
+      if (UseMultiEngineEnsemble)
+        return SelectedEngines.All(e => allow.Contains(e));
+      return !string.IsNullOrWhiteSpace(SelectedEngine) && allow.Contains(SelectedEngine);
+    }
+
+    private void RefreshProfileEngineCompatibility()
+    {
+      CompatibleProfilesForSelectedEngine.Clear();
+
+      if (SelectedProfile == null)
+      {
+        IsProfileEngineCompatibilityKnown = false;
+        IsSelectedProfileEngineCompatible = true;
+        SelectedProfileEngineCompatibilityStatus = ProfileEngineCompatibilityStatus.Unknown;
+        ProfileEngineCompatibilityMessage = "Select a voice profile and an engine to see compatibility.";
+        HasCompatibleProfilesForSelectedEngine = false;
+        ShowNoCompatibleProfilesHint = false;
+        NotifyProfileEngineCompatibilitySurface();
+        return;
+      }
+
+      var profileName = string.IsNullOrWhiteSpace(SelectedProfile.Name) ? SelectedProfile.Id : SelectedProfile.Name;
+      var engineLabel = GetEngineSelectionSummaryLabel();
+      var ambiguous = IsEnsembleEngineSelectionAmbiguousForCompatibility();
+
+      bool known;
+      HashSet<string>? selectedAllow = null;
+      if (ambiguous)
+      {
+        known = false;
+      }
+      else
+      {
+        known = TryParseEnginesAllowList(SelectedProfile.Tags, out selectedAllow);
+      }
+
+      if (!known)
+      {
+        IsProfileEngineCompatibilityKnown = false;
+        IsSelectedProfileEngineCompatible = true;
+        SelectedProfileEngineCompatibilityStatus = ProfileEngineCompatibilityStatus.Unknown;
+        ProfileEngineCompatibilityMessage =
+            $"{engineLabel} · {profileName}. Profile metadata does not restrict engines for this project.";
+      }
+      else
+      {
+        IsProfileEngineCompatibilityKnown = true;
+        var enginesOk = UseMultiEngineEnsemble
+            ? SelectedEngines.All(e => selectedAllow!.Contains(e))
+            : !string.IsNullOrWhiteSpace(SelectedEngine) && selectedAllow!.Contains(SelectedEngine);
+
+        IsSelectedProfileEngineCompatible = enginesOk;
+        SelectedProfileEngineCompatibilityStatus = enginesOk
+            ? ProfileEngineCompatibilityStatus.Compatible
+            : ProfileEngineCompatibilityStatus.Incompatible;
+
+        ProfileEngineCompatibilityMessage = enginesOk
+            ? $"{engineLabel} · {profileName}. Selected engine(s) satisfy this profile's engine allow-list."
+            : $"{engineLabel} · {profileName}. This profile's metadata restricts synthesis to other engine(s); change engine or profile to continue.";
+      }
+
+      foreach (var p in Profiles)
+      {
+        if (ProfileMatchesCurrentEngineSelection(p))
+          CompatibleProfilesForSelectedEngine.Add(p);
+      }
+
+      HasCompatibleProfilesForSelectedEngine = CompatibleProfilesForSelectedEngine.Count > 0;
+      ShowNoCompatibleProfilesHint = Profiles.Count > 0 && !HasCompatibleProfilesForSelectedEngine;
+
+      NotifyProfileEngineCompatibilitySurface();
+    }
+
+    private void NotifyProfileEngineCompatibilitySurface()
+    {
+      OnPropertyChanged(nameof(CanSynthesize));
+      OnPropertyChanged(nameof(IsProfileEngineCompatibilityInfoBarOpen));
+      OnPropertyChanged(nameof(ProfileEngineCompatibilityInfoBarSeverity));
+      SynthesizeCommand.NotifyCanExecuteChanged();
+      RetrySynthesisCommand.NotifyCanExecuteChanged();
+      StartStreamingCommand.NotifyCanExecuteChanged();
+      SelectFirstCompatibleProfileCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Clears prior operation error/capability UI state before a new synthesis attempt.</summary>
@@ -785,6 +985,7 @@ namespace VoiceStudio.App.Views.Panels
         IsLoading = false;
         TryCompletePendingPanelRestore();
         UpdateWorkflowStateFromInputs();
+        RefreshProfileEngineCompatibility();
       }
     }
 
@@ -1261,7 +1462,7 @@ namespace VoiceStudio.App.Views.Panels
         }
         _lastNonNullProfileIdForEmotionHygiene = value.Id;
       }
-      SynthesizeCommand.NotifyCanExecuteChanged();
+      RefreshProfileEngineCompatibility();
       if (!IsLoading && WorkflowState != SynthesisWorkflowState.Synthesizing)
         UpdateWorkflowStateFromInputs();
     }
@@ -1362,6 +1563,11 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnIsLongFormRunningChanged(bool value)
     {
       SynthesizeCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnUseMultiEngineEnsembleChanged(bool value)
+    {
+      RefreshProfileEngineCompatibility();
     }
 
     partial void OnWorkflowStateChanged(SynthesisWorkflowState value)
@@ -1686,6 +1892,8 @@ namespace VoiceStudio.App.Views.Panels
         if (t.IsFaulted)
           _errorLoggingService?.LogError(t.Exception?.InnerException ?? new Exception("LoadPipelines failed"), "LoadPipelines");
       }, TaskScheduler.Default);
+
+      RefreshProfileEngineCompatibility();
     }
 
     private async Task StartStreamingAsync(CancellationToken cancellationToken)
@@ -2357,6 +2565,7 @@ namespace VoiceStudio.App.Views.Panels
         }
       }
       CreateEnsembleCommand.NotifyCanExecuteChanged();
+      RefreshProfileEngineCompatibility();
     }
 
     public bool IsEngineSelected(string engine) => SelectedEngines.Contains(engine);
@@ -2853,6 +3062,7 @@ namespace VoiceStudio.App.Views.Panels
 
         // Clear collections
         Profiles.Clear();
+        SelectedEngines.CollectionChanged -= _selectedEnginesCollectionChangedHandler;
       }
 
       base.Dispose(disposing);

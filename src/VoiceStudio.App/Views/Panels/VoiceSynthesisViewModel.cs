@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -162,6 +163,21 @@ namespace VoiceStudio.App.Views.Panels
     private string? consentRequiredMessage;
 
     [ObservableProperty]
+    private bool isPlaybackError;
+
+    [ObservableProperty]
+    private string? playbackErrorMessage;
+
+    [ObservableProperty]
+    private string? playbackErrorDetails;
+
+    [ObservableProperty]
+    private string? playbackErrorAudioId;
+
+    [ObservableProperty]
+    private string? playbackErrorAudioReference;
+
+    [ObservableProperty]
     private SynthesisWorkflowState workflowState = SynthesisWorkflowState.Idle;
 
     /// <summary>Copy-friendly error text for clipboard (e.g. "Copy details" affordance).</summary>
@@ -169,6 +185,9 @@ namespace VoiceStudio.App.Views.Panels
 
     /// <summary>When consent is required, the generic error InfoBar is hidden so the consent callout is the single primary surface.</summary>
     public bool ShowGenericSynthesisError => HasError && !IsConsentRequired;
+
+    /// <summary>Playback failed but generated audio is still available; hidden while consent is primary.</summary>
+    public bool ShowPlaybackError => IsPlaybackError && !IsConsentRequired;
 
     [ObservableProperty]
     private QualityMetrics? qualityMetrics;
@@ -396,6 +415,16 @@ namespace VoiceStudio.App.Views.Panels
       CopyAudioReferenceCommand = new RelayCommand(CopyAudioReferenceToClipboard, () => CanCopyAudioReference);
       OpenOutputLocationCommand = new RelayCommand(OpenOutputLocation, () => CanOpenOutputLocation);
 
+      RetryPlaybackCommand = new EnhancedAsyncRelayCommand(async (ct) =>
+      {
+        using var profiler = PerformanceProfiler.Start("Command: RetryPlayback", PerformanceBudgets.CommandExecutionMs);
+        await PlayAudioAsync(ct);
+      }, () => CanPlayAudio && !IsLoading);
+
+      CopyPlaybackErrorCommand = new RelayCommand(
+          CopyPlaybackErrorToClipboard,
+          () => IsPlaybackError && !string.IsNullOrWhiteSpace(PlaybackErrorMessage));
+
       OpenProfileConsentCommand = new RelayCommand(
           OpenProfileConsent,
           () => IsConsentRequired && !string.IsNullOrEmpty(ConsentRequiredProfileId));
@@ -503,8 +532,16 @@ namespace VoiceStudio.App.Views.Panels
       };
 
       // Subscribe to audio player events (store handlers for disposal)
-      _isPlayingChangedHandler = (_, _) => PlayAudioCommand.NotifyCanExecuteChanged();
-      _playbackCompletedHandler = (_, _) => PlayAudioCommand.NotifyCanExecuteChanged();
+      _isPlayingChangedHandler = (_, _) =>
+      {
+        PlayAudioCommand.NotifyCanExecuteChanged();
+        RefreshPlaybackErrorCommandState();
+      };
+      _playbackCompletedHandler = (_, _) =>
+      {
+        PlayAudioCommand.NotifyCanExecuteChanged();
+        RefreshPlaybackErrorCommandState();
+      };
       _audioPlayer.IsPlayingChanged += _isPlayingChangedHandler;
       _audioPlayer.PlaybackCompleted += _playbackCompletedHandler;
     }
@@ -518,6 +555,8 @@ namespace VoiceStudio.App.Views.Panels
     public IRelayCommand CopyAudioIdCommand { get; }
     public IRelayCommand CopyAudioReferenceCommand { get; }
     public IRelayCommand OpenOutputLocationCommand { get; }
+    public EnhancedAsyncRelayCommand RetryPlaybackCommand { get; }
+    public IRelayCommand CopyPlaybackErrorCommand { get; }
     public IRelayCommand OpenProfileConsentCommand { get; }
     public EnhancedAsyncRelayCommand RetrySynthesisCommand { get; }
     public IRelayCommand AddToTimelineCommand { get; }
@@ -579,6 +618,7 @@ namespace VoiceStudio.App.Views.Panels
       HasError = false;
       HasQualityMetrics = false;
       ClearConsentState();
+      ClearPlaybackError();
       ResetLastSynthesisOutput();
     }
 
@@ -1225,6 +1265,7 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnIsConsentRequiredChanged(bool value)
     {
       OnPropertyChanged(nameof(ShowGenericSynthesisError));
+      OnPropertyChanged(nameof(ShowPlaybackError));
       OpenProfileConsentCommand.NotifyCanExecuteChanged();
       RetrySynthesisCommand.NotifyCanExecuteChanged();
     }
@@ -1412,6 +1453,50 @@ namespace VoiceStudio.App.Views.Panels
       CopyAudioIdCommand.NotifyCanExecuteChanged();
       CopyAudioReferenceCommand.NotifyCanExecuteChanged();
       OpenOutputLocationCommand.NotifyCanExecuteChanged();
+      RefreshPlaybackErrorCommandState();
+    }
+
+    private void ClearPlaybackError()
+    {
+      IsPlaybackError = false;
+      PlaybackErrorMessage = null;
+      PlaybackErrorDetails = null;
+      PlaybackErrorAudioId = null;
+      PlaybackErrorAudioReference = null;
+      RefreshPlaybackErrorCommandState();
+    }
+
+    private void RefreshPlaybackErrorCommandState()
+    {
+      OnPropertyChanged(nameof(ShowPlaybackError));
+      RetryPlaybackCommand.NotifyCanExecuteChanged();
+      CopyPlaybackErrorCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>Dismisses the playback error callout (e.g. InfoBar closed).</summary>
+    public void DismissPlaybackError()
+    {
+      ClearPlaybackError();
+    }
+
+    private void CopyPlaybackErrorToClipboard()
+    {
+      if (string.IsNullOrWhiteSpace(PlaybackErrorMessage))
+        return;
+
+      var details = new StringBuilder();
+      details.AppendLine($"Playback Error: {PlaybackErrorMessage}");
+      if (!string.IsNullOrWhiteSpace(PlaybackErrorDetails))
+        details.AppendLine($"Details: {PlaybackErrorDetails}");
+      if (!string.IsNullOrWhiteSpace(PlaybackErrorAudioId))
+        details.AppendLine($"Audio ID: {PlaybackErrorAudioId}");
+      if (!string.IsNullOrWhiteSpace(PlaybackErrorAudioReference))
+        details.AppendLine($"Reference: {PlaybackErrorAudioReference}");
+
+      CopyTextToClipboard(
+          details.ToString(),
+          ResourceHelper.GetString("VoiceSynthesis.PlaybackErrorCopied", "Copied"),
+          ResourceHelper.GetString("VoiceSynthesis.PlaybackErrorCopiedDetail", "Playback error details copied to clipboard"));
     }
 
     private void ClearError()
@@ -1591,7 +1676,7 @@ namespace VoiceStudio.App.Views.Panels
 
     private async Task PlayAudioAsync(CancellationToken cancellationToken)
     {
-      if (string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl))
+      if (string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl) && string.IsNullOrWhiteSpace(LastSynthesizedAudioId))
         return;
 
       // Own global transport so main Play routes here
@@ -1605,6 +1690,7 @@ namespace VoiceStudio.App.Views.Panels
       IsLoading = true;
       ErrorMessage = null;
       HasError = false;
+      ClearPlaybackError();
       StatusMessage = ResourceHelper.GetString("Status.LoadingAudio", "Loading audio for playback...");
 
       try
@@ -1658,6 +1744,7 @@ namespace VoiceStudio.App.Views.Panels
             }
             catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "full.Unknown"); }
           });
+          ClearPlaybackError();
         }
         else if (audioStream != null)
         {
@@ -1682,6 +1769,7 @@ namespace VoiceStudio.App.Views.Panels
             }
             catch (Exception ex) { ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "full.Unknown"); }
           });
+          ClearPlaybackError();
         }
         else
         {
@@ -1697,11 +1785,14 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         _errorLoggingService?.LogError(ex, "PlayAudio");
-        ErrorMessage = ErrorHandler.GetUserFriendlyMessage(ex);
-        HasError = true;
+        IsPlaybackError = true;
+        PlaybackErrorMessage = ErrorHandler.GetUserFriendlyMessage(ex);
+        PlaybackErrorDetails = ex.Message;
+        PlaybackErrorAudioId = LastSynthesizedAudioId;
+        PlaybackErrorAudioReference = LastSynthesizedAudioUrl;
+        RefreshPlaybackErrorCommandState();
         StatusMessage = string.Empty;
         _errorService?.ShowError(ex, ResourceHelper.GetString("Error.PlayAudioFailed", "Failed to play audio"));
-        await (_errorDialogService?.ShowErrorAsync(ex, ResourceHelper.GetString("VoiceSynthesis.AudioPlayback", "Audio Playback")) ?? Task.CompletedTask);
       }
       finally
       {

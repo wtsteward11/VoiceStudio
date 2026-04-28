@@ -342,6 +342,11 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    private void PlaybackErrorInfoBar_Closed(object sender, Microsoft.UI.Xaml.Controls.InfoBarClosedEventArgs e)
+    {
+      ViewModel?.DismissPlaybackError();
+    }
+
     private void ErrorInfoBar_Closed(object sender, Microsoft.UI.Xaml.Controls.InfoBarClosedEventArgs e)
     {
       var vm = ViewModel;

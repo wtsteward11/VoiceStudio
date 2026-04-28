@@ -37,6 +37,7 @@
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
     </Grid.RowDefinitions>
     
     <!-- Row 0: Header -->
@@ -408,8 +409,32 @@
       </InfoBar.Content>
     </InfoBar>
     
-    <!-- Row 7: Error/Status InfoBar (hidden while consent callout is primary) -->
+    <!-- Row 7: Playback error (generated audio exists but playback failed) -->
     <InfoBar Grid.Row="7"
+             AutomationProperties.AutomationId="VoiceSynthesisView_PlaybackErrorInfoBar"
+             IsOpen="{x:Bind ViewModel.ShowPlaybackError, Mode=OneWay}"
+             Severity="Error"
+             Title="Playback failed"
+             Message="{x:Bind ViewModel.PlaybackErrorMessage, Mode=OneWay, FallbackValue='Failed to play audio', TargetNullValue='Failed to play audio'}"
+             IsClosable="True"
+             Closed="PlaybackErrorInfoBar_Closed">
+      <InfoBar.ActionButton>
+        <Button Content="Retry"
+                AutomationProperties.AutomationId="VoiceSynthesisView_RetryPlaybackButton"
+                Command="{x:Bind ViewModel.RetryPlaybackCommand}"
+                ToolTipService.ToolTip="Retry playing the generated audio"/>
+      </InfoBar.ActionButton>
+      <InfoBar.Content>
+        <Button Content="Copy error"
+                Margin="0,4,0,0"
+                AutomationProperties.AutomationId="VoiceSynthesisView_CopyPlaybackErrorButton"
+                Command="{x:Bind ViewModel.CopyPlaybackErrorCommand}"
+                ToolTipService.ToolTip="Copy playback error details to clipboard"/>
+      </InfoBar.Content>
+    </InfoBar>
+    
+    <!-- Row 8: Error/Status InfoBar (hidden while consent callout is primary) -->
+    <InfoBar Grid.Row="8"
              AutomationProperties.AutomationId="VoiceSynthesisView_ErrorInfoBar"
              IsOpen="{x:Bind ViewModel.ShowGenericSynthesisError, Mode=OneWay}"
              Severity="Error"
@@ -426,10 +451,10 @@
     </InfoBar>
     
     <!-- Help Overlay -->
-    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed" d:Visibility="Collapsed" Grid.RowSpan="8"/>
+    <controls:HelpOverlay x:Name="HelpOverlay" IsVisible="False" Visibility="Collapsed" d:Visibility="Collapsed" Grid.RowSpan="9"/>
     
     <!-- Loading Overlay -->
-    <Grid Grid.RowSpan="8" 
+    <Grid Grid.RowSpan="9" 
           Background="{ThemeResource SystemControlBackgroundAltMediumHighBrush}"
           Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
           d:Visibility="Collapsed">

@@ -88,6 +88,8 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsNotNull(_sut.SynthesizeCommand);
       Assert.IsNotNull(_sut.LoadProfilesCommand);
       Assert.IsNotNull(_sut.PlayAudioCommand);
+      Assert.IsNotNull(_sut.RetryPlaybackCommand);
+      Assert.IsNotNull(_sut.CopyPlaybackErrorCommand);
       Assert.IsNotNull(_sut.StopAudioCommand);
     }
 
@@ -875,6 +877,154 @@ namespace VoiceStudio.App.Tests.ViewModels
           });
 
       await ((IAsyncRelayCommand)_sut.SynthesizeCommand).ExecuteAsync(default);
+    }
+
+    #endregion
+
+    #region Playback diagnostics tests
+
+    private void MockAudioIdPlaybackPipelineThrowsInvalidOp()
+    {
+      _mockVoiceSynthesisService
+          .Setup(x => x.GetAudioStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new MemoryStream(new byte[] { 0x01, 0x02, 0x03 }));
+
+      _mockAudioPlayer
+          .Setup(x => x.PlayFileAsync(It.IsAny<string>(), It.IsAny<Action?>()))
+          .ThrowsAsync(new InvalidOperationException("Audio device unavailable"));
+    }
+
+    [TestMethod]
+    public async Task PlaybackFailure_SetsIsPlaybackErrorTrue()
+    {
+      await RunSuccessfulSynthesisAsync("play-err-1", "/api/audio/play-err-1");
+      MockAudioIdPlaybackPipelineThrowsInvalidOp();
+
+      await _sut.PlayAudioCommand.ExecuteAsync(null);
+
+      Assert.IsTrue(_sut.IsPlaybackError);
+    }
+
+    [TestMethod]
+    public async Task PlaybackFailure_StoresNonEmptyPlaybackErrorMessage()
+    {
+      await RunSuccessfulSynthesisAsync("play-err-2", "/api/audio/play-err-2");
+      MockAudioIdPlaybackPipelineThrowsInvalidOp();
+
+      await _sut.PlayAudioCommand.ExecuteAsync(null);
+
+      Assert.IsFalse(string.IsNullOrWhiteSpace(_sut.PlaybackErrorMessage));
+    }
+
+    [TestMethod]
+    public async Task PlaybackFailure_PreservesLastSynthesizedAudioIdAndUrl()
+    {
+      await RunSuccessfulSynthesisAsync("preserved-id", "/api/audio/preserved-id");
+      MockAudioIdPlaybackPipelineThrowsInvalidOp();
+
+      await _sut.PlayAudioCommand.ExecuteAsync(null);
+
+      Assert.AreEqual("preserved-id", _sut.LastSynthesizedAudioId);
+      StringAssert.Contains(_sut.LastSynthesizedAudioUrl, "preserved-id");
+    }
+
+    [TestMethod]
+    public async Task PlaybackFailure_PreservesHasSynthesisResultTrue()
+    {
+      await RunSuccessfulSynthesisAsync("h-sr-1", "/api/audio/h-sr-1");
+      MockAudioIdPlaybackPipelineThrowsInvalidOp();
+
+      await _sut.PlayAudioCommand.ExecuteAsync(null);
+
+      Assert.IsTrue(_sut.HasSynthesisResult);
+    }
+
+    [TestMethod]
+    public void RetryPlaybackCommand_BeforeSynthesis_IsDisabled()
+    {
+      Assert.IsFalse(_sut.RetryPlaybackCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task RetryPlaybackCommand_AfterSuccessfulSynthesis_IsEnabled()
+    {
+      await RunSuccessfulSynthesisAsync("retry-en-1", "/api/audio/retry-en-1");
+      _mockVoiceSynthesisService
+          .Setup(x => x.GetAudioStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new MemoryStream(new byte[] { 0x01 }));
+      _mockAudioPlayer
+          .Setup(x => x.PlayFileAsync(It.IsAny<string>(), It.IsAny<Action?>()))
+          .Returns(Task.CompletedTask);
+
+      Assert.IsTrue(_sut.RetryPlaybackCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task RetryPlaybackCommand_InvokesAudioPlayerAgainAfterPriorFailure()
+    {
+      await RunSuccessfulSynthesisAsync("invoke-2x", "/api/audio/invoke-2x");
+      _mockVoiceSynthesisService
+          .Setup(x => x.GetAudioStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new MemoryStream(new byte[] { 0x01 }));
+      _mockAudioPlayer
+          .SetupSequence(x => x.PlayFileAsync(It.IsAny<string>(), It.IsAny<Action?>()))
+          .ThrowsAsync(new InvalidOperationException("first fail"))
+          .Returns(Task.CompletedTask);
+
+      await _sut.PlayAudioCommand.ExecuteAsync(null);
+      await _sut.RetryPlaybackCommand.ExecuteAsync(null);
+
+      _mockAudioPlayer.Verify(x => x.PlayFileAsync(It.IsAny<string>(), It.IsAny<Action?>()), Times.Exactly(2));
+    }
+
+    [TestMethod]
+    public async Task SuccessfulRetry_ClearsPlaybackError()
+    {
+      await RunSuccessfulSynthesisAsync("clear-pb-1", "/api/audio/clear-pb-1");
+      _mockVoiceSynthesisService
+          .Setup(x => x.GetAudioStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new MemoryStream(new byte[] { 0x01 }));
+      _mockAudioPlayer
+          .SetupSequence(x => x.PlayFileAsync(It.IsAny<string>(), It.IsAny<Action?>()))
+          .ThrowsAsync(new InvalidOperationException("first fail"))
+          .Returns(Task.CompletedTask);
+
+      await _sut.PlayAudioCommand.ExecuteAsync(null);
+      Assert.IsTrue(_sut.IsPlaybackError);
+
+      await _sut.RetryPlaybackCommand.ExecuteAsync(null);
+      Assert.IsFalse(_sut.IsPlaybackError);
+    }
+
+    [TestMethod]
+    public async Task SynthesisConsentError_DoesNotSetIsPlaybackError()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new ConsentRequiredException("Consent required for this voice profile."));
+
+      await ((IAsyncRelayCommand)_sut.SynthesizeCommand).ExecuteAsync(default);
+
+      Assert.IsTrue(_sut.IsConsentRequired);
+      Assert.IsFalse(_sut.IsPlaybackError);
+    }
+
+    [TestMethod]
+    public void CopyPlaybackErrorCommand_DisabledWhenNoPlaybackError()
+    {
+      Assert.IsFalse(_sut.CopyPlaybackErrorCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task CopyPlaybackErrorCommand_EnabledAfterPlaybackError()
+    {
+      await RunSuccessfulSynthesisAsync("cpy-pb-1", "/api/audio/cpy-pb-1");
+      MockAudioIdPlaybackPipelineThrowsInvalidOp();
+      await _sut.PlayAudioCommand.ExecuteAsync(null);
+
+      Assert.IsTrue(_sut.CopyPlaybackErrorCommand.CanExecute(null));
     }
 
     #endregion

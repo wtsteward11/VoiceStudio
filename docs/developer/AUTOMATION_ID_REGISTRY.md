@@ -170,6 +170,9 @@ Primary voice synthesis interface.
 | `VoiceSynthesisView_CopyAudioIdButton` | Button | Copy generated audio ID | v1.2.0 |
 | `VoiceSynthesisView_CopyAudioReferenceButton` | Button | Copy generated audio URL/path/reference | v1.2.0 |
 | `VoiceSynthesisView_OpenOutputLocationButton` | Button | Open local output file/folder when available | v1.2.0 |
+| `VoiceSynthesisView_PlaybackErrorInfoBar` | InfoBar | Playback error diagnostics and recovery | v1.2.0 |
+| `VoiceSynthesisView_RetryPlaybackButton` | Button | Retry failed playback | v1.2.0 |
+| `VoiceSynthesisView_CopyPlaybackErrorButton` | Button | Copy playback error details to clipboard | v1.2.0 |
 | `VoiceSynthesisView_ErrorInfoBar` | InfoBar | Error display (hidden while consent callout is primary) | v1.0.0 |
 | `VoiceSynthesisView_LongFormToggle` | CheckBox | Long-form (chunked) synthesis mode | v1.2.0 |
 | `VoiceSynthesisView_LongFormProgressText` | TextBlock | Long-form processing status | v1.2.0 |

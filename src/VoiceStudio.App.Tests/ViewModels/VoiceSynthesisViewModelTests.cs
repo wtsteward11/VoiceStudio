@@ -364,19 +364,19 @@ namespace VoiceStudio.App.Tests.ViewModels
     public void ProfileEngineCompatibility_SelectFirstCompatible_SelectsFirstMatchingInProfilesOrder()
     {
       _sut.Profiles.Clear();
-      var bad = new VoiceProfile { Id = "a", Name = "Bad", Tags = new List<string> { "vs:engines:piper" } };
-      var good = new VoiceProfile { Id = "b", Name = "Good", Tags = new List<string> { "vs:engines:xtts" } };
-      _sut.Profiles.Add(bad);
-      _sut.Profiles.Add(good);
+      var firstCompat = new VoiceProfile { Id = "c1", Name = "C1", Tags = new List<string> { "vs:engines:xtts" } };
+      var secondCompat = new VoiceProfile { Id = "c2", Name = "C2", Tags = new List<string> { "vs:engines:xtts" } };
+      _sut.Profiles.Add(firstCompat);
+      _sut.Profiles.Add(secondCompat);
 
       _sut.SelectedEngine = "xtts";
-      _sut.SelectedProfile = bad;
+      _sut.SelectedProfile = secondCompat;
       _sut.Text = "Hello";
 
       Assert.IsTrue(_sut.SelectFirstCompatibleProfileCommand.CanExecute(null));
       _sut.SelectFirstCompatibleProfileCommand.Execute(null);
 
-      Assert.AreSame(good, _sut.SelectedProfile);
+      Assert.AreSame(firstCompat, _sut.SelectedProfile);
     }
 
     [TestMethod]
@@ -392,6 +392,90 @@ namespace VoiceStudio.App.Tests.ViewModels
 
       Assert.IsFalse(_sut.HasCompatibleProfilesForSelectedEngine);
       Assert.IsFalse(_sut.SelectFirstCompatibleProfileCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public void ProfilePicker_Default_IncludesUnrestrictedProfiles_AndExcludesKnownIncompatible()
+    {
+      _sut.Profiles.Clear();
+      var unrestricted = new VoiceProfile { Id = "u", Name = "Free", Tags = new List<string> { "audiobook" } };
+      var bad = new VoiceProfile { Id = "b", Name = "Bad", Tags = new List<string> { "vs:engines:piper" } };
+      var good = new VoiceProfile { Id = "g", Name = "Good", Tags = new List<string> { "vs:engines:xtts" } };
+      _sut.Profiles.Add(unrestricted);
+      _sut.Profiles.Add(bad);
+      _sut.Profiles.Add(good);
+
+      _sut.SelectedEngine = "xtts";
+      _sut.ShowCompatibleProfilesOnly = false;
+
+      CollectionAssert.AreEqual(
+          new[] { unrestricted, good },
+          _sut.ProfilePickerProfiles.ToList());
+      Assert.AreEqual(2, _sut.ProfilePickerProfiles.Count);
+      Assert.IsTrue(_sut.ProfilePickerSummary.Contains("incompatible"));
+      Assert.AreEqual(1, _sut.IncompatibleProfileCount);
+      Assert.AreEqual(1, _sut.CompatibleProfileCount);
+      Assert.AreEqual(1, _sut.UnrestrictedProfileCount);
+    }
+
+    [TestMethod]
+    public void ProfilePicker_CompatibleOnly_ShowsOnlyMatchingAllowList_HidesUnrestricted()
+    {
+      _sut.Profiles.Clear();
+      var unrestricted = new VoiceProfile { Id = "u", Name = "Free", Tags = new List<string>() };
+      var good = new VoiceProfile { Id = "g", Name = "Good", Tags = new List<string> { "vs:engines:xtts" } };
+      _sut.Profiles.Add(unrestricted);
+      _sut.Profiles.Add(good);
+      _sut.SelectedEngine = "xtts";
+      _sut.ShowCompatibleProfilesOnly = true;
+
+      CollectionAssert.AreEqual(new[] { good }, _sut.ProfilePickerProfiles.ToList());
+      StringAssert.Contains(_sut.ProfilePickerSummary, "Compatible only");
+    }
+
+    [TestMethod]
+    public void ProfilePicker_EngineChange_RecomputesPickerAndCounts()
+    {
+      _sut.Profiles.Clear();
+      _sut.Profiles.Add(new VoiceProfile { Id = "g", Name = "G", Tags = new List<string> { "vs:engines:piper" } });
+      _sut.SelectedEngine = "xtts";
+      _sut.ShowCompatibleProfilesOnly = false;
+
+      Assert.AreEqual(0, _sut.ProfilePickerProfiles.Count);
+      Assert.AreEqual(1, _sut.IncompatibleProfileCount);
+
+      _sut.SelectedEngine = "piper";
+      Assert.AreEqual(1, _sut.ProfilePickerProfiles.Count);
+      Assert.AreEqual(1, _sut.CompatibleProfileCount);
+    }
+
+    [TestMethod]
+    public void ProfilePicker_WhenSelectedWasIncompatible_AlignsToFirstVisible()
+    {
+      _sut.Profiles.Clear();
+      var bad = new VoiceProfile { Id = "b", Name = "Bad", Tags = new List<string> { "vs:engines:piper" } };
+      var good = new VoiceProfile { Id = "g", Name = "Good", Tags = new List<string> { "vs:engines:xtts" } };
+      _sut.Profiles.Add(bad);
+      _sut.Profiles.Add(good);
+      _sut.SelectedEngine = "xtts";
+      _sut.SelectedProfile = bad;
+      _sut.Text = "hi";
+
+      Assert.AreSame(good, _sut.SelectedProfile);
+    }
+
+    [TestMethod]
+    public void ProfilePicker_DoesNotMutateProfileTags()
+    {
+      _sut.Profiles.Clear();
+      var p = new VoiceProfile { Id = "p", Name = "P", Tags = new List<string> { "vs:engines:xtts", "k=v" } };
+      _sut.Profiles.Add(p);
+      _sut.SelectedEngine = "xtts";
+      _sut.ShowCompatibleProfilesOnly = true;
+      _ = _sut.ProfilePickerSummary;
+
+      Assert.AreEqual(2, p.Tags.Count);
+      Assert.AreEqual("vs:engines:xtts", p.Tags[0]);
     }
 
     #endregion

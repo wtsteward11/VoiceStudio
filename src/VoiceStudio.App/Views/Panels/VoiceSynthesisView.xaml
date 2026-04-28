@@ -72,12 +72,13 @@
     </Grid>
     
     <!-- Row 1: Profile and Engine Selection -->
-    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,0,0,12">
+    <StackPanel Grid.Row="1" Orientation="Vertical" Spacing="8" Margin="0,0,0,12">
+      <StackPanel Orientation="Horizontal" Spacing="12">
       <StackPanel Spacing="4" MinWidth="200">
         <TextBlock Text="Voice Profile" FontSize="12" Opacity="0.7"/>
         <ComboBox x:Name="ProfileComboBox"
                   AutomationProperties.AutomationId="VoiceSynthesisView_ProfileComboBox"
-                  ItemsSource="{x:Bind ViewModel.Profiles, Mode=OneWay}"
+                  ItemsSource="{x:Bind ViewModel.ProfilePickerProfiles, Mode=OneWay}"
                   SelectedItem="{x:Bind ViewModel.SelectedProfile, Mode=TwoWay}"
                   HorizontalAlignment="Stretch"/>
       </StackPanel>
@@ -118,6 +119,22 @@
                   PlaceholderText="Optional preset"
                   HorizontalAlignment="Stretch">
         </ComboBox>
+      </StackPanel>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="16">
+        <TextBlock FontSize="12"
+                   Opacity="0.85"
+                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                   TextWrapping="WrapWholeWords"
+                   VerticalAlignment="Center"
+                   MaxWidth="520"
+                   Text="{x:Bind ViewModel.ProfilePickerSummary, Mode=OneWay}"
+                   AutomationProperties.AutomationId="VoiceSynthesisView_ProfilePickerSummary" />
+        <ToggleSwitch OnContent="Compatible only"
+                      OffContent="Compatible only"
+                      IsOn="{x:Bind ViewModel.ShowCompatibleProfilesOnly, Mode=TwoWay}"
+                      AutomationProperties.AutomationId="VoiceSynthesisView_CompatibleProfilesOnlyToggle"
+                      VerticalAlignment="Center" />
       </StackPanel>
     </StackPanel>
     

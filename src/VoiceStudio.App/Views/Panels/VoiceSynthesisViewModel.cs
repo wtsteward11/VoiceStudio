@@ -376,7 +376,32 @@ namespace VoiceStudio.App.Views.Panels
     /// <summary>Profiles in <see cref="Profiles"/> order that satisfy <see cref="ProfileMatchesCurrentEngineSelection"/> for the current engine UI state.</summary>
     public ObservableCollection<VoiceProfile> CompatibleProfilesForSelectedEngine { get; } = new();
 
+    /// <summary>
+    /// Profiles bound to the Voice Profile ComboBox. Default mode includes unrestricted/unknown tags and compatible allow-lists; excludes known-incompatible.
+    /// When <see cref="ShowCompatibleProfilesOnly"/> is true, only profiles with a matching <c>vs:engines:</c> allow-list are shown (unrestricted profiles are hidden).
+    /// </summary>
+    public ObservableCollection<VoiceProfile> ProfilePickerProfiles { get; } = new();
+
+    [ObservableProperty]
+    private bool showCompatibleProfilesOnly;
+
+    [ObservableProperty]
+    private int compatibleProfileCount;
+
+    [ObservableProperty]
+    private int incompatibleProfileCount;
+
+    [ObservableProperty]
+    private int unrestrictedProfileCount;
+
+    [ObservableProperty]
+    private string profilePickerSummary = string.Empty;
+
+    [ObservableProperty]
+    private bool hasProfilePickerMatches;
+
     private readonly NotifyCollectionChangedEventHandler _selectedEnginesCollectionChangedHandler;
+    private readonly NotifyCollectionChangedEventHandler _profilesCollectionChangedHandler;
 
     // Engine-Specific Quality Pipelines (IDEA 58)
     [ObservableProperty]
@@ -601,6 +626,9 @@ namespace VoiceStudio.App.Views.Panels
       _selectedEnginesCollectionChangedHandler = (_, _) => RefreshProfileEngineCompatibility();
       SelectedEngines.CollectionChanged += _selectedEnginesCollectionChangedHandler;
 
+      _profilesCollectionChangedHandler = (_, _) => RefreshProfileEngineCompatibility();
+      Profiles.CollectionChanged += _profilesCollectionChangedHandler;
+
       // Multi-Engine Ensemble commands (IDEA 55)
       CreateEnsembleCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -773,9 +801,117 @@ namespace VoiceStudio.App.Views.Panels
       return !string.IsNullOrWhiteSpace(SelectedEngine) && allow.Contains(SelectedEngine);
     }
 
-    private void RefreshProfileEngineCompatibility()
+    /// <summary>Classification for picker filtering (compatible / incompatible / unrestricted-unknown).</summary>
+    private enum ProfilePickerBucket
+    {
+      Unknown,
+      Compatible,
+      Incompatible,
+    }
+
+    private ProfilePickerBucket GetProfilePickerBucket(VoiceProfile profile)
+    {
+      if (IsEnsembleEngineSelectionAmbiguousForCompatibility())
+        return ProfilePickerBucket.Unknown;
+      if (!VoiceStudio.App.Core.Models.VoiceProfileEngineCompatibilityTags.TryParseAllowedEngines(profile.Tags, out var allowOrNull))
+        return ProfilePickerBucket.Unknown;
+      var allow = allowOrNull!;
+      var enginesOk = UseMultiEngineEnsemble
+          ? SelectedEngines.All(e => allow.Contains(e))
+          : !string.IsNullOrWhiteSpace(SelectedEngine) && allow.Contains(SelectedEngine);
+      return enginesOk ? ProfilePickerBucket.Compatible : ProfilePickerBucket.Incompatible;
+    }
+
+    private void RebuildProfilePickerListsAndCounts()
     {
       CompatibleProfilesForSelectedEngine.Clear();
+      ProfilePickerProfiles.Clear();
+
+      var compatible = 0;
+      var incompatible = 0;
+      var unknown = 0;
+      foreach (var p in Profiles)
+      {
+        var bucket = GetProfilePickerBucket(p);
+        switch (bucket)
+        {
+          case ProfilePickerBucket.Compatible:
+            compatible++;
+            break;
+          case ProfilePickerBucket.Incompatible:
+            incompatible++;
+            break;
+          default:
+            unknown++;
+            break;
+        }
+      }
+
+      CompatibleProfileCount = compatible;
+      IncompatibleProfileCount = incompatible;
+      UnrestrictedProfileCount = unknown;
+
+      foreach (var p in Profiles)
+      {
+        if (ProfileMatchesCurrentEngineSelection(p))
+          CompatibleProfilesForSelectedEngine.Add(p);
+      }
+
+      HasCompatibleProfilesForSelectedEngine = CompatibleProfilesForSelectedEngine.Count > 0;
+      ShowNoCompatibleProfilesHint = Profiles.Count > 0 && !HasCompatibleProfilesForSelectedEngine;
+
+      foreach (var p in Profiles)
+      {
+        var bucket = GetProfilePickerBucket(p);
+        var include = ShowCompatibleProfilesOnly
+            ? bucket == ProfilePickerBucket.Compatible
+            : bucket != ProfilePickerBucket.Incompatible;
+        if (include)
+          ProfilePickerProfiles.Add(p);
+      }
+
+      HasProfilePickerMatches = ProfilePickerProfiles.Count > 0;
+
+      if (Profiles.Count == 0)
+      {
+        ProfilePickerSummary = "No profiles loaded.";
+      }
+      else if (ShowCompatibleProfilesOnly)
+      {
+        ProfilePickerSummary =
+            $"Compatible only: showing {ProfilePickerProfiles.Count} profile(s) with a matching vs:engines allow-list. Unrestricted profiles (no tag / unknown) are hidden.";
+      }
+      else
+      {
+        ProfilePickerSummary =
+            $"Picker: {ProfilePickerProfiles.Count} shown · {compatible} compatible · {incompatible} incompatible (hidden) · {unknown} unrestricted";
+      }
+    }
+
+    /// <summary>If the current selection is excluded by the picker filter, move to the first visible profile (or clear).</summary>
+    private void AlignSelectedProfileWithPickerFilter()
+    {
+      if (Profiles.Count == 0)
+        return;
+
+      if (ProfilePickerProfiles.Count == 0)
+      {
+        if (SelectedProfile != null)
+          SelectedProfile = null;
+        return;
+      }
+
+      if (SelectedProfile != null && ProfilePickerProfiles.Contains(SelectedProfile))
+        return;
+
+      if (SelectedProfile != null)
+        SelectedProfile = ProfilePickerProfiles[0];
+    }
+
+    private void RefreshProfileEngineCompatibility()
+    {
+      RebuildProfilePickerListsAndCounts();
+      AlignSelectedProfileWithPickerFilter();
 
       if (SelectedProfile == null)
       {
@@ -783,8 +919,6 @@ namespace VoiceStudio.App.Views.Panels
         IsSelectedProfileEngineCompatible = true;
         SelectedProfileEngineCompatibilityStatus = ProfileEngineCompatibilityStatus.Unknown;
         ProfileEngineCompatibilityMessage = "Select a voice profile and an engine to see compatibility.";
-        HasCompatibleProfilesForSelectedEngine = false;
-        ShowNoCompatibleProfilesHint = false;
         NotifyProfileEngineCompatibilitySurface();
         return;
       }
@@ -829,16 +963,12 @@ namespace VoiceStudio.App.Views.Panels
             : $"{engineLabel} · {profileName}. This profile's metadata restricts synthesis to other engine(s); change engine or profile to continue.";
       }
 
-      foreach (var p in Profiles)
-      {
-        if (ProfileMatchesCurrentEngineSelection(p))
-          CompatibleProfilesForSelectedEngine.Add(p);
-      }
-
-      HasCompatibleProfilesForSelectedEngine = CompatibleProfilesForSelectedEngine.Count > 0;
-      ShowNoCompatibleProfilesHint = Profiles.Count > 0 && !HasCompatibleProfilesForSelectedEngine;
-
       NotifyProfileEngineCompatibilitySurface();
+    }
+
+    partial void OnShowCompatibleProfilesOnlyChanged(bool value)
+    {
+      RefreshProfileEngineCompatibility();
     }
 
     private void NotifyProfileEngineCompatibilitySurface()
@@ -3027,6 +3157,7 @@ namespace VoiceStudio.App.Views.Panels
         }
 
         // Clear collections
+        Profiles.CollectionChanged -= _profilesCollectionChangedHandler;
         Profiles.Clear();
         SelectedEngines.CollectionChanged -= _selectedEnginesCollectionChangedHandler;
       }

@@ -93,6 +93,36 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
+    private bool _isAddedToTimeline;
+
+    /// <summary>True when this output was placed on the project timeline in this session.</summary>
+    public bool IsAddedToTimeline
+    {
+      get => _isAddedToTimeline;
+      set
+      {
+        if (_isAddedToTimeline == value)
+          return;
+        _isAddedToTimeline = value;
+        OnPropertyChanged();
+      }
+    }
+
+    private DateTime? _addedToTimelineAtLocal;
+
+    /// <summary>Local time when <see cref="IsAddedToTimeline"/> was set true, if applicable.</summary>
+    public DateTime? AddedToTimelineAtLocal
+    {
+      get => _addedToTimelineAtLocal;
+      set
+      {
+        if (_addedToTimelineAtLocal == value)
+          return;
+        _addedToTimelineAtLocal = value;
+        OnPropertyChanged();
+      }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -153,6 +183,9 @@ namespace VoiceStudio.App.Views.Panels
     private readonly IErrorDialogService? _errorDialogService;
     private readonly IToastNotificationService? _toastNotificationService;
     private readonly IGeneratedAudioLibraryService? _generatedAudioLibraryService;
+    private readonly IGeneratedAudioTimelineService? _generatedAudioTimelineService;
+    private string? _lastSavedLibraryAssetId;
+    private double _lastSynthesisQualityScore;
     private readonly IErrorPresentationService? _errorService;
     private readonly string _backendBaseUrl;
     private StreamingAudioPlayer? _streamingPlayer;
@@ -367,6 +400,23 @@ namespace VoiceStudio.App.Views.Panels
     [ObservableProperty]
     private string generatedAudioSaveStatus = string.Empty;
 
+    /// <summary>True after the active output was successfully inserted on the project timeline.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanAddGeneratedAudioToTimeline))]
+    private bool isGeneratedAudioAddedToTimeline;
+
+    /// <summary>Timeline insertion outcome copy for operators (unavailable / failure / success).</summary>
+    [ObservableProperty]
+    private string generatedAudioTimelineStatus = string.Empty;
+
+    /// <summary>True when timeline insertion can be attempted (service present, synthesis output, profile id, not already added).</summary>
+    public bool CanAddGeneratedAudioToTimeline =>
+        _generatedAudioTimelineService != null &&
+        HasSynthesisResult &&
+        !IsLoading &&
+        !IsGeneratedAudioAddedToTimeline &&
+        !string.IsNullOrWhiteSpace(ResolveTimelineProfileId());
+
     /// <summary>True when user can add the current synthesis output to the library (service present, result exists, not busy, not already saved).</summary>
     public bool CanAddGeneratedAudioToLibrary =>
         _generatedAudioLibraryService != null &&
@@ -504,7 +554,7 @@ namespace VoiceStudio.App.Views.Panels
     /// Voice Synthesis panel VM. Optional <paramref name="toastNotificationService"/> and
     /// <paramref name="generatedAudioLibraryService"/> enable unit tests without full app DI.
     /// </summary>
-    public VoiceSynthesisViewModel(IVoiceSynthesisService voiceSynthesisService, IEnginesClient enginesClient, IQualityPipelineService qualityPipelineService, IEnsembleService ensembleService, ITextAnalysisService textAnalysisService, IQualityHistoryService qualityHistoryService, IProfilesClient profilesClient, IAudioPlayerService audioPlayer, IToastNotificationService? toastNotificationService = null, IGeneratedAudioLibraryService? generatedAudioLibraryService = null)
+    public VoiceSynthesisViewModel(IVoiceSynthesisService voiceSynthesisService, IEnginesClient enginesClient, IQualityPipelineService qualityPipelineService, IEnsembleService ensembleService, ITextAnalysisService textAnalysisService, IQualityHistoryService qualityHistoryService, IProfilesClient profilesClient, IAudioPlayerService audioPlayer, IToastNotificationService? toastNotificationService = null, IGeneratedAudioLibraryService? generatedAudioLibraryService = null, IGeneratedAudioTimelineService? generatedAudioTimelineService = null)
         : base(AppServices.GetViewModelContext())
     {
       _voiceSynthesisService = voiceSynthesisService ?? throw new ArgumentNullException(nameof(voiceSynthesisService));
@@ -564,6 +614,7 @@ namespace VoiceStudio.App.Views.Panels
       }
 
       _generatedAudioLibraryService = generatedAudioLibraryService ?? AppServices.GetService<IGeneratedAudioLibraryService>();
+      _generatedAudioTimelineService = generatedAudioTimelineService ?? AppServices.GetService<IGeneratedAudioTimelineService>();
 
       // EventAggregator for ProfileSelectedEvent (subscription in OnActivatedAsync per lifecycle rule)
       _eventAggregator = AppServices.TryGetEventAggregator();
@@ -627,10 +678,14 @@ namespace VoiceStudio.App.Views.Panels
           async (ct) => { await SynthesizeAsync(ct).ConfigureAwait(false); },
           () => IsConsentRequired && CanSynthesize);
 
-      // Add to Timeline command (Audit X-6: Synthesis -> Timeline)
-      // GAP-B04: Disabled when busy or no synthesis output
-      AddToTimelineCommand = new RelayCommand(AddSynthesizedAudioToTimeline,
-          () => !string.IsNullOrEmpty(LastSynthesizedAudioId) && !IsLoading);
+      // Add to Timeline: persisted clip via IGeneratedAudioTimelineService (legacy relay name: AddToTimelineCommand).
+      AddGeneratedAudioToTimelineCommand = new EnhancedAsyncRelayCommand(
+          async (ct) =>
+          {
+            using var profiler = PerformanceProfiler.Start("Command: AddGeneratedAudioToTimeline", PerformanceBudgets.CommandExecutionMs);
+            await AddGeneratedAudioToTimelineAsync(ct);
+          },
+          () => CanAddGeneratedAudioToTimeline);
 
       AddGeneratedAudioToLibraryCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -779,7 +834,11 @@ namespace VoiceStudio.App.Views.Panels
     public IRelayCommand ClearRecentResultsCommand { get; }
     public IRelayCommand OpenProfileConsentCommand { get; }
     public EnhancedAsyncRelayCommand RetrySynthesisCommand { get; }
-    public IRelayCommand AddToTimelineCommand { get; }
+    public EnhancedAsyncRelayCommand AddGeneratedAudioToTimelineCommand { get; }
+
+    /// <summary>Alias for bindings/tests expecting the historical command name.</summary>
+    public IRelayCommand AddToTimelineCommand => AddGeneratedAudioToTimelineCommand;
+
     public EnhancedAsyncRelayCommand AddGeneratedAudioToLibraryCommand { get; }
     public EnhancedAsyncRelayCommand StartStreamingCommand { get; }
     public IRelayCommand StopStreamingCommand { get; }
@@ -1068,6 +1127,10 @@ namespace VoiceStudio.App.Views.Panels
       LastSynthesizedDuration = TimeSpan.Zero;
       IsGeneratedAudioSaved = false;
       GeneratedAudioSaveStatus = string.Empty;
+      _lastSavedLibraryAssetId = null;
+      _lastSynthesisQualityScore = 0;
+      IsGeneratedAudioAddedToTimeline = false;
+      GeneratedAudioTimelineStatus = string.Empty;
     }
 
     // Quality metrics display properties
@@ -1365,12 +1428,15 @@ namespace VoiceStudio.App.Views.Panels
         LastSynthesizedAudioUrl = response.AudioUrl;
         LastSynthesizedAudioId = response.AudioId;
         LastSynthesizedDuration = TimeSpan.FromSeconds(response.Duration);
+        _lastSynthesisQualityScore = response.QualityScore;
+        IsGeneratedAudioAddedToTimeline = false;
+        GeneratedAudioTimelineStatus = string.Empty;
         WorkflowState = (!string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl) ||
                          !string.IsNullOrWhiteSpace(LastSynthesizedAudioId))
             ? SynthesisWorkflowState.AudioReady
             : WorkflowState;
         PlayAudioCommand.NotifyCanExecuteChanged();
-        AddToTimelineCommand.NotifyCanExecuteChanged();
+        AddGeneratedAudioToTimelineCommand.NotifyCanExecuteChanged();
 
         AddRecentSynthesisResult(
             response.AudioId,
@@ -1631,6 +1697,7 @@ namespace VoiceStudio.App.Views.Panels
       RefreshProfileEngineCompatibility();
       if (!IsLoading && WorkflowState != SynthesisWorkflowState.Synthesizing)
         UpdateWorkflowStateFromInputs();
+      RefreshTimelineOutputState();
     }
 
     /// <inheritdoc />
@@ -1706,7 +1773,7 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnIsLoadingChanged(bool value)
     {
       SynthesizeCommand.NotifyCanExecuteChanged();
-      AddToTimelineCommand.NotifyCanExecuteChanged(); // GAP-B04
+      AddGeneratedAudioToTimelineCommand.NotifyCanExecuteChanged(); // GAP-B04
       OnPropertyChanged(nameof(CanPlayAudio));
       RefreshSynthesisResultState();
       PlayAudioCommand.NotifyCanExecuteChanged();
@@ -1746,7 +1813,7 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnLastSynthesizedAudioIdChanged(string? value)
     {
       RefreshSynthesisResultState();
-      AddToTimelineCommand.NotifyCanExecuteChanged();
+      AddGeneratedAudioToTimelineCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnLastSynthesizedAudioUrlChanged(string? value)
@@ -1911,6 +1978,7 @@ namespace VoiceStudio.App.Views.Panels
       OpenOutputLocationCommand.NotifyCanExecuteChanged();
       RefreshPlaybackErrorCommandState();
       RefreshLibraryOutputState();
+      RefreshTimelineOutputState();
     }
 
     private void RefreshLibraryOutputState()
@@ -1919,9 +1987,23 @@ namespace VoiceStudio.App.Views.Panels
       AddGeneratedAudioToLibraryCommand.NotifyCanExecuteChanged();
     }
 
+    private void RefreshTimelineOutputState()
+    {
+      OnPropertyChanged(nameof(CanAddGeneratedAudioToTimeline));
+      AddGeneratedAudioToTimelineCommand.NotifyCanExecuteChanged();
+    }
+
+    private string? ResolveTimelineProfileId() =>
+        SelectedProfile?.Id ?? AppServices.TryGetContextManager()?.ActiveProfileId;
+
     partial void OnIsGeneratedAudioSavedChanged(bool value)
     {
       AddGeneratedAudioToLibraryCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsGeneratedAudioAddedToTimelineChanged(bool value)
+    {
+      RefreshTimelineOutputState();
     }
 
     private void ClearPlaybackError()
@@ -2017,15 +2099,20 @@ namespace VoiceStudio.App.Views.Panels
       LastSynthesizedAudioId = item.AudioId ?? string.Empty;
       LastSynthesizedAudioUrl = item.AudioReference ?? string.Empty;
       LastSynthesizedDuration = item.Duration;
+      _lastSynthesisQualityScore = item.QualityScore;
       WorkflowState = SynthesisWorkflowState.AudioReady;
       IsGeneratedAudioSaved = item.IsSavedToLibrary;
       GeneratedAudioSaveStatus = item.IsSavedToLibrary
           ? "Previously saved to library"
           : string.Empty;
+      IsGeneratedAudioAddedToTimeline = item.IsAddedToTimeline;
+      GeneratedAudioTimelineStatus = item.IsAddedToTimeline
+          ? "Previously added to timeline"
+          : string.Empty;
       ClearPlaybackError();
       RefreshSynthesisResultState();
       PlayAudioCommand.NotifyCanExecuteChanged();
-      AddToTimelineCommand.NotifyCanExecuteChanged();
+      AddGeneratedAudioToTimelineCommand.NotifyCanExecuteChanged();
     }
 
     private void CopyPlaybackErrorToClipboard()
@@ -2401,6 +2488,7 @@ namespace VoiceStudio.App.Views.Panels
 
       if (result.Success)
       {
+        _lastSavedLibraryAssetId = result.AssetId;
         IsGeneratedAudioSaved = true;
         GeneratedAudioSaveStatus = result.SaveKind switch
         {
@@ -2461,43 +2549,94 @@ namespace VoiceStudio.App.Views.Panels
       }
     }
 
-    /// <summary>
-    /// Send synthesized audio to the Timeline panel as a new clip.
-    /// Audit remediation X-6/C.3: Synthesis -> Timeline shortcut.
-    /// </summary>
-    private void AddSynthesizedAudioToTimeline()
+    /// <summary>Marks the matching recent-results row as placed on the timeline.</summary>
+    private void MarkMatchingRecentResultTimeline(string? audioId, string? audioReference)
     {
-      if (string.IsNullOrEmpty(LastSynthesizedAudioId))
+      var now = DateTime.Now;
+      foreach (var row in RecentSynthesisResults)
       {
-        return;
+        var idMatch = !string.IsNullOrWhiteSpace(audioId) &&
+                      string.Equals(row.AudioId, audioId, StringComparison.Ordinal);
+        var refMatch = !string.IsNullOrWhiteSpace(audioReference) &&
+                       string.Equals(row.AudioReference, audioReference, StringComparison.Ordinal);
+        if (idMatch || refMatch)
+        {
+          row.IsAddedToTimeline = true;
+          row.AddedToTimelineAtLocal = now;
+          break;
+        }
       }
+    }
 
-      var eventAggregator = AppServices.TryGetEventAggregator();
-      if (eventAggregator == null)
-      {
-        _toastNotificationService?.ShowWarning("Timeline", "Event system unavailable");
+    /// <summary>
+    /// Persist a generated-audio clip on the active project timeline (backend create).
+    /// </summary>
+    private async Task AddGeneratedAudioToTimelineAsync(CancellationToken cancellationToken)
+    {
+      if (_generatedAudioTimelineService == null || !CanAddGeneratedAudioToTimeline)
         return;
-      }
 
-      // C.3: Publish AddToTimelineEvent for direct clip addition (Pass 01: include ProfileId)
-      var clipName = $"Synthesis - {SelectedProfile?.Name ?? "Unknown"}";
-      eventAggregator.Publish(new AddToTimelineEvent(
-          PanelId,
-          LastSynthesizedAudioId,
-          LastSynthesizedAudioUrl ?? "",
+      var request = new GeneratedAudioTimelineRequest(
+          LastSynthesizedAudioId ?? string.Empty,
+          LastSynthesizedAudioUrl,
           LastSynthesizedDuration,
-          clipName,
-          targetTrackIndex: null,
-          insertPosition: null,
-          profileId: SelectedProfile?.Id));
+          ResolveTimelineProfileId(),
+          SelectedProfile?.Name,
+          SelectedEngine,
+          DateTime.Now,
+          _lastSynthesisQualityScore > 0 ? _lastSynthesisQualityScore : (double?)null,
+          _lastSavedLibraryAssetId,
+          string.IsNullOrWhiteSpace(Text) ? null : Text);
 
-      // Also publish AssetAddedEvent so Library knows
-      eventAggregator.Publish(new AssetAddedEvent(
-          PanelId,
-          LastSynthesizedAudioId,
-          "audio"));
+      try
+      {
+        var result = await _generatedAudioTimelineService
+            .AddGeneratedClipAsync(request, cancellationToken)
+            .ConfigureAwait(false);
 
-      _toastNotificationService?.ShowSuccess("Added to Timeline", $"'{clipName}' sent to Timeline");
+        if (result.Success && result.Kind == GeneratedAudioTimelineKind.Added)
+        {
+          IsGeneratedAudioAddedToTimeline = true;
+          GeneratedAudioTimelineStatus = "Added to timeline";
+          MarkMatchingRecentResultTimeline(
+              string.IsNullOrWhiteSpace(request.AudioId) ? null : request.AudioId,
+              request.AudioPathOrUrl);
+          _toastNotificationService?.ShowSuccess(
+              ResourceHelper.GetString("VoiceSynthesis.TimelineAddedTitle", "Timeline"),
+              ResourceHelper.GetString("VoiceSynthesis.TimelineAddedBody", "Generated audio was added to the project timeline."));
+        }
+        else if (result.Kind == GeneratedAudioTimelineKind.Unavailable)
+        {
+          GeneratedAudioTimelineStatus = result.Message
+              ?? "Timeline is not available. Select a project and timeline track.";
+          _toastNotificationService?.ShowWarning(
+              ResourceHelper.GetString("VoiceSynthesis.TimelineUnavailableTitle", "Timeline unavailable"),
+              GeneratedAudioTimelineStatus);
+        }
+        else
+        {
+          GeneratedAudioTimelineStatus = string.IsNullOrWhiteSpace(result.Message)
+              ? "Could not add to timeline"
+              : result.Message!;
+          _toastNotificationService?.ShowWarning(
+              ResourceHelper.GetString("VoiceSynthesis.TimelineAddFailedTitle", "Timeline"),
+              GeneratedAudioTimelineStatus);
+        }
+      }
+      catch (OperationCanceledException)
+      {
+        return;
+      }
+      catch (Exception ex)
+      {
+        _errorLoggingService?.LogError(ex, "VoiceSynthesis.AddToTimeline");
+        GeneratedAudioTimelineStatus = ErrorHandler.GetUserFriendlyMessage(ex);
+        _toastNotificationService?.ShowWarning("Timeline", GeneratedAudioTimelineStatus);
+      }
+      finally
+      {
+        RefreshTimelineOutputState();
+      }
     }
 
     private void OnQualityMetricsUpdated(QualityMetricsUpdatedEventArgs e)
@@ -2758,7 +2897,7 @@ namespace VoiceStudio.App.Views.Panels
             var qualityScore = QualityMetrics?.MosScore ?? 0.0;
             LastSynthesizedDuration = TimeSpan.Zero;
             PlayAudioCommand.NotifyCanExecuteChanged();
-            AddToTimelineCommand.NotifyCanExecuteChanged();
+            AddGeneratedAudioToTimelineCommand.NotifyCanExecuteChanged();
 
             var engineLabel = SelectedEngines.Count > 0
                 ? string.Join(", ", SelectedEngines)
@@ -3087,6 +3226,8 @@ namespace VoiceStudio.App.Views.Panels
       public string? CreatedAtUtc { get; set; }
       public bool IsSavedToLibrary { get; set; }
       public string? SavedAtUtc { get; set; }
+      public bool IsAddedToTimeline { get; set; }
+      public string? AddedToTimelineAtUtc { get; set; }
     }
 
     #region IPanelStatePersistable (GAP-050 state hygiene)
@@ -3125,6 +3266,9 @@ namespace VoiceStudio.App.Views.Panels
                 .ToString("O", System.Globalization.CultureInfo.InvariantCulture),
             IsSavedToLibrary = r.IsSavedToLibrary,
             SavedAtUtc = r.SavedAtLocal?.ToUniversalTime()
+                .ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            IsAddedToTimeline = r.IsAddedToTimeline,
+            AddedToTimelineAtUtc = r.AddedToTimelineAtLocal?.ToUniversalTime()
                 .ToString("O", System.Globalization.CultureInfo.InvariantCulture),
           }).ToList();
           state.CustomData[CustomKeyRecentResults] = JsonSerializer.Serialize(dtos);
@@ -3246,6 +3390,14 @@ namespace VoiceStudio.App.Views.Panels
                   System.Globalization.DateTimeStyles.RoundtripKind,
                   out var savedUtc))
             added.SavedAtLocal = savedUtc.ToLocalTime();
+          added.IsAddedToTimeline = dto.IsAddedToTimeline;
+          if (!string.IsNullOrWhiteSpace(dto.AddedToTimelineAtUtc) &&
+              DateTime.TryParse(
+                  dto.AddedToTimelineAtUtc,
+                  System.Globalization.CultureInfo.InvariantCulture,
+                  System.Globalization.DateTimeStyles.RoundtripKind,
+                  out var atUtc))
+            added.AddedToTimelineAtLocal = atUtc.ToLocalTime();
           count++;
         }
 

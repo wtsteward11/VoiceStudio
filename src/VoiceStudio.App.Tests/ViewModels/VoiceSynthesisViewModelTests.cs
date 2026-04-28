@@ -35,6 +35,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     private Mock<IAudioPlayerService> _mockAudioPlayer = null!;
     private Mock<IToastNotificationService> _mockToast = null!;
     private Mock<IGeneratedAudioLibraryService> _mockLibraryService = null!;
+    private Mock<IGeneratedAudioTimelineService> _mockTimelineService = null!;
     private VoiceSynthesisViewModel _sut = null!;
 
     [TestInitialize]
@@ -50,6 +51,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockAudioPlayer = new Mock<IAudioPlayerService>();
       _mockToast = new Mock<IToastNotificationService>();
       _mockLibraryService = new Mock<IGeneratedAudioLibraryService>();
+      _mockTimelineService = new Mock<IGeneratedAudioTimelineService>();
       _mockLibraryService
           .Setup(s => s.SaveAsync(It.IsAny<GeneratedAudioSaveRequest>(), It.IsAny<CancellationToken>()))
           .ReturnsAsync(new GeneratedAudioSaveResult(
@@ -73,6 +75,16 @@ namespace VoiceStudio.App.Tests.ViewModels
           .Setup(x => x.ListQualityPipelinePresetsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
           .ReturnsAsync(new List<string>());
 
+      _mockTimelineService
+          .Setup(t => t.AddGeneratedClipAsync(It.IsAny<GeneratedAudioTimelineRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioTimelineResult(
+              true,
+              GeneratedAudioTimelineKind.Added,
+              null,
+              "proj-x",
+              "tr-x",
+              "clip-x"));
+
       _sut = new VoiceSynthesisViewModel(
           _mockVoiceSynthesisService.Object,
           _mockEnginesClient.Object,
@@ -83,7 +95,8 @@ namespace VoiceStudio.App.Tests.ViewModels
           _mockProfilesClient.Object,
           _mockAudioPlayer.Object,
           _mockToast.Object,
-          _mockLibraryService.Object
+          _mockLibraryService.Object,
+          _mockTimelineService.Object
       );
     }
 
@@ -109,6 +122,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsNotNull(_sut.RemoveRecentResultCommand);
       Assert.IsNotNull(_sut.ClearRecentResultsCommand);
       Assert.IsNotNull(_sut.StopAudioCommand);
+      Assert.IsNotNull(_sut.AddGeneratedAudioToTimelineCommand);
     }
 
     [TestMethod]
@@ -2066,7 +2080,8 @@ namespace VoiceStudio.App.Tests.ViewModels
           _mockProfilesClient.Object,
           _mockAudioPlayer.Object,
           _mockToast.Object,
-          _mockLibraryService.Object);
+          _mockLibraryService.Object,
+          _mockTimelineService.Object);
       await sut2.RestoreStateAsync(state!, default);
 
       Assert.IsTrue(sut2.RecentSynthesisResults[0].IsSavedToLibrary);
@@ -2108,7 +2123,8 @@ namespace VoiceStudio.App.Tests.ViewModels
           _mockProfilesClient.Object,
           _mockAudioPlayer.Object,
           _mockToast.Object,
-          generatedAudioLibraryService: null);
+          generatedAudioLibraryService: null,
+          generatedAudioTimelineService: null);
       try
       {
         await RunSuccessfulSynthesisOn(vm, "no-lib", "/api/audio/no-lib");
@@ -2136,6 +2152,219 @@ namespace VoiceStudio.App.Tests.ViewModels
           });
 
       await ((IAsyncRelayCommand)vm.SynthesizeCommand).ExecuteAsync(default);
+    }
+
+    #endregion
+
+    #region Timeline output tests
+
+    [TestMethod]
+    public void TimelineOutput_BeforeSynthesis_CannotAddToTimeline()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      Assert.IsFalse(_sut.CanAddGeneratedAudioToTimeline);
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_AfterSynthesis_CanAddWhenTimelineServicePresent()
+    {
+      await RunSuccessfulSynthesisAsync("tl-1", "/api/audio/tl-1");
+      Assert.IsTrue(_sut.CanAddGeneratedAudioToTimeline);
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_WithoutTimelineService_CannotAdd()
+    {
+      var vm = new VoiceSynthesisViewModel(
+          _mockVoiceSynthesisService.Object,
+          _mockEnginesClient.Object,
+          _mockQualityPipelineService.Object,
+          _mockEnsembleService.Object,
+          _mockTextAnalysisService.Object,
+          _mockQualityHistoryService.Object,
+          _mockProfilesClient.Object,
+          _mockAudioPlayer.Object,
+          _mockToast.Object,
+          _mockLibraryService.Object,
+          generatedAudioTimelineService: null);
+      try
+      {
+        await RunSuccessfulSynthesisOn(vm, "no-tl", "/api/audio/no-tl");
+        Assert.IsFalse(vm.CanAddGeneratedAudioToTimeline);
+      }
+      finally
+      {
+        vm.Dispose();
+      }
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_Success_CallsServiceAndMarksAdded()
+    {
+      await RunSuccessfulSynthesisAsync("tl-ok", "/api/audio/tl-ok");
+
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+
+      _mockTimelineService.Verify(
+          t => t.AddGeneratedClipAsync(
+              It.Is<GeneratedAudioTimelineRequest>(r =>
+                  r.AudioId == "tl-ok" &&
+                  r.Engine == _sut.SelectedEngine &&
+                  r.ProfileId == "p1"),
+              It.IsAny<CancellationToken>()),
+          Times.Once);
+      Assert.IsTrue(_sut.IsGeneratedAudioAddedToTimeline);
+      Assert.IsFalse(_sut.CanAddGeneratedAudioToTimeline);
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_Unavailable_SetsActionableStatus()
+    {
+      _mockTimelineService
+          .Setup(t => t.AddGeneratedClipAsync(It.IsAny<GeneratedAudioTimelineRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioTimelineResult(
+              false,
+              GeneratedAudioTimelineKind.Unavailable,
+              "No active project.",
+              null,
+              null,
+              null));
+
+      await RunSuccessfulSynthesisAsync("tl-u", "/api/audio/tl-u");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+
+      Assert.IsFalse(_sut.IsGeneratedAudioAddedToTimeline);
+      StringAssert.Contains(_sut.GeneratedAudioTimelineStatus, "project");
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_Failure_DoesNotMarkAdded()
+    {
+      _mockTimelineService
+          .Setup(t => t.AddGeneratedClipAsync(It.IsAny<GeneratedAudioTimelineRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioTimelineResult(
+              false,
+              GeneratedAudioTimelineKind.Failed,
+              "network",
+              null,
+              null,
+              null));
+
+      await RunSuccessfulSynthesisAsync("tl-f", "/api/audio/tl-f");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+
+      Assert.IsFalse(_sut.IsGeneratedAudioAddedToTimeline);
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_Failure_PreservesGeneratedResultAndCanPlay()
+    {
+      _mockTimelineService
+          .Setup(t => t.AddGeneratedClipAsync(It.IsAny<GeneratedAudioTimelineRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioTimelineResult(
+              false,
+              GeneratedAudioTimelineKind.Failed,
+              "x",
+              null,
+              null,
+              null));
+
+      await RunSuccessfulSynthesisAsync("tl-k", "/api/audio/tl-k");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+
+      Assert.AreEqual("tl-k", _sut.LastSynthesizedAudioId);
+      Assert.IsTrue(_sut.CanPlayAudio);
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_Success_MarksMatchingRecentResult()
+    {
+      await RunSuccessfulSynthesisAsync("tl-recent", "/api/audio/tl-recent");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+
+      Assert.AreEqual(1, _sut.RecentSynthesisResults.Count);
+      Assert.IsTrue(_sut.RecentSynthesisResults[0].IsAddedToTimeline);
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_RestoreRecent_RestoresTimelineAddedState()
+    {
+      await RunSuccessfulSynthesisAsync("tl-rs", "/api/audio/tl-rs");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+
+      await RunSuccessfulSynthesisAsync("other", "/api/audio/other");
+
+      var row = _sut.RecentSynthesisResults.First(r => r.AudioId == "tl-rs");
+      _sut.RestoreRecentResultCommand.Execute(row);
+
+      Assert.IsTrue(_sut.IsGeneratedAudioAddedToTimeline);
+      StringAssert.Contains(_sut.GeneratedAudioTimelineStatus, "timeline");
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_Persistence_RoundTripsTimelineFlag()
+    {
+      await RunSuccessfulSynthesisAsync("tl-persist", "/api/audio/tl-persist");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+
+      var state = _sut.GetCurrentState();
+      Assert.IsNotNull(state?.CustomData);
+      var json = state!.CustomData![RecentResultsCustomKey] as string;
+      Assert.IsFalse(string.IsNullOrEmpty(json));
+      StringAssert.Contains(json!, "IsAddedToTimeline");
+
+      var sut2 = new VoiceSynthesisViewModel(
+          _mockVoiceSynthesisService.Object,
+          _mockEnginesClient.Object,
+          _mockQualityPipelineService.Object,
+          _mockEnsembleService.Object,
+          _mockTextAnalysisService.Object,
+          _mockQualityHistoryService.Object,
+          _mockProfilesClient.Object,
+          _mockAudioPlayer.Object,
+          _mockToast.Object,
+          _mockLibraryService.Object,
+          _mockTimelineService.Object);
+      await sut2.RestoreStateAsync(state!, default);
+
+      Assert.IsTrue(sut2.RecentSynthesisResults[0].IsAddedToTimeline);
+      sut2.Dispose();
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_LibrarySaveNotCleared_OnTimelineFailure()
+    {
+      await RunSuccessfulSynthesisAsync("both", "/api/audio/both");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToLibraryCommand).ExecuteAsync(default);
+      Assert.IsTrue(_sut.IsGeneratedAudioSaved);
+
+      _mockTimelineService
+          .Setup(t => t.AddGeneratedClipAsync(It.IsAny<GeneratedAudioTimelineRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioTimelineResult(
+              false,
+              GeneratedAudioTimelineKind.Failed,
+              "bad",
+              null,
+              null,
+              null));
+
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+
+      Assert.IsTrue(_sut.IsGeneratedAudioSaved);
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_ConsentFailure_DoesNotEnableTimelineAdd()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new ConsentRequiredException("need consent"));
+
+      await ((IAsyncRelayCommand)_sut.SynthesizeCommand).ExecuteAsync(default);
+
+      Assert.IsFalse(_sut.CanAddGeneratedAudioToTimeline);
     }
 
     #endregion

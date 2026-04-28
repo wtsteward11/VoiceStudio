@@ -48,6 +48,8 @@ PANELS_BY_CATEGORY: dict[str, list[PanelInfo]] = {
                 "VoiceSynthesisView_PlayButton",
                 "VoiceSynthesisView_StopButton",
                 "VoiceSynthesisView_AddToTimelineButton",
+                "VoiceSynthesisView_AddGeneratedAudioToTimelineButton",
+                "VoiceSynthesisView_GeneratedAudioTimelineStatus",
                 "VoiceSynthesisView_AnalyzeButton",
             ],
             description="Primary TTS synthesis panel",

@@ -427,6 +427,12 @@ namespace VoiceStudio.App.Services
           sp.GetRequiredService<IProjectAudioClient>(),
           sp.GetService<IErrorLoggingService>()));
 
+      services.AddSingleton<IGeneratedAudioTimelineService>(sp => new GeneratedAudioTimelineService(
+          sp.GetRequiredService<IContextManager>(),
+          sp.GetRequiredService<ITimelineTrackService>(),
+          sp.GetRequiredService<ITimelineClipService>(),
+          sp.GetService<IErrorLoggingService>()));
+
       // GAP-014: Legacy ILayoutService/IWorkspaceService (LayoutService/WorkspaceService) removed from DI.
       // Runtime workspace authority is PanelStateService (IUnifiedWorkspaceService) + MainWindow orchestration.
 

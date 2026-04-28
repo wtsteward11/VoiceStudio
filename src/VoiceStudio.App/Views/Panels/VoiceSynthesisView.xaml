@@ -443,6 +443,19 @@
                      Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
                      VerticalAlignment="Center"/>
         </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+          <Button Content="Add to Timeline"
+                  AutomationProperties.AutomationId="VoiceSynthesisView_AddGeneratedAudioToTimelineButton"
+                  Command="{x:Bind ViewModel.AddGeneratedAudioToTimelineCommand}"
+                  IsEnabled="{x:Bind ViewModel.CanAddGeneratedAudioToTimeline, Mode=OneWay}"
+                  ToolTipService.ToolTip="Create a clip on the active project timeline"/>
+          <TextBlock AutomationProperties.AutomationId="VoiceSynthesisView_GeneratedAudioTimelineStatus"
+                     Text="{x:Bind ViewModel.GeneratedAudioTimelineStatus, Mode=OneWay}"
+                     FontSize="11"
+                     Opacity="0.85"
+                     Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                     VerticalAlignment="Center"/>
+        </StackPanel>
       </StackPanel>
     </Border>
 
@@ -495,6 +508,12 @@
                              Foreground="{StaticResource VSQ.Accent.CyanBrush}"
                              AutomationProperties.AutomationId="VoiceSynthesisView_RecentResultSavedBadge"
                              Visibility="{x:Bind IsSavedToLibrary, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                  <TextBlock Text="Added to timeline"
+                             FontSize="10"
+                             Opacity="0.75"
+                             Foreground="{StaticResource VSQ.Accent.CyanBrush}"
+                             AutomationProperties.AutomationId="VoiceSynthesisView_RecentResultTimelineBadge"
+                             Visibility="{x:Bind IsAddedToTimeline, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal"

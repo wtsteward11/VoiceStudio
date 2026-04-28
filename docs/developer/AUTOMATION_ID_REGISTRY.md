@@ -177,7 +177,10 @@ Primary voice synthesis interface.
 | `VoiceSynthesisView_OpenOutputLocationButton` | Button | Open local output file/folder when available | v1.2.0 |
 | `VoiceSynthesisView_AddGeneratedAudioToLibraryButton` | Button | Register generated clip with library workflow | v1.2.0 |
 | `VoiceSynthesisView_GeneratedAudioSaveStatus` | TextBlock | Saved / failed status for library registration | v1.2.0 |
+| `VoiceSynthesisView_AddGeneratedAudioToTimelineButton` | Button | Insert generated clip on active project timeline | v1.2.0 |
+| `VoiceSynthesisView_GeneratedAudioTimelineStatus` | TextBlock | Timeline insert outcome / unavailable messaging | v1.2.0 |
 | `VoiceSynthesisView_RecentResultSavedBadge` | TextBlock | Per-row indicator when a recent result was saved to library | v1.2.0 |
+| `VoiceSynthesisView_RecentResultTimelineBadge` | TextBlock | Per-row indicator when a recent result was added to timeline | v1.2.0 |
 | `VoiceSynthesisView_PlaybackErrorInfoBar` | InfoBar | Playback error diagnostics and recovery | v1.2.0 |
 | `VoiceSynthesisView_RetryPlaybackButton` | Button | Retry failed playback | v1.2.0 |
 | `VoiceSynthesisView_CopyPlaybackErrorButton` | Button | Copy playback error details to clipboard | v1.2.0 |

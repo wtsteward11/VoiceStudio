@@ -489,6 +489,14 @@ namespace VoiceStudio.App.Views.Panels
           RestoreRecentResult,
           r => r != null);
 
+      RemoveRecentResultCommand = new RelayCommand<VoiceSynthesisRecentResult>(
+          RemoveRecentResult,
+          r => r != null);
+
+      ClearRecentResultsCommand = new RelayCommand(
+          ClearRecentResults,
+          () => HasRecentSynthesisResults);
+
       OpenProfileConsentCommand = new RelayCommand(
           OpenProfileConsent,
           () => IsConsentRequired && !string.IsNullOrEmpty(ConsentRequiredProfileId));
@@ -622,6 +630,8 @@ namespace VoiceStudio.App.Views.Panels
     public EnhancedAsyncRelayCommand RetryPlaybackCommand { get; }
     public IRelayCommand CopyPlaybackErrorCommand { get; }
     public IRelayCommand RestoreRecentResultCommand { get; }
+    public IRelayCommand RemoveRecentResultCommand { get; }
+    public IRelayCommand ClearRecentResultsCommand { get; }
     public IRelayCommand OpenProfileConsentCommand { get; }
     public EnhancedAsyncRelayCommand RetrySynthesisCommand { get; }
     public IRelayCommand AddToTimelineCommand { get; }
@@ -1579,7 +1589,40 @@ namespace VoiceStudio.App.Views.Panels
       RecentSynthesisResults.Insert(0, result);
       while (RecentSynthesisResults.Count > MaxRecentSynthesisResults)
         RecentSynthesisResults.RemoveAt(RecentSynthesisResults.Count - 1);
+      NotifyRecentSynthesisResultsChanged();
+    }
+
+    private void RemoveRecentResult(VoiceSynthesisRecentResult? item)
+    {
+      if (item is null)
+        return;
+      if (!RecentSynthesisResults.Contains(item))
+        return;
+
+      if (ReferenceEquals(SelectedRecentResult, item))
+        SelectedRecentResult = null;
+
+      RecentSynthesisResults.Remove(item);
+      NotifyRecentSynthesisResultsChanged();
+    }
+
+    private void ClearRecentResults()
+    {
+      if (RecentSynthesisResults.Count == 0)
+        return;
+
+      RecentSynthesisResults.Clear();
+      SelectedRecentResult = null;
+      NotifyRecentSynthesisResultsChanged();
+    }
+
+    /// <summary>After mutating <see cref="RecentSynthesisResults"/>, keep derived state and command gating in sync.</summary>
+    private void NotifyRecentSynthesisResultsChanged()
+    {
       OnPropertyChanged(nameof(HasRecentSynthesisResults));
+      RestoreRecentResultCommand.NotifyCanExecuteChanged();
+      RemoveRecentResultCommand.NotifyCanExecuteChanged();
+      ClearRecentResultsCommand.NotifyCanExecuteChanged();
     }
 
     private void RestoreRecentResult(VoiceSynthesisRecentResult? item)
@@ -2706,8 +2749,7 @@ namespace VoiceStudio.App.Views.Panels
           count++;
         }
 
-        OnPropertyChanged(nameof(HasRecentSynthesisResults));
-        RestoreRecentResultCommand.NotifyCanExecuteChanged();
+        NotifyRecentSynthesisResultsChanged();
       }
       catch (JsonException ex)
       {

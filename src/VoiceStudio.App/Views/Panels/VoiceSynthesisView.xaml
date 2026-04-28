@@ -396,9 +396,16 @@
             Background="{StaticResource VSQ.Panel.Background.DarkBrush}"
             CornerRadius="{StaticResource VSQ.CornerRadius.Panel}">
       <StackPanel Spacing="6">
-        <TextBlock Text="Recent generated audio"
-                   FontSize="12"
-                   Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <TextBlock Text="Recent generated audio"
+                     VerticalAlignment="Center"
+                     FontSize="12"
+                     Foreground="{StaticResource VSQ.Text.SecondaryBrush}"/>
+          <Button Content="Clear recent"
+                  AutomationProperties.AutomationId="VoiceSynthesisView_ClearRecentResultsButton"
+                  Command="{x:Bind ViewModel.ClearRecentResultsCommand}"
+                  ToolTipService.ToolTip="Remove all entries from this list (does not delete audio files)"/>
+        </StackPanel>
         <ListView ItemsSource="{x:Bind ViewModel.RecentSynthesisResults, Mode=OneWay}"
                   SelectedItem="{x:Bind ViewModel.SelectedRecentResult, Mode=TwoWay}"
                   SelectionMode="Single"
@@ -424,13 +431,23 @@
                              FontSize="11"
                              Foreground="{StaticResource VSQ.Text.TertiaryBrush}"/>
                 </StackPanel>
-                <Button Grid.Column="1"
-                        Content="Use"
-                        VerticalAlignment="Center"
-                        AutomationProperties.AutomationId="VoiceSynthesisView_RestoreRecentResultButton"
-                        Command="{Binding ViewModel.RestoreRecentResultCommand, ElementName=ThisView, Mode=OneWay}"
-                        CommandParameter="{x:Bind}"
-                        ToolTipService.ToolTip="Restore as the active generated audio result"/>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="4"
+                            VerticalAlignment="Center">
+                  <Button Content="Use"
+                          VerticalAlignment="Center"
+                          AutomationProperties.AutomationId="VoiceSynthesisView_RestoreRecentResultButton"
+                          Command="{Binding ViewModel.RestoreRecentResultCommand, ElementName=ThisView, Mode=OneWay}"
+                          CommandParameter="{x:Bind}"
+                          ToolTipService.ToolTip="Restore as the active generated audio result"/>
+                  <Button Content="Remove"
+                          VerticalAlignment="Center"
+                          AutomationProperties.AutomationId="VoiceSynthesisView_RemoveRecentResultButton"
+                          Command="{Binding ViewModel.RemoveRecentResultCommand, ElementName=ThisView, Mode=OneWay}"
+                          CommandParameter="{x:Bind}"
+                          ToolTipService.ToolTip="Remove this entry from the list (does not delete the file)"/>
+                </StackPanel>
               </Grid>
             </DataTemplate>
           </ListView.ItemTemplate>

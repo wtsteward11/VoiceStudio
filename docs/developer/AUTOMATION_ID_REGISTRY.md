@@ -176,6 +176,8 @@ Primary voice synthesis interface.
 | `VoiceSynthesisView_RecentResultsPanel` | Border | Recent synthesis results mini-list (in-memory, max 5) | v1.2.0 |
 | `VoiceSynthesisView_RecentResultsList` | ListView | Recent synthesis entries | v1.2.0 |
 | `VoiceSynthesisView_RestoreRecentResultButton` | Button | Restore a recent result as the active generated audio | v1.2.0 |
+| `VoiceSynthesisView_ClearRecentResultsButton` | Button | Clear all recent synthesis entries from the in-memory list | v1.2.0 |
+| `VoiceSynthesisView_RemoveRecentResultButton` | Button | Remove one recent synthesis entry from the in-memory list | v1.2.0 |
 | `VoiceSynthesisView_ErrorInfoBar` | InfoBar | Error display (hidden while consent callout is primary) | v1.0.0 |
 | `VoiceSynthesisView_LongFormToggle` | CheckBox | Long-form (chunked) synthesis mode | v1.2.0 |
 | `VoiceSynthesisView_LongFormProgressText` | TextBlock | Long-form processing status | v1.2.0 |

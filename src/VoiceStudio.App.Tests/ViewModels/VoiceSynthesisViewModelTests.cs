@@ -92,6 +92,8 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsNotNull(_sut.RetryPlaybackCommand);
       Assert.IsNotNull(_sut.CopyPlaybackErrorCommand);
       Assert.IsNotNull(_sut.RestoreRecentResultCommand);
+      Assert.IsNotNull(_sut.RemoveRecentResultCommand);
+      Assert.IsNotNull(_sut.ClearRecentResultsCommand);
       Assert.IsNotNull(_sut.StopAudioCommand);
     }
 
@@ -1339,6 +1341,153 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsFalse(el0.TryGetProperty("isPlaybackError", out _));
       Assert.IsTrue(el0.TryGetProperty("AudioId", out var aid));
       Assert.AreEqual("pe-err", aid.GetString());
+    }
+
+    #endregion
+
+    #region Recent results management tests
+
+    [TestMethod]
+    public async Task RemoveRecentResult_RemovesOneItem_NewestFirst()
+    {
+      await RunSuccessfulSynthesisAsync("rm-a", "/api/audio/rm-a");
+      await RunSuccessfulSynthesisAsync("rm-b", "/api/audio/rm-b");
+      var remove = _sut.RecentSynthesisResults[1];
+
+      _sut.RemoveRecentResultCommand.Execute(remove);
+
+      Assert.AreEqual(1, _sut.RecentSynthesisResults.Count);
+      Assert.AreEqual("rm-b", _sut.RecentSynthesisResults[0].AudioId);
+    }
+
+    [TestMethod]
+    public void RemoveRecentResult_UnknownItem_IsNoOp()
+    {
+      var orphan = new VoiceSynthesisRecentResult
+      {
+        AudioId = "not-in-list",
+        AudioReference = "/x",
+      };
+      Assert.AreEqual(0, _sut.RecentSynthesisResults.Count);
+      _sut.RemoveRecentResultCommand.Execute(orphan);
+      Assert.AreEqual(0, _sut.RecentSynthesisResults.Count);
+    }
+
+    [TestMethod]
+    public async Task RemoveRecentResult_PreservesActiveLastSynthesized_WhenRemovingOther()
+    {
+      await RunSuccessfulSynthesisAsync("keep-active", "/api/audio/keep-active");
+      await RunSuccessfulSynthesisAsync("newer", "/api/audio/newer");
+      Assert.AreEqual("newer", _sut.LastSynthesizedAudioId);
+
+      var older = _sut.RecentSynthesisResults[1];
+      _sut.RemoveRecentResultCommand.Execute(older);
+
+      Assert.AreEqual("newer", _sut.LastSynthesizedAudioId);
+      Assert.AreEqual("/api/audio/newer", _sut.LastSynthesizedAudioUrl);
+    }
+
+    [TestMethod]
+    public async Task ClearRecentResults_RemovesAllEntries()
+    {
+      await RunSuccessfulSynthesisAsync("c1", "/api/c1");
+      await RunSuccessfulSynthesisAsync("c2", "/api/c2");
+
+      _sut.ClearRecentResultsCommand.Execute(null);
+
+      Assert.AreEqual(0, _sut.RecentSynthesisResults.Count);
+      Assert.IsFalse(_sut.HasRecentSynthesisResults);
+    }
+
+    [TestMethod]
+    public async Task ClearRecentResults_PreservesActiveOutputAndPlaybackError()
+    {
+      await RunSuccessfulSynthesisAsync("active-pb", "/api/audio/active-pb");
+      await RunSuccessfulSynthesisAsync("second", "/api/audio/second");
+      MockAudioIdPlaybackPipelineThrowsInvalidOp();
+      await _sut.PlayAudioCommand.ExecuteAsync(null);
+      Assert.IsTrue(_sut.IsPlaybackError);
+      Assert.AreEqual("second", _sut.LastSynthesizedAudioId);
+
+      _sut.ClearRecentResultsCommand.Execute(null);
+
+      Assert.AreEqual("second", _sut.LastSynthesizedAudioId);
+      Assert.AreEqual("/api/audio/second", _sut.LastSynthesizedAudioUrl);
+      Assert.IsTrue(_sut.IsPlaybackError);
+      Assert.IsTrue(_sut.HasSynthesisResult);
+    }
+
+    [TestMethod]
+    public void ClearRecentResults_CanExecute_FalseWhenListEmpty()
+    {
+      Assert.IsFalse(_sut.ClearRecentResultsCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task ClearRecentResults_CanExecute_TrueWhenListNonEmpty()
+    {
+      await RunSuccessfulSynthesisAsync("ce-1", "/api/ce-1");
+      Assert.IsTrue(_sut.ClearRecentResultsCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task GetCurrentState_AfterRemove_ExcludesRemovedFromPersistence()
+    {
+      await RunSuccessfulSynthesisAsync("p-a", "/api/p-a");
+      await RunSuccessfulSynthesisAsync("p-b", "/api/p-b");
+      _sut.RemoveRecentResultCommand.Execute(_sut.RecentSynthesisResults[1]);
+
+      var state = _sut.GetCurrentState();
+      var json = state?.CustomData?[RecentResultsCustomKey] as string;
+      Assert.IsFalse(string.IsNullOrEmpty(json));
+      using var doc = JsonDocument.Parse(json!);
+      Assert.AreEqual(1, doc.RootElement.GetArrayLength());
+      Assert.AreEqual("p-b", doc.RootElement[0].GetProperty("AudioId").GetString());
+    }
+
+    [TestMethod]
+    public async Task GetCurrentState_AfterClear_OmitsRecentResultsKey()
+    {
+      await RunSuccessfulSynthesisAsync("oc-1", "/api/oc-1");
+      _sut.ClearRecentResultsCommand.Execute(null);
+
+      var state = _sut.GetCurrentState();
+      Assert.IsNotNull(state?.CustomData);
+      Assert.IsFalse(state!.CustomData!.ContainsKey(RecentResultsCustomKey));
+    }
+
+    [TestMethod]
+    public async Task RestoreState_AfterClearRoundTrip_KeepsRecentsEmpty()
+    {
+      await RunSuccessfulSynthesisAsync("rt-1", "/api/rt-1");
+      _sut.ClearRecentResultsCommand.Execute(null);
+      var state = _sut.GetCurrentState();
+
+      await _sut.RestoreStateAsync(state!, default);
+
+      Assert.IsFalse(_sut.HasRecentSynthesisResults);
+      Assert.AreEqual(0, _sut.RecentSynthesisResults.Count);
+    }
+
+    [TestMethod]
+    public async Task RecentResultsManagement_RefreshesHasAndClearCanExecute()
+    {
+      Assert.IsFalse(_sut.HasRecentSynthesisResults);
+      Assert.IsFalse(_sut.ClearRecentResultsCommand.CanExecute(null));
+
+      await RunSuccessfulSynthesisAsync("rf-1", "/api/rf-1");
+      Assert.IsTrue(_sut.HasRecentSynthesisResults);
+      Assert.IsTrue(_sut.ClearRecentResultsCommand.CanExecute(null));
+
+      _sut.ClearRecentResultsCommand.Execute(null);
+      Assert.IsFalse(_sut.HasRecentSynthesisResults);
+      Assert.IsFalse(_sut.ClearRecentResultsCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public void RemoveRecentResultCommand_CanExecute_FalseForNull()
+    {
+      Assert.IsFalse(_sut.RemoveRecentResultCommand.CanExecute(null));
     }
 
     #endregion

@@ -173,6 +173,9 @@ Primary voice synthesis interface.
 | `VoiceSynthesisView_PlaybackErrorInfoBar` | InfoBar | Playback error diagnostics and recovery | v1.2.0 |
 | `VoiceSynthesisView_RetryPlaybackButton` | Button | Retry failed playback | v1.2.0 |
 | `VoiceSynthesisView_CopyPlaybackErrorButton` | Button | Copy playback error details to clipboard | v1.2.0 |
+| `VoiceSynthesisView_RecentResultsPanel` | Border | Recent synthesis results mini-list (in-memory, max 5) | v1.2.0 |
+| `VoiceSynthesisView_RecentResultsList` | ListView | Recent synthesis entries | v1.2.0 |
+| `VoiceSynthesisView_RestoreRecentResultButton` | Button | Restore a recent result as the active generated audio | v1.2.0 |
 | `VoiceSynthesisView_ErrorInfoBar` | InfoBar | Error display (hidden while consent callout is primary) | v1.0.0 |
 | `VoiceSynthesisView_LongFormToggle` | CheckBox | Long-form (chunked) synthesis mode | v1.2.0 |
 | `VoiceSynthesisView_LongFormProgressText` | TextBlock | Long-form processing status | v1.2.0 |

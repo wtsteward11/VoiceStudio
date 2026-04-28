@@ -36,6 +36,54 @@ namespace VoiceStudio.App.Views.Panels
     Error
   }
 
+  /// <summary>
+  /// In-memory entry for the Voice Synthesis recent-results mini-list (not persisted; max 5 in VM).
+  /// </summary>
+  public sealed class VoiceSynthesisRecentResult
+  {
+    public string? AudioId { get; init; }
+    public string? AudioReference { get; init; }
+    public TimeSpan Duration { get; init; }
+    public double QualityScore { get; init; }
+    public string? ProfileId { get; init; }
+    public string? ProfileName { get; init; }
+    public string? Engine { get; init; }
+    public DateTime CreatedAtLocal { get; init; }
+
+    public string Summary
+    {
+      get
+      {
+        if (!string.IsNullOrWhiteSpace(AudioId))
+          return AudioId.Length > 12 ? string.Concat(AudioId.AsSpan(0, 12), "…") : AudioId;
+        if (!string.IsNullOrWhiteSpace(AudioReference))
+          return AudioReference.Length > 32 ? string.Concat(AudioReference.AsSpan(0, 32), "…") : AudioReference;
+        return "(unknown)";
+      }
+    }
+
+    public string DetailLine
+    {
+      get
+      {
+        var eng = string.IsNullOrWhiteSpace(Engine) ? "—" : Engine;
+        var prof = string.IsNullOrWhiteSpace(ProfileName) ? "—" : ProfileName;
+        var t = Duration < TimeSpan.Zero ? TimeSpan.Zero : Duration;
+        var dur = string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            "{0}:{1:D2}",
+            (int)t.TotalMinutes,
+            t.Seconds);
+        var qs = QualityScore > 0
+            ? string.Format(System.Globalization.CultureInfo.CurrentCulture, " · {0:P0}", QualityScore)
+            : string.Empty;
+        return $"{eng} · {dur} · {prof}{qs}";
+      }
+    }
+
+    public string CreatedAtLabel => CreatedAtLocal.ToString("g", System.Globalization.CultureInfo.CurrentCulture);
+  }
+
   // GAP-005: Updated to inherit from BaseViewModel for standardized error handling
   public partial class VoiceSynthesisViewModel : BaseViewModel, IPanelView, IPanelLifecycle, IPanelStatePersistable
   {
@@ -176,6 +224,16 @@ namespace VoiceStudio.App.Views.Panels
 
     [ObservableProperty]
     private string? playbackErrorAudioReference;
+
+    private const int MaxRecentSynthesisResults = 5;
+
+    /// <summary>Observable collection of recent synthesis outputs (newest first; max <see cref="MaxRecentSynthesisResults"/>).</summary>
+    public ObservableCollection<VoiceSynthesisRecentResult> RecentSynthesisResults { get; } = new();
+
+    [ObservableProperty]
+    private VoiceSynthesisRecentResult? selectedRecentResult;
+
+    public bool HasRecentSynthesisResults => RecentSynthesisResults.Count > 0;
 
     [ObservableProperty]
     private SynthesisWorkflowState workflowState = SynthesisWorkflowState.Idle;
@@ -425,6 +483,10 @@ namespace VoiceStudio.App.Views.Panels
           CopyPlaybackErrorToClipboard,
           () => IsPlaybackError && !string.IsNullOrWhiteSpace(PlaybackErrorMessage));
 
+      RestoreRecentResultCommand = new RelayCommand<VoiceSynthesisRecentResult>(
+          RestoreRecentResult,
+          r => r != null);
+
       OpenProfileConsentCommand = new RelayCommand(
           OpenProfileConsent,
           () => IsConsentRequired && !string.IsNullOrEmpty(ConsentRequiredProfileId));
@@ -557,6 +619,7 @@ namespace VoiceStudio.App.Views.Panels
     public IRelayCommand OpenOutputLocationCommand { get; }
     public EnhancedAsyncRelayCommand RetryPlaybackCommand { get; }
     public IRelayCommand CopyPlaybackErrorCommand { get; }
+    public IRelayCommand RestoreRecentResultCommand { get; }
     public IRelayCommand OpenProfileConsentCommand { get; }
     public EnhancedAsyncRelayCommand RetrySynthesisCommand { get; }
     public IRelayCommand AddToTimelineCommand { get; }
@@ -929,6 +992,15 @@ namespace VoiceStudio.App.Views.Panels
             : WorkflowState;
         PlayAudioCommand.NotifyCanExecuteChanged();
         AddToTimelineCommand.NotifyCanExecuteChanged();
+
+        AddRecentSynthesisResult(
+            response.AudioId,
+            response.AudioUrl,
+            response.Duration,
+            response.QualityScore,
+            SelectedProfile?.Id,
+            SelectedProfile?.Name,
+            SelectedEngine);
 
         StatusMessage = ResourceHelper.FormatString("Status.SynthesisComplete", response.Duration, response.QualityScore);
 
@@ -1477,6 +1549,50 @@ namespace VoiceStudio.App.Views.Panels
     public void DismissPlaybackError()
     {
       ClearPlaybackError();
+    }
+
+    private void AddRecentSynthesisResult(
+        string? audioId,
+        string? audioReference,
+        double durationSeconds,
+        double qualityScore,
+        string? profileId,
+        string? profileName,
+        string? engine)
+    {
+      if (string.IsNullOrWhiteSpace(audioId) && string.IsNullOrWhiteSpace(audioReference))
+        return;
+
+      var result = new VoiceSynthesisRecentResult
+      {
+        AudioId = string.IsNullOrWhiteSpace(audioId) ? null : audioId,
+        AudioReference = string.IsNullOrWhiteSpace(audioReference) ? null : audioReference,
+        Duration = TimeSpan.FromSeconds(Math.Max(0, durationSeconds)),
+        QualityScore = qualityScore,
+        ProfileId = profileId,
+        ProfileName = profileName,
+        Engine = engine,
+        CreatedAtLocal = DateTime.Now,
+      };
+      RecentSynthesisResults.Insert(0, result);
+      while (RecentSynthesisResults.Count > MaxRecentSynthesisResults)
+        RecentSynthesisResults.RemoveAt(RecentSynthesisResults.Count - 1);
+      OnPropertyChanged(nameof(HasRecentSynthesisResults));
+    }
+
+    private void RestoreRecentResult(VoiceSynthesisRecentResult? item)
+    {
+      if (item is null)
+        return;
+
+      LastSynthesizedAudioId = item.AudioId ?? string.Empty;
+      LastSynthesizedAudioUrl = item.AudioReference ?? string.Empty;
+      LastSynthesizedDuration = item.Duration;
+      WorkflowState = SynthesisWorkflowState.AudioReady;
+      ClearPlaybackError();
+      RefreshSynthesisResultState();
+      PlayAudioCommand.NotifyCanExecuteChanged();
+      AddToTimelineCommand.NotifyCanExecuteChanged();
     }
 
     private void CopyPlaybackErrorToClipboard()
@@ -2110,7 +2226,22 @@ namespace VoiceStudio.App.Views.Panels
             }
 
             var qualityScore = QualityMetrics?.MosScore ?? 0.0;
+            LastSynthesizedDuration = TimeSpan.Zero;
             PlayAudioCommand.NotifyCanExecuteChanged();
+            AddToTimelineCommand.NotifyCanExecuteChanged();
+
+            var engineLabel = SelectedEngines.Count > 0
+                ? string.Join(", ", SelectedEngines)
+                : SelectedEngine;
+            AddRecentSynthesisResult(
+                status.EnsembleAudioId,
+                $"/api/audio/{status.EnsembleAudioId}",
+                0.0,
+                qualityScore,
+                SelectedProfile?.Id,
+                SelectedProfile?.Name,
+                engineLabel);
+
             _toastNotificationService?.ShowSuccess(
                 "Ensemble Complete",
                 $"Best engine selected. MOS Score: {qualityScore:F2}"

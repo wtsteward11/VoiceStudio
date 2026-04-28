@@ -90,6 +90,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsNotNull(_sut.PlayAudioCommand);
       Assert.IsNotNull(_sut.RetryPlaybackCommand);
       Assert.IsNotNull(_sut.CopyPlaybackErrorCommand);
+      Assert.IsNotNull(_sut.RestoreRecentResultCommand);
       Assert.IsNotNull(_sut.StopAudioCommand);
     }
 
@@ -1025,6 +1026,121 @@ namespace VoiceStudio.App.Tests.ViewModels
       await _sut.PlayAudioCommand.ExecuteAsync(null);
 
       Assert.IsTrue(_sut.CopyPlaybackErrorCommand.CanExecute(null));
+    }
+
+    #endregion
+
+    #region Recent results tests
+
+    private async Task RunMultipleSynthesesAsync(int count)
+    {
+      for (var i = 0; i < count; i++)
+        await RunSuccessfulSynthesisAsync($"id-{i}", $"/api/audio/{i}");
+    }
+
+    [TestMethod]
+    public async Task SuccessfulSynthesis_AddsOneRecentResult()
+    {
+      await RunSuccessfulSynthesisAsync("r1", "/api/audio/r1");
+
+      Assert.AreEqual(1, _sut.RecentSynthesisResults.Count);
+    }
+
+    [TestMethod]
+    public async Task FailedSynthesis_DoesNotAddRecentResult()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new InvalidOperationException("Synthesis failed"));
+
+      await ((IAsyncRelayCommand)_sut.SynthesizeCommand).ExecuteAsync(default);
+
+      Assert.AreEqual(0, _sut.RecentSynthesisResults.Count);
+    }
+
+    [TestMethod]
+    public async Task RecentResults_AreNewestFirst()
+    {
+      await RunSuccessfulSynthesisAsync("first", "/api/audio/first");
+      await RunSuccessfulSynthesisAsync("second", "/api/audio/second");
+
+      Assert.AreEqual("second", _sut.RecentSynthesisResults[0].AudioId);
+      Assert.AreEqual("first", _sut.RecentSynthesisResults[1].AudioId);
+    }
+
+    [TestMethod]
+    public async Task RecentResults_TrimToFive()
+    {
+      await RunMultipleSynthesesAsync(6);
+
+      Assert.AreEqual(5, _sut.RecentSynthesisResults.Count);
+      Assert.AreEqual("id-5", _sut.RecentSynthesisResults[0].AudioId);
+      Assert.AreEqual("id-1", _sut.RecentSynthesisResults[4].AudioId);
+    }
+
+    [TestMethod]
+    public async Task RecentResult_CapturesAudioIdAndReference()
+    {
+      await RunSuccessfulSynthesisAsync("cap-id", "/api/audio/cap-ref");
+
+      Assert.AreEqual("cap-id", _sut.RecentSynthesisResults[0].AudioId);
+      Assert.AreEqual("/api/audio/cap-ref", _sut.RecentSynthesisResults[0].AudioReference);
+    }
+
+    [TestMethod]
+    public async Task RecentResult_CapturesProfileAndEngine()
+    {
+      await RunSuccessfulSynthesisAsync("pe-1", "/api/audio/pe-1");
+
+      Assert.AreEqual("P", _sut.RecentSynthesisResults[0].ProfileName);
+      Assert.AreEqual("p1", _sut.RecentSynthesisResults[0].ProfileId);
+      Assert.AreEqual("xtts", _sut.RecentSynthesisResults[0].Engine);
+    }
+
+    [TestMethod]
+    public async Task RestoreRecentResult_SetsActiveAudioIdAndUrl()
+    {
+      await RunSuccessfulSynthesisAsync("a", "/api/audio/a");
+      await RunSuccessfulSynthesisAsync("b", "/api/audio/b");
+      var older = _sut.RecentSynthesisResults[1];
+
+      _sut.RestoreRecentResultCommand.Execute(older);
+
+      Assert.AreEqual("a", _sut.LastSynthesizedAudioId);
+      Assert.AreEqual("/api/audio/a", _sut.LastSynthesizedAudioUrl);
+    }
+
+    [TestMethod]
+    public async Task RestoreRecentResult_SetsAudioReadyAndCanPlay()
+    {
+      await RunSuccessfulSynthesisAsync("ar-1", "/api/audio/ar-1");
+      _sut.WorkflowState = SynthesisWorkflowState.Idle;
+
+      _sut.RestoreRecentResultCommand.Execute(_sut.RecentSynthesisResults[0]);
+
+      Assert.AreEqual(SynthesisWorkflowState.AudioReady, _sut.WorkflowState);
+      Assert.IsTrue(_sut.CanPlayAudio);
+    }
+
+    [TestMethod]
+    public async Task RestoreRecentResult_ClearsPlaybackError()
+    {
+      await RunSuccessfulSynthesisAsync("pb-1", "/api/audio/pb-1");
+      MockAudioIdPlaybackPipelineThrowsInvalidOp();
+      await _sut.PlayAudioCommand.ExecuteAsync(null);
+      Assert.IsTrue(_sut.IsPlaybackError);
+
+      _sut.RestoreRecentResultCommand.Execute(_sut.RecentSynthesisResults[0]);
+
+      Assert.IsFalse(_sut.IsPlaybackError);
+    }
+
+    [TestMethod]
+    public void RestoreCommand_DisabledForNull()
+    {
+      Assert.IsFalse(_sut.RestoreRecentResultCommand.CanExecute(null));
     }
 
     #endregion

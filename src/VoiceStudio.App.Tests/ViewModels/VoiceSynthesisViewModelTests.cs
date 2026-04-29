@@ -83,7 +83,8 @@ namespace VoiceStudio.App.Tests.ViewModels
               null,
               "proj-x",
               "tr-x",
-              "clip-x"));
+              "clip-x",
+              12.5));
 
       _sut = new VoiceSynthesisViewModel(
           _mockVoiceSynthesisService.Object,
@@ -123,6 +124,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsNotNull(_sut.ClearRecentResultsCommand);
       Assert.IsNotNull(_sut.StopAudioCommand);
       Assert.IsNotNull(_sut.AddGeneratedAudioToTimelineCommand);
+      Assert.IsNotNull(_sut.CopyWorkflowEvidenceCommand);
     }
 
     [TestMethod]
@@ -2215,6 +2217,9 @@ namespace VoiceStudio.App.Tests.ViewModels
           Times.Once);
       Assert.IsTrue(_sut.IsGeneratedAudioAddedToTimeline);
       Assert.IsFalse(_sut.CanAddGeneratedAudioToTimeline);
+      Assert.AreEqual("clip-x", _sut.LastTimelineClipId);
+      Assert.AreEqual("tr-x", _sut.LastTimelineTrackId);
+      Assert.AreEqual(12.5, _sut.LastTimelinePlacementStartSeconds);
     }
 
     [TestMethod]
@@ -2255,7 +2260,7 @@ namespace VoiceStudio.App.Tests.ViewModels
       await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
 
       Assert.IsFalse(_sut.IsGeneratedAudioAddedToTimeline);
-      StringAssert.Contains(_sut.GeneratedAudioTimelineStatus, "safe");
+      StringAssert.Contains(_sut.GeneratedAudioTimelineStatus, "placement", StringComparison.OrdinalIgnoreCase);
     }
 
     [TestMethod]
@@ -2414,6 +2419,87 @@ namespace VoiceStudio.App.Tests.ViewModels
       await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
 
       Assert.IsTrue(_sut.IsGeneratedAudioSaved);
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_NewSynthesisClears_ClipAndTrackAndPlacement()
+    {
+      await RunSuccessfulSynthesisAsync("clear-tl-1", "/api/audio/clear-tl-1");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+      Assert.AreEqual("clip-x", _sut.LastTimelineClipId);
+
+      await RunSuccessfulSynthesisAsync("clear-tl-2", "/api/audio/clear-tl-2");
+
+      Assert.IsNull(_sut.LastTimelineClipId);
+      Assert.IsNull(_sut.LastTimelineTrackId);
+      Assert.IsNull(_sut.LastTimelinePlacementStartSeconds);
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_RestoreRecentResult_RestoresClipAndTrackId()
+    {
+      await RunSuccessfulSynthesisAsync("restore-ids", "/api/audio/restore-ids");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+      Assert.AreEqual("clip-x", _sut.RecentSynthesisResults[0].TimelineClipId);
+
+      await RunSuccessfulSynthesisAsync("z-other", "/api/audio/z-other");
+      var row = _sut.RecentSynthesisResults.First(r => r.AudioId == "restore-ids");
+      _sut.RestoreRecentResultCommand.Execute(row);
+
+      Assert.AreEqual("clip-x", _sut.LastTimelineClipId);
+      Assert.AreEqual("tr-x", _sut.LastTimelineTrackId);
+      Assert.AreEqual(12.5, _sut.LastTimelinePlacementStartSeconds);
+    }
+
+    [TestMethod]
+    public async Task TimelineOutput_PlacementUnavailable_SurfacesActionableMessage()
+    {
+      _mockTimelineService
+          .Setup(t => t.AddGeneratedClipAsync(It.IsAny<GeneratedAudioTimelineRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new GeneratedAudioTimelineResult(
+              false,
+              GeneratedAudioTimelineKind.PlacementUnavailable,
+              "Cannot determine a safe start time for this track.",
+              "proj-1",
+              "tr-1",
+              null,
+              null));
+
+      await RunSuccessfulSynthesisAsync("tl-pu-msg", "/api/audio/tl-pu-msg");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+
+      Assert.AreEqual(
+          "Timeline placement unavailable: existing clips have no valid timing.",
+          _sut.GeneratedAudioTimelineStatus);
+    }
+
+    [TestMethod]
+    public void WorkflowEvidence_CanCopyWorkflowEvidence_FalseBeforeResult()
+    {
+      Assert.IsFalse(_sut.CanCopyWorkflowEvidence);
+      Assert.IsFalse(_sut.CopyWorkflowEvidenceCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task WorkflowEvidence_CanCopyWorkflowEvidence_TrueAfterResult()
+    {
+      await RunSuccessfulSynthesisAsync("ev1", "/api/audio/ev1");
+      Assert.IsTrue(_sut.CanCopyWorkflowEvidence);
+      Assert.IsTrue(_sut.CopyWorkflowEvidenceCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task WorkflowEvidence_SummaryReflectsLibraryAndTimelineAfterCommands()
+    {
+      await RunSuccessfulSynthesisAsync("ev2", "/api/audio/ev2");
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToLibraryCommand).ExecuteAsync(default);
+      await ((IAsyncRelayCommand)_sut.AddGeneratedAudioToTimelineCommand).ExecuteAsync(default);
+
+      StringAssert.Contains(_sut.SynthesisResultSummary, "ev2");
+      StringAssert.Contains(_sut.SynthesisResultSummary, "Library:");
+      StringAssert.Contains(_sut.SynthesisResultSummary, "Timeline:");
+      StringAssert.Contains(_sut.SynthesisResultSummary, "tr-x");
+      StringAssert.Contains(_sut.SynthesisResultSummary, "clip-x");
     }
 
     [TestMethod]

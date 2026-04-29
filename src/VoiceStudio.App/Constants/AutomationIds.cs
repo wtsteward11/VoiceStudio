@@ -79,6 +79,7 @@ public static class AutomationIds
         public const string PlayButton = "VoiceSynthesisView_PlayButton";
         public const string StopButton = "VoiceSynthesisView_StopButton";
         public const string AddToTimelineButton = "VoiceSynthesisView_AddToTimelineButton";
+        public const string CopyWorkflowEvidenceButton = "VoiceSynthesisView_CopyWorkflowEvidenceButton";
         public const string AnalyzeButton = "VoiceSynthesisView_AnalyzeButton";
         public const string RefreshButton = "VoiceSynthesisView_RefreshButton";
         public const string HelpButton = "VoiceSynthesisView_HelpButton";

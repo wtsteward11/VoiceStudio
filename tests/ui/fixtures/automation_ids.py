@@ -49,6 +49,7 @@ PANELS_BY_CATEGORY: dict[str, list[PanelInfo]] = {
                 "VoiceSynthesisView_StopButton",
                 "VoiceSynthesisView_AddToTimelineButton",
                 "VoiceSynthesisView_AddGeneratedAudioToTimelineButton",
+                "VoiceSynthesisView_CopyWorkflowEvidenceButton",
                 "VoiceSynthesisView_GeneratedAudioTimelineStatus",
                 "VoiceSynthesisView_AnalyzeButton",
             ],

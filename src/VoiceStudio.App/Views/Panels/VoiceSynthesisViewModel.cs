@@ -110,6 +110,21 @@ namespace VoiceStudio.App.Views.Panels
 
     private DateTime? _addedToTimelineAtLocal;
 
+    /// <summary>Library asset id when this row was saved (evidence / restore).</summary>
+    public string? LibraryAssetId { get; set; }
+
+    /// <summary>Library save classification when this row was saved.</summary>
+    public GeneratedAudioSaveKind? LibrarySaveKind { get; set; }
+
+    /// <summary>Last timeline clip id for this recent row (when successfully added).</summary>
+    public string? TimelineClipId { get; set; }
+
+    /// <summary>Last timeline track id for this recent row (when successfully added).</summary>
+    public string? TimelineTrackId { get; set; }
+
+    /// <summary>Placement start in seconds when the clip was added to the timeline.</summary>
+    public double? TimelinePlacementStartSeconds { get; set; }
+
     /// <summary>Local time when <see cref="IsAddedToTimeline"/> was set true, if applicable.</summary>
     public DateTime? AddedToTimelineAtLocal
     {
@@ -157,7 +172,22 @@ namespace VoiceStudio.App.Views.Panels
         var qs = QualityScore > 0
             ? string.Format(System.Globalization.CultureInfo.CurrentCulture, " · {0:P0}", QualityScore)
             : string.Empty;
-        return $"{eng} · {dur} · {prof}{qs}";
+        var baseLine = $"{eng} · {dur} · {prof}{qs}";
+        if (!string.IsNullOrWhiteSpace(TimelineClipId) && !string.IsNullOrWhiteSpace(TimelineTrackId))
+        {
+          var clipShort = TimelineClipId.Length > 10
+              ? string.Concat(TimelineClipId.AsSpan(0, 10), "…")
+              : TimelineClipId;
+          var at = TimelinePlacementStartSeconds.HasValue
+              ? string.Format(
+                  System.Globalization.CultureInfo.InvariantCulture,
+                  " @ {0:F1}s",
+                  TimelinePlacementStartSeconds.Value)
+              : string.Empty;
+          return $"{baseLine} · timeline {clipShort}{at}";
+        }
+
+        return baseLine;
       }
     }
 
@@ -381,9 +411,33 @@ namespace VoiceStudio.App.Views.Panels
           parts.Add($"Audio ID: {LastSynthesizedAudioId}");
         if (!string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl))
           parts.Add($"Reference: {LastSynthesizedAudioUrl}");
+        if (!string.IsNullOrWhiteSpace(GeneratedAudioSaveStatus))
+          parts.Add($"Library: {GeneratedAudioSaveStatus}");
+        if (!string.IsNullOrWhiteSpace(GeneratedAudioTimelineStatus))
+          parts.Add($"Timeline: {GeneratedAudioTimelineStatus}");
+        if (!string.IsNullOrWhiteSpace(LastTimelineTrackId) && !string.IsNullOrWhiteSpace(LastTimelineClipId))
+        {
+          var clipShort = LastTimelineClipId.Length > 12
+              ? string.Concat(LastTimelineClipId.AsSpan(0, 12), "…")
+              : LastTimelineClipId;
+          var trackShort = LastTimelineTrackId.Length > 12
+              ? string.Concat(LastTimelineTrackId.AsSpan(0, 12), "…")
+              : LastTimelineTrackId;
+          var at = LastTimelinePlacementStartSeconds.HasValue
+              ? string.Format(
+                  System.Globalization.CultureInfo.InvariantCulture,
+                  " @ {0:F1}s",
+                  LastTimelinePlacementStartSeconds.Value)
+              : string.Empty;
+          parts.Add($"Track / clip: {trackShort} / {clipShort}{at}");
+        }
+
         return string.Join(Environment.NewLine, parts);
       }
     }
+
+    /// <summary>Copy a compact workflow evidence block (support / proof-prep UX).</summary>
+    public bool CanCopyWorkflowEvidence => HasSynthesisResult;
 
     public bool CanCopyAudioId => HasSynthesisResult && !string.IsNullOrWhiteSpace(LastSynthesizedAudioId);
 
@@ -426,6 +480,22 @@ namespace VoiceStudio.App.Views.Panels
 
     [ObservableProperty]
     private TimeSpan lastSynthesizedDuration;
+
+    /// <summary>Last successful timeline add — track id (inspectable / evidence).</summary>
+    [ObservableProperty]
+    private string? lastTimelineTrackId;
+
+    /// <summary>Last successful timeline add — clip id (inspectable / evidence).</summary>
+    [ObservableProperty]
+    private string? lastTimelineClipId;
+
+    /// <summary>Last successful timeline add — placement start in seconds when known.</summary>
+    [ObservableProperty]
+    private double? lastTimelinePlacementStartSeconds;
+
+    /// <summary>Save kind from the last successful library registration (for evidence copy).</summary>
+    [ObservableProperty]
+    private GeneratedAudioSaveKind? lastLibrarySaveKind;
 
     [ObservableProperty]
     private RealTimeQualityFeedback? realTimeQualityFeedback;
@@ -647,6 +717,7 @@ namespace VoiceStudio.App.Views.Panels
       CopyAudioIdCommand = new RelayCommand(CopyAudioIdToClipboard, () => CanCopyAudioId);
       CopyAudioReferenceCommand = new RelayCommand(CopyAudioReferenceToClipboard, () => CanCopyAudioReference);
       OpenOutputLocationCommand = new RelayCommand(OpenOutputLocation, () => CanOpenOutputLocation);
+      CopyWorkflowEvidenceCommand = new RelayCommand(CopyWorkflowEvidenceToClipboard, () => CanCopyWorkflowEvidence);
 
       RetryPlaybackCommand = new EnhancedAsyncRelayCommand(async (ct) =>
       {
@@ -827,6 +898,7 @@ namespace VoiceStudio.App.Views.Panels
     public IRelayCommand CopyAudioIdCommand { get; }
     public IRelayCommand CopyAudioReferenceCommand { get; }
     public IRelayCommand OpenOutputLocationCommand { get; }
+    public IRelayCommand CopyWorkflowEvidenceCommand { get; }
     public EnhancedAsyncRelayCommand RetryPlaybackCommand { get; }
     public IRelayCommand CopyPlaybackErrorCommand { get; }
     public IRelayCommand RestoreRecentResultCommand { get; }
@@ -1128,9 +1200,13 @@ namespace VoiceStudio.App.Views.Panels
       IsGeneratedAudioSaved = false;
       GeneratedAudioSaveStatus = string.Empty;
       _lastSavedLibraryAssetId = null;
+      LastLibrarySaveKind = null;
       _lastSynthesisQualityScore = 0;
       IsGeneratedAudioAddedToTimeline = false;
       GeneratedAudioTimelineStatus = string.Empty;
+      LastTimelineTrackId = null;
+      LastTimelineClipId = null;
+      LastTimelinePlacementStartSeconds = null;
     }
 
     // Quality metrics display properties
@@ -1431,6 +1507,9 @@ namespace VoiceStudio.App.Views.Panels
         _lastSynthesisQualityScore = response.QualityScore;
         IsGeneratedAudioAddedToTimeline = false;
         GeneratedAudioTimelineStatus = string.Empty;
+        LastTimelineTrackId = null;
+        LastTimelineClipId = null;
+        LastTimelinePlacementStartSeconds = null;
         WorkflowState = (!string.IsNullOrWhiteSpace(LastSynthesizedAudioUrl) ||
                          !string.IsNullOrWhiteSpace(LastSynthesizedAudioId))
             ? SynthesisWorkflowState.AudioReady
@@ -1882,6 +1961,32 @@ namespace VoiceStudio.App.Views.Panels
           ResourceHelper.GetString("VoiceSynthesis.AudioReferenceCopiedDetail", "Audio reference copied to clipboard"));
     }
 
+    private void CopyWorkflowEvidenceToClipboard()
+    {
+      if (!CanCopyWorkflowEvidence)
+        return;
+
+      var inv = System.Globalization.CultureInfo.InvariantCulture;
+      var sb = new StringBuilder();
+      sb.AppendLine($"Audio ID: {LastSynthesizedAudioId ?? "(none)"}");
+      sb.AppendLine($"Reference: {LastSynthesizedAudioUrl ?? "(none)"}");
+      var libLine = IsGeneratedAudioSaved
+          ? $"{GeneratedAudioSaveStatus} (kind={LastLibrarySaveKind?.ToString() ?? "?"}, asset={_lastSavedLibraryAssetId ?? "?"})"
+          : (string.IsNullOrWhiteSpace(GeneratedAudioSaveStatus) ? "Not saved" : GeneratedAudioSaveStatus);
+      sb.AppendLine($"Library: {libLine}");
+      var placementText = LastTimelinePlacementStartSeconds.HasValue
+          ? LastTimelinePlacementStartSeconds.Value.ToString("F1", inv)
+          : "?";
+      var tlLine = IsGeneratedAudioAddedToTimeline
+          ? $"{GeneratedAudioTimelineStatus} (track={LastTimelineTrackId ?? "?"}, clip={LastTimelineClipId ?? "?"}, placement={placementText}s)"
+          : (string.IsNullOrWhiteSpace(GeneratedAudioTimelineStatus) ? "Not on timeline" : GeneratedAudioTimelineStatus);
+      sb.AppendLine($"Timeline: {tlLine}");
+      CopyTextToClipboard(
+          sb.ToString().TrimEnd(),
+          ResourceHelper.GetString("VoiceSynthesis.WorkflowEvidenceCopied", "Copied"),
+          ResourceHelper.GetString("VoiceSynthesis.WorkflowEvidenceCopiedDetail", "Workflow evidence copied to clipboard"));
+    }
+
     private void CopyTextToClipboard(string? text, string title, string message)
     {
       if (string.IsNullOrWhiteSpace(text))
@@ -1976,6 +2081,7 @@ namespace VoiceStudio.App.Views.Panels
       CopyAudioIdCommand.NotifyCanExecuteChanged();
       CopyAudioReferenceCommand.NotifyCanExecuteChanged();
       OpenOutputLocationCommand.NotifyCanExecuteChanged();
+      CopyWorkflowEvidenceCommand.NotifyCanExecuteChanged();
       RefreshPlaybackErrorCommandState();
       RefreshLibraryOutputState();
       RefreshTimelineOutputState();
@@ -1999,11 +2105,43 @@ namespace VoiceStudio.App.Views.Panels
     partial void OnIsGeneratedAudioSavedChanged(bool value)
     {
       AddGeneratedAudioToLibraryCommand.NotifyCanExecuteChanged();
+      OnPropertyChanged(nameof(SynthesisResultSummary));
     }
 
     partial void OnIsGeneratedAudioAddedToTimelineChanged(bool value)
     {
       RefreshTimelineOutputState();
+      OnPropertyChanged(nameof(SynthesisResultSummary));
+    }
+
+    partial void OnGeneratedAudioSaveStatusChanged(string value)
+    {
+      OnPropertyChanged(nameof(SynthesisResultSummary));
+    }
+
+    partial void OnGeneratedAudioTimelineStatusChanged(string value)
+    {
+      OnPropertyChanged(nameof(SynthesisResultSummary));
+    }
+
+    partial void OnLastTimelineTrackIdChanged(string? value)
+    {
+      OnPropertyChanged(nameof(SynthesisResultSummary));
+    }
+
+    partial void OnLastTimelineClipIdChanged(string? value)
+    {
+      OnPropertyChanged(nameof(SynthesisResultSummary));
+    }
+
+    partial void OnLastTimelinePlacementStartSecondsChanged(double? value)
+    {
+      OnPropertyChanged(nameof(SynthesisResultSummary));
+    }
+
+    partial void OnLastLibrarySaveKindChanged(GeneratedAudioSaveKind? value)
+    {
+      OnPropertyChanged(nameof(SynthesisResultSummary));
     }
 
     private void ClearPlaybackError()
@@ -2100,6 +2238,11 @@ namespace VoiceStudio.App.Views.Panels
       LastSynthesizedAudioUrl = item.AudioReference ?? string.Empty;
       LastSynthesizedDuration = item.Duration;
       _lastSynthesisQualityScore = item.QualityScore;
+      _lastSavedLibraryAssetId = item.LibraryAssetId;
+      LastLibrarySaveKind = item.LibrarySaveKind;
+      LastTimelineTrackId = item.TimelineTrackId;
+      LastTimelineClipId = item.TimelineClipId;
+      LastTimelinePlacementStartSeconds = item.TimelinePlacementStartSeconds;
       WorkflowState = SynthesisWorkflowState.AudioReady;
       IsGeneratedAudioSaved = item.IsSavedToLibrary;
       GeneratedAudioSaveStatus = item.IsSavedToLibrary
@@ -2489,6 +2632,7 @@ namespace VoiceStudio.App.Views.Panels
       if (result.Success)
       {
         _lastSavedLibraryAssetId = result.AssetId;
+        LastLibrarySaveKind = result.SaveKind;
         IsGeneratedAudioSaved = true;
         GeneratedAudioSaveStatus = result.SaveKind switch
         {
@@ -2505,7 +2649,8 @@ namespace VoiceStudio.App.Views.Panels
         };
         MarkMatchingRecentResultSaved(
             string.IsNullOrWhiteSpace(request.AudioId) ? null : request.AudioId,
-            request.AudioReference);
+            request.AudioReference,
+            result);
         var toastBody = result.SaveKind switch
         {
           GeneratedAudioSaveKind.ProjectBacked => "Audio saved to project library",
@@ -2523,15 +2668,16 @@ namespace VoiceStudio.App.Views.Panels
       }
       else
       {
-        GeneratedAudioSaveStatus = string.IsNullOrWhiteSpace(result.ErrorMessage)
-            ? "Save failed"
-            : $"Save failed — {result.ErrorMessage}";
-        _toastNotificationService?.ShowWarning("Library", result.ErrorMessage ?? "Save failed");
+        GeneratedAudioSaveStatus = FormatLibrarySaveFailureMessage(result);
+        _toastNotificationService?.ShowWarning("Library", GeneratedAudioSaveStatus);
       }
     }
 
     /// <summary>Marks the matching recent-results row as saved (same audio id or reference as active output).</summary>
-    private void MarkMatchingRecentResultSaved(string? audioId, string? audioReference)
+    private void MarkMatchingRecentResultSaved(
+        string? audioId,
+        string? audioReference,
+        GeneratedAudioSaveResult? saveResult = null)
     {
       var now = DateTime.Now;
       foreach (var row in RecentSynthesisResults)
@@ -2544,13 +2690,22 @@ namespace VoiceStudio.App.Views.Panels
         {
           row.IsSavedToLibrary = true;
           row.SavedAtLocal = now;
+          if (saveResult is { Success: true })
+          {
+            row.LibraryAssetId = saveResult.AssetId;
+            row.LibrarySaveKind = saveResult.SaveKind;
+          }
+
           break;
         }
       }
     }
 
     /// <summary>Marks the matching recent-results row as placed on the timeline.</summary>
-    private void MarkMatchingRecentResultTimeline(string? audioId, string? audioReference)
+    private void MarkMatchingRecentResultTimeline(
+        string? audioId,
+        string? audioReference,
+        GeneratedAudioTimelineResult? timelineResult)
     {
       var now = DateTime.Now;
       foreach (var row in RecentSynthesisResults)
@@ -2563,23 +2718,101 @@ namespace VoiceStudio.App.Views.Panels
         {
           row.IsAddedToTimeline = true;
           row.AddedToTimelineAtLocal = now;
+          if (timelineResult is { Success: true })
+          {
+            row.TimelineClipId = timelineResult.ClipId;
+            row.TimelineTrackId = timelineResult.TrackId;
+            row.TimelinePlacementStartSeconds = timelineResult.PlacementStartSeconds;
+          }
+
           break;
         }
       }
+    }
+
+    private string BuildTimelineSuccessStatusText(GeneratedAudioTimelineResult result)
+    {
+      var basis = result.Kind switch
+      {
+        GeneratedAudioTimelineKind.ExactAppend => "Appended after existing clips.",
+        GeneratedAudioTimelineKind.DefaultAtZeroBecauseTrackEmpty => "Start of empty track (0 s).",
+        GeneratedAudioTimelineKind.Added => "Clip created on timeline.",
+        _ => "Clip created on timeline.",
+      };
+
+      if (!string.IsNullOrWhiteSpace(result.TrackId) &&
+          !string.IsNullOrWhiteSpace(result.ClipId) &&
+          result.PlacementStartSeconds.HasValue)
+      {
+        var tid = result.TrackId.Length > 10 ? string.Concat(result.TrackId.AsSpan(0, 10), "…") : result.TrackId;
+        var cid = result.ClipId.Length > 10 ? string.Concat(result.ClipId.AsSpan(0, 10), "…") : result.ClipId;
+        return string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            "Added to timeline — {0} Track {1}, clip {2} @ {3:F1}s.",
+            basis,
+            tid,
+            cid,
+            result.PlacementStartSeconds.Value);
+      }
+
+      return $"Added to timeline — {basis}";
+    }
+
+    private static string FormatLibrarySaveFailureMessage(GeneratedAudioSaveResult result)
+    {
+      var raw = result.ErrorMessage?.Trim();
+      if (string.IsNullOrWhiteSpace(raw))
+        return "Library save failed. Check backend logs.";
+
+      if (string.Equals(raw, "No audio ID or reference.", StringComparison.Ordinal) ||
+          raw.Contains("No audio ID or reference", StringComparison.OrdinalIgnoreCase))
+        return "No generated audio to save.";
+
+      if (raw.Contains("Library upload returned no asset", StringComparison.OrdinalIgnoreCase))
+        return "Library upload failed (no asset returned). Try again.";
+
+      if (raw.Length <= 160)
+        return $"Save failed — {raw}";
+
+      return "Library save failed. Check backend logs.";
+    }
+
+    private static string FormatTimelineFailureStatus(GeneratedAudioTimelineResult result)
+    {
+      if (result.Kind == GeneratedAudioTimelineKind.PlacementUnavailable)
+        return "Timeline placement unavailable: existing clips have no valid timing.";
+
+      if (result.Kind == GeneratedAudioTimelineKind.Unavailable)
+      {
+        var m = result.Message ?? string.Empty;
+        if (m.Contains("project", StringComparison.OrdinalIgnoreCase))
+          return "Add a project first to enable timeline.";
+        if (m.Contains("track", StringComparison.OrdinalIgnoreCase))
+          return "No timeline track available. Open Timeline and create a track.";
+        if (m.Contains("profile", StringComparison.OrdinalIgnoreCase))
+          return "Select a profile with a valid id before adding to the timeline.";
+
+        return string.IsNullOrWhiteSpace(m) ? "Timeline unavailable for this output." : m;
+      }
+
+      if (result.Kind == GeneratedAudioTimelineKind.Failed)
+      {
+        var m = result.Message?.Trim();
+        if (string.IsNullOrWhiteSpace(m) || m.Length > 160)
+          return "Timeline add failed. Check backend logs.";
+
+        return m;
+      }
+
+      return string.IsNullOrWhiteSpace(result.Message)
+          ? "Could not add to timeline."
+          : result.Message!;
     }
 
     private static bool IsSuccessfulTimelinePlacement(GeneratedAudioTimelineKind kind) =>
         kind == GeneratedAudioTimelineKind.Added ||
         kind == GeneratedAudioTimelineKind.ExactAppend ||
         kind == GeneratedAudioTimelineKind.DefaultAtZeroBecauseTrackEmpty;
-
-    private static string BuildTimelineSuccessStatusText(GeneratedAudioTimelineKind kind) =>
-        kind switch
-        {
-          GeneratedAudioTimelineKind.ExactAppend => "Added to timeline — appended after existing clips.",
-          GeneratedAudioTimelineKind.DefaultAtZeroBecauseTrackEmpty => "Added to timeline — start of empty track (0 s).",
-          _ => "Added to timeline",
-        };
 
     /// <summary>
     /// Persist a generated-audio clip on the active project timeline (backend create).
@@ -2609,11 +2842,15 @@ namespace VoiceStudio.App.Views.Panels
 
         if (result.Success && IsSuccessfulTimelinePlacement(result.Kind))
         {
+          LastTimelineTrackId = result.TrackId;
+          LastTimelineClipId = result.ClipId;
+          LastTimelinePlacementStartSeconds = result.PlacementStartSeconds;
           IsGeneratedAudioAddedToTimeline = true;
-          GeneratedAudioTimelineStatus = BuildTimelineSuccessStatusText(result.Kind);
+          GeneratedAudioTimelineStatus = BuildTimelineSuccessStatusText(result);
           MarkMatchingRecentResultTimeline(
               string.IsNullOrWhiteSpace(request.AudioId) ? null : request.AudioId,
-              request.AudioPathOrUrl);
+              request.AudioPathOrUrl,
+              result);
           _toastNotificationService?.ShowSuccess(
               ResourceHelper.GetString("VoiceSynthesis.TimelineAddedTitle", "Timeline"),
               ResourceHelper.GetString("VoiceSynthesis.TimelineAddedBody", "Generated audio was added to the project timeline."));
@@ -2621,17 +2858,20 @@ namespace VoiceStudio.App.Views.Panels
         else if (result.Kind == GeneratedAudioTimelineKind.Unavailable
             || result.Kind == GeneratedAudioTimelineKind.PlacementUnavailable)
         {
-          GeneratedAudioTimelineStatus = result.Message
-              ?? "Timeline is not available. Select a project and timeline track.";
+          LastTimelineTrackId = null;
+          LastTimelineClipId = null;
+          LastTimelinePlacementStartSeconds = null;
+          GeneratedAudioTimelineStatus = FormatTimelineFailureStatus(result);
           _toastNotificationService?.ShowWarning(
               ResourceHelper.GetString("VoiceSynthesis.TimelineUnavailableTitle", "Timeline unavailable"),
               GeneratedAudioTimelineStatus);
         }
         else
         {
-          GeneratedAudioTimelineStatus = string.IsNullOrWhiteSpace(result.Message)
-              ? "Could not add to timeline"
-              : result.Message!;
+          LastTimelineTrackId = null;
+          LastTimelineClipId = null;
+          LastTimelinePlacementStartSeconds = null;
+          GeneratedAudioTimelineStatus = FormatTimelineFailureStatus(result);
           _toastNotificationService?.ShowWarning(
               ResourceHelper.GetString("VoiceSynthesis.TimelineAddFailedTitle", "Timeline"),
               GeneratedAudioTimelineStatus);
@@ -2644,6 +2884,9 @@ namespace VoiceStudio.App.Views.Panels
       catch (Exception ex)
       {
         _errorLoggingService?.LogError(ex, "VoiceSynthesis.AddToTimeline");
+        LastTimelineTrackId = null;
+        LastTimelineClipId = null;
+        LastTimelinePlacementStartSeconds = null;
         GeneratedAudioTimelineStatus = ErrorHandler.GetUserFriendlyMessage(ex);
         _toastNotificationService?.ShowWarning("Timeline", GeneratedAudioTimelineStatus);
       }
@@ -3240,8 +3483,13 @@ namespace VoiceStudio.App.Views.Panels
       public string? CreatedAtUtc { get; set; }
       public bool IsSavedToLibrary { get; set; }
       public string? SavedAtUtc { get; set; }
+      public string? LibraryAssetId { get; set; }
+      public string? LibrarySaveKind { get; set; }
       public bool IsAddedToTimeline { get; set; }
       public string? AddedToTimelineAtUtc { get; set; }
+      public string? TimelineClipId { get; set; }
+      public string? TimelineTrackId { get; set; }
+      public double? TimelinePlacementStartSeconds { get; set; }
     }
 
     #region IPanelStatePersistable (GAP-050 state hygiene)
@@ -3281,9 +3529,14 @@ namespace VoiceStudio.App.Views.Panels
             IsSavedToLibrary = r.IsSavedToLibrary,
             SavedAtUtc = r.SavedAtLocal?.ToUniversalTime()
                 .ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            LibraryAssetId = r.LibraryAssetId,
+            LibrarySaveKind = r.LibrarySaveKind?.ToString(),
             IsAddedToTimeline = r.IsAddedToTimeline,
             AddedToTimelineAtUtc = r.AddedToTimelineAtLocal?.ToUniversalTime()
                 .ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            TimelineClipId = r.TimelineClipId,
+            TimelineTrackId = r.TimelineTrackId,
+            TimelinePlacementStartSeconds = r.TimelinePlacementStartSeconds,
           }).ToList();
           state.CustomData[CustomKeyRecentResults] = JsonSerializer.Serialize(dtos);
         }
@@ -3404,6 +3657,10 @@ namespace VoiceStudio.App.Views.Panels
                   System.Globalization.DateTimeStyles.RoundtripKind,
                   out var savedUtc))
             added.SavedAtLocal = savedUtc.ToLocalTime();
+          added.LibraryAssetId = dto.LibraryAssetId;
+          if (!string.IsNullOrWhiteSpace(dto.LibrarySaveKind) &&
+              Enum.TryParse<GeneratedAudioSaveKind>(dto.LibrarySaveKind, out var parsedKind))
+            added.LibrarySaveKind = parsedKind;
           added.IsAddedToTimeline = dto.IsAddedToTimeline;
           if (!string.IsNullOrWhiteSpace(dto.AddedToTimelineAtUtc) &&
               DateTime.TryParse(
@@ -3412,6 +3669,9 @@ namespace VoiceStudio.App.Views.Panels
                   System.Globalization.DateTimeStyles.RoundtripKind,
                   out var atUtc))
             added.AddedToTimelineAtLocal = atUtc.ToLocalTime();
+          added.TimelineClipId = dto.TimelineClipId;
+          added.TimelineTrackId = dto.TimelineTrackId;
+          added.TimelinePlacementStartSeconds = dto.TimelinePlacementStartSeconds;
           count++;
         }
 

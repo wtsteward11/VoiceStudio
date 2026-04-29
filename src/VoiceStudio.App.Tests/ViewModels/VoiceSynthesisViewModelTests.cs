@@ -2558,5 +2558,97 @@ namespace VoiceStudio.App.Tests.ViewModels
     }
 
     #endregion
+
+    #region Failure-Path Recovery Tests
+
+    [TestMethod]
+    public async Task SynthesizeAsync_BackendException_ClearsIsLoadingAndSetsErrorState()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p1", Name = "P" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new BackendException("Synthesis failed on server", 500, "SERVER_ERROR", false));
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      Assert.IsFalse(_sut.IsLoading, "IsLoading must be false after BackendException (finally must run).");
+      Assert.AreEqual(SynthesisWorkflowState.Error, _sut.WorkflowState, "WorkflowState must be Error after BackendException.");
+      Assert.IsTrue(_sut.HasError, "HasError must be true.");
+      Assert.IsFalse(string.IsNullOrWhiteSpace(_sut.ErrorMessage), "ErrorMessage must be populated.");
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_ConsentRequired_ClearsIsLoadingAndSetsConsentRecovery()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p2", Name = "Q" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new ConsentRequiredException("Consent required"));
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      Assert.IsFalse(_sut.IsLoading, "IsLoading must be false after ConsentRequiredException (finally must run).");
+      Assert.AreEqual(SynthesisWorkflowState.Error, _sut.WorkflowState, "WorkflowState must be Error.");
+      Assert.IsTrue(_sut.IsConsentRequired, "IsConsentRequired must be true.");
+      Assert.IsFalse(string.IsNullOrWhiteSpace(_sut.ErrorMessage), "ErrorMessage must be populated.");
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_GenericException_ClearsIsLoadingAndReportsError()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p3", Name = "R" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new InvalidOperationException("internal error"));
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      Assert.IsFalse(_sut.IsLoading, "IsLoading must be false after generic exception.");
+      Assert.AreEqual(SynthesisWorkflowState.Error, _sut.WorkflowState, "WorkflowState must be Error.");
+      Assert.IsTrue(_sut.HasError, "HasError must be true.");
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_Failure_CanSynthesizeReturnsTrueAfterRecovery()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p4", Name = "S" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new BackendException("fail", 500, "SERVER_ERROR", false));
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      // Inputs still valid, IsLoading false => command must be re-executable
+      Assert.IsTrue(_sut.CanSynthesize, "CanSynthesize must be true after failure so the user can retry.");
+      Assert.IsTrue(_sut.SynthesizeCommand.CanExecute(null), "SynthesizeCommand.CanExecute must be true after failure.");
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_Failure_DoesNotShowStaleResultAsSuccess()
+    {
+      _sut.SelectedProfile = new VoiceProfile { Id = "p5", Name = "T" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new BackendException("fail", 500, "SERVER_ERROR", false));
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      Assert.AreNotEqual(SynthesisWorkflowState.AudioReady, _sut.WorkflowState,
+          "WorkflowState must NOT be AudioReady after a failed attempt — no stale success state.");
+      Assert.IsTrue(string.IsNullOrEmpty(_sut.LastSynthesizedAudioId),
+          "LastSynthesizedAudioId must be empty after failure — no stale audio ID.");
+    }
+
+    #endregion
   }
 }

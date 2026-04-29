@@ -167,3 +167,99 @@ Test coverage:
 - No synthesis was performed to create this document.
 - Not related to GAP-008, Slice 46, MainWindow*ShellBridge, or ENGINE_PARITY_MATRIX.
 - Not related to RHVoice.
+
+---
+
+## Hardening Addendum — 2026-04-29
+
+**Commit:** `test(runtime): standardize voice synthesis proof boundary reporting`
+**Base guard commit:** `20f700b2`
+
+### Summary of Changes
+
+The initial guard (commit `20f700b2`) enforced basic engine-mode classification. This addendum records the hardening bundle that upgraded it to a durable proof-reporting standard.
+
+### Phase 2 — Comprehensive Changed-File Discovery
+
+`_get_changed_files(ref)` was replaced with a union of four git queries:
+
+| Source | Git Command |
+|---|---|
+| Committed delta | `git diff --name-only --diff-filter=ACM {ref}..HEAD` |
+| Staged changes | `git diff --name-only --cached --diff-filter=ACM` |
+| Unstaged changes | `git diff --name-only --diff-filter=ACM` |
+| Untracked relevant files | `git ls-files --others --exclude-standard docs/reports/verification/` |
+
+Partial failures produce advisory messages; git unavailability produces an advisory skip. Previously only committed delta was checked.
+
+### Phase 3 — Machine-Readable Metadata Block
+
+All relevant proof reports must now include a `VOICESTUDIO_PROOF_BOUNDARY_V1` HTML-comment metadata block:
+
+```markdown
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+```
+
+**New violation rules:** `MISSING_METADATA_BLOCK`, `METADATA_MISSING_FIELD`, `METADATA_CLASSIFICATION_MISMATCH`, `METADATA_INVALID_BOOLEAN`.
+
+The existing `REAL_ENGINE_GENERATED_AUDIO_PROOF_2026-04-29.md` was updated to include the metadata block.
+
+### Phase 4 — Mandatory Non-Claims Section
+
+All classifications (including REAL_ENGINE) must now contain an explicit Non-Claims / Boundaries section. **New rule:** `MISSING_NON_CLAIMS_SECTION`.
+
+**Fix:** `_NON_CLAIMS_HEADING` regex tightened to anchor on heading start (preventing false matches on titles containing the word).
+
+### Phase 5 — UNKNOWN Blocker Requirement
+
+UNKNOWN reports must include explicit blocker language (e.g., `could not determine`, `blocked`, `unavailable`). **New rule:** `UNKNOWN_MISSING_BLOCKER_EVIDENCE`.
+
+### Phase 6 — Stronger REAL_ENGINE Evidence
+
+Replaced flat evidence list with specific rules:
+- `REAL_ENGINE_MISSING_ROUTED_ENGINE`
+- `REAL_ENGINE_MISSING_ARTIFACT_SIZE`
+- `REAL_ENGINE_MISSING_ARTIFACT_FORMAT`
+- `REAL_ENGINE_NEGATIVE_LIBRARY_EVIDENCE` — negative-only library phrases rejected
+- `REAL_ENGINE_NEGATIVE_TIMELINE_EVIDENCE` — negative-only timeline phrases rejected
+- `REAL_ENGINE_MISSING_LIBRARY_EVIDENCE` / `REAL_ENGINE_MISSING_TIMELINE_EVIDENCE`
+
+### Phase 7 — Expanded Anti-Claim Phrases
+
+`STUB_CLAIMS_REAL_SYNTHESIS` renamed to `NON_REAL_REPORT_CLAIMS_REAL_SYNTHESIS`. Added forbidden phrases: `real model output`, `non-stub synthesis confirmed`, `runtime proof complete`, `runtime FULL PASS`, `operator proof complete`, `heard attestation`, `manual playback confirmed`.
+
+### Phase 8-9 — New Documents
+
+| File | Purpose |
+|---|---|
+| `docs/templates/VOICE_SYNTHESIS_PROOF_REPORT_TEMPLATE.md` | Proof report template with metadata block |
+| `docs/developer/VOICE_SYNTHESIS_PROOF_REPORTING_STANDARD.md` | Developer guide and standard reference |
+
+### Phase 10-11 — Tests
+
+21 total tests (up from 13). New tests cover:
+- Metadata block required / field validation / boolean validation / classification mismatch
+- Comprehensive changed-file discovery (committed, staged, unstaged, untracked)
+- Mandatory non-claims for all classifications
+- UNKNOWN blocker evidence
+- Negative-only library/timeline evidence
+- Expanded anti-claim phrases (runtime FULL PASS)
+- JSON output structure
+- Guard meta-report exclusion in `--all` mode
+- `--self-test-examples` CLI mode
+
+### Verification Results (Hardening)
+
+| Check | Result |
+|---|---|
+| `check_voice_synthesis_proof_boundary.py --changed-from origin/main` | PASS |
+| `check_voice_synthesis_proof_boundary.py --self-test-examples` | PASS (6/6) |
+| `pytest tests/unit/scripts/ci/test_voice_synthesis_proof_boundary.py` | 34/34 PASS |
+| `python scripts/run_verification.py` | PASS |
+| `.\scripts\verify.ps1 -Quick` | PASS |

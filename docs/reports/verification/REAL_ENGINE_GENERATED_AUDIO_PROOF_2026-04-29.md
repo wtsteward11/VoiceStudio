@@ -1,5 +1,13 @@
 # Real Engine Generated Audio Proof — 2026-04-29
 
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+
 **Classification: REAL_ENGINE**
 **Date:** 2026-04-29
 **HEAD:** f44d7c398d47aa848e48640c15eeb4dd1930b0f2

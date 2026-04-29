@@ -1,0 +1,240 @@
+# Verification Harness Protocol
+
+## The Golden Rule
+
+> **No changes allowed unless `scripts/verify.ps1` stays GREEN.**
+
+This is the single most important rule in VoiceStudio development. It is non-negotiable.
+
+## What is verify.ps1?
+
+The unified verification harness (`scripts/verify.ps1`) is the **single source of truth** for product verification. It runs stages that together prove the entire product works:
+
+1. **Clean Build (C#)** - VoiceStudio.sln builds with 0 errors
+2. **Python Quality** - Lint (ruff) and type-check (mypy) pass
+2.5 **Quick Critical Gates** (Quick mode only) - Golden-loop, route-alignment, contract-drift
+3. **C# Unit Tests** - Eleven first-class shards with per-shard timeouts: ViewModels Seam A-D, E-H, I-L, M, N-Z, ViewModels Lifecycle, ViewModels Legacy, Services, CommandsGateways, UIPanels, Other
+4. **Python Unit Tests** - All Python unit tests pass
+5. **Contract Tests** - C# ↔ Python API contracts are valid
+6. **Security Tests** - Injection, auth bypass, sandbox escape
+7. **Backend Integration** - API endpoints and engine adapters work
+8. **UI Smoke Tests** - App launches, panels exist, navigation works
+8.5 **UI Self-Test** - Gate C smoke + backend health
+8.6 **Icon-Launch Smoke** - Full startup path
+8.7 **Failure-Path Smoke** - Port occupied scenario
+8.8 **Runtime-Missing Failure Smoke** - App root invalid
+9. **Gate/Ledger Validation** - All gates pass, ledger is valid
+
+## Agent Requirements
+
+### Before ANY Code Change
+
+```powershell
+# Establish baseline - must be GREEN
+.\scripts\verify.ps1 -Quick
+```
+
+If this is RED, fix existing issues first. Do NOT proceed with new work.
+
+### After EVERY Code Change
+
+```powershell
+# Full verification
+.\scripts\verify.ps1
+```
+
+Exit code MUST be 0. If non-zero:
+1. Identify which stage failed (check artifacts)
+2. Fix the issue you introduced
+3. Run verify.ps1 again
+4. Repeat until GREEN
+
+### Before Claiming Task Complete
+
+- [ ] `verify.ps1` exit code is 0
+- [ ] All 8 stages passed or were explicitly skipped with justification
+- [ ] Artifacts captured in `artifacts/verify/latest/`
+- [ ] Report reviewed: `artifacts/verify/latest/verification_report.md`
+
+## Command Reference
+
+```powershell
+# Full verification (all stages)
+.\scripts\verify.ps1
+
+# Quick verification (build + lint + Quick Critical Gates + Security + Gate/Ledger; ~3-5 min)
+.\scripts\verify.ps1 -Quick
+
+# Run only C# Unit Tests (all 11 shards)
+.\scripts\verify.ps1 -OnlyStage "C# Unit Tests"
+
+# Run only a specific C# shard (e.g. when ViewModels Seam or Legacy times out)
+.\scripts\verify.ps1 -OnlyStage "C# Unit Tests - ViewModels Seam A-D"
+.\scripts\verify.ps1 -OnlyStage "C# Unit Tests - ViewModels Seam E-H"
+.\scripts\verify.ps1 -OnlyStage "C# Unit Tests - ViewModels Seam I-L"
+.\scripts\verify.ps1 -OnlyStage "C# Unit Tests - ViewModels Seam M"
+.\scripts\verify.ps1 -OnlyStage "C# Unit Tests - ViewModels Seam N-Z"
+.\scripts\verify.ps1 -OnlyStage "C# Unit Tests - ViewModels Lifecycle"
+.\scripts\verify.ps1 -OnlyStage "C# Unit Tests - ViewModels Legacy"
+
+# Skip specific stages
+.\scripts\verify.ps1 -SkipUI -SkipIntegration
+
+# Real UI automation (launches the app)
+.\scripts\verify.ps1 -RealUI
+
+# Release configuration
+.\scripts\verify.ps1 -Configuration Release
+
+# View results
+Get-Content artifacts\verify\latest\verification_report.md
+cat artifacts\verify\latest\summary.json | jq .
+```
+
+## Stage Dependencies
+
+```
+Stage 1 (Build) → C# shards, UI stages depend on this
+Stage 2 (Python Lint) → Python tests, Contract, Security, Integration depend on Python being valid
+Stage 3 (C# Tests) → Five shards; independent after build; each has per-shard timeout
+Stage 4 (Python Tests) → Independent after lint
+Stage 5 (Contract Tests) → Tests C# ↔ Python interface
+Stage 6 (Security Tests) → Independent after lint
+Stage 7 (Backend Integration) → Requires backend to be functional
+Stage 8 (UI Smoke) → Requires app to build and launch
+Stage 8.5–8.8 (Startup Smoke) → Require app exe
+Stage 9 (Gates) → Meta-validation of project state
+```
+
+## Failure Response
+
+### If a stage fails during your work:
+
+1. **Stop immediately** - Do not continue to other files
+2. **Check the log** - `artifacts/verify/latest/logs/{stage_name}.log`
+3. **Identify root cause** - Was it your change or pre-existing?
+4. **Fix the issue** - Minimal change to restore GREEN
+5. **Run verify.ps1 again** - Confirm GREEN
+6. **Continue work** - Only after GREEN is restored
+
+### If you cannot fix the issue:
+
+1. **Revert your changes** - `git checkout -- .`
+2. **Document the problem** - What you tried, what failed
+3. **Escalate to Overseer** - Do not merge broken code
+
+## Artifacts
+
+All verification runs capture artifacts to:
+
+```
+artifacts/verify/{timestamp}/
+├── verification_report.md  # Human-readable summary
+├── summary.json            # Machine-readable results
+├── logs/                   # Stage-specific logs
+│   ├── clean_build.log
+│   ├── python_quality.log
+│   ├── csharp_unit_tests.log
+│   ├── python_unit_tests.log
+│   ├── contract_tests.log
+│   ├── backend_integration.log
+│   ├── ui_smoke_tests.log
+│   └── gate_ledger_validation.log
+├── screenshots/            # UI test screenshots (on failure)
+└── test-results/           # TRX and JUnit XML files
+    ├── csharp_unit_tests.trx
+    ├── python_unit_tests.xml
+    ├── contract_tests.xml
+    ├── integration_tests.xml
+    └── ui_smoke_tests.trx
+```
+
+A symlink/junction `artifacts/verify/latest/` always points to the most recent run.
+
+## Integration with Other Rules
+
+### Change Control Rules
+
+See `docs/governance/CHANGE_CONTROL_RULES.md` for:
+- Blast radius limits (max files per change)
+- Prohibited actions during stabilization
+- Scope limiters for Cursor prompts
+
+### Error Resolution
+
+Per `error-resolution.mdc`:
+- All errors discovered must be logged
+- All errors must be resolved before task complete
+- Build/test verification proof must be captured
+
+### Closure Protocol
+
+Per `closure-protocol.mdc`:
+- Update STATE.md with verification status
+- Add proof artifacts to Proof Index
+- Link to `artifacts/verify/{timestamp}/`
+
+## Quick Reference
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 VERIFICATION HARNESS CHECKLIST                  │
+├─────────────────────────────────────────────────────────────────┤
+│ Before coding:                                                  │
+│   [ ] verify.ps1 -Quick is GREEN                                │
+│                                                                 │
+│ After each change:                                              │
+│   [ ] verify.ps1 is GREEN                                       │
+│                                                                 │
+│ Before claiming complete:                                       │
+│   [ ] All stages pass (or skipped with justification)           │
+│   [ ] Report reviewed                                           │
+│   [ ] Artifacts captured                                        │
+│                                                                 │
+│ If verification fails:                                          │
+│   [ ] Check logs                                                │
+│   [ ] Fix issue                                                 │
+│   [ ] Rerun until GREEN                                         │
+│   [ ] If stuck, REVERT and escalate                             │
+│                                                                 │
+│ If C# shard times out:                                          │
+│   [ ] Run -OnlyStage "C# Unit Tests - <ShardName>" to isolate    │
+│   [ ] Review blame-hang dumps in test-results/                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Known Limitations
+
+If `verify.ps1` hangs or a stage times out:
+
+- **Do not retry indefinitely.** The harness has stage-level timeouts; a TIMED_OUT result means the stage exceeded its time budget.
+- **Use `-OnlyStage`** to isolate the failing stage: `.\scripts\verify.ps1 -OnlyStage "C# Unit Tests"`
+- **For C# shard timeouts**, run the specific shard: `.\scripts\verify.ps1 -OnlyStage "C# Unit Tests - ViewModels Seam"` (or ViewModels Legacy, Services, CommandsGateways, UIPanels, Other)
+- **Review blame-hang dumps** in the test results directory if a C# shard times out. The report lists diag file paths for timed-out C# shards.
+- **To isolate a single test class** when a ViewModels sub-shard times out:
+  ```
+  dotnet test src\VoiceStudio.App.Tests\VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --no-build --filter "FullyQualifiedName~VoiceStudio.App.Tests.ViewModels.TrainingViewModelTests"
+  ```
+- See the Verification Harness Hardening Plan for stage time budgets and diagnostics.
+
+# Human Verification Boundary
+
+Human/operator verification is only for UI interaction and sensory/visual confirmation that cannot be collected by the agent.
+
+The agent must collect all objective evidence through code, APIs, logs, files, process state, tests, database state, and generated artifacts whenever possible.
+
+Do not ask the human to manually verify or transcribe data the agent can harvest, including IDs, paths, revisions, API state, file metadata, logs, test results, process state, or persistence state.
+
+For operator-assisted proof:
+- human performs unautomatable UI actions and reports heard/visual-only observations;
+- agent captures objective evidence and computes the verdict.
+
+If no operator is available for a required UI step, stop instead of producing another NOT RUN/PARTIAL report unless explicitly instructed.
+
+## Related Documents
+
+- [verify.ps1](../../scripts/verify.ps1) - The verification script
+- [CHANGE_CONTROL_RULES.md](../../docs/governance/CHANGE_CONTROL_RULES.md) - Change control rules
+- [AUTOMATION_ID_REGISTRY.md](../../docs/developer/AUTOMATION_ID_REGISTRY.md) - UI test identifiers
+- [error-resolution.mdc](error-resolution.mdc) - Error handling
+- [closure-protocol.mdc](closure-protocol.mdc) - Task closure

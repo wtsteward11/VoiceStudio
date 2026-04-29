@@ -1,135 +1,149 @@
 # Generated-audio WinUI **operator** proof (2026-04-29)
 
-**Mission:** Human-operator proof of synthesis → library → timeline → durability → playback, with API/log corroboration only (no API substitute for UI). This document is **separate** from [GENERATED_AUDIO_WORKFLOW_WINUI_PROOF_2026-04-29.md](GENERATED_AUDIO_WORKFLOW_WINUI_PROOF_2026-04-29.md) (launch-smoke / agent preflight).
+**Mission:** Human-operator proof of synthesis -> library -> timeline -> durability -> playback, with API/log corroboration only (no API substitute for UI). This document remains separate from [GENERATED_AUDIO_WORKFLOW_WINUI_PROOF_2026-04-29.md](GENERATED_AUDIO_WORKFLOW_WINUI_PROOF_2026-04-29.md) (launch-smoke / agent preflight).
 
-**Repo SHA:** `0f8b90bec56c4979a463e88c7c637ee37af00d14` (`HEAD` == `origin/main` at proof time).
+**Repo SHA:** `66e9f6892834a12080b8602028eefba26b175e68` (`HEAD` == `origin/main` at evidence time).
 
-**Backend mode:** `uvicorn backend.api.main:app` on `127.0.0.1:8000` via `.venv`; **`VOICESTUDIO_TEST_MODE` unset** (not stub/test mode for this run). Engine surface: manifests / safe mode; **`initialized_engines`: 0** in health `details.engines`.
+**Backend mode:** `uvicorn backend.api.main:app` on `127.0.0.1:8000` via `.venv`; `VOICESTUDIO_TEST_MODE` unset; engine availability from manifests / safe mode (`initialized_engines`: 0).
 
 ---
 
-## 1. Preflight — build and gates
+## 1. Preflight - build and gates
 
 | Step | Result |
 |------|--------|
-| `git fetch origin` + `git status -sb` | `HEAD` == `origin/main` at `0f8b90be`; staged index empty; working tree had only expected local noise (`M` `AGENTS.md`, `M` `.vscode/settings.json`, `??` `backend/data/voicestudio.db`, `??` `docs/reports/audit/*.md`). |
-| `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` | **Succeeded** — 0 errors (nullable warnings in app projects only; pre-existing pattern). |
-| `e:\VoiceStudio\.venv\Scripts\python.exe scripts/run_verification.py` | **Overall PASS** — `.buildlogs/verification/last_run.json` (timestamp `2026-04-29T05:43:02.997704+00:00`). Advisories: `runtime_proof_staleness`, `slo_baseline_freshness`, `backend_smoke_freshness` (warning-only). |
+| `git fetch origin` + `git status -sb` + `git rev-parse HEAD` + `git rev-parse origin/main` + `git diff --cached --name-only` | `HEAD` == `origin/main` at `66e9f689`; staged index empty; working tree contained only expected local noise (`AGENTS.md`, `.vscode/settings.json`, `backend/data/voicestudio.db`, `docs/reports/audit/*.md`). |
+| `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` | **Succeeded** - 0 errors, 5 nullable warnings (pre-existing warnings in app code). |
+| `.venv\\Scripts\\python.exe scripts/run_verification.py` | **Overall PASS** (`.buildlogs/verification/last_run.json`, `2026-04-29T06:16:11.960160+00:00`). Advisories: `runtime_proof_staleness`, `slo_baseline_freshness`, `backend_smoke_freshness`. |
 
 ---
 
 ## 2. Backend health and readiness
 
-**Health** `GET http://127.0.0.1:8000/api/health/` — **HTTP 200**
+`GET http://127.0.0.1:8000/api/health/` -> **HTTP 200**
 
-- Top-level **`status`:** `degraded` (nested **`gpu`** check: torch-based GPU detection not enabled; message references `VOICESTUDIO_HEALTH_ENABLE_TORCH=1`).
-- **`checks.database`:** `healthy`
-- **`checks.engines`:** `healthy`
-- **`details.engines`:** `available_engines` 64, **`initialized_engines`:** 0, `total_engines` 64, message includes **“Engine availability derived from manifests (safe mode)”**.
+- Top-level `status`: `degraded`
+- `checks.database`: `healthy`
+- `checks.engines`: `healthy`
+- Degraded check: GPU probe skipped / unavailable (`VOICESTUDIO_HEALTH_ENABLE_TORCH` guidance in message)
+- `details.engines`: `available_engines` 64, `initialized_engines` 0, `total_engines` 64, message `"Engine availability derived from manifests (safe mode)"`
 
-**Readiness** `GET http://127.0.0.1:8000/api/health/readiness` — **HTTP 200**
+`GET http://127.0.0.1:8000/api/health/readiness` -> **HTTP 200**
 
-- **`ready`:** `true`, **`status`:** `ready`
+- `ready`: `true`
+- `status`: `ready`
 
-**`git_commit` in health JSON:** Not cited; not confirmed present in captured payload (do not invent).
+Observed backend listener PID: `28856`.
 
 ---
 
 ## 3. WinUI launch (Phase 2)
 
-| Field | Value |
-|-------|--------|
-| Executable | `e:\VoiceStudio\.buildlogs\x64\Debug\net8.0-windows10.0.19041.0\VoiceStudio.App.exe` |
-| PID | **32344** |
-| Main window title | **VoiceStudio Quantum+** |
-| Stability | Process still running after **~20 s** and again after **~45 s** total; no crash observed in that window. |
-| Post-observation | Process terminated to clean the session (not a product defect). |
+| Field | Evidence |
+|-------|----------|
+| Executable | `e:\\VoiceStudio\\.buildlogs\\x64\\Debug\\net8.0-windows10.0.19041.0\\VoiceStudio.App.exe` |
+| Automated launch checks | Agent launch recorded `LAUNCH_PID=7480`, then `AFTER5S_RUNNING=0`, `AFTER30S_RUNNING=0`. |
+| Manual operator note | Operator reported app starts when launched manually via `Start-Process`, but no stable PID/title capture was preserved in terminal evidence. |
+| Stability verdict | **Unstable/inconclusive** in automated capture; manual observation lacks durable runtime fields required by checklist evidence table. |
 
 ---
 
-## 4. Operator workflow (Phase 3) — **not executed**
+## 4. Operator workflow execution (Phase 3)
 
-**Reason:** No human operator was available in this agent session to perform the mandatory UI checklist.
+Human checklist evidence was not captured in the required structured form for:
 
-**Planned checklist anchors** (from [AUTOMATION_ID_REGISTRY.md](../../developer/AUTOMATION_ID_REGISTRY.md)): `VoiceSynthesisView_EngineComboBox`, `VoiceSynthesisView_ProfileComboBox`, `VoiceSynthesisView_TextInput`, `VoiceSynthesisView_SynthesizeButton`, `VoiceSynthesisView_AddGeneratedAudioToLibraryButton`, `VoiceSynthesisView_AddGeneratedAudioToTimelineButton`, `VoiceSynthesisView_GeneratedAudioTimelineStatus`, `TimelineView_Root`, `VoiceSynthesisView_PlayButton` / `VoiceSynthesisView_StopButton`, consent/retry `InfoBar` AutomationIds as applicable.
+- selected engine/profile,
+- synthesis success,
+- generated output fields (id/reference/duration/quality),
+- add-to-library status,
+- add-to-timeline status,
+- timeline clip details,
+- reload/reopen persistence,
+- restart persistence,
+- playback outcome.
 
-**Fixed phrase (for human rerun):** `VoiceStudio generated audio WinUI durability proof.`
-
-**Engine rule:** **Piper** if available in UI; otherwise document actual engine and why Piper was not used — **not performed** in this run.
-
-**Evidence table:** Intentionally empty — no fabricated steps, timestamps, or synthesis results.
+Because required step-level artifacts were missing, the workflow cannot be credited as successful proof.
 
 ---
 
 ## 5. Generated audio evidence
 
-**N/A** — synthesis UI not run.
+No verifiable generated-audio UI artifact was captured (no confirmed audio id/reference/path/duration/quality entry from the human checklist).
 
 ---
 
 ## 6. Library evidence
 
-**N/A** — Add to Library not run.
+No verifiable Add-to-Library success artifact was captured from UI.
 
 ---
 
 ## 7. Timeline evidence
 
-**N/A** — Add to Timeline not run.
+No verifiable Add-to-Timeline UI artifact was captured.
 
 ---
 
 ## 8. Durability evidence
 
-**N/A** — reload/restart persistence not tested (no clip created in UI).
+No verifiable reload/reopen or restart persistence evidence was captured from the UI checklist.
 
 ---
 
 ## 9. Playback evidence
 
-**Tri-state:** **`not tested`** (no operator; no audio path exercised in UI).
+No audibility result (`heard yes` / `not heard environment` / `not tested`) was captured in structured operator evidence.
 
 ---
 
 ## 10. API and log cross-check (Phase 4)
 
-**`session_id`:** **Not discoverable** — no UI session, logs, or devtools capture tied to a real operator workflow; **no** `GET /api/timeline/state?session_id=...` call was made with an invented id.
+API corroboration (non-substitute):
 
-**Honest scope:** Health and readiness endpoints only (above).
+- `GET /api/timeline/state?session_id=default` returned timeline id `19d7b5b4-9b97-404f-82b4-cac86d4e424d`, `revision` `7`, `tracks` `[]`, `updated_at` `2026-04-29T00:54:10.008260`.
+- No UI-derived `session_id` attributable to the required operator checklist was discovered in captured evidence.
+
+Cross-check conclusion: API response does not corroborate a successful generated-audio timeline insertion for this run.
 
 ---
 
 ## 11. Defects found
 
-None observed in preflight, build, verification script, health/readiness, or WinUI launch smoke.
+1. **Launch stability defect/investigation gap:** automated app process exits before 5 seconds in agent launch checks; manual start claim exists but lacks durable runtime evidence.
+2. **Proof evidence gap:** required human checklist outputs were not captured, preventing verification of synthesis/library/timeline/durability/playback.
+
+No code fix was applied in this run because the proof failure was evidence/operability capture failure, not a fully isolated source-level defect with reproducible stack trace.
 
 ---
 
 ## 12. Documentation
 
-This file satisfies Phase 7 operator proof record. Registry addendum: [CANONICAL_REGISTRY.md](../../governance/CANONICAL_REGISTRY.md).
+This file is updated with current run evidence and strict outcome.
+Registry addendum is updated in [CANONICAL_REGISTRY.md](../../governance/CANONICAL_REGISTRY.md) to reflect the revised verdict and evidence.
 
-**`.cursor/STATE.md`:** Not updated — entire `.cursor/` tree is gitignored; optional single-line parallel-lane note deferred to avoid unscoped control-plane churn.
+`.cursor/STATE.md` not edited in this task.
 
 ---
 
 ## 13. Commit intent
 
-Single commit message (proof only): `docs(runtime): record generated audio WinUI operator proof`
+Proof-only commit message: `docs(runtime): update generated audio WinUI operator proof`
 
-**No `git push`** unless explicitly instructed.
+No push unless explicitly instructed.
 
 ---
 
-## 14. Verdict (Phase 5 — strict)
+## 14. Verdict (Phase 5 - strict)
 
-**`NOT RUN`** — Per mission table: no operator / proof aborted before meaningful UI checklist (honest). Launch and preflight succeeded; **not** a **FULL PASS**, **PARTIAL**, or workflow **FAIL** (no failing UI step — workflow simply not attempted).
+**FAIL**
+
+Reason: required success conditions were not proven. There is no complete evidence for synthesis + library + timeline + persistence + playback in this run, and automated launch stability capture failed.
 
 ---
 
 ## 15. Non-claims
 
-- **Not** GAP-008 / **not** Slice 46 / **not** new `MainWindow*ShellBridge` work.
-- **Not** RHVoice proof / **not** edits to `ENGINE_PARITY_MATRIX.md`.
-- **Not** claiming runtime **FULL PASS** for generated-audio workflow.
-- **Not** conflating this doc with the same-day launch-smoke report ([GENERATED_AUDIO_WORKFLOW_WINUI_PROOF_2026-04-29.md](GENERATED_AUDIO_WORKFLOW_WINUI_PROOF_2026-04-29.md)).
+- Not GAP-008 / not Slice 46 / not `MainWindow*ShellBridge`.
+- Not RHVoice work.
+- Not `ENGINE_PARITY_MATRIX.md` edits.
+- Not claiming runtime FULL PASS for generated-audio workflow.

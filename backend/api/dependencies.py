@@ -125,6 +125,33 @@ def _extract_voice_id(body: dict[str, Any] | None) -> str | None:
     return body.get("voice_id") or body.get("profile_id")
 
 
+_LOCAL_OWNER_IDS: frozenset[str] = frozenset({"local", "system", "local_user"})
+
+
+def _profile_has_remote_owner(profile_id: str) -> bool:
+    """
+    Returns True only if the profile has a non-local owner_user_id,
+    meaning third-party consent is required before synthesis.
+
+    Profiles with owner_user_id of None or a well-known local sentinel
+    ("local", "system", "local_user") are treated as owned by the local
+    user and do not require explicit consent.
+    """
+    try:
+        from backend.project.management.profile_store import get_profile_store
+
+        profile = get_profile_store().get(profile_id)
+        if profile is None:
+            return True
+        owner = profile.get("owner_user_id")
+        if not owner or owner in _LOCAL_OWNER_IDS:
+            return False
+        return True
+    except Exception as exc:
+        logger.debug("Could not determine profile ownership for %s: %s", profile_id, exc)
+        return True
+
+
 async def require_synthesis_clearance(request: Request) -> None:
     """
     FastAPI dependency enforcing synthesis policy (I-2).
@@ -160,20 +187,25 @@ async def require_synthesis_clearance(request: Request) -> None:
     ):
         voice_id = _extract_voice_id(body)
         if voice_id:
-            from backend.services.security_service import get_security_service
+            # Skip consent check for locally-created profiles (no owner).
+            # In local single-user mode, profiles with no owner_user_id are
+            # implicitly owned by the local user and do not require third-party consent.
+            _profile_requires_consent = _profile_has_remote_owner(voice_id)
+            if _profile_requires_consent:
+                from backend.services.security_service import get_security_service
 
-            consents = get_security_service().consent.get_consents(voice_id)
-            has_active = any(c.is_valid for c in consents)
-            if not has_active:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=(
-                        "Synthesis is blocked: no active consent for this voice profile. "
-                        "If the profile uses reference or third-party/bound audio, create consent "
-                        "via POST /api/consent/request and POST /api/consent/grant/{consent_id}, "
-                        "then pass consent_id in the synthesis request body (see VoiceSynthesizeRequest)."
-                    ),
-                )
+                consents = get_security_service().consent.get_consents(voice_id)
+                has_active = any(c.is_valid for c in consents)
+                if not has_active:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=(
+                            "Synthesis is blocked: no active consent for this voice profile. "
+                            "If the profile uses reference or third-party/bound audio, create consent "
+                            "via POST /api/consent/request and POST /api/consent/grant/{consent_id}, "
+                            "then pass consent_id in the synthesis request body (see VoiceSynthesizeRequest)."
+                        ),
+                    )
 
     # 3. Safety (fail-open when text not present or scanner unavailable)
     text = (body or {}).get("text") if isinstance(body, dict) else None

@@ -37,12 +37,18 @@ def check_consent_required(profile_id: str, request: Any = None) -> bool:
             if uid:
                 current_user_id = uid
 
+    _LOCAL_IDS: frozenset[str] = frozenset({"local", "system", "local_user"})
+
     profile = get_profile_store().get(profile_id)
     if profile is None:
         return True
 
     owner = profile.get("owner_user_id")
-    if owner and owner == current_user_id:
+    # Profiles with no owner, or with a well-known local sentinel, were
+    # created in local single-user mode and do not require third-party consent.
+    if not owner or owner in _LOCAL_IDS:
+        return False
+    if owner == current_user_id:
         return False
     return True
 

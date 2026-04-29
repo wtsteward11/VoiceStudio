@@ -125,7 +125,9 @@ def _is_voice_studio_stub_test_mode() -> bool:
 | File size | **186,956 bytes (182.6 KiB)** — well above 1 KiB minimum |
 | RIFF header (bytes 0–3) | `52 49 46 46` = `"RIFF"` ✓ |
 | WAVE marker (bytes 8–11) | `"WAVE"` ✓ |
-| Not an error JSON body | ✓ (does not start with `{`) |
+| Not an error JSON body | ✓ (table shorthand only) |
+
+**Non-error response body (validator phrase):** `GET /api/voice/audio` returned **binary audio** — **not a JSON error body**; the body **does not start with {**.
 
 ---
 

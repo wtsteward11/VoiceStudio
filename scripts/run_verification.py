@@ -641,6 +641,20 @@ def main():
                 "timeout": 15,
             })
 
+        harness_script = project_root / "scripts" / "proof" / "run_voice_synthesis_real_engine_proof.py"
+        if harness_script.exists():
+            checks.append({
+                "name": "voice_synthesis_real_engine_proof_harness_selftest",
+                "command": [
+                    sys.executable,
+                    str(harness_script),
+                    "--dry-run-fixtures",
+                    "--output-dir",
+                    str(project_root / "artifacts" / "proof_harness_selftest"),
+                ],
+                "timeout": 30,
+            })
+
     # Optionally add build check if --build flag
     if "--build" in sys.argv:
         checks.append({

@@ -104,6 +104,7 @@ UNKNOWN       — Engine mode could not be determined (blocker condition).
 | RIFF header (bytes 0–3) | `52 49 46 46` = `"RIFF"` ✓ |
 | WAVE marker (bytes 8–11) | `"WAVE"` ✓ |
 | Content-Type | `audio/wav` |
+| Non-error body | **GET `/api/voice/audio/{audio_id}`** returned **binary audio** (not a JSON error body; does not start with `{`) |
 
 ---
 

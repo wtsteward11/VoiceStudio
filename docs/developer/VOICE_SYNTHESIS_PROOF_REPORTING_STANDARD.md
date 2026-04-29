@@ -118,16 +118,41 @@ The section must list what the report does NOT establish. At minimum:
 
 A `REAL_ENGINE`-classified report must include all of:
 
-| Evidence | Accepted terms |
+| Evidence | Accepted terms (outside Non-Claims) |
 |---|---|
 | `routed_engine` field | `routed_engine` present and non-stub |
 | Artifact size | `bytes`, `KiB`, `MiB` |
 | Artifact format | `RIFF`, `WAV`, `WAVE`, `header` |
-| Library evidence | `asset id`, `asset_id`, `library asset`, `HTTP 201`, `audio_id` |
-| Timeline evidence | `revision`, `track`, `clip`, `placement` |
+| Non-error audio body | `not a JSON error body`, `binary audio`, `does not start with {` |
+| Library evidence | `HTTP 201`, `asset_id`, `library asset`, `audio_id`, `/api/library/` |
+| Timeline evidence | `clip_id`, `track_id`, `start_time`, `end_time`, `timeline revision`, `/api/timeline/` |
 
-**Negative-only evidence is rejected.** Phrases like "no library evidence", "timeline not tested",
-"library unavailable" fail the check unless placed inside an explicit Non-Claims section.
+**Negative-only evidence is rejected** when it appears **outside** Non-Claims. Phrases like
+"no library evidence", "timeline not tested", "library unavailable" fail unless they appear only
+under an explicit Non-Claims heading (those sections are blanked before positive/negative checks).
+
+### Metadata semantics
+
+- Exactly **one** `VOICESTUDIO_PROOF_BOUNDARY_V1` block; duplicate blocks or duplicate keys fail CI.
+- `classification`, `proof_type`, and `engine_mode_source` must match the allowed vocabularies.
+- If `operator_claim: true`, the body (outside Non-Claims) must contain operator-oriented evidence
+  (`operator`, `manual`, `heard`, `attestation`, `playback confirmed`).
+- If `runtime_claim: true`, the body (outside Non-Claims) must contain one of:
+  `runtime FULL PASS`, `full runtime`, `end-to-end runtime`.
+
+---
+
+## Generating a proof with the harness
+
+Use `scripts/proof/run_voice_synthesis_real_engine_proof.py` to emit JSON + Markdown that is
+pre-validated with `validate_report()`:
+
+```powershell
+python scripts/proof/run_voice_synthesis_real_engine_proof.py --dry-run-fixtures --output-dir artifacts/proof_harness_selftest
+```
+
+Dry-run requires **no backend**. Real mode is opt-in and targets the local FastAPI routes documented
+in [VOICE_SYNTHESIS_REAL_ENGINE_PROOF_HARNESS_2026-04-29.md](../reports/verification/VOICE_SYNTHESIS_REAL_ENGINE_PROOF_HARNESS_2026-04-29.md).
 
 ---
 
@@ -194,7 +219,7 @@ The CI gate uses `--changed-from origin/main`. This mode collects the union of:
 4. **Untracked files** — `git ls-files --others --exclude-standard docs/reports/verification/`
 
 Only files matching the relevant name patterns under `docs/reports/verification/` are checked.
-Guard/meta-reports (filenames containing `PROOF_BOUNDARY`, `_BOUNDARY_GUARD`, `_GUARD_`) are excluded.
+Guard/meta-reports (filenames containing `PROOF_BOUNDARY`, `PROOF_HARNESS`, `_BOUNDARY_GUARD`, `_GUARD_`) are excluded.
 
 ---
 
@@ -211,6 +236,7 @@ the standard. Use `--all` to audit all historical reports.
 
 Files matching these name patterns are excluded even if they start with `VOICE_SYNTHESIS`:
 - `*PROOF_BOUNDARY*`
+- `*PROOF_HARNESS*`
 - `*_BOUNDARY_GUARD*`
 - `*_GUARD_*`
 

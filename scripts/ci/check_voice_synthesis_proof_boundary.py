@@ -46,6 +46,7 @@ RELEVANT_NAME_PATTERNS: list[re.Pattern[str]] = [
 # Names that match the patterns above but are meta/guard reports — not synthesis proofs.
 _EXCLUSION_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"PROOF_BOUNDARY", re.IGNORECASE),
+    re.compile(r"PROOF_HARNESS", re.IGNORECASE),
     re.compile(r"_BOUNDARY_GUARD", re.IGNORECASE),
     re.compile(r"_GUARD_", re.IGNORECASE),
 ]
@@ -100,10 +101,10 @@ _UNKNOWN_BLOCKER_TERMS = re.compile(
     re.IGNORECASE,
 )
 
-# ── REAL_ENGINE positive library evidence ─────────────────────────────────────
+# ── REAL_ENGINE positive library evidence (outside Non-Claims only) ───────────
 _LIBRARY_POSITIVE = re.compile(
-    r"(?:asset[ _]id|library\s+asset|HTTP\s+201|audio_id|Created|"
-    r"upload_id|asset\s+id)",
+    r"(?:\basset[ _]id\b|\blibrary\s+asset\b|\bHTTP\s+201\b|\baudio_id\b|"
+    r"\bupload_id\b|/api/library/)",
     re.IGNORECASE,
 )
 _LIBRARY_NEGATIVE = re.compile(
@@ -111,15 +112,32 @@ _LIBRARY_NEGATIVE = re.compile(
     r"library\s+unavailable|library\s+not\s+verified)",
     re.IGNORECASE,
 )
-# ── REAL_ENGINE positive timeline evidence ────────────────────────────────────
+# ── REAL_ENGINE positive timeline evidence (outside Non-Claims only) ───────
 _TIMELINE_POSITIVE = re.compile(
-    r"\b(?:revision|track|clip|placement|start_time|end_time|"
-    r"clip_id|track_id|timeline\s+revision)\b",
+    r"(?:\bclip_id\b|\btrack_id\b|\bstart_time\b|\bend_time\b|"
+    r"timeline\s+revision|/api/timeline/)",
     re.IGNORECASE,
 )
 _TIMELINE_NEGATIVE = re.compile(
     r"(?:no\s+timeline\s+evidence|timeline\s+not\s+tested|"
     r"timeline\s+unavailable|timeline\s+not\s+verified)",
+    re.IGNORECASE,
+)
+
+# ── Metadata `operator_claim` / `runtime_claim` semantic evidence ──────────────
+_OPERATOR_CLAIM_EVIDENCE = re.compile(
+    r"\b(?:operator|manual|heard|attestation|playback\s+confirmed)\b",
+    re.IGNORECASE,
+)
+_RUNTIME_CLAIM_EVIDENCE = re.compile(
+    r"(?:runtime\s+FULL\s+PASS|full\s+runtime|end-to-end\s+runtime)",
+    re.IGNORECASE,
+)
+
+# ── REAL_ENGINE: non-error audio body (not JSON error payload) ───────────────
+_NON_ERROR_BODY_AUDIO_EVIDENCE = re.compile(
+    r"(?:not\s+a\s+json\s+error\s+body|binary\s+audio|"
+    r"does\s+not\s+start\s+with\s+\{)",
     re.IGNORECASE,
 )
 
@@ -197,16 +215,28 @@ def _find_classifications(text: str) -> list[str]:
     return found
 
 
-def _parse_metadata_block(text: str) -> dict[str, str] | None:
-    """Return parsed metadata fields from VOICESTUDIO_PROOF_BOUNDARY_V1 block, or None."""
-    m = _METADATA_BLOCK_RE.search(text)
-    if not m:
-        return None
-    body = m.group(1)
+def _parse_metadata_blocks(text: str) -> tuple[int, dict[str, str], frozenset[str]]:
+    """
+    Parse VOICESTUDIO_PROOF_BOUNDARY_V1 blocks.
+
+    Returns:
+        (block_count, first_block_fields, duplicate_field_keys_in_first_block)
+    """
+    matches = list(_METADATA_BLOCK_RE.finditer(text))
+    n = len(matches)
+    if n == 0:
+        return 0, {}, frozenset()
+    body = matches[0].group(1)
     fields: dict[str, str] = {}
+    key_counts: dict[str, int] = {}
     for fm in _METADATA_FIELD_RE.finditer(body):
-        fields[fm.group(1).lower()] = fm.group(2).strip()
-    return fields
+        key = fm.group(1).lower()
+        val = fm.group(2).strip()
+        key_counts[key] = key_counts.get(key, 0) + 1
+        if key not in fields:
+            fields[key] = val
+    dups = frozenset(k for k, c in key_counts.items() if c > 1)
+    return n, fields, dups
 
 
 def validate_report(path: Path) -> list[Violation]:
@@ -219,9 +249,19 @@ def validate_report(path: Path) -> list[Violation]:
     except OSError as e:
         return [Violation(rel, "FILE_READ", str(e), "Ensure file is readable")]
 
-    # ── 1. Metadata block ────────────────────────────────────────────────────
-    metadata = _parse_metadata_block(text)
-    if metadata is None:
+    # ── 1. Metadata block(s) ──────────────────────────────────────────────────
+    meta_block_count, metadata, meta_dup_keys = _parse_metadata_blocks(text)
+    if meta_block_count > 1:
+        violations.append(Violation(
+            file=rel,
+            rule="DUPLICATE_METADATA_BLOCK",
+            detail=(
+                f"Found {meta_block_count} VOICESTUDIO_PROOF_BOUNDARY_V1 blocks; "
+                "exactly one is required"
+            ),
+            fix="Remove duplicate metadata blocks; keep a single VOICESTUDIO_PROOF_BOUNDARY_V1 block",
+        ))
+    if meta_block_count == 0:
         violations.append(Violation(
             file=rel,
             rule="MISSING_METADATA_BLOCK",
@@ -237,9 +277,18 @@ def validate_report(path: Path) -> list[Violation]:
                 "-->"
             ),
         ))
-        # Continue — we can still check classification and other rules
         metadata = {}
     else:
+        if meta_dup_keys:
+            violations.append(Violation(
+                file=rel,
+                rule="METADATA_DUPLICATE_FIELD",
+                detail=(
+                    "Duplicate metadata field key(s) in the first block: "
+                    f"{', '.join(sorted(meta_dup_keys))}"
+                ),
+                fix="Each metadata key must appear at most once in VOICESTUDIO_PROOF_BOUNDARY_V1",
+            ))
         # Check required fields
         for field in _REQUIRED_METADATA_FIELDS:
             if field not in metadata:
@@ -259,6 +308,42 @@ def validate_report(path: Path) -> list[Violation]:
                     detail=f"Metadata field '{bool_field}' must be 'true' or 'false', got '{val}'",
                     fix=f"Set '{bool_field}: true' or '{bool_field}: false' in the metadata block",
                 ))
+        meta_class_raw = metadata.get("classification", "").strip()
+        if meta_class_raw:
+            meta_class_upper = meta_class_raw.upper()
+            if meta_class_upper not in VALID_CLASSIFICATIONS:
+                violations.append(Violation(
+                    file=rel,
+                    rule="METADATA_INVALID_CLASSIFICATION",
+                    detail=(
+                        f"Metadata classification must be one of "
+                        f"{sorted(VALID_CLASSIFICATIONS)}; got '{meta_class_raw}'"
+                    ),
+                    fix="Set classification to REAL_ENGINE, STUB_ENGINE, MOCK_ENGINE, or UNKNOWN",
+                ))
+        proof_type_val = metadata.get("proof_type", "").strip().lower()
+        if proof_type_val and proof_type_val not in _VALID_PROOF_TYPES:
+            violations.append(Violation(
+                file=rel,
+                rule="METADATA_INVALID_PROOF_TYPE",
+                detail=(
+                    f"Metadata proof_type must be one of {sorted(_VALID_PROOF_TYPES)}; "
+                    f"got '{metadata.get('proof_type', '')}'"
+                ),
+                fix="Set proof_type to a valid value (e.g. voice_synthesis, generated_audio)",
+            ))
+        engine_src_val = metadata.get("engine_mode_source", "").strip().lower()
+        if engine_src_val and engine_src_val not in _VALID_ENGINE_MODE_SOURCES:
+            violations.append(Violation(
+                file=rel,
+                rule="METADATA_INVALID_ENGINE_MODE_SOURCE",
+                detail=(
+                    "Metadata engine_mode_source must be one of "
+                    f"{sorted(_VALID_ENGINE_MODE_SOURCES)}; "
+                    f"got '{metadata.get('engine_mode_source', '')}'"
+                ),
+                fix="Set engine_mode_source to a valid value (e.g. runtime_probe, test_mode_env)",
+            ))
 
     # ── 2. Classification detection ──────────────────────────────────────────
     # Strip the metadata block before searching for classifications so that the
@@ -292,9 +377,9 @@ def validate_report(path: Path) -> list[Violation]:
 
     classification = classifications[0]
 
-    # Check metadata classification matches textual classification
-    meta_class = metadata.get("classification", "").upper()
-    if meta_class and meta_class != classification:
+    # Check metadata classification matches textual classification (when valid)
+    meta_class = metadata.get("classification", "").strip().upper()
+    if meta_class and meta_class in VALID_CLASSIFICATIONS and meta_class != classification:
         violations.append(Violation(
             file=rel,
             rule="METADATA_CLASSIFICATION_MISMATCH",
@@ -320,6 +405,32 @@ def validate_report(path: Path) -> list[Violation]:
                 "## Proof Boundary | ## What This Does Not Prove"
             ),
         ))
+
+    outside_nc = _strip_non_claims_sections(text)
+    if metadata.get("operator_claim", "").lower() == "true":
+        if not _OPERATOR_CLAIM_EVIDENCE.search(outside_nc):
+            violations.append(Violation(
+                file=rel,
+                rule="OPERATOR_CLAIM_MISSING_EVIDENCE",
+                detail=(
+                    "Metadata operator_claim is true but the report body (outside "
+                    "Non-Claims) lacks operator evidence terms "
+                    "(operator, manual, heard, attestation, playback confirmed)"
+                ),
+                fix="Add explicit operator evidence in the main body or set operator_claim: false",
+            ))
+    if metadata.get("runtime_claim", "").lower() == "true":
+        if not _RUNTIME_CLAIM_EVIDENCE.search(outside_nc):
+            violations.append(Violation(
+                file=rel,
+                rule="RUNTIME_CLAIM_MISSING_EVIDENCE",
+                detail=(
+                    "Metadata runtime_claim is true but the report body (outside "
+                    "Non-Claims) lacks runtime evidence phrases "
+                    "(runtime FULL PASS, full runtime, end-to-end runtime)"
+                ),
+                fix="Add explicit runtime evidence in the main body or set runtime_claim: false",
+            ))
 
     # ── 4. UNKNOWN: require blocker evidence ─────────────────────────────────
     if classification == "UNKNOWN":
@@ -389,56 +500,68 @@ def validate_report(path: Path) -> list[Violation]:
                 fix="Add RIFF/WAV header validation evidence in an Audio Artifact section",
             ))
 
-        # Library evidence — require positive, reject negative-only
-        has_positive_library = bool(_LIBRARY_POSITIVE.search(text))
-        has_negative_library = bool(_LIBRARY_NEGATIVE.search(text))
+        # Non-error audio body (not a JSON error payload)
+        if not _NON_ERROR_BODY_AUDIO_EVIDENCE.search(outside_nc):
+            violations.append(Violation(
+                file=rel,
+                rule="REAL_ENGINE_MISSING_NON_ERROR_AUDIO_EVIDENCE",
+                detail=(
+                    "Missing explicit non-error-body audio evidence — require one of: "
+                    "'not a JSON error body', 'binary audio', 'does not start with {'"
+                ),
+                fix=(
+                    "Document that the /audio response was binary audio / not a JSON error body "
+                    "(e.g. 'does not start with {')"
+                ),
+            ))
+
+        # Library evidence — outside Non-Claims only; require positive terms
+        has_positive_library = bool(_LIBRARY_POSITIVE.search(outside_nc))
+        has_negative_library = bool(_LIBRARY_NEGATIVE.search(outside_nc))
         if has_negative_library and not has_positive_library:
             violations.append(Violation(
                 file=rel,
                 rule="REAL_ENGINE_NEGATIVE_LIBRARY_EVIDENCE",
-                detail="Report contains negative-only library evidence phrase ('no library evidence', etc.)",
+                detail="Report contains negative-only library evidence phrase outside Non-Claims",
                 fix=(
-                    "Add positive library evidence (asset id, library asset, audio_id, HTTP 201) "
+                    "Add positive library evidence (HTTP 201, asset_id, library asset, /api/library/) "
                     "or move negative statement to an Explicit Non-Claims section"
                 ),
             ))
-        elif not has_positive_library and not has_negative_library:
-            # Fallback — check for broad library mentions
-            if not any(term in text for term in ("library", "Library", "asset", "Asset")):
-                violations.append(Violation(
-                    file=rel,
-                    rule="REAL_ENGINE_MISSING_LIBRARY_EVIDENCE",
-                    detail="No library evidence found — REAL_ENGINE reports must document library save",
-                    fix=(
-                        "Add a Library Evidence section with asset id, library asset, "
-                        "or audio_id from the upload response"
-                    ),
-                ))
+        elif not has_positive_library:
+            violations.append(Violation(
+                file=rel,
+                rule="REAL_ENGINE_MISSING_LIBRARY_EVIDENCE",
+                detail="No positive library evidence outside Non-Claims — REAL_ENGINE must document library save",
+                fix=(
+                    "Add a Library Evidence section with HTTP 201, asset_id, audio_id, "
+                    "or /api/library/ path outside Non-Claims"
+                ),
+            ))
 
-        # Timeline evidence — require positive, reject negative-only
-        has_positive_timeline = bool(_TIMELINE_POSITIVE.search(text))
-        has_negative_timeline = bool(_TIMELINE_NEGATIVE.search(text))
+        # Timeline evidence — outside Non-Claims only
+        has_positive_timeline = bool(_TIMELINE_POSITIVE.search(outside_nc))
+        has_negative_timeline = bool(_TIMELINE_NEGATIVE.search(outside_nc))
         if has_negative_timeline and not has_positive_timeline:
             violations.append(Violation(
                 file=rel,
                 rule="REAL_ENGINE_NEGATIVE_TIMELINE_EVIDENCE",
-                detail="Report contains negative-only timeline evidence phrase ('no timeline evidence', etc.)",
+                detail="Report contains negative-only timeline evidence phrase outside Non-Claims",
                 fix=(
-                    "Add positive timeline evidence (revision, track, clip, placement) "
+                    "Add positive timeline evidence (clip_id, track_id, start_time, /api/timeline/) "
                     "or move negative statement to an Explicit Non-Claims section"
                 ),
             ))
-        elif not has_positive_timeline and not has_negative_timeline:
-            if not any(term in text for term in ("timeline", "Timeline", "clip", "Clip")):
-                violations.append(Violation(
-                    file=rel,
-                    rule="REAL_ENGINE_MISSING_TIMELINE_EVIDENCE",
-                    detail="No timeline evidence found — REAL_ENGINE reports must document timeline placement",
-                    fix=(
-                        "Add a Timeline Evidence section with revision, clip, or track details; "
-                        "or add an explicit non-claim if timeline is out of scope for this proof"
-                    ),
-                ))
+        elif not has_positive_timeline:
+            violations.append(Violation(
+                file=rel,
+                rule="REAL_ENGINE_MISSING_TIMELINE_EVIDENCE",
+                detail="No positive timeline evidence outside Non-Claims",
+                fix=(
+                    "Add a Timeline Evidence section with clip_id, track_id, timeline revision, "
+                    "or /api/timeline/ path outside Non-Claims"
+                ),
+            ))
 
     # ── 6. STUB / MOCK / UNKNOWN: forbid real-synthesis claims ───────────────
     elif classification in ("STUB_ENGINE", "MOCK_ENGINE", "UNKNOWN"):
@@ -627,14 +750,15 @@ VERDICT: REAL_ENGINE
 
 | Size | 186,956 bytes (182.6 KiB) |
 | RIFF header | 52 49 46 46 = RIFF / WAVE |
+| Body | binary audio — not a JSON error body; does not start with `{` |
 
 ## Library Evidence
 
-Library asset id: abc123
+HTTP 201 library asset; audio_id abc123
 
 ## Timeline Evidence
 
-timeline revision 1→2 clip def456
+timeline revision 1→2; clip_id def456; POST /api/timeline/tracks
 
 ## Explicit Non-Claims
 

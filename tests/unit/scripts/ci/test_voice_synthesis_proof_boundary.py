@@ -52,14 +52,15 @@ operator_claim: false
 
 | Size | 186,956 bytes (182.6 KiB) |
 | RIFF header | 52 49 46 46 = RIFF / WAVE |
+| Body | binary audio — not a JSON error body; does not start with `{` |
 
 ## 6. Library Evidence
 
-Library asset id: abc123
+HTTP 201 library asset; audio_id abc123
 
 ## 7. Timeline Evidence
 
-timeline revision 1→2 clip def456
+timeline revision 1→2; clip_id def456; POST /api/timeline/tracks
 
 ## 10. Explicit Non-Claims
 
@@ -375,6 +376,8 @@ def test_unrelated_reports_ignored() -> None:
     assert not _is_relevant(Path("ADR_001_PLATFORM.md"))
     # Guard/boundary meta-reports excluded even if name starts with VOICE_SYNTHESIS
     assert not _is_relevant(Path("VOICE_SYNTHESIS_PROOF_BOUNDARY_GUARD_2026-04-29.md"))
+    # Harness / tooling meta-reports (PROOF_HARNESS) excluded from proof-boundary gate
+    assert not _is_relevant(Path("VOICE_SYNTHESIS_REAL_ENGINE_PROOF_HARNESS_2026-04-29.md"))
     # Matching synthesis proof report names should be relevant
     assert _is_relevant(Path("GENERATED_AUDIO_WORKFLOW_TEST.md"))
     assert _is_relevant(Path("VOICE_SYNTHESIS_ERROR_DIALOG_RECOVERY_2026-04-29.md"))
@@ -978,6 +981,8 @@ def test_guard_meta_report_excluded_in_all_mode(tmp_path: Path, monkeypatch: pyt
     # Guard/meta report
     guard = proof_dir / "VOICE_SYNTHESIS_PROOF_BOUNDARY_GUARD_2026-04-29.md"
     guard.write_text("# Guard Report\n\n## Non-Claims\n- test\n", encoding="utf-8")
+    harness_meta = proof_dir / "VOICE_SYNTHESIS_REAL_ENGINE_PROOF_HARNESS_2026-04-29.md"
+    harness_meta.write_text("# Harness Meta\n\n## Non-Claims\n- test\n", encoding="utf-8")
 
     monkeypatch.setattr(mod, "ROOT", tmp_path)
     monkeypatch.setattr(mod, "RELEVANT_DIR", proof_dir)
@@ -985,6 +990,7 @@ def test_guard_meta_report_excluded_in_all_mode(tmp_path: Path, monkeypatch: pyt
     files = mod._get_all_relevant_files()
     names = [p.name for p in files]
     assert "VOICE_SYNTHESIS_PROOF_BOUNDARY_GUARD_2026-04-29.md" not in names
+    assert "VOICE_SYNTHESIS_REAL_ENGINE_PROOF_HARNESS_2026-04-29.md" not in names
 
 
 # ─── Bonus Test 21: --self-test-examples exits 0 ─────────────────────────────
@@ -993,3 +999,464 @@ def test_self_test_examples_passes() -> None:
     """--self-test-examples CLI mode exits 0 — built-in sanity check."""
     ret = main(["--self-test-examples"])
     assert ret == 0, "Built-in self-test examples must all pass"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Residual gap tests (validator hardening)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_REAL_BODY_CORE = """\
+**Classification: REAL_ENGINE**
+
+VERDICT: REAL_ENGINE
+
+| routed_engine | xtts_v2 |
+
+186,956 bytes (182.6 KiB)
+
+RIFF WAVE header confirmed.
+
+HTTP 201 library asset; audio_id z9
+
+timeline revision 1→2; clip_id z9; POST /api/timeline/tracks
+
+binary audio; does not start with `{`
+"""
+
+
+def test_duplicate_metadata_blocks_fail(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+# Dup Meta
+
+""" + _REAL_BODY_CORE + """
+
+## Non-Claims
+
+- not operator proof
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_DUP_META_BLOCK.md", content)
+    rules = [v.rule for v in validate_report(p)]
+    assert "DUPLICATE_METADATA_BLOCK" in rules
+
+
+def test_metadata_duplicate_field_key_fails(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+# Dup Field
+
+""" + _REAL_BODY_CORE + """
+
+## Non-Claims
+
+- not operator proof
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_DUP_META_FIELD.md", content)
+    rules = [v.rule for v in validate_report(p)]
+    assert "METADATA_DUPLICATE_FIELD" in rules
+
+
+def test_metadata_invalid_classification_value_fails(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: NOT_A_REAL_TOKEN
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+# Bad meta class
+
+**Classification: REAL_ENGINE**
+
+VERDICT: REAL_ENGINE
+
+| routed_engine | xtts_v2 |
+
+186,956 bytes (182.6 KiB)
+
+RIFF WAVE header.
+
+HTTP 201 library asset; audio_id z
+
+timeline revision 1; clip_id z; /api/timeline/state
+
+binary audio; not a JSON error body
+
+## Non-Claims
+
+- not operator proof
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_BAD_META_CLASS.md", content)
+    rules = [v.rule for v in validate_report(p)]
+    assert "METADATA_INVALID_CLASSIFICATION" in rules
+
+
+def test_metadata_invalid_proof_type_fails(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: not_a_valid_proof_type
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+# Bad proof_type
+
+""" + _REAL_BODY_CORE + """
+
+## Non-Claims
+
+- not operator proof
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_BAD_PROOF_TYPE.md", content)
+    rules = [v.rule for v in validate_report(p)]
+    assert "METADATA_INVALID_PROOF_TYPE" in rules
+
+
+def test_metadata_invalid_engine_mode_source_fails(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: imaginary_source
+runtime_claim: false
+operator_claim: false
+-->
+# Bad engine_mode_source
+
+""" + _REAL_BODY_CORE + """
+
+## Non-Claims
+
+- not operator proof
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_BAD_ENGINE_SRC.md", content)
+    rules = [v.rule for v in validate_report(p)]
+    assert "METADATA_INVALID_ENGINE_MODE_SOURCE" in rules
+
+
+def test_operator_claim_true_missing_evidence_fails(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: true
+-->
+# Op claim no evidence
+
+""" + _REAL_BODY_CORE + """
+
+## Non-Claims
+
+- operator playback is not attested in the main body above
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_OP_CLAIM_NO_EVID.md", content)
+    rules = [v.rule for v in validate_report(p)]
+    assert "OPERATOR_CLAIM_MISSING_EVIDENCE" in rules
+
+
+def test_runtime_claim_true_missing_evidence_fails(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: true
+operator_claim: false
+-->
+# Rt claim no evidence
+
+""" + _REAL_BODY_CORE + """
+
+## Non-Claims
+
+- runtime FULL PASS is not claimed in the main body above
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_RT_CLAIM_NO_EVID.md", content)
+    rules = [v.rule for v in validate_report(p)]
+    assert "RUNTIME_CLAIM_MISSING_EVIDENCE" in rules
+
+
+def test_operator_claim_true_with_evidence_passes(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: true
+-->
+# Op claim with evidence
+
+""" + _REAL_BODY_CORE + """
+
+Operator manual playback confirmed.
+
+## Non-Claims
+
+- not end-to-end certification
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_OP_CLAIM_OK.md", content)
+    assert validate_report(p) == []
+
+
+def test_runtime_claim_true_with_evidence_passes(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: true
+operator_claim: false
+-->
+# Rt claim with evidence
+
+""" + _REAL_BODY_CORE + """
+
+End-to-end runtime FULL PASS recorded.
+
+## Non-Claims
+
+- not operator attestation
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_RT_CLAIM_OK.md", content)
+    assert validate_report(p) == []
+
+
+def test_real_engine_missing_non_error_audio_evidence_fails(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+**Classification: REAL_ENGINE**
+
+VERDICT: REAL_ENGINE
+
+| routed_engine | xtts_v2 |
+
+186,956 bytes (182.6 KiB)
+
+RIFF WAVE header confirmed.
+
+HTTP 201 library asset; audio_id z
+
+timeline revision 1; clip_id z; /api/timeline/tracks
+
+## Non-Claims
+
+- not operator proof
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_NO_NONERROR_BODY.md", content)
+    rules = [v.rule for v in validate_report(p)]
+    assert "REAL_ENGINE_MISSING_NON_ERROR_AUDIO_EVIDENCE" in rules
+
+
+def test_negative_library_phrase_only_in_non_claims_passes(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+# Neg lib in NC only
+
+""" + _REAL_BODY_CORE + """
+
+## Explicit Non-Claims
+
+- no library evidence for durability (hypothetical)
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_NEG_LIB_IN_NC.md", content)
+    assert validate_report(p) == []
+
+
+def test_negative_timeline_phrase_only_in_non_claims_passes(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+# Neg timeline in NC only
+
+""" + _REAL_BODY_CORE + """
+
+## Explicit Non-Claims
+
+- no timeline evidence for export (out of scope)
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_NEG_TL_IN_NC.md", content)
+    assert validate_report(p) == []
+
+
+def test_positive_library_evidence_only_in_non_claims_fails(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+**Classification: REAL_ENGINE**
+
+VERDICT: REAL_ENGINE
+
+| routed_engine | xtts_v2 |
+
+186,956 bytes (182.6 KiB)
+
+RIFF WAVE header confirmed.
+
+timeline revision 1; clip_id z; /api/timeline/tracks
+
+binary audio; does not start with `{`
+
+## Explicit Non-Claims
+
+- HTTP 201 library asset would appear here only
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_LIB_ONLY_NC.md", content)
+    rules = [v.rule for v in validate_report(p)]
+    assert "REAL_ENGINE_MISSING_LIBRARY_EVIDENCE" in rules
+
+
+def test_positive_timeline_evidence_only_in_non_claims_fails(tmp_path: Path) -> None:
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+**Classification: REAL_ENGINE**
+
+VERDICT: REAL_ENGINE
+
+| routed_engine | xtts_v2 |
+
+186,956 bytes (182.6 KiB)
+
+RIFF WAVE header confirmed.
+
+HTTP 201 library asset; audio_id z
+
+binary audio; not a JSON error body
+
+## Explicit Non-Claims
+
+- clip_id fake only in non-claims; POST /api/timeline/tracks hypothetical
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_TL_ONLY_NC.md", content)
+    rules = [v.rule for v in validate_report(p)]
+    assert "REAL_ENGINE_MISSING_TIMELINE_EVIDENCE" in rules
+
+
+def test_negative_inside_non_claims_does_not_trigger_negative_library_rule(
+    tmp_path: Path,
+) -> None:
+    """'no library evidence' inside Non-Claims must not pair with missing positive."""
+    content = """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+# NC neg lib
+
+""" + _REAL_BODY_CORE + """
+
+## Explicit Non-Claims
+
+- no library evidence for unrelated subsystem X
+"""
+    p = _write_proof(tmp_path, "REAL_ENGINE_NC_NEG_LIB.md", content)
+    rules = [v.rule for v in validate_report(p)]
+    assert "REAL_ENGINE_NEGATIVE_LIBRARY_EVIDENCE" not in rules
+
+
+def test_json_output_includes_residual_rules(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import scripts.ci.check_voice_synthesis_proof_boundary as mod
+
+    proof_dir = tmp_path / "docs" / "reports" / "verification"
+    proof_dir.mkdir(parents=True, exist_ok=True)
+    report = proof_dir / "GENERATED_AUDIO_JSON_RESIDUAL.md"
+    report.write_text(
+        """\
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: bad_proof_type_x
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+**Classification: REAL_ENGINE**
+
+VERDICT: REAL_ENGINE
+
+| routed_engine | xtts_v2 |
+
+186,956 bytes (182.6 KiB)
+
+RIFF WAVE
+
+HTTP 201 library asset
+
+clip_id x; /api/timeline/
+
+binary audio; not a JSON error body
+
+## Non-Claims
+
+- test
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(mod, "ROOT", tmp_path)
+    monkeypatch.setattr(mod, "RELEVANT_DIR", proof_dir)
+
+    buf = io.StringIO()
+    with patch("builtins.print", side_effect=lambda *a, **kw: buf.write(" ".join(str(x) for x in a) + "\n")):
+        ret = main(["--all", "--json"])
+
+    assert ret == 1
+    output = buf.getvalue()
+    json_start = output.find("{")
+    data = json.loads(output[json_start : output.rfind("}") + 1])
+    rules = {v["rule"] for v in data["violations"]}
+    assert "METADATA_INVALID_PROOF_TYPE" in rules

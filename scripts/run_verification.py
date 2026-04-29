@@ -632,6 +632,15 @@ def main():
                 "command": f"{sys.executable} {ui_audit_script}"
             })
 
+        # Voice synthesis proof boundary guard (engine classification enforcement)
+        proof_boundary_script = project_root / "scripts" / "ci" / "check_voice_synthesis_proof_boundary.py"
+        if proof_boundary_script.exists():
+            checks.append({
+                "name": "voice_synthesis_proof_boundary",
+                "command": f"{sys.executable} {proof_boundary_script} --changed-from origin/main",
+                "timeout": 15,
+            })
+
     # Optionally add build check if --build flag
     if "--build" in sys.argv:
         checks.append({

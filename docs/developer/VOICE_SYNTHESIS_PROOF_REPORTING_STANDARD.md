@@ -156,6 +156,66 @@ in [VOICE_SYNTHESIS_REAL_ENGINE_PROOF_HARNESS_2026-04-29.md](../reports/verifica
 
 ---
 
+## JSON Proof Schema
+
+Harness JSON proof artifacts use `schemas/voice_synthesis_proof.schema.json` and `schema_version: "voice_synthesis_proof.v1"`.
+
+Required top-level fields include `git`, `classification`, `proof_type`, `engine_mode_source`, `requested_engine`, `routed_engine`, `environment`, `backend`, `profile`, `synthesis`, `audio_artifact`, `library`, `timeline`, `durability`, `non_claims`, and `verdict`.
+
+Validate JSON proofs with:
+
+```powershell
+python scripts/ci/check_voice_synthesis_proof_json.py --path <proof.json>
+python scripts/ci/check_voice_synthesis_proof_json.py --dir docs/reports/verification/runtime_proofs
+python scripts/ci/check_voice_synthesis_proof_json.py --self-test-examples
+```
+
+The validator enforces semantic rules that are intentionally clearer than JSON Schema alone: `REAL_ENGINE` cannot route to stub/mock/test, UNKNOWN requires blockers, durability claims require restart/reload evidence, and SHA-256 must be lowercase hex.
+
+---
+
+## Audio Forensic Requirements
+
+`REAL_ENGINE` JSON proofs must include WAV forensic evidence from `scripts/proof/audio_forensics.py`:
+
+- `size_bytes > 1024`
+- `sha256`
+- `header_hex`
+- `container` containing `RIFF/WAVE`
+- `not_json_error_body: true`
+- sample rate, channels, bits per sample, data chunk size
+- WAV-derived duration
+- `non_silent: true` with peak/RMS values
+
+If non-silence cannot be proven, classify the proof as `UNKNOWN` with a blocker instead of claiming `REAL_ENGINE`.
+
+---
+
+## Durability Claim Requirements
+
+Default harness runs must set `durability.claimed=false`. Durability can be claimed only when:
+
+- `--verify-durability` is used,
+- `--restart-backend-command` is explicitly supplied,
+- the restart command exits 0, and
+- audio, library, and timeline reload checks pass after restart.
+
+Replay checks without restart are useful evidence, but they are not restart durability proof.
+
+---
+
+## Proof Bundle Index
+
+Use `scripts/proof/index_voice_synthesis_proofs.py` to summarize JSON proof bundles:
+
+```powershell
+python scripts/proof/index_voice_synthesis_proofs.py --dir docs/reports/verification/runtime_proofs --output docs/reports/verification/runtime_proofs/index.json --strict
+```
+
+The index records latest proof, latest `REAL_ENGINE`, latest `UNKNOWN`, counts by classification, schema versions, proof files, and validation status.
+
+---
+
 ## UNKNOWN Blocker Requirement
 
 An `UNKNOWN`-classified report must contain explicit blocker language outside the
@@ -219,7 +279,7 @@ The CI gate uses `--changed-from origin/main`. This mode collects the union of:
 4. **Untracked files** — `git ls-files --others --exclude-standard docs/reports/verification/`
 
 Only files matching the relevant name patterns under `docs/reports/verification/` are checked.
-Guard/meta-reports (filenames containing `PROOF_BOUNDARY`, `PROOF_HARNESS`, `_BOUNDARY_GUARD`, `_GUARD_`) are excluded.
+Guard/meta-reports (filenames containing `PROOF_BOUNDARY`, `PROOF_HARNESS`, `PROOF_DURABILITY`, `PROOF_SCHEMA`, `_BOUNDARY_GUARD`, `_GUARD_`) are excluded.
 
 ---
 
@@ -237,6 +297,8 @@ the standard. Use `--all` to audit all historical reports.
 Files matching these name patterns are excluded even if they start with `VOICE_SYNTHESIS`:
 - `*PROOF_BOUNDARY*`
 - `*PROOF_HARNESS*`
+- `*PROOF_DURABILITY*`
+- `*PROOF_SCHEMA*`
 - `*_BOUNDARY_GUARD*`
 - `*_GUARD_*`
 

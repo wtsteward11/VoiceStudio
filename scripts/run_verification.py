@@ -655,6 +655,18 @@ def main():
                 "timeout": 30,
             })
 
+        proof_json_script = project_root / "scripts" / "ci" / "check_voice_synthesis_proof_json.py"
+        if proof_json_script.exists():
+            checks.append({
+                "name": "voice_synthesis_proof_json_selftest",
+                "command": [
+                    sys.executable,
+                    str(proof_json_script),
+                    "--self-test-examples",
+                ],
+                "timeout": 15,
+            })
+
     # Optionally add build check if --build flag
     if "--build" in sys.argv:
         checks.append({

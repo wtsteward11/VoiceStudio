@@ -378,6 +378,8 @@ def test_unrelated_reports_ignored() -> None:
     assert not _is_relevant(Path("VOICE_SYNTHESIS_PROOF_BOUNDARY_GUARD_2026-04-29.md"))
     # Harness / tooling meta-reports (PROOF_HARNESS) excluded from proof-boundary gate
     assert not _is_relevant(Path("VOICE_SYNTHESIS_REAL_ENGINE_PROOF_HARNESS_2026-04-29.md"))
+    assert not _is_relevant(Path("VOICE_SYNTHESIS_PROOF_DURABILITY_AND_SCHEMA_2026-04-29.md"))
+    assert not _is_relevant(Path("VOICE_SYNTHESIS_PROOF_SCHEMA_NOTES_2026-04-29.md"))
     # Matching synthesis proof report names should be relevant
     assert _is_relevant(Path("GENERATED_AUDIO_WORKFLOW_TEST.md"))
     assert _is_relevant(Path("VOICE_SYNTHESIS_ERROR_DIALOG_RECOVERY_2026-04-29.md"))
@@ -983,6 +985,8 @@ def test_guard_meta_report_excluded_in_all_mode(tmp_path: Path, monkeypatch: pyt
     guard.write_text("# Guard Report\n\n## Non-Claims\n- test\n", encoding="utf-8")
     harness_meta = proof_dir / "VOICE_SYNTHESIS_REAL_ENGINE_PROOF_HARNESS_2026-04-29.md"
     harness_meta.write_text("# Harness Meta\n\n## Non-Claims\n- test\n", encoding="utf-8")
+    durability_meta = proof_dir / "VOICE_SYNTHESIS_PROOF_DURABILITY_AND_SCHEMA_2026-04-29.md"
+    durability_meta.write_text("# Durability Meta\n\n## Non-Claims\n- test\n", encoding="utf-8")
 
     monkeypatch.setattr(mod, "ROOT", tmp_path)
     monkeypatch.setattr(mod, "RELEVANT_DIR", proof_dir)
@@ -991,6 +995,7 @@ def test_guard_meta_report_excluded_in_all_mode(tmp_path: Path, monkeypatch: pyt
     names = [p.name for p in files]
     assert "VOICE_SYNTHESIS_PROOF_BOUNDARY_GUARD_2026-04-29.md" not in names
     assert "VOICE_SYNTHESIS_REAL_ENGINE_PROOF_HARNESS_2026-04-29.md" not in names
+    assert "VOICE_SYNTHESIS_PROOF_DURABILITY_AND_SCHEMA_2026-04-29.md" not in names
 
 
 # ─── Bonus Test 21: --self-test-examples exits 0 ─────────────────────────────

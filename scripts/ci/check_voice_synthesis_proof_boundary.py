@@ -47,6 +47,8 @@ RELEVANT_NAME_PATTERNS: list[re.Pattern[str]] = [
 _EXCLUSION_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"PROOF_BOUNDARY", re.IGNORECASE),
     re.compile(r"PROOF_HARNESS", re.IGNORECASE),
+    re.compile(r"PROOF_DURABILITY", re.IGNORECASE),
+    re.compile(r"PROOF_SCHEMA", re.IGNORECASE),
     re.compile(r"_BOUNDARY_GUARD", re.IGNORECASE),
     re.compile(r"_GUARD_", re.IGNORECASE),
 ]

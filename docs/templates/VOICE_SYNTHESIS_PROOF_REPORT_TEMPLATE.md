@@ -37,6 +37,7 @@ UNKNOWN       — Engine mode could not be determined (blocker condition).
 | `origin/main` | `[hash]` |
 | Ahead/behind | `[N ahead, M behind]` |
 | Dirty files | [none / list] |
+| JSON proof artifact | `[path/to/proof.json]` |
 
 ---
 
@@ -105,6 +106,10 @@ UNKNOWN       — Engine mode could not be determined (blocker condition).
 | WAVE marker (bytes 8–11) | `"WAVE"` ✓ |
 | Content-Type | `audio/wav` |
 | Non-error body | **GET `/api/voice/audio/{audio_id}`** returned **binary audio** (not a JSON error body; does not start with `{`) |
+| SHA-256 | `[lowercase hex digest]` |
+| Sample rate / channels / bits | `[Hz] / [channels] / [bits]` |
+| WAV-derived duration | `[seconds]` |
+| Non-silent analysis | `non_silent=[true/false/unknown]`, `peak_abs_sample=[value]`, `rms=[value]` |
 
 ---
 
@@ -133,7 +138,14 @@ UNKNOWN       — Engine mode could not be determined (blocker condition).
 
 <!-- Either add durability checks, or explicitly state this is out of scope: -->
 
-[Durability not tested in this proof. See Explicit Non-Claims section.]
+| Field | Value |
+|---|---|
+| `durability.claimed` | `[true / false]` |
+| `restart_performed` | `[true / false]` |
+| `reload_verified` | `[true / false]` |
+| Blocker / non-claim | `[restart not performed / reload verified / reason]` |
+
+Durability must be a non-claim unless automated restart + reload evidence exists.
 
 ---
 

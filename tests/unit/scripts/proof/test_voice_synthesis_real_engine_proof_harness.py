@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import struct
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -13,9 +14,10 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.ci.check_voice_synthesis_proof_boundary import validate_report
 from scripts.proof.run_voice_synthesis_real_engine_proof import (
-    MINIMAL_WAV_BYTES,
+    ProofApiRoutes,
     ProofOptions,
     ProofResult,
+    _proof_json,
     dry_run_write_reports,
     render_markdown_report,
     run_real_engine_flow,
@@ -227,7 +229,23 @@ def _good_chain(
     })
 
 
-def test_real_engine_happy_path_minimal_wav(proof_opts: ProofOptions) -> None:
+def _non_silent_wav(sample_count: int = 1200) -> bytes:
+    pcm = b"".join(struct.pack("<h", 1000 if i % 2 else -1000) for i in range(sample_count))
+    fmt = struct.pack("<HHIIHH", 1, 1, 44100, 88200, 2, 16)
+    riff_size = 4 + (8 + len(fmt)) + (8 + len(pcm))
+    return (
+        b"RIFF"
+        + struct.pack("<I", riff_size)
+        + b"WAVEfmt "
+        + struct.pack("<I", len(fmt))
+        + fmt
+        + b"data"
+        + struct.pack("<I", len(pcm))
+        + pcm
+    )
+
+
+def test_real_engine_happy_path_non_silent_wav(proof_opts: ProofOptions) -> None:
     syn = {
         "audio_id": "aid1",
         "routed_engine": "xtts_v2",
@@ -252,7 +270,7 @@ def test_real_engine_happy_path_minimal_wav(proof_opts: ProofOptions) -> None:
             if "/api/profiles" in url:
                 return (200, json.dumps({"items": [{"id": "p1", "reference_audio_bound": True}]}).encode())
             if "/api/voice/audio/aid1" in url:
-                return (200, MINIMAL_WAV_BYTES)
+                return (200, _non_silent_wav())
             if "/api/timeline/state" in url:
                 self._state_i += 1
                 if self._state_i == 1:
@@ -299,7 +317,7 @@ def test_audio_json_unknown(proof_opts: ProofOptions) -> None:
 
 
 def test_audio_not_riff_unknown(proof_opts: ProofOptions) -> None:
-    body = b"x" * 200
+    body = b"x" * 2048
     http = _good_chain(body)
     r = run_real_engine_flow(http, proof_opts)
     assert r.classification == "UNKNOWN"
@@ -307,14 +325,123 @@ def test_audio_not_riff_unknown(proof_opts: ProofOptions) -> None:
 
 
 def test_library_upload_fail_unknown(proof_opts: ProofOptions) -> None:
-    http = _good_chain(MINIMAL_WAV_BYTES, upload_status=500)
+    http = _good_chain(_non_silent_wav(), upload_status=500)
     r = run_real_engine_flow(http, proof_opts)
     assert r.classification == "UNKNOWN"
     assert any("library" in b.lower() for b in r.blockers)
 
 
 def test_timeline_clip_fail_unknown(proof_opts: ProofOptions) -> None:
-    http = _good_chain(MINIMAL_WAV_BYTES, clip_status=400)
+    http = _good_chain(_non_silent_wav(), clip_status=400)
     r = run_real_engine_flow(http, proof_opts)
     assert r.classification == "UNKNOWN"
     assert any("clip" in b.lower() for b in r.blockers)
+
+
+def test_default_run_does_not_claim_durability(proof_opts: ProofOptions) -> None:
+    r = run_real_engine_flow(_good_chain(_non_silent_wav()), proof_opts)
+    assert r.classification == "REAL_ENGINE"
+    assert r.durability["claimed"] is False
+    assert r.durability["restart_performed"] is False
+
+
+def test_verify_durability_without_restart_replays_but_does_not_claim_restart(
+    proof_opts: ProofOptions,
+) -> None:
+    proof_opts.verify_durability = True
+    http = _good_chain(_non_silent_wav())
+    http.handlers["/api/library/assets/lib1"] = (200, json.dumps({"id": "lib1"}).encode())
+    r = run_real_engine_flow(http, proof_opts)
+    assert r.classification == "REAL_ENGINE"
+    assert r.durability["claimed"] is False
+    assert "restart command not supplied" in r.durability["blocker"]
+
+
+def test_library_requery_failure_produces_durability_blocker(proof_opts: ProofOptions) -> None:
+    proof_opts.verify_durability = True
+    r = run_real_engine_flow(_good_chain(_non_silent_wav()), proof_opts)
+    assert r.classification == "UNKNOWN"
+    assert any("library asset re-query" in b for b in r.blockers)
+
+
+def test_timeline_requery_failure_produces_durability_blocker(proof_opts: ProofOptions) -> None:
+    proof_opts.verify_durability = True
+    http = _good_chain(_non_silent_wav())
+    http.handlers["/api/library/assets/lib1"] = (200, json.dumps({"id": "lib1"}).encode())
+    http.handlers["/api/timeline/state"] = (200, json.dumps({"revision": 2, "tracks": []}).encode())
+    r = run_real_engine_flow(http, proof_opts)
+    assert r.classification == "UNKNOWN"
+    assert any("timeline re-query" in b for b in r.blockers)
+
+
+def test_restart_command_failure_produces_durability_blocker(
+    proof_opts: ProofOptions,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proof_opts.verify_durability = True
+    proof_opts.restart_backend_command = "restart_backend --now"
+    http = _good_chain(_non_silent_wav())
+    http.handlers["/api/library/assets/lib1"] = (200, json.dumps({"id": "lib1"}).encode())
+
+    class FailedProcess:
+        returncode = 7
+        stderr = "restart failed"
+
+    from scripts.proof import run_voice_synthesis_real_engine_proof as mod
+
+    monkeypatch.setattr(mod.subprocess, "run", lambda *args, **kwargs: FailedProcess())
+    r = run_real_engine_flow(http, proof_opts)
+    assert r.classification == "UNKNOWN"
+    assert any("restart command failed" in b for b in r.blockers)
+
+
+def test_restart_command_success_sets_durability_claimed(
+    proof_opts: ProofOptions,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proof_opts.verify_durability = True
+    proof_opts.restart_backend_command = "restart_backend --now"
+    http = _good_chain(_non_silent_wav())
+    http.handlers["/api/library/assets/lib1"] = (200, json.dumps({"id": "lib1"}).encode())
+
+    class OkProcess:
+        returncode = 0
+        stderr = ""
+
+    from scripts.proof import run_voice_synthesis_real_engine_proof as mod
+
+    monkeypatch.setattr(mod.subprocess, "run", lambda *args, **kwargs: OkProcess())
+    r = run_real_engine_flow(http, proof_opts)
+    assert r.classification == "REAL_ENGINE"
+    assert r.durability["claimed"] is True
+    assert r.durability["restart_performed"] is True
+    assert r.durability["reload_verified"] is True
+
+
+def test_generated_json_records_durability_fields(proof_opts: ProofOptions) -> None:
+    r = run_real_engine_flow(_good_chain(_non_silent_wav()), proof_opts)
+    payload = _proof_json(r, proof_opts)
+    assert payload["durability"]["claimed"] is False
+    assert "restart_performed" in payload["durability"]
+    assert "reload_verified" in payload["durability"]
+
+
+def test_generated_markdown_marks_durability_non_claim(proof_opts: ProofOptions) -> None:
+    r = run_real_engine_flow(_good_chain(_non_silent_wav()), proof_opts)
+    md = render_markdown_report(r, proof_opts)
+    assert "Durability non-claim" in md
+    assert "not durability proof unless restart durability" in md
+
+
+def test_route_builder_returns_expected_paths() -> None:
+    assert ProofApiRoutes.audio_url("abc") == "/api/voice/audio/abc"
+    assert ProofApiRoutes.library_asset_url("asset") == "/api/library/assets/asset"
+
+
+def test_route_builder_session_id_is_encoded() -> None:
+    path = ProofApiRoutes.timeline_with_session(ProofApiRoutes.TIMELINE_STATE, "a b&c")
+    assert path == "/api/timeline/state?session_id=a+b%26c"
+
+
+def test_full_url_trailing_slash_does_not_double_slash() -> None:
+    assert ProofApiRoutes.full_url("http://127.0.0.1:8000/", "/api/health/") == "http://127.0.0.1:8000/api/health/"

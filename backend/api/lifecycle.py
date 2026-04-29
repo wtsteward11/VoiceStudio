@@ -308,7 +308,7 @@ async def on_startup_prepare(app: FastAPI) -> None:
                     get_database_adapter,
                 )
 
-                db = get_database_adapter(connection_string=config.connection_string)
+                db = get_database_adapter(connection_string=config.get_connection_string())
                 if not db._connected:
                     await db.connect()
             except Exception as db_err:

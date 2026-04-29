@@ -426,6 +426,9 @@ async def response_cache_middleware(request: Request, call_next: Callable) -> Re
         "/docs",
         "/openapi.json",
         "/redoc",
+        # Timeline state is session-scoped and mutates frequently; caching GET here
+        # returns stale empty state after POST /tracks|/clips (no invalidation on writes).
+        "/api/timeline",
     ]
     if any(request.url.path.startswith(path) for path in skip_paths):
         resp2: Response = await call_next(request)

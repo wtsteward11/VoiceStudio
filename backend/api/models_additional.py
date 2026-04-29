@@ -263,6 +263,16 @@ class VoiceSynthesizeRequest(VoiceStudioBaseModel):
         description="Consent record ID required when synthesizing with a third-party voice profile",
         max_length=100,
     )
+    project_id: str | None = Field(
+        default=None,
+        description="Optional project context for generated audio provenance",
+        max_length=100,
+    )
+    session_id: str | None = Field(
+        default=None,
+        description="Optional timeline/session context for generated audio provenance",
+        max_length=100,
+    )
     speed: float | None = Field(
         default=None,
         description="Speech speed (0.5-2.0, default 1.0)",
@@ -425,6 +435,14 @@ class VoiceSynthesizeResponse(VoiceStudioBaseModel):
 
     audio_id: str
     audio_url: str
+    generated_audio_id: str | None = Field(
+        default=None,
+        description="Stable generated-audio identity; currently aliases audio_id when no separate model exists.",
+    )
+    profile_id: str | None = Field(
+        default=None,
+        description="Voice profile that produced the generated audio.",
+    )
     duration: float
     # Overall quality score (0.0-1.0)
     quality_score: float

@@ -132,6 +132,7 @@ class AddClipRequest(BaseModel):
     start_time: float = 0.0
     duration: float = 1.0
     name: str | None = "Clip"
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class MoveClipRequest(BaseModel):
@@ -749,6 +750,7 @@ async def add_clip(request: AddClipRequest, session_id: SessionIdQuery = DEFAULT
         start_time=request.start_time,
         end_time=request.start_time + request.duration,
         name=request.name or "Clip",
+        metadata=request.metadata,
     )
     track.clips.append(clip)
     _update_timeline_duration(timeline)

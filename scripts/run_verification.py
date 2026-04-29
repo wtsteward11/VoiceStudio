@@ -667,6 +667,18 @@ def main():
                 "timeout": 15,
             })
 
+        no_fallback_product_path_script = project_root / "scripts" / "ci" / "check_runtime_no_fallback_product_path.py"
+        if no_fallback_product_path_script.exists():
+            checks.append({
+                "name": "runtime_no_fallback_product_path_selftest",
+                "command": [
+                    sys.executable,
+                    str(no_fallback_product_path_script),
+                    "--self-test-examples",
+                ],
+                "timeout": 15,
+            })
+
     # Optionally add build check if --build flag
     if "--build" in sys.argv:
         checks.append({

@@ -11,6 +11,8 @@ Tests all 15 timeline endpoints with comprehensive coverage:
 - Undo/Redo operations
 """
 
+from pathlib import Path
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -205,6 +207,34 @@ class TestClipOperations:
         assert data["start_time"] == 0.0
         assert data["end_time"] == 5.0
         assert data["source_path"] == "/path/to/audio.wav"
+
+    def test_add_clip_preserves_generated_audio_metadata(self, timeline_client, setup_track):
+        """Generated-audio proof metadata must round-trip into persisted clip state."""
+        metadata = {
+            "generated_audio_id": "ga-123",
+            "library_asset_id": "asset-123",
+            "audio_id": "audio-123",
+            "project_id": "project-123",
+            "session_id": "proof-session",
+        }
+        response = timeline_client.post(
+            "/api/timeline/clips",
+            json={
+                "track_id": setup_track,
+                "source_path": "/path/to/audio.wav",
+                "start_time": 0.0,
+                "duration": 5.0,
+                "name": "Generated Clip",
+                "metadata": metadata,
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["metadata"] == metadata
+
+        state = timeline_client.get("/api/timeline/state").json()
+        clips = state["tracks"][0]["clips"]
+        assert clips[0]["metadata"] == metadata
 
     def test_add_clip_to_nonexistent_track(self, timeline_client):
         """Test adding clip to non-existent track."""
@@ -480,6 +510,57 @@ class TestExport:
         assert isinstance(data["output_path"], str)
         assert data["output_path"].endswith(".wav")
         assert "duration" in data
+
+    def test_export_timeline_writes_replay_verifiable_wav(self, timeline_client, tmp_path):
+        """Generated-audio closure export must produce a decodeable non-silent WAV."""
+        import numpy as np
+        import soundfile as sf
+
+        from scripts.proof.audio_forensics import analyze_wav_bytes
+
+        wav_path = tmp_path / "generated_clip.wav"
+        samples = np.sin(np.linspace(0.0, 12.0, 4800, dtype=np.float32)) * 0.25
+        sf.write(str(wav_path), samples, 48000)
+
+        timeline_client.post("/api/timeline/create", json={"name": "Generated", "sample_rate": 48000})
+        timeline_client.post("/api/timeline/tracks", json={"name": "Generated Track", "type": "audio"})
+        state = timeline_client.get("/api/timeline/state").json()
+        track_id = state["tracks"][0]["id"]
+        timeline_client.post(
+            "/api/timeline/clips",
+            json={
+                "track_id": track_id,
+                "source_path": str(wav_path),
+                "start_time": 0.0,
+                "duration": 0.1,
+                "name": "Generated Clip",
+                "metadata": {
+                    "generated_audio_id": "generated-123",
+                    "library_asset_id": "asset-123",
+                },
+            },
+        )
+
+        output_path = tmp_path / "timeline_export.wav"
+        response = timeline_client.post(
+            "/api/timeline/export",
+            json={
+                "output_path": str(output_path),
+                "format": "wav",
+                "sample_rate": 48000,
+                "lufs_preset": "neutral",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        exported = Path(data["output_path"])
+        assert exported.exists()
+        analysis = analyze_wav_bytes(exported.read_bytes())
+        assert analysis["is_wav"] is True
+        assert analysis["non_silent"] is True
+        assert analysis["duration_seconds"] is not None
 
     def test_export_empty_timeline_returns_400_without_fallback(self, timeline_client):
         """GAP-031: empty mix fails closed when fallback does not apply."""

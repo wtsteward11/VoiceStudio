@@ -35,6 +35,44 @@ def _rules(path: Path) -> list[str]:
     return [v.rule for v in validate_proof_json(path)]
 
 
+def _with_product_closure(payload: dict) -> dict:
+    payload["project"] = {
+        "project_id": "project-123",
+        "project_name": "Proof Project",
+        "session_id": "session-123",
+        "persistence_scope": "sqlite",
+        "reload_verified": True,
+    }
+    payload["generated_audio"] = {
+        "generated_audio_id": "a1",
+        "audio_id": "a1",
+        "source_engine": "xtts_v2",
+        "routed_engine": "xtts_v2",
+        "profile_id": "p1",
+        "artifact_path": "C:/tmp/a1.wav",
+        "artifact_sha256": "a" * 64,
+        "duration_seconds": 1.0,
+        "library_asset_id": "asset1",
+        "timeline_track_id": "trk1",
+        "timeline_clip_id": "clip1",
+        "provenance": {"source": "voice_synthesis"},
+    }
+    payload["export"] = {
+        "claimed": True,
+        "export_id": "export-1",
+        "path": "C:/tmp/export.wav",
+        "size_bytes": 4096,
+        "sha256": "b" * 64,
+        "container": "RIFF/WAVE",
+        "duration_seconds_from_wav": 1.0,
+        "sample_rate_hz": 44100,
+        "channels": 1,
+        "non_silent": True,
+        "blocker": None,
+    }
+    return payload
+
+
 def test_valid_real_engine_json_passes(tmp_path: Path) -> None:
     assert validate_proof_json(_write(tmp_path / "proof.json", _valid_real_fixture())) == []
 
@@ -158,6 +196,31 @@ def test_json_output_contains_file_rule_field_and_fix(tmp_path: Path) -> None:
     out = json.loads(buf.getvalue())
     violation = out["violations"][0]
     assert {"file", "rule", "field", "fix"} <= set(violation)
+
+
+def test_product_closure_mode_requires_project_generated_audio_and_export(tmp_path: Path) -> None:
+    proof = _write(tmp_path / "proof.json", _valid_real_fixture())
+    rules = [v.rule for v in validate_proof_json(proof, product_closure=True)]
+    assert "PRODUCT_CLOSURE_MISSING_PROJECT" in rules
+    assert "PRODUCT_CLOSURE_MISSING_GENERATED_AUDIO" in rules
+    assert "PRODUCT_CLOSURE_MISSING_EXPORT" in rules
+    assert validate_proof_json(proof) == []
+
+
+def test_valid_product_closure_real_engine_json_passes(tmp_path: Path) -> None:
+    proof = _write(tmp_path / "proof.json", _with_product_closure(_valid_real_fixture()))
+    assert validate_proof_json(proof, product_closure=True) == []
+
+
+def test_product_closure_cli_json_output(tmp_path: Path) -> None:
+    proof = _write(tmp_path / "proof.json", _valid_real_fixture())
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = main(["--path", str(proof), "--product-closure", "--json"])
+    assert rc == 1
+    out = json.loads(buf.getvalue())
+    assert out["status"] == "fail"
+    assert any(v["rule"] == "PRODUCT_CLOSURE_MISSING_PROJECT" for v in out["violations"])
 
 
 def test_self_test_examples_exit_zero() -> None:

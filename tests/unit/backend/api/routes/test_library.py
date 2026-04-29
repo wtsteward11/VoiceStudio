@@ -5,6 +5,9 @@ Tests library management endpoints against the real DB-backed
 repository layer (BaseRepository + aiosqlite).
 """
 
+import io
+import wave
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -16,6 +19,16 @@ def _make_client() -> TestClient:
     app = FastAPI()
     app.include_router(router)
     return TestClient(app, raise_server_exceptions=False)
+
+
+def _wav_bytes() -> bytes:
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(16000)
+        wf.writeframes((1000).to_bytes(2, "little", signed=True) * 1600)
+    return buf.getvalue()
 
 
 class TestLibraryRouteImports:
@@ -105,6 +118,34 @@ class TestLibraryAssetsEndpoints:
         data = r.json()
         assert data["total"] == 0
         assert data["assets"] == []
+
+    def test_upload_asset_preserves_generated_audio_provenance(self, tmp_path, monkeypatch):
+        """Generated-audio closure metadata must be persisted in library asset metadata."""
+        from backend.api.routes import library
+
+        monkeypatch.setattr(library, "get_path", lambda _name: tmp_path)
+        client = _make_client()
+        response = client.post(
+            "/api/library/assets/upload",
+            params={
+                "project_id": "project-123",
+                "session_id": "session-123",
+                "generated_audio_id": "ga-123",
+                "source_engine": "xtts_v2",
+                "routed_engine": "xtts_v2",
+                "profile_id": "profile-123",
+            },
+            files={"file": ("generated.wav", _wav_bytes(), "audio/wav")},
+        )
+        assert response.status_code == 201, response.text
+        data = response.json()
+        assert data["audio_id"]
+        assert data["metadata"]["project_id"] == "project-123"
+        assert data["metadata"]["session_id"] == "session-123"
+        assert data["metadata"]["generated_audio_id"] == "ga-123"
+        assert data["metadata"]["source_engine"] == "xtts_v2"
+        assert data["metadata"]["routed_engine"] == "xtts_v2"
+        assert data["metadata"]["profile_id"] == "profile-123"
 
 
 class TestLibraryTypesEndpoint:

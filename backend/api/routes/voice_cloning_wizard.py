@@ -25,7 +25,6 @@ router = APIRouter(prefix="/api/voice/clone/wizard", tags=["voice-cloning-wizard
 # Disk-backed wizard job state (durable across backend restarts)
 _wizard_store = get_job_state_store("voice_cloning_wizard")
 _wizard_jobs: dict[str, WizardJob] = {}
-_state_lock = asyncio.Lock()
 
 
 class WizardJob(BaseModel):

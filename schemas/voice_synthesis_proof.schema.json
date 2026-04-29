@@ -126,6 +126,12 @@
         "audio_id": {
           "type": ["string", "null"]
         },
+        "generated_audio_id": {
+          "type": ["string", "null"]
+        },
+        "profile_id": {
+          "type": ["string", "null"]
+        },
         "audio_url": {
           "type": ["string", "null"]
         },
@@ -267,6 +273,116 @@
         "duration_seconds": {
           "type": ["number", "null"],
           "minimum": 0
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "type": ["string", "null"]
+        },
+        "project_name": {
+          "type": ["string", "null"]
+        },
+        "session_id": {
+          "type": ["string", "null"]
+        },
+        "persistence_scope": {
+          "type": ["string", "null"]
+        },
+        "reload_verified": {
+          "type": ["boolean", "null"]
+        }
+      }
+    },
+    "generated_audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "generated_audio_id": {
+          "type": ["string", "null"]
+        },
+        "audio_id": {
+          "type": ["string", "null"]
+        },
+        "source_engine": {
+          "type": ["string", "null"]
+        },
+        "routed_engine": {
+          "type": ["string", "null"]
+        },
+        "profile_id": {
+          "type": ["string", "null"]
+        },
+        "created_at_utc": {
+          "type": ["string", "null"]
+        },
+        "artifact_path": {
+          "type": ["string", "null"]
+        },
+        "artifact_sha256": {
+          "type": ["string", "null"]
+        },
+        "duration_seconds": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "library_asset_id": {
+          "type": ["string", "null"]
+        },
+        "timeline_track_id": {
+          "type": ["string", "null"]
+        },
+        "timeline_clip_id": {
+          "type": ["string", "null"]
+        },
+        "provenance": {
+          "type": ["object", "null"]
+        }
+      }
+    },
+    "export": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "claimed": {
+          "type": "boolean"
+        },
+        "export_id": {
+          "type": ["string", "null"]
+        },
+        "path": {
+          "type": ["string", "null"]
+        },
+        "size_bytes": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "sha256": {
+          "type": ["string", "null"]
+        },
+        "container": {
+          "type": ["string", "null"]
+        },
+        "duration_seconds_from_wav": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "sample_rate_hz": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "channels": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "non_silent": {
+          "type": ["boolean", "null"]
+        },
+        "blocker": {
+          "type": ["string", "null"]
         }
       }
     },

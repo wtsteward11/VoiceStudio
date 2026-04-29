@@ -77,7 +77,9 @@ UNKNOWN       — Engine mode could not be determined (blocker condition).
 {
   "text": "[synthesis text]",
   "profile_id": "[profile uuid]",
-  "engine": "[engine_name]"
+  "engine": "[engine_name]",
+  "project_id": "[project uuid if product-closure]",
+  "session_id": "[timeline session id if product-closure]"
 }
 ```
 
@@ -85,6 +87,8 @@ UNKNOWN       — Engine mode could not be determined (blocker condition).
 ```json
 {
   "audio_id": "[audio_id]",
+  "generated_audio_id": "[generated_audio_id]",
+  "profile_id": "[profile uuid]",
   "duration": [seconds],
   "quality_score": [0.0-1.0],
   "routed_engine": "[engine_name]",
@@ -131,10 +135,68 @@ UNKNOWN       — Engine mode could not be determined (blocker condition).
 | Clip added | `[clip_uuid]` |
 | Timeline revision after clip | **[N]** |
 | Clip start/end | `[start]s – [end]s` |
+| Clip metadata | `generated_audio_id=[id]`, `library_asset_id=[id]`, `project_id=[id]`, `session_id=[id]` |
 
 ---
 
-## 8. Durability Evidence (or Non-Claim)
+## 8. Product-Closure Identity Spine
+
+| Field | Value |
+|---|---|
+| `project.project_id` | `[project_id]` |
+| `project.session_id` | `[session_id]` |
+| `generated_audio.generated_audio_id` | `[generated_audio_id]` |
+| `generated_audio.audio_id` | `[audio_id]` |
+| `generated_audio.library_asset_id` | `[asset_id]` |
+| `generated_audio.timeline_track_id` | `[track_id]` |
+| `generated_audio.timeline_clip_id` | `[clip_id]` |
+| `generated_audio.source_engine` / `routed_engine` | `[requested] / [routed]` |
+| `generated_audio.profile_id` | `[profile_id]` |
+| `generated_audio.artifact_sha256` | `[lowercase hex digest]` |
+
+Validate with:
+
+```powershell
+python scripts/ci/check_generated_audio_identity_spine.py --proof-json [proof.json]
+```
+
+---
+
+## 9. Export Evidence (or Non-Claim)
+
+| Field | Value |
+|---|---|
+| `export.claimed` | `[true / false]` |
+| Export path | `[path]` |
+| Export SHA-256 | `[lowercase hex digest]` |
+| Export size | `[N bytes]` |
+| Export container | `[RIFF/WAVE]` |
+| Export non-silent | `[true / false]` |
+| Export WAV-derived duration | `[seconds]` |
+
+Export must be a non-claim unless `POST /api/timeline/export` succeeded and the exported WAV passed automated forensic validation.
+
+---
+
+## 10. Automated Replay Validation
+
+| Field | Value |
+|---|---|
+| Replay target | `[audio path / audio URL / proof JSON]` |
+| Decode result | `[pass / fail]` |
+| Non-silent | `[true / false]` |
+| Sample rate / channels | `[Hz] / [channels]` |
+| Duration | `[seconds]` |
+
+Use "automated replay validation" terminology. Do not claim the audio was heard unless this report includes an explicit operator claim and attestation.
+
+```powershell
+python scripts/proof/verify_generated_audio_replay.py --proof-json [proof.json] --json
+```
+
+---
+
+## 11. Durability Evidence (or Non-Claim)
 
 <!-- Either add durability checks, or explicitly state this is out of scope: -->
 
@@ -146,6 +208,10 @@ UNKNOWN       — Engine mode could not be determined (blocker condition).
 | Blocker / non-claim | `[restart not performed / reload verified / reason]` |
 
 Durability must be a non-claim unless automated restart + reload evidence exists.
+
+```powershell
+python scripts/proof/verify_backend_restart_durability.py --proof-json [proof.json] --restart-command "[command]" --json
+```
 
 ---
 
@@ -183,11 +249,13 @@ Durability must be a non-claim unless automated restart + reload evidence exists
 
 <!-- === END UNKNOWN BLOCKER SECTION === -->
 
-## 9. Verification Commands
+## 12. Verification Commands
 
 ```powershell
 # Validator (run before commit)
 python scripts/ci/check_voice_synthesis_proof_boundary.py --changed-from origin/main
+python scripts/ci/check_voice_synthesis_proof_json.py --path [proof.json] --product-closure
+python scripts/ci/check_generated_audio_identity_spine.py --proof-json [proof.json]
 
 # Gate status
 python scripts/run_verification.py
@@ -204,17 +272,18 @@ python scripts/run_verification.py
 
 ---
 
-## 10. Explicit Non-Claims
+## 13. Explicit Non-Claims
 
 - [Describe what this report does NOT prove]
 - This is NOT a runtime FULL PASS
 - This is NOT an operator/human proof
+- This is NOT restart durability unless restart + reload checks passed
 - [NOT GAP-008 / NOT Slice 46 / NOT MainWindow*ShellBridge — if applicable]
 - [NOT RHVoice / NOT ENGINE_PARITY_MATRIX — if applicable]
 
 ---
 
-## 11. Final Verdict
+## 14. Final Verdict
 
 **VERDICT: [REAL_ENGINE | STUB_ENGINE | MOCK_ENGINE | UNKNOWN]**
 

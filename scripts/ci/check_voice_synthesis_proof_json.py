@@ -285,12 +285,122 @@ def _semantic_errors(data: dict[str, Any], rel: str) -> list[Violation]:
     return violations
 
 
-def validate_proof_json(path: Path) -> list[Violation]:
+def _product_closure_errors(data: dict[str, Any], rel: str) -> list[Violation]:
+    """Extra product-closure requirements for REAL_ENGINE generated-audio proofs."""
+    if str(data.get("classification") or "") != "REAL_ENGINE":
+        return []
+
+    violations: list[Violation] = []
+    project = data.get("project") if isinstance(data.get("project"), dict) else None
+    generated_audio = (
+        data.get("generated_audio") if isinstance(data.get("generated_audio"), dict) else None
+    )
+    export = data.get("export") if isinstance(data.get("export"), dict) else None
+
+    if project is None:
+        violations.append(
+            Violation(
+                rel,
+                "PRODUCT_CLOSURE_MISSING_PROJECT",
+                "$.project",
+                "Product-closure REAL_ENGINE proof requires project evidence",
+                "Populate project.project_id and project.session_id",
+            )
+        )
+    else:
+        if not project.get("project_id"):
+            violations.append(
+                Violation(
+                    rel,
+                    "PRODUCT_CLOSURE_MISSING_PROJECT_ID",
+                    "$.project.project_id",
+                    "Product-closure REAL_ENGINE proof requires project_id",
+                    "Record the project id that owns this generated audio",
+                )
+            )
+        if not project.get("session_id"):
+            violations.append(
+                Violation(
+                    rel,
+                    "PRODUCT_CLOSURE_MISSING_SESSION_ID",
+                    "$.project.session_id",
+                    "Product-closure REAL_ENGINE proof requires session_id",
+                    "Record the timeline/session id used for reload and export",
+                )
+            )
+
+    if generated_audio is None:
+        violations.append(
+            Violation(
+                rel,
+                "PRODUCT_CLOSURE_MISSING_GENERATED_AUDIO",
+                "$.generated_audio",
+                "Product-closure REAL_ENGINE proof requires generated_audio evidence",
+                "Populate generated_audio ids, artifact hash, library id, and timeline clip id",
+            )
+        )
+    else:
+        required_fields = (
+            ("generated_audio_id", "PRODUCT_CLOSURE_MISSING_GENERATED_AUDIO_ID"),
+            ("artifact_sha256", "PRODUCT_CLOSURE_MISSING_GENERATED_AUDIO_HASH"),
+            ("library_asset_id", "PRODUCT_CLOSURE_MISSING_LIBRARY_ASSET_ID"),
+            ("timeline_clip_id", "PRODUCT_CLOSURE_MISSING_TIMELINE_CLIP_ID"),
+        )
+        for field, rule in required_fields:
+            if not generated_audio.get(field):
+                violations.append(
+                    Violation(
+                        rel,
+                        rule,
+                        f"$.generated_audio.{field}",
+                        f"Product-closure REAL_ENGINE proof requires generated_audio.{field}",
+                        f"Record generated_audio.{field} in the proof JSON",
+                    )
+                )
+
+    if export is None:
+        violations.append(
+            Violation(
+                rel,
+                "PRODUCT_CLOSURE_MISSING_EXPORT",
+                "$.export",
+                "Product-closure REAL_ENGINE proof requires export evidence",
+                "Populate export path, hash, WAV forensics, and non_silent=true",
+            )
+        )
+    else:
+        if export.get("claimed") is not True:
+            violations.append(
+                Violation(
+                    rel,
+                    "PRODUCT_CLOSURE_EXPORT_NOT_CLAIMED",
+                    "$.export.claimed",
+                    "Product-closure REAL_ENGINE proof requires export.claimed=true",
+                    "Set export.claimed=true only after automated export replay validation",
+                )
+            )
+        if not export.get("path") or not export.get("sha256") or export.get("non_silent") is not True:
+            violations.append(
+                Violation(
+                    rel,
+                    "PRODUCT_CLOSURE_EXPORT_EVIDENCE_INCOMPLETE",
+                    "$.export",
+                    "Product-closure export lacks path, hash, or non_silent=true",
+                    "Record export path, SHA-256, and automated non-silence validation",
+                )
+            )
+    return violations
+
+
+def validate_proof_json(path: Path, *, product_closure: bool = False) -> list[Violation]:
     data, violations = _load_json(path)
     if violations or data is None:
         return violations
     rel = _rel(path)
-    return _schema_errors(data, rel) + _semantic_errors(data, rel)
+    result = _schema_errors(data, rel) + _semantic_errors(data, rel)
+    if product_closure:
+        result.extend(_product_closure_errors(data, rel))
+    return result
 
 
 def _is_relevant(path: Path) -> bool:
@@ -479,6 +589,11 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--dir", type=Path)
     group.add_argument("--changed-from", default=None)
     group.add_argument("--self-test-examples", action="store_true")
+    parser.add_argument(
+        "--product-closure",
+        action="store_true",
+        help="Require project, generated_audio, and export sections for REAL_ENGINE proofs.",
+    )
     parser.add_argument("--json", action="store_true", dest="json_output")
     args = parser.parse_args(argv)
 
@@ -501,7 +616,7 @@ def main(argv: list[str] | None = None) -> int:
 
     all_violations: list[Violation] = []
     for path in files:
-        all_violations.extend(validate_proof_json(path))
+        all_violations.extend(validate_proof_json(path, product_closure=args.product_closure))
 
     if all_violations:
         payload = _result_payload("fail", mode, files, all_violations)

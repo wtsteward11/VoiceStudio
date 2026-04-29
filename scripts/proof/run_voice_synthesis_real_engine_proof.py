@@ -56,6 +56,11 @@ class ProofOptions:
     timeout_seconds: float
     verify_durability: bool = False
     restart_backend_command: str | None = None
+    product_closure: bool = False
+    project_id: str | None = None
+    project_name: str | None = None
+    export_timeline: bool = False
+    verify_reload: bool = False
 
 
 @dataclass
@@ -68,8 +73,11 @@ class ProofResult:
     profile: dict[str, Any] = field(default_factory=dict)
     synthesis: dict[str, Any] = field(default_factory=dict)
     audio_artifact: dict[str, Any] = field(default_factory=dict)
+    project: dict[str, Any] = field(default_factory=dict)
+    generated_audio: dict[str, Any] = field(default_factory=dict)
     library: dict[str, Any] = field(default_factory=dict)
     timeline: dict[str, Any] = field(default_factory=dict)
+    export: dict[str, Any] = field(default_factory=dict)
     durability: dict[str, Any] = field(default_factory=dict)
     non_claims: list[str] = field(default_factory=list)
 
@@ -86,6 +94,7 @@ class ProofApiRoutes:
     TIMELINE_CREATE = "/api/timeline/create"
     TIMELINE_TRACKS = "/api/timeline/tracks"
     TIMELINE_CLIPS = "/api/timeline/clips"
+    TIMELINE_EXPORT = "/api/timeline/export"
 
     @staticmethod
     def full_url(base_url: str, path: str) -> str:
@@ -257,6 +266,41 @@ def _proof_json(result: ProofResult, options: ProofOptions) -> dict[str, Any]:
     evidence = result.evidence
     requested_engine = evidence.get("requested_engine") or options.engine or "xtts_v2"
     routed_engine = evidence.get("routed_engine") or result.synthesis.get("routed_engine")
+    project_id = options.project_id or result.project.get("project_id") or f"proof-project-{options.session_id}"
+    project = {
+        "project_id": project_id,
+        "project_name": options.project_name,
+        "session_id": options.session_id,
+        "persistence_scope": "backend_sqlite",
+        "reload_verified": None,
+        **result.project,
+    }
+    generated_audio_id = (
+        result.generated_audio.get("generated_audio_id")
+        or result.generated_audio.get("audio_id")
+        or result.synthesis.get("generated_audio_id")
+        or result.synthesis.get("audio_id")
+    )
+    generated_audio = {
+        "generated_audio_id": generated_audio_id,
+        "audio_id": result.synthesis.get("audio_id"),
+        "source_engine": requested_engine,
+        "routed_engine": routed_engine,
+        "profile_id": result.profile.get("selected_profile_id") or options.profile_id,
+        "created_at_utc": result.generated_audio.get("created_at_utc"),
+        "artifact_path": result.generated_audio.get("artifact_path"),
+        "artifact_sha256": result.audio_artifact.get("sha256"),
+        "duration_seconds": result.synthesis.get("duration_seconds")
+        or result.audio_artifact.get("duration_seconds_from_wav"),
+        "library_asset_id": result.library.get("asset_id"),
+        "timeline_track_id": result.timeline.get("track_id"),
+        "timeline_clip_id": result.timeline.get("clip_id"),
+        "provenance": {
+            "source": "voice_synthesis",
+            "proof_mode": "product_closure" if options.product_closure else "voice_synthesis",
+        },
+        **result.generated_audio,
+    }
     return {
         "schema_version": "voice_synthesis_proof.v1",
         "timestamp_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -306,6 +350,8 @@ def _proof_json(result: ProofResult, options: ProofOptions) -> dict[str, Any]:
             "error": None,
             **result.audio_artifact,
         },
+        "project": project,
+        "generated_audio": generated_audio,
         "library": {
             "http_status": None,
             "asset_id": None,
@@ -323,6 +369,20 @@ def _proof_json(result: ProofResult, options: ProofOptions) -> dict[str, Any]:
             "end_time": None,
             "duration_seconds": None,
             **result.timeline,
+        },
+        "export": {
+            "claimed": False,
+            "export_id": None,
+            "path": None,
+            "size_bytes": None,
+            "sha256": None,
+            "container": None,
+            "duration_seconds_from_wav": None,
+            "sample_rate_hz": None,
+            "channels": None,
+            "non_silent": None,
+            "blocker": "timeline export not requested",
+            **result.export,
         },
         "durability": result.durability or _default_durability(),
         "non_claims": result.non_claims or _default_non_claims(),
@@ -475,6 +535,28 @@ def dry_run_write_reports(output_dir: Path) -> tuple[Path, Path]:
             "quality_metrics": {"mos_score": 4.5},
         },
         audio_artifact=audio_artifact,
+        project={
+            "project_id": "dryrun-project",
+            "project_name": "Dry-run Proof Project",
+            "session_id": "dryrun-session",
+            "persistence_scope": "dry_run_fixture",
+            "reload_verified": True,
+        },
+        generated_audio={
+            "generated_audio_id": "dryrun-audio",
+            "audio_id": "dryrun-audio",
+            "source_engine": "xtts_v2",
+            "routed_engine": "xtts_v2",
+            "profile_id": "dryrun-profile",
+            "created_at_utc": "2026-04-29T00:00:00Z",
+            "artifact_path": "dryrun.wav",
+            "artifact_sha256": audio_artifact["sha256"],
+            "duration_seconds": 1.0,
+            "library_asset_id": "dryrun-asset",
+            "timeline_track_id": "dryrun-track",
+            "timeline_clip_id": "dryrun-clip",
+            "provenance": {"source": "dry_run_fixture"},
+        },
         library={"http_status": 201, "asset_id": "dryrun-asset", "audio_id": "dryrun-audio", "saved_path": "dryrun.wav"},
         timeline={
             "session_id": "dryrun-session",
@@ -485,6 +567,19 @@ def dry_run_write_reports(output_dir: Path) -> tuple[Path, Path]:
             "start_time": 0.0,
             "end_time": 1.0,
             "duration_seconds": 1.0,
+        },
+        export={
+            "claimed": True,
+            "export_id": "dryrun-export",
+            "path": "dryrun-export.wav",
+            "size_bytes": audio_artifact["size_bytes"],
+            "sha256": audio_artifact["sha256"],
+            "container": audio_artifact["container"],
+            "duration_seconds_from_wav": audio_artifact["duration_seconds_from_wav"],
+            "sample_rate_hz": audio_artifact["sample_rate_hz"],
+            "channels": audio_artifact["channels"],
+            "non_silent": audio_artifact["non_silent"],
+            "blocker": None,
         },
     )
     stub_json_path = output_dir / "VOICE_SYNTHESIS_PROOF_HARNESS_DRYRUN_STUB.json"
@@ -614,6 +709,27 @@ def render_markdown_report(result: ProofResult, options: ProofOptions) -> str:
     )
 
 
+def _analyze_export_file(path: Path) -> dict[str, Any]:
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        return {"claimed": False, "path": str(path), "blocker": f"export file read failed: {exc}"}
+    analysis = analyze_wav_bytes(data)
+    return {
+        "claimed": True,
+        "export_id": path.stem,
+        "path": str(path),
+        "size_bytes": len(data),
+        "sha256": sha256_hex(data),
+        "container": analysis["container"],
+        "duration_seconds_from_wav": analysis["duration_seconds"],
+        "sample_rate_hz": analysis["sample_rate_hz"],
+        "channels": analysis["channels"],
+        "non_silent": analysis["non_silent"],
+        "blocker": analysis["error"] if analysis["is_wav"] is not True else None,
+    }
+
+
 def run_real_engine_flow(client: HttpLike, options: ProofOptions) -> ProofResult:
     t = options.timeout_seconds
     blockers: list[str] = []
@@ -622,8 +738,17 @@ def run_real_engine_flow(client: HttpLike, options: ProofOptions) -> ProofResult
     profile: dict[str, Any] = {}
     synthesis: dict[str, Any] = {}
     audio_artifact: dict[str, Any] = {}
+    project: dict[str, Any] = {
+        "project_id": options.project_id or f"proof-project-{options.session_id}",
+        "project_name": options.project_name,
+        "session_id": options.session_id,
+        "persistence_scope": "backend_sqlite",
+        "reload_verified": None,
+    }
+    generated_audio: dict[str, Any] = {}
     library: dict[str, Any] = {}
     timeline: dict[str, Any] = {"session_id": options.session_id}
+    export: dict[str, Any] = {"claimed": False, "blocker": "timeline export not requested"}
     durability = _default_durability()
 
     def base(path: str) -> str:
@@ -638,8 +763,11 @@ def run_real_engine_flow(client: HttpLike, options: ProofOptions) -> ProofResult
             profile=profile,
             synthesis=synthesis,
             audio_artifact=audio_artifact,
+            project=project,
+            generated_audio=generated_audio,
             library=library,
             timeline=timeline,
+            export=export,
             durability=durability,
         )
 
@@ -723,6 +851,8 @@ def run_real_engine_flow(client: HttpLike, options: ProofOptions) -> ProofResult
         "text": "Harness proof one two three.",
         "engine": engine,
         "language": "en",
+        "project_id": project["project_id"],
+        "session_id": options.session_id,
     }
     try:
         st, body = client.post_json(base(ProofApiRoutes.SYNTHESIZE), synth_payload, t)
@@ -736,12 +866,14 @@ def run_real_engine_flow(client: HttpLike, options: ProofOptions) -> ProofResult
         return unknown()
 
     audio_id = syn.get("audio_id")
+    generated_audio_id = syn.get("generated_audio_id") or audio_id
     audio_url = syn.get("audio_url") or (ProofApiRoutes.audio_url(str(audio_id)) if audio_id else None)
     routed = str(syn.get("routed_engine") or "")
     synthesis.update(
         {
             "audio_id": audio_id,
             "audio_url": audio_url,
+            "generated_audio_id": generated_audio_id,
             "duration_seconds": syn.get("duration"),
             "quality_score": syn.get("quality_score"),
             "quality_metrics": syn.get("quality_metrics"),
@@ -798,10 +930,33 @@ def run_real_engine_flow(client: HttpLike, options: ProofOptions) -> ProofResult
 
     evidence["artifact_size_bytes"] = len(audio_bytes)
     evidence["artifact_size_kib"] = len(audio_bytes) / 1024.0
+    generated_audio.update(
+        {
+            "generated_audio_id": generated_audio_id,
+            "audio_id": audio_id,
+            "source_engine": engine,
+            "routed_engine": routed,
+            "profile_id": profile_id,
+            "created_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "artifact_sha256": audio_artifact["sha256"],
+            "duration_seconds": synthesis.get("duration_seconds")
+            or audio_artifact.get("duration_seconds_from_wav"),
+        }
+    )
 
     try:
+        library_query = urlencode(
+            {
+                "project_id": project["project_id"],
+                "session_id": options.session_id,
+                "generated_audio_id": generated_audio_id,
+                "source_engine": engine,
+                "routed_engine": routed,
+                "profile_id": profile_id,
+            }
+        )
         st, up_body = client.post_multipart_file(
-            base(ProofApiRoutes.LIBRARY_UPLOAD),
+            base(f"{ProofApiRoutes.LIBRARY_UPLOAD}?{library_query}"),
             "file",
             "harness_proof.wav",
             audio_bytes,
@@ -819,6 +974,8 @@ def run_real_engine_flow(client: HttpLike, options: ProofOptions) -> ProofResult
                 "saved_path": asset.get("path"),
             }
         )
+        generated_audio["library_asset_id"] = library.get("asset_id")
+        generated_audio["artifact_path"] = library.get("saved_path")
         evidence["library"] = library
     except (OSError, HTTPError, URLError, json.JSONDecodeError) as e:
         blockers.append(f"library upload: {e}")
@@ -873,6 +1030,17 @@ def run_real_engine_flow(client: HttpLike, options: ProofOptions) -> ProofResult
                 "start_time": 0.0,
                 "duration": duration,
                 "name": "HarnessClip",
+                "metadata": {
+                    "project_id": project["project_id"],
+                    "session_id": options.session_id,
+                    "generated_audio_id": generated_audio_id,
+                    "library_asset_id": library.get("asset_id"),
+                    "audio_id": audio_id,
+                    "source_engine": engine,
+                    "routed_engine": routed,
+                    "profile_id": profile_id,
+                    "artifact_sha256": audio_artifact.get("sha256"),
+                },
             },
             t,
         )
@@ -907,7 +1075,56 @@ def run_real_engine_flow(client: HttpLike, options: ProofOptions) -> ProofResult
             "duration_seconds": duration,
         }
     )
+    generated_audio["timeline_track_id"] = track_id
+    generated_audio["timeline_clip_id"] = clip_id
     evidence["timeline"] = timeline
+
+    if options.verify_reload:
+        ok, reload_evidence, reload_blocker = _durability_replay_checks(
+            client,
+            options,
+            audio_url=str(audio_url),
+            asset_id=str(library.get("asset_id") or ""),
+            track_id=str(track_id),
+            clip_id=str(clip_id),
+        )
+        project["reload_verified"] = ok
+        evidence["reload"] = reload_evidence
+        if not ok and options.product_closure:
+            export["blocker"] = reload_blocker
+
+    if options.export_timeline:
+        export_path = (options.output_dir / f"{options.session_id}_timeline_export.wav").resolve()
+        export_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            st, export_body = client.post_json(
+                base(ProofApiRoutes.TIMELINE_EXPORT),
+                {
+                    "output_path": str(export_path),
+                    "format": "wav",
+                    "sample_rate": audio_artifact.get("sample_rate_hz") or 48000,
+                    "project_id": project["project_id"],
+                    "lufs_preset": "neutral",
+                },
+                t,
+            )
+            if st >= 400:
+                export = {
+                    "claimed": False,
+                    "path": str(export_path),
+                    "blocker": f"timeline export HTTP {st}: {export_body[:200]!r}",
+                }
+            else:
+                export_resp = json.loads(export_body.decode("utf-8", errors="replace"))
+                exported = Path(str(export_resp.get("output_path") or export_path))
+                export = _analyze_export_file(exported)
+        except (OSError, HTTPError, URLError, json.JSONDecodeError) as e:
+            export = {
+                "claimed": False,
+                "path": str(export_path),
+                "blocker": f"timeline export failed: {e}",
+            }
+        evidence["export"] = export
 
     durability = _verify_durability(
         client,
@@ -934,8 +1151,11 @@ def run_real_engine_flow(client: HttpLike, options: ProofOptions) -> ProofResult
         profile=profile,
         synthesis=synthesis,
         audio_artifact=audio_artifact,
+        project=project,
+        generated_audio=generated_audio,
         library=library,
         timeline=timeline,
+        export=export,
         durability=durability,
     )
 
@@ -953,6 +1173,17 @@ def _validate_paths(paths: list[Path]) -> int:
             for viol in v:
                 print(f"[harness] VALIDATION {p.name}: {viol.rule} — {viol.detail}", file=sys.stderr)
     return rc
+
+
+def _validate_json_product_closure(path: Path) -> int:
+    from scripts.ci.check_voice_synthesis_proof_json import validate_proof_json
+
+    violations = validate_proof_json(path, product_closure=True)
+    if violations:
+        for viol in violations:
+            print(f"[harness] PRODUCT_CLOSURE {path.name}: {viol.rule} — {viol.detail}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def _timeline_contains(state: dict[str, Any], track_id: str, clip_id: str) -> bool:
@@ -1104,6 +1335,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--timeout-seconds", type=float, default=120.0)
     parser.add_argument("--verify-durability", action="store_true")
     parser.add_argument("--restart-backend-command", default=None)
+    parser.add_argument("--product-closure", action="store_true")
+    parser.add_argument("--project-id", default=None)
+    parser.add_argument("--project-name", default=None)
+    parser.add_argument("--export-timeline", action="store_true")
+    parser.add_argument("--verify-reload", action="store_true")
     args = parser.parse_args(argv)
 
     opts = ProofOptions(
@@ -1119,12 +1355,21 @@ def main(argv: list[str] | None = None) -> int:
         timeout_seconds=args.timeout_seconds,
         verify_durability=args.verify_durability,
         restart_backend_command=args.restart_backend_command,
+        product_closure=args.product_closure,
+        project_id=args.project_id,
+        project_name=args.project_name,
+        export_timeline=args.export_timeline or args.product_closure,
+        verify_reload=args.verify_reload or args.product_closure,
     )
 
     if opts.dry_run_fixtures:
         stub_p, real_p = dry_run_write_reports(opts.output_dir)
         if _validate_paths([stub_p, real_p]) != 0:
             return 1
+        if opts.product_closure:
+            real_json = opts.output_dir / "VOICE_SYNTHESIS_PROOF_HARNESS_DRYRUN_REAL.json"
+            if _validate_json_product_closure(real_json) != 0:
+                return 1
         print(f"[harness] dry-run fixtures OK: {stub_p}, {real_p}")
         return 0
 
@@ -1152,6 +1397,8 @@ def main(argv: list[str] | None = None) -> int:
         _write_json(out_json, _proof_json(result, opts))
         if _validate_paths([out_md]) != 0:
             return 1
+        if opts.product_closure and _validate_json_product_closure(out_json) != 0:
+            return 1
         if opts.require_real:
             print("[harness] STUB_ENGINE with --require-real → exit 1", file=sys.stderr)
             return 1
@@ -1168,6 +1415,8 @@ def main(argv: list[str] | None = None) -> int:
     out_json = opts.json_output or (opts.output_dir / "proof_harness_result.json")
     _write_json(out_json, _proof_json(result, opts))
     if _validate_paths([out_md]) != 0:
+        return 1
+    if opts.product_closure and _validate_json_product_closure(out_json) != 0:
         return 1
     if opts.require_real and result.classification != "REAL_ENGINE":
         return 1

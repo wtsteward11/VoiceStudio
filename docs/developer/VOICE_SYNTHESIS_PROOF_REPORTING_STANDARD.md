@@ -151,6 +151,12 @@ pre-validated with `validate_report()`:
 python scripts/proof/run_voice_synthesis_real_engine_proof.py --dry-run-fixtures --output-dir artifacts/proof_harness_selftest
 ```
 
+Product-closure mode extends the proof from synthesis to project authority:
+
+```powershell
+python scripts/proof/run_voice_synthesis_real_engine_proof.py --product-closure --project-id <project_id> --project-name <name> --export-timeline --verify-reload
+```
+
 Dry-run requires **no backend**. Real mode is opt-in and targets the local FastAPI routes documented
 in [VOICE_SYNTHESIS_REAL_ENGINE_PROOF_HARNESS_2026-04-29.md](../reports/verification/VOICE_SYNTHESIS_REAL_ENGINE_PROOF_HARNESS_2026-04-29.md).
 
@@ -162,15 +168,25 @@ Harness JSON proof artifacts use `schemas/voice_synthesis_proof.schema.json` and
 
 Required top-level fields include `git`, `classification`, `proof_type`, `engine_mode_source`, `requested_engine`, `routed_engine`, `environment`, `backend`, `profile`, `synthesis`, `audio_artifact`, `library`, `timeline`, `durability`, `non_claims`, and `verdict`.
 
+Product-closure JSON proofs also populate `project`, `generated_audio`, and `export`. These sections carry the identity spine from project/session to generated audio, library asset, timeline clip, and exported WAV evidence.
+
 Validate JSON proofs with:
 
 ```powershell
 python scripts/ci/check_voice_synthesis_proof_json.py --path <proof.json>
 python scripts/ci/check_voice_synthesis_proof_json.py --dir docs/reports/verification/runtime_proofs
+python scripts/ci/check_voice_synthesis_proof_json.py --path <proof.json> --product-closure
 python scripts/ci/check_voice_synthesis_proof_json.py --self-test-examples
 ```
 
 The validator enforces semantic rules that are intentionally clearer than JSON Schema alone: `REAL_ENGINE` cannot route to stub/mock/test, UNKNOWN requires blockers, durability claims require restart/reload evidence, and SHA-256 must be lowercase hex.
+
+Use `scripts/ci/check_generated_audio_identity_spine.py` for identity graph validation:
+
+```powershell
+python scripts/ci/check_generated_audio_identity_spine.py --proof-json <proof.json>
+python scripts/ci/check_generated_audio_identity_spine.py --self-test-examples
+```
 
 ---
 
@@ -191,6 +207,29 @@ If non-silence cannot be proven, classify the proof as `UNKNOWN` with a blocker 
 
 ---
 
+## Generated Audio Product-Closure Requirements
+
+Product closure is stronger than real-engine synthesis. A product-closure proof must show:
+
+- `project.project_id` and a consistent `session_id`.
+- `generated_audio.generated_audio_id` linked to `synthesis.audio_id`.
+- `generated_audio.library_asset_id` linked to the library response.
+- `generated_audio.timeline_track_id` and `generated_audio.timeline_clip_id` linked to timeline state.
+- `generated_audio.artifact_sha256` matching `audio_artifact.sha256`.
+- `export.claimed=true` only when export WAV forensic evidence exists.
+- Automated replay/decode validation, not human listening language.
+
+Automated replay validation is performed with:
+
+```powershell
+python scripts/proof/verify_generated_audio_replay.py --audio-path <generated.wav> --json
+python scripts/proof/verify_generated_audio_replay.py --proof-json <proof.json> --json
+```
+
+Reports must say "automated replay validation" or "decode validation"; they must not claim the audio was heard unless `operator_claim: true` and human attestation evidence is present.
+
+---
+
 ## Durability Claim Requirements
 
 Default harness runs must set `durability.claimed=false`. Durability can be claimed only when:
@@ -201,6 +240,14 @@ Default harness runs must set `durability.claimed=false`. Durability can be clai
 - audio, library, and timeline reload checks pass after restart.
 
 Replay checks without restart are useful evidence, but they are not restart durability proof.
+
+For product-closure restart durability, use:
+
+```powershell
+python scripts/proof/verify_backend_restart_durability.py --proof-json <proof.json> --restart-command "<command>" --json
+```
+
+If `--restart-command` is absent, the output must remain a non-claim with an explicit blocker.
 
 ---
 

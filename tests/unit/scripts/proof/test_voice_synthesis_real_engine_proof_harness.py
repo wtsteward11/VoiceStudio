@@ -13,12 +13,14 @@ ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
 from scripts.ci.check_voice_synthesis_proof_boundary import validate_report
+from scripts.ci.check_voice_synthesis_proof_json import validate_proof_json
 from scripts.proof.run_voice_synthesis_real_engine_proof import (
     ProofApiRoutes,
     ProofOptions,
     ProofResult,
     _proof_json,
     dry_run_write_reports,
+    main,
     render_markdown_report,
     run_real_engine_flow,
 )
@@ -301,6 +303,94 @@ def test_real_engine_happy_path_non_silent_wav(proof_opts: ProofOptions) -> None
     r = run_real_engine_flow(SeqHttp2(), proof_opts)
     assert r.classification == "REAL_ENGINE"
     assert not r.blockers
+
+
+def test_product_closure_flow_records_project_generated_audio_and_export(
+    proof_opts: ProofOptions,
+    tmp_path: Path,
+) -> None:
+    proof_opts.output_dir = tmp_path
+    proof_opts.product_closure = True
+    proof_opts.export_timeline = True
+    proof_opts.verify_reload = True
+    proof_opts.project_id = "project-123"
+    proof_opts.project_name = "Proof Project"
+
+    class ProductClosureHttp(FakeHttp):
+        def __init__(self) -> None:
+            super().__init__(
+                {
+                    "/api/health/": (200, b"{}"),
+                    "/api/health/readiness": (200, json.dumps({"ready": True}).encode()),
+                    "/api/profiles": (
+                        200,
+                        json.dumps({"items": [{"id": "p1", "reference_audio_bound": True}]}).encode(),
+                    ),
+                    "/api/voice/synthesize": (
+                        200,
+                        json.dumps(
+                            {
+                                "audio_id": "aid1",
+                                "generated_audio_id": "aid1",
+                                "routed_engine": "xtts_v2",
+                                "duration": 1.0,
+                                "quality_score": 0.9,
+                            }
+                        ).encode(),
+                    ),
+                    "/api/voice/audio/aid1": (200, _non_silent_wav()),
+                    "/api/library/assets/upload": (
+                        201,
+                        json.dumps({"id": "lib1", "audio_id": "aid1", "path": "/tmp/harness.wav"}).encode(),
+                    ),
+                    "/api/library/assets/lib1": (200, json.dumps({"id": "lib1"}).encode()),
+                    "/api/timeline/state": (
+                        200,
+                        json.dumps(
+                            {
+                                "revision": 2,
+                                "tracks": [{"id": "trk1", "clips": [{"id": "clip1"}]}],
+                            }
+                        ).encode(),
+                    ),
+                    "/api/timeline/create": (200, b"{}"),
+                    "/api/timeline/tracks": (200, json.dumps({"id": "trk1"}).encode()),
+                    "/api/timeline/clips": (200, json.dumps({"id": "clip1"}).encode()),
+                }
+            )
+
+        def post_json(self, url: str, payload: dict, timeout: float) -> tuple[int, bytes]:
+            if "/api/timeline/export" in url:
+                Path(payload["output_path"]).write_bytes(_non_silent_wav())
+                return (
+                    200,
+                    json.dumps(
+                        {
+                            "success": True,
+                            "output_path": payload["output_path"],
+                            "duration": 1.0,
+                        }
+                    ).encode(),
+                )
+            return super().post_json(url, payload, timeout)
+
+    result = run_real_engine_flow(ProductClosureHttp(), proof_opts)
+    assert result.classification == "REAL_ENGINE"
+    assert result.project["project_id"] == "project-123"
+    assert result.generated_audio["generated_audio_id"] == "aid1"
+    assert result.export["claimed"] is True
+
+    proof_json = _proof_json(result, proof_opts)
+    path = tmp_path / "proof.json"
+    path.write_text(json.dumps(proof_json), encoding="utf-8")
+    assert validate_proof_json(path, product_closure=True) == []
+
+
+def test_dry_run_product_closure_json_passes_product_validator(tmp_path: Path) -> None:
+    rc = main(["--dry-run-fixtures", "--product-closure", "--output-dir", str(tmp_path)])
+    assert rc == 0
+    proof = tmp_path / "VOICE_SYNTHESIS_PROOF_HARNESS_DRYRUN_REAL.json"
+    assert validate_proof_json(proof, product_closure=True) == []
 
 
 def test_audio_too_small_unknown(proof_opts: ProofOptions) -> None:

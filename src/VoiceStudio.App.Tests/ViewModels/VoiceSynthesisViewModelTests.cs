@@ -36,6 +36,7 @@ namespace VoiceStudio.App.Tests.ViewModels
     private Mock<IToastNotificationService> _mockToast = null!;
     private Mock<IGeneratedAudioLibraryService> _mockLibraryService = null!;
     private Mock<IGeneratedAudioTimelineService> _mockTimelineService = null!;
+    private Mock<IErrorDialogService> _mockErrorDialogService = null!;
     private VoiceSynthesisViewModel _sut = null!;
 
     [TestInitialize]
@@ -52,6 +53,10 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockToast = new Mock<IToastNotificationService>();
       _mockLibraryService = new Mock<IGeneratedAudioLibraryService>();
       _mockTimelineService = new Mock<IGeneratedAudioTimelineService>();
+      _mockErrorDialogService = new Mock<IErrorDialogService>();
+      _mockErrorDialogService
+          .Setup(x => x.ShowErrorAsync(It.IsAny<Exception>(), It.IsAny<string>(), It.IsAny<string>()))
+          .Returns(Task.CompletedTask);
       _mockLibraryService
           .Setup(s => s.SaveAsync(It.IsAny<GeneratedAudioSaveRequest>(), It.IsAny<CancellationToken>()))
           .ReturnsAsync(new GeneratedAudioSaveResult(
@@ -97,7 +102,8 @@ namespace VoiceStudio.App.Tests.ViewModels
           _mockAudioPlayer.Object,
           _mockToast.Object,
           _mockLibraryService.Object,
-          _mockTimelineService.Object
+          _mockTimelineService.Object,
+          _mockErrorDialogService.Object
       );
     }
 
@@ -2647,6 +2653,87 @@ namespace VoiceStudio.App.Tests.ViewModels
           "WorkflowState must NOT be AudioReady after a failed attempt — no stale success state.");
       Assert.IsTrue(string.IsNullOrEmpty(_sut.LastSynthesizedAudioId),
           "LastSynthesizedAudioId must be empty after failure — no stale audio ID.");
+    }
+
+    #endregion
+
+    #region Error Dialog Recovery Tests
+
+    [TestMethod]
+    public async Task SynthesizeAsync_BackendException_DoesNotWaitForErrorDialog()
+    {
+      // Arrange: dialog never completes — simulates blocked/hung ShowAsync
+      var hangingTcs = new TaskCompletionSource<bool>();
+      _mockErrorDialogService
+          .Setup(x => x.ShowErrorAsync(It.IsAny<Exception>(), It.IsAny<string>(), It.IsAny<string>()))
+          .Returns(hangingTcs.Task);
+
+      _sut.SelectedProfile = new VoiceProfile { Id = "p10", Name = "Hang" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new BackendException("server error", 500, "SERVER_ERROR", false));
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+
+      // Act: command must complete even though the dialog "hangs" (fire-and-forget)
+      await cmd.ExecuteAsync(default);
+
+      // Assert: IsLoading cleared and error state set without waiting for dialog
+      Assert.IsFalse(_sut.IsLoading, "IsLoading must be false even when error dialog hangs — fire-and-forget must not block finally.");
+      Assert.AreEqual(SynthesisWorkflowState.Error, _sut.WorkflowState, "WorkflowState must be Error before dialog resolves.");
+      Assert.IsTrue(_sut.HasError, "HasError must be true.");
+
+      // Cleanup: resolve the hanging task to avoid test process leaks
+      hangingTcs.TrySetResult(true);
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_ErrorDialogThrows_StillClearsLoadingAndReportsError()
+    {
+      // Arrange: dialog throws — verifies fire-and-log absorbs dialog exceptions
+      _mockErrorDialogService
+          .Setup(x => x.ShowErrorAsync(It.IsAny<Exception>(), It.IsAny<string>(), It.IsAny<string>()))
+          .ThrowsAsync(new InvalidOperationException("dialog crash"));
+
+      _sut.SelectedProfile = new VoiceProfile { Id = "p11", Name = "DialogCrash" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new BackendException("server error", 500, "SERVER_ERROR", false));
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      Assert.IsFalse(_sut.IsLoading, "IsLoading must be false even when error dialog itself throws.");
+      Assert.AreEqual(SynthesisWorkflowState.Error, _sut.WorkflowState, "WorkflowState must be Error.");
+      Assert.IsTrue(_sut.HasError, "HasError must be true.");
+      Assert.IsFalse(string.IsNullOrWhiteSpace(_sut.ErrorMessage), "ErrorMessage must be populated.");
+    }
+
+    [TestMethod]
+    public async Task SynthesizeAsync_ConsentRequired_DoesNotWaitForErrorDialog()
+    {
+      // Arrange: dialog never completes — consent path must not be held hostage
+      var hangingTcs = new TaskCompletionSource<bool>();
+      _mockErrorDialogService
+          .Setup(x => x.ShowErrorAsync(It.IsAny<Exception>(), It.IsAny<string>(), It.IsAny<string>()))
+          .Returns(hangingTcs.Task);
+
+      _sut.SelectedProfile = new VoiceProfile { Id = "p12", Name = "ConsentHang" };
+      _sut.Text = "Hello";
+      _mockVoiceSynthesisService
+          .Setup(x => x.SynthesizeVoiceAsync(It.IsAny<VoiceSynthesisRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new ConsentRequiredException("Consent required"));
+
+      var cmd = (IAsyncRelayCommand)_sut.SynthesizeCommand;
+      await cmd.ExecuteAsync(default);
+
+      Assert.IsFalse(_sut.IsLoading, "IsLoading must be false even when error dialog hangs on consent path.");
+      Assert.IsTrue(_sut.IsConsentRequired, "IsConsentRequired must be true.");
+      Assert.AreEqual(SynthesisWorkflowState.Error, _sut.WorkflowState, "WorkflowState must be Error before dialog resolves.");
+
+      hangingTcs.TrySetResult(true);
     }
 
     #endregion

@@ -624,7 +624,7 @@ namespace VoiceStudio.App.Views.Panels
     /// Voice Synthesis panel VM. Optional <paramref name="toastNotificationService"/> and
     /// <paramref name="generatedAudioLibraryService"/> enable unit tests without full app DI.
     /// </summary>
-    public VoiceSynthesisViewModel(IVoiceSynthesisService voiceSynthesisService, IEnginesClient enginesClient, IQualityPipelineService qualityPipelineService, IEnsembleService ensembleService, ITextAnalysisService textAnalysisService, IQualityHistoryService qualityHistoryService, IProfilesClient profilesClient, IAudioPlayerService audioPlayer, IToastNotificationService? toastNotificationService = null, IGeneratedAudioLibraryService? generatedAudioLibraryService = null, IGeneratedAudioTimelineService? generatedAudioTimelineService = null)
+    public VoiceSynthesisViewModel(IVoiceSynthesisService voiceSynthesisService, IEnginesClient enginesClient, IQualityPipelineService qualityPipelineService, IEnsembleService ensembleService, ITextAnalysisService textAnalysisService, IQualityHistoryService qualityHistoryService, IProfilesClient profilesClient, IAudioPlayerService audioPlayer, IToastNotificationService? toastNotificationService = null, IGeneratedAudioLibraryService? generatedAudioLibraryService = null, IGeneratedAudioTimelineService? generatedAudioTimelineService = null, IErrorDialogService? errorDialogService = null)
         : base(AppServices.GetViewModelContext())
     {
       _voiceSynthesisService = voiceSynthesisService ?? throw new ArgumentNullException(nameof(voiceSynthesisService));
@@ -655,14 +655,15 @@ namespace VoiceStudio.App.Views.Panels
         _qualityService = null;
       }
 
-      // Get error services
+      // Get error services — injected value preferred (enables unit-test mocking)
       try
       {
         _errorLoggingService = ServiceProvider.GetErrorLoggingService();
-        _errorDialogService = ServiceProvider.GetErrorDialogService();
+        _errorDialogService = errorDialogService ?? ServiceProvider.GetErrorDialogService();
       }
       catch (Exception ex)
       {
+        _errorDialogService ??= errorDialogService;
         ErrorLogger.LogWarning($"Best effort operation failed: {ex.Message}", "VoiceSynthesisViewModel.Unknown");
       }
 
@@ -1603,7 +1604,14 @@ namespace VoiceStudio.App.Views.Panels
         _toastNotificationService?.ShowError(
             ResourceHelper.FormatString("VoiceSynthesis.SynthesisFailedDetail", toastDetail),
             ResourceHelper.GetString("VoiceSynthesis.SynthesisFailed", "Synthesis Failed"));
-        await (_errorDialogService?.ShowErrorAsync(consentEx, ResourceHelper.GetString("Panel.VoiceSynthesis.DisplayName", "Voice Synthesis")) ?? Task.CompletedTask);
+        (_errorDialogService?.ShowErrorAsync(consentEx, ResourceHelper.GetString("Panel.VoiceSynthesis.DisplayName", "Voice Synthesis")) ?? Task.CompletedTask)
+            .ContinueWith(t =>
+            {
+              if (t.IsFaulted)
+                _errorLoggingService?.LogError(
+                    t.Exception?.InnerException ?? t.Exception,
+                    "VoiceSynthesis.ErrorDialog.ConsentRequired");
+            }, TaskScheduler.Default);
       }
       catch (Exception ex)
       {
@@ -1628,7 +1636,14 @@ namespace VoiceStudio.App.Views.Panels
         _toastNotificationService?.ShowError(
             ResourceHelper.FormatString("VoiceSynthesis.SynthesisFailedDetail", toastDetail),
             ResourceHelper.GetString("VoiceSynthesis.SynthesisFailed", "Synthesis Failed"));
-        await (_errorDialogService?.ShowErrorAsync(ex, ResourceHelper.GetString("Panel.VoiceSynthesis.DisplayName", "Voice Synthesis")) ?? Task.CompletedTask);
+        (_errorDialogService?.ShowErrorAsync(ex, ResourceHelper.GetString("Panel.VoiceSynthesis.DisplayName", "Voice Synthesis")) ?? Task.CompletedTask)
+            .ContinueWith(t =>
+            {
+              if (t.IsFaulted)
+                _errorLoggingService?.LogError(
+                    t.Exception?.InnerException ?? t.Exception,
+                    "VoiceSynthesis.ErrorDialog");
+            }, TaskScheduler.Default);
       }
       finally
       {

@@ -393,10 +393,33 @@ def clear_route_job_stores():
 # ============================================================================
 
 
-
 # NOTE: pytest_configure is defined at the top of this file (line 26).
 # It handles both sys.path setup AND marker registration in a single function.
 # Previously there were two definitions; the second silently overwrote the first.
+
+
+# ============================================================================
+# JsonFileStore root redirect (runtime store JSON must not dirty repo source tree)
+# ============================================================================
+
+
+@pytest.fixture(scope="session", autouse=True)
+def redirect_voicestudio_json_stores_to_session_tmp(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """Point JsonFileStore at pytest temp (effect chains / presets), not backend/data/stores."""
+    import backend.audio.effects.effect_chain_store as ecs
+    import backend.infrastructure.adapters.json_file_store as jfs
+
+    root = tmp_path_factory.mktemp("vs_jfs_data")
+    previous = jfs._DATA_ROOT
+    jfs._DATA_ROOT = str(root)
+    ecs._chain_store = None
+    ecs._preset_store = None
+    yield
+    jfs._DATA_ROOT = previous
+    ecs._chain_store = None
+    ecs._preset_store = None
 
 
 # ============================================================================

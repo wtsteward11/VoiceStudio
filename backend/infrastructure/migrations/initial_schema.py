@@ -104,7 +104,8 @@ async def run_migrations(db_path: str | None = None) -> None:
             updated_at TEXT NOT NULL,
             timeline_json TEXT NOT NULL,
             undo_stack_json TEXT NOT NULL,
-            redo_stack_json TEXT NOT NULL
+            redo_stack_json TEXT NOT NULL,
+            revision INTEGER NOT NULL DEFAULT 0
         )
         """,
     ]

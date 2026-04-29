@@ -2,6 +2,7 @@
 
 from backend.project.timeline.session_repository import (
     DEFAULT_SESSION_ID,
+    TimelineConflictError,
     delete_session_timeline,
     ensure_session_timeline_table,
     load_session_timeline_raw,
@@ -10,6 +11,7 @@ from backend.project.timeline.session_repository import (
 
 __all__ = [
     "DEFAULT_SESSION_ID",
+    "TimelineConflictError",
     "delete_session_timeline",
     "ensure_session_timeline_table",
     "load_session_timeline_raw",

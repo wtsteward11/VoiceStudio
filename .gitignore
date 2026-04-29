@@ -107,6 +107,9 @@ data/audio_uploads/
 backups/
 data/recordings/
 
+# Runtime JsonFileStore artifacts (effect chains, presets) — not source fixtures
+backend/data/stores/
+
 # PDF documents (generated, not source)
 docs/**/*.pdf
 

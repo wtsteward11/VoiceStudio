@@ -84,6 +84,8 @@ class TestTimelineState:
         assert "tracks" in data
         assert "duration" in data
         assert "playhead_position" in data
+        assert "revision" in data
+        assert isinstance(data["revision"], int)
 
     def test_create_timeline(self, timeline_client):
         """Test POST /api/timeline/create creates new timeline."""
@@ -822,3 +824,51 @@ class TestUndoRedo:
         data = response.json()
         assert data["can_undo"] is True  # Still has 1 undo
         assert data["can_redo"] is True  # Has 1 redo
+
+
+class TestTimelineDurabilityHardening:
+    """Session scoping, concurrency conflict surface, lazy DB (no lifespan)."""
+
+    def test_session_scoped_tracks_isolated(self, timeline_client):
+        """Different session_id query values do not share tracks."""
+        r1 = timeline_client.post(
+            "/api/timeline/tracks?session_id=proj-alpha",
+            json={"name": "A", "type": "audio"},
+        )
+        assert r1.status_code == 200
+        r2 = timeline_client.post(
+            "/api/timeline/tracks?session_id=proj-beta",
+            json={"name": "B", "type": "audio"},
+        )
+        assert r2.status_code == 200
+        sa = timeline_client.get("/api/timeline/state?session_id=proj-alpha").json()
+        sb = timeline_client.get("/api/timeline/state?session_id=proj-beta").json()
+        assert len(sa["tracks"]) == 1
+        assert len(sb["tracks"]) == 1
+        assert sa["tracks"][0]["name"] == "A"
+        assert sb["tracks"][0]["name"] == "B"
+
+    def test_concurrent_write_conflict_returns_409(self, timeline_client, monkeypatch):
+        """409 when persist uses a stale base revision (simulated via hydrate skew)."""
+        from backend.api.routes import timeline as tl_mod
+        from backend.project.timeline.session_repository import DEFAULT_SESSION_ID
+
+        real = tl_mod._hydrate
+
+        async def always_base_zero(sid: str = DEFAULT_SESSION_ID):
+            s, u, r, _br = await real(sid)
+            return s, u, r, 0
+
+        monkeypatch.setattr(tl_mod, "_hydrate", always_base_zero)
+        r1 = timeline_client.post("/api/timeline/tracks", json={"name": "T1", "type": "audio"})
+        assert r1.status_code == 200
+        r2 = timeline_client.post("/api/timeline/tracks", json={"name": "T2", "type": "audio"})
+        assert r2.status_code == 409
+        body = r2.json()
+        assert body["detail"]["code"] == "TIMELINE_CONFLICT"
+
+    def test_testclient_without_lifespan_lazy_connects_timeline_state(self, timeline_client):
+        """Security-style TestClient still reads timeline (session_repository lazy-connect)."""
+        r = timeline_client.get("/api/timeline/state")
+        assert r.status_code == 200
+        assert "tracks" in r.json()

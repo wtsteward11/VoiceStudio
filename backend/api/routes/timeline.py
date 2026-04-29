@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 from uuid import uuid4
 
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+
+from backend.project.timeline.session_repository import DEFAULT_SESSION_ID
 
 from ..deps import TrackStoreDep
 from ..middleware.auth_middleware import require_auth_if_enabled
@@ -24,6 +26,16 @@ from ..middleware.auth_middleware import require_auth_if_enabled
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/timeline", tags=["timeline"])
+
+SessionIdQuery = Annotated[
+    str,
+    Query(
+        description=(
+            "Timeline scope key (project/session). "
+            "Defaults to 'default' for backward compatibility."
+        ),
+    ),
+]
 
 
 # ============================================================================
@@ -82,6 +94,7 @@ class TimelineState(BaseModel):
     scroll_offset: float = 0.0
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    revision: int = 0
 
 
 class CreateTimelineOptions(BaseModel):
@@ -226,40 +239,63 @@ class UndoRedoState(BaseModel):
 # ============================================================================
 
 
-async def _hydrate() -> tuple[TimelineState, list[TimelineState], list[TimelineState]]:
-    """Load timeline + undo/redo stacks from SQLite (or empty defaults)."""
-    from backend.project.timeline.session_repository import (
-        DEFAULT_SESSION_ID,
-        load_session_timeline_raw,
-    )
+async def _hydrate(
+    session_id: str = DEFAULT_SESSION_ID,
+) -> tuple[TimelineState, list[TimelineState], list[TimelineState], int]:
+    """Load timeline + undo/redo stacks from SQLite (or empty defaults).
 
-    raw = await load_session_timeline_raw(DEFAULT_SESSION_ID)
+    Returns ``base_revision`` from the database row (``0`` when no row exists yet).
+    """
+    from backend.project.timeline.session_repository import load_session_timeline_raw
+
+    raw = await load_session_timeline_raw(session_id)
     if raw is None:
-        return TimelineState(), [], []
+        return TimelineState(), [], [], 0
+    base_revision = int(raw.get("revision", 0))
     state = TimelineState.model_validate(raw["timeline"])
+    state.revision = base_revision
     undo = [TimelineState.model_validate(x) for x in raw["undo"]]
     redo = [TimelineState.model_validate(x) for x in raw["redo"]]
-    return state, undo, redo
+    return state, undo, redo, base_revision
 
 
 async def _persist(
     state: TimelineState,
     undo_stack: list[TimelineState],
     redo_stack: list[TimelineState],
-) -> None:
-    """Write timeline + stacks to SQLite."""
+    session_id: str,
+    expected_revision: int,
+) -> int:
+    """Write timeline + stacks to SQLite with optimistic concurrency."""
     from backend.project.timeline.session_repository import (
-        DEFAULT_SESSION_ID,
+        TimelineConflictError,
         save_session_timeline_raw,
     )
 
     state.updated_at = datetime.now().isoformat()
-    await save_session_timeline_raw(
-        state.model_dump(mode="json"),
-        [x.model_dump(mode="json") for x in undo_stack],
-        [x.model_dump(mode="json") for x in redo_stack],
-        session_id=DEFAULT_SESSION_ID,
-    )
+    try:
+        new_rev = await save_session_timeline_raw(
+            state.model_dump(mode="json"),
+            [x.model_dump(mode="json") for x in undo_stack],
+            [x.model_dump(mode="json") for x in redo_stack],
+            session_id=session_id,
+            expected_revision=expected_revision,
+        )
+    except TimelineConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "TIMELINE_CONFLICT",
+                "message": (
+                    "Timeline was modified by another request. Reload current state and retry."
+                ),
+                "session_id": exc.session_id,
+                "expected_revision": exc.expected_revision,
+                "actual_revision": exc.actual_revision,
+            },
+        ) from exc
+    state.revision = new_rev
+    return new_rev
 
 
 def _push_undo_before_mutate(
@@ -517,33 +553,33 @@ async def _convert_to_format(input_path: str, output_path: str, format: str) -> 
 
 
 @router.get("/state", response_model=TimelineState, dependencies=[Depends(require_auth_if_enabled)])
-async def get_timeline_state():
+async def get_timeline_state(session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Get the current timeline state."""
-    state, _, _ = await _hydrate()
+    state, _, _, _ = await _hydrate(session_id)
     return state
 
 
 @router.post(
     "/create", response_model=TimelineState, dependencies=[Depends(require_auth_if_enabled)]
 )
-async def create_timeline(options: CreateTimelineOptions):
+async def create_timeline(options: CreateTimelineOptions, session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Create a new timeline."""
-    state, undo, redo = await _hydrate()
+    state, undo, redo, base_rev = await _hydrate(session_id)
     _push_undo_before_mutate(state, undo, redo)
 
     new_state = TimelineState(
         name=options.name or "Untitled Timeline",
         sample_rate=options.sample_rate or 48000,
     )
-    await _persist(new_state, undo, redo)
+    await _persist(new_state, undo, redo, session_id, base_rev)
     logger.info(f"Created new timeline: {new_state.name}")
     return new_state
 
 
 @router.post("/tracks", response_model=Track, dependencies=[Depends(require_auth_if_enabled)])
-async def add_track(request: AddTrackRequest):
+async def add_track(request: AddTrackRequest, session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Add a track to the timeline."""
-    state, undo, redo = await _hydrate()
+    state, undo, redo, base_rev = await _hydrate(session_id)
     _push_undo_before_mutate(state, undo, redo)
 
     track = Track(
@@ -552,7 +588,7 @@ async def add_track(request: AddTrackRequest):
         order=len(state.tracks),
     )
     state.tracks.append(track)
-    await _persist(state, undo, redo)
+    await _persist(state, undo, redo, session_id, base_rev)
     logger.info(f"Added track: {track.name}")
     return track
 
@@ -562,9 +598,11 @@ async def add_track(request: AddTrackRequest):
     response_model=Track,
     dependencies=[Depends(require_auth_if_enabled)],
 )
-async def update_timeline_track(track_id: str, request: UpdateTimelineTrackRequest):
+async def update_timeline_track(
+    track_id: str, request: UpdateTimelineTrackRequest, session_id: SessionIdQuery = DEFAULT_SESSION_ID
+):
     """Update mix/rendering fields on an in-memory timeline track (GAP-031)."""
-    timeline, undo, redo = await _hydrate()
+    timeline, undo, redo, base_rev = await _hydrate(session_id)
     _push_undo_before_mutate(timeline, undo, redo)
     track = next((t for t in timeline.tracks if t.id == track_id), None)
     if track is None:
@@ -579,7 +617,7 @@ async def update_timeline_track(track_id: str, request: UpdateTimelineTrackReque
         track.volume = request.volume
     if request.pan is not None:
         track.pan = request.pan
-    await _persist(timeline, undo, redo)
+    await _persist(timeline, undo, redo, session_id, base_rev)
     return track
 
 
@@ -588,11 +626,13 @@ async def update_timeline_track(track_id: str, request: UpdateTimelineTrackReque
     response_model=TimelineState,
     dependencies=[Depends(require_auth_if_enabled)],
 )
-async def import_timeline_from_project(body: ImportProjectRequest, track_store: TrackStoreDep):
+async def import_timeline_from_project(
+    body: ImportProjectRequest, track_store: TrackStoreDep, session_id: SessionIdQuery = DEFAULT_SESSION_ID
+):
     """Load persisted project tracks into the timeline mix graph used by export (GAP-031)."""
     from backend.services.audio_artifacts import AudioRegistry
 
-    prior, undo, redo = await _hydrate()
+    prior, undo, redo, base_rev = await _hydrate(session_id)
     _push_undo_before_mutate(prior, undo, redo)
     project_id = body.project_id.strip()
     track_data_list = track_store.list_tracks(project_id)
@@ -659,7 +699,7 @@ async def import_timeline_from_project(body: ImportProjectRequest, track_store: 
         tracks=tracks,
         updated_at=datetime.now().isoformat(),
     )
-    await _persist(timeline, undo, redo)
+    await _persist(timeline, undo, redo, session_id, base_rev)
     logger.info(
         "Imported timeline from project %s (%s tracks, duration=%ss)",
         project_id,
@@ -672,9 +712,9 @@ async def import_timeline_from_project(body: ImportProjectRequest, track_store: 
 @router.post(
     "/tracks/delete", response_model=DeleteResponse, dependencies=[Depends(require_auth_if_enabled)]
 )
-async def delete_track(request: DeleteRequest):
+async def delete_track(request: DeleteRequest, session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Delete a track from the timeline."""
-    timeline, undo, redo = await _hydrate()
+    timeline, undo, redo, base_rev = await _hydrate(session_id)
     _push_undo_before_mutate(timeline, undo, redo)
 
     original_count = len(timeline.tracks)
@@ -688,15 +728,15 @@ async def delete_track(request: DeleteRequest):
         track.order = i
 
     _update_timeline_duration(timeline)
-    await _persist(timeline, undo, redo)
+    await _persist(timeline, undo, redo, session_id, base_rev)
     logger.info(f"Deleted track: {request.id}")
     return DeleteResponse(success=True, deleted_id=request.id)
 
 
 @router.post("/clips", response_model=Clip, dependencies=[Depends(require_auth_if_enabled)])
-async def add_clip(request: AddClipRequest):
+async def add_clip(request: AddClipRequest, session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Add a clip to a track."""
-    timeline, undo, redo = await _hydrate()
+    timeline, undo, redo, base_rev = await _hydrate(session_id)
     _push_undo_before_mutate(timeline, undo, redo)
 
     track = next((t for t in timeline.tracks if t.id == request.track_id), None)
@@ -712,7 +752,7 @@ async def add_clip(request: AddClipRequest):
     )
     track.clips.append(clip)
     _update_timeline_duration(timeline)
-    await _persist(timeline, undo, redo)
+    await _persist(timeline, undo, redo, session_id, base_rev)
     logger.info(f"Added clip: {clip.name} to track {track.name}")
     return clip
 
@@ -720,9 +760,9 @@ async def add_clip(request: AddClipRequest):
 @router.post(
     "/clips/delete", response_model=DeleteResponse, dependencies=[Depends(require_auth_if_enabled)]
 )
-async def delete_clip(request: DeleteRequest):
+async def delete_clip(request: DeleteRequest, session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Delete a clip from the timeline."""
-    timeline, undo, redo = await _hydrate()
+    timeline, undo, redo, base_rev = await _hydrate(session_id)
     _push_undo_before_mutate(timeline, undo, redo)
 
     for track in timeline.tracks:
@@ -730,7 +770,7 @@ async def delete_clip(request: DeleteRequest):
         track.clips = [c for c in track.clips if c.id != request.id]
         if len(track.clips) < original_count:
             _update_timeline_duration(timeline)
-            await _persist(timeline, undo, redo)
+            await _persist(timeline, undo, redo, session_id, base_rev)
             logger.info(f"Deleted clip: {request.id}")
             return DeleteResponse(success=True, deleted_id=request.id)
 
@@ -740,9 +780,9 @@ async def delete_clip(request: DeleteRequest):
 @router.put(
     "/clips/{clip_id}/move", response_model=Clip, dependencies=[Depends(require_auth_if_enabled)]
 )
-async def move_clip(clip_id: str, request: MoveClipRequest):
+async def move_clip(clip_id: str, request: MoveClipRequest, session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Move a clip to a new position or track."""
-    timeline, undo, redo = await _hydrate()
+    timeline, undo, redo, base_rev = await _hydrate(session_id)
     _push_undo_before_mutate(timeline, undo, redo)
 
     clip = None
@@ -777,7 +817,7 @@ async def move_clip(clip_id: str, request: MoveClipRequest):
         target_track.clips.append(clip)
 
     _update_timeline_duration(timeline)
-    await _persist(timeline, undo, redo)
+    await _persist(timeline, undo, redo, session_id, base_rev)
     logger.info(f"Moved clip: {clip_id}")
     return clip
 
@@ -785,9 +825,9 @@ async def move_clip(clip_id: str, request: MoveClipRequest):
 @router.put(
     "/clips/{clip_id}/trim", response_model=Clip, dependencies=[Depends(require_auth_if_enabled)]
 )
-async def trim_clip(clip_id: str, request: TrimClipRequest):
+async def trim_clip(clip_id: str, request: TrimClipRequest, session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Trim a clip's start or end time."""
-    timeline, undo, redo = await _hydrate()
+    timeline, undo, redo, base_rev = await _hydrate(session_id)
     _push_undo_before_mutate(timeline, undo, redo)
 
     clip = None
@@ -811,7 +851,7 @@ async def trim_clip(clip_id: str, request: TrimClipRequest):
         clip.end_time = request.new_end
 
     _update_timeline_duration(timeline)
-    await _persist(timeline, undo, redo)
+    await _persist(timeline, undo, redo, session_id, base_rev)
     logger.info(f"Trimmed clip: {clip_id}")
     return clip
 
@@ -821,9 +861,9 @@ async def trim_clip(clip_id: str, request: TrimClipRequest):
     response_model=SplitClipResponse,
     dependencies=[Depends(require_auth_if_enabled)],
 )
-async def split_clip(clip_id: str, request: SplitClipRequest):
+async def split_clip(clip_id: str, request: SplitClipRequest, session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Split a clip at a given position."""
-    timeline, undo, redo = await _hydrate()
+    timeline, undo, redo, base_rev = await _hydrate(session_id)
     _push_undo_before_mutate(timeline, undo, redo)
 
     clip = None
@@ -866,7 +906,7 @@ async def split_clip(clip_id: str, request: SplitClipRequest):
 
     track.clips.append(clip_after)
     _update_timeline_duration(timeline)
-    await _persist(timeline, undo, redo)
+    await _persist(timeline, undo, redo, session_id, base_rev)
     logger.info(f"Split clip: {clip_id} at {request.split_position}")
     return SplitClipResponse(clip_before=clip_before, clip_after=clip_after)
 
@@ -876,9 +916,9 @@ async def split_clip(clip_id: str, request: SplitClipRequest):
     response_model=Clip,
     dependencies=[Depends(require_auth_if_enabled)],
 )
-async def set_clip_fade(clip_id: str, request: SetClipFadeRequest):
+async def set_clip_fade(clip_id: str, request: SetClipFadeRequest, session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Set linear fade-in/out in seconds (applied at mixdown)."""
-    timeline, undo, redo = await _hydrate()
+    timeline, undo, redo, base_rev = await _hydrate(session_id)
     _push_undo_before_mutate(timeline, undo, redo)
 
     clip = None
@@ -895,7 +935,7 @@ async def set_clip_fade(clip_id: str, request: SetClipFadeRequest):
 
     clip.fade_in_seconds = max(0.0, float(request.fade_in_seconds))
     clip.fade_out_seconds = max(0.0, float(request.fade_out_seconds))
-    await _persist(timeline, undo, redo)
+    await _persist(timeline, undo, redo, session_id, base_rev)
     logger.info(
         "Set fade clip=%s in=%ss out=%ss", clip_id, clip.fade_in_seconds, clip.fade_out_seconds
     )
@@ -903,22 +943,22 @@ async def set_clip_fade(clip_id: str, request: SetClipFadeRequest):
 
 
 @router.post("/playhead", dependencies=[Depends(require_auth_if_enabled)])
-async def set_playhead(request: PlayheadRequest):
+async def set_playhead(request: PlayheadRequest, session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Set the playhead position."""
-    timeline, undo, redo = await _hydrate()
+    timeline, undo, redo, base_rev = await _hydrate(session_id)
     timeline.playhead_position = max(0.0, request.Position)
-    await _persist(timeline, undo, redo)
+    await _persist(timeline, undo, redo, session_id, base_rev)
     logger.debug(f"Set playhead to: {request.Position}")
     return {"success": True}
 
 
 @router.post("/loop", dependencies=[Depends(require_auth_if_enabled)])
-async def set_loop(request: LoopRequest):
+async def set_loop(request: LoopRequest, session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Set the loop region."""
-    timeline, undo, redo = await _hydrate()
+    timeline, undo, redo, base_rev = await _hydrate(session_id)
     timeline.loop_start = request.Start
     timeline.loop_end = request.End
-    await _persist(timeline, undo, redo)
+    await _persist(timeline, undo, redo, session_id, base_rev)
     logger.debug(f"Set loop: {request.Start} - {request.End}")
     return {"success": True}
 
@@ -965,7 +1005,7 @@ def _resolve_export_path(output_path: str, format: str) -> str:
 @router.post(
     "/export", response_model=ExportResponse, dependencies=[Depends(require_auth_if_enabled)]
 )
-async def export_timeline(request: ExportRequest):
+async def export_timeline(request: ExportRequest, session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Export the timeline to a file.
 
     Renders all audio clips from the timeline, mixing them according to their
@@ -983,7 +1023,7 @@ async def export_timeline(request: ExportRequest):
                 detail="effect_chain_id is required when apply_effects is true",
             )
 
-    timeline, _, _ = await _hydrate()
+    timeline, _, _, _ = await _hydrate(session_id)
     sample_rate = request.sample_rate or timeline.sample_rate
 
     output_path = _resolve_export_path(request.output_path, request.format)
@@ -1017,9 +1057,12 @@ async def export_timeline(request: ExportRequest):
     if request.apply_effects:
         from backend.services.timeline_effect_bake import apply_timeline_export_effect_chain
 
+        ecid = request.effect_chain_id
+        pid_fx = request.project_id
+        assert ecid is not None and pid_fx is not None
         rendered_audio = apply_timeline_export_effect_chain(
-            chain_id=request.effect_chain_id.strip(),  # type: ignore[union-attr]
-            project_id=request.project_id.strip(),
+            chain_id=ecid.strip(),
+            project_id=pid_fx.strip(),
             audio=rendered_audio,
             sample_rate=sample_rate,
         )
@@ -1055,9 +1098,9 @@ async def export_timeline(request: ExportRequest):
 
 
 @router.post("/undo", response_model=UndoResponse, dependencies=[Depends(require_auth_if_enabled)])
-async def undo():
+async def undo(session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Undo the last operation."""
-    state, undo_stack, redo_stack = await _hydrate()
+    state, undo_stack, redo_stack, base_rev = await _hydrate(session_id)
 
     if not undo_stack:
         return UndoResponse(success=False, operation=None)
@@ -1067,15 +1110,15 @@ async def undo():
 
     # Restore previous state
     state = undo_stack.pop()
-    await _persist(state, undo_stack, redo_stack)
+    await _persist(state, undo_stack, redo_stack, session_id, base_rev)
     logger.info("Undo performed")
     return UndoResponse(success=True, operation="undo")
 
 
 @router.post("/redo", response_model=UndoResponse, dependencies=[Depends(require_auth_if_enabled)])
-async def redo():
+async def redo(session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Redo the last undone operation."""
-    state, undo_stack, redo_stack = await _hydrate()
+    state, undo_stack, redo_stack, base_rev = await _hydrate(session_id)
 
     if not redo_stack:
         return UndoResponse(success=False, operation=None)
@@ -1085,7 +1128,7 @@ async def redo():
 
     # Restore redo state
     state = redo_stack.pop()
-    await _persist(state, undo_stack, redo_stack)
+    await _persist(state, undo_stack, redo_stack, session_id, base_rev)
     logger.info("Redo performed")
     return UndoResponse(success=True, operation="redo")
 
@@ -1095,9 +1138,9 @@ async def redo():
     response_model=UndoRedoState,
     dependencies=[Depends(require_auth_if_enabled)],
 )
-async def get_undo_redo_state():
+async def get_undo_redo_state(session_id: SessionIdQuery = DEFAULT_SESSION_ID):
     """Get the current undo/redo state."""
-    _, undo_stack, redo_stack = await _hydrate()
+    _, undo_stack, redo_stack, _ = await _hydrate(session_id)
     return UndoRedoState(
         can_undo=len(undo_stack) > 0,
         can_redo=len(redo_stack) > 0,

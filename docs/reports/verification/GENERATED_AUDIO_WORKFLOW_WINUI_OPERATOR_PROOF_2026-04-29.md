@@ -1,149 +1,196 @@
-# Generated-audio WinUI **operator** proof (2026-04-29)
+# Generated-audio WinUI operator proof (operator-assisted, 2026-04-29)
 
-**Mission:** Human-operator proof of synthesis -> library -> timeline -> durability -> playback, with API/log corroboration only (no API substitute for UI). This document remains separate from [GENERATED_AUDIO_WORKFLOW_WINUI_PROOF_2026-04-29.md](GENERATED_AUDIO_WORKFLOW_WINUI_PROOF_2026-04-29.md) (launch-smoke / agent preflight).
+**Mission:** Human performs UI actions and reports heard/visual-only observations; Cursor collects objective evidence (Copy Evidence text when provided, APIs, logs, files, process state). **Baseline code:** `d913df23` — `feat(runtime): improve generated audio workflow operability` (Copy evidence + timeline ids in VM).
 
-**Repo SHA:** `66e9f6892834a12080b8602028eefba26b175e68` (`HEAD` == `origin/main` at evidence time).
+**Changelog**
 
-**Backend mode:** `uvicorn backend.api.main:app` on `127.0.0.1:8000` via `.venv`; `VOICESTUDIO_TEST_MODE` unset; engine availability from manifests / safe mode (`initialized_engines`: 0).
+| Date | Change |
+|------|--------|
+| 2026-04-29 (AM) | Prior run documented **FAIL** (automated launch exited &lt;5s; operator checklist not captured). |
+| 2026-04-29 (PM) | **This revision:** repo at `d913df23`; automated WinUI launch **stable** (`VoiceStudio.App` PID **33164**, `MainWindowTitle` **VoiceStudio Quantum+**); preflight + gates **PASS**; operator Phase-3 checklist **not completed inside this Cursor session** (no Copy Evidence pastes in chat) — verdict **PARTIAL**. |
+
+**Non-claims:** Not GAP-008; not Slice 46; not `MainWindow*ShellBridge`; not RHVoice; not `ENGINE_PARITY_MATRIX.md`; **not** runtime FULL PASS for the end-to-end generated-audio workflow.
 
 ---
 
-## 1. Preflight - build and gates
+## 1. Repo Reality
+
+| Check | Result |
+|-------|--------|
+| `git fetch origin` + `git status -sb` | `main...origin/main` (clean tracking); dirty only expected local noise: `M AGENTS.md`, `M .vscode/settings.json`, `?? backend/data/voicestudio.db`, `?? docs/reports/audit/*.md`. |
+| `git rev-parse HEAD` / `origin/main` | **`d913df2395c7fa99c557019647b16e4f4a972b9c`** (both). |
+| `git diff --cached --name-only` | **Empty** (nothing staged). |
+
+---
+
+## 2. Build and Backend Preflight
 
 | Step | Result |
 |------|--------|
-| `git fetch origin` + `git status -sb` + `git rev-parse HEAD` + `git rev-parse origin/main` + `git diff --cached --name-only` | `HEAD` == `origin/main` at `66e9f689`; staged index empty; working tree contained only expected local noise (`AGENTS.md`, `.vscode/settings.json`, `backend/data/voicestudio.db`, `docs/reports/audit/*.md`). |
-| `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` | **Succeeded** - 0 errors, 5 nullable warnings (pre-existing warnings in app code). |
-| `.venv\\Scripts\\python.exe scripts/run_verification.py` | **Overall PASS** (`.buildlogs/verification/last_run.json`, `2026-04-29T06:16:11.960160+00:00`). Advisories: `runtime_proof_staleness`, `slo_baseline_freshness`, `backend_smoke_freshness`. |
+| `dotnet build VoiceStudio.sln -c Debug -p:Platform=x64` | **Succeeded** — **0** errors, **716** warnings (pre-existing test project warnings; not introduced by this proof). |
+| `python scripts/run_verification.py` | **Overall PASS** (`.buildlogs/verification/last_run.json`). Advisories: `runtime_proof_staleness`, `slo_baseline_freshness`, `backend_smoke_freshness` (stale age; warning-only). |
+| `GET http://127.0.0.1:8000/api/health/` | **HTTP 200**; top-level `status`: **`degraded`** (GPU check: torch probe off — `VOICESTUDIO_HEALTH_ENABLE_TORCH`); `checks.database` / `engines` / `plugins`: **healthy**. |
+| `GET http://127.0.0.1:8000/api/health/readiness` | **HTTP 200**; `ready`: **true**, `status`: **ready**. |
+| Backend PID | Not resolved via `Get-NetTCPConnection` in this session; backend responded on **127.0.0.1:8000**. |
 
 ---
 
-## 2. Backend health and readiness
-
-`GET http://127.0.0.1:8000/api/health/` -> **HTTP 200**
-
-- Top-level `status`: `degraded`
-- `checks.database`: `healthy`
-- `checks.engines`: `healthy`
-- Degraded check: GPU probe skipped / unavailable (`VOICESTUDIO_HEALTH_ENABLE_TORCH` guidance in message)
-- `details.engines`: `available_engines` 64, `initialized_engines` 0, `total_engines` 64, message `"Engine availability derived from manifests (safe mode)"`
-
-`GET http://127.0.0.1:8000/api/health/readiness` -> **HTTP 200**
-
-- `ready`: `true`
-- `status`: `ready`
-
-Observed backend listener PID: `28856`.
-
----
-
-## 3. WinUI launch (Phase 2)
+## 3. WinUI Launch and Instrumentation
 
 | Field | Evidence |
 |-------|----------|
-| Executable | `e:\\VoiceStudio\\.buildlogs\\x64\\Debug\\net8.0-windows10.0.19041.0\\VoiceStudio.App.exe` |
-| Automated launch checks | Agent launch recorded `LAUNCH_PID=7480`, then `AFTER5S_RUNNING=0`, `AFTER30S_RUNNING=0`. |
-| Manual operator note | Operator reported app starts when launched manually via `Start-Process`, but no stable PID/title capture was preserved in terminal evidence. |
-| Stability verdict | **Unstable/inconclusive** in automated capture; manual observation lacks durable runtime fields required by checklist evidence table. |
+| Executable | `e:\VoiceStudio\.buildlogs\x64\Debug\net8.0-windows10.0.19041.0\VoiceStudio.App.exe` |
+| Launch | `Start-Process -PassThru` → **`LAUNCH_PID=33164`** |
+| Alive @ 5s | **True** (`Get-Process -Id 33164`) |
+| Alive @ 30s | Tooling timeout interrupted the scripted 30s sleep; **post-hoc** `Get-Process` confirmed process still running with **`MainWindowTitle`: VoiceStudio Quantum+** |
+| Log paths | `%LOCALAPPDATA%\VoiceStudio` exists but no log files with mtime in the last 15 minutes were enumerated from shell (app may use in-process / other channels). |
+
+**Contrast vs prior doc:** Earlier **FAIL** cited `AFTER5S_RUNNING=0` for a different launch attempt; this run shows **stable** `VoiceStudio.App` for PID **33164**.
 
 ---
 
-## 4. Operator workflow execution (Phase 3)
+## 4. Human UI Actions
 
-Human checklist evidence was not captured in the required structured form for:
+**Required checklist (operator — not executed inside this Cursor chat turn):**
 
-- selected engine/profile,
-- synthesis success,
-- generated output fields (id/reference/duration/quality),
-- add-to-library status,
-- add-to-timeline status,
-- timeline clip details,
-- reload/reopen persistence,
-- restart persistence,
-- playback outcome.
+1. Open Voice Synthesis.  
+2. Select Piper if available (else record engine).  
+3. Select compatible profile.  
+4. Enter phrase: `VoiceStudio generated audio WinUI durability proof.`  
+5. Synthesize → wait for result.  
+6. **Copy Evidence** → paste to Cursor.  
+7. Add to Library → wait.  
+8. **Copy Evidence** again → paste.  
+9. Add to Timeline → wait.  
+10. **Copy Evidence** again → paste.  
+11. Open Timeline; confirm clip visible (yes/no).  
+12. Reload/reopen Timeline; confirm clip still visible (yes/no).  
+13. Play if available.  
+14. Report: audio heard (yes/no/not tested), visible UI errors.
 
-Because required step-level artifacts were missing, the workflow cannot be credited as successful proof.
-
----
-
-## 5. Generated audio evidence
-
-No verifiable generated-audio UI artifact was captured (no confirmed audio id/reference/path/duration/quality entry from the human checklist).
-
----
-
-## 6. Library evidence
-
-No verifiable Add-to-Library success artifact was captured from UI.
+**This session:** Operator did **not** supply the three Copy Evidence pastes or visual/heard summary in chat, so Phases 4–6 of the workflow proof are **blocked on human input**.
 
 ---
 
-## 7. Timeline evidence
+## 5. Copy Evidence Output
 
-No verifiable Add-to-Timeline UI artifact was captured.
-
----
-
-## 8. Durability evidence
-
-No verifiable reload/reopen or restart persistence evidence was captured from the UI checklist.
+**Not captured** — no operator paste in this agent session.
 
 ---
 
-## 9. Playback evidence
+## 6. Generated Audio Evidence
 
-No audibility result (`heard yes` / `not heard environment` / `not tested`) was captured in structured operator evidence.
-
----
-
-## 10. API and log cross-check (Phase 4)
-
-API corroboration (non-substitute):
-
-- `GET /api/timeline/state?session_id=default` returned timeline id `19d7b5b4-9b97-404f-82b4-cac86d4e424d`, `revision` `7`, `tracks` `[]`, `updated_at` `2026-04-29T00:54:10.008260`.
-- No UI-derived `session_id` attributable to the required operator checklist was discovered in captured evidence.
-
-Cross-check conclusion: API response does not corroborate a successful generated-audio timeline insertion for this run.
+**Not captured** — no synthesis run attributed to this proof session; no audio id / path / WAV validation performed.
 
 ---
 
-## 11. Defects found
+## 7. Library Evidence
 
-1. **Launch stability defect/investigation gap:** automated app process exits before 5 seconds in agent launch checks; manual start claim exists but lacks durable runtime evidence.
-2. **Proof evidence gap:** required human checklist outputs were not captured, preventing verification of synthesis/library/timeline/durability/playback.
-
-No code fix was applied in this run because the proof failure was evidence/operability capture failure, not a fully isolated source-level defect with reproducible stack trace.
+**Not captured** — Add to Library not executed in session.
 
 ---
 
-## 12. Documentation
+## 8. Timeline Evidence
 
-This file is updated with current run evidence and strict outcome.
-Registry addendum is updated in [CANONICAL_REGISTRY.md](../../governance/CANONICAL_REGISTRY.md) to reflect the revised verdict and evidence.
+**API baseline (Cursor, default session):**
 
-`.cursor/STATE.md` not edited in this task.
+`GET http://127.0.0.1:8000/api/timeline/state?session_id=default` → **200**
 
----
+```json
+{"id":"0061e35f-9aaf-4e5f-9105-babe30fed273","name":"Test","duration":0.0,"sample_rate":48000,"tracks":[],"playhead_position":0.0,"revision":11,"updated_at":"2026-04-29T03:20:08.502998"}
+```
 
-## 13. Commit intent
-
-Proof-only commit message: `docs(runtime): update generated audio WinUI operator proof`
-
-No push unless explicitly instructed.
-
----
-
-## 14. Verdict (Phase 5 - strict)
-
-**FAIL**
-
-Reason: required success conditions were not proven. There is no complete evidence for synthesis + library + timeline + persistence + playback in this run, and automated launch stability capture failed.
+- **Tracks:** **0** (empty).  
+- No UI-derived `session_id` from Copy Evidence (none provided).  
+- `GET /api/timeline/sessions` → **404** (no list endpoint in this backend build).
 
 ---
 
-## 15. Non-claims
+## 9. Durability Evidence
 
-- Not GAP-008 / not Slice 46 / not `MainWindow*ShellBridge`.
-- Not RHVoice work.
-- Not `ENGINE_PARITY_MATRIX.md` edits.
-- Not claiming runtime FULL PASS for generated-audio workflow.
+| Step | Result |
+|------|--------|
+| Query `GET .../state?session_id=default` (t=0) | `revision` **11**, `tracks` **[]** |
+| Query again after ~2s | `revision` **11**, `tracks` **[]** (stable) |
+| Timeline UI reload | **Not attested** (operator step not performed in session) |
+| Backend restart + re-query | **Skipped** — shared dev listener on port 8000; restart would disrupt operator/other work without explicit consent |
+
+**Conclusion:** No generated-audio clip existed in default-session API state to prove insert + durability.
+
+---
+
+## 10. Playback Evidence
+
+**Not tested** — no synthesis artifact and no operator heard attestation.
+
+---
+
+## 11. API and Log Cross-Check
+
+| Source | Finding |
+|--------|---------|
+| Health | See §2 — degraded overall due to GPU probe; readiness **ready**. |
+| Timeline state | Default session empty tracks; revision stable at **11** across two reads. |
+| Logs | No structured file harvest in this session (see §3). |
+
+---
+
+## 12. Defects Found
+
+1. **Operator evidence gap:** Phase-3 checklist and three **Copy Evidence** pastes were **not** delivered in this Cursor session — blocks FULL PASS criteria.  
+2. **Session discovery:** No `/api/timeline/sessions` route (**404**); session id must come from UI Copy Evidence or app logs when operator runs checklist.  
+3. **Prior doc inaccuracy (resolved for launch):** Earlier claim that WinUI always exits &lt;5s is **not** reproduced for PID **33164** in this run.
+
+**No product code defect** was isolated with stack/API failure in this session → **no code fix** applied.
+
+---
+
+## 13. Tests and Verification
+
+| Command | Result |
+|---------|--------|
+| `python scripts/run_verification.py` | **PASS** (Phase 1). |
+| `.\scripts\verify.ps1 -Quick` | **PASS**, exit **0** — `artifacts/verify/20260429_115059/verification_report.md`; `.buildlogs/verification/last_run.json`. |
+
+No C# code changes → no focused `dotnet test` filter run beyond Quick harness.
+
+---
+
+## 14. Documentation
+
+This file is the canonical operator-proof record for **2026-04-29**. Related: [GENERATED_AUDIO_WORKFLOW_OPERABILITY_BUNDLE_2026-04-29.md](./GENERATED_AUDIO_WORKFLOW_OPERABILITY_BUNDLE_2026-04-29.md) (automated bundle, **PASS**).
+
+---
+
+## 15. Commit Result
+
+- **Commit message:** `docs(runtime): update generated audio WinUI operator proof`  
+- **Files:** `GENERATED_AUDIO_WORKFLOW_WINUI_OPERATOR_PROOF_2026-04-29.md`, `docs/governance/CANONICAL_REGISTRY.md` (addendum), `.cursor/STATE.md` (LATEST PROOF INDEX row).  
+- **Push:** **Not performed** (per mission).  
+- **SHA:** Use `git log -1 --oneline` on `main` for the durable hash (avoid self-referential drift in amended commits).
+
+---
+
+## 16. Remaining Dirty Files
+
+Uncommitted (expected): `AGENTS.md`, `.vscode/settings.json`, `backend/data/voicestudio.db`, `docs/reports/audit/*.md` — **not** staged for this proof commit.
+
+---
+
+## 17. Final Verdict
+
+**PARTIAL**
+
+| Criterion | Met? |
+|-----------|------|
+| WinUI synthesis succeeded | **No** (not run in session) |
+| Generated artifact validated | **No** |
+| Add to Library + corroboration | **No** |
+| Add to Timeline + corroboration | **No** |
+| Timeline UI clip visible | **Not attested** |
+| Reload + backend restart durability | **Not attested** / restart skipped |
+| Playback / heard | **Not attested** |
+
+**Met:** Repo guard (`d913df23`), **dotnet build** PASS, **run_verification.py** PASS, health/readiness **200**, **WinUI launch stable** (PID **33164**, title **VoiceStudio Quantum+**), **verify.ps1 -Quick** PASS.
+
+**Next operator action:** Complete §4 checklist and paste **three** Copy Evidence blocks into a follow-up Cursor message so Cursor can execute §6–§10 file/API harvest without asking for manual ID transcription.

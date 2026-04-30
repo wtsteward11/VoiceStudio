@@ -11,7 +11,9 @@ import asyncio
 import json
 import logging
 import uuid
+from collections.abc import Coroutine
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -52,6 +54,16 @@ from ..optimization import cache_response
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/transcribe", tags=["transcribe"])
+
+# Strong references so scheduled background coroutines are not GC'd mid-flight.
+_BACKGROUND_TASKS: set[asyncio.Task[Any]] = set()
+
+
+def _fire_and_track(coro: Coroutine[Any, Any, Any]) -> None:
+    """Schedule a background coroutine and retain the task until it completes."""
+    task = asyncio.create_task(coro)
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
 
 
 class WordTimestamp(BaseModel):
@@ -496,7 +508,7 @@ async def transcribe_job_route(
             "Transcription job",
             metadata=meta,
         )
-        asyncio.create_task(_run_transcription_job_bg(job_id, request, project_id))
+        _fire_and_track(_run_transcription_job_bg(job_id, request, project_id))
         return TranscriptionJobResponse(
             job_id=job_id,
             audio_id=request.audio_id,
@@ -751,7 +763,7 @@ async def start_regenerate_segment(
         },
     )
 
-    asyncio.create_task(
+    _fire_and_track(
         run_transcript_segment_regeneration_job(
             job_id,
             project_id=body.project_id,

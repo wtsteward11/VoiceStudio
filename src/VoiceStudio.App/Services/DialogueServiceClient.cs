@@ -37,4 +37,27 @@ public sealed class DialogueServiceClient : IDialogueServiceClient
       throw new InvalidOperationException("Dialogue regenerate returned an empty response.");
     return resp;
   }
+
+  /// <inheritdoc />
+  public async Task<CreateTimelineClipsFromTranscriptResponse> CreateTimelineClipsAsync(
+      string transcriptId,
+      CreateTimelineClipsFromTranscriptRequest request,
+      CancellationToken cancellationToken = default)
+  {
+    if (string.IsNullOrWhiteSpace(transcriptId))
+      throw new ArgumentException("Transcript id is required.", nameof(transcriptId));
+    if (request == null)
+      throw new ArgumentNullException(nameof(request));
+    var ep = $"/api/dialogue/transcripts/{Uri.EscapeDataString(transcriptId)}/create-timeline-clips";
+    var resp = await _backend
+        .SendRequestAsync<CreateTimelineClipsFromTranscriptRequest, CreateTimelineClipsFromTranscriptResponse>(
+            ep,
+            request,
+            HttpMethod.Post,
+            cancellationToken)
+        .ConfigureAwait(false);
+    if (resp == null)
+      throw new InvalidOperationException("Create timeline clips returned an empty response.");
+    return resp;
+  }
 }

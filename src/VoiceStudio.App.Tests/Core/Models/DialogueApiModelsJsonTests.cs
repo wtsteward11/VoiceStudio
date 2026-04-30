@@ -167,4 +167,40 @@ public sealed class DialogueApiModelsJsonTests
     Assert.IsNotNull(r);
     Assert.AreEqual("nested-tl", r.Segment.TimelineClipId);
   }
+
+  [TestMethod]
+  public void CreateTimelineClipsFromTranscriptRequest_SerializesTrackIdAsSnakeCase()
+  {
+    var req = new CreateTimelineClipsFromTranscriptRequest
+    {
+      TrackId = "track-1",
+      ReplaceExisting = true,
+    };
+    var json = JsonSerializer.Serialize(req, Options);
+    StringAssert.Contains(json, "\"track_id\":\"track-1\"");
+    StringAssert.Contains(json, "\"replace_existing\":true");
+  }
+
+  [TestMethod]
+  public void CreateTimelineClipsFromTranscriptResponse_DeserializesCreatedClipIdsFromSnakeCase()
+  {
+    const string json = """
+      {
+        "transcript_id": "t1",
+        "session_id": "s1",
+        "track_id": "k1",
+        "created_clip_ids": ["a", "b"],
+        "segment_count": 2,
+        "status": "done"
+      }
+      """;
+    var r = JsonSerializer.Deserialize<CreateTimelineClipsFromTranscriptResponse>(json, Options);
+    Assert.IsNotNull(r);
+    Assert.AreEqual("t1", r.TranscriptId);
+    Assert.AreEqual(2, r.CreatedClipIds.Count);
+    Assert.AreEqual("a", r.CreatedClipIds[0]);
+    Assert.AreEqual("b", r.CreatedClipIds[1]);
+    Assert.AreEqual(2, r.SegmentCount);
+    Assert.AreEqual("done", r.Status);
+  }
 }

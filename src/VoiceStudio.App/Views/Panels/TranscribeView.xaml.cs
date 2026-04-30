@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Media;
 using Windows.System;
 using Windows.UI.Core;
 using VoiceStudio.App.Services;
+using VoiceStudio.App.Core.Services;
 using VoiceStudio.App.Utilities;
 using VoiceStudio.App.Core.Models;
 using VoiceStudio.Core.Models;
@@ -43,7 +44,8 @@ namespace VoiceStudio.App.Views.Panels
           AppServices.GetRequiredService<VoiceStudio.Core.Services.ITranscriptionClient>(),
           AppServices.GetRequiredService<VoiceStudio.Core.Services.IProjectAudioClient>(),
           AppServices.GetProjectRepository(),
-          AppServices.GetService<IShellProgressPublisher>() ?? NullShellProgressPublisher.Instance);
+          AppServices.GetService<IShellProgressPublisher>() ?? NullShellProgressPublisher.Instance,
+          AppServices.GetService<IDialogueServiceClient>());
       this.DataContext = ViewModel;
 
       // Initialize services

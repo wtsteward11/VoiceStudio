@@ -12,4 +12,10 @@ public interface IDialogueServiceClient
       string segmentId,
       RegenerateDialogueSegmentRequest request,
       CancellationToken cancellationToken = default);
+
+  /// <summary>POST /api/dialogue/transcripts/{transcriptId}/create-timeline-clips</summary>
+  Task<CreateTimelineClipsFromTranscriptResponse> CreateTimelineClipsAsync(
+      string transcriptId,
+      CreateTimelineClipsFromTranscriptRequest request,
+      CancellationToken cancellationToken = default);
 }

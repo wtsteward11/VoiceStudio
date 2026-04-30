@@ -13,6 +13,7 @@ using VoiceStudio.Core.Panels;
 using VoiceStudio.Core.Services;
 using VoiceStudio.Core.Transcription;
 using VoiceStudio.App.Core.Models;
+using VoiceStudio.App.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.Utilities;
@@ -53,6 +54,7 @@ namespace VoiceStudio.App.Views.Panels
     private readonly MultiSelectService _multiSelectService;
     private MultiSelectState? _multiSelectState;
     private readonly IShellProgressPublisher _shellProgress;
+    private readonly IDialogueServiceClient? _dialogueServiceClient;
 
     public string PanelId => PanelIds.Transcribe;
     public string DisplayName => ResourceHelper.GetString("Panel.Transcribe.DisplayName", "Transcribe");
@@ -92,6 +94,14 @@ namespace VoiceStudio.App.Views.Panels
     /// <summary>Set after the last job path completion when the backend used simulation.</summary>
     [ObservableProperty]
     private bool lastTranscriptionWasSimulated;
+
+    /// <summary>Target timeline track id for <c>POST /api/dialogue/transcripts/{{id}}/create-timeline-clips</c>.</summary>
+    [ObservableProperty]
+    private string createTimelineClipsTrackId = string.Empty;
+
+    /// <summary>Clip ids returned from the last successful create-timeline-clips call.</summary>
+    [ObservableProperty]
+    private List<string> lastCreatedTimelineClipIds = new();
 
     /// <summary>Backend job <c>mode</c> (<c>real</c>, <c>simulation</c>, <c>unavailable</c>) for operator visibility.</summary>
     [ObservableProperty]
@@ -226,13 +236,15 @@ namespace VoiceStudio.App.Views.Panels
         ITranscriptionClient transcriptionClient,
         IProjectAudioClient projectAudioClient,
         IProjectRepository? projectRepository = null,
-        IShellProgressPublisher? shellProgressPublisher = null)
+        IShellProgressPublisher? shellProgressPublisher = null,
+        IDialogueServiceClient? dialogueServiceClient = null)
         : base(context)
     {
       _transcriptionClient = transcriptionClient ?? throw new ArgumentNullException(nameof(transcriptionClient));
       _projectAudioClient = projectAudioClient ?? throw new ArgumentNullException(nameof(projectAudioClient));
       _projectRepository = projectRepository ?? AppServices.TryGetProjectRepository();
       _shellProgress = shellProgressPublisher ?? NullShellProgressPublisher.Instance;
+      _dialogueServiceClient = dialogueServiceClient ?? AppServices.GetService<IDialogueServiceClient>();
       _logService = ServiceProvider.TryGetErrorLoggingService();
 
       // Get multi-select service
@@ -293,6 +305,14 @@ namespace VoiceStudio.App.Views.Panels
       SendToTimelineCommand = new RelayCommand(
           SendSelectedTranscriptionToTimeline,
           () => SelectedTranscription != null);
+
+      CreateTimelineClipsCommand = new EnhancedAsyncRelayCommand(
+          async (ct) =>
+          {
+            using var profiler = PerformanceProfiler.StartCommand("CreateTimelineClips");
+            await CreateTimelineClipsFromTranscriptAsync(ct).ConfigureAwait(true);
+          },
+          () => !IsLoading && SelectedTranscription != null && _dialogueServiceClient != null);
 
       RefreshTranscriptTruthCommand = new EnhancedAsyncRelayCommand(
           async (ct) =>
@@ -1742,6 +1762,9 @@ namespace VoiceStudio.App.Views.Panels
     /// <summary>Send selected transcription to Timeline as a subtitle track.</summary>
     public IRelayCommand SendToTimelineCommand { get; }
 
+    /// <summary>POST dialogue create-timeline-clips for the selected transcript (requires <see cref="CreateTimelineClipsTrackId"/>).</summary>
+    public IAsyncRelayCommand CreateTimelineClipsCommand { get; }
+
     /// <summary>GAP-045 Option B: operator-triggered canonical transcript refresh for stale clip audio.</summary>
     public IAsyncRelayCommand RefreshTranscriptTruthCommand { get; }
 
@@ -1916,6 +1939,7 @@ namespace VoiceStudio.App.Views.Panels
       LoadTranscriptionsCommand.NotifyCanExecuteChanged();
       DeleteTranscriptionCommand.NotifyCanExecuteChanged();
       RefreshTranscriptTruthCommand.NotifyCanExecuteChanged();
+      CreateTimelineClipsCommand.NotifyCanExecuteChanged();
     }
 
     private async Task LoadLanguagesAsync(CancellationToken cancellationToken)
@@ -2596,7 +2620,13 @@ namespace VoiceStudio.App.Views.Panels
       }
 
       SendToTimelineCommand.NotifyCanExecuteChanged();
+      CreateTimelineClipsCommand.NotifyCanExecuteChanged();
       TranscriptSegmentLayoutRevision++;
+    }
+
+    partial void OnCreateTimelineClipsTrackIdChanged(string value)
+    {
+      CreateTimelineClipsCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
@@ -2649,6 +2679,106 @@ namespace VoiceStudio.App.Views.Panels
                 { "transcriptionId", SelectedTranscription.Id },
                 { "projectId", projectId },
               }));
+    }
+
+    /// <summary>
+    /// Creates one timeline clip per transcript segment via dialogue API (requires <see cref="CreateTimelineClipsTrackId"/>).
+    /// </summary>
+    private async Task CreateTimelineClipsFromTranscriptAsync(CancellationToken cancellationToken)
+    {
+      if (_dialogueServiceClient == null)
+      {
+        var msg = ResourceHelper.GetString(
+            "Transcribe.DialogueClientUnavailable",
+            "Dialogue service is not available.");
+        ErrorMessage = msg;
+        _toastNotificationService?.ShowWarning(
+            ResourceHelper.GetString("Transcribe.TimelineClipsTitle", "Timeline clips"),
+            msg);
+        return;
+      }
+
+      if (SelectedTranscription == null)
+      {
+        var msg = ResourceHelper.GetString(
+            "Transcribe.NoTranscriptionForTimelineClips",
+            "Select a transcript before creating timeline clips.");
+        ErrorMessage = msg;
+        _toastNotificationService?.ShowWarning(
+            ResourceHelper.GetString("Transcribe.TimelineClipsTitle", "Timeline clips"),
+            msg);
+        return;
+      }
+
+      if (string.IsNullOrWhiteSpace(CreateTimelineClipsTrackId))
+      {
+        var msg = ResourceHelper.GetString(
+            "Transcribe.TrackIdRequiredForTimelineClips",
+            "Enter a timeline track id (create a track on the Timeline panel, then paste its id here).");
+        ErrorMessage = msg;
+        _toastNotificationService?.ShowWarning(
+            ResourceHelper.GetString("Transcribe.TimelineClipsTitle", "Timeline clips"),
+            msg);
+        return;
+      }
+
+      try
+      {
+        IsLoading = true;
+        ErrorMessage = null;
+
+        var req = new CreateTimelineClipsFromTranscriptRequest
+        {
+          TrackId = CreateTimelineClipsTrackId.Trim(),
+          ProjectId = string.IsNullOrWhiteSpace(SelectedProjectId) ? null : SelectedProjectId,
+          SessionId = null,
+          ReplaceExisting = false,
+        };
+
+        var resp = await _dialogueServiceClient
+            .CreateTimelineClipsAsync(SelectedTranscription.Id, req, cancellationToken)
+            .ConfigureAwait(true);
+
+        LastCreatedTimelineClipIds = resp.CreatedClipIds != null && resp.CreatedClipIds.Count > 0
+            ? new List<string>(resp.CreatedClipIds)
+            : new List<string>();
+
+        var simNote = LastTranscriptionWasSimulated
+            ? ResourceHelper.GetString("Transcribe.TimelineClipsSimulatedNote", " (simulated transcript)")
+            : string.Empty;
+        TranscriptOperatorMessage =
+            $"Created {LastCreatedTimelineClipIds.Count} clip(s); segment_count={resp.SegmentCount}; status={resp.Status}{simNote}";
+
+        _toastNotificationService?.ShowSuccess(
+            TranscriptOperatorMessage,
+            ResourceHelper.GetString("Transcribe.TimelineClipsTitle", "Timeline clips"));
+
+        var eventAggregator = AppServices.TryGetEventAggregator();
+        if (eventAggregator != null)
+        {
+          eventAggregator.Publish(
+              new NavigateToEvent(
+                  PanelId,
+                  "timeline",
+                  new Dictionary<string, object>
+                  {
+                    { "action", "reloadAfterCreateTranscriptClips" },
+                    { "transcriptionId", SelectedTranscription.Id },
+                    { "trackId", req.TrackId },
+                  }));
+        }
+      }
+      catch (Exception ex)
+      {
+        ErrorMessage = $"Failed to create timeline clips: {ex.Message}";
+        _toastNotificationService?.ShowError(
+            ResourceHelper.GetString("Transcribe.TimelineClipsTitle", "Timeline clips"),
+            ex.Message);
+      }
+      finally
+      {
+        IsLoading = false;
+      }
     }
 
     /// <summary>

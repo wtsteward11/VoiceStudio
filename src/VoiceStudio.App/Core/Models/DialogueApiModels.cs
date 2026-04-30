@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace VoiceStudio.App.Core.Models;
@@ -80,3 +81,43 @@ public sealed class DialogueSegmentPayload
   [JsonPropertyName("timeline_clip_id")]
   public string? TimelineClipId { get; set; }
 }
+
+/// <summary>POST /api/dialogue/transcripts/{transcript_id}/create-timeline-clips request body.</summary>
+public sealed class CreateTimelineClipsFromTranscriptRequest
+{
+  [JsonPropertyName("track_id")]
+  public string TrackId { get; set; } = string.Empty;
+
+  [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+  [JsonPropertyName("session_id")]
+  public string? SessionId { get; set; }
+
+  [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+  [JsonPropertyName("project_id")]
+  public string? ProjectId { get; set; }
+
+  [JsonPropertyName("replace_existing")]
+  public bool ReplaceExisting { get; set; }
+}
+
+/// <summary>POST /api/dialogue/transcripts/{transcript_id}/create-timeline-clips response.</summary>
+public sealed class CreateTimelineClipsFromTranscriptResponse
+{
+  [JsonPropertyName("transcript_id")]
+  public string TranscriptId { get; set; } = string.Empty;
+
+  [JsonPropertyName("session_id")]
+  public string SessionId { get; set; } = string.Empty;
+
+  [JsonPropertyName("track_id")]
+  public string TrackId { get; set; } = string.Empty;
+
+  [JsonPropertyName("created_clip_ids")]
+  public List<string> CreatedClipIds { get; set; } = new();
+
+  [JsonPropertyName("segment_count")]
+  public int SegmentCount { get; set; }
+
+  public string Status { get; set; } = string.Empty;
+}
+

@@ -8,6 +8,7 @@ Supports multiple languages, word timestamps, and diarization.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import uuid
 from datetime import datetime
@@ -16,11 +17,14 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from backend.api.deps import TrackStoreDep
+from backend.core.exceptions import ServiceError
 from backend.data.repositories.job_repository import JobType
 from backend.data.repositories.transcription_repository import get_transcription_repository
-from backend.ml.models.model_preflight import PreflightError
+from backend.ml.models.model_preflight import PreflightError as MLPreflightError
+from backend.services.model_preflight import PreflightError as ServicePreflightError
 from backend.services.transcription_service import (
     TranscriptionRequest,
+    build_simulation_transcript,
     transcribe_audio,
 )
 from backend.services.transcription_service import (
@@ -30,7 +34,7 @@ from backend.services.transcription_service import (
     list_transcription_engines as list_transcription_engines_svc,
 )
 
-from ..models import ApiOk
+from ..models import ApiOk, VoiceStudioBaseModel
 from ..optimization import cache_response
 
 logger = logging.getLogger(__name__)
@@ -163,6 +167,40 @@ def _result_to_response(result) -> TranscriptionResponse:
     )
 
 
+def _job_blocker_str(detail: object) -> str:
+    """Normalize preflight/service detail to a single string for job.blocker."""
+    if isinstance(detail, str):
+        return detail
+    try:
+        return json.dumps(detail, default=str)
+    except (TypeError, ValueError):
+        return str(detail)
+
+
+class TranscriptionJobRequest(VoiceStudioBaseModel):
+    """Explicit simulation or real transcription under a single job contract."""
+
+    audio_id: str
+    engine: str = "whisper"
+    language: str | None = None
+    word_timestamps: bool = False
+    simulate: bool = False
+
+
+class TranscriptionJobResponse(VoiceStudioBaseModel):
+    """Transcription job outcome with simulation / availability metadata."""
+
+    job_id: str
+    audio_id: str
+    transcript_id: str | None = None
+    status: str
+    mode: str
+    is_simulated: bool
+    real_transcription_performed: bool
+    blocker: str | None = None
+    transcript: TranscriptionResponse | None = None
+
+
 @router.post("/", response_model=TranscriptionResponse)
 async def transcribe_audio_route(
     request: TranscriptionRequest,
@@ -181,11 +219,117 @@ async def transcribe_audio_route(
         return _result_to_response(result)
     except HTTPException:
         raise
-    except PreflightError as e:
+    except (MLPreflightError, ServicePreflightError) as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
     except Exception as e:
         logger.error("Transcription error: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Transcription failed: {e!s}")
+
+
+@router.post("/jobs", response_model=TranscriptionJobResponse)
+async def transcribe_job_route(
+    request: TranscriptionJobRequest,
+    project_id: str | None = Query(None, description="Project ID to associate transcription with"),
+):
+    """
+    Run transcription as a job with explicit simulation and availability metadata.
+
+    Always returns ``TranscriptionJobResponse`` for contract outcomes; HTTP 422
+    is used only for invalid simulation payloads (e.g. empty segments).
+    """
+    job_id = str(uuid.uuid4())
+    repo = get_transcription_repository()
+
+    if request.simulate:
+        transcript_id = str(uuid.uuid4())
+        payload = build_simulation_transcript(
+            transcript_id=transcript_id,
+            audio_id=request.audio_id,
+            job_id=job_id,
+            language=(request.language or "en"),
+        )
+        if project_id:
+            payload["project_id"] = project_id
+        if not payload.get("segments"):
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "EMPTY_TRANSCRIPT",
+                    "message": "Simulation produced no segments.",
+                },
+            )
+        await repo.store_transcription(payload)
+        stored = await repo.get_transcription(transcript_id)
+        if stored is None:
+            logger.error("Simulation stored but transcript %s not readable", transcript_id)
+            raise HTTPException(status_code=500, detail="Transcription persistence failed after simulation")
+        transcript = TranscriptionResponse(**stored)
+        return TranscriptionJobResponse(
+            job_id=job_id,
+            audio_id=request.audio_id,
+            transcript_id=transcript_id,
+            status="completed",
+            mode="simulation",
+            is_simulated=True,
+            real_transcription_performed=False,
+            blocker=None,
+            transcript=transcript,
+        )
+
+    try:
+        result = await transcribe_audio(
+            TranscriptionRequest(
+                audio_id=request.audio_id,
+                engine=request.engine,
+                language=request.language,
+                word_timestamps=request.word_timestamps,
+                diarization=False,
+                use_vad=False,
+            ),
+            project_id=project_id,
+        )
+    except (MLPreflightError, ServicePreflightError) as e:
+        return TranscriptionJobResponse(
+            job_id=job_id,
+            audio_id=request.audio_id,
+            transcript_id=None,
+            status="unavailable",
+            mode="unavailable",
+            is_simulated=False,
+            real_transcription_performed=False,
+            blocker=_job_blocker_str(e.detail),
+            transcript=None,
+        )
+    except ServiceError as e:
+        return TranscriptionJobResponse(
+            job_id=job_id,
+            audio_id=request.audio_id,
+            transcript_id=None,
+            status="failed",
+            mode="real",
+            is_simulated=False,
+            real_transcription_performed=False,
+            blocker=_job_blocker_str(e.detail),
+            transcript=None,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Transcription job error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {e!s}") from e
+
+    transcript = _result_to_response(result)
+    return TranscriptionJobResponse(
+        job_id=job_id,
+        audio_id=request.audio_id,
+        transcript_id=result.id,
+        status="completed",
+        mode="real",
+        is_simulated=False,
+        real_transcription_performed=True,
+        blocker=None,
+        transcript=transcript,
+    )
 
 
 @router.get("/{transcription_id}", response_model=TranscriptionResponse)

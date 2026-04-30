@@ -82,6 +82,24 @@ class FakeTranscriptionRepository:
         }
 
 
+class StoringFakeTranscriptionRepository(FakeTranscriptionRepository):
+    """Fake transcription repo that supports ``store_transcription`` (job route + GET)."""
+
+    def __init__(self, rows: dict[str, dict[str, Any]] | None = None):
+        super().__init__(rows or {})
+
+    async def store_transcription(self, transcription_data: dict[str, Any]) -> Any:
+        from types import SimpleNamespace
+
+        tid = transcription_data["id"]
+        row = copy.deepcopy(transcription_data)
+        cr = row.get("created")
+        if hasattr(cr, "isoformat"):
+            row["created"] = cr.isoformat()
+        self._rows[tid] = row
+        return SimpleNamespace(id=tid)
+
+
 @pytest.fixture(autouse=True)
 def reset_timeline_state(tmp_path):
     """Reset SQLite-backed timeline session before each test (D-001)."""
@@ -120,8 +138,10 @@ def reset_timeline_state(tmp_path):
 def dialogue_client(tmp_path):
     from backend.api.routes.dialogue import router as dialogue_router
     from backend.api.routes.timeline import router as timeline_router
+    from backend.api.routes.transcribe import router as transcribe_router
 
     app = FastAPI()
+    app.include_router(transcribe_router)
     app.include_router(dialogue_router)
     app.include_router(timeline_router)
     return TestClient(app)
@@ -1380,6 +1400,118 @@ class TestDialogueExportForensics:
         # second segment still placeholder clip
         ph = [c for t in st["tracks"] for c in t["clips"] if c["metadata"].get("segment_id") == s2]
         assert ph and ph[0]["metadata"].get("playable") is False
+
+
+class TestTranscriptionToDialogueWorkflow:
+    def test_full_pipeline_simulate_to_export(self, dialogue_client, tmp_path, lib_repo):
+        """Simulated job → timeline clips → edit → regenerate → export with WAV forensics."""
+        from contextlib import ExitStack
+
+        repo = StoringFakeTranscriptionRepository({})
+        wav = tmp_path / "pipeline_src.wav"
+        _write_non_silent_wav16_mono(wav, seconds=0.5)
+        from backend.api.routes import transcribe as transcribe_routes
+        from backend.services import dialogue_segment_workflow as dsw
+        from backend.services.audio_artifacts import AudioRegistry
+        from scripts.proof.audio_forensics import analyze_wav_bytes
+
+        audio_id = f"audio-pipeline-sim-{uuid.uuid4().hex}"
+
+        def _with_repo():
+            stack = ExitStack()
+            stack.enter_context(
+                patch.object(transcribe_routes, "get_transcription_repository", return_value=repo)
+            )
+            stack.enter_context(patch.object(dsw, "get_transcription_repository", return_value=repo))
+            return stack
+
+        with _with_repo():
+            jr = dialogue_client.post(
+                "/api/transcribe/jobs",
+                json={"audio_id": audio_id, "simulate": True},
+            )
+        assert jr.status_code == 200, jr.text
+        job = jr.json()
+        tid = job["transcript_id"]
+        assert tid
+        assert job["is_simulated"] is True
+        seg_id = job["transcript"]["segments"][0]["id"]
+
+        AudioRegistry.register(
+            audio_id,
+            str(wav),
+            project_id=None,
+            source="transcription_dialogue_e2e",
+            model_used="unit_test",
+            duration_seconds=0.5,
+        )
+
+        with _with_repo():
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "Pipe", "type": "audio"}
+            ).json()["id"]
+            r = dialogue_client.post(
+                f"/api/dialogue/transcripts/{tid}/create-timeline-clips",
+                json={"track_id": track_id},
+            )
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data["segment_count"] >= 1
+
+        with _with_repo():
+            st = dialogue_client.get("/api/timeline/state").json()
+        clip_meta = next(
+            c["metadata"]
+            for t in st["tracks"]
+            for c in t["clips"]
+            if c["metadata"].get("segment_id") == seg_id
+        )
+        assert clip_meta.get("transcript_id") == tid
+        assert clip_meta.get("segment_id") == seg_id
+        assert clip_meta.get("source_audio_id") == audio_id
+
+        with _with_repo():
+            dialogue_client.put(
+                f"/api/dialogue/segments/{seg_id}/edit",
+                params={"transcript_id": tid},
+                json={"edited_text": "pipeline spoken line"},
+            )
+
+        p1, p2, p3 = _patches(repo, lib_repo, wav)
+        with ExitStack() as stack:
+            stack.enter_context(p1)
+            stack.enter_context(p2)
+            stack.enter_context(p3)
+            stack.enter_context(
+                patch.object(transcribe_routes, "get_transcription_repository", return_value=repo)
+            )
+            stack.enter_context(patch.object(dsw, "get_transcription_repository", return_value=repo))
+            reg = dialogue_client.post(
+                f"/api/dialogue/segments/{seg_id}/regenerate",
+                json={
+                    "transcript_id": tid,
+                    "profile_id": "p1",
+                    "track_id": track_id,
+                    "engine": "piper",
+                    "replace_existing_clip": True,
+                },
+            )
+        assert reg.status_code == 200, reg.text
+        out = reg.json()
+        assert out["generated_audio_id"]
+        assert out["library_asset_id"]
+        assert out["timeline_clip_id"]
+
+        out_file = tmp_path / "pipeline_export.wav"
+        ex = dialogue_client.post(
+            "/api/timeline/export",
+            json={"output_path": str(out_file), "format": "wav"},
+        )
+        assert ex.status_code == 200, ex.text
+        report = analyze_wav_bytes(out_file.read_bytes())
+        assert report["is_wav"] is True
+        assert report.get("non_silent") is True
+        assert float(report.get("duration_seconds") or 0) > 0
 
 
 @pytest.mark.skipif(

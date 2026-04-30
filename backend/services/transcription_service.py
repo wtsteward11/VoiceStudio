@@ -12,7 +12,7 @@ import logging
 import os
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -523,3 +523,56 @@ def list_transcription_engines() -> list[dict[str, Any]]:
             },
         ]
     return engines
+
+
+def build_simulation_transcript(
+    *,
+    transcript_id: str,
+    audio_id: str,
+    job_id: str,
+    language: str = "en",
+    duration_seconds: float | None = None,
+    include_segment: bool = True,
+) -> dict[str, Any]:
+    """
+    Build a minimal synthetic transcription payload for explicit simulation jobs.
+
+    Pure function (no I/O). When ``include_segment`` is False, returns an empty
+    segment list for contract / error-path tests.
+    """
+    dur = float(duration_seconds) if duration_seconds is not None else 1.0
+    dur = max(dur, 0.01)
+    created = datetime.now(timezone.utc)
+    if not include_segment:
+        return {
+            "id": transcript_id,
+            "audio_id": audio_id,
+            "text": "",
+            "language": language,
+            "duration": 0.0,
+            "segments": [],
+            "word_timestamps": [],
+            "created": created,
+            "engine": "simulation",
+        }
+
+    seg_id = str(uuid.uuid4())
+    segment = {
+        "id": seg_id,
+        "text": f"[simulated transcript job={job_id}]",
+        "start": 0.0,
+        "end": dur,
+        "is_simulated": True,
+    }
+    text = segment["text"]
+    return {
+        "id": transcript_id,
+        "audio_id": audio_id,
+        "text": text,
+        "language": language,
+        "duration": dur,
+        "segments": [segment],
+        "word_timestamps": [],
+        "created": created,
+        "engine": "simulation",
+    }

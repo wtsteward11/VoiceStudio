@@ -68,5 +68,20 @@ namespace VoiceStudio.App.Services
     /// <inheritdoc />
     public Task<bool> DeleteTranscriptionAsync(string transcriptionId, CancellationToken ct = default)
       => _backend.DeleteTranscriptionAsync(transcriptionId, ct);
+
+    /// <inheritdoc />
+    public async Task<TranscriptionJobResponse> StartTranscriptionJobAsync(
+        TranscriptionJobRequest request,
+        string? projectId = null,
+        CancellationToken ct = default)
+    {
+      var url = "/api/transcribe/jobs";
+      if (!string.IsNullOrEmpty(projectId))
+      {
+        url += $"?project_id={Uri.EscapeDataString(projectId)}";
+      }
+
+      return await _backend.PostAsync<TranscriptionJobRequest, TranscriptionJobResponse>(url, request, ct).ConfigureAwait(false);
+    }
   }
 }

@@ -103,6 +103,21 @@
                             MinWidth="120" />
                 </Grid>
 
+                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <CheckBox AutomationProperties.AutomationId="TranscribeView_SimulateCheckBox"
+                              Content="Simulate (no engine required)"
+                              IsChecked="{x:Bind ViewModel.SimulateTranscription, Mode=TwoWay}" />
+                    <Button AutomationProperties.AutomationId="TranscribeView_StartJobButton"
+                            Content="Start Job"
+                            Command="{x:Bind ViewModel.StartJobCommand}"
+                            VerticalAlignment="Center"
+                            Padding="16,8" />
+                    <TextBlock VerticalAlignment="Center"
+                               Foreground="{StaticResource VSQ.Text.SecondaryBrush}"
+                               Text="{x:Bind ViewModel.TranscriptionJobMode, Mode=OneWay}"
+                               Visibility="{x:Bind ViewModel.TranscriptionJobMode, Converter={StaticResource NullToVisibilityConverter}, Mode=OneWay, FallbackValue=Collapsed}" />
+                </StackPanel>
+
                 <Expander IsExpanded="{x:Bind ViewModel.IsAdvancedTranscribeOptionsExpanded, Mode=TwoWay}"
                           HorizontalAlignment="Stretch"
                           HorizontalContentAlignment="Stretch"

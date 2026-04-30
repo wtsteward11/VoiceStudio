@@ -22,5 +22,10 @@ namespace VoiceStudio.Core.Services
         List<TranscriptionSegment> segments,
         CancellationToken ct = default);
     Task<bool> DeleteTranscriptionAsync(string transcriptionId, CancellationToken ct = default);
+
+    Task<TranscriptionJobResponse> StartTranscriptionJobAsync(
+        TranscriptionJobRequest request,
+        string? projectId = null,
+        CancellationToken ct = default);
   }
 }

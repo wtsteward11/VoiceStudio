@@ -535,12 +535,60 @@ def _valid_unknown_fixture() -> dict[str, Any]:
     return data
 
 
+def _valid_real_product_closure_fixture() -> dict[str, Any]:
+    data = _valid_real_fixture()
+    data["project"] = {
+        "project_id": "project-123",
+        "project_name": "Proof Project",
+        "session_id": "session-123",
+        "persistence_scope": "sqlite",
+        "reload_verified": True,
+    }
+    data["generated_audio"] = {
+        "generated_audio_id": "ga1",
+        "audio_id": "a1",
+        "source_engine": "xtts_v2",
+        "routed_engine": "xtts_v2",
+        "profile_id": "p1",
+        "artifact_path": "C:/tmp/a1.wav",
+        "artifact_sha256": "a" * 64,
+        "duration_seconds": 1.0,
+        "library_asset_id": "asset1",
+        "timeline_track_id": "trk1",
+        "timeline_clip_id": "clip1",
+        "provenance": {"source": "voice_synthesis"},
+    }
+    data["export"] = {
+        "claimed": True,
+        "export_id": "export-1",
+        "path": "C:/tmp/export.wav",
+        "size_bytes": 4096,
+        "sha256": "b" * 64,
+        "container": "RIFF/WAVE",
+        "duration_seconds_from_wav": 1.0,
+        "sample_rate_hz": 44100,
+        "channels": 1,
+        "non_silent": True,
+        "blocker": None,
+    }
+    return data
+
+
 def run_self_test() -> int:
     cases: list[tuple[str, dict[str, Any], list[str], bool]] = [
         ("valid_real", _valid_real_fixture(), [], True),
         ("valid_unknown", _valid_unknown_fixture(), [], True),
         ("bad_stub_routed", {**_valid_real_fixture(), "routed_engine": "stub"}, ["REAL_ENGINE_STUB_ROUTED"], False),
         ("unknown_no_blocker", {**_valid_unknown_fixture(), "blockers": []}, ["UNKNOWN_MISSING_BLOCKERS"], False),
+    ]
+    pc_cases: list[tuple[str, dict[str, Any], list[str], bool]] = [
+        ("product_closure_ok", _valid_real_product_closure_fixture(), [], True),
+        (
+            "product_closure_missing_export",
+            {k: v for k, v in _valid_real_product_closure_fixture().items() if k != "export"},
+            ["PRODUCT_CLOSURE_MISSING_EXPORT"],
+            False,
+        ),
     ]
     failures: list[str] = []
     with tempfile.TemporaryDirectory() as td:
@@ -556,11 +604,23 @@ def run_self_test() -> int:
                 missing = [r for r in expected if r not in rules]
                 if not violations or missing:
                     failures.append(f"{name}: expected {expected}, got {rules}")
+
+        for name, payload, expected, should_pass in pc_cases:
+            path = root / f"{name}.json"
+            path.write_text(json.dumps(payload, sort_keys=True, indent=2), encoding="utf-8")
+            violations = validate_proof_json(path, product_closure=True)
+            rules = [v.rule for v in violations]
+            if should_pass and violations:
+                failures.append(f"{name}: expected PASS, got {rules}")
+            elif not should_pass:
+                missing = [r for r in expected if r not in rules]
+                if not violations or missing:
+                    failures.append(f"{name}: expected {expected}, got {rules}")
     if failures:
         for f in failures:
             print(f"[voice_synthesis_proof_json] SELF-TEST FAIL: {f}", file=sys.stderr)
         return 1
-    print(f"[voice_synthesis_proof_json] Self-test: {len(cases)} example(s) PASS")
+    print(f"[voice_synthesis_proof_json] Self-test: {len(cases) + len(pc_cases)} example(s) PASS")
     return 0
 
 

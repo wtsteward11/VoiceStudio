@@ -667,6 +667,78 @@ def main():
                 "timeout": 15,
             })
 
+        proof_freshness_script = project_root / "scripts" / "ci" / "check_proof_freshness.py"
+        if proof_freshness_script.exists():
+            checks.append({
+                "name": "proof_freshness_selftest",
+                "command": [
+                    sys.executable,
+                    str(proof_freshness_script),
+                    "--self-test-examples",
+                ],
+                "timeout": 15,
+            })
+
+        generated_audio_identity_script = project_root / "scripts" / "ci" / "check_generated_audio_identity_spine.py"
+        if generated_audio_identity_script.exists():
+            checks.append({
+                "name": "generated_audio_identity_spine_selftest",
+                "command": [
+                    sys.executable,
+                    str(generated_audio_identity_script),
+                    "--self-test-examples",
+                ],
+                "timeout": 15,
+            })
+
+        no_fallback_global_script = project_root / "scripts" / "ci" / "check_runtime_no_fallback_global.py"
+        if no_fallback_global_script.exists():
+            checks.append({
+                "name": "runtime_no_fallback_global_selftest",
+                "command": [
+                    sys.executable,
+                    str(no_fallback_global_script),
+                    "--self-test-examples",
+                ],
+                "timeout": 15,
+            })
+
+        async_durability_script = project_root / "scripts" / "ci" / "check_async_task_durability.py"
+        if async_durability_script.exists():
+            checks.append({
+                "name": "async_task_durability_selftest",
+                "command": [
+                    sys.executable,
+                    str(async_durability_script),
+                    "--self-test-examples",
+                ],
+                "timeout": 15,
+            })
+
+        release_engine_script = project_root / "scripts" / "ci" / "check_release_engine_readiness_truth.py"
+        if release_engine_script.exists():
+            checks.append({
+                "name": "release_engine_readiness_selftest",
+                "command": [
+                    sys.executable,
+                    str(release_engine_script),
+                    "--self-test-examples",
+                ],
+                "timeout": 15,
+            })
+
+        evidence_freshness_script = project_root / "scripts" / "ci" / "check_verification_evidence_freshness.py"
+        if evidence_freshness_script.exists():
+            checks.append({
+                "name": "verification_evidence_freshness_selftest",
+                "command": [
+                    sys.executable,
+                    str(evidence_freshness_script),
+                    "--self-test-examples",
+                ],
+                "timeout": 15,
+            })
+
         no_fallback_product_path_script = project_root / "scripts" / "ci" / "check_runtime_no_fallback_product_path.py"
         if no_fallback_product_path_script.exists():
             checks.append({

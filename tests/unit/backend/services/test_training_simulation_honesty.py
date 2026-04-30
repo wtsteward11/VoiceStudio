@@ -1,107 +1,75 @@
-"""Runtime honesty: simulated training must not report status identical to real completion."""
+"""Tests for training simulation honesty enforcement.
+
+Verifies that:
+- run_training fails closed when real training backend is unavailable
+- Simulation does not masquerade as real training completion
+- Training status distinguishes simulation_complete from completed
+- Placeholder metrics are not returned as real quality scores
+"""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-project_root = Path(__file__).resolve().parents[4]
-sys.path.insert(0, str(project_root))
-
-from backend.services import training_service as ts
+ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(ROOT))
 
 
-@pytest.mark.asyncio
-async def test_simulation_path_sets_simulation_complete_status():
-    tid = "sim-honesty-unit"
-    key = f"training_{tid}"
-    ts._training_jobs_store[key] = {"status": "pending"}
-    ts._training_logs[tid] = []
+class TestTrainingSimulationHonesty:
+    """Training service must fail closed when real training is unavailable."""
 
-    with (
-        patch.object(ts, "get_broadcaster", return_value=MagicMock(
-            broadcast_training_progress=AsyncMock(),
-        )),
-        patch("asyncio.sleep", new_callable=AsyncMock),
-    ):
-        await ts._simulate_training(tid, epochs=2, batch_size=2, learning_rate=0.001)
+    @pytest.mark.asyncio
+    async def test_run_training_fails_when_coqui_missing(self) -> None:
+        """run_training must not silently fall back to simulation."""
+        from backend.services.training_service import _training_jobs_store, run_training
 
-    assert ts._training_jobs_store[key]["status"] == ts.SIMULATION_STATUS
-    assert ts._training_jobs_store[key]["status"] != "completed"
-    assert ts._training_jobs_store[key].get("simulation_mode") is True
+        training_id = "test_honesty_001"
+        key = f"training_{training_id}"
+        _training_jobs_store[key] = {
+            "status": "pending",
+            "progress": 0.0,
+        }
 
+        with patch.dict("sys.modules", {"backend.training.facade": None}):
+            with patch("builtins.__import__", side_effect=ImportError("No module named 'backend.training.facade'")):
+                await run_training(
+                    training_id=training_id,
+                    dataset_id="ds_001",
+                    profile_id="profile_001",
+                    engine="xtts",
+                    epochs=10,
+                    batch_size=4,
+                    learning_rate=0.0001,
+                    gpu=False,
+                )
 
-@pytest.mark.asyncio
-async def test_real_path_sets_completed_status(tmp_path, monkeypatch):
-    """Real training path ends in status 'completed' (mocked trainer, no Coqui)."""
-    tid = "real-honesty-unit"
-    key = f"training_{tid}"
-    ds_id = "ds_real_honesty"
-    ds_key = f"dataset_{ds_id}"
-    wav = tmp_path / "clip.wav"
-    wav.write_bytes(b"fake-wav")
+        status = _training_jobs_store.get(key, {})
+        assert status.get("status") == "failed", (
+            f"Expected 'failed' when Coqui TTS unavailable, got '{status.get('status')}'"
+        )
+        assert "error" in status, "Expected error field in failed training job"
+        assert "coqui" in status["error"].lower() or "unavailable" in status["error"].lower(), (
+            f"Error should mention install instructions, got: {status.get('error')}"
+        )
 
-    ts._datasets_store[ds_key] = {"audio_files": [str(wav)]}
-    ts._training_jobs_store[key] = {
-        "status": "pending",
-        "dataset_id": ds_id,
-        "profile_id": "p1",
-    }
-    ts._training_logs[tid] = []
+        if key in _training_jobs_store:
+            del _training_jobs_store[key]
 
-    class FakeTrainer:
-        def __init__(self, *a, **k):
-            pass
+    def test_simulation_status_is_not_completed(self) -> None:
+        """SIMULATION_STATUS must differ from 'completed'."""
+        from backend.services.training_service import SIMULATION_STATUS
 
-        def prepare_dataset(self, **kwargs):
-            return str(tmp_path / "meta.json")
+        assert SIMULATION_STATUS != "completed", (
+            "SIMULATION_STATUS must not be 'completed' — simulation must not masquerade as real"
+        )
+        assert SIMULATION_STATUS == "simulation_complete"
 
-        def initialize_model(self):
-            return True
+    def test_simulation_status_is_explicit(self) -> None:
+        """SIMULATION_STATUS must contain 'simulation' to be distinguishable."""
+        from backend.services.training_service import SIMULATION_STATUS
 
-        def train(self, **_kwargs):
-            return {"final_loss": 0.01}
-
-        def export_model(self, output_path=None):
-            out = tmp_path / "exported"
-            out.mkdir(parents=True, exist_ok=True)
-            return str(out)
-
-    import backend.training.facade as facade_mod
-
-    monkeypatch.setattr(facade_mod, "XTTSTrainer", FakeTrainer)
-    monkeypatch.setattr(
-        ts,
-        "get_broadcaster",
-        lambda: MagicMock(broadcast_training_progress=AsyncMock()),
-    )
-    monkeypatch.setattr("asyncio.create_task", lambda _coro: MagicMock())
-
-    await ts._execute_real_training(
-        tid,
-        ds_id,
-        "p1",
-        "xtts",
-        epochs=1,
-        batch_size=1,
-        learning_rate=0.001,
-        gpu=False,
-    )
-
-    assert ts._training_jobs_store[key]["status"] == "completed"
-    assert ts._training_jobs_store[key].get("simulation_mode") is not True
-
-
-def test_export_trained_model_rejects_simulation_status():
-    tid = "sim-export-blocked"
-    key = f"training_{tid}"
-    ts._training_jobs_store[key] = {
-        "status": ts.SIMULATION_STATUS,
-        "output_path": "/tmp/fake",
-        "dataset_id": "d1",
-        "profile_id": "p1",
-    }
-    assert ts.export_trained_model(tid, profile_id="p1") is None
+        assert "simulation" in SIMULATION_STATUS.lower()

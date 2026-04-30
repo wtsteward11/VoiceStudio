@@ -1,0 +1,22 @@
+{
+  "paths": [],
+  "line_regex": [
+    "^\\s*#.*(?:fallback|degrade|graceful)",
+    "^\\s*//.*(?:fallback|degrade|graceful)",
+    "\"fallback\"\\s*:\\s*false",
+    "no.fallback",
+    "not.*fallback",
+    "without.*fallback",
+    "removed.*fallback",
+    "forbidden.*fallback",
+    "prohibit.*fallback"
+  ],
+  "_meta": {
+    "purpose": "Allow documentation-style references and explicit negations of fallback patterns. Each entry must have a justification.",
+    "justifications": {
+      "comment lines": "Full-line comments in Python (#) and C# (//) discussing fallback policy are not runtime branching.",
+      "false value": "Explicitly setting fallback=false is disabling fallback, not enabling it.",
+      "negation patterns": "Phrases like 'no fallback', 'not fallback', 'removed fallback' describe the absence of fallback."
+    }
+  }
+}

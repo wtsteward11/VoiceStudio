@@ -1070,7 +1070,7 @@ async def _process_batch_job(job_id: str):
                 audio, quality_metrics = result
             else:
                 audio = result
-                quality_metrics = {}
+                quality_metrics = None
 
             if audio is None:
                 # Some engines write only to output_path and return None in-memory.

@@ -3,17 +3,17 @@
     "bits_per_sample": 16,
     "channels": 1,
     "container": "RIFF/WAVE",
-    "data_chunk_size": 325152,
-    "duration_seconds_from_wav": 6.774,
+    "data_chunk_size": 307232,
+    "duration_seconds_from_wav": 6.400666666666667,
     "error": null,
-    "header_hex": "5249464644f6040057415645666d7420",
+    "header_hex": "5249464644b0040057415645666d7420",
     "non_silent": true,
     "not_json_error_body": true,
     "peak_abs_sample": 32767,
-    "rms": 4862.0618791407915,
+    "rms": 2389.4753379849294,
     "sample_rate_hz": 24000,
-    "sha256": "bdf40c0d81db31ddf388991f697dc27f025adea81efc837e6a7d2860c3defecc",
-    "size_bytes": 325196
+    "sha256": "9a05871ce522bac603d50e467499e8b6d2d5e86d1429eca889909fc56a5bdd4c",
+    "size_bytes": 307276
   },
   "backend": {
     "base_url": "http://127.0.0.1:8000",
@@ -21,29 +21,29 @@
       "checks": {
         "database": {
           "message": "Check completed",
-          "response_time_ms": 2.530813217163086,
+          "response_time_ms": 4.141092300415039,
           "status": "healthy"
         },
         "engines": {
           "message": "Check completed",
-          "response_time_ms": 8.039474487304688,
+          "response_time_ms": 11.949539184570312,
           "status": "healthy"
         },
         "gpu": {
           "message": "Check completed",
-          "response_time_ms": 0.0,
+          "response_time_ms": 0.5636215209960938,
           "status": "unhealthy"
         },
         "plugins": {
           "message": "Check completed",
-          "response_time_ms": 0.0,
+          "response_time_ms": 0.5636215209960938,
           "status": "healthy"
         }
       },
       "details": {
         "database": {
           "message": "Check completed",
-          "response_time_ms": 2.530813217163086,
+          "response_time_ms": 4.141092300415039,
           "status": "healthy"
         },
         "engines": {
@@ -88,18 +88,18 @@
         },
         "system": {
           "cpu_percent": 0.0,
-          "memory_mb": 2686.41015625,
-          "memory_percent": 4.154173418426957
+          "memory_mb": 316.75390625,
+          "memory_percent": 0.4898174816921739
         }
       },
       "status": "degraded",
-      "timestamp": "2026-04-29T22:47:30.651559"
+      "timestamp": "2026-04-29T23:23:12.923799"
     },
     "health_status": 200,
     "readiness_body": {
       "ready": true,
       "status": "ready",
-      "timestamp": "2026-04-29T22:47:30.677740"
+      "timestamp": "2026-04-29T23:23:12.949246"
     },
     "readiness_status": 200
   },
@@ -122,22 +122,22 @@
     "channels": 1,
     "claimed": true,
     "container": "RIFF/WAVE",
-    "duration_seconds_from_wav": 6.774,
-    "export_id": "timeline_export_081740cb",
+    "duration_seconds_from_wav": 6.400666666666667,
+    "export_id": "timeline_export_adf0e3dc",
     "non_silent": true,
-    "path": "C:\\Users\\Tyler\\AppData\\Roaming\\VoiceStudio\\artifacts\\timeline_export_081740cb.wav",
+    "path": "C:\\Users\\Tyler\\AppData\\Roaming\\VoiceStudio\\artifacts\\timeline_export_adf0e3dc.wav",
     "sample_rate_hz": 24000,
-    "sha256": "bdf40c0d81db31ddf388991f697dc27f025adea81efc837e6a7d2860c3defecc",
-    "size_bytes": 325196
+    "sha256": "9a05871ce522bac603d50e467499e8b6d2d5e86d1429eca889909fc56a5bdd4c",
+    "size_bytes": 307276
   },
   "generated_audio": {
-    "artifact_path": "C:\\Users\\Tyler\\AppData\\Local\\VoiceStudio\\audio_uploads\\71d3a9ea-d865-4a7e-84e1-c58e5c29424f.wav",
-    "artifact_sha256": "bdf40c0d81db31ddf388991f697dc27f025adea81efc837e6a7d2860c3defecc",
-    "audio_id": "synth_9f0364b0-7ead-4b55-9267-57a54796426a_2a8202a7",
-    "created_at_utc": "2026-04-29T22:47:44.223432Z",
-    "duration_seconds": 6.774,
-    "generated_audio_id": "synth_9f0364b0-7ead-4b55-9267-57a54796426a_2a8202a7",
-    "library_asset_id": "bce92dfb-1b58-432f-905c-cb2dbe80bf5f",
+    "artifact_path": "C:\\Users\\Tyler\\AppData\\Local\\VoiceStudio\\audio_uploads\\125c45b0-51b5-4c8a-a2cc-a6e4243b3a36.wav",
+    "artifact_sha256": "9a05871ce522bac603d50e467499e8b6d2d5e86d1429eca889909fc56a5bdd4c",
+    "audio_id": "synth_9f0364b0-7ead-4b55-9267-57a54796426a_54ec6e78",
+    "created_at_utc": "2026-04-29T23:23:28.140754Z",
+    "duration_seconds": 6.400666666666667,
+    "generated_audio_id": "synth_9f0364b0-7ead-4b55-9267-57a54796426a_54ec6e78",
+    "library_asset_id": "cb553f03-f5b7-47fa-90b5-9b24d45be054",
     "profile_id": "9f0364b0-7ead-4b55-9267-57a54796426a",
     "provenance": {
       "proof_mode": "product_closure",
@@ -145,19 +145,19 @@
     },
     "routed_engine": "xtts_v2",
     "source_engine": "xtts_v2",
-    "timeline_clip_id": "ab874ef0-4933-4617-8b29-c544ff5a06d2",
-    "timeline_track_id": "5fa6eac2-cb7c-43d3-82ec-3c716dd57e76"
+    "timeline_clip_id": "9578880d-2e4d-4142-ae6b-3be1510ceb7f",
+    "timeline_track_id": "74c6ff94-9f3b-4eeb-bdf5-3e41045f836b"
   },
   "git": {
-    "dirty_summary": "M .cursor/STATE.md;  M .vscode/settings.json;  M AGENTS.md;  M backend/api/models_additional.py;  M backend/api/routes/ensemble.py;  M backend/api/routes/library.py;  M backend/api/routes/multi_voice_generator.py;  M backend/api/routes/timeline.py;  M backend/api/routes/voice_cloning_wizard.py;  M backend/services/synthesis_service.py;  M docs/developer/VOICE_SYNTHESIS_PROOF_REPORTING_STANDARD.md;  M docs/governance/CANONICAL_REGISTRY.md;  M docs/reports/verification/slice10/engine_readiness_probe.json;  M docs/reports/verification/slice12/engine_readiness_probe.json;  M docs/reports/verification/slice13/engine_readiness_probe.json;  M docs/reports/verification/slice14/engine_readiness_probe.json;  M docs/reports/verification/slice15/engine_readiness_probe.json;  M docs/reports/verification/slice17/engine_readiness_probe.json;  M docs/reports/verification/slice18/engine_readiness_probe.json;  M docs/templates/VOICE_SYNTHESIS_PROOF_REPORT_TEMPLATE.md;  M schemas/voice_synthesis_proof.schema.json;  M scripts/ci/check_voice_synthesis_proof_json.py;  M scripts/proof/run_voice_synthesis_real_engine_proof.py;  M scripts/run_verification.py;  M tests/contract/test_voice_synthesis_proof_surface_contract.py;  M tests/unit/backend/api/routes/test_library.py;  M tests/unit/backend/api/routes/test_synthesis_stub.py;  M tests/unit/backend/api/routes/test_timeline.py;  M tests/unit/scripts/ci/test_voice_synthesis_proof_json.py;  M tests/unit/scripts/proof/test_voice_synthesis_real_engine_proof_harness.py; ?? backend/data/voicestudio.db; ?? docs/reports/audit/NEXT_MAJOR_COMPLETIONS_ASSESSMENT_2026-04-28.md; ?? docs/reports/audit/SPEED_WITHOUT_DRIFT_PLAN_2026-04-28.md; ?? docs/reports/verification/GENERATED_AUDIO_PRODUCT_CLOSURE_V1_2026-04-29.md; ?? docs/reports/verification/PROJECT_AUTHORITY_GENERATED_AUDIO_INVENTORY_2026-04-29.md; ?? docs/reports/verification/VOICE_SYNTHESIS_LOCAL_STACK_SUMMARY_2026-04-29.md; ?? docs/reports/verification/product_closure_live_attempt/; ?? scripts/ci/check_generated_audio_identity_spine.py; ?? scripts/ci/check_runtime_no_fallback_product_path.py; ?? scripts/proof/verify_backend_restart_durability.py; ?? scripts/proof/verify_generated_audio_replay.py; ?? tests/unit/scripts/ci/test_generated_audio_identity_spine.py; ?? tests/unit/scripts/ci/test_runtime_no_fallback_product_path.py; ?? tests/unit/scripts/proof/test_backend_restart_durability.py; ?? tests/unit/scripts/proof/test_generated_audio_replay.py",
-    "head": "52c069d137bfedf88ed9231613a601ee529d7bbd",
+    "dirty_summary": "M docs/reports/verification/product_closure_live_attempt/GENERATED_AUDIO_PRODUCT_CLOSURE_LIVE_ATTEMPT_2026-04-29.md;  M scripts/ci/check_voice_synthesis_proof_json.py; ?? backend/data/voicestudio.db; ?? docs/reports/audit/NEXT_MAJOR_COMPLETIONS_ASSESSMENT_2026-04-28.md; ?? docs/reports/audit/SPEED_WITHOUT_DRIFT_PLAN_2026-04-28.md; ?? docs/reports/verification/RUNTIME_TRUTH_LOCAL_STACK_2026-04-29.md; ?? scripts/ci/check_proof_freshness.py; ?? tests/unit/scripts/ci/test_proof_freshness.py",
+    "head": "c41beddab1c8d24ca8c9a4d14db4dae1b8caebce",
     "origin_main": "f44d7c398d47aa848e48640c15eeb4dd1930b0f2"
   },
   "library": {
-    "asset_id": "bce92dfb-1b58-432f-905c-cb2dbe80bf5f",
-    "audio_id": "71d3a9ea-d865-4a7e-84e1-c58e5c29424f",
+    "asset_id": "cb553f03-f5b7-47fa-90b5-9b24d45be054",
+    "audio_id": "125c45b0-51b5-4c8a-a2cc-a6e4243b3a36",
     "http_status": 201,
-    "saved_path": "C:\\Users\\Tyler\\AppData\\Local\\VoiceStudio\\audio_uploads\\71d3a9ea-d865-4a7e-84e1-c58e5c29424f.wav"
+    "saved_path": "C:\\Users\\Tyler\\AppData\\Local\\VoiceStudio\\audio_uploads\\125c45b0-51b5-4c8a-a2cc-a6e4243b3a36.wav"
   },
   "non_claims": [
     "not operator proof",
@@ -183,48 +183,47 @@
   "proof_type": "voice_synthesis",
   "requested_engine": "xtts_v2",
   "routed_engine": "xtts_v2",
+  "dirty_proof_policy": "allow-dirty-proof: this proof was generated at the correct HEAD c41bedda with a dirty working tree during Runtime Truth v1 implementation. The dirty_summary records the ambient modified/untracked files. This is NOT a claim of clean-tree proof generation.",
   "schema_version": "voice_synthesis_proof.v1",
   "synthesis": {
-    "audio_id": "synth_9f0364b0-7ead-4b55-9267-57a54796426a_2a8202a7",
-    "audio_url": "/api/voice/audio/synth_9f0364b0-7ead-4b55-9267-57a54796426a_2a8202a7",
-    "duration_seconds": 6.774,
-    "generated_audio_id": "synth_9f0364b0-7ead-4b55-9267-57a54796426a_2a8202a7",
+    "audio_id": "synth_9f0364b0-7ead-4b55-9267-57a54796426a_54ec6e78",
+    "audio_url": "/api/voice/audio/synth_9f0364b0-7ead-4b55-9267-57a54796426a_54ec6e78",
+    "duration_seconds": 6.400666666666667,
+    "generated_audio_id": "synth_9f0364b0-7ead-4b55-9267-57a54796426a_54ec6e78",
     "http_status": 200,
     "quality_metrics": {
       "artifact_score": 0.0,
       "has_clicks": false,
       "has_distortion": false,
-      "mos_score": 4.746525573730469,
+      "mos_score": 4.7534912109375,
       "naturalness": 1.0,
-      "similarity": 0.9188017738851346,
-      "snr_db": 83.42667105315104,
+      "similarity": 0.9526517797822591,
+      "snr_db": 77.25608258284804,
       "voice_profile_match": {
-        "f0_similarity": 0.5432846181486658,
-        "formant_similarity": 0.9535110606920023,
-        "mfcc_cosine_similarity": 0.9738554523559699,
-        "mfcc_distance": 119.52424583479215,
-        "overall_similarity": 0.6751828661405418,
+        "f0_similarity": 0.8242845238708574,
+        "formant_similarity": 0.8654634146341463,
+        "mfcc_cosine_similarity": 0.9901857295806984,
+        "mfcc_distance": 72.70937004267164,
+        "overall_similarity": 0.782318921285961,
         "recommendations": [
           "F0 mismatch detected - consider adjusting pitch parameters",
-          "High MFCC distance - consider reference audio quality",
-          "Spectral centroid mismatch - brightness differs from reference",
-          "Overall voice match is moderate - review synthesis parameters"
+          "Spectral centroid mismatch - brightness differs from reference"
         ],
-        "spectral_similarity": 0.34875350664821214
+        "spectral_similarity": 0.27665845345392875
       }
     },
-    "quality_score": 0.9493051147460937
+    "quality_score": 0.9506982421875
   },
   "timeline": {
-    "clip_id": "ab874ef0-4933-4617-8b29-c544ff5a06d2",
-    "duration_seconds": 6.774,
-    "end_time": 6.774,
-    "revision_after": 37,
-    "revision_before": 34,
+    "clip_id": "9578880d-2e4d-4142-ae6b-3be1510ceb7f",
+    "duration_seconds": 6.400666666666667,
+    "end_time": 6.400666666666667,
+    "revision_after": 41,
+    "revision_before": 38,
     "session_id": "default",
     "start_time": 0.0,
-    "track_id": "5fa6eac2-cb7c-43d3-82ec-3c716dd57e76"
+    "track_id": "74c6ff94-9f3b-4eeb-bdf5-3e41045f836b"
   },
-  "timestamp_utc": "2026-04-29T22:47:44.476685Z",
+  "timestamp_utc": "2026-04-29T23:23:28.534627Z",
   "verdict": "REAL_ENGINE"
 }

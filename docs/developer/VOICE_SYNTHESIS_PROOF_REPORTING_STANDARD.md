@@ -350,3 +350,30 @@ Files matching these name patterns are excluded even if they start with `VOICE_S
 - `*_GUARD_*`
 
 This prevents the guard documentation report itself from needing to classify itself.
+
+---
+
+## Proof Freshness (Runtime Truth v1)
+
+**Validator:** `scripts/ci/check_proof_freshness.py`
+
+### Committed-HEAD Proof Freshness
+Proof JSON files with `schema_version: voice_synthesis_proof.v1` must have `git.head` matching the current `git rev-parse HEAD`. If not, the validator reports `STALE_PROOF_HEAD`.
+
+### Historical Proof Policy
+Proofs from older commits may be marked `historical: true` with the correct generation commit SHA in `git.head`. The validator skips HEAD-matching for historical proofs but flags a contradiction if `historical: true` and `git.head` matches current HEAD.
+
+### Dirty-Proof Policy
+Proofs generated with a dirty working tree are flagged as `DIRTY_PROOF_NOT_ALLOWED` unless:
+- The validator is run with `--allow-dirty-proof`, AND
+- The proof JSON includes a `dirty_proof_policy` field documenting the non-claim.
+
+### Verification-Artifact Freshness
+Use `scripts/ci/check_verification_evidence_freshness.py` to validate that referenced artifacts exist and are non-empty.
+
+### Product-Closure Proof Expectations
+Product-closure proofs (`--product-closure` flag) must additionally satisfy:
+- Library ownership (`library.library_id` present)
+- Timeline placement evidence (`timeline.clip_id`, `timeline.track_id`)
+- Export/replay artifact reference
+- Quality metrics with non-placeholder values

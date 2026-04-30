@@ -17,17 +17,17 @@ VERDICT: REAL_ENGINE
 
 ## Audio Artifact
 
-| Size | 325196 bytes (317.6 KiB) |
+| Size | 307276 bytes (300.1 KiB) |
 | RIFF header | 52 49 46 46 = RIFF / WAVE |
 | Body | binary audio — not a JSON error body; does not start with `{` |
 
 ## Library Evidence
 
-HTTP 201 library asset; audio_id 71d3a9ea-d865-4a7e-84e1-c58e5c29424f
+HTTP 201 library asset; audio_id 125c45b0-51b5-4c8a-a2cc-a6e4243b3a36
 
 ## Timeline Evidence
 
-timeline revision 34→37; clip_id ab874ef0-4933-4617-8b29-c544ff5a06d2; POST /api/timeline/tracks
+timeline revision 38→41; clip_id 9578880d-2e4d-4142-ae6b-3be1510ceb7f; POST /api/timeline/tracks
 
 ## Durability Evidence
 

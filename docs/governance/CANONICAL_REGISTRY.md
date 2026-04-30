@@ -816,6 +816,21 @@ Before creating a new document, check this registry to ensure the topic isn't al
 
 ---
 
+## Runtime Truth v1 Validators and Scanners (2026-04-29)
+
+| Topic | Canonical Source | Notes |
+|-------|-----------------|-------|
+| Proof Freshness Validator | `scripts/ci/check_proof_freshness.py` | Enforces HEAD-matching, dirty-tree detection, historical consistency for `voice_synthesis_proof.v1` JSON. |
+| Global No-Fallback Scanner | `scripts/ci/check_runtime_no_fallback_global.py` | Static scan for forbidden silent fallback / fake-success language in production code. Allowlist: `scripts/ci/runtime_no_fallback_allowlist.json`. |
+| Async Task Durability Scanner | `scripts/ci/check_async_task_durability.py` | Detects untracked fire-and-forget async/background work. Allowlist: `scripts/ci/async_task_durability_allowlist.json`. |
+| Release Engine Readiness Truth | `scripts/ci/check_release_engine_readiness_truth.py` | Manifest-based readiness check for release-critical engines (xtts_v2, piper). |
+| Verification Evidence Freshness | `scripts/ci/check_verification_evidence_freshness.py` | Validates artifact existence and non-emptiness. |
+| Durable Job Authority Inventory | `docs/reports/verification/DURABLE_JOB_AUTHORITY_INVENTORY_2026-04-29.md` | Catalog of 13 background work paths with risk classification. |
+| Runtime Truth Report | `docs/reports/verification/RUNTIME_TRUTH_NO_FALLBACK_DURABLE_JOBS_2026-04-29.md` | Evidence report for no-fallback, simulation honesty, durable jobs. |
+| Runtime Honesty Standard | `docs/developer/RUNTIME_HONESTY_AND_DURABLE_JOBS_STANDARD.md` | Developer standard for runtime honesty requirements. |
+
+---
+
 ## Registry Maintenance
 
 ### Adding New Canonical Sources

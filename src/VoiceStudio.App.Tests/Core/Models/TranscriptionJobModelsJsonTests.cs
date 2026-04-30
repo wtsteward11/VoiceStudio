@@ -92,4 +92,25 @@ public sealed class TranscriptionJobModelsJsonTests
     Assert.AreEqual("unavailable", r.Status);
     Assert.AreEqual("engine down", r.Blocker);
   }
+
+  [TestMethod]
+  public void Request_SerializesAsyncMode()
+  {
+    var req = new TranscriptionJobRequest { AudioId = "a", AsyncMode = true };
+    var json = JsonSerializer.Serialize(req, Options);
+    StringAssert.Contains(json, "\"async_mode\":true");
+  }
+
+  [TestMethod]
+  public void Response_DeserializesProgress()
+  {
+    const string json = """{"job_id":"j1","audio_id":"a1","status":"running","mode":"real","is_simulated":false,"real_transcription_performed":false,"progress":0.25}""";
+    var r = JsonSerializer.Deserialize<TranscriptionJobResponse>(json, Options);
+    Assert.IsNotNull(r);
+    Assert.AreEqual(0.25f, r.Progress);
+  }
+
 }
+
+
+

@@ -753,6 +753,7 @@ namespace VoiceStudio.App.Tests.ViewModels
 
       Assert.IsNotNull(captured);
       Assert.AreEqual("audio-job-send", captured.AudioId);
+      Assert.IsTrue(captured.AsyncMode);
     }
 
     [TestMethod]
@@ -916,6 +917,174 @@ namespace VoiceStudio.App.Tests.ViewModels
       await PumpDispatcherQueueAsync().ConfigureAwait(false);
 
       Assert.AreEqual(0, completedCount);
+    }
+
+    [TestMethod]
+    public async Task StartJob_PendingThenCompleted_SetsSelectedTranscription()
+    {
+      var tr = new TranscriptionResponse
+      {
+        Id = "tr-poll",
+        AudioId = "aud-poll",
+        Text = "polled",
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>(),
+      };
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-poll",
+                Status = "pending",
+                Mode = "pending",
+                Progress = 0f,
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.GetTranscriptionJobStatusAsync("j-poll", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-poll",
+                Status = "completed",
+                Mode = "real",
+                TranscriptId = "tr-poll",
+                IsSimulated = false,
+                RealTranscriptionPerformed = true,
+                Progress = 1f,
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.GetTranscriptionAsync("tr-poll", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(tr);
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync("aud-poll", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse> { tr });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-poll";
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsNotNull(vm.SelectedTranscription);
+      Assert.AreEqual("tr-poll", vm.SelectedTranscription.Id);
+    }
+
+    [TestMethod]
+    public async Task StartJob_PendingThenUnavailable_SetsErrorMessage()
+    {
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-pu",
+                Status = "pending",
+                Mode = "pending",
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.GetTranscriptionJobStatusAsync("j-pu", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-pu",
+                Status = "unavailable",
+                Mode = "unavailable",
+                Blocker = "engine-off",
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-pu";
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      StringAssert.Contains(vm.ErrorMessage, "engine-off");
+      Assert.IsNull(vm.SelectedTranscription);
+    }
+
+    [TestMethod]
+    public async Task StartJob_PendingThenFailed_SetsErrorMessage()
+    {
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-pf",
+                Status = "pending",
+                Mode = "pending",
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.GetTranscriptionJobStatusAsync("j-pf", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-pf",
+                Status = "failed",
+                Mode = "real",
+                Blocker = "missing-audio",
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-pf";
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      StringAssert.Contains(vm.ErrorMessage, "missing-audio");
+      Assert.IsNull(vm.SelectedTranscription);
+    }
+
+    [TestMethod]
+    public async Task StartJob_PendingThenSimulatedCompleted_SetsLastTranscriptionWasSimulated()
+    {
+      var tr = new TranscriptionResponse
+      {
+        Id = "tr-sim-poll",
+        AudioId = "aud-sim-poll",
+        Text = "sim",
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>(),
+      };
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-sim-poll",
+                Status = "pending",
+                Mode = "pending",
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.GetTranscriptionJobStatusAsync("j-sim-poll", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-sim-poll",
+                Status = "completed",
+                Mode = "simulation",
+                TranscriptId = "tr-sim-poll",
+                IsSimulated = true,
+                RealTranscriptionPerformed = false,
+                Progress = 1f,
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.GetTranscriptionAsync("tr-sim-poll", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(tr);
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync("aud-sim-poll", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse> { tr });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-sim-poll";
+      vm.SimulateTranscription = true;
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsTrue(vm.LastTranscriptionWasSimulated);
+      Assert.IsNotNull(vm.SelectedTranscription);
     }
   }
 }

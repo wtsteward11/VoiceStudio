@@ -59,6 +59,34 @@ public sealed class TranscriptionJobOutcomeClassifierTests
   }
 
   [TestMethod]
+  public void SimulatedCompleted_WhenCompletedTranscriptIdOnly_IsSimulated()
+  {
+    var r = new TranscriptionJobResponse
+    {
+      Status = "completed",
+      TranscriptId = "t-hydrate",
+      IsSimulated = true,
+      RealTranscriptionPerformed = false,
+      Transcript = null,
+    };
+    Assert.AreEqual(TranscriptionJobOutcome.SimulatedCompleted, TranscriptionJobOutcomeClassifier.Classify(r));
+  }
+
+  [TestMethod]
+  public void RealCompleted_WhenCompletedTranscriptIdOnly_RealPerformed()
+  {
+    var r = new TranscriptionJobResponse
+    {
+      Status = "completed",
+      TranscriptId = "t-hydrate",
+      IsSimulated = false,
+      RealTranscriptionPerformed = true,
+      Transcript = null,
+    };
+    Assert.AreEqual(TranscriptionJobOutcome.RealCompleted, TranscriptionJobOutcomeClassifier.Classify(r));
+  }
+
+  [TestMethod]
   public void Unavailable_IsNotTreatedAsSuccess()
   {
     var r = new TranscriptionJobResponse { Status = "unavailable", Mode = "unavailable", Blocker = "x" };

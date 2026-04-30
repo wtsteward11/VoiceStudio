@@ -27,5 +27,9 @@ namespace VoiceStudio.Core.Services
         TranscriptionJobRequest request,
         string? projectId = null,
         CancellationToken ct = default);
+
+    Task<TranscriptionJobResponse> GetTranscriptionJobStatusAsync(
+        string jobId,
+        CancellationToken ct = default);
   }
 }

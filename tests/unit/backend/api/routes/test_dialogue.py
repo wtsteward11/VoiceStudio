@@ -280,6 +280,46 @@ class TestDialogueSegmentContract:
         assert d["status"] == "edited"
 
 
+class TestDialogueAsyncTranscriptTimelineFeed:
+    def test_completed_async_transcript_feeds_create_timeline_clips(self, dialogue_client):
+        """Stored transcript_id (as after async durable job) must work with create-timeline-clips."""
+        tid = "transcript-async-tl-1"
+        seg_id = "seg-async-tl-1"
+        fake_repo = FakeTranscriptionRepository(
+            {
+                tid: {
+                    "id": tid,
+                    "audio_id": "aud-async",
+                    "text": "one line",
+                    "language": "en",
+                    "duration": 2.0,
+                    "segments": [
+                        {"id": seg_id, "text": "hello", "start": 0.0, "end": 1.0, "status": "raw"},
+                    ],
+                    "word_timestamps": [],
+                    "created": "2026-04-29T12:00:00",
+                    "engine": "simulation",
+                    "project_id": "proj-tl",
+                },
+            },
+        )
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            tr = dialogue_client.post("/api/timeline/tracks", json={"name": "AsyncTL", "type": "audio"})
+            assert tr.status_code == 200, tr.text
+            track_id = tr.json()["id"]
+            r = dialogue_client.post(
+                f"/api/dialogue/transcripts/{tid}/create-timeline-clips",
+                json={"track_id": track_id, "project_id": "proj-tl", "replace_existing": False},
+            )
+        assert r.status_code == 200, r.text
+        out = r.json()
+        assert out["transcript_id"] == tid
+        assert out["segment_count"] >= 1
+        assert len(out["created_clip_ids"]) >= 1
+
+
 class TestDialogueRegenerateChain:
     def test_regenerate_returns_ids_and_provenance(self, dialogue_client, tmp_path, lib_repo):
         tid, fake_repo = _seed_transcription()

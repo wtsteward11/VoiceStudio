@@ -18,9 +18,21 @@ from pydantic import BaseModel, Field
 
 from backend.api.deps import TrackStoreDep
 from backend.core.exceptions import ServiceError
-from backend.data.repositories.job_repository import JobType
+from backend.data.repositories.job_repository import (
+    JobEntity,
+    JobStatus,
+    JobType,
+    get_job_repository,
+)
 from backend.data.repositories.transcription_repository import get_transcription_repository
 from backend.ml.models.model_preflight import PreflightError as MLPreflightError
+from backend.services.canonical_job_lifecycle import (
+    complete_job,
+    create_job,
+    fail_job,
+    mark_job_running,
+    update_job_progress,
+)
 from backend.services.model_preflight import PreflightError as ServicePreflightError
 from backend.services.transcription_service import (
     TranscriptionRequest,
@@ -185,6 +197,7 @@ class TranscriptionJobRequest(VoiceStudioBaseModel):
     language: str | None = None
     word_timestamps: bool = False
     simulate: bool = False
+    async_mode: bool = False
 
 
 class TranscriptionJobResponse(VoiceStudioBaseModel):
@@ -199,6 +212,226 @@ class TranscriptionJobResponse(VoiceStudioBaseModel):
     real_transcription_performed: bool
     blocker: str | None = None
     transcript: TranscriptionResponse | None = None
+    progress: float | None = None
+
+
+async def _merge_transcription_job_metadata(job_id: str, patch: dict[str, object]) -> None:
+    """Merge keys into job_history.metadata for transcription_job domain jobs."""
+    jrepo = get_job_repository()
+    entity = await jrepo.get_by_id(job_id)
+    if not entity:
+        return
+    meta = entity.get_metadata()
+    meta.update(patch)
+    entity.set_metadata(meta)
+    await jrepo.update(job_id, {"metadata": entity.metadata})
+
+
+def _transcription_job_metadata_base(
+    request: TranscriptionJobRequest,
+    project_id: str | None,
+) -> dict[str, object]:
+    return {
+        "domain": "transcription_job",
+        "audio_id": request.audio_id,
+        "simulate": request.simulate,
+        "engine": request.engine,
+        "language": request.language or "",
+        "project_id": project_id or "",
+        "transcription_status": "pending",
+        "mode": "pending",
+        "is_simulated": False,
+        "real_transcription_performed": False,
+        "blocker": None,
+    }
+
+
+async def _run_transcription_job_bg(
+    job_id: str,
+    request: TranscriptionJobRequest,
+    project_id: str | None,
+) -> None:
+    """Execute transcription job work after async POST accepted (canonical job_history)."""
+    repo = get_transcription_repository()
+    try:
+        await mark_job_running(job_id)
+        await update_job_progress(job_id, 0.1, current_step="transcribing")
+        await _merge_transcription_job_metadata(
+            job_id,
+            {
+                "transcription_status": "running",
+                "mode": "simulation" if request.simulate else "real",
+            },
+        )
+
+        if request.simulate:
+            transcript_id = str(uuid.uuid4())
+            payload = build_simulation_transcript(
+                transcript_id=transcript_id,
+                audio_id=request.audio_id,
+                job_id=job_id,
+                language=(request.language or "en"),
+            )
+            if project_id:
+                payload["project_id"] = project_id
+            if not payload.get("segments"):
+                await _merge_transcription_job_metadata(
+                    job_id,
+                    {
+                        "transcription_status": "failed",
+                        "mode": "simulation",
+                        "is_simulated": True,
+                        "real_transcription_performed": False,
+                        "blocker": "Simulation produced no segments.",
+                    },
+                )
+                await fail_job(job_id, "EMPTY_TRANSCRIPT: Simulation produced no segments.")
+                return
+            await repo.store_transcription(payload)
+            stored = await repo.get_transcription(transcript_id)
+            if stored is None:
+                logger.error("Async simulation stored but transcript %s not readable", transcript_id)
+                await _merge_transcription_job_metadata(
+                    job_id,
+                    {
+                        "transcription_status": "failed",
+                        "mode": "simulation",
+                        "is_simulated": True,
+                        "real_transcription_performed": False,
+                        "blocker": "Transcription persistence failed after simulation",
+                    },
+                )
+                await fail_job(job_id, "Transcription persistence failed after simulation")
+                return
+            await _merge_transcription_job_metadata(
+                job_id,
+                {
+                    "transcription_status": "completed",
+                    "mode": "simulation",
+                    "is_simulated": True,
+                    "real_transcription_performed": False,
+                    "blocker": None,
+                },
+            )
+            await complete_job(job_id, result_id=transcript_id)
+            return
+
+        try:
+            result = await transcribe_audio(
+                TranscriptionRequest(
+                    audio_id=request.audio_id,
+                    engine=request.engine,
+                    language=request.language,
+                    word_timestamps=request.word_timestamps,
+                    diarization=False,
+                    use_vad=False,
+                ),
+                project_id=project_id,
+            )
+        except (MLPreflightError, ServicePreflightError) as e:
+            blocker = _job_blocker_str(e.detail)
+            await _merge_transcription_job_metadata(
+                job_id,
+                {
+                    "transcription_status": "unavailable",
+                    "mode": "unavailable",
+                    "is_simulated": False,
+                    "real_transcription_performed": False,
+                    "blocker": blocker,
+                },
+            )
+            await fail_job(job_id, blocker)
+            return
+        except ServiceError as e:
+            blocker = _job_blocker_str(e.detail)
+            await _merge_transcription_job_metadata(
+                job_id,
+                {
+                    "transcription_status": "failed",
+                    "mode": "real",
+                    "is_simulated": False,
+                    "real_transcription_performed": False,
+                    "blocker": blocker,
+                },
+            )
+            await fail_job(job_id, blocker)
+            return
+
+        await update_job_progress(job_id, 0.95, current_step="persisting")
+        await _merge_transcription_job_metadata(
+            job_id,
+            {
+                "transcription_status": "completed",
+                "mode": "real",
+                "is_simulated": False,
+                "real_transcription_performed": True,
+                "blocker": None,
+            },
+        )
+        await complete_job(job_id, result_id=result.id)
+    except Exception as e:
+        logger.error("Async transcription job %s failed: %s", job_id, e, exc_info=True)
+        await _merge_transcription_job_metadata(
+            job_id,
+            {
+                "transcription_status": "failed",
+                "mode": "real",
+                "is_simulated": False,
+                "real_transcription_performed": False,
+                "blocker": str(e),
+            },
+        )
+        await fail_job(job_id, str(e))
+
+
+def _job_entity_to_transcription_job_response(entity: JobEntity) -> TranscriptionJobResponse:
+    """Map canonical JobEntity (domain transcription_job) to TranscriptionJobResponse."""
+    meta = entity.get_metadata()
+    if meta.get("domain") != "transcription_job":
+        raise ValueError("not a transcription_job entity")
+
+    audio_id = str(meta.get("audio_id", ""))
+    transcript_id = entity.result_id
+    ts = meta.get("transcription_status")
+    if isinstance(ts, str):
+        api_status = ts
+    elif entity.status == JobStatus.COMPLETED.value:
+        api_status = "completed"
+    elif entity.status == JobStatus.FAILED.value:
+        api_status = "unavailable" if meta.get("mode") == "unavailable" else "failed"
+    elif entity.status == JobStatus.RUNNING.value:
+        api_status = "running"
+    else:
+        api_status = "pending"
+
+    mode = str(meta.get("mode") or api_status)
+    is_simulated = bool(meta.get("is_simulated", False))
+    real_tp = bool(meta.get("real_transcription_performed", False))
+    blocker_raw = meta.get("blocker")
+    blocker_out: str | None = None
+    if isinstance(blocker_raw, str):
+        blocker_out = blocker_raw
+    elif blocker_raw is not None:
+        blocker_out = str(blocker_raw)
+    if blocker_out is None and entity.error and api_status in ("failed", "unavailable"):
+        blocker_out = entity.error
+
+    progress_val: float | None = None
+    if entity.progress is not None:
+        progress_val = float(entity.progress)
+
+    return TranscriptionJobResponse(
+        job_id=entity.id,
+        audio_id=audio_id,
+        transcript_id=transcript_id,
+        status=api_status,
+        mode=mode,
+        is_simulated=is_simulated,
+        real_transcription_performed=real_tp,
+        blocker=blocker_out,
+        transcript=None,
+        progress=progress_val,
+    )
 
 
 @router.post("/", response_model=TranscriptionResponse)
@@ -239,6 +472,43 @@ async def transcribe_job_route(
     """
     job_id = str(uuid.uuid4())
     repo = get_transcription_repository()
+
+    if request.async_mode:
+        if request.simulate:
+            probe = build_simulation_transcript(
+                transcript_id="__probe__",
+                audio_id=request.audio_id,
+                job_id=job_id,
+                language=(request.language or "en"),
+            )
+            if not probe.get("segments"):
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "code": "EMPTY_TRANSCRIPT",
+                        "message": "Simulation produced no segments.",
+                    },
+                )
+        meta = _transcription_job_metadata_base(request, project_id)
+        await create_job(
+            job_id,
+            JobType.TRANSCRIPTION.value,
+            "Transcription job",
+            metadata=meta,
+        )
+        asyncio.create_task(_run_transcription_job_bg(job_id, request, project_id))
+        return TranscriptionJobResponse(
+            job_id=job_id,
+            audio_id=request.audio_id,
+            transcript_id=None,
+            status="pending",
+            mode="pending",
+            is_simulated=request.simulate,
+            real_transcription_performed=False,
+            blocker=None,
+            transcript=None,
+            progress=0.0,
+        )
 
     if request.simulate:
         transcript_id = str(uuid.uuid4())
@@ -330,6 +600,22 @@ async def transcribe_job_route(
         blocker=None,
         transcript=transcript,
     )
+
+
+@router.get("/jobs/{job_id}", response_model=TranscriptionJobResponse)
+async def get_transcription_job_status(job_id: str):
+    """Poll durable transcription job status (canonical job_history, domain transcription_job)."""
+    jrepo = get_job_repository()
+    entity = await jrepo.get_by_id(job_id)
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Transcription job not found")
+    meta = entity.get_metadata()
+    if meta.get("domain") != "transcription_job":
+        raise HTTPException(status_code=404, detail="Transcription job not found")
+    try:
+        return _job_entity_to_transcription_job_response(entity)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Transcription job not found") from None
 
 
 @router.get("/{transcription_id}", response_model=TranscriptionResponse)

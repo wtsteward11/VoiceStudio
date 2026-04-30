@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -95,6 +96,10 @@ namespace VoiceStudio.App.Views.Panels
     /// <summary>Backend job <c>mode</c> (<c>real</c>, <c>simulation</c>, <c>unavailable</c>) for operator visibility.</summary>
     [ObservableProperty]
     private string? transcriptionJobMode;
+
+    /// <summary>Canonical job progress (0..1) while a durable transcription job is in flight.</summary>
+    [ObservableProperty]
+    private float transcriptionJobProgress;
 
     /// <summary>GAP-067 slice 5: progressive disclosure for optional project scope and STT toggles.</summary>
     [ObservableProperty]
@@ -2145,6 +2150,7 @@ namespace VoiceStudio.App.Views.Panels
         IsLoading = true;
         ErrorMessage = null;
         TranscriptionJobMode = null;
+        TranscriptionJobProgress = 0f;
         AudioPersistenceSemanticsHint = null;
 
         var request = new TranscriptionJobRequest
@@ -2154,127 +2160,22 @@ namespace VoiceStudio.App.Views.Panels
           Language = SelectedLanguage == "auto" ? null : SelectedLanguage,
           WordTimestamps = WordTimestamps,
           Simulate = SimulateTranscription,
+          AsyncMode = true,
         };
 
         var job = await _transcriptionClient.StartTranscriptionJobAsync(request, SelectedProjectId, cancellationToken).ConfigureAwait(true);
         TranscriptionJobMode = string.IsNullOrWhiteSpace(job.Mode) ? null : job.Mode;
+        TranscriptionJobProgress = job.Progress ?? 0f;
 
-        var outcome = TranscriptionJobOutcomeClassifier.Classify(job);
-
-        switch (outcome)
+        if (string.Equals(job.Status, "pending", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(job.Status, "running", StringComparison.OrdinalIgnoreCase))
         {
-          case TranscriptionJobOutcome.RealCompleted:
-          case TranscriptionJobOutcome.SimulatedCompleted:
-          {
-            var transcription = job.Transcript!;
-            LastTranscriptionWasSimulated = outcome == TranscriptionJobOutcome.SimulatedCompleted;
-            Transcriptions.Insert(0, transcription);
-            SelectedTranscription = transcription;
-            TranscriptionText = transcription.Text;
-
-            await LoadTranscriptionsAsync(cancellationToken).ConfigureAwait(true);
-
-            var eventAggregator = AppServices.TryGetEventAggregator();
-            var subtitleSource = transcription.Segments ?? new List<TranscriptionSegment>();
-            if (eventAggregator != null && subtitleSource.Count > 0)
-            {
-              var subtitleSegments = subtitleSource
-                  .Select(s => new VoiceStudio.Core.Events.SubtitleSegment(
-                      s.Start,
-                      s.End,
-                      s.Text,
-                      string.IsNullOrWhiteSpace(s.Id) ? null : s.Id))
-                  .ToList();
-
-              eventAggregator.Publish(new VoiceStudio.Core.Events.TranscriptionCompletedEvent(
-                  PanelId,
-                  transcription.AudioId,
-                  transcription.Id,
-                  transcription.Text,
-                  subtitleSegments,
-                  TimeSpan.FromSeconds(transcription.Duration),
-                  transcription.Language));
-            }
-
-            var saveOutcome = await TranscribeToProjectPersistence.TrySaveLibraryAudioToProjectAsync(
-                _projectAudioClient,
-                _logService,
-                SelectedProjectId,
-                transcription.AudioId,
-                cancellationToken).ConfigureAwait(false);
-
-            var title = ResourceHelper.GetString("Transcribe.C3.TranscribeCompleteTitle", "Transcription complete");
-            string detail;
-            string hint;
-            switch (saveOutcome)
-            {
-              case TranscribeProjectAudioSaveOutcome.Saved:
-              {
-                var detailFmt = ResourceHelper.GetString(
-                    "Transcribe.A1.TranscribeCompleteDetailWithProjectCopy",
-                    "Transcribed with {0}. Source audio was also added to project audio.");
-                detail = string.Format(System.Globalization.CultureInfo.CurrentCulture, detailFmt, SelectedEngine);
-                hint = ResourceHelper.GetString(
-                    "Transcribe.A1.AudioPersistenceHintProjectCopy",
-                    "Source audio is in the library and was copied to project audio.");
-                break;
-              }
-              case TranscribeProjectAudioSaveOutcome.Failed:
-              {
-                var detailFmt = ResourceHelper.GetString(
-                    "Transcribe.A1.TranscribeCompleteDetailProjectCopyFailed",
-                    "Transcribed with {0}. The transcript is ready; copying source audio to the project failed. Check logs.");
-                detail = string.Format(System.Globalization.CultureInfo.CurrentCulture, detailFmt, SelectedEngine);
-                hint = ResourceHelper.GetString(
-                    "Transcribe.A1.AudioPersistenceHintProjectCopyFailed",
-                    "Transcript is ready; source audio could not be copied to the project. See logs.");
-                break;
-              }
-              default:
-              {
-                var detailTemplate = ResourceHelper.GetString(
-                    "Transcribe.C3.TranscribeCompleteDetail",
-                    "Transcribed with {0}. Source audio remains a library asset; this step does not add it to project audio. Creating a transcript does not save source audio to the project.");
-                detail = string.Format(System.Globalization.CultureInfo.CurrentCulture, detailTemplate, SelectedEngine);
-                hint = ResourceHelper.GetString(
-                    "Transcribe.C3.AudioPersistenceHint",
-                    "Source audio remains a library asset; transcribing does not add it to project audio.");
-                break;
-              }
-            }
-
-            _toastNotificationService?.ShowSuccess(detail, title);
-            AudioPersistenceSemanticsHint = hint;
-            break;
-          }
-          case TranscriptionJobOutcome.Unavailable:
-          {
-            var blocker = string.IsNullOrWhiteSpace(job.Blocker) ? "(no detail)" : job.Blocker;
-            ErrorMessage = $"Transcription {job.Mode}: {blocker}";
-            _toastNotificationService?.ShowWarning(
-                ResourceHelper.GetString("Transcribe.JobUnavailableTitle", "Transcription unavailable"),
-                ErrorMessage);
-            break;
-          }
-          case TranscriptionJobOutcome.Failed:
-          {
-            var blocker = string.IsNullOrWhiteSpace(job.Blocker) ? "(no detail)" : job.Blocker;
-            ErrorMessage = $"Transcription {job.Mode}: {blocker}";
-            _toastNotificationService?.ShowError(
-                ResourceHelper.GetString("Transcribe.JobFailedTitle", "Transcription job failed"),
-                ErrorMessage);
-            break;
-          }
-          case TranscriptionJobOutcome.InvalidCompleted:
-          default:
-          {
-            ErrorMessage = "Transcription completed but returned no transcript";
-            _toastNotificationService?.ShowError(
-                ResourceHelper.GetString("Transcribe.JobInvalidTitle", "Transcription incomplete"),
-                ErrorMessage);
-            break;
-          }
+          await PollTranscriptionJobAsync(job.JobId, cancellationToken).ConfigureAwait(true);
+          return;
         }
+
+        await HydrateJobTranscriptIfMissingAsync(job, cancellationToken).ConfigureAwait(true);
+        await ApplyTranscriptionJobOutcomeAsync(job, cancellationToken).ConfigureAwait(true);
       }
       catch (Exception ex)
       {
@@ -2286,6 +2187,164 @@ namespace VoiceStudio.App.Views.Panels
         IsLoading = false;
         TranscribeCommand.NotifyCanExecuteChanged();
         StartJobCommand.NotifyCanExecuteChanged();
+      }
+    }
+
+    private async Task PollTranscriptionJobAsync(string jobId, CancellationToken cancellationToken)
+    {
+      const int maxWaitMs = 300_000;
+      const int intervalMs = 250;
+      var sw = Stopwatch.StartNew();
+      while (sw.ElapsedMilliseconds < maxWaitMs)
+      {
+        await Task.Delay(intervalMs, cancellationToken).ConfigureAwait(true);
+        var status = await _transcriptionClient.GetTranscriptionJobStatusAsync(jobId, cancellationToken).ConfigureAwait(true);
+        TranscriptionJobMode = string.IsNullOrWhiteSpace(status.Mode) ? null : status.Mode;
+        TranscriptionJobProgress = status.Progress ?? 0f;
+        if (!string.Equals(status.Status, "pending", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(status.Status, "running", StringComparison.OrdinalIgnoreCase))
+        {
+          await HydrateJobTranscriptIfMissingAsync(status, cancellationToken).ConfigureAwait(true);
+          await ApplyTranscriptionJobOutcomeAsync(status, cancellationToken).ConfigureAwait(true);
+          return;
+        }
+      }
+
+      ErrorMessage = ResourceHelper.GetString(
+          "Transcribe.JobPollTimeout",
+          "Transcription job timed out.");
+      _toastNotificationService?.ShowWarning(
+          ResourceHelper.GetString("Transcribe.JobPollTimeoutTitle", "Transcription job"),
+          ErrorMessage);
+    }
+
+    private async Task HydrateJobTranscriptIfMissingAsync(TranscriptionJobResponse job, CancellationToken cancellationToken)
+    {
+      if (!string.Equals(job.Status, "completed", StringComparison.OrdinalIgnoreCase))
+        return;
+      if (job.Transcript != null || string.IsNullOrWhiteSpace(job.TranscriptId))
+        return;
+      var loaded = await _transcriptionClient.GetTranscriptionAsync(job.TranscriptId, cancellationToken).ConfigureAwait(true);
+      job.Transcript = loaded;
+    }
+
+    private async Task ApplyTranscriptionJobOutcomeAsync(TranscriptionJobResponse job, CancellationToken cancellationToken)
+    {
+      var outcome = TranscriptionJobOutcomeClassifier.Classify(job);
+
+      switch (outcome)
+      {
+        case TranscriptionJobOutcome.RealCompleted:
+        case TranscriptionJobOutcome.SimulatedCompleted:
+        {
+          var transcription = job.Transcript!;
+          LastTranscriptionWasSimulated = outcome == TranscriptionJobOutcome.SimulatedCompleted;
+          Transcriptions.Insert(0, transcription);
+          SelectedTranscription = transcription;
+          TranscriptionText = transcription.Text;
+
+          await LoadTranscriptionsAsync(cancellationToken).ConfigureAwait(true);
+
+          var eventAggregator = AppServices.TryGetEventAggregator();
+          var subtitleSource = transcription.Segments ?? new List<TranscriptionSegment>();
+          if (eventAggregator != null && subtitleSource.Count > 0)
+          {
+            var subtitleSegments = subtitleSource
+                .Select(s => new VoiceStudio.Core.Events.SubtitleSegment(
+                    s.Start,
+                    s.End,
+                    s.Text,
+                    string.IsNullOrWhiteSpace(s.Id) ? null : s.Id))
+                .ToList();
+
+            eventAggregator.Publish(new VoiceStudio.Core.Events.TranscriptionCompletedEvent(
+                PanelId,
+                transcription.AudioId,
+                transcription.Id,
+                transcription.Text,
+                subtitleSegments,
+                TimeSpan.FromSeconds(transcription.Duration),
+                transcription.Language));
+          }
+
+          var saveOutcome = await TranscribeToProjectPersistence.TrySaveLibraryAudioToProjectAsync(
+              _projectAudioClient,
+              _logService,
+              SelectedProjectId,
+              transcription.AudioId,
+              cancellationToken).ConfigureAwait(false);
+
+          var title = ResourceHelper.GetString("Transcribe.C3.TranscribeCompleteTitle", "Transcription complete");
+          string detail;
+          string hint;
+          switch (saveOutcome)
+          {
+            case TranscribeProjectAudioSaveOutcome.Saved:
+            {
+              var detailFmt = ResourceHelper.GetString(
+                  "Transcribe.A1.TranscribeCompleteDetailWithProjectCopy",
+                  "Transcribed with {0}. Source audio was also added to project audio.");
+              detail = string.Format(System.Globalization.CultureInfo.CurrentCulture, detailFmt, SelectedEngine);
+              hint = ResourceHelper.GetString(
+                  "Transcribe.A1.AudioPersistenceHintProjectCopy",
+                  "Source audio is in the library and was copied to project audio.");
+              break;
+            }
+            case TranscribeProjectAudioSaveOutcome.Failed:
+            {
+              var detailFmt = ResourceHelper.GetString(
+                  "Transcribe.A1.TranscribeCompleteDetailProjectCopyFailed",
+                  "Transcribed with {0}. The transcript is ready; copying source audio to the project failed. Check logs.");
+              detail = string.Format(System.Globalization.CultureInfo.CurrentCulture, detailFmt, SelectedEngine);
+              hint = ResourceHelper.GetString(
+                  "Transcribe.A1.AudioPersistenceHintProjectCopyFailed",
+                  "Transcript is ready; source audio could not be copied to the project. See logs.");
+              break;
+            }
+            default:
+            {
+              var detailTemplate = ResourceHelper.GetString(
+                  "Transcribe.C3.TranscribeCompleteDetail",
+                  "Transcribed with {0}. Source audio remains a library asset; this step does not add it to project audio. Creating a transcript does not save source audio to the project.");
+              detail = string.Format(System.Globalization.CultureInfo.CurrentCulture, detailTemplate, SelectedEngine);
+              hint = ResourceHelper.GetString(
+                  "Transcribe.C3.AudioPersistenceHint",
+                  "Source audio remains a library asset; transcribing does not add it to project audio.");
+              break;
+            }
+          }
+
+          _toastNotificationService?.ShowSuccess(detail, title);
+          AudioPersistenceSemanticsHint = hint;
+          break;
+        }
+        case TranscriptionJobOutcome.Unavailable:
+        {
+          var blocker = string.IsNullOrWhiteSpace(job.Blocker) ? "(no detail)" : job.Blocker;
+          ErrorMessage = $"Transcription {job.Mode}: {blocker}";
+          _toastNotificationService?.ShowWarning(
+              ResourceHelper.GetString("Transcribe.JobUnavailableTitle", "Transcription unavailable"),
+              ErrorMessage);
+          break;
+        }
+        case TranscriptionJobOutcome.Failed:
+        {
+          var blocker = string.IsNullOrWhiteSpace(job.Blocker) ? "(no detail)" : job.Blocker;
+          ErrorMessage = $"Transcription {job.Mode}: {blocker}";
+          _toastNotificationService?.ShowError(
+              ResourceHelper.GetString("Transcribe.JobFailedTitle", "Transcription job failed"),
+              ErrorMessage);
+          break;
+        }
+        case TranscriptionJobOutcome.InvalidCompleted:
+        default:
+        {
+          ErrorMessage = "Transcription completed but returned no transcript";
+          _toastNotificationService?.ShowError(
+              ResourceHelper.GetString("Transcribe.JobInvalidTitle", "Transcription incomplete"),
+              ErrorMessage);
+          break;
+        }
       }
     }
 

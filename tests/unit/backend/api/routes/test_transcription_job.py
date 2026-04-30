@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 from backend.api.routes import transcribe as transcribe_routes
 from backend.ml.models.model_preflight import PreflightError as MLPreflightError
@@ -23,6 +25,17 @@ def transcribe_client():
 @pytest.fixture
 def fake_repo():
     return StoringFakeTranscriptionRepository({})
+
+
+@pytest.fixture
+def in_memory_jobs(monkeypatch):
+    """Canonical job store for async transcription jobs (no SQLite dependency)."""
+    from backend.data.repositories import job_repository as jr
+
+    mem = jr.InMemoryJobRepository()
+    monkeypatch.setattr(jr, "_job_repository", mem)
+    monkeypatch.setattr(jr, "_job_repository_init_attempted", True)
+    yield mem
 
 
 class TestTranscriptionJobRoute:
@@ -154,3 +167,97 @@ class TestTranscriptionJobRoute:
         assert b["status"] == "failed"
         assert b["mode"] == "real"
         assert b["blocker"]
+
+
+class TestTranscriptionJobAsyncRoute:
+    """Durable async_mode + GET /api/transcribe/jobs/{job_id} polling contract."""
+
+    async def test_async_simulate_returns_pending_immediately(self, fake_repo, in_memory_jobs):
+        app = FastAPI()
+        app.include_router(transcribe_routes.router)
+        transport = ASGITransport(app=app)
+        with patch.object(transcribe_routes, "get_transcription_repository", return_value=fake_repo):
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                r = await client.post(
+                    "/api/transcribe/jobs",
+                    json={"audio_id": "a1", "simulate": True, "async_mode": True},
+                )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["status"] == "pending"
+        assert body["job_id"]
+        assert body["progress"] == 0.0
+
+    async def test_async_simulate_job_status_eventually_completed(self, fake_repo, in_memory_jobs):
+        app = FastAPI()
+        app.include_router(transcribe_routes.router)
+        transport = ASGITransport(app=app)
+        with patch.object(transcribe_routes, "get_transcription_repository", return_value=fake_repo):
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                r = await client.post(
+                    "/api/transcribe/jobs",
+                    json={"audio_id": "a1", "simulate": True, "async_mode": True},
+                )
+                assert r.status_code == 200
+                jid = r.json()["job_id"]
+                gr = None
+                for _ in range(100):
+                    await asyncio.sleep(0.01)
+                    gr = await client.get(f"/api/transcribe/jobs/{jid}")
+                    if gr.status_code == 200 and gr.json().get("status") == "completed":
+                        break
+                assert gr is not None
+                assert gr.status_code == 200
+                data = gr.json()
+                assert data["status"] == "completed"
+                assert data["transcript_id"]
+                assert data["mode"] == "simulation"
+
+    async def test_async_real_unavailable_returns_pending_then_unavailable(
+        self, fake_repo, in_memory_jobs
+    ):
+        app = FastAPI()
+        app.include_router(transcribe_routes.router)
+        transport = ASGITransport(app=app)
+        with (
+            patch.object(transcribe_routes, "get_transcription_repository", return_value=fake_repo),
+            patch.object(
+                transcribe_routes,
+                "transcribe_audio",
+                new=AsyncMock(side_effect=MLPreflightError({"code": "ENGINE_UNAVAILABLE"}, status_code=503)),
+            ),
+        ):
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                r = await client.post(
+                    "/api/transcribe/jobs",
+                    json={"audio_id": "a1", "simulate": False, "async_mode": True},
+                )
+                assert r.status_code == 200
+                jid = r.json()["job_id"]
+                gr = None
+                for _ in range(100):
+                    await asyncio.sleep(0.01)
+                    gr = await client.get(f"/api/transcribe/jobs/{jid}")
+                    if gr.status_code == 200 and gr.json().get("status") == "unavailable":
+                        break
+                assert gr is not None
+                assert gr.json()["status"] == "unavailable"
+                assert gr.json()["mode"] == "unavailable"
+                assert gr.json().get("blocker")
+
+    def test_sync_path_unchanged_with_async_mode_false(self, transcribe_client, fake_repo):
+        with patch.object(transcribe_routes, "get_transcription_repository", return_value=fake_repo):
+            r = transcribe_client.post(
+                "/api/transcribe/jobs",
+                json={"audio_id": "a1", "simulate": True, "async_mode": False},
+            )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "completed"
+        assert body["mode"] == "simulation"
+        assert body["transcript_id"]
+
+    def test_poll_missing_job_returns_404(self, transcribe_client):
+        r = transcribe_client.get("/api/transcribe/jobs/00000000-0000-0000-0000-000000000001")
+        assert r.status_code == 404
+        assert r.headers.get("content-type", "").startswith("application/json")

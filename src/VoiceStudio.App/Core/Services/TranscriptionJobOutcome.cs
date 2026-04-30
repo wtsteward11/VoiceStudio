@@ -17,9 +17,12 @@ namespace VoiceStudio.Core.Services
     {
       "unavailable" => TranscriptionJobOutcome.Unavailable,
       "failed" => TranscriptionJobOutcome.Failed,
-      "completed" when r.Transcript == null => TranscriptionJobOutcome.InvalidCompleted,
-      "completed" when r.IsSimulated => TranscriptionJobOutcome.SimulatedCompleted,
-      "completed" when r.RealTranscriptionPerformed => TranscriptionJobOutcome.RealCompleted,
+      "completed" when r.Transcript != null && r.IsSimulated => TranscriptionJobOutcome.SimulatedCompleted,
+      "completed" when r.Transcript != null && r.RealTranscriptionPerformed => TranscriptionJobOutcome.RealCompleted,
+      "completed" when r.Transcript != null => TranscriptionJobOutcome.InvalidCompleted,
+      "completed" when !string.IsNullOrWhiteSpace(r.TranscriptId) && r.IsSimulated => TranscriptionJobOutcome.SimulatedCompleted,
+      "completed" when !string.IsNullOrWhiteSpace(r.TranscriptId) && r.RealTranscriptionPerformed => TranscriptionJobOutcome.RealCompleted,
+      "completed" when !string.IsNullOrWhiteSpace(r.TranscriptId) => TranscriptionJobOutcome.InvalidCompleted,
       "completed" => TranscriptionJobOutcome.InvalidCompleted,
       _ => TranscriptionJobOutcome.Failed,
     };

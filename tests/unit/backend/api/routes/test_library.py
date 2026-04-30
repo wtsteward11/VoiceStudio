@@ -6,6 +6,7 @@ repository layer (BaseRepository + aiosqlite).
 """
 
 import io
+import os
 import wave
 
 import pytest
@@ -146,6 +147,39 @@ class TestLibraryAssetsEndpoints:
         assert data["metadata"]["source_engine"] == "xtts_v2"
         assert data["metadata"]["routed_engine"] == "xtts_v2"
         assert data["metadata"]["profile_id"] == "profile-123"
+
+    def test_upload_asset_audio_id_resolves_for_transcription(self, tmp_path, monkeypatch):
+        """Library upload_id (audio_id) must resolve to on-disk WAV for STT."""
+        from backend.api.routes import library
+        from backend.services import audio_path_resolver
+
+        monkeypatch.setattr(library, "get_path", lambda _name: tmp_path)
+        monkeypatch.setattr(audio_path_resolver, "get_path", lambda _name: tmp_path)
+
+        client = _make_client()
+        response = client.post(
+            "/api/library/assets/upload",
+            files={"file": ("source.wav", _wav_bytes(), "audio/wav")},
+        )
+        assert response.status_code == 201, response.text
+        data = response.json()
+        audio_id = data.get("audio_id")
+        assert audio_id, "audio_id must be returned for transcription-ready playback"
+        resolved = audio_path_resolver.resolve_audio_path(audio_id)
+        assert resolved is not None
+        assert os.path.isfile(resolved)
+
+    def test_upload_missing_file_returns_json_error(self, tmp_path, monkeypatch):
+        """Missing upload body must yield JSON (not opaque HTML)."""
+        from backend.api.routes import library
+
+        monkeypatch.setattr(library, "get_path", lambda _name: tmp_path)
+        client = _make_client()
+        response = client.post("/api/library/assets/upload")
+        assert response.status_code in (400, 422)
+        assert response.headers.get("content-type", "").startswith("application/json")
+        body = response.json()
+        assert body is not None
 
 
 class TestLibraryTypesEndpoint:

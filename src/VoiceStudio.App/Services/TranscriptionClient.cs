@@ -83,5 +83,15 @@ namespace VoiceStudio.App.Services
 
       return await _backend.PostAsync<TranscriptionJobRequest, TranscriptionJobResponse>(url, request, ct).ConfigureAwait(false);
     }
+
+    /// <inheritdoc />
+    public async Task<TranscriptionJobResponse> GetTranscriptionJobStatusAsync(string jobId, CancellationToken ct = default)
+    {
+      if (string.IsNullOrWhiteSpace(jobId))
+        throw new ArgumentException("Job id is required.", nameof(jobId));
+      var url = $"/api/transcribe/jobs/{Uri.EscapeDataString(jobId)}";
+      var result = await _backend.GetAsync<TranscriptionJobResponse>(url, ct).ConfigureAwait(false);
+      return result ?? throw new InvalidOperationException("Transcription job status response was null.");
+    }
   }
 }

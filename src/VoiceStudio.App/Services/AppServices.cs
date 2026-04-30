@@ -238,9 +238,9 @@ namespace VoiceStudio.App.Services
       services.AddSingleton<ITimelineSelectedProjectGate, TimelineSelectedProjectGate>();
       services.AddSingleton<ITranscriptSegmentTargetResolver, TranscriptSegmentTargetResolver>();
       services.AddSingleton<ITranscriptRegenerationClient, TranscriptRegenerationClient>();
+      services.AddSingleton<IDialogueServiceClient, DialogueServiceClient>();
       services.AddSingleton<TranscriptSegmentRegenerationCoordinator>(sp => new TranscriptSegmentRegenerationCoordinator(
-          sp.GetRequiredService<ITranscriptRegenerationClient>(),
-          sp.GetRequiredService<IJobProgressApiClient>(),
+          sp.GetRequiredService<IDialogueServiceClient>(),
           sp.GetRequiredService<IBackendClient>(),
           sp.GetRequiredService<IClipTranscriptLinkageService>(),
           sp.GetRequiredService<ITimelineSelectedProjectGate>(),

@@ -83,6 +83,8 @@ def segment_to_public_dict(*, transcript_id: str, segment: dict[str, Any]) -> di
         "session_id": segment.get("session_id"),
         "source_audio_id": segment.get("source_audio_id"),
         "source_path": segment.get("source_path"),
+        "last_failure_stage": segment.get("last_failure_stage"),
+        "last_failed_at": segment.get("last_failed_at"),
     }
 
 
@@ -195,6 +197,61 @@ async def _delete_timeline_clip(clip_id: str, session_id: str) -> None:
         await timeline_routes._persist(timeline, undo, redo, session_id, base_rev)
 
 
+def _find_track_id_for_clip_on_timeline(timeline: Any, clip_id: str) -> str | None:
+    """Return track id containing the clip, or None if not found."""
+    for tr in timeline.tracks:
+        for c in tr.clips:
+            if c.id == clip_id:
+                return tr.id
+    return None
+
+
+async def _derive_track_id_for_clip(session_id: str, clip_id: str) -> str | None:
+    from backend.api.routes import timeline as timeline_routes
+
+    timeline, _, _, _ = await timeline_routes._hydrate(session_id)
+    return _find_track_id_for_clip_on_timeline(timeline, clip_id)
+
+
+async def _replace_timeline_clip_atomic(
+    *,
+    session_id: str,
+    resolved_track_id: str,
+    old_clip_id: str,
+    source_path: str | None,
+    start_time: float,
+    clip_duration: float,
+    name: str,
+    metadata: dict[str, Any],
+) -> str:
+    """Remove old clip and append replacement in one hydrate + single persist."""
+    from backend.api.routes import timeline as timeline_routes
+
+    timeline, undo, redo, base_rev = await timeline_routes._hydrate(session_id)
+    timeline_routes._push_undo_before_mutate(timeline, undo, redo)
+    old_tid = _find_track_id_for_clip_on_timeline(timeline, old_clip_id)
+    if old_tid is None:
+        raise LookupError("clip_not_found_on_timeline")
+    if old_tid != resolved_track_id:
+        raise ValueError("cross_track_dialogue_replace_not_supported")
+    old_track = next((t for t in timeline.tracks if t.id == old_tid), None)
+    if old_track is None:
+        raise LookupError("track_not_found")
+    old_track.clips = [c for c in old_track.clips if c.id != old_clip_id]
+    clip = timeline_routes.Clip(
+        track_id=resolved_track_id,
+        source_path=source_path,
+        start_time=start_time,
+        end_time=start_time + clip_duration,
+        name=name,
+        metadata=metadata,
+    )
+    old_track.clips.append(clip)
+    timeline_routes._update_timeline_duration(timeline)
+    await timeline_routes._persist(timeline, undo, redo, session_id, base_rev)
+    return clip.id
+
+
 async def _insert_timeline_clip(
     *,
     track_id: str,
@@ -235,10 +292,19 @@ async def _persist_segment_failed(
     message: str,
     *,
     clear_timeline_clip_id: bool,
+    restore_linkage: dict[str, Any] | None = None,
+    last_failure_stage: str | None = None,
 ) -> None:
     seg["status"] = "failed"
     seg["error_message"] = message
-    if clear_timeline_clip_id:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if last_failure_stage:
+        seg["last_failure_stage"] = last_failure_stage
+        seg["last_failed_at"] = now_iso
+    if restore_linkage:
+        for k, v in restore_linkage.items():
+            seg[k] = v
+    elif clear_timeline_clip_id:
         seg["timeline_clip_id"] = None
     segments[idx] = seg
     await repo.update_transcription(transcript_id, segments=segments)
@@ -255,6 +321,11 @@ class RegenerateOutcome:
     routed_engine: str
     duration: float
     segment: dict[str, Any]
+    project_id: str | None
+    session_id: str
+    transcript_id: str
+    segment_id: str
+    status: str
 
 
 async def regenerate_dialogue_segment(
@@ -263,12 +334,13 @@ async def regenerate_dialogue_segment(
     segment_id: str,
     profile_id: str,
     engine: str | None,
-    track_id: str,
+    track_id: str | None,
     project_id: str | None,
     session_id: str,
     replace_existing_clip: bool,
     http_request: Any,
     edited_text_override: str | None = None,
+    raw_request_track_id: str | None = None,
 ) -> RegenerateOutcome:
     """
     Run synthesis; persist provenance; library asset; timeline clip.
@@ -301,6 +373,33 @@ async def regenerate_dialogue_segment(
     if session_id and str(session_id).strip():
         seg["session_id"] = str(session_id).strip()
 
+    linkage_snap: dict[str, Any] = {
+        "timeline_clip_id": seg.get("timeline_clip_id"),
+        "library_asset_id": seg.get("library_asset_id"),
+        "generated_audio_id": seg.get("generated_audio_id"),
+        "audio_id": seg.get("audio_id"),
+    }
+
+    req_track = (track_id or "").strip() or None
+    raw_track = (raw_request_track_id or "").strip() or None
+    old_clip = str(seg.get("timeline_clip_id") or "").strip() or None
+
+    resolved_track_id: str | None = None
+    if req_track:
+        resolved_track_id = req_track
+    elif replace_existing_clip and old_clip:
+        derived = await _derive_track_id_for_clip(session_id, old_clip)
+        if not derived:
+            raise ValueError("track_id_required_for_new_dialogue_clip")
+        resolved_track_id = derived
+    else:
+        raise ValueError("track_id_required_for_new_dialogue_clip")
+
+    if replace_existing_clip and old_clip and raw_track:
+        old_track_for_clip = await _derive_track_id_for_clip(session_id, old_clip)
+        if old_track_for_clip and raw_track != old_track_for_clip:
+            raise ValueError("cross_track_dialogue_replace_not_supported")
+
     synth_body = (seg.get("edited_text") or seg.get("text") or "").strip()
     if not synth_body:
         raise ValueError("empty_synthesis_text")
@@ -324,6 +423,7 @@ async def regenerate_dialogue_segment(
             seg,
             _detail_to_str(se.detail),
             clear_timeline_clip_id=False,
+            last_failure_stage="synthesis",
         )
         raise
 
@@ -342,6 +442,7 @@ async def regenerate_dialogue_segment(
             seg,
             "synthesis_succeeded_but_audio_not_registered",
             clear_timeline_clip_id=False,
+            last_failure_stage="registry",
         )
         raise ServiceError(
             502,
@@ -423,15 +524,9 @@ async def regenerate_dialogue_segment(
             seg,
             f"library_create_failed:{ex!s}",
             clear_timeline_clip_id=False,
+            last_failure_stage="library",
         )
         raise ServiceError(500, {"code": "LIBRARY_CREATE_FAILED", "message": str(ex)}) from ex
-
-    old_clip = str(seg.get("timeline_clip_id") or "").strip()
-    old_deleted = False
-    if replace_existing_clip and old_clip:
-        await _delete_timeline_clip(old_clip, session_id)
-        old_deleted = True
-        seg["timeline_clip_id"] = None
 
     clip_meta: dict[str, Any] = {
         **lib_meta,
@@ -439,16 +534,29 @@ async def regenerate_dialogue_segment(
     }
     start_time = float(seg.get("start", 0.0) or 0.0)
     clip_duration = duration if duration > 0 else max(0.01, float(seg.get("end", 0.0) or 0.0) - start_time)
+    assert resolved_track_id is not None
     try:
-        clip_id = await _insert_timeline_clip(
-            track_id=track_id,
-            source_path=resolved,
-            start_time=start_time,
-            duration=clip_duration,
-            name=f"Dialogue {segment_id[:8]}",
-            metadata=clip_meta,
-            session_id=session_id,
-        )
+        if replace_existing_clip and old_clip:
+            clip_id = await _replace_timeline_clip_atomic(
+                session_id=session_id,
+                resolved_track_id=resolved_track_id,
+                old_clip_id=old_clip,
+                source_path=resolved,
+                start_time=start_time,
+                clip_duration=clip_duration,
+                name=f"Dialogue {segment_id[:8]}",
+                metadata=clip_meta,
+            )
+        else:
+            clip_id = await _insert_timeline_clip(
+                track_id=resolved_track_id,
+                source_path=resolved,
+                start_time=start_time,
+                duration=clip_duration,
+                name=f"Dialogue {segment_id[:8]}",
+                metadata=clip_meta,
+                session_id=session_id,
+            )
     except LookupError as le:
         await asset_repo.delete(asset_id, soft=True)
         await _persist_segment_failed(
@@ -458,7 +566,9 @@ async def regenerate_dialogue_segment(
             idx,
             seg,
             f"timeline_insert_failed:{le!s}",
-            clear_timeline_clip_id=old_deleted or True,
+            clear_timeline_clip_id=False,
+            restore_linkage=linkage_snap,
+            last_failure_stage="timeline",
         )
         raise
     except HTTPException as he:
@@ -472,7 +582,9 @@ async def regenerate_dialogue_segment(
             idx,
             seg,
             f"timeline_insert_failed:{msg}",
-            clear_timeline_clip_id=True,
+            clear_timeline_clip_id=False,
+            restore_linkage=linkage_snap,
+            last_failure_stage="timeline",
         )
         raise ServiceError(he.status_code, {"code": "TIMELINE_INSERT_FAILED", "message": msg}) from he
     except Exception as ex:
@@ -485,7 +597,9 @@ async def regenerate_dialogue_segment(
             idx,
             seg,
             f"timeline_insert_failed:{ex!s}",
-            clear_timeline_clip_id=old_deleted or True,
+            clear_timeline_clip_id=False,
+            restore_linkage=linkage_snap,
+            last_failure_stage="timeline",
         )
         raise ServiceError(500, {"code": "TIMELINE_INSERT_FAILED", "message": str(ex)}) from ex
 
@@ -500,7 +614,26 @@ async def regenerate_dialogue_segment(
     seg["error_message"] = None
     seg["dialogue_provenance"] = provenance
     segments[idx] = seg
-    await repo.update_transcription(transcript_id, segments=segments)
+
+    async def _persist_segment_success() -> None:
+        await repo.update_transcription(transcript_id, segments=segments)
+
+    try:
+        await _persist_segment_success()
+    except Exception as ex:
+        logger.exception("transcription update after timeline success (primary): %s", ex)
+        try:
+            await _persist_segment_success()
+        except Exception as ex2:
+            logger.exception("transcription update retry failed: %s", ex2)
+            raise ServiceError(
+                500,
+                {
+                    "code": "SEGMENT_PERSIST_FAILED",
+                    "message": str(ex2),
+                    "detail": "Timeline clip was updated; segment JSON may be stale until transcription is repaired.",
+                },
+            ) from ex2
 
     refreshed = await repo.get_transcription(transcript_id)
     assert refreshed is not None
@@ -518,6 +651,11 @@ async def regenerate_dialogue_segment(
         routed_engine=routed,
         duration=duration,
         segment=segment_to_public_dict(transcript_id=transcript_id, segment=final_seg),
+        project_id=eff_project,
+        session_id=session_id,
+        transcript_id=transcript_id,
+        segment_id=segment_id,
+        status=str(final_seg.get("status") or "regenerated"),
     )
 
 

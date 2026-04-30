@@ -48,6 +48,8 @@ class DialogueSegment(VoiceStudioBaseModel):
     words: list[Any] | None = None
     status: str = "raw"
     error_message: str | None = None
+    last_failure_stage: str | None = None
+    last_failed_at: str | None = None
     audio_id: str | None = None
     generated_audio_id: str | None = None
     library_asset_id: str | None = None
@@ -79,7 +81,7 @@ class EditDialogueSegmentBody(VoiceStudioBaseModel):
 class RegenerateDialogueSegmentBody(VoiceStudioBaseModel):
     transcript_id: str = Field(min_length=1)
     profile_id: str = Field(min_length=1, max_length=100)
-    track_id: str = Field(min_length=1)
+    track_id: str | None = Field(default=None, max_length=100)
     engine: str | None = Field(default=None, max_length=50)
     project_id: str | None = Field(default=None, max_length=100)
     session_id: str | None = Field(default=None, max_length=100)
@@ -88,6 +90,11 @@ class RegenerateDialogueSegmentBody(VoiceStudioBaseModel):
 
 
 class RegenerateDialogueSegmentResponse(VoiceStudioBaseModel):
+    project_id: str | None = None
+    session_id: str = ""
+    transcript_id: str = ""
+    segment_id: str = ""
+    status: str = ""
     audio_id: str
     generated_audio_id: str | None
     library_asset_id: str
@@ -121,6 +128,8 @@ def _map_lookup(exc: LookupError) -> HTTPException:
         return HTTPException(status_code=404, detail="Segment not found.")
     if key == "track_not_found":
         return HTTPException(status_code=404, detail="Timeline track not found.")
+    if key == "clip_not_found_on_timeline":
+        return HTTPException(status_code=404, detail="Timeline clip not found on session timeline.")
     return HTTPException(status_code=404, detail="Not found.")
 
 
@@ -197,20 +206,27 @@ async def post_dialogue_segment_regenerate(
     insert (or replace) a timeline clip, and persist linkage on the segment.
     """
     session = (body.session_id or "").strip() or DEFAULT_SESSION_ID
+    raw_track = (body.track_id or "").strip() or None
     try:
         out: RegenerateOutcome = await regenerate_dialogue_segment(
             transcript_id=body.transcript_id,
             segment_id=segment_id,
             profile_id=body.profile_id,
             engine=body.engine,
-            track_id=body.track_id,
+            track_id=raw_track,
             project_id=body.project_id,
             session_id=session,
             replace_existing_clip=body.replace_existing_clip,
             http_request=request,
             edited_text_override=body.edited_text,
+            raw_request_track_id=raw_track,
         )
         return RegenerateDialogueSegmentResponse(
+            project_id=out.project_id,
+            session_id=out.session_id,
+            transcript_id=out.transcript_id,
+            segment_id=out.segment_id,
+            status=out.status,
             audio_id=out.audio_id,
             generated_audio_id=out.generated_audio_id,
             library_asset_id=out.library_asset_id,
@@ -231,6 +247,22 @@ async def post_dialogue_segment_regenerate(
             raise HTTPException(
                 status_code=422,
                 detail="edited_text in regenerate must be non-empty when provided.",
+            ) from e
+        if str(e) == "track_id_required_for_new_dialogue_clip":
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "track_id_required_for_new_dialogue_clip",
+                    "message": "track_id is required unless replace_existing_clip is true and the segment has a timeline_clip_id to derive the track.",
+                },
+            ) from e
+        if str(e) == "cross_track_dialogue_replace_not_supported":
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "cross_track_dialogue_replace_not_supported",
+                    "message": "Replacing a dialogue clip on a different track than where the clip exists is not supported.",
+                },
             ) from e
         raise
     except ServiceError as se:

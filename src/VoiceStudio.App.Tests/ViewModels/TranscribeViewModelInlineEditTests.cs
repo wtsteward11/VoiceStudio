@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,7 +35,7 @@ public sealed class TranscribeViewModelInlineEditTests
   private static readonly SemaphoreSlim AppServicesHarnessGate = new(1, 1);
 
   private DispatcherQueueController? _dispatcherController;
-  private Mock<ITranscriptRegenerationClient>? _regenMock;
+  private Mock<IDialogueServiceClient>? _dialogueHarnessMock;
   private Mock<ITranscriptionClient>? _overrideVmTranscriptionClientMock;
 
   [TestInitialize]
@@ -83,31 +84,39 @@ public sealed class TranscribeViewModelInlineEditTests
     var linkage = new ClipTranscriptLinkageService();
     var resolver = new TranscriptSegmentTargetResolver(gate, linkage);
 
-    _regenMock = new Mock<ITranscriptRegenerationClient>();
-    _regenMock
-        .Setup(x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()))
-        .ReturnsAsync(new RegenerateSegmentJobStartResponse { JobId = "job-inline", Status = "pending" });
-
-    var jobsMock = new Mock<IJobProgressApiClient>();
-    var terminal = jobFails
-        ? new JobDto
-        {
-            Id = "job-inline",
-            Status = "failed",
-            ErrorMessage = "synthesis failed",
-        }
-        : new JobDto
-        {
-            Id = "job-inline",
-            Status = "completed",
-            ResultId = "audio-new",
-            Metadata = new Dictionary<string, object>
-            {
-                ["audio_url"] = "/new.wav",
-                ["duration_seconds"] = 4.2,
-            },
-        };
-    jobsMock.Setup(j => j.GetJobAsync("job-inline", It.IsAny<CancellationToken>())).ReturnsAsync(terminal);
+    _dialogueHarnessMock = new Mock<IDialogueServiceClient>();
+    if (jobFails)
+    {
+      _dialogueHarnessMock
+          .Setup(d => d.RegenerateSegmentAsync(
+              It.IsAny<string>(),
+              It.IsAny<RegenerateDialogueSegmentRequest>(),
+              It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new InvalidOperationException("synthesis failed"));
+    }
+    else
+    {
+      _dialogueHarnessMock
+          .Setup(d => d.RegenerateSegmentAsync(
+              It.IsAny<string>(),
+              It.IsAny<RegenerateDialogueSegmentRequest>(),
+              It.IsAny<CancellationToken>()))
+          .Returns<string, RegenerateDialogueSegmentRequest, CancellationToken>((segId, req, _) =>
+              Task.FromResult(new RegenerateDialogueSegmentResponse
+              {
+                AudioId = "audio-new",
+                GeneratedAudioId = "audio-new",
+                LibraryAssetId = "lib-x",
+                TimelineClipId = "tl-x",
+                RoutedEngine = "piper",
+                Duration = 4.2,
+                TranscriptId = req.TranscriptId,
+                SegmentId = segId,
+                Status = "regenerated",
+                ProjectId = req.ProjectId,
+                SessionId = "",
+              }));
+    }
 
     var backendMock = new Mock<IBackendClient>();
     backendMock
@@ -118,7 +127,7 @@ public sealed class TranscribeViewModelInlineEditTests
             null,
             null,
             "audio-new",
-            "/new.wav",
+            "/api/voice/audio/audio-new",
             4.2,
             null,
             null,
@@ -187,8 +196,7 @@ public sealed class TranscribeViewModelInlineEditTests
         sp.GetRequiredService<ITimelineSelectedProjectGate>()));
     services.AddSingleton(undoRedo);
     services.AddSingleton(sp => new TranscriptSegmentRegenerationCoordinator(
-        _regenMock.Object,
-        jobsMock.Object,
+        _dialogueHarnessMock.Object,
         backendMock.Object,
         linkage,
         gate,
@@ -223,38 +231,37 @@ public sealed class TranscribeViewModelInlineEditTests
     var linkage = new ClipTranscriptLinkageService();
     var resolver = new TranscriptSegmentTargetResolver(gate, linkage);
 
-    _regenMock = new Mock<ITranscriptRegenerationClient>();
-    var jobIds = new Queue<string>(new[] { "job-inline-a", "job-inline-b" });
-    _regenMock
-        .Setup(x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()))
-        .ReturnsAsync(() =>
+    var dialogueAttempt = 0;
+    _dialogueHarnessMock = new Mock<IDialogueServiceClient>();
+    _dialogueHarnessMock
+        .Setup(d => d.RegenerateSegmentAsync(
+            It.IsAny<string>(),
+            It.IsAny<RegenerateDialogueSegmentRequest>(),
+            It.IsAny<CancellationToken>()))
+        .Returns<string, RegenerateDialogueSegmentRequest, CancellationToken>((segId, req, _) =>
         {
-          var id = jobIds.Count > 0 ? jobIds.Dequeue() : "job-inline-extra";
-          return new RegenerateSegmentJobStartResponse { JobId = id, Status = "pending" };
-        });
+          dialogueAttempt++;
+          if (dialogueAttempt == 1)
+          {
+            return Task.FromException<RegenerateDialogueSegmentResponse>(
+                new InvalidOperationException("synthesis failed"));
+          }
 
-    var jobsMock = new Mock<IJobProgressApiClient>();
-    var failed = new JobDto
-    {
-      Id = "job-inline-a",
-      Status = "failed",
-      ErrorMessage = "synthesis failed",
-    };
-    var success = new JobDto
-    {
-      Id = "job-inline-b",
-      Status = "completed",
-      ResultId = "audio-new",
-      Metadata = new Dictionary<string, object>
-      {
-        ["audio_url"] = "/new.wav",
-        ["duration_seconds"] = 4.2,
-      },
-    };
-    jobsMock
-        .Setup(j => j.GetJobAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-        .ReturnsAsync((string id, CancellationToken _) =>
-            string.Equals(id, "job-inline-a", StringComparison.Ordinal) ? failed : success);
+          return Task.FromResult(new RegenerateDialogueSegmentResponse
+          {
+            AudioId = "audio-new",
+            GeneratedAudioId = "audio-new",
+            LibraryAssetId = "lib-x",
+            TimelineClipId = "tl-x",
+            RoutedEngine = "piper",
+            Duration = 4.2,
+            TranscriptId = req.TranscriptId,
+            SegmentId = segId,
+            Status = "regenerated",
+            ProjectId = req.ProjectId,
+            SessionId = "",
+          });
+        });
 
     var backendMock = new Mock<IBackendClient>();
     backendMock
@@ -265,7 +272,7 @@ public sealed class TranscribeViewModelInlineEditTests
             null,
             null,
             "audio-new",
-            "/new.wav",
+            "/api/voice/audio/audio-new",
             4.2,
             null,
             null,
@@ -321,8 +328,7 @@ public sealed class TranscribeViewModelInlineEditTests
         sp.GetRequiredService<ITimelineSelectedProjectGate>()));
     services.AddSingleton(undoRedo);
     services.AddSingleton(sp => new TranscriptSegmentRegenerationCoordinator(
-        _regenMock.Object,
-        jobsMock.Object,
+        _dialogueHarnessMock.Object,
         backendMock.Object,
         linkage,
         gate,
@@ -672,12 +678,16 @@ public sealed class TranscribeViewModelInlineEditTests
     var err = await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false);
 
     Assert.IsNull(err);
-    _regenMock!.Verify(
-        x => x.StartRegenerateSegmentAsync(
-            It.Is<RegenerateSegmentStartRequest>(r =>
-                r.TranscriptionId == "tr1"
-                && r.SegmentId == "s9"
-                && r.ReplacementText == "new words"),
+    _dialogueHarnessMock!.Verify(
+        x => x.RegenerateSegmentAsync(
+            "s9",
+            It.Is<RegenerateDialogueSegmentRequest>(r =>
+                r.TranscriptId == "tr1"
+                && r.ProfileId == "prof-1"
+                && r.ProjectId == "p1"
+                && r.TrackId == null
+                && r.ReplaceExistingClip
+                && r.EditedText == "new words"),
             It.IsAny<CancellationToken>()),
         Times.Once);
   }
@@ -779,10 +789,13 @@ public sealed class TranscribeViewModelInlineEditTests
     await PumpDispatcherOnceAsync().ConfigureAwait(false);
     await PumpDispatcherOnceAsync().ConfigureAwait(false);
 
-    _regenMock!.Verify(
-        x => x.StartRegenerateSegmentAsync(
-            It.Is<RegenerateSegmentStartRequest>(r =>
-                r.ReplacementText == "new words" && r.SegmentId == "s9"),
+    _dialogueHarnessMock!.Verify(
+        x => x.RegenerateSegmentAsync(
+            "s9",
+            It.Is<RegenerateDialogueSegmentRequest>(r =>
+                r.EditedText == "new words"
+                && r.TranscriptId == "tr1"
+                && r.ReplaceExistingClip),
             It.IsAny<CancellationToken>()),
         Times.Exactly(2));
 
@@ -809,8 +822,11 @@ public sealed class TranscribeViewModelInlineEditTests
 
     await vm.RetryTranscriptApplyJobAsync(failedEntry, CancellationToken.None).ConfigureAwait(false);
 
-    _regenMock!.Verify(
-        x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()),
+    _dialogueHarnessMock!.Verify(
+        x => x.RegenerateSegmentAsync(
+            It.IsAny<string>(),
+            It.IsAny<RegenerateDialogueSegmentRequest>(),
+            It.IsAny<CancellationToken>()),
         Times.Once);
   }
 
@@ -839,8 +855,11 @@ public sealed class TranscribeViewModelInlineEditTests
 
     await vm.RetryTranscriptApplyJobAsync(failedEntry, CancellationToken.None).ConfigureAwait(false);
 
-    _regenMock!.Verify(
-        x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()),
+    _dialogueHarnessMock!.Verify(
+        x => x.RegenerateSegmentAsync(
+            It.IsAny<string>(),
+            It.IsAny<RegenerateDialogueSegmentRequest>(),
+            It.IsAny<CancellationToken>()),
         Times.Once);
   }
 
@@ -856,8 +875,11 @@ public sealed class TranscribeViewModelInlineEditTests
 
     StringAssert.Contains(err ?? "", "empty");
     Assert.AreEqual("s9", vm.EditingSegmentId);
-    _regenMock!.Verify(
-        x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()),
+    _dialogueHarnessMock!.Verify(
+        x => x.RegenerateSegmentAsync(
+            It.IsAny<string>(),
+            It.IsAny<RegenerateDialogueSegmentRequest>(),
+            It.IsAny<CancellationToken>()),
         Times.Never);
   }
 
@@ -994,12 +1016,16 @@ public sealed class TranscribeViewModelInlineEditTests
     var err = await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false);
 
     Assert.IsNull(err);
-    _regenMock!.Verify(
-        x => x.StartRegenerateSegmentAsync(
-            It.Is<RegenerateSegmentStartRequest>(r =>
-                r.TranscriptionId == "tr1"
-                && r.SegmentId == "s1"
-                && r.ReplacementText == "merged words"),
+    _dialogueHarnessMock!.Verify(
+        x => x.RegenerateSegmentAsync(
+            "s1",
+            It.Is<RegenerateDialogueSegmentRequest>(r =>
+                r.TranscriptId == "tr1"
+                && r.ProfileId == "prof-1"
+                && r.ProjectId == "p1"
+                && r.TrackId == null
+                && r.ReplaceExistingClip
+                && r.EditedText == "merged words"),
             It.IsAny<CancellationToken>()),
         Times.Once);
   }
@@ -1117,10 +1143,12 @@ public sealed class TranscribeViewModelInlineEditTests
     var err = await vm.ApplyEditedSegmentAsync(CancellationToken.None).ConfigureAwait(false);
 
     Assert.IsNull(err);
-    _regenMock!.Verify(
-        x => x.StartRegenerateSegmentAsync(
-            It.Is<RegenerateSegmentStartRequest>(r =>
-                r.ReplacementText == "new words"),
+    _dialogueHarnessMock!.Verify(
+        x => x.RegenerateSegmentAsync(
+            "s9",
+            It.Is<RegenerateDialogueSegmentRequest>(r =>
+                r.EditedText == "new words"
+                && r.TranscriptId == "tr1"),
             It.IsAny<CancellationToken>()),
         Times.Once);
   }
@@ -1164,8 +1192,11 @@ public sealed class TranscribeViewModelInlineEditTests
     var err = vm.TryRemoveFillersFromEditingDraft();
 
     Assert.IsNull(err);
-    _regenMock!.Verify(
-        x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()),
+    _dialogueHarnessMock!.Verify(
+        x => x.RegenerateSegmentAsync(
+            It.IsAny<string>(),
+            It.IsAny<RegenerateDialogueSegmentRequest>(),
+            It.IsAny<CancellationToken>()),
         Times.Never);
   }
 
@@ -1182,8 +1213,11 @@ public sealed class TranscribeViewModelInlineEditTests
     umToggle.IsRemoveEnabled = false;
     umToggle.IsRemoveEnabled = true;
 
-    _regenMock!.Verify(
-        x => x.StartRegenerateSegmentAsync(It.IsAny<RegenerateSegmentStartRequest>(), It.IsAny<CancellationToken>()),
+    _dialogueHarnessMock!.Verify(
+        x => x.RegenerateSegmentAsync(
+            It.IsAny<string>(),
+            It.IsAny<RegenerateDialogueSegmentRequest>(),
+            It.IsAny<CancellationToken>()),
         Times.Never);
   }
 

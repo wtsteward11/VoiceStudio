@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceStudio.App.Core.Models;
@@ -15,12 +14,13 @@ using VoiceStudio.Core.Transcription;
 namespace VoiceStudio.App.Services;
 
 /// <summary>
-/// GAP-046: orchestrates segment regen job, clip apply, linkage removal, undo, and timeline sync event.
+/// GAP-046: orchestrates segment regeneration via synchronous dialogue API, clip apply, linkage removal, undo, and timeline sync event.
 /// </summary>
 public sealed class TranscriptSegmentRegenerationCoordinator
 {
-  private readonly ITranscriptRegenerationClient _regen;
-  private readonly IJobProgressApiClient _jobs;
+  private const string DialogueRegenerateSyntheticJobId = "dialogue-regenerate-sync";
+
+  private readonly IDialogueServiceClient _dialogue;
   private readonly IBackendClient _backend;
   private readonly ITranscriptionClient? _transcriptionClient;
   private readonly IClipTranscriptLinkageService _linkage;
@@ -32,8 +32,7 @@ public sealed class TranscriptSegmentRegenerationCoordinator
   private readonly IErrorLoggingService? _log;
 
   public TranscriptSegmentRegenerationCoordinator(
-      ITranscriptRegenerationClient regen,
-      IJobProgressApiClient jobs,
+      IDialogueServiceClient dialogue,
       IBackendClient backend,
       IClipTranscriptLinkageService linkage,
       ITimelineSelectedProjectGate gate,
@@ -44,8 +43,7 @@ public sealed class TranscriptSegmentRegenerationCoordinator
       IErrorLoggingService? log = null,
       ITranscriptionClient? transcriptionClient = null)
   {
-    _regen = regen ?? throw new ArgumentNullException(nameof(regen));
-    _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
+    _dialogue = dialogue ?? throw new ArgumentNullException(nameof(dialogue));
     _backend = backend ?? throw new ArgumentNullException(nameof(backend));
     _transcriptionClient = transcriptionClient;
     _linkage = linkage ?? throw new ArgumentNullException(nameof(linkage));
@@ -98,54 +96,85 @@ public sealed class TranscriptSegmentRegenerationCoordinator
       ProfileId = string.IsNullOrWhiteSpace(clip.ProfileId) ? null : clip.ProfileId,
     };
 
-    RegenerateSegmentJobStartResponse? accepted;
-    try
+    var replaceExisting = ShouldReplaceExistingClip(project, transcription.Id, segment.Id, r.ClipId);
+    var dialogueRequest = new RegenerateDialogueSegmentRequest
     {
-      accepted = await _regen.StartRegenerateSegmentAsync(start, cancellationToken).ConfigureAwait(false);
-    }
-    catch (Exception ex)
-    {
-      _log?.LogError(ex, "TranscriptRegenerationStart");
-      return $"Regeneration could not start: {ex.Message}";
-    }
-
-    if (accepted == null || string.IsNullOrWhiteSpace(accepted.JobId))
-      return "Regeneration did not return a job id.";
+      TranscriptId = transcription.Id,
+      ProfileId = string.IsNullOrWhiteSpace(start.ProfileId) ? string.Empty : start.ProfileId,
+      TrackId = replaceExisting ? null : r.TrackId,
+      Engine = start.Engine,
+      ProjectId = project.Id,
+      SessionId = null,
+      ReplaceExistingClip = replaceExisting,
+      EditedText = string.IsNullOrWhiteSpace(replacementText) ? null : replacementText.Trim(),
+    };
 
     ReportJobProgress(
         operationCorrelationId,
         jobProgress,
-        accepted.JobId,
-        string.IsNullOrWhiteSpace(accepted.Status) ? "pending" : accepted.Status,
+        DialogueRegenerateSyntheticJobId,
+        "pending",
         0,
         null,
         null);
 
-    var terminal = await WaitForTerminalJobAsync(
-            accepted.JobId,
-            operationCorrelationId,
-            jobProgress,
-            cancellationToken)
-        .ConfigureAwait(false);
-    if (terminal == null)
-      return "Regeneration timed out while waiting for the synthesis job.";
+    ReportJobProgress(
+        operationCorrelationId,
+        jobProgress,
+        DialogueRegenerateSyntheticJobId,
+        "running",
+        0,
+        "dialogue_regenerate",
+        null);
 
-    if (string.Equals(terminal.Status, "failed", StringComparison.OrdinalIgnoreCase))
-      return string.IsNullOrWhiteSpace(terminal.ErrorMessage)
-          ? "Regeneration failed."
-          : terminal.ErrorMessage;
+    RegenerateDialogueSegmentResponse dialogueResp;
+    try
+    {
+      dialogueResp = await _dialogue
+          .RegenerateSegmentAsync(segment.Id, dialogueRequest, cancellationToken)
+          .ConfigureAwait(false);
+    }
+    catch (Exception ex)
+    {
+      _log?.LogError(ex, "DialogueRegenerateSegment");
+      ReportJobProgress(
+          operationCorrelationId,
+          jobProgress,
+          DialogueRegenerateSyntheticJobId,
+          "failed",
+          0,
+          null,
+          ex.Message);
+      return $"Regeneration failed: {ex.Message}";
+    }
 
-    if (!string.Equals(terminal.Status, "completed", StringComparison.OrdinalIgnoreCase))
-      return $"Regeneration ended with unexpected status: {terminal.Status}";
-
-    var newAudioId = terminal.ResultId;
+    var newAudioId = dialogueResp.AudioId;
     if (string.IsNullOrWhiteSpace(newAudioId))
       return "Regeneration completed without an audio result id.";
 
-    if (!TryGetMetadataString(terminal.Metadata, "audio_url", out var newUrl))
-      newUrl = $"/api/voice/audio/{newAudioId}";
-    if (!TryGetMetadataDouble(terminal.Metadata, "duration_seconds", out var newDur))
-      newDur = clip.Duration.TotalSeconds;
+    var newUrl = $"/api/voice/audio/{newAudioId}";
+    var newDur = dialogueResp.Duration > 0 ? dialogueResp.Duration : clip.Duration.TotalSeconds;
+
+    if (_transcriptionClient != null && !string.IsNullOrWhiteSpace(transcription.Id))
+    {
+      try
+      {
+        var fresh = await _transcriptionClient
+            .GetTranscriptionAsync(transcription.Id, cancellationToken)
+            .ConfigureAwait(false);
+        if (fresh?.Segments != null)
+        {
+          transcription.Segments = fresh.Segments;
+          transcription.Text = fresh.Text;
+        }
+      }
+      catch (Exception ex)
+      {
+        _log?.LogWarning(
+            $"Transcript refresh after dialogue regenerate failed: {ex.Message}",
+            "TranscriptRefreshAfterDialogueRegenerate");
+      }
+    }
 
     var prevAudioId = clip.AudioId;
     var prevUrl = clip.AudioUrl;
@@ -176,7 +205,7 @@ public sealed class TranscriptSegmentRegenerationCoordinator
       ReportJobProgress(
           operationCorrelationId,
           jobProgress,
-          accepted.JobId,
+          DialogueRegenerateSyntheticJobId,
           "apply_failed",
           0,
           null,
@@ -195,16 +224,14 @@ public sealed class TranscriptSegmentRegenerationCoordinator
     }
 
     var persistenceMessage = await TryPersistUpdatedTranscriptionAsync(
-            transcription,
-            segment,
-            replacementText,
-            rangeEndInclusiveIndex,
-            cancellationToken)
-        .ConfigureAwait(false);
+        transcription,
+        segment,
+        replacementText,
+        rangeEndInclusiveIndex,
+        cancellationToken).ConfigureAwait(false);
 
-    if (persistenceMessage != null)
+    if (!string.IsNullOrWhiteSpace(persistenceMessage))
     {
-      var errMsg = persistenceMessage;
       try
       {
         await _backend
@@ -212,32 +239,40 @@ public sealed class TranscriptSegmentRegenerationCoordinator
                 project.Id,
                 r.TrackId,
                 r.ClipId,
-                audioId: string.IsNullOrWhiteSpace(prevAudioId) ? null : prevAudioId,
-                audioUrl: string.IsNullOrWhiteSpace(prevUrl) ? null : prevUrl,
+                audioId: prevAudioId,
+                audioUrl: prevUrl,
                 durationSeconds: prevDur,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
       }
-      catch (Exception compensateEx)
+      catch (Exception rbEx)
       {
-        _log?.LogError(compensateEx, "TranscriptRegenCompensateClip");
-        errMsg = $"{errMsg} Clip audio rollback also failed: {compensateEx.Message}";
+        _log?.LogError(rbEx, "TranscriptRegenRollbackClip");
+        ReportJobProgress(
+            operationCorrelationId,
+            jobProgress,
+            DialogueRegenerateSyntheticJobId,
+            "failed",
+            0,
+            null,
+            persistenceMessage);
+        return $"{persistenceMessage} Clip audio rollback also failed: {rbEx.Message}";
       }
 
       ReportJobProgress(
           operationCorrelationId,
           jobProgress,
-          accepted.JobId,
-          "apply_failed",
+          DialogueRegenerateSyntheticJobId,
+          "failed",
           0,
           null,
-          errMsg);
-      return errMsg;
+          persistenceMessage);
+      return persistenceMessage;
     }
 
     TranscriptTextUndoPayload? preForUndo = null;
     TranscriptTextUndoPayload? postForUndo = null;
-    if (preApplyTranscriptCapture != null && persistenceMessage == null)
+    if (preApplyTranscriptCapture != null)
     {
       preForUndo = preApplyTranscriptCapture;
       postForUndo = TranscriptTextUndoPayload.FromTranscription(transcription);
@@ -300,12 +335,28 @@ public sealed class TranscriptSegmentRegenerationCoordinator
     ReportJobProgress(
         operationCorrelationId,
         jobProgress,
-        accepted.JobId,
+        DialogueRegenerateSyntheticJobId,
         "session_succeeded",
         1,
         null,
         null);
     return persistenceMessage;
+  }
+
+  private bool ShouldReplaceExistingClip(Project project, string transcriptionId, string segmentId, string clipId)
+  {
+    if (string.IsNullOrWhiteSpace(transcriptionId) || string.IsNullOrWhiteSpace(segmentId)
+        || string.IsNullOrWhiteSpace(clipId))
+      return false;
+    foreach (var link in _linkage.GetLinksForClip(project, clipId))
+    {
+      if (!string.Equals(link.TranscriptionId, transcriptionId, StringComparison.Ordinal))
+        continue;
+      if (link.SegmentIds != null && link.SegmentIds.Contains(segmentId))
+        return true;
+    }
+
+    return false;
   }
 
   private static void ReportJobProgress(
@@ -452,95 +503,5 @@ public sealed class TranscriptSegmentRegenerationCoordinator
     }
 
     return null;
-  }
-
-  private async Task<Job?> WaitForTerminalJobAsync(
-      string jobId,
-      string? operationCorrelationId,
-      IProgress<TranscriptRegenerationJobProgressReport>? jobProgress,
-      CancellationToken cancellationToken)
-  {
-    var deadline = DateTime.UtcNow.AddMinutes(4);
-    var lastSig = (string?)null;
-    while (DateTime.UtcNow < deadline)
-    {
-      cancellationToken.ThrowIfCancellationRequested();
-      var j = await _jobs.GetJobAsync(jobId, cancellationToken).ConfigureAwait(false);
-      if (j != null)
-      {
-        var isTerminal = string.Equals(j.Status, "completed", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(j.Status, "failed", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(j.Status, "cancelled", StringComparison.OrdinalIgnoreCase);
-        var sig = $"{j.Status}|{j.Progress}|{j.CurrentStep}|{j.ErrorMessage}";
-        if (isTerminal || !string.Equals(sig, lastSig, StringComparison.Ordinal))
-        {
-          lastSig = sig;
-          ReportJobProgress(
-              operationCorrelationId,
-              jobProgress,
-              jobId,
-              j.Status ?? string.Empty,
-              j.Progress,
-              j.CurrentStep,
-              j.ErrorMessage);
-        }
-
-        if (isTerminal)
-          return j;
-      }
-
-      await Task.Delay(350, cancellationToken).ConfigureAwait(false);
-    }
-
-    ReportJobProgress(
-        operationCorrelationId,
-        jobProgress,
-        jobId,
-        "timeout",
-        0,
-        null,
-        "Regeneration timed out while waiting for the synthesis job.");
-    return null;
-  }
-
-  private static bool TryGetMetadataDouble(IReadOnlyDictionary<string, object>? meta, string key, out double value)
-  {
-    value = 0;
-    if (meta == null || !meta.TryGetValue(key, out var o) || o == null)
-      return false;
-    if (o is JsonElement je && je.ValueKind == JsonValueKind.Number)
-    {
-      value = je.GetDouble();
-      return true;
-    }
-
-    if (o is double d)
-    {
-      value = d;
-      return true;
-    }
-
-    if (o is float f)
-    {
-      value = f;
-      return true;
-    }
-
-    return double.TryParse(o.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out value);
-  }
-
-  private static bool TryGetMetadataString(IReadOnlyDictionary<string, object>? meta, string key, out string? value)
-  {
-    value = null;
-    if (meta == null || !meta.TryGetValue(key, out var o) || o == null)
-      return false;
-    if (o is JsonElement je && je.ValueKind == JsonValueKind.String)
-    {
-      value = je.GetString();
-      return !string.IsNullOrWhiteSpace(value);
-    }
-
-    value = o.ToString();
-    return !string.IsNullOrWhiteSpace(value);
   }
 }

@@ -10,6 +10,7 @@ using VoiceStudio.Core.Events;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Services;
 using VoiceStudio.Core.Transcription;
+using VoiceStudio.Core.Exceptions;
 
 namespace VoiceStudio.App.Services;
 
@@ -96,6 +97,9 @@ public sealed class TranscriptSegmentRegenerationCoordinator
       ProfileId = string.IsNullOrWhiteSpace(clip.ProfileId) ? null : clip.ProfileId,
     };
 
+    if (string.IsNullOrWhiteSpace(start.ProfileId))
+      return "No voice profile is assigned to this clip. Assign a profile before regenerating.";
+
     var replaceExisting = ShouldReplaceExistingClip(project, transcription.Id, segment.Id, r.ClipId);
     var dialogueRequest = new RegenerateDialogueSegmentRequest
     {
@@ -137,6 +141,7 @@ public sealed class TranscriptSegmentRegenerationCoordinator
     catch (Exception ex)
     {
       _log?.LogError(ex, "DialogueRegenerateSegment");
+      var userMsg = MapDialogueRegenerationFailureMessage(ex);
       ReportJobProgress(
           operationCorrelationId,
           jobProgress,
@@ -144,8 +149,8 @@ public sealed class TranscriptSegmentRegenerationCoordinator
           "failed",
           0,
           null,
-          ex.Message);
-      return $"Regeneration failed: {ex.Message}";
+          userMsg);
+      return userMsg;
     }
 
     var newAudioId = dialogueResp.AudioId;
@@ -343,12 +348,46 @@ public sealed class TranscriptSegmentRegenerationCoordinator
     return persistenceMessage;
   }
 
+
+  private static string MapDialogueRegenerationFailureMessage(Exception ex)
+  {
+    var bex = TryGetBackendException(ex);
+    if (bex != null)
+    {
+      return bex.ErrorCode switch
+      {
+        "track_id_required_for_new_dialogue_clip" =>
+            "A timeline track is required for a new clip. Select a target track or link the clip first.",
+        "cross_track_dialogue_replace_not_supported" =>
+            "Cross-track replacement is not supported. The clip must stay on its original track.",
+        _ when bex.StatusCode == 502 || bex.StatusCode == 503 =>
+            $"Synthesis service unavailable: {bex.Message}",
+        _ => $"Regeneration failed: {bex.Message}",
+      };
+    }
+
+    return $"Regeneration failed: {ex.Message}";
+  }
+
+  private static BackendException? TryGetBackendException(Exception ex)
+  {
+    for (Exception? cur = ex; cur != null; cur = cur.InnerException)
+    {
+      if (cur is BackendException be)
+        return be;
+    }
+
+    return null;
+  }
   private bool ShouldReplaceExistingClip(Project project, string transcriptionId, string segmentId, string clipId)
   {
     if (string.IsNullOrWhiteSpace(transcriptionId) || string.IsNullOrWhiteSpace(segmentId)
         || string.IsNullOrWhiteSpace(clipId))
       return false;
-    foreach (var link in _linkage.GetLinksForClip(project, clipId))
+    var links = _linkage.GetLinksForClip(project, clipId);
+    if (links == null)
+      return false;
+    foreach (var link in links)
     {
       if (!string.Equals(link.TranscriptionId, transcriptionId, StringComparison.Ordinal))
         continue;
@@ -505,3 +544,4 @@ public sealed class TranscriptSegmentRegenerationCoordinator
     return null;
   }
 }
+

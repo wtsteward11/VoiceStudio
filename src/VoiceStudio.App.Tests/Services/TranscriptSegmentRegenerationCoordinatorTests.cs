@@ -10,6 +10,7 @@ using VoiceStudio.App.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.Core.Events;
+using VoiceStudio.Core.Exceptions;
 using JobDto = VoiceStudio.App.Services.Job;
 using VoiceStudio.Core.Models;
 using VoiceStudio.Core.Panels;
@@ -17,6 +18,18 @@ using VoiceStudio.Core.Services;
 using VoiceStudio.Core.Transcription;
 
 namespace VoiceStudio.App.Tests.Services;
+
+internal sealed class ImmediateTranscriptRegenerationProgress : IProgress<TranscriptRegenerationJobProgressReport>
+{
+  private readonly Action<TranscriptRegenerationJobProgressReport> _handler;
+
+  public ImmediateTranscriptRegenerationProgress(Action<TranscriptRegenerationJobProgressReport> handler)
+  {
+    _handler = handler;
+  }
+
+  public void Report(TranscriptRegenerationJobProgressReport value) => _handler(value);
+}
 
 [TestClass]
 public sealed class TranscriptSegmentRegenerationCoordinatorTests
@@ -775,6 +788,148 @@ public sealed class TranscriptSegmentRegenerationCoordinatorTests
   }
 
   [TestMethod]
+  public async Task TryExecuteAsync_MissingProfileId_ReturnsActionableMessage()
+  {
+    var project = BuildProject("p1", "t1", "c1", profileId: string.Empty);
+    var gate = new Mock<ITimelineSelectedProjectGate>();
+    gate.SetupGet(g => g.SelectedProject).Returns(project);
+    var resolver = new Mock<ITranscriptSegmentTargetResolver>();
+    resolver
+        .Setup(r => r.Resolve("tr1", "seg1", It.IsAny<double>(), It.IsAny<double>()))
+        .Returns(TranscriptSegmentTargetResolution.Resolved("t1", "c1", "tr1", 0, 1, 0));
+    var dialogue = new Mock<IDialogueServiceClient>();
+    var backend = new Mock<IBackendClient>();
+    var linkage = new Mock<IClipTranscriptLinkageService>();
+
+    var sut = new TranscriptSegmentRegenerationCoordinator(
+        dialogue.Object,
+        backend.Object,
+        linkage.Object,
+        gate.Object,
+        resolver.Object);
+
+    var msg = await sut.TryExecuteAsync(
+        new TranscriptionResponse { Id = "tr1" },
+        new TranscriptionSegment { Id = "seg1", Start = 0, End = 1 },
+        PanelIds.Transcribe,
+        null,
+        CancellationToken.None);
+
+    StringAssert.Contains(msg ?? string.Empty, "voice profile");
+    dialogue.Verify(
+        d => d.RegenerateSegmentAsync(
+            It.IsAny<string>(),
+            It.IsAny<RegenerateDialogueSegmentRequest>(),
+            It.IsAny<CancellationToken>()),
+        Times.Never);
+  }
+
+  [TestMethod]
+  public async Task TryExecuteAsync_Backend422TrackIdRequired_SurfacesSpecificMessage()
+  {
+    var project = BuildProject("p1", "t1", "c1");
+    var gate = new Mock<ITimelineSelectedProjectGate>();
+    gate.SetupGet(g => g.SelectedProject).Returns(project);
+    var resolver = new Mock<ITranscriptSegmentTargetResolver>();
+    resolver
+        .Setup(r => r.Resolve("tr1", "seg1", It.IsAny<double>(), It.IsAny<double>()))
+        .Returns(TranscriptSegmentTargetResolution.Resolved("t1", "c1", "tr1", 0, 1, 0));
+    var dialogue = DialogueRegenerateThrows(
+        new BackendException("Provide track_id", 422, "track_id_required_for_new_dialogue_clip", false));
+    var backend = new Mock<IBackendClient>();
+    var linkage = new Mock<IClipTranscriptLinkageService>();
+    linkage.Setup(l => l.GetLinksForClip(It.IsAny<Project>(), It.IsAny<string>()))
+        .Returns(Array.Empty<ClipTranscriptLink>());
+
+    var sut = new TranscriptSegmentRegenerationCoordinator(
+        dialogue.Object,
+        backend.Object,
+        linkage.Object,
+        gate.Object,
+        resolver.Object);
+
+    var msg = await sut.TryExecuteAsync(
+        new TranscriptionResponse { Id = "tr1" },
+        new TranscriptionSegment { Id = "seg1", Start = 0, End = 1 },
+        PanelIds.Transcribe,
+        null,
+        CancellationToken.None);
+
+    StringAssert.Contains(msg ?? string.Empty, "timeline track is required");
+  }
+
+  [TestMethod]
+  public async Task TryExecuteAsync_Backend422CrossTrack_SurfacesSpecificMessage()
+  {
+    var project = BuildProject("p1", "t1", "c1");
+    var gate = new Mock<ITimelineSelectedProjectGate>();
+    gate.SetupGet(g => g.SelectedProject).Returns(project);
+    var resolver = new Mock<ITranscriptSegmentTargetResolver>();
+    resolver
+        .Setup(r => r.Resolve("tr1", "seg1", It.IsAny<double>(), It.IsAny<double>()))
+        .Returns(TranscriptSegmentTargetResolution.Resolved("t1", "c1", "tr1", 0, 1, 0));
+    var dialogue = DialogueRegenerateThrows(
+        new BackendException("wrong track", 422, "cross_track_dialogue_replace_not_supported", false));
+    var backend = new Mock<IBackendClient>();
+    var linkage = new Mock<IClipTranscriptLinkageService>();
+    linkage.Setup(l => l.GetLinksForClip(It.IsAny<Project>(), It.IsAny<string>()))
+        .Returns(Array.Empty<ClipTranscriptLink>());
+
+    var sut = new TranscriptSegmentRegenerationCoordinator(
+        dialogue.Object,
+        backend.Object,
+        linkage.Object,
+        gate.Object,
+        resolver.Object);
+
+    var msg = await sut.TryExecuteAsync(
+        new TranscriptionResponse { Id = "tr1" },
+        new TranscriptionSegment { Id = "seg1", Start = 0, End = 1 },
+        PanelIds.Transcribe,
+        null,
+        CancellationToken.None);
+
+    StringAssert.Contains(msg ?? string.Empty, "original track");
+  }
+
+  [TestMethod]
+  public async Task TryExecuteAsync_SynthesisUnavailable_SurfacesBackendDetail()
+  {
+    var project = BuildProject("p1", "t1", "c1");
+    var gate = new Mock<ITimelineSelectedProjectGate>();
+    gate.SetupGet(g => g.SelectedProject).Returns(project);
+    var resolver = new Mock<ITranscriptSegmentTargetResolver>();
+    resolver
+        .Setup(r => r.Resolve("tr1", "seg1", It.IsAny<double>(), It.IsAny<double>()))
+        .Returns(TranscriptSegmentTargetResolution.Resolved("t1", "c1", "tr1", 0, 1, 0));
+    var dialogue = DialogueRegenerateThrows(
+        new BackendException("upstream timeout", 503, "SERVICE_UNAVAILABLE", true));
+    var backend = new Mock<IBackendClient>();
+    var linkage = new Mock<IClipTranscriptLinkageService>();
+    linkage.Setup(l => l.GetLinksForClip(It.IsAny<Project>(), It.IsAny<string>()))
+        .Returns(Array.Empty<ClipTranscriptLink>());
+
+    var sut = new TranscriptSegmentRegenerationCoordinator(
+        dialogue.Object,
+        backend.Object,
+        linkage.Object,
+        gate.Object,
+        resolver.Object);
+
+    var msg = await sut.TryExecuteAsync(
+        new TranscriptionResponse { Id = "tr1" },
+        new TranscriptionSegment { Id = "seg1", Start = 0, End = 1 },
+        PanelIds.Transcribe,
+        null,
+        CancellationToken.None);
+
+    Assert.IsTrue(
+        (msg ?? string.Empty).StartsWith("Synthesis service unavailable:", StringComparison.Ordinal),
+        msg);
+    StringAssert.Contains(msg ?? string.Empty, "upstream timeout");
+  }
+
+  [TestMethod]
   public async Task TryExecuteAsync_NoProject_ReturnsEarly()
   {
     var gate = new Mock<ITimelineSelectedProjectGate>();
@@ -873,7 +1028,8 @@ public sealed class TranscriptSegmentRegenerationCoordinatorTests
     linkage.Setup(l => l.GetLinksForClip(project, "c1")).Returns(Array.Empty<ClipTranscriptLink>());
 
     var reports = new System.Collections.Generic.List<TranscriptRegenerationJobProgressReport>();
-    var progress = new Progress<TranscriptRegenerationJobProgressReport>(reports.Add);
+    IProgress<TranscriptRegenerationJobProgressReport> progress =
+        new ImmediateTranscriptRegenerationProgress(reports.Add);
 
     var sut = new TranscriptSegmentRegenerationCoordinator(
         dialogue.Object,

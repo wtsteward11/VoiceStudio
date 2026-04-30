@@ -4,20 +4,26 @@ namespace VoiceStudio.App.Core.Models;
 
 public sealed class RegenerateDialogueSegmentRequest
 {
+  [JsonPropertyName("transcript_id")]
   public string TranscriptId { get; set; } = string.Empty;
 
+  [JsonPropertyName("profile_id")]
   public string ProfileId { get; set; } = string.Empty;
 
   [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+  [JsonPropertyName("track_id")]
   public string? TrackId { get; set; }
 
   [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+  [JsonPropertyName("engine")]
   public string? Engine { get; set; }
 
   [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+  [JsonPropertyName("project_id")]
   public string? ProjectId { get; set; }
 
   [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+  [JsonPropertyName("session_id")]
   public string? SessionId { get; set; }
 
   [JsonPropertyName("replace_existing_clip")]

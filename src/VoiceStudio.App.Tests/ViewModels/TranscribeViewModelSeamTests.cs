@@ -224,6 +224,43 @@ namespace VoiceStudio.App.Tests.ViewModels
     }
 
     /// <summary>
+    /// Source audio import: playback id from library upload (same as ImportWorkflowService
+    /// after GetPlaybackAudioId) must flow into durable transcription job request.
+    /// </summary>
+    [TestMethod]
+    public async Task ImportWorkflow_UploadedAsset_AudioId_FeedsTranscriptionJob()
+    {
+      TranscriptionJobRequest? captured = null;
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .Callback<TranscriptionJobRequest, string?, CancellationToken>((req, _, _) => captured = req)
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-import",
+                Status = "pending",
+                Mode = "real",
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+
+      var agg = AppServices.TryGetEventAggregator();
+      Assert.IsNotNull(agg);
+      agg.Publish(new AssetAddedEvent("import-workflow", "lib-file-uuid-1", "audio", @"C:\src.wav"));
+      await PumpDispatcherQueueAsync();
+
+      Assert.AreEqual("lib-file-uuid-1", vm.SelectedAudioId);
+
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsNotNull(captured);
+      Assert.AreEqual("lib-file-uuid-1", captured.AudioId);
+      Assert.IsTrue(captured.AsyncMode);
+    }
+
+    /// <summary>
     /// Pass 05 C2: after deactivate, AssetAdded must not update (subscriptions released).
     /// </summary>
     [TestMethod]

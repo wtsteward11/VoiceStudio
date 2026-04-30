@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
@@ -18,8 +19,10 @@ from backend.services.transcription_service import (
     TranscriptionRequest,
     TranscriptionResult,
     TranscriptionSegmentResult,
+    _resolve_audio_path,
 )
 from tests.unit.backend.api.routes.test_dialogue import StoringFakeTranscriptionRepository
+from tests.unit.backend.api.routes.test_library import _make_client, _wav_bytes
 
 
 @pytest.fixture
@@ -397,3 +400,29 @@ class TestTranscriptionJobAsyncRoute:
         r = transcribe_client.get("/api/transcribe/jobs/00000000-0000-0000-0000-000000000001")
         assert r.status_code == 404
         assert r.headers.get("content-type", "").startswith("application/json")
+
+
+class TestLibraryUploadAudioIdResolvesForTranscriptionService:
+    """Library upload_id (audio_id) must resolve through transcription_service._resolve_audio_path."""
+
+    @pytest.mark.asyncio
+    async def test_library_upload_audio_id_resolves_via_transcription_service(self, tmp_path, monkeypatch):
+        from backend.api.routes import library
+        from backend.services import audio_path_resolver
+
+        monkeypatch.setattr(library, "get_path", lambda _name: tmp_path)
+        monkeypatch.setattr(audio_path_resolver, "get_path", lambda _name: tmp_path)
+
+        client = _make_client()
+        response = client.post(
+            "/api/library/assets/upload",
+            files={"file": ("source.wav", _wav_bytes(), "audio/wav")},
+        )
+        assert response.status_code == 201, response.text
+        data = response.json()
+        audio_id = data.get("audio_id")
+        assert audio_id, "audio_id must be returned for transcription-ready playback"
+
+        resolved = await _resolve_audio_path(audio_id, None)
+        assert resolved is not None
+        assert os.path.isfile(resolved)

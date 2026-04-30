@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
 import math
 import struct
 import uuid
@@ -18,7 +19,7 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from backend.api.models_additional import VoiceSynthesizeResponse
@@ -452,3 +453,646 @@ class TestDialogueRegenerateChain:
                 },
             )
         assert r.status_code == 422
+
+
+class TestDialogueSegmentIdentity:
+    def test_create_persists_project_id_and_source_audio_id(self, dialogue_client):
+        tid, fake_repo = _seed_transcription()
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            r = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={
+                    "transcript_id": tid,
+                    "text": "line",
+                    "start": 0.0,
+                    "end": 1.0,
+                    "project_id": "explicit-proj",
+                    "session_id": "sess-99",
+                },
+            )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["project_id"] == "explicit-proj"
+        assert body["session_id"] == "sess-99"
+        assert body["source_audio_id"] == "audio-src-1"
+
+    def test_create_inherits_project_from_transcription_when_omitted(self, dialogue_client):
+        tid, fake_repo = _seed_transcription()
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            r = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "x", "start": 0.0, "end": 0.5},
+            )
+        assert r.status_code == 200
+        assert r.json()["project_id"] == "proj-1"
+        assert r.json()["source_audio_id"] == "audio-src-1"
+
+    def test_edit_preserves_identity_fields(self, dialogue_client):
+        tid, fake_repo = _seed_transcription()
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            sid = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={
+                    "transcript_id": tid,
+                    "text": "a",
+                    "start": 1.0,
+                    "end": 2.0,
+                    "project_id": "p-x",
+                    "session_id": "s-y",
+                },
+            ).json()["id"]
+            r = dialogue_client.put(
+                f"/api/dialogue/segments/{sid}/edit",
+                params={"transcript_id": tid},
+                json={"edited_text": "edited body"},
+            )
+        d = r.json()
+        assert d["project_id"] == "p-x"
+        assert d["session_id"] == "s-y"
+        assert d["source_audio_id"] == "audio-src-1"
+
+
+def _patches_stub_engine(fake_repo: FakeTranscriptionRepository, lib_repo: Any, tmp_wav: Path):
+    async def _synth(req: Any, request: Any, config_service: Any) -> VoiceSynthesizeResponse:
+        from backend.services.audio_artifacts import AudioRegistry
+
+        aid = f"sdlg_{uuid.uuid4().hex}"
+        AudioRegistry.register(
+            aid,
+            str(tmp_wav),
+            project_id=getattr(req, "project_id", None),
+            source="dialogue_unit_test",
+            model_used="stub",
+            duration_seconds=1.0,
+        )
+        return VoiceSynthesizeResponse(
+            audio_id=aid,
+            audio_url=f"/audio/{aid}",
+            generated_audio_id=aid,
+            profile_id=req.profile_id,
+            duration=1.0,
+            quality_score=0.5,
+            routed_engine="stub",
+        )
+
+    from backend.services import dialogue_segment_workflow as dsw
+
+    return (
+        patch.object(dsw, "get_transcription_repository", return_value=fake_repo),
+        patch.object(dsw, "get_library_asset_repository", return_value=lib_repo),
+        patch.object(dsw.SynthesisService, "synthesize", new=AsyncMock(side_effect=_synth)),
+    )
+
+
+class TestDialogueRegenerateEditedText:
+    def test_regenerate_persists_edited_text_override(self, dialogue_client, tmp_path, lib_repo):
+        tid, fake_repo = _seed_transcription()
+        wav = tmp_path / "u.wav"
+        _write_non_silent_wav16_mono(wav, seconds=0.5)
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            sid = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "orig", "start": 0.0, "end": 1.0},
+            ).json()["id"]
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "T", "type": "audio"}
+            ).json()["id"]
+
+        p1, p2, p3 = _patches(fake_repo, lib_repo, wav)
+        with p1, p2, p3:
+            r = dialogue_client.post(
+                f"/api/dialogue/segments/{sid}/regenerate",
+                json={
+                    "transcript_id": tid,
+                    "profile_id": "p1",
+                    "track_id": track_id,
+                    "engine": "piper",
+                    "edited_text": "override synth text",
+                },
+            )
+        assert r.status_code == 200, r.text
+        seg = r.json()["segment"]
+        assert seg["edited_text"] == "override synth text"
+        assert seg["status"] == "regenerated"
+
+    def test_regenerate_blank_edited_text_422(self, dialogue_client, tmp_path, lib_repo):
+        tid, fake_repo = _seed_transcription()
+        wav = tmp_path / "u.wav"
+        _write_non_silent_wav16_mono(wav, seconds=0.3)
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            sid = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "x", "start": 0.0, "end": 1.0},
+            ).json()["id"]
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "T2", "type": "audio"}
+            ).json()["id"]
+
+        p1, p2, p3 = _patches(fake_repo, lib_repo, wav)
+        with p1, p2, p3:
+            r = dialogue_client.post(
+                f"/api/dialogue/segments/{sid}/regenerate",
+                json={
+                    "transcript_id": tid,
+                    "profile_id": "p1",
+                    "track_id": track_id,
+                    "edited_text": "   ",
+                },
+            )
+        assert r.status_code == 422
+
+    def test_regenerate_omit_edited_text_uses_prior_edit(self, dialogue_client, tmp_path, lib_repo):
+        tid, fake_repo = _seed_transcription()
+        wav = tmp_path / "u.wav"
+        _write_non_silent_wav16_mono(wav, seconds=0.4)
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            sid = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "orig", "start": 0.0, "end": 1.0},
+            ).json()["id"]
+            dialogue_client.put(
+                f"/api/dialogue/segments/{sid}/edit",
+                params={"transcript_id": tid},
+                json={"edited_text": "prior edit"},
+            )
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "T3", "type": "audio"}
+            ).json()["id"]
+
+        p1, p2, p3 = _patches(fake_repo, lib_repo, wav)
+        with p1, p2, p3:
+            r = dialogue_client.post(
+                f"/api/dialogue/segments/{sid}/regenerate",
+                json={
+                    "transcript_id": tid,
+                    "profile_id": "p1",
+                    "track_id": track_id,
+                },
+            )
+        assert r.status_code == 200
+        assert r.json()["segment"]["edited_text"] == "prior edit"
+
+    def test_regenerate_omit_edited_text_falls_back_to_original_text(
+        self, dialogue_client, tmp_path, lib_repo
+    ):
+        tid, fake_repo = _seed_transcription()
+        wav = tmp_path / "u.wav"
+        _write_non_silent_wav16_mono(wav, seconds=0.4)
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            sid = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "only original", "start": 0.0, "end": 1.0},
+            ).json()["id"]
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "T4", "type": "audio"}
+            ).json()["id"]
+
+        p1, p2, p3 = _patches(fake_repo, lib_repo, wav)
+        with p1, p2, p3:
+            r = dialogue_client.post(
+                f"/api/dialogue/segments/{sid}/regenerate",
+                json={
+                    "transcript_id": tid,
+                    "profile_id": "p1",
+                    "track_id": track_id,
+                },
+            )
+        assert r.status_code == 200
+        prov = r.json()["segment"]["dialogue_provenance"]
+        assert prov["source_text"] == "only original"
+
+
+class TestDialogueProvenanceAndLibrary:
+    def test_provenance_has_artifact_and_source_ids(self, dialogue_client, tmp_path, lib_repo):
+        tid, fake_repo = _seed_transcription()
+        wav = tmp_path / "p.wav"
+        _write_non_silent_wav16_mono(wav)
+        from backend.project.timeline.session_repository import DEFAULT_SESSION_ID
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            sid = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "t", "start": 0.1, "end": 0.9},
+            ).json()["id"]
+            dialogue_client.put(
+                f"/api/dialogue/segments/{sid}/edit",
+                params={"transcript_id": tid},
+                json={"edited_text": "prov text"},
+            )
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "P", "type": "audio"}
+            ).json()["id"]
+
+        p1, p2, p3 = _patches(fake_repo, lib_repo, wav)
+        with p1, p2, p3:
+            reg = dialogue_client.post(
+                f"/api/dialogue/segments/{sid}/regenerate",
+                json={
+                    "transcript_id": tid,
+                    "profile_id": "p1",
+                    "track_id": track_id,
+                    "project_id": "proj-1",
+                    "session_id": DEFAULT_SESSION_ID,
+                },
+            )
+        assert reg.status_code == 200, reg.text
+        out = reg.json()
+        prov = out["segment"]["dialogue_provenance"]
+        assert prov["artifact_sha256"] and len(prov["artifact_sha256"]) == 64
+        assert prov["artifact_size_bytes"] > 0
+        assert isinstance(prov["artifact_path"], str) and len(prov["artifact_path"]) > 0
+        assert prov["source_audio_id"] == "audio-src-1"
+        assert prov["project_id"] == "proj-1"
+        assert prov["session_id"] == DEFAULT_SESSION_ID
+        assert prov["duration_seconds"] == out["duration"]
+
+    def test_library_asset_size_matches_bytes(self, dialogue_client, tmp_path, lib_repo):
+        tid, fake_repo = _seed_transcription()
+        wav = tmp_path / "lib.wav"
+        _write_non_silent_wav16_mono(wav, seconds=0.2)
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            sid = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "z", "start": 0.0, "end": 1.0},
+            ).json()["id"]
+            dialogue_client.put(
+                f"/api/dialogue/segments/{sid}/edit",
+                params={"transcript_id": tid},
+                json={"edited_text": "lib"},
+            )
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "L", "type": "audio"}
+            ).json()["id"]
+
+        p1, p2, p3 = _patches(fake_repo, lib_repo, wav)
+        with p1, p2, p3:
+            aid = dialogue_client.post(
+                f"/api/dialogue/segments/{sid}/regenerate",
+                json={"transcript_id": tid, "profile_id": "p1", "track_id": track_id},
+            ).json()["library_asset_id"]
+
+        ent = asyncio.run(lib_repo.get_by_id(aid))
+        assert ent is not None
+        assert ent.size == wav.stat().st_size
+        meta = json.loads(ent.metadata)
+        assert meta.get("artifact_sha256")
+
+
+class TestDialogueTimelineClipMetadata:
+    def test_clip_timing_and_metadata_parity(self, dialogue_client, tmp_path, lib_repo):
+        tid, fake_repo = _seed_transcription()
+        wav = tmp_path / "c.wav"
+        _write_non_silent_wav16_mono(wav)
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            sid = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "c", "start": 2.0, "end": 5.0},
+            ).json()["id"]
+            dialogue_client.put(
+                f"/api/dialogue/segments/{sid}/edit",
+                params={"transcript_id": tid},
+                json={"edited_text": "clip meta"},
+            )
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "C", "type": "audio"}
+            ).json()["id"]
+
+        p1, p2, p3 = _patches(fake_repo, lib_repo, wav)
+        with p1, p2, p3:
+            out = dialogue_client.post(
+                f"/api/dialogue/segments/{sid}/regenerate",
+                json={"transcript_id": tid, "profile_id": "p1", "track_id": track_id},
+            ).json()
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            st = dialogue_client.get("/api/timeline/state").json()
+        clip = next(
+            c
+            for t in st["tracks"]
+            for c in t["clips"]
+            if c["id"] == out["timeline_clip_id"]
+        )
+        assert clip["end_time"] - clip["start_time"] == pytest.approx(out["duration"])
+        m = clip["metadata"]
+        assert m["library_asset_id"] == out["library_asset_id"]
+        assert m["artifact_sha256"]
+        assert m["segment_id"] == sid
+
+
+class TestDialogueRegenerateFailures:
+    def test_synthesis_service_error_json_body(self, dialogue_client, tmp_path, lib_repo):
+        tid, fake_repo = _seed_transcription()
+        from backend.core.exceptions import ServiceError
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            sid = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "q", "start": 0.0, "end": 1.0},
+            ).json()["id"]
+            dialogue_client.put(
+                f"/api/dialogue/segments/{sid}/edit",
+                params={"transcript_id": tid},
+                json={"edited_text": "synth fail"},
+            )
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "F", "type": "audio"}
+            ).json()["id"]
+
+        p1, p2 = (
+            patch.object(dsw, "get_transcription_repository", return_value=fake_repo),
+            patch.object(dsw, "get_library_asset_repository", return_value=lib_repo),
+        )
+        with p1, p2, patch.object(
+            dsw.SynthesisService,
+            "synthesize",
+            new=AsyncMock(side_effect=ServiceError(503, {"code": "DOWN", "message": "busy"})),
+        ):
+            r = dialogue_client.post(
+                f"/api/dialogue/segments/{sid}/regenerate",
+                json={"transcript_id": tid, "profile_id": "p1", "track_id": track_id},
+            )
+        assert r.status_code == 503
+        body = r.json()
+        assert "detail" in body
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            seg = dialogue_client.get(
+                f"/api/dialogue/segments/{sid}", params={"transcript_id": tid}
+            ).json()
+        assert seg["status"] == "failed"
+
+    def test_library_create_failure_no_linkage(self, dialogue_client, tmp_path, lib_repo):
+        tid, fake_repo = _seed_transcription()
+        wav = tmp_path / "lc.wav"
+        _write_non_silent_wav16_mono(wav, seconds=0.15)
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            sid = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "q", "start": 0.0, "end": 1.0},
+            ).json()["id"]
+            dialogue_client.put(
+                f"/api/dialogue/segments/{sid}/edit",
+                params={"transcript_id": tid},
+                json={"edited_text": "lib fail"},
+            )
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "LF", "type": "audio"}
+            ).json()["id"]
+
+        async def boom_create(entity):
+            raise RuntimeError("disk full")
+
+        lib_repo.create = boom_create  # type: ignore[method-assign]
+
+        p1, p2, p3 = _patches(fake_repo, lib_repo, wav)
+        with p1, p2, p3:
+            r = dialogue_client.post(
+                f"/api/dialogue/segments/{sid}/regenerate",
+                json={"transcript_id": tid, "profile_id": "p1", "track_id": track_id},
+            )
+        assert r.status_code == 500
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            seg = dialogue_client.get(
+                f"/api/dialogue/segments/{sid}", params={"transcript_id": tid}
+            ).json()
+        assert seg["status"] == "failed"
+        assert seg.get("library_asset_id") in (None, "")
+        assert seg.get("timeline_clip_id") in (None, "")
+
+    def test_timeline_insert_failure_soft_deletes_asset(self, dialogue_client, tmp_path, lib_repo):
+        tid, fake_repo = _seed_transcription()
+        wav = tmp_path / "ti.wav"
+        _write_non_silent_wav16_mono(wav, seconds=0.15)
+        from backend.api.routes import timeline as timeline_routes
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            sid = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "q", "start": 0.0, "end": 1.0},
+            ).json()["id"]
+            dialogue_client.put(
+                f"/api/dialogue/segments/{sid}/edit",
+                params={"transcript_id": tid},
+                json={"edited_text": "tl fail"},
+            )
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "TF", "type": "audio"}
+            ).json()["id"]
+
+        async def flaky_persist(*args, **kwargs):
+            raise HTTPException(status_code=409, detail={"code": "TIMELINE_CONFLICT"})
+
+        p1, p2, p3 = _patches(fake_repo, lib_repo, wav)
+        with p1, p2, p3, patch.object(timeline_routes, "_persist", new=flaky_persist):
+            r = dialogue_client.post(
+                f"/api/dialogue/segments/{sid}/regenerate",
+                json={"transcript_id": tid, "profile_id": "p1", "track_id": track_id},
+            )
+        assert r.status_code == 409
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            seg = dialogue_client.get(
+                f"/api/dialogue/segments/{sid}", params={"transcript_id": tid}
+            ).json()
+        assert seg["status"] == "failed"
+        assert seg.get("timeline_clip_id") in (None, "")
+
+
+class TestDialogueTranscriptTimelineBatch:
+    def test_create_timeline_clips_placeholder_and_ids(self, dialogue_client):
+        tid, fake_repo = _seed_transcription()
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            s1 = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "a", "start": 0.0, "end": 1.0},
+            ).json()["id"]
+            s2 = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "b", "start": 1.0, "end": 3.5},
+            ).json()["id"]
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "Batch", "type": "audio"}
+            ).json()["id"]
+            r = dialogue_client.post(
+                f"/api/dialogue/transcripts/{tid}/create-timeline-clips",
+                json={"track_id": track_id},
+            )
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data["segment_count"] == 2
+        assert len(data["created_clip_ids"]) == 2
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            st = dialogue_client.get("/api/timeline/state").json()
+        clip_by_seg = {
+            c["metadata"]["segment_id"]: c for t in st["tracks"] for c in t["clips"]
+        }
+        assert clip_by_seg[s1]["metadata"]["playable"] is False
+        assert clip_by_seg[s1]["metadata"]["kind"] == "transcript_region"
+        assert clip_by_seg[s1]["end_time"] - clip_by_seg[s1]["start_time"] == pytest.approx(1.0)
+        assert clip_by_seg[s2]["end_time"] - clip_by_seg[s2]["start_time"] == pytest.approx(2.5)
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            g1 = dialogue_client.get(
+                f"/api/dialogue/segments/{s1}", params={"transcript_id": tid}
+            ).json()
+        assert g1["timeline_clip_id"] == clip_by_seg[s1]["id"]
+
+    def test_create_timeline_clips_track_not_found_404(self, dialogue_client):
+        tid, fake_repo = _seed_transcription()
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "a", "start": 0.0, "end": 1.0},
+            )
+            r = dialogue_client.post(
+                f"/api/dialogue/transcripts/{tid}/create-timeline-clips",
+                json={"track_id": "missing-track-id"},
+            )
+        assert r.status_code == 404
+
+
+class TestDialogueStubHonesty:
+    def test_routed_engine_stub_surfaces_everywhere(self, dialogue_client, tmp_path, lib_repo):
+        tid, fake_repo = _seed_transcription()
+        wav = tmp_path / "stub.wav"
+        _write_non_silent_wav16_mono(wav, seconds=0.2)
+        from backend.services import dialogue_segment_workflow as dsw
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            sid = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "s", "start": 0.0, "end": 1.0},
+            ).json()["id"]
+            dialogue_client.put(
+                f"/api/dialogue/segments/{sid}/edit",
+                params={"transcript_id": tid},
+                json={"edited_text": "stub line"},
+            )
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "S", "type": "audio"}
+            ).json()["id"]
+
+        p1, p2, p3 = _patches_stub_engine(fake_repo, lib_repo, wav)
+        with p1, p2, p3:
+            out = dialogue_client.post(
+                f"/api/dialogue/segments/{sid}/regenerate",
+                json={"transcript_id": tid, "profile_id": "p1", "track_id": track_id},
+            ).json()
+        assert out["routed_engine"] == "stub"
+        seg = out["segment"]
+        assert seg["routed_engine"] == "stub"
+        prov = seg["dialogue_provenance"]
+        assert prov["routed_engine"] == "stub"
+        forbidden = ("REAL_ENGINE", "fake_engine_claim")
+        for k in seg:
+            assert k not in forbidden
+
+
+class TestDialogueExportForensics:
+    def test_helper_edit_regenerate_export_mixdown(self, dialogue_client, tmp_path, lib_repo):
+        tid, fake_repo = _seed_transcription()
+        wav = tmp_path / "mix.wav"
+        _write_non_silent_wav16_mono(wav, seconds=0.5)
+        from backend.services import dialogue_segment_workflow as dsw
+        from scripts.proof.audio_forensics import analyze_wav_bytes
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            s1 = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "one", "start": 0.0, "end": 1.0},
+            ).json()["id"]
+            s2 = dialogue_client.post(
+                "/api/dialogue/segments",
+                json={"transcript_id": tid, "text": "two", "start": 1.0, "end": 2.0},
+            ).json()["id"]
+            dialogue_client.put(
+                f"/api/dialogue/segments/{s1}/edit",
+                params={"transcript_id": tid},
+                json={"edited_text": "mix target"},
+            )
+            track_id = dialogue_client.post(
+                "/api/timeline/tracks", json={"name": "Mix", "type": "audio"}
+            ).json()["id"]
+            dialogue_client.post(
+                f"/api/dialogue/transcripts/{tid}/create-timeline-clips",
+                json={"track_id": track_id, "replace_existing": False},
+            )
+
+        p1, p2, p3 = _patches(fake_repo, lib_repo, wav)
+        with p1, p2, p3:
+            reg = dialogue_client.post(
+                f"/api/dialogue/segments/{s1}/regenerate",
+                json={
+                    "transcript_id": tid,
+                    "profile_id": "p1",
+                    "track_id": track_id,
+                    "replace_existing_clip": True,
+                },
+            )
+        assert reg.status_code == 200, reg.text
+        reg_clip = reg.json()["timeline_clip_id"]
+
+        out_file = tmp_path / "forensics.wav"
+        ex = dialogue_client.post(
+            "/api/timeline/export",
+            json={"output_path": str(out_file), "format": "wav"},
+        )
+        assert ex.status_code == 200, ex.text
+        data = out_file.read_bytes()
+        report = analyze_wav_bytes(data)
+        assert report["is_wav"] is True
+        assert report.get("non_silent") is True
+        assert float(report.get("duration_seconds") or 0) > 0
+
+        with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
+            st = dialogue_client.get("/api/timeline/state").json()
+        reg_clips = [c for t in st["tracks"] for c in t["clips"] if c["id"] == reg_clip]
+        assert len(reg_clips) == 1
+        assert reg_clips[0]["metadata"].get("segment_id") == s1
+        # second segment still placeholder clip
+        ph = [c for t in st["tracks"] for c in t["clips"] if c["metadata"].get("segment_id") == s2]
+        assert ph and ph[0]["metadata"].get("playable") is False
+
+
+@pytest.mark.skipif(
+    __import__("os").environ.get("VOICESTUDIO_LIVE_DIALOGUE_PROOF") != "1",
+    reason="Set VOICESTUDIO_LIVE_DIALOGUE_PROOF=1 to run live dialogue smoke",
+)
+def test_live_dialogue_health_optional():
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:8000/api/health", timeout=1.5) as resp:
+            assert resp.status == 200
+    except (urllib.error.URLError, TimeoutError):
+        pytest.skip("backend not reachable on 127.0.0.1:8000")

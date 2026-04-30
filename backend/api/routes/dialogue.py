@@ -1,9 +1,7 @@
 """
-Dialogue Timeline Regeneration v1 — transcript segment contract, edit, and
-synchronous regeneration with library + timeline linkage.
-
-Batch ``POST /api/dialogue/transcripts/{id}/create-timeline-clips`` is omitted:
-per-segment clip insertion covers the product workflow (Phase 10 assessment).
+Dialogue Timeline Regeneration v1.1 — transcript segment contract, edit,
+synchronous regeneration with library + timeline linkage, and batch
+``POST /api/dialogue/transcripts/{id}/create-timeline-clips``.
 """
 
 from __future__ import annotations
@@ -20,6 +18,7 @@ from backend.project.timeline.session_repository import DEFAULT_SESSION_ID
 from backend.services.dialogue_segment_workflow import (
     RegenerateOutcome,
     append_dialogue_segment,
+    create_timeline_clips_from_transcript,
     edit_dialogue_segment,
     get_dialogue_segment,
     regenerate_dialogue_segment,
@@ -57,6 +56,10 @@ class DialogueSegment(VoiceStudioBaseModel):
     engine: str | None = None
     routed_engine: str | None = None
     dialogue_provenance: dict[str, Any] | None = None
+    project_id: str | None = None
+    session_id: str | None = None
+    source_audio_id: str | None = None
+    source_path: str | None = None
 
 
 class CreateDialogueSegmentRequest(VoiceStudioBaseModel):
@@ -65,7 +68,8 @@ class CreateDialogueSegmentRequest(VoiceStudioBaseModel):
     start: float = 0.0
     end: float = 1.0
     speaker: str | None = None
-    project_id: str | None = None
+    project_id: str | None = Field(default=None, max_length=100)
+    session_id: str | None = Field(default=None, max_length=100)
 
 
 class EditDialogueSegmentBody(VoiceStudioBaseModel):
@@ -80,6 +84,7 @@ class RegenerateDialogueSegmentBody(VoiceStudioBaseModel):
     project_id: str | None = Field(default=None, max_length=100)
     session_id: str | None = Field(default=None, max_length=100)
     replace_existing_clip: bool = False
+    edited_text: str | None = Field(default=None, max_length=10000)
 
 
 class RegenerateDialogueSegmentResponse(VoiceStudioBaseModel):
@@ -90,6 +95,22 @@ class RegenerateDialogueSegmentResponse(VoiceStudioBaseModel):
     routed_engine: str
     duration: float
     segment: DialogueSegment
+
+
+class CreateTimelineClipsFromTranscriptBody(VoiceStudioBaseModel):
+    track_id: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, max_length=100)
+    project_id: str | None = Field(default=None, max_length=100)
+    replace_existing: bool = False
+
+
+class CreateTimelineClipsFromTranscriptResponse(VoiceStudioBaseModel):
+    transcript_id: str
+    session_id: str
+    track_id: str
+    created_clip_ids: list[str]
+    segment_count: int
+    status: str
 
 
 def _map_lookup(exc: LookupError) -> HTTPException:
@@ -117,6 +138,8 @@ async def create_dialogue_segment(body: CreateDialogueSegmentRequest):
             start=body.start,
             end=body.end,
             speaker=body.speaker,
+            project_id=body.project_id,
+            session_id=body.session_id,
         )
         return DialogueSegment.model_validate(row)
     except LookupError as e:
@@ -185,6 +208,7 @@ async def post_dialogue_segment_regenerate(
             session_id=session,
             replace_existing_clip=body.replace_existing_clip,
             http_request=request,
+            edited_text_override=body.edited_text,
         )
         return RegenerateDialogueSegmentResponse(
             audio_id=out.audio_id,
@@ -203,6 +227,37 @@ async def post_dialogue_segment_regenerate(
                 status_code=422,
                 detail="Segment has no non-empty text or edited_text for synthesis.",
             ) from e
+        if str(e) == "blank_edited_text_in_regenerate":
+            raise HTTPException(
+                status_code=422,
+                detail="edited_text in regenerate must be non-empty when provided.",
+            ) from e
         raise
     except ServiceError as se:
         raise HTTPException(status_code=se.status_code, detail=se.detail) from se
+
+
+@router.post(
+    "/transcripts/{transcript_id}/create-timeline-clips",
+    response_model=CreateTimelineClipsFromTranscriptResponse,
+    dependencies=[Depends(require_auth_if_enabled)],
+)
+async def post_create_timeline_clips_from_transcript(
+    transcript_id: str,
+    body: CreateTimelineClipsFromTranscriptBody,
+):
+    """Create one timeline clip per transcript segment (placeholder when no audio path)."""
+    session = (body.session_id or "").strip() or DEFAULT_SESSION_ID
+    try:
+        row = await create_timeline_clips_from_transcript(
+            transcript_id=transcript_id,
+            track_id=body.track_id,
+            session_id=session,
+            project_id=body.project_id,
+            replace_existing=body.replace_existing,
+        )
+        return CreateTimelineClipsFromTranscriptResponse.model_validate(row)
+    except LookupError as e:
+        raise _map_lookup(e) from e
+    except HTTPException:
+        raise

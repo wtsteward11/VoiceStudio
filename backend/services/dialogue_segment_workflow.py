@@ -1,6 +1,6 @@
 """
-Dialogue Timeline Regeneration v1 — segment persistence, synthesis linkage,
-library asset creation, and timeline clip insert/replace.
+Dialogue Timeline Regeneration v1.1 — segment identity, synthesis linkage,
+library asset creation, timeline clip insert/replace, and transcript batch clips.
 
 Orchestrates transcription JSON segments (no DB schema migration) with
 SQLite-backed session timeline (D-001).
@@ -8,13 +8,16 @@ SQLite-backed session timeline (D-001).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from types import SimpleNamespace
+from pathlib import Path
 from typing import Any
+
+from fastapi import HTTPException
 
 from backend.api.models_additional import VoiceSynthesizeRequest
 from backend.core.exceptions import ServiceError
@@ -39,6 +42,22 @@ def _find_segment_index(segments: list[Any], segment_id: str) -> int | None:
     return None
 
 
+def _detail_to_str(detail: object) -> str:
+    if isinstance(detail, str):
+        return detail
+    try:
+        return json.dumps(detail, default=str)
+    except (TypeError, ValueError):
+        return str(detail)
+
+
+def _artifact_fingerprint(resolved: str) -> tuple[str, int, str]:
+    """Return (absolute_path, size_bytes, sha256_hex)."""
+    p = Path(resolved)
+    data = p.read_bytes()
+    return str(p.resolve()), len(data), hashlib.sha256(data).hexdigest()
+
+
 def segment_to_public_dict(*, transcript_id: str, segment: dict[str, Any]) -> dict[str, Any]:
     """Map persisted segment JSON to DialogueSegment API shape."""
     return {
@@ -60,7 +79,26 @@ def segment_to_public_dict(*, transcript_id: str, segment: dict[str, Any]) -> di
         "engine": segment.get("engine"),
         "routed_engine": segment.get("routed_engine"),
         "dialogue_provenance": segment.get("dialogue_provenance"),
+        "project_id": segment.get("project_id"),
+        "session_id": segment.get("session_id"),
+        "source_audio_id": segment.get("source_audio_id"),
+        "source_path": segment.get("source_path"),
     }
+
+
+def _inherit_transcription_context(
+    t: dict[str, Any], row: dict[str, Any], *, project_id: str | None, session_id: str | None
+) -> None:
+    """Fill segment identity from request + transcription row."""
+    tp = t.get("project_id")
+    eff_p = (project_id or "").strip() or (str(tp).strip() if tp else "") or None
+    if eff_p:
+        row["project_id"] = eff_p
+    if session_id and str(session_id).strip():
+        row["session_id"] = str(session_id).strip()
+    aid = str(t.get("audio_id") or "").strip()
+    if aid and not row.get("source_audio_id"):
+        row["source_audio_id"] = aid
 
 
 async def append_dialogue_segment(
@@ -70,6 +108,8 @@ async def append_dialogue_segment(
     start: float,
     end: float,
     speaker: str | None,
+    project_id: str | None,
+    session_id: str | None,
 ) -> dict[str, Any]:
     repo = get_transcription_repository()
     t = await repo.get_transcription(transcript_id)
@@ -86,6 +126,7 @@ async def append_dialogue_segment(
     }
     if speaker:
         row["speaker"] = speaker
+    _inherit_transcription_context(t, row, project_id=project_id, session_id=session_id)
     segments.append(row)
     updated = await repo.update_transcription(transcript_id, segments=segments)
     if not updated:
@@ -157,7 +198,7 @@ async def _delete_timeline_clip(clip_id: str, session_id: str) -> None:
 async def _insert_timeline_clip(
     *,
     track_id: str,
-    source_path: str,
+    source_path: str | None,
     start_time: float,
     duration: float,
     name: str,
@@ -185,6 +226,24 @@ async def _insert_timeline_clip(
     return clip.id
 
 
+async def _persist_segment_failed(
+    repo: Any,
+    transcript_id: str,
+    segments: list[Any],
+    idx: int,
+    seg: dict[str, Any],
+    message: str,
+    *,
+    clear_timeline_clip_id: bool,
+) -> None:
+    seg["status"] = "failed"
+    seg["error_message"] = message
+    if clear_timeline_clip_id:
+        seg["timeline_clip_id"] = None
+    segments[idx] = seg
+    await repo.update_transcription(transcript_id, segments=segments)
+
+
 @dataclass(frozen=True)
 class RegenerateOutcome:
     """Structured result from synchronous dialogue regeneration."""
@@ -209,9 +268,11 @@ async def regenerate_dialogue_segment(
     session_id: str,
     replace_existing_clip: bool,
     http_request: Any,
+    edited_text_override: str | None = None,
 ) -> RegenerateOutcome:
     """
-    Run synthesis for segment edited text; persist provenance; library asset; timeline clip.
+    Run synthesis; persist provenance; library asset; timeline clip.
+    Fails closed: does not mark regenerated if library or timeline steps fail.
     """
     repo = get_transcription_repository()
     t = await repo.get_transcription(transcript_id)
@@ -225,26 +286,45 @@ async def regenerate_dialogue_segment(
     if not isinstance(seg, dict):
         raise LookupError("segment_not_found")
 
-    text = (seg.get("edited_text") or seg.get("text") or "").strip()
-    if not text:
+    if edited_text_override is not None:
+        stripped = edited_text_override.strip()
+        if not stripped:
+            raise ValueError("blank_edited_text_in_regenerate")
+        seg["edited_text"] = stripped
+        seg["status"] = "edited"
+
+    _eff = (project_id or "").strip() or str(seg.get("project_id") or "").strip()
+    _eff = _eff or str(t.get("project_id") or "").strip()
+    eff_project: str | None = _eff if _eff else None
+    if eff_project:
+        seg["project_id"] = eff_project
+    if session_id and str(session_id).strip():
+        seg["session_id"] = str(session_id).strip()
+
+    synth_body = (seg.get("edited_text") or seg.get("text") or "").strip()
+    if not synth_body:
         raise ValueError("empty_synthesis_text")
 
     synth_req = VoiceSynthesizeRequest(
         profile_id=profile_id,
-        text=text,
+        text=synth_body,
         engine=engine,
-        project_id=project_id,
+        project_id=eff_project,
         session_id=session_id,
     )
-    req = SimpleNamespace(state=SimpleNamespace(request_id=str(uuid.uuid4()), voice_policy=None))
 
     try:
         resp = await SynthesisService.synthesize(synth_req, http_request, None)
     except ServiceError as se:
-        seg["status"] = "failed"
-        seg["error_message"] = str(se.detail)
-        segments[idx] = seg
-        await repo.update_transcription(transcript_id, segments=segments)
+        await _persist_segment_failed(
+            repo,
+            transcript_id,
+            segments,
+            idx,
+            seg,
+            _detail_to_str(se.detail),
+            clear_timeline_clip_id=False,
+        )
         raise
 
     audio_id = str(resp.audio_id)
@@ -254,44 +334,67 @@ async def regenerate_dialogue_segment(
 
     resolved = AudioRegistry.get_path(audio_id)
     if not resolved:
-        seg["status"] = "failed"
-        seg["error_message"] = "synthesis_succeeded_but_audio_not_registered"
-        segments[idx] = seg
-        await repo.update_transcription(transcript_id, segments=segments)
+        await _persist_segment_failed(
+            repo,
+            transcript_id,
+            segments,
+            idx,
+            seg,
+            "synthesis_succeeded_but_audio_not_registered",
+            clear_timeline_clip_id=False,
+        )
         raise ServiceError(
             502,
             "Synthesis returned audio_id but AudioRegistry has no file path (registration gap).",
         )
 
+    artifact_path, artifact_size_bytes, artifact_sha256 = _artifact_fingerprint(resolved)
     created_at = datetime.now(timezone.utc).isoformat()
+    source_audio_id = str(seg.get("source_audio_id") or "").strip() or None
+    source_path_val = seg.get("source_path")
+    source_path_str = str(source_path_val).strip() if source_path_val else None
+
     provenance: dict[str, Any] = {
-        "project_id": project_id,
+        "project_id": eff_project,
         "session_id": session_id,
         "transcript_id": transcript_id,
         "segment_id": segment_id,
+        "source_audio_id": source_audio_id,
+        "source_path": source_path_str,
         "profile_id": profile_id,
         "requested_engine": engine,
         "routed_engine": routed,
         "source_text": seg.get("text"),
         "edited_text": seg.get("edited_text"),
-        "created_at": created_at,
         "audio_id": audio_id,
         "generated_audio_id": generated,
+        "artifact_path": artifact_path,
+        "artifact_sha256": artifact_sha256,
+        "artifact_size_bytes": artifact_size_bytes,
+        "duration_seconds": duration,
+        "created_at": created_at,
     }
 
     asset_repo = get_library_asset_repository()
     asset_id = str(uuid.uuid4())
     now = datetime.now()
-    meta = {
+    lib_meta: dict[str, Any] = {
         "source": "dialogue_segment_regeneration",
+        "project_id": eff_project,
+        "session_id": session_id,
         "transcript_id": transcript_id,
         "segment_id": segment_id,
+        "source_audio_id": source_audio_id,
         "generated_audio_id": generated,
+        "audio_id": audio_id,
         "profile_id": profile_id,
-        "routed_engine": routed,
         "requested_engine": engine,
+        "routed_engine": routed,
         "edited_text": seg.get("edited_text"),
         "original_text": seg.get("text"),
+        "artifact_sha256": artifact_sha256,
+        "artifact_size_bytes": artifact_size_bytes,
+        "duration_seconds": duration,
     }
     entity = LibraryAssetEntity(
         id=asset_id,
@@ -300,39 +403,91 @@ async def regenerate_dialogue_segment(
         path=resolved,
         folder_id=None,
         tags=json.dumps([]),
-        metadata=json.dumps(meta),
-        size=0,
+        metadata=json.dumps(lib_meta),
+        size=int(artifact_size_bytes),
         duration=duration,
         thumbnail_url=None,
         created_at=now,
         updated_at=now,
         modified_at=now,
     )
-    await asset_repo.create(entity)
+    try:
+        await asset_repo.create(entity)
+    except Exception as ex:
+        logger.exception("library create failed: %s", ex)
+        await _persist_segment_failed(
+            repo,
+            transcript_id,
+            segments,
+            idx,
+            seg,
+            f"library_create_failed:{ex!s}",
+            clear_timeline_clip_id=False,
+        )
+        raise ServiceError(500, {"code": "LIBRARY_CREATE_FAILED", "message": str(ex)}) from ex
 
     old_clip = str(seg.get("timeline_clip_id") or "").strip()
+    old_deleted = False
     if replace_existing_clip and old_clip:
         await _delete_timeline_clip(old_clip, session_id)
+        old_deleted = True
+        seg["timeline_clip_id"] = None
 
     clip_meta: dict[str, Any] = {
-        "transcript_id": transcript_id,
-        "segment_id": segment_id,
-        "generated_audio_id": generated,
+        **lib_meta,
         "library_asset_id": asset_id,
-        "audio_id": audio_id,
-        "source": "dialogue_segment_regeneration",
     }
     start_time = float(seg.get("start", 0.0) or 0.0)
     clip_duration = duration if duration > 0 else max(0.01, float(seg.get("end", 0.0) or 0.0) - start_time)
-    clip_id = await _insert_timeline_clip(
-        track_id=track_id,
-        source_path=resolved,
-        start_time=start_time,
-        duration=clip_duration,
-        name=f"Dialogue {segment_id[:8]}",
-        metadata=clip_meta,
-        session_id=session_id,
-    )
+    try:
+        clip_id = await _insert_timeline_clip(
+            track_id=track_id,
+            source_path=resolved,
+            start_time=start_time,
+            duration=clip_duration,
+            name=f"Dialogue {segment_id[:8]}",
+            metadata=clip_meta,
+            session_id=session_id,
+        )
+    except LookupError as le:
+        await asset_repo.delete(asset_id, soft=True)
+        await _persist_segment_failed(
+            repo,
+            transcript_id,
+            segments,
+            idx,
+            seg,
+            f"timeline_insert_failed:{le!s}",
+            clear_timeline_clip_id=old_deleted or True,
+        )
+        raise
+    except HTTPException as he:
+        logger.warning("timeline insert HTTP error: %s", he.detail)
+        await asset_repo.delete(asset_id, soft=True)
+        msg = _detail_to_str(he.detail) if hasattr(he, "detail") else str(he)
+        await _persist_segment_failed(
+            repo,
+            transcript_id,
+            segments,
+            idx,
+            seg,
+            f"timeline_insert_failed:{msg}",
+            clear_timeline_clip_id=True,
+        )
+        raise ServiceError(he.status_code, {"code": "TIMELINE_INSERT_FAILED", "message": msg}) from he
+    except Exception as ex:
+        logger.exception("timeline insert failed: %s", ex)
+        await asset_repo.delete(asset_id, soft=True)
+        await _persist_segment_failed(
+            repo,
+            transcript_id,
+            segments,
+            idx,
+            seg,
+            f"timeline_insert_failed:{ex!s}",
+            clear_timeline_clip_id=old_deleted or True,
+        )
+        raise ServiceError(500, {"code": "TIMELINE_INSERT_FAILED", "message": str(ex)}) from ex
 
     seg["audio_id"] = audio_id
     seg["generated_audio_id"] = generated
@@ -364,3 +519,107 @@ async def regenerate_dialogue_segment(
         duration=duration,
         segment=segment_to_public_dict(transcript_id=transcript_id, segment=final_seg),
     )
+
+
+def _resolve_clip_source_path(seg: dict[str, Any]) -> str | None:
+    """Pick first registry-backed path from segment audio ids."""
+    for key in ("audio_id", "generated_audio_id", "source_audio_id"):
+        aid = str(seg.get(key) or "").strip()
+        if not aid:
+            continue
+        p = AudioRegistry.get_path(aid)
+        if p:
+            return p
+    return None
+
+
+async def create_timeline_clips_from_transcript(
+    *,
+    transcript_id: str,
+    track_id: str,
+    session_id: str,
+    project_id: str | None,
+    replace_existing: bool,
+) -> dict[str, Any]:
+    """Create one timeline clip per transcript segment (placeholder if no audio).
+
+    Single hydrate + persist so timeline state stays consistent on conflict.
+    """
+    from backend.api.routes import timeline as timeline_routes
+
+    repo = get_transcription_repository()
+    t = await repo.get_transcription(transcript_id)
+    if not t:
+        raise LookupError("transcription_not_found")
+
+    timeline, undo, redo, base_rev = await timeline_routes._hydrate(session_id)
+    timeline_routes._push_undo_before_mutate(timeline, undo, redo)
+    track = next((tr for tr in timeline.tracks if tr.id == track_id), None)
+    if track is None:
+        raise LookupError("track_not_found")
+
+    segments = [dict(s) if isinstance(s, dict) else s for s in (t.get("segments") or [])]
+    created: list[str] = []
+    eff_project = (project_id or "").strip() or str(t.get("project_id") or "").strip() or None
+    src_audio = str(t.get("audio_id") or "").strip() or None
+
+    for i, seg in enumerate(segments):
+        if not isinstance(seg, dict):
+            continue
+        sid = str(seg.get("id", ""))
+        if not sid:
+            continue
+        st = float(seg.get("start", 0.0) or 0.0)
+        en = float(seg.get("end", 0.0) or 0.0)
+        dur = max(0.01, en - st)
+        if eff_project:
+            seg["project_id"] = eff_project
+        if session_id:
+            seg["session_id"] = session_id
+        if src_audio and not seg.get("source_audio_id"):
+            seg["source_audio_id"] = src_audio
+
+        old_clip = str(seg.get("timeline_clip_id") or "").strip()
+        if replace_existing and old_clip:
+            track.clips = [c for c in track.clips if c.id != old_clip]
+            seg["timeline_clip_id"] = None
+
+        path = _resolve_clip_source_path(seg)
+        playable = path is not None
+        meta: dict[str, Any] = {
+            "source": "dialogue_transcript_timeline_batch",
+            "kind": "transcript_region",
+            "playable": playable,
+            "transcript_id": transcript_id,
+            "segment_id": sid,
+            "project_id": eff_project,
+            "session_id": session_id,
+            "source_audio_id": seg.get("source_audio_id"),
+        }
+        if not playable:
+            meta["note"] = "no_registry_audio_for_segment"
+
+        clip = timeline_routes.Clip(
+            track_id=track_id,
+            source_path=path,
+            start_time=st,
+            end_time=st + dur,
+            name=f"Transcript {sid[:8]}",
+            metadata=meta,
+        )
+        track.clips.append(clip)
+        created.append(clip.id)
+        seg["timeline_clip_id"] = clip.id
+        segments[i] = seg
+
+    timeline_routes._update_timeline_duration(timeline)
+    await timeline_routes._persist(timeline, undo, redo, session_id, base_rev)
+    await repo.update_transcription(transcript_id, segments=segments)
+    return {
+        "transcript_id": transcript_id,
+        "session_id": session_id,
+        "track_id": track_id,
+        "created_clip_ids": created,
+        "segment_count": len(created),
+        "status": "ok",
+    }

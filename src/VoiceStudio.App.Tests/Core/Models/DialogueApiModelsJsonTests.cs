@@ -174,6 +174,7 @@ public sealed class DialogueApiModelsJsonTests
     var req = new CreateTimelineClipsFromTranscriptRequest
     {
       TrackId = "track-1",
+      AutoCreateTrack = false,
       ReplaceExisting = true,
     };
     var json = JsonSerializer.Serialize(req, Options);
@@ -181,6 +182,43 @@ public sealed class DialogueApiModelsJsonTests
     StringAssert.Contains(json, "\"replace_existing\":true");
   }
 
+
+  [TestMethod]
+  public void CreateTimelineClipsRequest_WithNullTrackId_OmitsTrackIdFromJson()
+  {
+    var req = new CreateTimelineClipsFromTranscriptRequest
+    {
+      TrackId = null,
+      AutoCreateTrack = true,
+      ReplaceExisting = false,
+    };
+    var json = JsonSerializer.Serialize(req, Options);
+    Assert.IsFalse(json.Contains("\"track_id\"", StringComparison.Ordinal));
+    StringAssert.Contains(json, "\"auto_create_track\":true");
+  }
+
+  [TestMethod]
+  public void CreateTimelineClipsRequest_WithExplicitTrackId_SerializesTrackIdAndAutoFlag()
+  {
+    var req = new CreateTimelineClipsFromTranscriptRequest
+    {
+      TrackId = "t-1",
+      AutoCreateTrack = false,
+      ReplaceExisting = false,
+    };
+    var json = JsonSerializer.Serialize(req, Options);
+    StringAssert.Contains(json, "\"track_id\":\"t-1\"");
+    StringAssert.Contains(json, "\"auto_create_track\":false");
+  }
+
+  [TestMethod]
+  public void CreateTimelineClipsRequest_AutoCreateTrack_SerializesAsSnakeCase()
+  {
+    var req = new CreateTimelineClipsFromTranscriptRequest { AutoCreateTrack = true };
+    var json = JsonSerializer.Serialize(req, Options);
+    Assert.IsFalse(json.Contains("AutoCreateTrack", StringComparison.Ordinal));
+    StringAssert.Contains(json, "\"auto_create_track\":true");
+  }
   [TestMethod]
   public void CreateTimelineClipsFromTranscriptResponse_DeserializesCreatedClipIdsFromSnakeCase()
   {

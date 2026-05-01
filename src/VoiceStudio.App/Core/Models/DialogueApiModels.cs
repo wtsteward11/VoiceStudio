@@ -85,8 +85,12 @@ public sealed class DialogueSegmentPayload
 /// <summary>POST /api/dialogue/transcripts/{transcript_id}/create-timeline-clips request body.</summary>
 public sealed class CreateTimelineClipsFromTranscriptRequest
 {
+  [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
   [JsonPropertyName("track_id")]
-  public string TrackId { get; set; } = string.Empty;
+  public string? TrackId { get; set; }
+
+  [JsonPropertyName("auto_create_track")]
+  public bool AutoCreateTrack { get; set; }
 
   [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
   [JsonPropertyName("session_id")]
@@ -120,4 +124,3 @@ public sealed class CreateTimelineClipsFromTranscriptResponse
 
   public string Status { get; set; } = string.Empty;
 }
-

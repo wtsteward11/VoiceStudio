@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Diagnostics;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -18,6 +19,7 @@ using VoiceStudio.App.Services;
 using VoiceStudio.App.Services.UndoableActions;
 using VoiceStudio.App.Utilities;
 using VoiceStudio.App.ViewModels;
+using VoiceStudio.App.UseCases;
 
 namespace VoiceStudio.App.Views.Panels
 {
@@ -55,6 +57,7 @@ namespace VoiceStudio.App.Views.Panels
     private MultiSelectState? _multiSelectState;
     private readonly IShellProgressPublisher _shellProgress;
     private readonly IDialogueServiceClient? _dialogueServiceClient;
+    private readonly ITimelineUseCase? _timelineUseCase;
 
     public string PanelId => PanelIds.Transcribe;
     public string DisplayName => ResourceHelper.GetString("Panel.Transcribe.DisplayName", "Transcribe");
@@ -102,6 +105,10 @@ namespace VoiceStudio.App.Views.Panels
     /// <summary>Clip ids returned from the last successful create-timeline-clips call.</summary>
     [ObservableProperty]
     private List<string> lastCreatedTimelineClipIds = new();
+
+    /// <summary>Path returned from the last successful <see cref="ExportTimelineCommand"/> (hero workflow export).</summary>
+    [ObservableProperty]
+    private string lastExportPath = string.Empty;
 
     /// <summary>Backend job <c>mode</c> (<c>real</c>, <c>simulation</c>, <c>unavailable</c>) for operator visibility.</summary>
     [ObservableProperty]
@@ -237,7 +244,8 @@ namespace VoiceStudio.App.Views.Panels
         IProjectAudioClient projectAudioClient,
         IProjectRepository? projectRepository = null,
         IShellProgressPublisher? shellProgressPublisher = null,
-        IDialogueServiceClient? dialogueServiceClient = null)
+        IDialogueServiceClient? dialogueServiceClient = null,
+        ITimelineUseCase? timelineUseCase = null)
         : base(context)
     {
       _transcriptionClient = transcriptionClient ?? throw new ArgumentNullException(nameof(transcriptionClient));
@@ -245,6 +253,7 @@ namespace VoiceStudio.App.Views.Panels
       _projectRepository = projectRepository ?? AppServices.TryGetProjectRepository();
       _shellProgress = shellProgressPublisher ?? NullShellProgressPublisher.Instance;
       _dialogueServiceClient = dialogueServiceClient ?? AppServices.GetService<IDialogueServiceClient>();
+      _timelineUseCase = timelineUseCase ?? AppServices.TryGetTimelineUseCase();
       _logService = ServiceProvider.TryGetErrorLoggingService();
 
       // Get multi-select service
@@ -313,6 +322,17 @@ namespace VoiceStudio.App.Views.Panels
             await CreateTimelineClipsFromTranscriptAsync(ct).ConfigureAwait(true);
           },
           () => !IsLoading && SelectedTranscription != null && _dialogueServiceClient != null);
+
+      ExportTimelineCommand = new EnhancedAsyncRelayCommand(
+          async (ct) =>
+          {
+            using var profiler = PerformanceProfiler.StartCommand("ExportTimeline");
+            await ExportTimelineToWavAsync(ct).ConfigureAwait(true);
+          },
+          () =>
+              !IsLoading
+              && _timelineUseCase != null
+              && LastCreatedTimelineClipIds.Count > 0);
 
       RefreshTranscriptTruthCommand = new EnhancedAsyncRelayCommand(
           async (ct) =>
@@ -1762,8 +1782,11 @@ namespace VoiceStudio.App.Views.Panels
     /// <summary>Send selected transcription to Timeline as a subtitle track.</summary>
     public IRelayCommand SendToTimelineCommand { get; }
 
-    /// <summary>POST dialogue create-timeline-clips for the selected transcript (requires <see cref="CreateTimelineClipsTrackId"/>).</summary>
+    /// <summary>POST dialogue create-timeline-clips for the selected transcript (optional <see cref="CreateTimelineClipsTrackId"/>; otherwise backend auto-creates Dialogue track).</summary>
     public IAsyncRelayCommand CreateTimelineClipsCommand { get; }
+
+    /// <summary>Export session timeline to WAV after clips exist (uses <see cref="ITimelineUseCase.ExportAsync"/>).</summary>
+    public IAsyncRelayCommand ExportTimelineCommand { get; }
 
     /// <summary>GAP-045 Option B: operator-triggered canonical transcript refresh for stale clip audio.</summary>
     public IAsyncRelayCommand RefreshTranscriptTruthCommand { get; }
@@ -1940,6 +1963,7 @@ namespace VoiceStudio.App.Views.Panels
       DeleteTranscriptionCommand.NotifyCanExecuteChanged();
       RefreshTranscriptTruthCommand.NotifyCanExecuteChanged();
       CreateTimelineClipsCommand.NotifyCanExecuteChanged();
+      ExportTimelineCommand.NotifyCanExecuteChanged();
     }
 
     private async Task LoadLanguagesAsync(CancellationToken cancellationToken)
@@ -2621,12 +2645,18 @@ namespace VoiceStudio.App.Views.Panels
 
       SendToTimelineCommand.NotifyCanExecuteChanged();
       CreateTimelineClipsCommand.NotifyCanExecuteChanged();
+      ExportTimelineCommand.NotifyCanExecuteChanged();
       TranscriptSegmentLayoutRevision++;
     }
 
     partial void OnCreateTimelineClipsTrackIdChanged(string value)
     {
       CreateTimelineClipsCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnLastCreatedTimelineClipIdsChanged(List<string> value)
+    {
+      ExportTimelineCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
@@ -2682,7 +2712,8 @@ namespace VoiceStudio.App.Views.Panels
     }
 
     /// <summary>
-    /// Creates one timeline clip per transcript segment via dialogue API (requires <see cref="CreateTimelineClipsTrackId"/>).
+    /// Creates one timeline clip per transcript segment via dialogue API.
+    /// When <see cref="CreateTimelineClipsTrackId"/> is set, that track is used; otherwise the backend creates or reuses a &quot;Dialogue&quot; track.
     /// </summary>
     private async Task CreateTimelineClipsFromTranscriptAsync(CancellationToken cancellationToken)
     {
@@ -2710,26 +2741,18 @@ namespace VoiceStudio.App.Views.Panels
         return;
       }
 
-      if (string.IsNullOrWhiteSpace(CreateTimelineClipsTrackId))
-      {
-        var msg = ResourceHelper.GetString(
-            "Transcribe.TrackIdRequiredForTimelineClips",
-            "Enter a timeline track id (create a track on the Timeline panel, then paste its id here).");
-        ErrorMessage = msg;
-        _toastNotificationService?.ShowWarning(
-            ResourceHelper.GetString("Transcribe.TimelineClipsTitle", "Timeline clips"),
-            msg);
-        return;
-      }
-
       try
       {
         IsLoading = true;
         ErrorMessage = null;
 
+        var explicitTrack = string.IsNullOrWhiteSpace(CreateTimelineClipsTrackId)
+            ? null
+            : CreateTimelineClipsTrackId.Trim();
         var req = new CreateTimelineClipsFromTranscriptRequest
         {
-          TrackId = CreateTimelineClipsTrackId.Trim(),
+          TrackId = explicitTrack,
+          AutoCreateTrack = explicitTrack == null,
           ProjectId = string.IsNullOrWhiteSpace(SelectedProjectId) ? null : SelectedProjectId,
           SessionId = null,
           ReplaceExisting = false,
@@ -2743,18 +2766,27 @@ namespace VoiceStudio.App.Views.Panels
             ? new List<string>(resp.CreatedClipIds)
             : new List<string>();
 
+        var resolvedTrackId = string.IsNullOrWhiteSpace(resp.TrackId) ? explicitTrack : resp.TrackId;
+        if (!string.IsNullOrWhiteSpace(resolvedTrackId))
+        {
+          CreateTimelineClipsTrackId = resolvedTrackId;
+        }
+
         var simNote = LastTranscriptionWasSimulated
             ? ResourceHelper.GetString("Transcribe.TimelineClipsSimulatedNote", " (simulated transcript)")
             : string.Empty;
+        var trackLabel = string.IsNullOrWhiteSpace(explicitTrack)
+            ? $"Dialogue track {resolvedTrackId ?? "(unknown)"} (auto)"
+            : $"track {resolvedTrackId}";
         TranscriptOperatorMessage =
-            $"Created {LastCreatedTimelineClipIds.Count} clip(s); segment_count={resp.SegmentCount}; status={resp.Status}{simNote}";
+            $"Created {LastCreatedTimelineClipIds.Count} clip(s) on {trackLabel}; segment_count={resp.SegmentCount}; status={resp.Status}{simNote}";
 
         _toastNotificationService?.ShowSuccess(
             TranscriptOperatorMessage,
             ResourceHelper.GetString("Transcribe.TimelineClipsTitle", "Timeline clips"));
 
         var eventAggregator = AppServices.TryGetEventAggregator();
-        if (eventAggregator != null)
+        if (eventAggregator != null && !string.IsNullOrWhiteSpace(resolvedTrackId))
         {
           eventAggregator.Publish(
               new NavigateToEvent(
@@ -2764,7 +2796,7 @@ namespace VoiceStudio.App.Views.Panels
                   {
                     { "action", "reloadAfterCreateTranscriptClips" },
                     { "transcriptionId", SelectedTranscription.Id },
-                    { "trackId", req.TrackId },
+                    { "trackId", resolvedTrackId },
                   }));
         }
       }
@@ -2773,6 +2805,81 @@ namespace VoiceStudio.App.Views.Panels
         ErrorMessage = $"Failed to create timeline clips: {ex.Message}";
         _toastNotificationService?.ShowError(
             ResourceHelper.GetString("Transcribe.TimelineClipsTitle", "Timeline clips"),
+            ex.Message);
+      }
+      finally
+      {
+        IsLoading = false;
+      }
+    }
+
+    private async Task ExportTimelineToWavAsync(CancellationToken cancellationToken)
+    {
+      if (_timelineUseCase == null)
+      {
+        var msg = ResourceHelper.GetString(
+            "Transcribe.TimelineExportUnavailable",
+            "Timeline export is not available.");
+        ErrorMessage = msg;
+        _toastNotificationService?.ShowWarning(
+            ResourceHelper.GetString("Transcribe.TimelineExportTitle", "Export timeline"),
+            msg);
+        return;
+      }
+
+      if (LastCreatedTimelineClipIds.Count == 0)
+      {
+        var msg = ResourceHelper.GetString(
+            "Transcribe.TimelineExportNeedsClips",
+            "Create timeline clips from the transcript before exporting.");
+        ErrorMessage = msg;
+        _toastNotificationService?.ShowWarning(
+            ResourceHelper.GetString("Transcribe.TimelineExportTitle", "Export timeline"),
+            msg);
+        return;
+      }
+
+      try
+      {
+        IsLoading = true;
+        ErrorMessage = null;
+
+        var fileName = $"export_{DateTime.UtcNow:yyyyMMdd_HHmmss}.wav";
+        var outputDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "VoiceStudio",
+            "exports");
+        Directory.CreateDirectory(outputDir);
+        var outputPath = Path.Combine(outputDir, fileName);
+
+        var exportedPath = await _timelineUseCase
+            .ExportAsync(
+                outputPath,
+                new ExportOptions
+                {
+                  Format = "wav",
+                  ProjectId = string.IsNullOrWhiteSpace(SelectedProjectId) ? null : SelectedProjectId,
+                },
+                cancellationToken)
+            .ConfigureAwait(true);
+
+        LastExportPath = exportedPath;
+        var fmt = ResourceHelper.GetString(
+            "Transcribe.TimelineExportSuccessDetail",
+            "Exported timeline to: {0}");
+        TranscriptOperatorMessage = string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            fmt,
+            exportedPath);
+        _toastNotificationService?.ShowSuccess(
+            TranscriptOperatorMessage,
+            ResourceHelper.GetString("Transcribe.TimelineExportTitle", "Export timeline"));
+      }
+      catch (Exception ex)
+      {
+        ErrorMessage = $"Export failed: {ex.Message}";
+        _toastNotificationService?.ShowError(
+            ResourceHelper.GetString("Transcribe.TimelineExportTitle", "Export timeline"),
             ex.Message);
       }
       finally

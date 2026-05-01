@@ -105,7 +105,8 @@ class RegenerateDialogueSegmentResponse(VoiceStudioBaseModel):
 
 
 class CreateTimelineClipsFromTranscriptBody(VoiceStudioBaseModel):
-    track_id: str = Field(min_length=1)
+    track_id: str | None = Field(default=None, max_length=200)
+    auto_create_track: bool = False
     session_id: str | None = Field(default=None, max_length=100)
     project_id: str | None = Field(default=None, max_length=100)
     replace_existing: bool = False
@@ -126,6 +127,14 @@ def _map_lookup(exc: LookupError) -> HTTPException:
         return HTTPException(status_code=404, detail="Transcription not found.")
     if key == "segment_not_found":
         return HTTPException(status_code=404, detail="Segment not found.")
+    if key == "track_id_required":
+        return HTTPException(
+            status_code=422,
+            detail={
+                "code": "track_id_required",
+                "message": "track_id is required unless auto_create_track is true.",
+            },
+        )
     if key == "track_not_found":
         return HTTPException(status_code=404, detail="Timeline track not found.")
     if key == "clip_not_found_on_timeline":
@@ -283,10 +292,11 @@ async def post_create_timeline_clips_from_transcript(
     try:
         row = await create_timeline_clips_from_transcript(
             transcript_id=transcript_id,
-            track_id=body.track_id,
+            track_id=(body.track_id or "").strip() or None,
             session_id=session,
             project_id=body.project_id,
             replace_existing=body.replace_existing,
+            auto_create_track=body.auto_create_track,
         )
         return CreateTimelineClipsFromTranscriptResponse.model_validate(row)
     except LookupError as e:

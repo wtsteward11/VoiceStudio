@@ -674,10 +674,11 @@ def _resolve_clip_source_path(seg: dict[str, Any]) -> str | None:
 async def create_timeline_clips_from_transcript(
     *,
     transcript_id: str,
-    track_id: str,
+    track_id: str | None,
     session_id: str,
     project_id: str | None,
     replace_existing: bool,
+    auto_create_track: bool = False,
 ) -> dict[str, Any]:
     """Create one timeline clip per transcript segment (placeholder if no audio).
 
@@ -692,9 +693,30 @@ async def create_timeline_clips_from_transcript(
 
     timeline, undo, redo, base_rev = await timeline_routes._hydrate(session_id)
     timeline_routes._push_undo_before_mutate(timeline, undo, redo)
-    track = next((tr for tr in timeline.tracks if tr.id == track_id), None)
-    if track is None:
-        raise LookupError("track_not_found")
+
+    resolved_track_id = (track_id or "").strip() or None
+    track: timeline_routes.Track | None = None
+    if resolved_track_id:
+        track = next((tr for tr in timeline.tracks if tr.id == resolved_track_id), None)
+        if track is None:
+            raise LookupError("track_not_found")
+    elif auto_create_track:
+        dialogue_name = "Dialogue"
+        track = next(
+            (tr for tr in timeline.tracks if (tr.name or "").strip() == dialogue_name),
+            None,
+        )
+        if track is None:
+            new_track = timeline_routes.Track(
+                name=dialogue_name,
+                type="audio",
+                order=len(timeline.tracks),
+            )
+            timeline.tracks.append(new_track)
+            track = new_track
+        resolved_track_id = track.id
+    else:
+        raise LookupError("track_id_required")
 
     segments = [dict(s) if isinstance(s, dict) else s for s in (t.get("segments") or [])]
     created: list[str] = []
@@ -738,7 +760,7 @@ async def create_timeline_clips_from_transcript(
             meta["note"] = "no_registry_audio_for_segment"
 
         clip = timeline_routes.Clip(
-            track_id=track_id,
+            track_id=resolved_track_id,
             source_path=path,
             start_time=st,
             end_time=st + dur,
@@ -756,7 +778,7 @@ async def create_timeline_clips_from_transcript(
     return {
         "transcript_id": transcript_id,
         "session_id": session_id,
-        "track_id": track_id,
+        "track_id": resolved_track_id,
         "created_clip_ids": created,
         "segment_count": len(created),
         "status": "ok",

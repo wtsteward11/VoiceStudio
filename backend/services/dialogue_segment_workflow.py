@@ -27,10 +27,38 @@ from backend.data.repositories.library_repository import (
     get_library_asset_repository,
 )
 from backend.data.repositories.transcription_repository import get_transcription_repository
+from backend.services import timeline_state as _timeline_state
 from backend.services.audio_artifacts import AudioRegistry
 from backend.services.synthesis_service import SynthesisService
 
 logger = logging.getLogger(__name__)
+
+
+async def _persist_timeline_with_http_conflict(
+    timeline: Any,
+    undo: list[Any],
+    redo: list[Any],
+    session_id: str,
+    base_rev: int,
+) -> None:
+    """Persist session timeline; map optimistic-lock failure to HTTP 409 (API parity)."""
+    from backend.project.timeline.session_repository import TimelineConflictError
+
+    try:
+        await _timeline_state.persist_timeline(timeline, undo, redo, session_id, base_rev)
+    except TimelineConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "TIMELINE_CONFLICT",
+                "message": (
+                    "Timeline was modified by another request. Reload current state and retry."
+                ),
+                "session_id": exc.session_id,
+                "expected_revision": exc.expected_revision,
+                "actual_revision": exc.actual_revision,
+            },
+        ) from exc
 
 
 def _find_segment_index(segments: list[Any], segment_id: str) -> int | None:
@@ -181,10 +209,8 @@ async def edit_dialogue_segment(
 
 
 async def _delete_timeline_clip(clip_id: str, session_id: str) -> None:
-    from backend.api.routes import timeline as timeline_routes
-
-    timeline, undo, redo, base_rev = await timeline_routes._hydrate(session_id)
-    timeline_routes._push_undo_before_mutate(timeline, undo, redo)
+    timeline, undo, redo, base_rev = await _timeline_state._hydrate(session_id)
+    _timeline_state._push_undo_before_mutate(timeline, undo, redo)
     removed = False
     for track in timeline.tracks:
         before = len(track.clips)
@@ -193,8 +219,8 @@ async def _delete_timeline_clip(clip_id: str, session_id: str) -> None:
             removed = True
             break
     if removed:
-        timeline_routes._update_timeline_duration(timeline)
-        await timeline_routes._persist(timeline, undo, redo, session_id, base_rev)
+        _timeline_state._update_timeline_duration(timeline)
+        await _persist_timeline_with_http_conflict(timeline, undo, redo, session_id, base_rev)
 
 
 def _find_track_id_for_clip_on_timeline(timeline: Any, clip_id: str) -> str | None:
@@ -207,9 +233,7 @@ def _find_track_id_for_clip_on_timeline(timeline: Any, clip_id: str) -> str | No
 
 
 async def _derive_track_id_for_clip(session_id: str, clip_id: str) -> str | None:
-    from backend.api.routes import timeline as timeline_routes
-
-    timeline, _, _, _ = await timeline_routes._hydrate(session_id)
+    timeline, _, _, _ = await _timeline_state._hydrate(session_id)
     return _find_track_id_for_clip_on_timeline(timeline, clip_id)
 
 
@@ -225,10 +249,8 @@ async def _replace_timeline_clip_atomic(
     metadata: dict[str, Any],
 ) -> str:
     """Remove old clip and append replacement in one hydrate + single persist."""
-    from backend.api.routes import timeline as timeline_routes
-
-    timeline, undo, redo, base_rev = await timeline_routes._hydrate(session_id)
-    timeline_routes._push_undo_before_mutate(timeline, undo, redo)
+    timeline, undo, redo, base_rev = await _timeline_state._hydrate(session_id)
+    _timeline_state._push_undo_before_mutate(timeline, undo, redo)
     old_tid = _find_track_id_for_clip_on_timeline(timeline, old_clip_id)
     if old_tid is None:
         raise LookupError("clip_not_found_on_timeline")
@@ -238,7 +260,7 @@ async def _replace_timeline_clip_atomic(
     if old_track is None:
         raise LookupError("track_not_found")
     old_track.clips = [c for c in old_track.clips if c.id != old_clip_id]
-    clip = timeline_routes.Clip(
+    clip = _timeline_state.Clip(
         track_id=resolved_track_id,
         source_path=source_path,
         start_time=start_time,
@@ -247,8 +269,8 @@ async def _replace_timeline_clip_atomic(
         metadata=metadata,
     )
     old_track.clips.append(clip)
-    timeline_routes._update_timeline_duration(timeline)
-    await timeline_routes._persist(timeline, undo, redo, session_id, base_rev)
+    _timeline_state._update_timeline_duration(timeline)
+    await _persist_timeline_with_http_conflict(timeline, undo, redo, session_id, base_rev)
     return clip.id
 
 
@@ -262,14 +284,12 @@ async def _insert_timeline_clip(
     metadata: dict[str, Any],
     session_id: str,
 ) -> str:
-    from backend.api.routes import timeline as timeline_routes
-
-    timeline, undo, redo, base_rev = await timeline_routes._hydrate(session_id)
-    timeline_routes._push_undo_before_mutate(timeline, undo, redo)
+    timeline, undo, redo, base_rev = await _timeline_state._hydrate(session_id)
+    _timeline_state._push_undo_before_mutate(timeline, undo, redo)
     track = next((t for t in timeline.tracks if t.id == track_id), None)
     if track is None:
         raise LookupError("track_not_found")
-    clip = timeline_routes.Clip(
+    clip = _timeline_state.Clip(
         track_id=track_id,
         source_path=source_path,
         start_time=start_time,
@@ -278,8 +298,8 @@ async def _insert_timeline_clip(
         metadata=metadata,
     )
     track.clips.append(clip)
-    timeline_routes._update_timeline_duration(timeline)
-    await timeline_routes._persist(timeline, undo, redo, session_id, base_rev)
+    _timeline_state._update_timeline_duration(timeline)
+    await _persist_timeline_with_http_conflict(timeline, undo, redo, session_id, base_rev)
     return clip.id
 
 
@@ -689,18 +709,16 @@ async def create_timeline_clips_from_transcript(
 
     Single hydrate + persist so timeline state stays consistent on conflict.
     """
-    from backend.api.routes import timeline as timeline_routes
-
     repo = get_transcription_repository()
     t = await repo.get_transcription(transcript_id)
     if not t:
         raise LookupError("transcription_not_found")
 
-    timeline, undo, redo, base_rev = await timeline_routes._hydrate(session_id)
-    timeline_routes._push_undo_before_mutate(timeline, undo, redo)
+    timeline, undo, redo, base_rev = await _timeline_state._hydrate(session_id)
+    _timeline_state._push_undo_before_mutate(timeline, undo, redo)
 
     resolved_track_id = (track_id or "").strip() or None
-    track: timeline_routes.Track | None = None
+    track: _timeline_state.Track | None = None
     if resolved_track_id:
         track = next((tr for tr in timeline.tracks if tr.id == resolved_track_id), None)
         if track is None:
@@ -712,7 +730,7 @@ async def create_timeline_clips_from_transcript(
             None,
         )
         if track is None:
-            new_track = timeline_routes.Track(
+            new_track = _timeline_state.Track(
                 name=dialogue_name,
                 type="audio",
                 order=len(timeline.tracks),
@@ -764,7 +782,7 @@ async def create_timeline_clips_from_transcript(
         if not playable:
             meta["note"] = "no_registry_audio_for_segment"
 
-        clip = timeline_routes.Clip(
+        clip = _timeline_state.Clip(
             track_id=resolved_track_id,
             source_path=path,
             start_time=st,
@@ -777,8 +795,8 @@ async def create_timeline_clips_from_transcript(
         seg["timeline_clip_id"] = clip.id
         segments[i] = seg
 
-    timeline_routes._update_timeline_duration(timeline)
-    await timeline_routes._persist(timeline, undo, redo, session_id, base_rev)
+    _timeline_state._update_timeline_duration(timeline)
+    await _persist_timeline_with_http_conflict(timeline, undo, redo, session_id, base_rev)
     await repo.update_transcription(transcript_id, segments=segments)
     return {
         "transcript_id": transcript_id,

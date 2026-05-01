@@ -946,8 +946,8 @@ class TestDialogueRegenerateFailures:
         tid, fake_repo = _seed_transcription()
         wav = tmp_path / "ti.wav"
         _write_non_silent_wav16_mono(wav, seconds=0.15)
-        from backend.api.routes import timeline as timeline_routes
         from backend.services import dialogue_segment_workflow as dsw
+        from backend.services import timeline_state as tls_mod
 
         with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
             sid = dialogue_client.post(
@@ -967,7 +967,7 @@ class TestDialogueRegenerateFailures:
             raise HTTPException(status_code=409, detail={"code": "TIMELINE_CONFLICT"})
 
         p1, p2, p3 = _patches(fake_repo, lib_repo, wav)
-        with p1, p2, p3, patch.object(timeline_routes, "_persist", new=flaky_persist):
+        with p1, p2, p3, patch.object(tls_mod, "persist_timeline", new=flaky_persist):
             r = dialogue_client.post(
                 f"/api/dialogue/segments/{sid}/regenerate",
                 json={"transcript_id": tid, "profile_id": "p1", "track_id": track_id},
@@ -1167,8 +1167,8 @@ class TestDialogueV12AtomicAndTrackResolution:
         tid, fake_repo = _seed_transcription()
         wav = tmp_path / "v12e.wav"
         _write_non_silent_wav16_mono(wav)
-        from backend.api.routes import timeline as timeline_routes
         from backend.services import dialogue_segment_workflow as dsw
+        from backend.services import timeline_state as tls_mod
 
         with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
             sid = dialogue_client.post(
@@ -1199,14 +1199,14 @@ class TestDialogueV12AtomicAndTrackResolution:
 
         calls: list[int] = []
 
-        orig_persist = timeline_routes._persist
+        orig_persist = tls_mod.persist_timeline
 
         async def counting_persist(*args, **kwargs):
             calls.append(1)
             return await orig_persist(*args, **kwargs)
 
         p1, p2, p3 = _patches(fake_repo, lib_repo, wav)
-        with p1, p2, p3, patch.object(timeline_routes, "_persist", new=counting_persist):
+        with p1, p2, p3, patch.object(tls_mod, "persist_timeline", new=counting_persist):
             dialogue_client.post(
                 f"/api/dialogue/segments/{sid}/regenerate",
                 json={
@@ -1223,8 +1223,8 @@ class TestDialogueV12AtomicAndTrackResolution:
         tid, fake_repo = _seed_transcription()
         wav = tmp_path / "v12f.wav"
         _write_non_silent_wav16_mono(wav)
-        from backend.api.routes import timeline as timeline_routes
         from backend.services import dialogue_segment_workflow as dsw
+        from backend.services import timeline_state as tls_mod
 
         with patch.object(dsw, "get_transcription_repository", return_value=fake_repo):
             sid = dialogue_client.post(
@@ -1257,7 +1257,7 @@ class TestDialogueV12AtomicAndTrackResolution:
             raise HTTPException(status_code=409, detail={"code": "TIMELINE_CONFLICT"})
 
         p1, p2, p3 = _patches(fake_repo, lib_repo, wav)
-        with p1, p2, p3, patch.object(timeline_routes, "_persist", new=flaky_persist):
+        with p1, p2, p3, patch.object(tls_mod, "persist_timeline", new=flaky_persist):
             r = dialogue_client.post(
                 f"/api/dialogue/segments/{sid}/regenerate",
                 json={

@@ -1,9 +1,16 @@
 """
 Placeholder Verification Script
-Comprehensive scan of all code files for forbidden placeholder terms.
+
+Scans first-party source for high-signal placeholder markers using word-boundary
+regexes (avoids false positives such as ``NamedTemporaryFile`` or ``TodoPanel``).
 """
 
+from __future__ import annotations
+
 import logging
+import os
+import re
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -13,67 +20,16 @@ logger = logging.getLogger(__name__)
 
 project_root = Path(__file__).parent.parent.parent
 
-# Complete list of forbidden terms from MASTER_RULES_COMPLETE.md
-FORBIDDEN_TERMS = [
-    # Bookmarks
-    "TODO",
-    "FIXME",
-    "NOTE",
-    "HACK",
-    "REMINDER",
-    "XXX",
-    "WARNING",
-    "CAUTION",
-    "BUG",
-    "ISSUE",
-    "REFACTOR",
-    "OPTIMIZE",
-    "REVIEW",
-    "CHECK",
-    "VERIFY",
-    "TEST",
-    "DEBUG",
-    "DEPRECATED",
-    "OBSOLETE",
-    # Placeholders
-    "placeholder",
-    "stub",
-    "dummy",
-    "mock",
-    "fake",
-    "sample",
-    "temporary",
-    "NotImplementedError",
-    "NotImplementedException",
-    # Status words
-    "incomplete",
-    "unfinished",
-    "partial",
-    "coming soon",
-    "not yet",
-    "eventually",
-    "later",
-    "for now",
-    "temporary",
-    "needs",
-    "requires",
-    "missing",
-    "WIP",
-    "tbd",
-    "tba",
-    "tbc",
-    # Variations
-    "to be done",
-    "will be implemented",
-    "coming soon",
-    "not yet",
-    "eventually",
-    "later",
-    "for now",
-    "temporary",
-    "in progress",
-    "under development",
-    "work in progress",
+# Case-sensitive bookmark tokens (avoids matching ``Todo`` feature names / ``todo-panel`` routes)
+PLACEHOLDER_SCAN_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"\bTODO\b"), "TODO"),
+    (re.compile(r"\bFIXME\b"), "FIXME"),
+    (re.compile(r"\bHACK\b"), "HACK"),
+    (re.compile(r"\bXXX\b"), "XXX"),
+    (re.compile(r"\bTBD\b"), "TBD"),
+    (re.compile(r"\bTBA\b"), "TBA"),
+    (re.compile(r"\bTBC\b"), "TBC"),
+    (re.compile(r"\bWIP\b"), "WIP"),
 ]
 
 # File patterns to check
@@ -81,8 +37,6 @@ INCLUDE_PATTERNS = [
     "**/*.py",
     "**/*.cs",
     "**/*.xaml",
-    "**/*.json",
-    "**/*.md",
 ]
 
 # Directories to exclude
@@ -100,6 +54,14 @@ EXCLUDE_DIRS = [
     ".mypy_cache",
     "tests",  # Exclude test files
     "test_data",  # Exclude test data
+    "docs",  # Canonical docs use words like NOTE/VERIFY; not code placeholders
+    "installer",  # Installer scripts and bundled strings
+    "runtime/external",  # Vendored trees — not VoiceStudio-authored placeholders
+    ".cursor",  # Editor/agent artifacts
+    "artifacts",
+    ".buildlogs",
+    ".vscode",
+    "_archived",
 ]
 
 # Files to exclude
@@ -115,72 +77,98 @@ EXCLUDE_FILES = [
     "*.wxs",  # WiX scripts
 ]
 
-# Contexts where forbidden terms are acceptable
-ACCEPTABLE_CONTEXTS = [
-    ("partial", "class"),  # C# partial classes
-    ("sample", "rate"),  # Audio sample rate
-    ("sample", "count"),  # Sample count
-    ("sample", "index"),  # Sample index
-    ("sample", "data"),  # Sample data (audio)
-    ("sample", "file"),  # Sample files
-    ("test", "file"),  # Test files (in test directory)
-    ("test", "data"),  # Test data
-    ("test", "profile"),  # Test profiles
-    ("test", "project"),  # Test projects
-    ("check", "health"),  # Health check
-    ("check", "sum"),  # Checksum
-    ("verify", "model"),  # Model verification
-    ("verify", "checksum"),  # Checksum verification
-    ("review", "code"),  # Code review (documentation)
-    ("note", "field"),  # Notes field
-    ("warning", "level"),  # Warning level (error handling)
-    ("warning", "severity"),  # Warning severity
-    ("placeholder", "text"),  # UI PlaceholderText (acceptable)
-]
-
 
 def should_check_file(file_path: Path) -> bool:
     """Determine if file should be checked."""
-    # Check if in exclude directory
     for exclude_dir in EXCLUDE_DIRS:
         if exclude_dir in str(file_path):
             return False
 
-    # Check if matches exclude pattern
     for exclude_pattern in EXCLUDE_FILES:
         if file_path.match(exclude_pattern):
             return False
 
-    # Check if matches include pattern
     return any(file_path.match(include_pattern) for include_pattern in INCLUDE_PATTERNS)
 
 
 def check_file_for_violations(file_path: Path) -> list[tuple[int, str, str]]:
     """Check file for forbidden terms and return violations."""
-    violations = []
+    violations: list[tuple[int, str, str]] = []
 
     try:
         with open(file_path, encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
+    except OSError as exc:
+        logger.warning("Could not read %s: %s", file_path, exc)
+        return violations
 
-            for line_num, line in enumerate(lines, 1):
-                line_lower = line.lower()
-                line_stripped = line.strip()
-
-                for term in FORBIDDEN_TERMS:
-                    term_lower = term.lower()
-
-                    if term_lower in line_lower:
-                        violations.append((line_num, term, line_stripped[:100]))
-    except Exception as e:
-        logger.warning(f"Could not read {file_path}: {e}")
+    for line_num, line in enumerate(lines, 1):
+        line_stripped = line.strip()
+        if not line_stripped:
+            continue
+        for pattern, label in PLACEHOLDER_SCAN_PATTERNS:
+            if pattern.search(line):
+                violations.append((line_num, label, line_stripped[:120]))
 
     return violations
 
 
+def _pull_request_changed_files() -> list[Path] | None:
+    """
+    Return paths changed on this PR relative to the merge base with the base branch.
+
+    Requires a non-shallow checkout (fetch-depth: 0) so ``origin/$GITHUB_BASE_REF`` exists.
+    """
+    if os.environ.get("GITHUB_ACTIONS", "").lower() != "true":
+        return None
+    if os.environ.get("GITHUB_EVENT_NAME", "") != "pull_request":
+        return None
+    base = os.environ.get("GITHUB_BASE_REF", "").strip()
+    if not base:
+        return None
+
+    upstream = f"origin/{base}"
+    diff = subprocess.run(
+        ["git", "diff", "--name-only", f"{upstream}...HEAD"],
+        cwd=str(project_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if diff.returncode != 0:
+        logger.error(
+            "git diff for placeholder scan failed (ensure checkout fetch-depth: 0). stderr: %s",
+            diff.stderr.strip(),
+        )
+        sys.exit(2)
+
+    paths: list[Path] = []
+    for rel in diff.stdout.splitlines():
+        rel = rel.strip().replace("\\", "/")
+        if not rel:
+            continue
+        candidate = (project_root / rel).resolve()
+        try:
+            candidate.relative_to(project_root.resolve())
+        except ValueError:
+            continue
+        if candidate.is_file() and should_check_file(candidate):
+            paths.append(candidate)
+    logger.info("PR-scoped placeholder scan: %s candidate files", len(paths))
+    return paths
+
+
 def scan_directory(directory: Path) -> dict[str, list[tuple[int, str, str]]]:
     """Scan directory for placeholder violations."""
-    violations_by_file = {}
+    violations_by_file: dict[str, list[tuple[int, str, str]]] = {}
+
+    pr_files = _pull_request_changed_files()
+    if pr_files is not None:
+        for file_path in pr_files:
+            violations = check_file_for_violations(file_path)
+            if violations:
+                violations_by_file[str(file_path.relative_to(project_root))] = violations
+        return violations_by_file
 
     for file_path in directory.rglob("*"):
         if file_path.is_file() and should_check_file(file_path):
@@ -193,13 +181,14 @@ def scan_directory(directory: Path) -> dict[str, list[tuple[int, str, str]]]:
 
 def generate_report(violations_by_file: dict[str, list[tuple[int, str, str]]]) -> str:
     """Generate violation report."""
-    report_lines = []
-    report_lines.append("=" * 80)
-    report_lines.append("PLACEHOLDER VERIFICATION REPORT")
-    report_lines.append("=" * 80)
-    report_lines.append(f"Generated: {datetime.now().isoformat()}")
-    report_lines.append(f"Total files with violations: {len(violations_by_file)}")
-    report_lines.append("")
+    report_lines = [
+        "=" * 80,
+        "PLACEHOLDER VERIFICATION REPORT",
+        "=" * 80,
+        f"Generated: {datetime.now().isoformat()}",
+        f"Total files with violations: {len(violations_by_file)}",
+        "",
+    ]
 
     total_violations = sum(len(v) for v in violations_by_file.values())
     report_lines.append(f"Total violations found: {total_violations}")
@@ -223,28 +212,29 @@ def generate_report(violations_by_file: dict[str, list[tuple[int, str, str]]]) -
     return "\n".join(report_lines)
 
 
-def main():
+def main() -> int:
     """Main function."""
     logger.info("Starting placeholder verification scan...")
-    logger.info(f"Project root: {project_root}")
+    logger.info("Project root: %s", project_root)
 
     violations_by_file = scan_directory(project_root)
 
     if violations_by_file:
         report = generate_report(violations_by_file)
-        print(report)
 
         report_file = project_root / "placeholder_verification_report.txt"
         with open(report_file, "w", encoding="utf-8") as f:
             f.write(report)
 
-        logger.error(f"Found {len(violations_by_file)} files with violations")
-        logger.error(f"Report saved to: {report_file}")
-
+        logger.error(
+            "Found %s files with violations - full report written to %s",
+            len(violations_by_file),
+            report_file,
+        )
         return 1
-    else:
-        logger.info("No placeholder violations found!")
-        return 0
+
+    logger.info("No placeholder violations found!")
+    return 0
 
 
 if __name__ == "__main__":

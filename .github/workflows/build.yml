@@ -667,6 +667,8 @@ jobs:
 
       - name: Run Python contract tests
         run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
           python -m pip install pytest pytest-randomly --quiet
           python -m pytest tests/contract/test_openapi_contract.py -v --tb=short
         # GAP-CI-001: Contract tests should fail CI if they fail

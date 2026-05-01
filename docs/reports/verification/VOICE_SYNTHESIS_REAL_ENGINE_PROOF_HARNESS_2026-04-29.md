@@ -86,7 +86,7 @@ python scripts/run_verification.py
 ## Opt-in integration
 
 - Marker: `real_voice_synthesis_proof` (registered in `pytest.ini`; excluded from default `addopts`).
-- Env: `VOICESTUDIO_RUN_REAL_ENGINE_PROOF=1` to run `tests/integration/test_voice_synthesis_real_engine_proof_harness.py`.
+- Env: `VOICESTUDIO_RUN_REAL_ENGINE_PROOF=1` to run `tests/integration/test_voice_synthesis_real_engine_proof_harness_integration.py`.
 - Base URL: `VOICESTUDIO_REAL_ENGINE_PROOF_BASE` (optional; default `http://127.0.0.1:8000`).
 
 ---
@@ -98,7 +98,7 @@ python scripts/run_verification.py
 - `scripts/proof/run_voice_synthesis_real_engine_proof.py`
 - `scripts/proof/__init__.py`
 - `tests/unit/scripts/proof/test_voice_synthesis_real_engine_proof_harness.py`
-- `tests/integration/test_voice_synthesis_real_engine_proof_harness.py`
+- `tests/integration/test_voice_synthesis_real_engine_proof_harness_integration.py`
 - `scripts/run_verification.py`
 - `pytest.ini`
 - `docs/developer/VOICE_SYNTHESIS_PROOF_REPORTING_STANDARD.md`

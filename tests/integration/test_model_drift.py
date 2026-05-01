@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.ml.models.model_drift_detector import (
+from backend.services.model_drift_detector import (
     ModelDriftDetector,
     _compute_psi,
     _values_to_bins,

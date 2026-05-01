@@ -35,6 +35,7 @@ def test_live_harness_smoke_when_opt_in(tmp_path: Path) -> None:
         text=True,
         timeout=300,
     )
-    assert proc.returncode in (0, 1), (
-        f"harness unexpected exit {proc.returncode}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
-    )
+    assert proc.returncode in (
+        0,
+        1,
+    ), f"harness unexpected exit {proc.returncode}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"

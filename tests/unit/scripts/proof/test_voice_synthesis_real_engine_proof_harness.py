@@ -1,4 +1,5 @@
 """Unit tests for scripts/proof/run_voice_synthesis_real_engine_proof.py."""
+
 from __future__ import annotations
 
 import json
@@ -113,18 +114,21 @@ def test_stub_env_writes_valid_markdown(tmp_path: Path, monkeypatch: pytest.Monk
 
     monkeypatch.setattr(mod, "_stub_test_mode", lambda: True)
     result = ProofResult("STUB_ENGINE", [], {})
-    md = mod.render_markdown_report(result, ProofOptions(
-        base_url="http://x",
-        engine=None,
-        profile_id=None,
-        session_id="default",
-        output_dir=tmp_path,
-        json_output=None,
-        markdown_output=out,
-        require_real=False,
-        dry_run_fixtures=False,
-        timeout_seconds=1.0,
-    ))
+    md = mod.render_markdown_report(
+        result,
+        ProofOptions(
+            base_url="http://x",
+            engine=None,
+            profile_id=None,
+            session_id="default",
+            output_dir=tmp_path,
+            json_output=None,
+            markdown_output=out,
+            require_real=False,
+            dry_run_fixtures=False,
+            timeout_seconds=1.0,
+        ),
+    )
     out.write_text(md, encoding="utf-8")
     assert validate_report(out) == []
 
@@ -134,11 +138,13 @@ def test_require_real_stub_exit_code(tmp_path: Path, monkeypatch: pytest.MonkeyP
     from scripts.proof import run_voice_synthesis_real_engine_proof as mod
 
     with patch.object(mod, "_stub_test_mode", return_value=True):
-        rc = mod.main([
-            "--output-dir",
-            str(tmp_path),
-            "--require-real",
-        ])
+        rc = mod.main(
+            [
+                "--output-dir",
+                str(tmp_path),
+                "--require-real",
+            ]
+        )
     assert rc == 1
 
 
@@ -150,10 +156,12 @@ def test_health_failure_unknown(proof_opts: ProofOptions) -> None:
 
 
 def test_readiness_503_unknown(proof_opts: ProofOptions) -> None:
-    http = FakeHttp({
-        "/api/health/": (200, b"{}"),
-        "/api/health/readiness": (503, b'{"detail":"no"}'),
-    })
+    http = FakeHttp(
+        {
+            "/api/health/": (200, b"{}"),
+            "/api/health/readiness": (503, b'{"detail":"no"}'),
+        }
+    )
     r = run_real_engine_flow(http, proof_opts)
     assert r.classification == "UNKNOWN"
     assert any("readiness" in b.lower() for b in r.blockers)
@@ -172,11 +180,13 @@ def test_no_profile_unknown(tmp_path: Path) -> None:
         dry_run_fixtures=False,
         timeout_seconds=5.0,
     )
-    http = FakeHttp({
-        "/api/health/": (200, b"{}"),
-        "/api/health/readiness": (200, json.dumps({"ready": True}).encode()),
-        "/api/profiles": (200, json.dumps({"items": []}).encode()),
-    })
+    http = FakeHttp(
+        {
+            "/api/health/": (200, b"{}"),
+            "/api/health/readiness": (200, json.dumps({"ready": True}).encode()),
+            "/api/profiles": (200, json.dumps({"items": []}).encode()),
+        }
+    )
     r = run_real_engine_flow(http, opts)
     assert r.classification == "UNKNOWN"
     assert any("profile" in b.lower() for b in r.blockers)
@@ -189,12 +199,17 @@ def test_stub_routed_engine_unknown(proof_opts: ProofOptions) -> None:
         "duration": 1.0,
         "quality_score": 0.9,
     }
-    http = FakeHttp({
-        "/api/health/": (200, b"{}"),
-        "/api/health/readiness": (200, json.dumps({"ready": True}).encode()),
-        "/api/profiles": (200, json.dumps({"items": [{"id": "p1", "reference_audio_bound": True}]}).encode()),
-        "/api/voice/synthesize": (200, json.dumps(syn).encode()),
-    })
+    http = FakeHttp(
+        {
+            "/api/health/": (200, b"{}"),
+            "/api/health/readiness": (200, json.dumps({"ready": True}).encode()),
+            "/api/profiles": (
+                200,
+                json.dumps({"items": [{"id": "p1", "reference_audio_bound": True}]}).encode(),
+            ),
+            "/api/voice/synthesize": (200, json.dumps(syn).encode()),
+        }
+    )
     r = run_real_engine_flow(http, proof_opts)
     assert r.classification == "UNKNOWN"
     assert any("routed_engine" in b.lower() for b in r.blockers)
@@ -217,18 +232,26 @@ def _good_chain(
     clip = {"id": "clip1"}
     state0 = {"revision": 0, "tracks": []}
     state1 = {"revision": 2, "tracks": [{"id": "trk1", "clips": [{"id": "clip1"}]}]}
-    return FakeHttp({
-        "/api/health/": (200, b"{}"),
-        "/api/health/readiness": (200, json.dumps({"ready": True}).encode()),
-        "/api/profiles": (200, json.dumps({"items": [{"id": "p1", "reference_audio_bound": True}]}).encode()),
-        "/api/voice/synthesize": (200, json.dumps(syn).encode()),
-        "/api/voice/audio/aid1": (200, audio_body),
-        "/api/library/assets/upload": (upload_status, json.dumps(asset).encode()),
-        "/api/timeline/state": (200, json.dumps(state1).encode()),
-        "/api/timeline/create": (200, json.dumps(state0).encode()),
-        "/api/timeline/tracks": (200, json.dumps(track).encode()),
-        "/api/timeline/clips": (clip_status, json.dumps(clip).encode() if clip_status == 200 else b'{"detail":"bad"}'),
-    })
+    return FakeHttp(
+        {
+            "/api/health/": (200, b"{}"),
+            "/api/health/readiness": (200, json.dumps({"ready": True}).encode()),
+            "/api/profiles": (
+                200,
+                json.dumps({"items": [{"id": "p1", "reference_audio_bound": True}]}).encode(),
+            ),
+            "/api/voice/synthesize": (200, json.dumps(syn).encode()),
+            "/api/voice/audio/aid1": (200, audio_body),
+            "/api/library/assets/upload": (upload_status, json.dumps(asset).encode()),
+            "/api/timeline/state": (200, json.dumps(state1).encode()),
+            "/api/timeline/create": (200, json.dumps(state0).encode()),
+            "/api/timeline/tracks": (200, json.dumps(track).encode()),
+            "/api/timeline/clips": (
+                clip_status,
+                json.dumps(clip).encode() if clip_status == 200 else b'{"detail":"bad"}',
+            ),
+        }
+    )
 
 
 def _non_silent_wav(sample_count: int = 1200) -> bytes:
@@ -270,7 +293,10 @@ def test_real_engine_happy_path_non_silent_wav(proof_opts: ProofOptions) -> None
             if "/api/health/" in url:
                 return (200, b"{}")
             if "/api/profiles" in url:
-                return (200, json.dumps({"items": [{"id": "p1", "reference_audio_bound": True}]}).encode())
+                return (
+                    200,
+                    json.dumps({"items": [{"id": "p1", "reference_audio_bound": True}]}).encode(),
+                )
             if "/api/voice/audio/aid1" in url:
                 return (200, _non_silent_wav())
             if "/api/timeline/state" in url:
@@ -324,7 +350,9 @@ def test_product_closure_flow_records_project_generated_audio_and_export(
                     "/api/health/readiness": (200, json.dumps({"ready": True}).encode()),
                     "/api/profiles": (
                         200,
-                        json.dumps({"items": [{"id": "p1", "reference_audio_bound": True}]}).encode(),
+                        json.dumps(
+                            {"items": [{"id": "p1", "reference_audio_bound": True}]}
+                        ).encode(),
                     ),
                     "/api/voice/synthesize": (
                         200,
@@ -341,7 +369,9 @@ def test_product_closure_flow_records_project_generated_audio_and_export(
                     "/api/voice/audio/aid1": (200, _non_silent_wav()),
                     "/api/library/assets/upload": (
                         201,
-                        json.dumps({"id": "lib1", "audio_id": "aid1", "path": "/tmp/harness.wav"}).encode(),
+                        json.dumps(
+                            {"id": "lib1", "audio_id": "aid1", "path": "/tmp/harness.wav"}
+                        ).encode(),
                     ),
                     "/api/library/assets/lib1": (200, json.dumps({"id": "lib1"}).encode()),
                     "/api/timeline/state": (
@@ -534,4 +564,7 @@ def test_route_builder_session_id_is_encoded() -> None:
 
 
 def test_full_url_trailing_slash_does_not_double_slash() -> None:
-    assert ProofApiRoutes.full_url("http://127.0.0.1:8000/", "/api/health/") == "http://127.0.0.1:8000/api/health/"
+    assert (
+        ProofApiRoutes.full_url("http://127.0.0.1:8000/", "/api/health/")
+        == "http://127.0.0.1:8000/api/health/"
+    )

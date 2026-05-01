@@ -1038,8 +1038,10 @@ async def export_timeline(request: ExportRequest, session_id: SessionIdQuery = D
         import os
 
         from backend.services.audio_artifacts import AudioRegistry
+        from backend.services.audio_path_resolver import resolve_audio_path
 
-        fb_path = AudioRegistry.get_path(request.fallback_project_audio_id.strip())
+        fid = request.fallback_project_audio_id.strip()
+        fb_path = AudioRegistry.get_path(fid) or resolve_audio_path(fid)
         if fb_path and os.path.exists(fb_path):
             fb_audio = await _load_audio_file(fb_path, sample_rate)
             if fb_audio is not None:

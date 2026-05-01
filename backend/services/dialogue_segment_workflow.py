@@ -660,7 +660,9 @@ async def regenerate_dialogue_segment(
 
 
 def _resolve_clip_source_path(seg: dict[str, Any]) -> str | None:
-    """Pick first registry-backed path from segment audio ids."""
+    """Pick first playable path from segment audio ids (registry, then canonical resolver)."""
+    from backend.services.audio_path_resolver import resolve_audio_path
+
     for key in ("audio_id", "generated_audio_id", "source_audio_id"):
         aid = str(seg.get(key) or "").strip()
         if not aid:
@@ -668,6 +670,9 @@ def _resolve_clip_source_path(seg: dict[str, Any]) -> str | None:
         p = AudioRegistry.get_path(aid)
         if p:
             return p
+        resolved = resolve_audio_path(aid)
+        if resolved:
+            return resolved
     return None
 
 

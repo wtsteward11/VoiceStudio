@@ -357,6 +357,24 @@
                                 <TextBlock Text="Timeline" FontSize="12" />
                             </StackPanel>
                         </Button>
+                        <Button AutomationProperties.AutomationId="TranscribeView_CreateTimelineClipsButton"
+                                ToolTipService.ToolTip="Create dialogue timeline clips from the selected transcript"
+                                Command="{x:Bind ViewModel.CreateTimelineClipsCommand}"
+                                Padding="8,6">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <FontIcon Glyph="&#xE8DE;" FontSize="12" />
+                                <TextBlock Text="Create clips" FontSize="12" />
+                            </StackPanel>
+                        </Button>
+                        <Button AutomationProperties.AutomationId="TranscribeView_ExportTimelineButton"
+                                ToolTipService.ToolTip="Export the current timeline to WAV"
+                                Command="{x:Bind ViewModel.ExportTimelineCommand}"
+                                Padding="8,6">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <FontIcon Glyph="&#xE74E;" FontSize="12" />
+                                <TextBlock Text="Export WAV" FontSize="12" />
+                            </StackPanel>
+                        </Button>
                         <Button AutomationProperties.AutomationId="TranscribeView_CopyButton"
                                 ToolTipService.ToolTip="Copy transcription text"
                                 Click="CopyTranscriptionText_Click"
@@ -580,6 +598,14 @@
                                FontSize="12"
                                TextWrapping="WrapWholeWords"
                                Visibility="{x:Bind ViewModel.TranscriptOperatorMessage, Converter={StaticResource NullToVisibilityConverter}, Mode=OneWay, FallbackValue=Collapsed}" />
+                    <TextBlock AutomationProperties.AutomationId="TranscribeView_LastExportPathText"
+                               Text="{x:Bind ViewModel.LastExportPath, Mode=OneWay}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               FontSize="11"
+                               TextTrimming="CharacterEllipsis"
+                               TextWrapping="NoWrap"
+                               ToolTipService.ToolTip="{x:Bind ViewModel.LastExportPath, Mode=OneWay}"
+                               Visibility="{x:Bind ViewModel.LastExportPath, Converter={StaticResource NullToVisibilityConverter}, Mode=OneWay, FallbackValue=Collapsed}" />
                     <TextBlock AutomationProperties.AutomationId="TranscribeView_SegmentEditOperatorHint"
                                Text="{x:Bind ViewModel.SegmentEditOperatorHint, Mode=OneWay}"
                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"

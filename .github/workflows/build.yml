@@ -591,18 +591,16 @@ jobs:
         run: dotnet tool install -g NSwag.ConsoleCore || true
         continue-on-error: true
 
-      # PR merge checkout + downloaded artifact can disagree with `git show HEAD:openapi.json` (merge tree),
-      # producing spurious "breaking" deltas and crashing Windows cp1252 on emoji output. Baseline = base branch.
-      - name: Prepare OpenAPI baseline from base branch (PRs)
-        if: github.event_name == 'pull_request'
+      # After download, `docs/api/openapi.json` may be replaced by the CI-exported artifact. Comparing
+      # `git show HEAD:` to post-download disk produced spurious deltas; comparing main to artifact
+      # flags legitimate PR-vs-main API drift and fails large feature PRs. Baseline = same file
+      # tree before artifact overwrite; current = after download (must match for this job).
+      - name: Save committed OpenAPI before artifact download
         shell: bash
-        env:
-          GITHUB_BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
           mkdir -p .buildlogs
-          git fetch origin "${GITHUB_BASE_REF}" --depth=1
-          git show "origin/${GITHUB_BASE_REF}:docs/api/openapi.json" > .buildlogs/openapi-baseline.json
+          cp docs/api/openapi.json .buildlogs/openapi-committed.json
 
       - name: Download OpenAPI schema artifact
         uses: actions/download-artifact@v4
@@ -660,7 +658,7 @@ jobs:
           set -euo pipefail
           python tools/nswag/detect-breaking-changes.py --json > .buildlogs/breaking-changes.json 2>&1 || true
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            python tools/nswag/detect-breaking-changes.py --baseline .buildlogs/openapi-baseline.json --current docs/api/openapi.json
+            python tools/nswag/detect-breaking-changes.py --baseline .buildlogs/openapi-committed.json --current docs/api/openapi.json
           else
             python tools/nswag/detect-breaking-changes.py
           fi

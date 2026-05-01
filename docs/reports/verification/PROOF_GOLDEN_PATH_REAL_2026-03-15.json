@@ -29,6 +29,6 @@
   "stt_step_ran": true,
   "stt_engine_name": "backend_default",
   "tts_engine_name": "espeak_ng",
-  "historical_proof": false,
+  "historical_proof": true,
   "evidence_fingerprint": "803f93e3b60b98918794a536767e49eecefa64a609cce45d5cc527972a7e23a5"
 }

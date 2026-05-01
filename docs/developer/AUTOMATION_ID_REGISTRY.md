@@ -380,6 +380,9 @@ Every panel has a `_Root` AutomationId for test navigation:
 | TranscribeView (GOV-VOICESTUDIO-EDIT-APPLY-RETRY-RECOVERY-01: retry failed job row) | `TranscribeView_ApplyJobRetryButton` |
 | TranscribeView (GOV-EDIT-APPLY-JOB-STATUS: clear job status rows) | `TranscribeView_ClearApplyJobStatusButton` |
 | TranscribeView (GAP-067 slice 5 advanced options) | `TranscribeView_AdvancedOptionsExpander` |
+| TranscribeView (hero workflow: create timeline clips) | `TranscribeView_CreateTimelineClipsButton` |
+| TranscribeView (hero workflow: export timeline to WAV) | `TranscribeView_ExportTimelineButton` |
+| TranscribeView (hero workflow: last export path status) | `TranscribeView_LastExportPathText` |
 | LibraryView (import vs drag-drop scope footnote, Pass 01 slice 2) | `LibraryView_ImportDragDropScopeFootnote` |
 | TrainingView (surface maturity footnote, Pass 01 slice 3) | `TrainingView_SurfaceMaturityFootnote` |
 | QualityBenchmarkView (surface maturity footnote, Pass 01 slice 4) | `QualityBenchmarkView_SurfaceMaturityFootnote` |

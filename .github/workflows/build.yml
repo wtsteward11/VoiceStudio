@@ -591,6 +591,19 @@ jobs:
         run: dotnet tool install -g NSwag.ConsoleCore || true
         continue-on-error: true
 
+      # PR merge checkout + downloaded artifact can disagree with `git show HEAD:openapi.json` (merge tree),
+      # producing spurious "breaking" deltas and crashing Windows cp1252 on emoji output. Baseline = base branch.
+      - name: Prepare OpenAPI baseline from base branch (PRs)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          mkdir -p .buildlogs
+          git fetch origin "${GITHUB_BASE_REF}" --depth=1
+          git show "origin/${GITHUB_BASE_REF}:docs/api/openapi.json" > .buildlogs/openapi-baseline.json
+
       - name: Download OpenAPI schema artifact
         uses: actions/download-artifact@v4
         with:
@@ -642,9 +655,15 @@ jobs:
         id: contract-check
 
       - name: Detect breaking changes
+        shell: bash
         run: |
+          set -euo pipefail
           python tools/nswag/detect-breaking-changes.py --json > .buildlogs/breaking-changes.json 2>&1 || true
-          python tools/nswag/detect-breaking-changes.py
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python tools/nswag/detect-breaking-changes.py --baseline .buildlogs/openapi-baseline.json --current docs/api/openapi.json
+          else
+            python tools/nswag/detect-breaking-changes.py
+          fi
         # GAP-CI-001: Breaking change detection is important (removed continue-on-error)
         id: breaking-changes
 

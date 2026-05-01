@@ -116,6 +116,8 @@ def parse_csharp_client(client_path: Path) -> set[str]:
 
     NSwag emits `System.Threading.Tasks.Task<...> Operation_id_from_openapiAsync(` or, for
     no-content responses, `System.Threading.Tasks.Task Operation_idAsync(` (non-generic Task).
+    Implementations may place `async` after `Task<...>` and before the method name
+    (e.g. `public virtual async System.Threading.Tasks.Task<object> NameAsync(`).
 
     Return types may nest generics (`Task<ICollection<Foo>>`); a naive `Task<[^>]+>` regex
     stops at the first `>` and misses those methods.
@@ -142,6 +144,17 @@ def parse_csharp_client(client_path: Path) -> set[str]:
             m_idx = pos
         while m_idx < len(content) and content[m_idx] in " \t\r\n":
             m_idx += 1
+        # NSwag implementation methods: `public virtual async System.Threading.Tasks.Task<...> NameAsync(`
+        if (
+            m_idx + 5 <= len(content)
+            and content[m_idx : m_idx + 5] == "async"
+            and (m_idx + 5 == len(content) or not (content[m_idx + 5].isalnum() or content[m_idx + 5] == "_"))
+        ):
+            prev = content[m_idx - 1] if m_idx > 0 else " "
+            if not (prev.isalnum() or prev == "_"):
+                m_idx += 5
+                while m_idx < len(content) and content[m_idx] in " \t\r\n":
+                    m_idx += 1
         name_start = m_idx
         while m_idx < len(content) and (content[m_idx].isalnum() or content[m_idx] == "_"):
             m_idx += 1

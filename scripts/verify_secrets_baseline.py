@@ -20,6 +20,7 @@ Exit Codes:
 import argparse
 import json
 import logging
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 REPO_ROOT = Path(__file__).parent.parent
 BASELINE_FILE = REPO_ROOT / ".secrets.baseline"
 
-# Files/patterns to exclude from scan (beyond what's in baseline config)
+# Path substrings excluded from detect-secrets (heavy or non-source); passed as --exclude-files regex.
 ADDITIONAL_EXCLUDES = [
     ".venv",
     "venv",
@@ -43,7 +44,18 @@ ADDITIONAL_EXCLUDES = [
     "__pycache__",
     ".git",
     ".buildlogs",
+    "artifacts",
+    "bin",
+    "obj",
+    "backend/data",
+    "installer/runtime",
+    "src/VoiceStudio.App/Services/Generated",
 ]
+
+
+def _exclude_files_regex() -> str:
+    """Regex for detect-secrets --exclude-files (substring match on paths)."""
+    return "|".join(re.escape(fragment) for fragment in ADDITIONAL_EXCLUDES)
 
 
 def load_baseline() -> dict:
@@ -73,6 +85,9 @@ def run_secrets_scan(update_baseline: bool = False) -> tuple[int, str, str]:
 
     if update_baseline:
         cmd.append("--update")
+
+    exclude_regex = _exclude_files_regex()
+    cmd.extend(["--exclude-files", exclude_regex])
 
     logger.info(f"Running: {' '.join(cmd)}")
 

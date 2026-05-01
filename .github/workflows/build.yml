@@ -555,6 +555,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run verification checks
+        env:
+          # ubuntu-latest has no WinUI app / startup_decision.json (GAP-069 guard)
+          VOICESTUDIO_SKIP_STARTUP_ARTIFACT_CHECK: "true"
         run: python scripts/run_verification.py
         
       - name: Upload verification report

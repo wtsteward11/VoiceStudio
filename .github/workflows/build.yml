@@ -588,8 +588,12 @@ jobs:
           python-version: "3.11"
 
       - name: Install NSwag CLI
-        run: dotnet tool install -g NSwag.ConsoleCore || true
-        continue-on-error: true
+        run: |
+          dotnet tool install -g NSwag.ConsoleCore --version 14.7.1 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            dotnet tool update -g NSwag.ConsoleCore --version 14.7.1
+          }
+          nswag version
 
       # After download, `docs/api/openapi.json` may be replaced by the CI-exported artifact. Comparing
       # `git show HEAD:` to post-download disk produced spurious deltas; comparing main to artifact

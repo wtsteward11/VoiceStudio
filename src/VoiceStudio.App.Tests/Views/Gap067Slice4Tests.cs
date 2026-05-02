@@ -36,9 +36,6 @@ public sealed class Gap067Slice4Tests
   private static string FileActivationPath =>
     Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "FileActivation.cs");
 
-  private static string FileActivationArgsPath =>
-    Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "Services", "FileActivationArgs.cs");
-
   private static string AppXamlPath =>
     Path.Combine(FindRepoRoot(), "src", "VoiceStudio.App", "App.xaml.cs");
 

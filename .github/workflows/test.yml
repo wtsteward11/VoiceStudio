@@ -32,7 +32,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f requirements_engines.txt ]; then pip install -r requirements_engines.txt; fi
+          if [ -f requirements_engines.txt ]; then \
+            pip install -r requirements_engines.txt \
+              --extra-index-url https://download.pytorch.org/whl/cu121; \
+          fi
           
       - name: Run unit tests with coverage
         run: |

@@ -5,15 +5,46 @@ Tests library management endpoints against the real DB-backed
 repository layer (BaseRepository + aiosqlite).
 """
 
+import asyncio
 import io
 import os
 import wave
 
+import aiosqlite
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+import backend.settings as backend_settings
 from backend.api.routes.library import router
+from backend.data.migrations.v003_library_tables import LibraryTablesMigration
+from backend.data.repositories.library_repository import reset_library_repositories
+
+
+@pytest.fixture(autouse=True)
+def _library_route_isolated_sqlite(tmp_path, monkeypatch):
+    """Use an isolated SQLite file with v003 library tables (CI-safe).
+
+    The route tests mount only ``library.router`` on a bare FastAPI app, so
+    production lifespan migrations never run. Without tables, SQLite raises
+    ``OperationalError`` and the route maps that to HTTP 503. This fixture
+    applies the canonical v003 schema and refreshes settings + repo singletons.
+    """
+    db_path = tmp_path / "library_routes_unit.sqlite"
+    monkeypatch.setenv("VOICESTUDIO_DB_PATH", str(db_path))
+    backend_settings.get_config.cache_clear()
+    monkeypatch.setattr(backend_settings, "config", backend_settings.get_config())
+
+    async def _apply_schema() -> None:
+        async with aiosqlite.connect(str(db_path)) as conn:
+            migration = LibraryTablesMigration()
+            await migration.upgrade(conn)
+
+    asyncio.run(_apply_schema())
+    reset_library_repositories()
+    yield
+    reset_library_repositories()
+    backend_settings.get_config.cache_clear()
 
 
 def _make_client() -> TestClient:

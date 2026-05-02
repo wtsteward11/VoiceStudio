@@ -289,6 +289,7 @@ jobs:
     name: E2E UI Tests
     runs-on: windows-latest
     needs: [dotnet-build]
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
     
     steps:
       - uses: actions/checkout@v4
@@ -334,6 +335,7 @@ jobs:
     name: Python WinAppDriver UI Tests
     runs-on: windows-latest
     needs: [dotnet-build]
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
     
     steps:
       - uses: actions/checkout@v4

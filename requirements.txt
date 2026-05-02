@@ -47,6 +47,9 @@ pydantic-settings>=2.1.0
 # Audio Processing (core dep — synced from pyproject.toml [project.dependencies])
 # ============================================================================
 numpy>=1.24.0
+# PR/CI unit tests import these; keep out of CUDA-heavy requirements_engines.txt
+soundfile>=0.12.0
+aiohttp>=3.8.0
 
 # ============================================================================
 # HTTP Client & WebSocket

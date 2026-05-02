@@ -24,7 +24,21 @@ class PolicyLoader:
     Loads and validates agent governance policies.
 
     Supports YAML and JSON formats with environment variable expansion.
+    Path-related placeholders (${PROJECT_ROOT}, ${TEMP}, etc.) stay literal in
+    the loaded document so PolicyEngine resolves them at evaluation time.
     """
+
+    # Resolved at policy evaluation, not at YAML load (tests set PROJECT_ROOT).
+    DEFERRED_ENV_PLACEHOLDERS: frozenset[str] = frozenset(
+        {
+            "PROJECT_ROOT",
+            "APPDATA",
+            "TEMP",
+            "PROGRAMFILES",
+            "PROGRAMFILES(X86)",
+            "WINDIR",
+        }
+    )
 
     # Required top-level keys
     REQUIRED_KEYS = {"version", "risk_tiers", "tool_restrictions"}
@@ -58,8 +72,10 @@ class PolicyLoader:
             # Find all ${VAR} patterns
             pattern = r'\$\{([^}]+)\}'
 
-            def replace(match):
+            def replace(match: re.Match[str]) -> str:
                 var_name = match.group(1)
+                if var_name in self.DEFERRED_ENV_PLACEHOLDERS:
+                    return match.group(0)
                 if var_name not in self._env_cache:
                     self._env_cache[var_name] = os.environ.get(var_name, "")
                 return self._env_cache[var_name]

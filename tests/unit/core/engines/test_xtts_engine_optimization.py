@@ -2,6 +2,12 @@
 Unit tests for XTTS Engine optimizations.
 
 Tests model caching, lazy loading, batch processing, and GPU optimizations.
+
+``app.core.engines.xtts_engine`` unconditionally imports ``torch``. Torch is
+only installed as part of the engines requirements profile, which the PR
+Ubuntu CI does not bring in. Skip the whole module when torch is unavailable
+so missing optional deps produce honest skips rather than ImportErrors at
+collection time (PR #49 first-failure triage).
 """
 
 import os
@@ -9,7 +15,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from app.core.engines.xtts_engine import (
+pytest.importorskip("torch", reason="torch not installed; xtts_engine requires it")
+
+from app.core.engines.xtts_engine import (  # noqa: E402
     _MODEL_CACHE,
     XTTSEngine,
     _cache_model,

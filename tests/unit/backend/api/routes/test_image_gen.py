@@ -2,13 +2,26 @@
 Unit Tests for Image Generation API Routes.
 
 Tests image generation, upscaling, and face enhancement endpoints.
+
+The route module unconditionally imports ``PIL.Image``. Pillow is *not*
+installed in the PR Ubuntu CI environment (only in the engines profile), so
+importing the route in CI raises ``ImportError`` and produces a collection
+error rather than a runnable test suite. Skip the whole module when Pillow is
+unavailable so missing optional deps surface as honest skips, not collection
+failures (PR #49 first-failure triage).
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
+
+pytest.importorskip(
+    "PIL",
+    reason="Pillow not installed; backend.api.routes.image_gen requires it",
+)
+
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
 # =============================================================================
 # Fixtures

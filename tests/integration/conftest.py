@@ -227,6 +227,40 @@ class IntegrationTestClient:
             response.status_code == expected
         ), f"Expected {expected}, got {response.status_code}: {response.body}"
 
+    # ------------------------------------------------------------------
+    # Lifespan-aware cleanup (PR #49: stop pytest leaking processes/threads)
+    # ------------------------------------------------------------------
+    def close(self) -> None:
+        """Close the underlying TestClient, driving FastAPI lifespan shutdown.
+
+        ``starlette.testclient.TestClient`` fires the ASGI lifespan ``shutdown``
+        event from ``__exit__``. If callers create the client without a ``with``
+        block (or via ``create_test_client(...)``), ``shutdown`` never runs,
+        leaving engine subprocesses, the task scheduler, and other non-daemon
+        worker threads alive — which in CI has been observed to block process
+        exit even after pytest prints its summary.
+        """
+        client = getattr(self, "client", None)
+        if client is None:
+            return
+        exit_method = getattr(client, "__exit__", None)
+        if exit_method is None:
+            return
+        try:
+            exit_method(None, None, None)
+        except RuntimeError:
+            # Already exited (e.g., second close()); benign.
+            pass
+
+    def __enter__(self) -> "IntegrationTestClient":
+        # ``self.client.__enter__`` was already invoked by ``create_test_client``
+        # (so lifespan startup has fired). We expose the wrapper as a context
+        # manager so callers can write ``with create_test_client() as c:``.
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
 
 # =============================================================================
 # Fixtures
@@ -279,8 +313,17 @@ def app():
 
 @pytest.fixture(scope="function")
 def client(app):
-    """Create a test client for the FastAPI app."""
-    return TestClient(app)
+    """Create a test client for the FastAPI app.
+
+    Uses ``with TestClient(app) as c`` so that the FastAPI lifespan ``shutdown``
+    actually fires (engine stop, scheduler stop, db close, temp-file cleanup).
+    Without the context manager, lifespan never starts and dependent teardown
+    is skipped — the latter risks leaving non-daemon worker threads alive on
+    CI Linux runners and blocking pytest process exit after the summary line
+    (PR #49 post-pytest hang).
+    """
+    with TestClient(app) as c:
+        yield c
 
 
 @pytest.fixture(scope="function")

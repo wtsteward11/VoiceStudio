@@ -657,7 +657,13 @@ async def _execute_real_training(
     import concurrent.futures
 
     loop = asyncio.get_event_loop()
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    # Use the executor as a context manager so its non-daemon worker thread is
+    # joined when the training job finishes (success or failure). Without this,
+    # the worker can survive interpreter shutdown and contribute to the PR #49
+    # post-pytest hang on CI Linux runners.
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=1, thread_name_prefix="training-job"
+    )
 
     def run_training_sync():
         return trainer.train(
@@ -670,7 +676,10 @@ async def _execute_real_training(
         )
 
     try:
-        training_result = await loop.run_in_executor(executor, run_training_sync)
+        try:
+            training_result = await loop.run_in_executor(executor, run_training_sync)
+        finally:
+            executor.shutdown(wait=False)
         if key in _training_jobs_store:
             sd = _training_jobs_store[key]
             sd["status"] = "completed"

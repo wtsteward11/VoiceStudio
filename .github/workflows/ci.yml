@@ -84,9 +84,9 @@ jobs:
       - name: Run tests
         timeout-minutes: 60
         run: |
-          python -m pytest tests/ -v --cov=backend --cov=app --cov-report=xml --randomly-seed=12345 --timeout=120 --ignore=tests/integration/route_integrations --ignore=tests/ui
-          python -m pytest tests/ -q --randomly-seed=99999 --timeout=120 --ignore=tests/integration/route_integrations --ignore=tests/ui
-          python -m pytest tests/ -q --randomly-seed=55555 --timeout=120 --ignore=tests/integration/route_integrations --ignore=tests/ui
+          python -m pytest tests/ -v --cov=backend --cov=app --cov-report=xml --randomly-seed=12345 --timeout=120 --tb=short --durations=25 --ignore=tests/integration/route_integrations --ignore=tests/ui
+          python -m pytest tests/ -q --randomly-seed=99999 --timeout=120 --tb=short --durations=25 --ignore=tests/integration/route_integrations --ignore=tests/ui
+          python -m pytest tests/ -q --randomly-seed=55555 --timeout=120 --tb=short --durations=25 --ignore=tests/integration/route_integrations --ignore=tests/ui
       
       - name: Upload coverage
         uses: codecov/codecov-action@v4

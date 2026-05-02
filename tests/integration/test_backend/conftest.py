@@ -83,11 +83,19 @@ def test_client_with_app(backend_app):
     """
     Provide test client connected to actual backend app.
 
-    Use this when you need to test against real routes.
+    Yields the wrapper and explicitly closes it on teardown so the FastAPI
+    lifespan ``shutdown`` runs (engine stop, scheduler stop, db close).
+    Without explicit close, lifespan shutdown never fires and non-daemon
+    worker threads can survive pytest's summary line, blocking process exit
+    on CI Linux runners (PR #49).
     """
     if backend_app is None:
         pytest.skip("Backend app not available")
-    return create_test_client(app=backend_app)
+    client = create_test_client(app=backend_app)
+    try:
+        yield client
+    finally:
+        client.close()
 
 
 @pytest.fixture

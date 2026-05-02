@@ -2,6 +2,7 @@
 Training engines for VoiceStudio
 """
 
+from . import unified_trainer as unified_trainer  # keep submodule reachable for mock.patch targets
 from .auto_trainer import AutoTrainer, create_auto_trainer
 from .parameter_optimizer import ParameterOptimizer, create_parameter_optimizer
 from .training_progress_monitor import (

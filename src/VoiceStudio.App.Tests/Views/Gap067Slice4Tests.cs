@@ -136,8 +136,16 @@ public sealed class Gap067Slice4Tests
   public void MainWindow_HasTryDispatchPendingFileActivation()
   {
     var text = File.ReadAllText(MainWindowPath);
+    StringAssert.Contains(text, "_fileActivationShellBridge");
     StringAssert.Contains(text, "TryDispatchPendingFileActivation");
-    StringAssert.Contains(text, "RunFileActivationPendingAsync");
+    var bridgePath = Path.Combine(
+      FindRepoRoot(),
+      "src",
+      "VoiceStudio.App",
+      "Services",
+      "MainWindowFileActivationShellBridge.cs");
+    var bridgeText = File.ReadAllText(bridgePath);
+    StringAssert.Contains(bridgeText, "RunFileActivationPendingAsync");
   }
 
   [TestMethod]

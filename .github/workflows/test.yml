@@ -32,10 +32,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f requirements_engines.txt ]; then \
-            pip install -r requirements_engines.txt \
-              --extra-index-url https://download.pytorch.org/whl/cu121; \
-          fi
+          # PR/unit gates: do not install requirements_engines.txt here — CUDA torch + native
+          # wheels (e.g. aeneas) are heavy and break ubuntu-latest matrix; unit/integration
+          # under tests/unit and tests/integration do not exercise engine subprocesses.
+          # Engine installs remain on self-hosted / nightly jobs (see nightly-golden-loop-real).
           
       - name: Run unit tests with coverage
         run: |

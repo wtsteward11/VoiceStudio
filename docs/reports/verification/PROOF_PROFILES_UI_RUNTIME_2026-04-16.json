@@ -41,5 +41,11 @@
     "verification": "operator_interactive_recommended",
     "reference": "docs/reports/verification/VOICESTUDIO_UNIFIED_STARTUP_SLICE2_PROOF_2026-03-28.md"
   },
-  "screenshot_path": null
+  "screenshot_path": null,
+  "command": "dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Debug -p:Platform=x64 --filter \"FullyQualifiedName~ProfilesRuntimeLiveBackendTests\"",
+  "exit_code": 0,
+  "timestamp": "2026-04-16T11:05:00.000000Z",
+  "git_commit": "0000000000000000000000000000000000000000",
+  "git_branch": "historical_verification_artifact",
+  "evidence_fingerprint": "273ea855e03ab9794fdde62fb0c94468730b71cbf673193fae7df9a2216d131d"
 }

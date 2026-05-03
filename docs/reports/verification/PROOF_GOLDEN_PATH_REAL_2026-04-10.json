@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "timestamp": "2026-04-10T23:11:05.7562523-05:00",
+  "timestamp": "2026-04-10T23:11:05.756252-05:00",
   "commit_hash": "8bd7f32afc6fa98211af5ff721ab011a898d1ce4",
   "status": "PASS",
   "blocked_reason": null,
@@ -36,5 +36,10 @@
       "status": "PASS"
     }
   ],
-  "log": "E:\\VoiceStudio\\artifacts\\verify\\20260410_230939\\logs\\runtime_proof.log"
+  "log": "E:\\VoiceStudio\\artifacts\\verify\\20260410_230939\\logs\\runtime_proof.log",
+  "command": "verify.ps1 -RuntimeProof",
+  "exit_code": 0,
+  "git_commit": "8bd7f32afc6fa98211af5ff721ab011a898d1ce4",
+  "git_branch": "historical_verification_artifact",
+  "evidence_fingerprint": "645676246aab91e67e0a24e170188d7f133db9f67c0923d1619db30a816247fb"
 }

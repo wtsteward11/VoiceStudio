@@ -12,5 +12,11 @@
     "url": "http://127.0.0.1:8000/api/profiles",
     "items_count": 50
   },
-  "interpretation": "At probe time the backend returned a non-zero profile catalog. Footer TotalProfiles should match items_count when the app loads against this backend with no filters. Pixel-level WinUI screenshot of the Profiles grid remains an optional operator artifact; ViewModel truth is additionally covered by ProfilesViewModelSeamTests (9 tests)."
+  "interpretation": "At probe time the backend returned a non-zero profile catalog. Footer TotalProfiles should match items_count when the app loads against this backend with no filters. Pixel-level WinUI screenshot of the Profiles grid remains an optional operator artifact; ViewModel truth is additionally covered by ProfilesViewModelSeamTests (9 tests).",
+  "command": "Operator HTTP probe: GET /health + GET /api/profiles (schema VoiceStudio.runtime_api_probe.v1)",
+  "exit_code": 0,
+  "timestamp": "2026-04-16T10:32:07.939070Z",
+  "git_commit": "0000000000000000000000000000000000000000",
+  "git_branch": "historical_verification_artifact",
+  "evidence_fingerprint": "aac7157cc1c987c84763a1efd33dc3c5231c5abebdb950edad9453ccb1bb725f"
 }

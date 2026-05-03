@@ -30,5 +30,11 @@
   },
   "blocking_reason": null,
   "failure_reason": null,
-  "environment_hints": []
+  "environment_hints": [],
+  "command": "python scripts/ci/run_backend_smoke.py",
+  "exit_code": 0,
+  "timestamp": "2026-04-14T01:48:56.186692+00:00",
+  "git_commit": "0000000000000000000000000000000000000000",
+  "git_branch": "historical_verification_artifact",
+  "evidence_fingerprint": "ae2d79f78b572b7499e7be415d34b273984fc0606b5244d513a059254bf225a0"
 }

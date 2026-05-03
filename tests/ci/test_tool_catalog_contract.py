@@ -100,32 +100,54 @@ def test_tool_catalog_has_pin_support() -> None:
 
 
 def test_main_window_uses_selected_region() -> None:
-    """MainWindow (or partials) must use dialog.SelectedRegion when opening from Tool Catalog."""
+    """Region from Tool Catalog: launcher reads dialog.SelectedRegion; bridge passes EffectiveRegion to open."""
     main_files = list(MAIN_WINDOW_DIR.glob("MainWindow*.cs"))
     if not main_files:
         pytest.skip("No MainWindow*.cs files found")
-    combined = ""
+    combined_main = ""
     for p in main_files:
-        combined += p.read_text(encoding="utf-8-sig")
-    assert "dialog.SelectedRegion" in combined, (
-        "MainWindow must use dialog.SelectedRegion when opening panel from Tool Catalog"
+        combined_main += p.read_text(encoding="utf-8-sig")
+    launcher_cs = MAIN_WINDOW_DIR / "Services" / "ToolCatalogShellLauncher.cs"
+    bridge_cs = MAIN_WINDOW_DIR / "Services" / "MainWindowToolCatalogShellBridge.cs"
+    launcher = launcher_cs.read_text(encoding="utf-8-sig") if launcher_cs.exists() else ""
+    bridge = bridge_cs.read_text(encoding="utf-8-sig") if bridge_cs.exists() else ""
+    assert "dialog.SelectedRegion" in launcher, (
+        "ToolCatalogShellLauncher must read dialog.SelectedRegion when mapping catalog choice"
+    )
+    assert "open(choice.PanelId, choice.EffectiveRegion)" in bridge, (
+        "MainWindowToolCatalogShellBridge must call the wired open delegate with choice.PanelId and choice.EffectiveRegion"
+    )
+    assert "WireToolCatalogHandlers" in combined_main, "MainWindow must call WireToolCatalogHandlers for tool catalog shell"
+    assert "(panelId, region) => OpenPanelByIdAsync(panelId, region)" in combined_main, (
+        "MainWindow must wire OpenPanelByIdAsync(panelId, region) into the tool catalog bridge"
     )
 
 
 def test_tool_catalog_region_flows_to_open() -> None:
-    """Prove Tool Catalog region selection flows through to OpenPanelByIdAsync (not bypassed)."""
+    """Prove region override flows launcher → bridge → OpenPanelByIdAsync (not bypassed)."""
     main_files = list(MAIN_WINDOW_DIR.glob("MainWindow*.cs"))
     if not main_files:
         pytest.skip("No MainWindow*.cs files found")
-    combined = ""
+    combined_main = ""
     for p in main_files:
-        combined += p.read_text(encoding="utf-8-sig")
-    assert "dialog.SelectedRegion ?? desc.DefaultRegion" in combined, (
-        "ShowToolCatalogAsync must use override cascade: dialog.SelectedRegion ?? desc.DefaultRegion"
+        combined_main += p.read_text(encoding="utf-8-sig")
+    launcher_cs = MAIN_WINDOW_DIR / "Services" / "ToolCatalogShellLauncher.cs"
+    bridge_cs = MAIN_WINDOW_DIR / "Services" / "MainWindowToolCatalogShellBridge.cs"
+    launcher = launcher_cs.read_text(encoding="utf-8-sig") if launcher_cs.exists() else ""
+    bridge = bridge_cs.read_text(encoding="utf-8-sig") if bridge_cs.exists() else ""
+    combined = combined_main + launcher + bridge
+    assert "dialog.SelectedRegion ?? desc.DefaultRegion" in launcher, (
+        "ToolCatalogShellLauncher must compute region as dialog.SelectedRegion ?? desc.DefaultRegion"
     )
-    assert "OpenPanelByIdAsync(desc.PanelId, region)" in combined, (
-        "ShowToolCatalogAsync must pass region variable to OpenPanelByIdAsync, not desc.DefaultRegion"
+    assert "EffectiveRegion = region" in launcher, (
+        "ToolCatalogShellLauncher must assign EffectiveRegion from resolved region"
+    )
+    assert "open(choice.PanelId, choice.EffectiveRegion)" in bridge, (
+        "MainWindowToolCatalogShellBridge must pass choice.EffectiveRegion into the open delegate"
+    )
+    assert "(panelId, region) => OpenPanelByIdAsync(panelId, region)" in combined_main, (
+        "MainWindow must wire OpenPanelByIdAsync(panelId, region) for tool catalog"
     )
     assert "OpenPanelByIdAsync(desc.PanelId, desc.DefaultRegion)" not in combined, (
-        "ShowToolCatalogAsync must NOT bypass SelectedRegion by passing desc.DefaultRegion directly"
+        "Tool catalog path must not bypass SelectedRegion by passing desc.DefaultRegion directly to OpenPanelByIdAsync"
     )

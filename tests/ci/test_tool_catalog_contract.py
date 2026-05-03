@@ -38,13 +38,23 @@ def test_tool_catalog_uses_panel_descriptor() -> None:
 
 
 def test_main_window_references_tool_catalog() -> None:
-    """MainWindow must reference ToolCatalogDialog and ShowToolCatalogAsync."""
+    """MainWindow must wire Tool Catalog (inline or via launcher) and expose ShowToolCatalogAsync.
+
+    Implementation may delegate dialog instantiation to ToolCatalogShellLauncher
+    (shell-bridge pattern); the wiring is preserved as long as either MainWindow
+    or the launcher service references ToolCatalogDialog.
+    """
     main_cs = MAIN_WINDOW_DIR / "MainWindow.xaml.cs"
+    launcher_cs = MAIN_WINDOW_DIR / "Services" / "ToolCatalogShellLauncher.cs"
     if not main_cs.exists():
         pytest.skip(f"MainWindow.xaml.cs not found: {main_cs}")
-    content = main_cs.read_text(encoding="utf-8-sig")
-    assert "ToolCatalogDialog" in content, "MainWindow must reference ToolCatalogDialog"
-    assert "ShowToolCatalogAsync" in content, "MainWindow must have ShowToolCatalogAsync"
+    main_content = main_cs.read_text(encoding="utf-8-sig")
+    launcher_content = launcher_cs.read_text(encoding="utf-8-sig") if launcher_cs.exists() else ""
+    combined = main_content + launcher_content
+    assert "ToolCatalogDialog" in combined, (
+        "MainWindow or ToolCatalogShellLauncher must reference ToolCatalogDialog"
+    )
+    assert "ShowToolCatalogAsync" in main_content, "MainWindow must have ShowToolCatalogAsync"
 
 
 def test_tool_catalog_has_region_chooser() -> None:

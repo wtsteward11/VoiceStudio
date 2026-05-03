@@ -18,6 +18,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 MAX_UNTRACKED_BYTES = 500_000
+MAX_UNTRACKED_DIR_WALK_FILES = 500
 TEXT_EXTENSIONS = {".md", ".markdown", ".yml", ".yaml", ".txt", ".json"}
 GUARDED_PREFIXES = (
     ".cursor/STATE.md",
@@ -31,8 +32,9 @@ GUARDED_PREFIXES = (
 
 # Require "status:" (label) for status lines — avoids false positives in governance tables.
 # Omit broad "state ... complete" / "phase ... complete" — they fire on STATE.md / archive prose.
+_PATTERN_BRACKET_X = re.compile(r"\[[xX]\]")
 _COMPLETION_LINE_PATTERNS = [
-    re.compile(r"\[[xX]\]"),
+    _PATTERN_BRACKET_X,
     re.compile(r"(?i)status\s*:\s*.*\bcomplete(d)?\b"),
     re.compile(r"(?i)status\s*:\s*.*\bdone\b"),
 ]
@@ -77,6 +79,19 @@ def _is_docs_design_path(rel_path: str | None) -> bool:
     return normalized.startswith("docs/design/")
 
 
+def _docs_path_bracket_x_must_be_checklist(rel_path: str | None) -> bool:
+    """Under docs/ (except design), require a real markdown checklist line for [x] matches.
+
+    Git often reports only `?? docs/` for new trees; scanning those files would otherwise
+    treat prose like `No [x] here` as a completion marker.
+    """
+    if not rel_path:
+        return False
+    if _is_docs_design_path(rel_path):
+        return False
+    return rel_path.replace("\\", "/").startswith("docs/")
+
+
 def _matches_completion(line: str, rel_path: str | None = None) -> bool:
     """True if line looks like an uncommitted task-closure marker in a guarded path."""
     s = line.strip()
@@ -85,7 +100,15 @@ def _matches_completion(line: str, rel_path: str | None = None) -> bool:
         return False
     if design and re.match(r"^\*\*Status:\*\*", s, re.IGNORECASE):
         return False
-    return any(pattern.search(line) for pattern in _COMPLETION_LINE_PATTERNS)
+    docs_checklist_only = _docs_path_bracket_x_must_be_checklist(rel_path)
+    for pattern in _COMPLETION_LINE_PATTERNS:
+        if not pattern.search(line):
+            continue
+        if pattern is _PATTERN_BRACKET_X and docs_checklist_only:
+            if not _MARKDOWN_CHECKLIST_DONE.match(s):
+                continue
+        return True
+    return False
 
 
 def _is_guarded_path(path: str) -> bool:
@@ -93,6 +116,52 @@ def _is_guarded_path(path: str) -> bool:
     if normalized == ".cursor/STATE.md":
         return True
     return any(normalized.startswith(prefix) for prefix in GUARDED_PREFIXES)
+
+
+def _dir_may_contain_guarded_files(dir_rel: str) -> bool:
+    """True if an untracked directory tree could include paths matched by _is_guarded_path."""
+    d = dir_rel.replace("\\", "/").rstrip("/")
+    if not d:
+        return False
+    slash = d + "/"
+    for gp in GUARDED_PREFIXES:
+        g = gp.replace("\\", "/")
+        if g == d or g.startswith(slash):
+            return True
+    # Exact file .cursor/STATE.md lives under .cursor/; git often reports only ?? .cursor/
+    state = ".cursor/STATE.md"
+    if state == d or state.startswith(slash):
+        return True
+    return False
+
+
+def _expand_untracked_entries(raw_path: str) -> list[str]:
+    """Map git status `??` path to concrete file paths (git may emit a directory, e.g. `?? .cursor/`)."""
+    normalized = raw_path.replace("\\", "/").strip().rstrip("/")
+    if not normalized:
+        return []
+    anchor = PROJECT_ROOT / normalized
+    if anchor.is_file():
+        return [normalized]
+    if not anchor.is_dir():
+        return []
+    if not _dir_may_contain_guarded_files(normalized):
+        return []
+    out: list[str] = []
+    for fp in anchor.rglob("*"):
+        if not fp.is_file():
+            continue
+        try:
+            rel_fp = fp.relative_to(PROJECT_ROOT)
+        except ValueError:
+            continue
+        rel_str = str(rel_fp).replace("\\", "/")
+        if not _is_guarded_path(rel_str):
+            continue
+        out.append(rel_str)
+        if len(out) >= MAX_UNTRACKED_DIR_WALK_FILES:
+            break
+    return out
 
 
 def _parse_diff(diff_text: str, source: str) -> list[MarkerHit]:
@@ -136,35 +205,36 @@ def _is_in_code_fence(lines: list[str], line_no: int) -> bool:
 
 def _scan_untracked(paths: Iterable[str]) -> list[MarkerHit]:
     hits: list[MarkerHit] = []
-    for rel_path in paths:
-        rel_path = rel_path.replace("\\", "/")
-        if not _is_guarded_path(rel_path):
-            continue
-        path = PROJECT_ROOT / rel_path
-        if not path.exists():
-            continue
-        if path.suffix.lower() not in TEXT_EXTENSIONS:
-            continue
-        try:
-            if path.stat().st_size > MAX_UNTRACKED_BYTES:
+    for raw in paths:
+        for rel_path in _expand_untracked_entries(raw):
+            rel_path = rel_path.replace("\\", "/")
+            if not _is_guarded_path(rel_path):
                 continue
-            text = path.read_text(encoding="utf-8", errors="ignore")
-        except Exception:
-            continue
-        all_lines = text.splitlines()
-        for line_no, line in enumerate(all_lines, start=1):
-            if _is_in_code_fence(all_lines, line_no):
+            path = PROJECT_ROOT / rel_path
+            if not path.exists():
                 continue
-            if _matches_completion(line, rel_path):
-                hits.append(
-                    MarkerHit(
-                        path=rel_path,
-                        line=f"L{line_no}: {line.strip()}",
-                        source="untracked",
+            if path.suffix.lower() not in TEXT_EXTENSIONS:
+                continue
+            try:
+                if path.stat().st_size > MAX_UNTRACKED_BYTES:
+                    continue
+                text = path.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                continue
+            all_lines = text.splitlines()
+            for line_no, line in enumerate(all_lines, start=1):
+                if _is_in_code_fence(all_lines, line_no):
+                    continue
+                if _matches_completion(line, rel_path):
+                    hits.append(
+                        MarkerHit(
+                            path=rel_path,
+                            line=f"L{line_no}: {line.strip()}",
+                            source="untracked",
+                        )
                     )
-                )
-                if len(hits) >= 20:
-                    return hits
+                    if len(hits) >= 20:
+                        return hits
     return hits
 
 

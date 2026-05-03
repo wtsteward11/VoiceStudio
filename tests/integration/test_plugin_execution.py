@@ -27,6 +27,10 @@ try:
 except ImportError:
     SOUNDFILE_AVAILABLE = False
 
+import importlib.util
+
+NOISEREDUCE_AVAILABLE = importlib.util.find_spec("noisereduce") is not None
+
 
 def _generate_test_wav(
     path: Path, duration: float = 1.0, sr: int = 22050, add_noise: bool = True
@@ -65,6 +69,7 @@ class TestNoiseReductionExecution:
     """Test the noise reduction plugin actually processes audio."""
 
     @pytest.mark.skipif(not SOUNDFILE_AVAILABLE, reason="soundfile not installed")
+    @pytest.mark.skipif(not NOISEREDUCE_AVAILABLE, reason="noisereduce not installed")
     @pytest.mark.asyncio
     async def test_process_reduces_noise(self, temp_audio_dir):
         from plugins.reference.noise_reduction.plugin import NoiseReductionPlugin
@@ -93,6 +98,7 @@ class TestNoiseReductionExecution:
         await plugin.deactivate()
 
     @pytest.mark.skipif(not SOUNDFILE_AVAILABLE, reason="soundfile not installed")
+    @pytest.mark.skipif(not NOISEREDUCE_AVAILABLE, reason="noisereduce not installed")
     @pytest.mark.asyncio
     async def test_process_preserves_tone(self, temp_audio_dir):
         from plugins.reference.noise_reduction.plugin import NoiseReductionPlugin

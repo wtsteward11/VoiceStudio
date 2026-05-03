@@ -20,12 +20,14 @@ try:
     NOISEREDUCE_AVAILABLE = True
 except ImportError:
     NOISEREDUCE_AVAILABLE = False
+    nr = None
 
 try:
     import soundfile as sf
     SOUNDFILE_AVAILABLE = True
 except ImportError:
     SOUNDFILE_AVAILABLE = False
+    sf = None
 
 
 class NoiseReductionPlugin:
@@ -72,6 +74,11 @@ class NoiseReductionPlugin:
         audio_path = Path(input_data["audio_path"])
         if not audio_path.exists():
             return {"error": f"Input file not found: {audio_path}"}
+
+        if not NOISEREDUCE_AVAILABLE:
+            return {"error": "noisereduce library not installed"}
+        if not SOUNDFILE_AVAILABLE or sf is None:
+            return {"error": "soundfile library not installed"}
 
         audio_data, sample_rate = sf.read(str(audio_path))
 

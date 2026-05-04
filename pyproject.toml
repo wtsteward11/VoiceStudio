@@ -39,7 +39,7 @@ dependencies = [
     "httpx>=0.26.0",
     "numpy>=1.24.0",
     "scipy>=1.11.0",
-    "soundfile>=0.12.0",
+    "soundfile>=0.13.1",
     "librosa>=0.10.0",
     "psutil>=5.9.0",
 ]
@@ -101,7 +101,7 @@ extras = [
     "asyncpg>=0.29.0",
 ]
 engines = [
-    "torch>=2.1.0",
+    "torch>=2.11.0",
     "TTS>=0.22.0",
     "transformers>=4.36.0",
 ]

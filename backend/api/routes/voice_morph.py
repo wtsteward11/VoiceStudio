@@ -243,7 +243,7 @@ async def apply_morph(request: MorphApplyRequest, http_request: Request):
                 # Get approximate duration of source audio for synthesis
                 len(source_audio) / sample_rate
 
-                # Synthesize with target voice (using placeholder text)
+                # Synthesize with target voice (using neutral sample text)
                 # In production, this would use voice conversion instead
                 synth_req = VoiceSynthesizeRequest(
                     profile_id=target_voice.voice_profile_id,
@@ -881,7 +881,7 @@ async def get_voice_embedding(request: VoiceEmbeddingRequest):
         except HTTPException:
             raise
 
-        # If all extraction methods failed, return error instead of placeholder
+        # If all extraction methods failed, return error instead of fallback data
         logger.error(
             f"All voice embedding extraction methods failed for profile "
             f"{request.voice_profile_id}. Reference audio may be missing or invalid."

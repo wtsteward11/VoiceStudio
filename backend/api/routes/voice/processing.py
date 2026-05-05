@@ -692,6 +692,7 @@ async def post_process_pipeline(
                     import cv2
                     import numpy as np
 
+                    # VideoWriter_fourcc exists at runtime; OpenCV stubs omit it.
                     _fourcc_fn = cast(
                         Callable[..., int], cv2.VideoWriter_fourcc
                     )

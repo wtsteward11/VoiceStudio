@@ -694,7 +694,7 @@ async def post_process_pipeline(
 
                     # VideoWriter_fourcc exists at runtime; OpenCV stubs omit it.
                     _fourcc_fn = cast(
-                        Callable[..., int], cv2.VideoWriter_fourcc
+                        Callable[..., int], getattr(cv2, "VideoWriter_fourcc")
                     )
                     processed_video_path = video_path
                     stages_applied = []

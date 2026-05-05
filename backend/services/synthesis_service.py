@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 
 from backend.core.exceptions import ServiceError
 from backend.services.audio_artifacts.use_cases import (
@@ -365,7 +366,9 @@ class SynthesisService:
                     audio_id = f"synth_{req.profile_id}_{uuid.uuid4().hex[:8]}"
                     sample_rate = 22050
                     n_samples = int(sample_rate * 0.25)
-                    silence = np.zeros(n_samples, dtype=np.float32)
+                    silence: npt.NDArray[np.float32] = np.zeros(
+                        n_samples, dtype=np.float32
+                    )
                     create_audio_artifact_from_wav_array(
                         silence,
                         sample_rate,

@@ -58,7 +58,7 @@ async def setup_job_tables(db_path: str) -> None:
 
 
 async def setup_training_tables(db_path: str) -> None:
-    """Create training job tables for testing."""
+    """Create training job tables for testing (aligned with v001_core_persistence_tables)."""
     async with aiosqlite.connect(db_path) as conn:
         await conn.execute(
             """
@@ -77,13 +77,14 @@ async def setup_training_tables(db_path: str) -> None:
                 loss REAL,
                 validation_loss REAL,
                 best_loss REAL,
-                logs TEXT DEFAULT '[]',
-                quality_history TEXT DEFAULT '[]',
+                metrics TEXT,
+                hyperparameters TEXT,
+                checkpoints TEXT,
                 error TEXT,
-                metadata TEXT DEFAULT '{}',
-                profile_id TEXT,
-                created_at TEXT DEFAULT (datetime('now')),
-                updated_at TEXT DEFAULT (datetime('now')),
+                output_path TEXT,
+                user_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
                 started_at TEXT,
                 completed_at TEXT,
                 deleted_at TEXT
@@ -91,35 +92,39 @@ async def setup_training_tables(db_path: str) -> None:
         """
         )
         await conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_training_jobs_profile ON training_jobs(profile_id)"
+            "CREATE INDEX IF NOT EXISTS idx_training_jobs_status ON training_jobs(status)"
         )
         await conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_training_jobs_status ON training_jobs(status)"
+            "CREATE INDEX IF NOT EXISTS idx_training_jobs_dataset ON training_jobs(dataset_id)"
         )
         await conn.commit()
 
 
 async def setup_session_tables(db_path: str) -> None:
-    """Create session tables for testing."""
+    """Create session tables for testing (aligned with v001_core_persistence_tables)."""
     async with aiosqlite.connect(db_path) as conn:
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
-                user_id TEXT,
-                token TEXT,
+                user_id TEXT NOT NULL,
+                token_hash TEXT NOT NULL,
+                device_info TEXT,
+                ip_address TEXT,
+                user_agent TEXT,
                 is_active INTEGER DEFAULT 1,
-                data TEXT DEFAULT '{}',
                 last_activity TEXT,
-                expires_at TEXT,
-                created_at TEXT DEFAULT (datetime('now')),
-                updated_at TEXT DEFAULT (datetime('now')),
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
                 deleted_at TEXT
             )
         """
         )
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)")
-        await conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)")
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token_hash)"
+        )
         await conn.commit()
 
 
@@ -326,17 +331,18 @@ class TestTrainingJobRepository(AsyncIntegrationTestBase):
         job_id = str(uuid.uuid4())
         entity = TrainingJobEntity(
             id=job_id,
-            profile_id="profile-001",
-            model_type="xtts_v2",
-            status="queued",
-            epochs_completed=0,
+            dataset_id="dataset-001",
+            model_name="xtts_v2",
+            engine_id="xtts_v2",
+            status="pending",
+            current_epoch=0,
             total_epochs=100,
         )
 
         result = await training_repo.create(entity)
         assert result is not None
         assert result.id == job_id
-        assert result.model_type == "xtts_v2"
+        assert result.model_name == "xtts_v2"
 
     @integration
     @pytest.mark.asyncio
@@ -347,10 +353,11 @@ class TestTrainingJobRepository(AsyncIntegrationTestBase):
         job_id = str(uuid.uuid4())
         entity = TrainingJobEntity(
             id=job_id,
-            profile_id="profile-001",
-            model_type="rvc",
-            status="training",
-            epochs_completed=0,
+            dataset_id="dataset-001",
+            model_name="rvc",
+            engine_id="rvc",
+            status="running",
+            current_epoch=0,
             total_epochs=50,
         )
         await training_repo.create(entity)
@@ -359,13 +366,13 @@ class TestTrainingJobRepository(AsyncIntegrationTestBase):
         updated = await training_repo.update(
             job_id,
             {
-                "epochs_completed": 25,
+                "current_epoch": 25,
                 "loss": 0.05,
             },
         )
 
         assert updated is not None
-        assert updated.epochs_completed == 25
+        assert updated.current_epoch == 25
 
     @integration
     @pytest.mark.asyncio
@@ -373,35 +380,37 @@ class TestTrainingJobRepository(AsyncIntegrationTestBase):
         """Test finding training jobs by profile ID."""
         from backend.data.repositories.training_repository import TrainingJobEntity
 
-        profile_id = "profile-test"
+        dataset_id = "dataset-profile-test"
 
-        # Create jobs for this profile
+        # Create jobs for this dataset (surrogate for prior profile_id grouping)
         for _i in range(3):
             entity = TrainingJobEntity(
                 id=str(uuid.uuid4()),
-                profile_id=profile_id,
-                model_type="xtts_v2",
+                dataset_id=dataset_id,
+                model_name="xtts_v2",
+                engine_id="xtts_v2",
                 status="completed",
-                epochs_completed=100,
+                current_epoch=100,
                 total_epochs=100,
             )
             await training_repo.create(entity)
 
-        # Create jobs for another profile
+        # Create jobs for another dataset
         other_entity = TrainingJobEntity(
             id=str(uuid.uuid4()),
-            profile_id="other-profile",
-            model_type="rvc",
+            dataset_id="other-dataset",
+            model_name="rvc",
+            engine_id="rvc",
             status="completed",
-            epochs_completed=50,
+            current_epoch=50,
             total_epochs=50,
         )
         await training_repo.create(other_entity)
 
-        # Find by profile
-        jobs = await training_repo.find({"profile_id": profile_id})
+        # Find by dataset
+        jobs = await training_repo.find({"dataset_id": dataset_id})
         assert len(jobs) == 3
-        assert all(j.profile_id == profile_id for j in jobs)
+        assert all(j.dataset_id == dataset_id for j in jobs)
 
     @integration
     @pytest.mark.asyncio
@@ -412,10 +421,11 @@ class TestTrainingJobRepository(AsyncIntegrationTestBase):
         # Create active job
         active_entity = TrainingJobEntity(
             id=str(uuid.uuid4()),
-            profile_id="profile-001",
-            model_type="xtts_v2",
-            status="training",
-            epochs_completed=10,
+            dataset_id="dataset-001",
+            model_name="xtts_v2",
+            engine_id="xtts_v2",
+            status="running",
+            current_epoch=10,
             total_epochs=100,
         )
         await training_repo.create(active_entity)
@@ -423,17 +433,18 @@ class TestTrainingJobRepository(AsyncIntegrationTestBase):
         # Create completed job
         completed_entity = TrainingJobEntity(
             id=str(uuid.uuid4()),
-            profile_id="profile-002",
-            model_type="rvc",
+            dataset_id="dataset-002",
+            model_name="rvc",
+            engine_id="rvc",
             status="completed",
-            epochs_completed=50,
+            current_epoch=50,
             total_epochs=50,
         )
         await training_repo.create(completed_entity)
 
-        active = await training_repo.find({"status": "training"})
+        active = await training_repo.find({"status": "running"})
         assert len(active) == 1
-        assert active[0].status == "training"
+        assert active[0].status == "running"
 
 
 # =============================================================================
@@ -476,7 +487,8 @@ class TestSessionRepository(AsyncIntegrationTestBase):
         entity = SessionEntity(
             id=session_id,
             user_id="user-001",
-            project_id="project-001",
+            token_hash="token-hash-create",
+            expires_at=(datetime.utcnow() + timedelta(days=1)).isoformat(),
         )
 
         result = await session_repo.create(entity)
@@ -493,7 +505,8 @@ class TestSessionRepository(AsyncIntegrationTestBase):
         entity = SessionEntity(
             id=session_id,
             user_id="user-001",
-            project_id="project-001",
+            token_hash="token-hash-get",
+            expires_at=(datetime.utcnow() + timedelta(days=1)).isoformat(),
         )
         await session_repo.create(entity)
 
@@ -504,18 +517,20 @@ class TestSessionRepository(AsyncIntegrationTestBase):
     @integration
     @pytest.mark.asyncio
     async def test_update_session_activity(self, session_repo):
-        """Test updating session last_active timestamp."""
+        """Test updating session last_activity timestamp."""
         from backend.data.repositories.session_repository import SessionEntity
 
         session_id = str(uuid.uuid4())
         original_time = datetime.utcnow() - timedelta(hours=1)
+        original_iso = original_time.isoformat()
 
         entity = SessionEntity(
             id=session_id,
             user_id="user-001",
-            project_id="project-001",
+            token_hash="token-hash-activity",
+            expires_at=(datetime.utcnow() + timedelta(days=1)).isoformat(),
             created_at=original_time,
-            last_active=original_time,
+            last_activity=original_iso,
         )
         await session_repo.create(entity)
 
@@ -523,13 +538,13 @@ class TestSessionRepository(AsyncIntegrationTestBase):
         updated = await session_repo.update(
             session_id,
             {
-                "last_active": new_time,
+                "last_activity": new_time.isoformat(),
             },
         )
 
         assert updated is not None
         # The updated timestamp should be newer
-        assert updated.last_active != original_time
+        assert updated.last_activity != original_iso
 
     @integration
     @pytest.mark.asyncio
@@ -543,7 +558,8 @@ class TestSessionRepository(AsyncIntegrationTestBase):
             entity = SessionEntity(
                 id=str(uuid.uuid4()),
                 user_id=f"user-{i}",
-                project_id="project-001",
+                token_hash=f"token-hash-list-{i}",
+                expires_at=(datetime.utcnow() + timedelta(days=1)).isoformat(),
             )
             await session_repo.create(entity)
 
@@ -561,7 +577,8 @@ class TestSessionRepository(AsyncIntegrationTestBase):
         entity = SessionEntity(
             id=session_id,
             user_id="user-001",
-            project_id="project-001",
+            token_hash="token-hash-delete",
+            expires_at=(datetime.utcnow() + timedelta(days=1)).isoformat(),
         )
         await session_repo.create(entity)
 
@@ -639,10 +656,11 @@ class TestRepositoryIntegration(AsyncIntegrationTestBase):
         training_id = str(uuid.uuid4())
         training_entity = TrainingJobEntity(
             id=training_id,
-            profile_id="profile-001",
-            model_type="xtts_v2",
-            status="queued",
-            epochs_completed=0,
+            dataset_id="dataset-001",
+            model_name="xtts_v2",
+            engine_id="xtts_v2",
+            status="pending",
+            current_epoch=0,
             total_epochs=100,
         )
         await repositories["training"].create(training_entity)
@@ -651,7 +669,8 @@ class TestRepositoryIntegration(AsyncIntegrationTestBase):
         session_entity = SessionEntity(
             id=session_id,
             user_id="user-001",
-            project_id="project-001",
+            token_hash="token-hash-cross",
+            expires_at=(datetime.utcnow() + timedelta(days=1)).isoformat(),
         )
         await repositories["session"].create(session_entity)
 
